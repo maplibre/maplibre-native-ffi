@@ -383,10 +383,14 @@ def test_a_frame_view_holds_its_owners_until_its_scope_ends(
         def inspect(view: object) -> int:
             # The view reserves the frame and each owner above it, so the
             # binding refuses to release them before native sees the call.
-            for release in (frame.close, target.session.abandon):
+            for release, owner in (
+                (frame.close, "AcquiredFrameHandle"),
+                (target.session.abandon, "RenderSessionHandle"),
+            ):
                 with pytest.raises(mln.InvalidStateError) as raised:
                     release()
                 assert raised.value.native_status_code is None
+                assert raised.value.diagnostic == f"{owner} is in use"
             return _texture_name(backend, view)
 
         assert target.with_texture(frame, inspect) != 0

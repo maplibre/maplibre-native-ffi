@@ -25,6 +25,7 @@ test "copied handles share one close and close twice safely" {
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.mapSnapshotGet(map_copy, &diagnostic));
     try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try testing.expectEqualStrings("Map is closed", diagnostic.message());
 
     try support.closeRuntimeHandle(runtime_copy);
     fixture.runtime_open = false;

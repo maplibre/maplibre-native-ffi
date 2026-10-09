@@ -2,6 +2,7 @@ const std = @import("std");
 const status = @import("status.zig");
 const callback = @import("callback.zig");
 const sync = @import("sync.zig");
+const Diagnostic = @import("diagnostics.zig").Diagnostic;
 const allocator = std.heap.smp_allocator;
 
 pub const Anchor = struct {
@@ -54,10 +55,31 @@ const State = struct {
     }
 };
 
+/// The public type name for the native handle type `native`: `mln_map`
+/// becomes `Map`.
+fn publicName(comptime native: []const u8) []const u8 {
+    comptime {
+        const words = if (std.mem.startsWith(u8, native, "mln_")) native["mln_".len..] else native;
+        var result: []const u8 = "";
+        var upper = true;
+        for (words) |char| {
+            if (char == '_') {
+                upper = true;
+            } else {
+                result = result ++ .{if (upper) std.ascii.toUpper(char) else char};
+                upper = false;
+            }
+        }
+        return result;
+    }
+}
+
 pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) status.Error!void) type {
     return struct {
         const Self = @This();
         pub const native_name = name;
+        /// The public type name that lifecycle errors name.
+        pub const type_name = publicName(name);
         var mutex: std.Io.Mutex = .init;
         var registry: std.AutoHashMapUnmanaged(u64, *State) = .empty;
         raw: u64,
@@ -67,6 +89,14 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
         }
         fn unlock() void {
             std.Io.Threaded.mutexUnlock(&mutex);
+        }
+
+        /// Records that this handle is `state` (closed, closing, or in use)
+        /// and returns the invalid-state error, which carries no native
+        /// status.
+        fn unavailable(diagnostic: ?*Diagnostic, comptime state: []const u8) status.Error {
+            status.record(diagnostic, null, type_name ++ " " ++ state);
+            return error.InvalidState;
         }
 
         pub fn adopt(raw: u64, parent: ?Anchor) status.Error!Self {
@@ -107,11 +137,12 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             if (!accepted) state.release() else if (release) state.finalize();
             return accepted;
         }
-        pub fn beginComplete(self: Self) status.Error!Lease {
+        pub fn beginComplete(self: Self, diagnostic: ?*Diagnostic) status.Error!Lease {
             lock();
             defer unlock();
-            const state = registry.get(self.raw) orelse return error.InvalidState;
-            if (state.closing or state.completing) return error.InvalidState;
+            const state = registry.get(self.raw) orelse return unavailable(diagnostic, "is closed");
+            if (state.closing) return unavailable(diagnostic, "is closing");
+            if (state.completing) return unavailable(diagnostic, "is in use");
             if (state.completed) return error.AlreadyCompleted;
             state.completing = true;
             state.retain();
@@ -148,20 +179,20 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             }
         };
 
-        pub fn lease(self: Self) status.Error!Lease {
+        pub fn lease(self: Self, diagnostic: ?*Diagnostic) status.Error!Lease {
             lock();
             defer unlock();
-            const state = registry.get(self.raw) orelse return error.InvalidState;
-            if (state.closing) return error.InvalidState;
+            const state = registry.get(self.raw) orelse return unavailable(diagnostic, "is closed");
+            if (state.closing) return unavailable(diagnostic, "is closing");
             state.retain();
             return .{ .state = state, .native = self.raw };
         }
 
-        pub fn borrow(self: Self) status.Error!Lease {
+        pub fn borrow(self: Self, diagnostic: ?*Diagnostic) status.Error!Lease {
             lock();
             defer unlock();
-            const state = registry.get(self.raw) orelse return error.InvalidState;
-            if (state.closing) return error.InvalidState;
+            const state = registry.get(self.raw) orelse return unavailable(diagnostic, "is closed");
+            if (state.closing) return unavailable(diagnostic, "is closing");
             state.readers += 1;
             state.retain();
             return .{ .state = state, .native = self.raw, .reserved = true };
@@ -190,13 +221,13 @@ pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) statu
             }
         };
 
-        pub fn beginClose(self: Self) status.Error!?Close {
+        pub fn beginClose(self: Self, diagnostic: ?*Diagnostic) status.Error!?Close {
             lock();
             defer unlock();
             const state = registry.get(self.raw) orelse return null;
             if (state.release_requested) return null;
-            if (state.closing) return error.InvalidState;
-            if (state.readers != 0) return error.ActiveBorrow;
+            if (state.closing) return unavailable(diagnostic, "is closing");
+            if (state.readers != 0) return unavailable(diagnostic, "is in use");
             state.closing = true;
             return .{ .state = state, .native = self.raw, .deferred = state.decision_pending or state.completing };
         }
@@ -236,15 +267,19 @@ test "copied owners defer disposal through borrowed copies exactly once" {
             disposals += 1;
         }
     };
-    const Owner = Handle("borrowed-owner-test", Probe.dispose);
+    const Owner = Handle("mln_borrowed_owner_test", Probe.dispose);
     Probe.disposals = 0;
     var value = try Owner.adopt(71, null);
     const copy = value;
-    const ordinary = try value.lease();
-    const borrowed = try value.borrow();
-    try std.testing.expectError(error.ActiveBorrow, copy.beginClose());
+    const ordinary = try value.lease(null);
+    const borrowed = try value.borrow(null);
+    var diagnostic: Diagnostic = .{};
+    try std.testing.expectError(error.InvalidState, copy.beginClose(&diagnostic));
+    try std.testing.expectEqualStrings("BorrowedOwnerTest is in use", diagnostic.message());
+    try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
     value.deinit();
-    try std.testing.expectError(error.InvalidState, copy.lease());
+    try std.testing.expectError(error.InvalidState, copy.lease(&diagnostic));
+    try std.testing.expectEqualStrings("BorrowedOwnerTest is closed", diagnostic.message());
     try std.testing.expectEqual(@as(usize, 0), Probe.disposals);
     borrowed.release();
     ordinary.release();
@@ -260,29 +295,33 @@ test "rejected close restores owner and accepted provider actions force ownershi
             disposals += 1;
         }
     };
-    const Owner = Handle("provider-owner-test", Probe.dispose);
+    const Owner = Handle("mln_provider_owner_test", Probe.dispose);
     Probe.disposals = 0;
     var value = try Owner.adopt(81, null);
-    const closing = (try value.beginClose()).?;
-    try std.testing.expectError(error.InvalidState, value.beginClose());
+    const closing = (try value.beginClose(null)).?;
+    var diagnostic: Diagnostic = .{};
+    try std.testing.expectError(error.InvalidState, value.beginClose(&diagnostic));
+    try std.testing.expectEqualStrings("ProviderOwnerTest is closing", diagnostic.message());
+    try std.testing.expectError(error.InvalidState, value.lease(&diagnostic));
+    try std.testing.expectEqualStrings("ProviderOwnerTest is closing", diagnostic.message());
     closing.rollback();
-    (try value.lease()).release();
+    (try value.lease(null)).release();
     value.deinit();
     var request = try Owner.beginDecision(82);
-    const rejected = try request.beginComplete();
+    const rejected = try request.beginComplete(null);
     rejected.finishComplete(false);
     try std.testing.expect(!request.finishDecision(false));
     try std.testing.expectEqual(@as(usize, 1), Probe.disposals);
     request = try Owner.beginDecision(83);
-    const accepted = try request.beginComplete();
+    const accepted = try request.beginComplete(null);
     accepted.finishComplete(true);
     try std.testing.expect(request.finishDecision(false));
     request.deinit();
     request = try Owner.beginDecision(84);
-    const inline_close = (try request.beginClose()).?;
+    const inline_close = (try request.beginClose(null)).?;
     try std.testing.expect(inline_close.deferred);
     inline_close.commit();
-    try std.testing.expect((try request.beginClose()) == null);
+    try std.testing.expect((try request.beginClose(null)) == null);
     try std.testing.expect(request.finishDecision(false));
     try std.testing.expectEqual(@as(usize, 3), Probe.disposals);
 }
@@ -308,13 +347,13 @@ const ThreadProbe = struct {
 
 test "a borrow on another thread holds off disposal until it ends" {
     ThreadProbe.reset();
-    const Owner = Handle("threaded-borrow-test", ThreadProbe.dispose);
+    const Owner = Handle("mln_threaded_borrow_test", ThreadProbe.dispose);
     var value = try Owner.adopt(91, null);
     var borrowed: sync.Latch = .{};
     var finish: sync.Latch = .{};
     const Borrower = struct {
         fn run(owner: Owner, entered: *sync.Latch, done: *sync.Latch) void {
-            const lease = owner.borrow() catch return entered.set();
+            const lease = owner.borrow(null) catch return entered.set();
             entered.set();
             done.wait();
             lease.release();
@@ -322,7 +361,7 @@ test "a borrow on another thread holds off disposal until it ends" {
     };
     const thread = try std.Thread.spawn(.{}, Borrower.run, .{ value, &borrowed, &finish });
     borrowed.wait();
-    try std.testing.expectError(error.ActiveBorrow, value.beginClose());
+    try std.testing.expectError(error.InvalidState, value.beginClose(null));
     value.deinit();
     try std.testing.expectEqual(@as(usize, 0), ThreadProbe.disposals.load(.acquire));
     finish.set();
@@ -340,7 +379,7 @@ test "a borrow on another thread holds off disposal until it ends" {
 // rather than a leak, and there is no leak for the binding to report.
 test "an owner abandoned inside a callback scope disposes off the callback stack" {
     ThreadProbe.reset();
-    const Owner = Handle("finalizer-owner-test", ThreadProbe.dispose);
+    const Owner = Handle("mln_finalizer_owner_test", ThreadProbe.dispose);
     var inline_value = try Owner.adopt(101, null);
     inline_value.deinit();
     try std.testing.expectEqual(std.Thread.getCurrentId(), ThreadProbe.thread.load(.acquire));

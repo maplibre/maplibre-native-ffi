@@ -4277,7 +4277,7 @@ func (view WebgpuOwnedTextureFrameView) Format() (uint32, error) {
 type AcquiredFrameHandle struct{ *bindingOwner }
 
 func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
-	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_acquired_frame_dispose(C.mln_acquired_frame(raw), nil) })}
+	owner := &AcquiredFrameHandle{bindingAdopt(raw, parent, "AcquiredFrameHandle", func(raw uint64) { C.mln_acquired_frame_dispose(C.mln_acquired_frame(raw), nil) })}
 	return owner
 }
 
@@ -4292,7 +4292,7 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 type BufferHandle struct{ *bindingOwner }
 
 func adoptBufferHandle(raw uint64, parent any) *BufferHandle {
-	owner := &BufferHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_buffer_destroy(C.mln_buffer(raw)) })}
+	owner := &BufferHandle{bindingAdopt(raw, parent, "BufferHandle", func(raw uint64) { C.mln_buffer_destroy(C.mln_buffer(raw)) })}
 	return owner
 }
 
@@ -4307,7 +4307,7 @@ func (handle *BufferHandle) owner() *bindingOwner {
 type EventBatchHandle struct{ *bindingOwner }
 
 func adoptEventBatchHandle(raw uint64, parent any) *EventBatchHandle {
-	owner := &EventBatchHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_event_batch_release(C.mln_event_batch(raw)) })}
+	owner := &EventBatchHandle{bindingAdopt(raw, parent, "EventBatchHandle", func(raw uint64) { C.mln_event_batch_release(C.mln_event_batch(raw)) })}
 	return owner
 }
 
@@ -4322,7 +4322,7 @@ func (handle *EventBatchHandle) owner() *bindingOwner {
 type GeojsonSourceDataHandle struct{ *bindingOwner }
 
 func adoptGeojsonSourceDataHandle(raw uint64, parent any) *GeojsonSourceDataHandle {
-	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw)) })}
+	owner := &GeojsonSourceDataHandle{bindingAdopt(raw, parent, "GeojsonSourceDataHandle", func(raw uint64) { C.mln_geojson_source_data_destroy(C.mln_geojson_source_data(raw)) })}
 	return owner
 }
 
@@ -4337,7 +4337,7 @@ func (handle *GeojsonSourceDataHandle) owner() *bindingOwner {
 type MapHandle struct{ *bindingOwner }
 
 func adoptMapHandle(raw uint64, parent any) *MapHandle {
-	owner := &MapHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_map_dispose(C.mln_map(raw), nil) })}
+	owner := &MapHandle{bindingAdopt(raw, parent, "MapHandle", func(raw uint64) { C.mln_map_dispose(C.mln_map(raw), nil) })}
 	return owner
 }
 
@@ -4352,7 +4352,7 @@ func (handle *MapHandle) owner() *bindingOwner {
 type MapProjectionHandle struct{ *bindingOwner }
 
 func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
-	owner := &MapProjectionHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_map_projection_close(C.mln_map_projection(raw), nil) })}
+	owner := &MapProjectionHandle{bindingAdopt(raw, parent, "MapProjectionHandle", func(raw uint64) { C.mln_map_projection_close(C.mln_map_projection(raw), nil) })}
 	return owner
 }
 
@@ -4367,7 +4367,7 @@ func (handle *MapProjectionHandle) owner() *bindingOwner {
 type RenderFrameBatchHandle struct{ *bindingOwner }
 
 func adoptRenderFrameBatchHandle(raw uint64, parent any) *RenderFrameBatchHandle {
-	owner := &RenderFrameBatchHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw)) })}
+	owner := &RenderFrameBatchHandle{bindingAdopt(raw, parent, "RenderFrameBatchHandle", func(raw uint64) { C.mln_render_frame_batch_release(C.mln_render_frame_batch(raw)) })}
 	return owner
 }
 
@@ -4382,7 +4382,7 @@ func (handle *RenderFrameBatchHandle) owner() *bindingOwner {
 type RenderSessionHandle struct{ *bindingOwner }
 
 func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
-	owner := &RenderSessionHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil) })}
+	owner := &RenderSessionHandle{bindingAdopt(raw, parent, "RenderSessionHandle", func(raw uint64) { C.mln_render_session_dispose(C.mln_render_session(raw), nil) })}
 	return owner
 }
 
@@ -4397,7 +4397,7 @@ func (handle *RenderSessionHandle) owner() *bindingOwner {
 type ResourceRequestHandle struct{ *bindingOwner }
 
 func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
-	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request_handle(raw)) })}
+	owner := &ResourceRequestHandle{bindingAdopt(raw, parent, "ResourceRequestHandle", func(raw uint64) { C.mln_resource_request_release(C.mln_resource_request_handle(raw)) })}
 	return owner
 }
 
@@ -4412,7 +4412,7 @@ func (handle *ResourceRequestHandle) owner() *bindingOwner {
 type RuntimeHandle struct{ *bindingOwner }
 
 func adoptRuntimeHandle(raw uint64, parent any) *RuntimeHandle {
-	owner := &RuntimeHandle{bindingAdopt(raw, parent, func(raw uint64) { C.mln_runtime_dispose(C.mln_runtime(raw), nil) })}
+	owner := &RuntimeHandle{bindingAdopt(raw, parent, "RuntimeHandle", func(raw uint64) { C.mln_runtime_dispose(C.mln_runtime(raw), nil) })}
 	return owner
 }
 

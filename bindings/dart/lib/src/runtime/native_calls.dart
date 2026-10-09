@@ -190,10 +190,11 @@ final class _NativeRegistrations {
 }
 
 /// The borrowed-view scope of an owner, which native code holds open while a
-/// synchronous `withView` callback reads a view.
+/// synchronous `withView` callback reads a view. The view reads its owner, so
+/// the owner refuses to close until the callback returns.
 final class _NativeViewScope {
-  _NativeViewScope(this.handle, this.begin, this.end);
-  final NativeHandle Function() handle;
+  _NativeViewScope(this.owner, this.begin, this.end);
+  final NativeHandleState<NativeHandle> owner;
   final int Function(int, Pointer<Pointer<Void>>, Pointer<raw.mln_diagnostic>)
   begin;
   final void Function(Pointer<Void>) end;
@@ -213,21 +214,23 @@ final class _NativeViewScope {
     return value;
   }
 
-  T use<T>(T Function() callback) => withNativeArena((arena) {
-    final token = arena<Pointer<Void>>();
-    _check(begin(handle().raw, token, nativeDiagnostic));
-    _active++;
-    try {
-      final result = callback();
-      if (result is Future) {
-        throwInvalidArgument('withView callback must complete synchronously');
+  T use<T>(T Function() callback) => owner.read(
+    (handle) => withNativeArena((arena) {
+      final token = arena<Pointer<Void>>();
+      _check(begin(handle.raw, token, nativeDiagnostic));
+      _active++;
+      try {
+        final result = callback();
+        if (result is Future) {
+          throwInvalidArgument('withView callback must complete synchronously');
+        }
+        return result;
+      } finally {
+        _active--;
+        end(token.value);
       }
-      return result;
-    } finally {
-      _active--;
-      end(token.value);
-    }
-  });
+    }),
+  );
 }
 
 /// Checks that an integer fits its native field before it is stored.

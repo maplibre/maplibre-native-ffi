@@ -74,10 +74,10 @@ void main() {
     handle.close();
     handle.waitUntilRetired();
     handle.close();
-    expect(handle.cancelled, throwsA(isA<InvalidArgumentException>()));
+    expect(handle.cancelled, throwsA(isA<InvalidStateException>()));
     expect(
       () => handle.complete(emptyStyleResponse),
-      throwsA(isA<InvalidArgumentException>()),
+      throwsA(isA<InvalidStateException>()),
     );
   });
 

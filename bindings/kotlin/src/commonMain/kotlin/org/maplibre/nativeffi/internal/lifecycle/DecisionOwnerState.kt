@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import org.maplibre.nativeffi.internal.callback.CallbackAdmission
+import org.maplibre.nativeffi.internal.status.Status
 
 /**
  * The owner state behind a handle that a native callback issues and then decides about.
@@ -21,6 +22,10 @@ internal class DecisionOwnerState(
    * hold it without keeping reachable an owner that its own cancel callback captures.
    */
   val core: DecisionOwnerCore = DecisionOwnerCore(typeName, ReleaseNative(handle, dispose))
+
+  init {
+    Status.requireArgument(handle != 0L) { "$typeName handle must not be zero" }
+  }
 
   /** Whether close or completion has marked the owner, even while borrows still drain. */
   val isClosed: Boolean

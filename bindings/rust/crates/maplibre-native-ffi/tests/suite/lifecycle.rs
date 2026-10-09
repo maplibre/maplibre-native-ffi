@@ -38,8 +38,9 @@ fn closing_a_handle_twice_does_nothing() {
     projection.close().unwrap();
     assert!(projection.is_closed());
     let error = projection.get_camera().unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert_eq!(error.kind(), ErrorKind::InvalidState);
     assert_eq!(error.raw_status(), None);
+    assert_eq!(error.diagnostic(), "MapProjectionHandle is closed");
 
     // A release that completes asynchronously does the same: the second one
     // resolves at once.

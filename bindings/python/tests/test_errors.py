@@ -50,4 +50,4 @@ def test_a_binding_failure_carries_no_native_status() -> None:
 
     assert raised.value.status == mln.Status.INVALID_STATE
     assert raised.value.native_status_code is None
-    assert raised.value.diagnostic == "handle is closed"
+    assert raised.value.diagnostic == "RuntimeHandle is closed"

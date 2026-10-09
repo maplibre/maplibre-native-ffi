@@ -214,7 +214,9 @@ func bindingArenaString(pointer unsafe.Pointer, size, offset, count uint64) stri
 }
 
 type bindingState struct {
-	mu             sync.Mutex
+	mu sync.Mutex
+	// typeName is the public handle type that lifecycle errors name.
+	typeName       string
 	raw            uint64
 	issued         uint64
 	readers        int
@@ -239,9 +241,9 @@ func (owner *bindingOwner) bindingAcquire(read bool) (uint64, func()) {
 	}
 	state := owner.state
 	state.mu.Lock()
-	if state.raw == 0 || state.closing {
+	if err := state.unavailable(); err != nil {
 		state.mu.Unlock()
-		panic(bindingFailure{newBindingError(ErrInvalidState, "handle is closed")})
+		panic(bindingFailure{err})
 	}
 	raw := state.raw
 	if read {
@@ -267,11 +269,23 @@ func (owner *bindingOwner) IsClosed() bool {
 	return owner.state.raw == 0
 }
 
-func bindingAdopt(raw uint64, parent any, dispose func(uint64)) *bindingOwner {
-	if raw == 0 {
-		panic(bindingFailure{newBindingError(ErrNative, "native returned a null owner")})
+// unavailable returns the lifecycle error for a closed or closing handle, or
+// nil for a live one. The caller holds state.mu.
+func (state *bindingState) unavailable() *Error {
+	switch {
+	case state.closing:
+		return newBindingError(ErrInvalidState, state.typeName+" is closing")
+	case state.raw == 0:
+		return newBindingError(ErrInvalidState, state.typeName+" is closed")
 	}
-	state := &bindingState{raw: raw, issued: raw, dispose: dispose}
+	return nil
+}
+
+func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64)) *bindingOwner {
+	if raw == 0 {
+		panic(bindingFailure{newBindingError(ErrNative, "native returned a null "+typeName)})
+	}
+	state := &bindingState{typeName: typeName, raw: raw, issued: raw, dispose: dispose}
 	owner := &bindingOwner{state: state, parent: parent, roots: make(map[cgo.Handle]*bindingCallbackTicket)}
 	runtime.AddCleanup(owner, func(state *bindingState) {
 		state.mu.Lock()
@@ -297,8 +311,11 @@ func (state *bindingState) reserveClose() (uint64, *bindingClose) {
 	}
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	if state.closing || state.readers != 0 {
-		panic(bindingFailure{newBindingError(ErrBusy, "handle has an active read or close")})
+	if state.closing {
+		panic(bindingFailure{newBindingError(ErrInvalidState, state.typeName+" is closing")})
+	}
+	if state.readers != 0 {
+		panic(bindingFailure{newBindingError(ErrInvalidState, state.typeName+" is in use")})
 	}
 	transaction := &bindingClose{state: state, raw: state.raw}
 	state.closing = true
@@ -482,9 +499,13 @@ func (state *bindingState) finishDecision(decision, accept, pass uint32) uint32 
 
 func (state *bindingState) reserveCompletion() (uint64, func(bool)) {
 	state.mu.Lock()
-	if state.raw == 0 || state.closing || state.completed || state.completing {
+	if err := state.unavailable(); err != nil {
 		state.mu.Unlock()
-		panic(bindingFailure{newBindingError(ErrInvalidState, "request is closed or completion is already accepted")})
+		panic(bindingFailure{err})
+	}
+	if state.completed || state.completing {
+		state.mu.Unlock()
+		panic(bindingFailure{newBindingError(ErrInvalidState, state.typeName+" completion is already accepted or in progress")})
 	}
 	state.completing = true
 	raw := state.raw

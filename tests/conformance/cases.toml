@@ -40,7 +40,7 @@
 "VAL-05" = "An array input is copied at submission, so changing it afterwards has no effect"
 
 # Views and rendering
-"VIEW-01" = "A borrowed view expires with its scope, and closing its owner while it is borrowed reports busy"
+"VIEW-01" = "A borrowed view expires with its scope, and its owner refuses to close while it is borrowed"
 "REND-01" = "An owned-texture session renders a frame the binding reads back as pixels, on each backend the build supports"
 "REND-02" = "A caller-driven session is serviced from a thread the language manages (event loop, coroutine, isolate)"
 

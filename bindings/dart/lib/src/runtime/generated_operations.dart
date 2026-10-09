@@ -6277,7 +6277,7 @@ final class RenderSessionAttachment {
 final class ScopedMetalOwnedTextureFrame {
   ScopedMetalOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
-        () => owner._handle,
+        owner._state,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
@@ -6306,7 +6306,7 @@ final class ScopedMetalOwnedTextureFrame {
 final class ScopedOpenglOwnedTextureFrame {
   ScopedOpenglOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
-        () => owner._handle,
+        owner._state,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
@@ -6329,7 +6329,7 @@ final class ScopedOpenglOwnedTextureFrame {
 final class ScopedGpuSync {
   ScopedGpuSync._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
-        () => owner._handle,
+        owner._state,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
@@ -6344,7 +6344,7 @@ final class ScopedGpuSync {
 final class ScopedVulkanOwnedTextureFrame {
   ScopedVulkanOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
-        () => owner._handle,
+        owner._state,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );
@@ -6371,7 +6371,7 @@ final class ScopedVulkanOwnedTextureFrame {
 final class ScopedWebgpuOwnedTextureFrame {
   ScopedWebgpuOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
-        () => owner._handle,
+        owner._state,
         raw.mln_adapter_acquired_frame_view_begin,
         raw.mln_adapter_acquired_frame_view_end,
       );

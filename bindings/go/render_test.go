@@ -247,8 +247,8 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 		if !errors.Is(result[0], ErrInvalidState) {
 			t.Errorf("view read from another thread = %v, want ErrInvalidState", result[0])
 		}
-		if !errors.Is(result[1], ErrBusy) {
-			t.Errorf("frame close during the view = %v, want ErrBusy", result[1])
+		if !errors.Is(result[1], ErrInvalidState) || result[1].Error() != "AcquiredFrameHandle is in use" {
+			t.Errorf("frame close during the view = %v, want ErrInvalidState for a frame in use", result[1])
 		}
 		return nil
 	})

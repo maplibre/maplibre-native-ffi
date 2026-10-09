@@ -90,7 +90,11 @@ public sealed class RenderTests
                     // while it is in scope.
                     var busy = Assert.Throws<MaplibreException>(() => session.Abandon());
                     Assert.Equal(MaplibreStatus.Busy, busy.Status);
-                    Assert.Throws<InvalidStateException>(() => frame.Release(GpuSync.Default));
+                    var inUse = Assert.Throws<InvalidStateException>(() =>
+                        frame.Release(GpuSync.Default)
+                    );
+                    Assert.Equal("AcquiredFrameHandle is in use", inUse.Diagnostic);
+                    Assert.Null(inUse.RawStatus);
                     escaped = width;
                 }
                 switch (backend)

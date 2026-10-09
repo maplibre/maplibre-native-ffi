@@ -20,8 +20,6 @@ pub const NativeStatusError = error{
 };
 
 pub const BindingError = NativeStatusError || error{
-    ClosedHandle,
-    ActiveBorrow,
     InvalidString,
     AbiVersionMismatch,
     AlreadyCompleted,
@@ -105,8 +103,6 @@ pub fn validateAbiVersionValue(
 
 fn bindingMessage(err: anyerror) []const u8 {
     return switch (err) {
-        error.ClosedHandle => "the handle is closed",
-        error.ActiveBorrow => "the handle has an active borrow",
         error.InvalidString => "the string contains a NUL byte",
         error.AlreadyCompleted => "the operation already completed",
         error.OutOfMemory => "out of memory",
@@ -196,9 +192,9 @@ test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     try std.testing.expectEqualStrings("", diagnostic.message());
     // A failure the binding detects records its own message only once, so the
     // first recorded cause wins.
-    fail(&diagnostic, error.ClosedHandle);
     fail(&diagnostic, error.InvalidString);
-    try std.testing.expectEqualStrings("the handle is closed", diagnostic.message());
+    fail(&diagnostic, error.AlreadyCompleted);
+    try std.testing.expectEqualStrings("the string contains a NUL byte", diagnostic.message());
 }
 
 test "ABI version validation reports mismatch diagnostics" {

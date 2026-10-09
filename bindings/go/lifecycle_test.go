@@ -20,8 +20,13 @@ func TestClosingTwiceIsSafe(t *testing.T) {
 	default:
 		t.Fatal("the second close submitted native work")
 	}
-	if _, err := f.m.Id(); !errors.Is(err, ErrInvalidState) {
-		t.Fatalf("Id() after close = %v, want ErrInvalidState", err)
+	_, err = f.m.Id()
+	var closed *Error
+	if !errors.As(err, &closed) || !errors.Is(err, ErrInvalidState) || closed.Diagnostic() != "MapHandle is closed" {
+		t.Fatalf("Id() after close = %v, want ErrInvalidState for a closed MapHandle", err)
+	}
+	if _, hasStatus := closed.RawStatus(); hasStatus {
+		t.Fatalf("Id() after close = %v, want no native status", err)
 	}
 	if _, err := f.m.SetStyleJson([]byte(emptyStyle)); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("SetStyleJson after close = %v, want ErrInvalidState", err)

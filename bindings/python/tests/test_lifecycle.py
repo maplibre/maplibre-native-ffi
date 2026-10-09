@@ -23,7 +23,7 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
         assert result(map_handle.close()) is None
         # Events drained after close still name the handle that sent them.
         assert map_handle.id == issued
-        with pytest.raises(mln.InvalidStateError, match="closed"):
+        with pytest.raises(mln.InvalidStateError, match="^MapHandle is closed$"):
             map_handle.snapshot_get()
     assert runtime.closed
     runtime.close()

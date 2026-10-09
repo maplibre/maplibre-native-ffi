@@ -4169,7 +4169,7 @@ pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame
     status.begin(diagnostic);
     errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_metal_texture", handle.raw);
-    const lease = try handle.lease();
+    const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
     try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
@@ -4184,7 +4184,7 @@ pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFram
     status.begin(diagnostic);
     errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_opengl_texture", handle.raw);
-    const lease = try handle.lease();
+    const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
     try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
@@ -4199,7 +4199,7 @@ pub fn acquiredFrameGetProducerSync(comptime Result: type, handle: AcquiredFrame
     status.begin(diagnostic);
     errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_producer_sync", handle.raw);
-    const lease = try handle.lease();
+    const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
     try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
@@ -4218,7 +4218,7 @@ pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFram
     status.begin(diagnostic);
     errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_vulkan_texture", handle.raw);
-    const lease = try handle.lease();
+    const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
     try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
@@ -4233,7 +4233,7 @@ pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFram
     status.begin(diagnostic);
     errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_acquired_frame_get_webgpu_texture", handle.raw);
-    const lease = try handle.lease();
+    const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
     try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
@@ -5130,7 +5130,7 @@ pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_
     status.begin(diagnostic);
     errdefer |err| status.fail(diagnostic, err);
     try callback.check("mln_resource_request_set_cancel_callback", binding_arg_0.raw);
-    const lease = try binding_arg_0.lease();
+    const lease = try binding_arg_0.lease(diagnostic);
     defer lease.release();
     var roots: callback.Roots = .{};
     defer roots.deinit();

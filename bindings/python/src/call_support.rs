@@ -120,6 +120,8 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     type Native: maplibre_core::handle::NativeHandle;
     /// The C type name, for diagnostics.
     const NATIVE: &'static str;
+    /// The public type name, which a lifecycle error names.
+    const OWNER_NAME: &'static str;
     /// Disposes a handle that no close consumed, for a handle type with a
     /// disposal.
     const DISPOSE: Option<unsafe extern "C" fn(Self::Native) -> sys::mln_status>;
@@ -141,16 +143,12 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
 
     /// The live handle that another owner's call takes as an argument.
     fn input(&self) -> PyResult<Self::Native> {
-        self.state()
-            .live_handle()
-            .ok_or_else(|| invalid_state_error("input handle is closed"))
+        self.state().require_live()
     }
 
     /// The live handle for a call that borrows none of its storage.
     fn live(&self) -> PyResult<Self::Native> {
-        self.state()
-            .live_handle()
-            .ok_or_else(|| invalid_state_error("handle is closed"))
+        self.state().require_live()
     }
 
     /// Holds off close while a call's results borrow the handle's storage.
@@ -177,9 +175,10 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         roots: Vec<std::sync::Weak<GeneratedCallbackRoot>>,
     ) -> PyResult<Py<PyAny>> {
         // SAFETY: the caller transfers ownership of the live handle.
-        let mut state = unsafe { NativeHandleState::from_handle(raw, Self::NATIVE) }
-            .map_err(map_error)?
-            .with_callback_roots(roots);
+        let mut state =
+            unsafe { NativeHandleState::from_handle(raw, Self::NATIVE, Self::OWNER_NAME) }
+                .map_err(map_error)?
+                .with_callback_roots(roots);
         if let Some(dispose) = Self::DISPOSE {
             state = state.with_disposal(dispose);
         }
@@ -199,6 +198,7 @@ macro_rules! generated_owner {
         impl GeneratedOwner for $owner {
             type Native = sys::$native;
             const NATIVE: &'static str = stringify!($native);
+            const OWNER_NAME: &'static str = stringify!($owner);
             const DISPOSE: Option<unsafe extern "C" fn(sys::$native) -> sys::mln_status> = $dispose;
 
             fn shared(&self) -> &Arc<Mutex<NativeHandleState<sys::$native>>> {

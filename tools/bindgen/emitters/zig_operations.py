@@ -330,7 +330,7 @@ def view_operation(plan, values):
     code = f'''pub fn {camel(plan.name.removeprefix("mln_"))}(comptime Result: type, handle: {handle_type}, context: anytype, comptime use: *const fn (@TypeOf(context), {typ}) anyerror!Result, {DIAGNOSTIC_PARAMETER}) anyerror!Result {{
     {preamble}
     try callback.check("{plan.name}", handle.raw);
-    const lease = try handle.lease();
+    const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
     {begin}

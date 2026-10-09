@@ -4,11 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.TestThread
 import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.WrongThreadException
@@ -63,10 +65,7 @@ class OwnedTextureSessionTest {
         escaped = sync
         val kind = sync.kind
         // The view borrows the frame, so neither the frame nor its session can go away under it.
-        assertEquals(
-          MaplibreStatus.BUSY,
-          assertFailsWith<MaplibreException> { frame.release() }.status,
-        )
+        assertInUse(assertFailsWith<InvalidStateException> { frame.release() })
         assertEquals(
           MaplibreStatus.BUSY,
           assertFailsWith<MaplibreException> { session.abandon() }.status,
@@ -98,10 +97,7 @@ class OwnedTextureSessionTest {
       }
       try {
         entered.awaitWithin("the borrow to start on the other thread")
-        assertEquals(
-          MaplibreStatus.BUSY,
-          assertFailsWith<MaplibreException> { frame.release() }.status,
-        )
+        assertInUse(assertFailsWith<InvalidStateException> { frame.release() })
         assertFalse(frame.isClosed)
       } finally {
         leave.complete(Unit)
@@ -129,4 +125,10 @@ class OwnedTextureSessionTest {
     const val RED_BACKGROUND_STYLE =
       """{"version":8,"sources":{},"layers":[{"id":"bg","type":"background","paint":{"background-color":"#ff0000"}}]}"""
   }
+}
+
+/** Checks that the binding refused a close because a borrow still holds the frame. */
+private fun assertInUse(error: InvalidStateException) {
+  assertEquals("AcquiredFrameHandle is in use", error.diagnostic)
+  assertNull(error.nativeStatusCode)
 }

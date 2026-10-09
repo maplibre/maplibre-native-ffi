@@ -26,9 +26,8 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     pendingDecision: Bool = false
   ) throws {
     guard !handle.isNull else {
-      throw NativeStatusFailure(
-        rawStatus: 0,
-        diagnostic: "\(typeName) native handle is the null handle"
+      throw MaplibreError.invalidArgument(
+        "\(typeName) native handle is the null handle"
       )
     }
     self.typeName = typeName
@@ -85,15 +84,9 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     case let .live(handle):
       return handle
     case .closing:
-      throw NativeStatusFailure(
-        rawStatus: 0,
-        diagnostic: "\(typeName) is closing"
-      )
+      throw MaplibreError.invalidState("\(typeName) is closing")
     case .closed:
-      throw NativeStatusFailure(
-        rawStatus: 0,
-        diagnostic: "\(typeName) is closed"
-      )
+      throw MaplibreError.invalidState("\(typeName) is closed")
     }
   }
 
@@ -107,18 +100,12 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
           return nil
         }
         guard readers == 0 else {
-          throw NativeStatusFailure(
-            rawStatus: 0,
-            diagnostic: "\(typeName) is in use"
-          )
+          throw MaplibreError.invalidState("\(typeName) is in use")
         }
         state = .closing(handle)
         return handle
       case .closing:
-        throw NativeStatusFailure(
-          rawStatus: 0,
-          diagnostic: "\(typeName) is closing"
-        )
+        throw MaplibreError.invalidState("\(typeName) is closing")
       case .closed:
         return nil
       }

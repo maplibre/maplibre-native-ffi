@@ -1,10 +1,14 @@
 package org.maplibre.nativeffi.error
 
-/** Base unchecked exception for errors reported by the native MapLibre C ABI. */
+/**
+ * Base unchecked exception for errors reported by the native MapLibre C ABI or raised by the
+ * binding.
+ */
 public open class MaplibreException
 internal constructor(
   public val status: MaplibreStatus,
-  public val nativeStatusCode: Int,
+  /** The C status code, or null for an error the binding raised without calling native code. */
+  public val nativeStatusCode: Int?,
   public val diagnostic: String = "",
 ) : RuntimeException(message(status, nativeStatusCode, diagnostic)) {
   internal companion object {
@@ -25,9 +29,10 @@ internal constructor(
   }
 }
 
-private fun message(status: MaplibreStatus, nativeStatusCode: Int, diagnostic: String): String {
+private fun message(status: MaplibreStatus, nativeStatusCode: Int?, diagnostic: String): String {
   val detail = diagnostic.ifBlank { "No native diagnostic available." }
-  return "${statusLabel(status)} ($nativeStatusCode): $detail"
+  val code = if (nativeStatusCode == null) "" else " ($nativeStatusCode)"
+  return "${statusLabel(status)}$code: $detail"
 }
 
 private fun statusLabel(status: MaplibreStatus): String =

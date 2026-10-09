@@ -2,8 +2,6 @@ package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
-import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.status.Status
 
 /**
@@ -25,10 +23,7 @@ internal class DecisionOwnerCore(
 
   fun beginComplete(): CompletionOperation {
     if (!completion.compareAndSet(COMPLETION_OPEN, COMPLETION_RUNNING)) {
-      throw InvalidStateException(
-        MaplibreStatus.INVALID_STATE.nativeCode,
-        "$typeName is already completed",
-      )
+      throw Status.invalidState("$typeName is already completed")
     }
     return try {
       CompletionOperation(this, retainLive())
@@ -88,7 +83,7 @@ internal class DecisionOwnerCore(
   private fun retainLive(): Borrow {
     while (true) {
       val current = state.load()
-      if (current and CLOSED_FLAG != 0) throw Status.released(typeName)
+      if (current and CLOSED_FLAG != 0) throw Status.closed(typeName)
       val active = current and ACTIVE_MASK
       check(active < ACTIVE_MASK) { "too many active $typeName operations" }
       if (state.compareAndSet(current, current + 1)) return Borrow(this)

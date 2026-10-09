@@ -5,8 +5,6 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.callback.CallbackAdmission
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -24,11 +22,15 @@ internal class HandleStateCore(
   private val readers = AtomicInt(0)
   private val retirement = AtomicReference<CompletableDeferred<Unit>?>(null)
 
+  init {
+    Status.requireArgument(handleId != 0L) { "$typeName handle must not be zero" }
+  }
+
   fun requireLive() {
     when (releaseState.load()) {
       STATE_LIVE -> return
-      STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
-      else -> throw Status.released(typeName)
+      STATE_RELEASING -> throw Status.closing(typeName)
+      else -> throw Status.closed(typeName)
     }
   }
 
@@ -38,7 +40,7 @@ internal class HandleStateCore(
       val count = readers.load()
       if (count < 0) {
         requireLive()
-        throw Status.released(typeName)
+        throw Status.closing(typeName)
       }
       check(count < Int.MAX_VALUE)
       if (readers.compareAndSet(count, count + 1)) break
@@ -81,20 +83,14 @@ internal class HandleStateCore(
   fun beginClose(): Boolean {
     if (releaseState.load() == STATE_CLOSED) return false
     if (!readers.compareAndSet(0, -1)) {
-      if (readers.load() > 0)
-        throw MaplibreException(
-          MaplibreStatus.BUSY,
-          MaplibreStatus.BUSY.nativeCode,
-          "$typeName has an active borrowed value copy",
-        )
+      if (readers.load() > 0) throw Status.inUse(typeName)
       if (releaseState.load() == STATE_CLOSED) return false
-      throw Status.invalidState("$typeName is currently releasing")
+      throw Status.closing(typeName)
     }
     if (!releaseState.compareAndSet(STATE_LIVE, STATE_RELEASING)) {
       when (releaseState.load()) {
         STATE_CLOSED -> return false
-        STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
-        else -> throw Status.released(typeName)
+        else -> throw Status.closing(typeName)
       }
     }
     return true

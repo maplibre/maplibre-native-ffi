@@ -172,15 +172,15 @@ fn Receiver(comptime access: Access, comptime T: type) type {
         }
 
         /// Takes hold of the receiver, or returns null for a closed one.
-        fn acquire(receiver: T) Error!?Self {
+        fn acquire(receiver: T, diagnostic: ?*Diagnostic) Error!?Self {
             return .{ .state = switch (access) {
                 .none => {},
-                .lease => try receiver.lease(),
-                .borrow => try receiver.borrow(),
-                .complete => try receiver.beginComplete(),
+                .lease => try receiver.lease(diagnostic),
+                .borrow => try receiver.borrow(diagnostic),
+                .complete => try receiver.beginComplete(diagnostic),
                 .issued => receiver.raw,
                 .scoped => receiver,
-                .close => try receiver.beginClose() orelse return null,
+                .close => try receiver.beginClose(diagnostic) orelse return null,
             } };
         }
 
@@ -247,6 +247,9 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
         const NativeArgs = Native(function, offset + fields.len);
 
         receiver: Hold,
+        /// Where a lifecycle error of the receiver or an input handle is
+        /// recorded.
+        diagnostic: ?*Diagnostic,
         arena: if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator else void,
         roots: callback.Roots = .{},
         held: Held(function, offset, Args) = undefined,
@@ -258,11 +261,12 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
 
         /// Admits the call and takes hold of the receiver, or returns null for
         /// a receiver that is already closed.
-        fn begin(receiver: ReceiverType, allocator: Allocator) Error!?Self {
+        fn begin(receiver: ReceiverType, allocator: Allocator, diagnostic: ?*Diagnostic) Error!?Self {
             try Hold.admit(name, receiver);
-            const hold = try Hold.acquire(receiver) orelse return null;
+            const hold = try Hold.acquire(receiver, diagnostic) orelse return null;
             return .{
                 .receiver = hold,
+                .diagnostic = diagnostic,
                 .arena = if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator.init(allocator) else {},
             };
         }
@@ -299,7 +303,7 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
                 const Parameter = Param(function, offset + index);
                 const input = @field(args, field.name);
                 if (comptime isHandle(field.type)) {
-                    self.held[index] = try input.lease();
+                    self.held[index] = try input.lease(self.diagnostic);
                     self.leased = index + 1;
                     native[offset + index] = self.held[index].native;
                 } else if (comptime isOutput(field.type)) {
@@ -421,7 +425,7 @@ pub fn invoke(
     status.begin(diagnostic);
     errdefer |err| status.fail(diagnostic, err);
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator) orelse return closed(Outputs(@TypeOf(args)));
+    var op = try Op.begin(receiver, allocator, diagnostic) orelse return closed(Outputs(@TypeOf(args)));
     defer op.end();
     const native = try op.arguments(args);
     if (op.receiver.calls()) try status.call(@field(c, name), native, diagnostic);
@@ -441,7 +445,7 @@ pub fn direct(
     args: anytype,
 ) Error!T {
     const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
-    var op = try Op.begin(receiver, allocator) orelse return closed(T);
+    var op = try Op.begin(receiver, allocator, null) orelse return closed(T);
     defer op.end();
     const native = try op.arguments(args);
     if (T == void) {
@@ -490,7 +494,7 @@ pub fn submit(
     errdefer |err| status.fail(diagnostic, err);
     const Allocator = @TypeOf(allocator);
     const Op = Operation(name, access, @TypeOf(receiver), Allocator, @TypeOf(args));
-    var op = try Op.begin(receiver, allocator) orelse return closed(Submitted(Copy, @TypeOf(args)));
+    var op = try Op.begin(receiver, allocator, diagnostic) orelse return closed(Submitted(Copy, @TypeOf(args)));
     defer op.end();
     const native = try op.arguments(args);
     const function = @field(c, name);

@@ -15,7 +15,6 @@ pub(crate) type Parent = Option<Arc<dyn Any + Send + Sync>>;
 pub(crate) struct OwnerState<H: NativeHandle> {
     handle: ConcurrentNativeHandle<H>,
     id: u64,
-    owner: &'static str,
     dispose: fn(H) -> Result<()>,
     _parent: Parent,
 }
@@ -35,11 +34,10 @@ impl<H: NativeHandle> OwnerState<H> {
         parent: Parent,
     ) -> Result<Arc<Self>> {
         // SAFETY: the caller transfers ownership of a live handle.
-        let handle = unsafe { ConcurrentNativeHandle::from_handle(raw, native) }?;
+        let handle = unsafe { ConcurrentNativeHandle::from_handle(raw, native, owner) }?;
         Ok(Arc::new(Self {
             handle,
             id: raw.to_raw(),
-            owner,
             dispose,
             _parent: parent,
         }))
@@ -64,9 +62,7 @@ impl<H: NativeHandle> OwnerState<H> {
     /// The live handle, for a call made outside every native callback.
     pub(crate) fn native(&self) -> Result<H> {
         maplibre_core::callback::check("", 0)?;
-        self.handle
-            .live_handle()
-            .ok_or_else(|| closed_handle_error(self.owner))
+        self.handle.live_handle()
     }
 
     /// Admits one call of `operation` on the live handle.
@@ -172,7 +168,10 @@ enum ConcurrentHandleState<T> {
 #[derive(Debug)]
 pub(crate) struct ConcurrentNativeHandle<T: NativeHandle> {
     state: std::sync::Mutex<ConcurrentHandleState<T>>,
+    /// The native type name, which a leak report carries.
     type_name: &'static str,
+    /// The public type name, which a lifecycle error names.
+    owner: &'static str,
 }
 
 impl<T: NativeHandle> ConcurrentNativeHandle<T> {
@@ -182,7 +181,11 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
     /// # Safety
     ///
     /// `handle` must be a live owned handle of the matching native type.
-    pub(crate) unsafe fn from_handle(handle: T, type_name: &'static str) -> Result<Self> {
+    pub(crate) unsafe fn from_handle(
+        handle: T,
+        type_name: &'static str,
+        owner: &'static str,
+    ) -> Result<Self> {
         if handle.to_raw() == 0 {
             return Err(Error::invalid_argument(format!(
                 "{type_name} handle must not be zero"
@@ -191,13 +194,16 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
         Ok(Self {
             state: std::sync::Mutex::new(ConcurrentHandleState::Live(handle, 0)),
             type_name,
+            owner,
         })
     }
 
-    pub(crate) fn live_handle(&self) -> Option<T> {
+    /// The live handle, or the lifecycle error for a closing or closed one.
+    pub(crate) fn live_handle(&self) -> Result<T> {
         match *lock(&self.state) {
-            ConcurrentHandleState::Live(handle, _) => Some(handle),
-            ConcurrentHandleState::Closing | ConcurrentHandleState::Closed => None,
+            ConcurrentHandleState::Live(handle, _) => Ok(handle),
+            ConcurrentHandleState::Closing => Err(lifecycle_error(self.owner, "is closing")),
+            ConcurrentHandleState::Closed => Err(lifecycle_error(self.owner, "is closed")),
         }
     }
 
@@ -215,7 +221,8 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
                     native: *native,
                 })
             }
-            _ => Err(closed_handle_error(self.type_name)),
+            ConcurrentHandleState::Closing => Err(lifecycle_error(self.owner, "is closing")),
+            ConcurrentHandleState::Closed => Err(lifecycle_error(self.owner, "is closed")),
         }
     }
 
@@ -225,12 +232,11 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
         let native = match *state {
             ConcurrentHandleState::Live(native, 0) => native,
             ConcurrentHandleState::Closed => return Ok(None),
-            _ => {
-                return Err(Error::new(
-                    crate::ErrorKind::InvalidState,
-                    None,
-                    "handle has an active close or borrowed read",
-                ));
+            ConcurrentHandleState::Live(_, _) => {
+                return Err(lifecycle_error(self.owner, "is in use"));
+            }
+            ConcurrentHandleState::Closing => {
+                return Err(lifecycle_error(self.owner, "is closing"));
             }
         };
         *state = ConcurrentHandleState::Closing;
@@ -301,8 +307,14 @@ pub(crate) fn lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, 
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-pub(crate) fn closed_handle_error(type_name: &'static str) -> Error {
-    Error::invalid_argument(format!("{type_name} is closed"))
+/// The binding-raised error for a call on a handle that is closed, closing, or
+/// in use, which carries no native status.
+fn lifecycle_error(owner: &'static str, state: &str) -> Error {
+    Error::new(
+        crate::ErrorKind::InvalidState,
+        None,
+        format!("{owner} {state}"),
+    )
 }
 
 #[cfg(test)]
@@ -318,7 +330,12 @@ mod tests {
     #[test]
     fn concurrent_close_rejects_reentry_and_calls_native_once() {
         let handle = Arc::new(unsafe {
-            ConcurrentNativeHandle::from_handle(sys::mln_render_session(1), "test session").unwrap()
+            ConcurrentNativeHandle::from_handle(
+                sys::mln_render_session(1),
+                "mln_render_session",
+                "RenderSessionHandle",
+            )
+            .unwrap()
         });
         let entered = Arc::new(Barrier::new(2));
         let finish = Arc::new(Barrier::new(2));
@@ -340,20 +357,21 @@ mod tests {
         });
 
         entered.wait();
-        assert!(handle.live_handle().is_none());
+        let error = handle.live_handle().unwrap_err();
+        assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
+        assert_eq!(error.raw_status(), None);
+        assert_eq!(error.diagnostic(), "RenderSessionHandle is closing");
         let second_handle = Arc::clone(&handle);
         let (sender, receiver) = mpsc::channel();
         let second = std::thread::spawn(move || {
             sender.send(second_handle.close_with(|_| Ok(()))).unwrap();
         });
-        assert_eq!(
-            receiver
-                .recv_timeout(Duration::from_secs(10))
-                .unwrap()
-                .unwrap_err()
-                .kind(),
-            crate::ErrorKind::InvalidState
-        );
+        let error = receiver
+            .recv_timeout(Duration::from_secs(10))
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
+        assert_eq!(error.diagnostic(), "RenderSessionHandle is closing");
         finish.wait();
 
         assert_eq!(first.join().unwrap(), Some(()));
@@ -366,7 +384,12 @@ mod tests {
     #[test]
     fn a_read_on_another_thread_holds_off_close_until_it_ends() {
         let handle = Arc::new(unsafe {
-            ConcurrentNativeHandle::from_handle(sys::mln_event_batch(9), "batch").unwrap()
+            ConcurrentNativeHandle::from_handle(
+                sys::mln_event_batch(9),
+                "mln_event_batch",
+                "EventBatchHandle",
+            )
+            .unwrap()
         });
         let reading = Arc::new(Barrier::new(2));
         let release = Arc::new(Barrier::new(2));
@@ -388,6 +411,8 @@ mod tests {
             .close_with::<()>(|_| panic!("close reached native during a read"))
             .unwrap_err();
         assert_eq!(error.kind(), crate::ErrorKind::InvalidState);
+        assert_eq!(error.raw_status(), None);
+        assert_eq!(error.diagnostic(), "EventBatchHandle is in use");
         assert_eq!(handle.live_handle().unwrap().0, 9);
         release.wait();
         reader.join().unwrap();
@@ -399,7 +424,12 @@ mod tests {
     #[test]
     fn a_rejected_or_panicking_close_leaves_the_handle_live() {
         let handle = unsafe {
-            ConcurrentNativeHandle::from_handle(sys::mln_event_batch(9), "batch").unwrap()
+            ConcurrentNativeHandle::from_handle(
+                sys::mln_event_batch(9),
+                "mln_event_batch",
+                "EventBatchHandle",
+            )
+            .unwrap()
         };
         assert!(
             handle
@@ -422,8 +452,9 @@ mod tests {
             let _ = sender.send((leak, std::thread::current().id()));
         })));
         let id = 0x0d00_0000_0000_0007;
-        let mut handle =
-            unsafe { ConcurrentNativeHandle::from_handle(sys::mln_map(id), "mln_map").unwrap() };
+        let mut handle = unsafe {
+            ConcurrentNativeHandle::from_handle(sys::mln_map(id), "mln_map", "MapHandle").unwrap()
+        };
 
         // A drop inside a native callback must not dispose on that callback's
         // stack, so the disposal runs on the finalization thread, and its

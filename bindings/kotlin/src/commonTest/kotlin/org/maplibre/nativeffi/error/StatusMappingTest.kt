@@ -43,6 +43,8 @@ class StatusMappingTest {
       "INVALID_ARGUMENT (-1): invalid pointer",
       InvalidArgumentException(-1, "invalid pointer").message,
     )
+    // An error the binding raises has no native status to show.
+    assertEquals("INVALID_STATE: MapHandle is closed", Status.closed("MapHandle").message)
     assertEquals(
       "MaplibreStatus(-127) (-127): from a newer library",
       assertFailsWith<MaplibreException> { Status.check(-127) { "from a newer library" } }.message,

@@ -60,7 +60,7 @@ public sealed class HandleLifecycleTests
         });
 
         Assert.Null(error.RawStatus);
-        Assert.Contains("MapHandle is closed", error.Diagnostic, StringComparison.Ordinal);
+        Assert.Equal("MapHandle is closed", error.Diagnostic);
     }
 
     [Fact]

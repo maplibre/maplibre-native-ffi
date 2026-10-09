@@ -132,7 +132,7 @@ impl ResourceRequestHandleState {
                 return Err(Error::new(
                     ErrorKind::InvalidState,
                     None,
-                    "resource request is closed",
+                    "ResourceRequestHandle is closed",
                 ));
             }
             inner.completing = true;
@@ -180,7 +180,7 @@ impl ResourceRequestHandleState {
             return Err(Error::new(
                 ErrorKind::InvalidState,
                 None,
-                "resource request is closed",
+                "ResourceRequestHandle is closed",
             ));
         }
         Ok(Self::native_handle(&inner))

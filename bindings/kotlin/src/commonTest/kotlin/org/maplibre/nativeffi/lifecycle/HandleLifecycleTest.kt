@@ -6,6 +6,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
@@ -38,7 +39,8 @@ class HandleLifecycleTest {
     assertSame(teardown, runtime.release())
     teardown.awaitWithin("the runtime teardown")
     val failure = assertFailsWith<InvalidStateException> { runtime.barrier().await() }
-    assertEquals("RuntimeHandle is already closed", failure.diagnostic)
+    assertEquals("RuntimeHandle is closed", failure.diagnostic)
+    assertNull(failure.nativeStatusCode)
   }
 
   @Test

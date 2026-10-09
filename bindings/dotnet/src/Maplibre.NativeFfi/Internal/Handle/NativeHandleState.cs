@@ -170,7 +170,7 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,
                 null,
-                $"{typeName} is closing.",
+                $"{typeName} is closing",
                 null
             );
         }
@@ -180,7 +180,7 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,
                 null,
-                $"{typeName} is closed.",
+                $"{typeName} is closed",
                 null
             );
         }
@@ -354,7 +354,7 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,
                 null,
-                $"{typeName} is closing.",
+                $"{typeName} is closing",
                 null
             );
         }
@@ -370,7 +370,7 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,
                 null,
-                $"{typeName} is in use by a native value copy.",
+                $"{typeName} is in use",
                 null
             );
         }

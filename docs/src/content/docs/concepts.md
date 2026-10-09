@@ -232,3 +232,10 @@ Language bindings preserve the runtime, map, render session, and event model in
 the target language. They sit directly above the C API and expose the same
 objects and relationships, adding language-appropriate safety around handles,
 lifetimes, errors, and event draining.
+
+Each binding tracks the lifecycle of the handles that it owns and reports misuse
+before any native call. A call on a closed handle, a call while the handle's
+close is in progress, and a close while a call or borrowed view still holds the
+handle each raise the binding's invalid-state error. That error carries no
+native status, and its message names the handle type and its state: closed,
+closing, or in use. Closing a handle that is already closed does nothing.

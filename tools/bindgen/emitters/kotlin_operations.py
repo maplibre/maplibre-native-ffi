@@ -548,9 +548,12 @@ def view(plan, values, native):
     end = native.checked(functions[owner.view_end], ["it"])
     read = native.checked(plan.function, ["handle", "out"])
     decoded = values.decode(result, "out", "scope")
+    # The view holds a read, so the binding refuses to close its owner until
+    # the block returns.
+    held = ", Access.READ" if plan.receiver else ""
     return (
         f"  public fun <T> {method}(block: ({result_type}) -> T): T = "
-        f'nativeCall({receiver_arguments(plan)}, "{plan.name}") {{ '
+        f'nativeCall({receiver_arguments(plan)}, "{plan.name}"{held}) {{ '
         f"borrowView({{ {begin} }}, {{ {end} }}) {{ scope -> "
         f"val out = {allocation}; {read}; block({decoded}) }} }}\n"
     )

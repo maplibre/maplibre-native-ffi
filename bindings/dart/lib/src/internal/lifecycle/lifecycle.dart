@@ -49,6 +49,8 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   }
 
   bool _closed = false;
+  bool _closing = false;
+  int _readers = 0;
   Future<void>? _closeFuture;
   final Object _finalizerDetachToken = Object();
   Pointer<Void>? _ownerToken;
@@ -62,23 +64,38 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   /// The issued handle ID.
   int get handleId => _handle.raw;
 
-  /// Returns the live handle, or throws when it is closed.
+  /// Returns the live handle, or throws when it is closed or closing.
   H get handle {
+    if (_closing) {
+      throwInvalidState('$typeName is closing');
+    }
     if (_closed) {
-      throwInvalidArgument('$typeName is closed');
+      throwInvalidState('$typeName is closed');
     }
     return _handle;
+  }
+
+  /// Runs [body] with the live handle and holds off a close until it returns.
+  T read<T>(T Function(H handle) body) {
+    final live = handle;
+    _readers++;
+    try {
+      return body(live);
+    } finally {
+      _readers--;
+    }
   }
 
   /// Releases the native handle with [destroy] exactly once after success.
   ///
   /// [destroy] returns the status of a call that wrote [nativeDiagnostic].
   void close(int Function(H) destroy) {
-    if (_closed) {
-      return;
+    if (!_beginClose()) return;
+    try {
+      checkNativeCall(destroy(_handle));
+    } finally {
+      _closing = false;
     }
-
-    checkNativeCall(destroy(_handle));
     _closed = true;
     _detachOwnerFinalizer();
   }
@@ -89,10 +106,25 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
   /// consumes it immediately; the returned future reports native quiescence.
   Future<void> closeAsync(Future<void> Function(H) close) {
     if (_closed) return _closeFuture ?? Future.value();
-    final completion = close(_handle);
+    _beginClose();
+    final Future<void> completion;
+    try {
+      completion = close(_handle);
+    } finally {
+      _closing = false;
+    }
     _closed = true;
     _detachOwnerFinalizer();
     return _closeFuture = completion;
+  }
+
+  /// Marks a live handle as closing, or returns false for a closed one.
+  bool _beginClose() {
+    if (_closed) return false;
+    if (_closing) throwInvalidState('$typeName is closing');
+    if (_readers != 0) throwInvalidState('$typeName is in use');
+    _closing = true;
+    return true;
   }
 
   void _attachOwnerFinalizer(NativeHandle handle) {

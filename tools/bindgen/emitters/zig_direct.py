@@ -61,7 +61,10 @@ def operation(plan, values):
         receiver = next(p.value for p in plan.inputs if p.name == plan.receiver)
         signature.append(f"{receiver_name}: {values.public(receiver)}")
         setup.extend(
-            [f"const lease = try {receiver_name}.lease();", "defer lease.release();"]
+            [
+                f"const lease = try {receiver_name}.lease(diagnostic);",
+                "defer lease.release();",
+            ]
         )
     signature.append(f"{public_callback}: ?{name}")
     setup.insert(

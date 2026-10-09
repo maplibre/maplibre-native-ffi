@@ -15,7 +15,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
     }
 
   public fun <T> withGetMetalTexture(block: (MetalOwnedTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_metal_texture") {
+    nativeCall(this, binding, "mln_acquired_frame_get_metal_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_adapter_acquired_frame_view_end(it) },
@@ -27,7 +27,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
     }
 
   public fun <T> withGetOpenglTexture(block: (OpenglOwnedTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_opengl_texture") {
+    nativeCall(this, binding, "mln_acquired_frame_get_opengl_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_adapter_acquired_frame_view_end(it) },
@@ -39,7 +39,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
     }
 
   public fun <T> withGetProducerSync(block: (GpuSync) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_producer_sync") {
+    nativeCall(this, binding, "mln_acquired_frame_get_producer_sync", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_adapter_acquired_frame_view_end(it) },
@@ -58,7 +58,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
     }
 
   public fun <T> withGetVulkanTexture(block: (VulkanOwnedTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_vulkan_texture") {
+    nativeCall(this, binding, "mln_acquired_frame_get_vulkan_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_adapter_acquired_frame_view_end(it) },
@@ -70,7 +70,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
     }
 
   public fun <T> withGetWebgpuTexture(block: (WebgpuOwnedTextureFrame) -> T): T =
-    nativeCall(this, binding, "mln_acquired_frame_get_webgpu_texture") {
+    nativeCall(this, binding, "mln_acquired_frame_get_webgpu_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_adapter_acquired_frame_view_end(it) },

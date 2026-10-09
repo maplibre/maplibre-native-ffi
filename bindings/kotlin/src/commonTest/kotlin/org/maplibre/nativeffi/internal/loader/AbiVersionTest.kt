@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
@@ -22,7 +23,7 @@ class AbiVersionTest {
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, error.expectedVersion)
     assertIs<NativeErrorException>(error)
     assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
-    assertEquals(MaplibreStatus.NATIVE_ERROR.nativeCode, error.nativeStatusCode)
+    assertNull(error.nativeStatusCode)
     assertTrue(error.diagnostic.contains("expected ${Maplibre.EXPECTED_C_ABI_VERSION}"))
   }
 }

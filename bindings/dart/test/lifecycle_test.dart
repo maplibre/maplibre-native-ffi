@@ -26,7 +26,18 @@ void main() {
       expect(map.isClosed, isTrue);
 
       // A closed owner refuses use without reaching native code.
-      expect(map.snapshotGet, throwsA(isA<InvalidArgumentException>()));
+      expect(
+        map.snapshotGet,
+        throwsA(
+          isA<InvalidStateException>()
+              .having((error) => error.nativeStatusCode, 'status', isNull)
+              .having(
+                (error) => error.diagnostic,
+                'diagnostic',
+                'MapHandle is closed',
+              ),
+        ),
+      );
     },
   );
 

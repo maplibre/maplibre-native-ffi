@@ -61,7 +61,15 @@ void main() {
         // can go away while it is open.
         expect(
           () => frame.release(gpuSyncDefault()),
-          throwsA(isA<BusyException>()),
+          throwsA(
+            isA<InvalidStateException>()
+                .having((error) => error.nativeStatusCode, 'status', isNull)
+                .having(
+                  (error) => error.diagnostic,
+                  'diagnostic',
+                  'AcquiredFrameHandle is in use',
+                ),
+          ),
         );
         expect(session.abandon, throwsA(isA<BusyException>()));
       });

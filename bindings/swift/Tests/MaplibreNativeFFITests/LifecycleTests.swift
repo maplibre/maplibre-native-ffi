@@ -66,6 +66,7 @@ import Testing
     try await map.close()
   }
   #expect(refusal?.diagnostic == "MapHandle is in use")
+  #expect(refusal?.rawStatus == nil)
   #expect(!map.isClosed)
 
   finish.signal()
@@ -129,10 +130,9 @@ import Testing
   }.start()
 
   #expect(isSignalled(closeStarted))
-  #expect(throws: NativeStatusFailure(
-    rawStatus: 0,
-    diagnostic: "test_handle is closing"
-  )) { try state.requireLive() }
+  #expect(throws: MaplibreError.invalidState("test_handle is closing")) {
+    try state.requireLive()
+  }
 
   failClose.signal()
   #expect(isSignalled(closeFinished))

@@ -655,7 +655,7 @@ def render_scoped_views(bound, generated, values):
                 f"  {'ScopedNativePointer' if native_pointer else typ} get {name} => {result};"
             )
         chunks.append(
-            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner.native)[0]} owner, this._value) : _scope = _NativeViewScope(() => owner._handle, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _NativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
+            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner.native)[0]} owner, this._value) : _scope = _NativeViewScope(owner._state, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _NativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
             + "\n".join(getters)
             + "\n}\n"
         )

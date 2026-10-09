@@ -14,10 +14,12 @@ import (
 )
 
 var (
-	// ErrInvalidArgument reports invalid arguments, released handles, invalid
-	// enum values, invalid string shapes, or other binding-owned argument errors.
+	// ErrInvalidArgument reports invalid arguments, invalid enum values, invalid
+	// string shapes, or other binding-owned argument errors.
 	ErrInvalidArgument = errors.New("maplibre: invalid argument")
-	// ErrInvalidState reports valid objects used in an invalid lifecycle state.
+	// ErrInvalidState reports valid objects used in an invalid lifecycle state,
+	// including a handle that is closed, closing, or in use by a borrow that
+	// holds off its close.
 	ErrInvalidState = errors.New("maplibre: invalid state")
 	// ErrWrongThread reports use of a thread-affine render handle from the
 	// wrong OS thread.
@@ -29,7 +31,8 @@ var (
 	ErrNative = errors.New("maplibre: native error")
 	// ErrCancelled reports a terminal cancelled operation.
 	ErrCancelled = errors.New("maplibre: cancelled")
-	// ErrBusy reports a conflicting driver or lifecycle call.
+	// ErrBusy reports a native refusal while a conflicting driver call or
+	// lifecycle transition is in flight.
 	ErrBusy = errors.New("maplibre: busy")
 	// ErrTargetLost reports irreversible render-target loss.
 	ErrTargetLost = errors.New("maplibre: target lost")

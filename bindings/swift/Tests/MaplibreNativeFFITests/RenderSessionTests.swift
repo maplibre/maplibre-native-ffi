@@ -121,9 +121,9 @@ private func withOwnedTextureSession<Result>(
 }
 
 /// A frame view is usable only inside its callback, a second view of the
-/// same frame and an abandon of its session are refused while it is open,
-/// and a sibling frame that the host drops inside the view does not disturb
-/// it.
+/// same frame, a release of the frame, and an abandon of its session are
+/// refused while it is open, and a sibling frame that the host drops inside
+/// the view does not disturb it.
 @Test func aFrameViewExpiresWithItsScopeAndHoldsOffAbandon() async throws {
   try await withOwnedTextureSession(ringDepth: 2) { rendered in
     let session = rendered.session
@@ -140,6 +140,10 @@ private func withOwnedTextureSession<Result>(
       #expect(try view.height == 32)
       #expect(throws: MaplibreError.self) {
         try rendered.graphics.withTextureView(of: first) { _ in }
+      }
+      let inUse = MaplibreError.invalidState("AcquiredFrameHandle is in use")
+      #expect(throws: inUse) {
+        try first.release(consumerCompletion: .default)
       }
       do {
         _ = try session.abandon()

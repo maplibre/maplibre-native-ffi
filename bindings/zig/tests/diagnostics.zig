@@ -23,7 +23,7 @@ test "diagnostics describe failures that the binding detects" {
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidState, maplibre.mapRequestRepaint(released, &diagnostic));
     try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
-    try testing.expect(diagnostic.message().len > 0);
+    try testing.expectEqualStrings("Map is closed", diagnostic.message());
 }
 
 // A command that native accepts and then fails completes with a failed

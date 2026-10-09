@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
@@ -12,8 +13,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.internal.status.Status
@@ -25,7 +26,7 @@ class HandleStateCoreTest {
     var releases = 0
     state.withLive {
       val error =
-        assertFailsWith<MaplibreException> {
+        assertFailsWith<InvalidStateException> {
           state.retire(
             call = {
               releases++
@@ -33,7 +34,8 @@ class HandleStateCoreTest {
             }
           )
         }
-      assertEquals(MaplibreStatus.BUSY, error.status)
+      assertEquals("Batch is in use", error.diagnostic)
+      assertNull(error.nativeStatusCode)
       assertEquals(0, releases)
       assertFalse(state.isReleased())
     }
@@ -117,12 +119,13 @@ class HandleStateCoreTest {
         attempts += 1
         val accessError = assertFailsWith<InvalidStateException> { state.requireLive() }
         assertEquals(MaplibreStatus.INVALID_STATE, accessError.status)
-        assertEquals("TestHandle is currently releasing", accessError.diagnostic)
+        assertEquals("TestHandle is closing", accessError.diagnostic)
+        assertNull(accessError.nativeStatusCode)
 
         val closeError =
           assertFailsWith<InvalidStateException> { state.closeOnce(destroy = { attempts += 1 }) }
         assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
-        assertEquals("TestHandle is currently releasing", closeError.diagnostic)
+        assertEquals("TestHandle is closing", closeError.diagnostic)
       }
     )
 
@@ -179,8 +182,16 @@ class HandleStateCoreTest {
       destroy = { refusal = assertFailsWith<InvalidStateException> { state.withLive {} } }
     )
 
-    assertTrue(refusal!!.message!!.contains("releasing"))
-    assertFailsWith<InvalidStateException> { state.withLive {} }
+    assertEquals("TestHandle is closing", (refusal as InvalidStateException).diagnostic)
+    val closed = assertFailsWith<InvalidStateException> { state.withLive {} }
+    assertEquals("TestHandle is closed", closed.diagnostic)
+  }
+
+  @Test
+  fun adoptingTheZeroHandleIsAnInvalidArgument() {
+    val error = assertFailsWith<InvalidArgumentException> { HandleStateCore("TestHandle", 0L) }
+    assertEquals("TestHandle handle must not be zero", error.diagnostic)
+    assertNull(error.nativeStatusCode)
   }
 
   @Test

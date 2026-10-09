@@ -41,7 +41,10 @@ struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     closing: bool,
     _typed_handle: std::marker::PhantomData<fn() -> T>,
     dispose_abandoned: Option<unsafe extern "C" fn(T) -> sys::mln_status>,
+    /// The native type name, which a leak report carries.
     type_name: &'static str,
+    /// The public type name, which a lifecycle error names.
+    owner_name: &'static str,
 }
 
 impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
@@ -52,7 +55,11 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
     /// `handle` must be a live handle of the matching native type owned by the
     /// caller, which must later close this state with the matching C API
     /// destroy function.
-    unsafe fn from_handle(handle: T, type_name: &'static str) -> Result<Self, Error> {
+    unsafe fn from_handle(
+        handle: T,
+        type_name: &'static str,
+        owner_name: &'static str,
+    ) -> Result<Self, Error> {
         let Some(id) = std::num::NonZeroU64::new(handle.to_raw()) else {
             return Err(maplibre_core::ptr::null_handle_error(type_name));
         };
@@ -66,6 +73,7 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
             _typed_handle: std::marker::PhantomData,
             dispose_abandoned: None,
             type_name,
+            owner_name,
         })
     }
 
@@ -116,6 +124,21 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
 
     fn live_handle(&self) -> Option<T> {
         self.id.map(|id| T::from_raw(id.get()))
+    }
+
+    /// The live handle, or the lifecycle error for a closing or closed owner.
+    fn require_live(&self) -> PyResult<T> {
+        if self.closing {
+            return Err(self.lifecycle_error("is closing"));
+        }
+        self.live_handle()
+            .ok_or_else(|| self.lifecycle_error("is closed"))
+    }
+
+    /// The binding-raised error for an owner that is closed, closing, or in
+    /// use, which carries no native status.
+    fn lifecycle_error(&self, state: &str) -> PyErr {
+        invalid_state_error(format!("{} {state}", self.owner_name))
     }
 
     fn is_closed(&self) -> bool {

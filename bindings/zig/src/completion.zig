@@ -74,7 +74,7 @@ pub fn Future(comptime T: type) type {
         state: ?*State,
 
         pub fn poll(self: *const Self) status.BindingError!bool {
-            const state = self.state orelse return error.ClosedHandle;
+            const state = self.state orelse return error.InvalidState;
             return state.completed.load(.acquire) != 0;
         }
 
@@ -88,7 +88,10 @@ pub fn Future(comptime T: type) type {
         pub fn wait(self: *Self, diagnostic: ?*diagnostics.Diagnostic) status.Error!T {
             status.begin(diagnostic);
             errdefer |err| status.fail(diagnostic, err);
-            const state = self.state orelse return error.ClosedHandle;
+            const state = self.state orelse {
+                status.record(diagnostic, null, "Future is closed");
+                return error.InvalidState;
+            };
             state.ready.wait();
             if (state.consumed.swap(true, .acq_rel)) return error.AlreadyCompleted;
             errdefer if (state.value) |*owned| {
@@ -327,7 +330,9 @@ test "a completion delivers once, and a value that fails to convert reports the 
     // The caller took the value, so deinit leaves it to the caller.
     future.deinit();
     try std.testing.expectEqual(@as(usize, 0), Tracked.disposals);
-    try std.testing.expectError(error.ClosedHandle, future.wait(null));
+    var closed: diagnostics.Diagnostic = .{};
+    try std.testing.expectError(error.InvalidState, future.wait(&closed));
+    try std.testing.expectEqualStrings("Future is closed", closed.message());
 
     var failed = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
     defer failed.deinit();
@@ -373,7 +378,7 @@ test "a pending future polls without blocking and deinit abandons it" {
     var future = try submit(Tracked, null, Tracked.copy, FakeSubmission.start, .{});
     try std.testing.expect(!try future.poll());
     future.deinit();
-    try std.testing.expectError(error.ClosedHandle, future.poll());
+    try std.testing.expectError(error.InvalidState, future.poll());
     FakeSubmission.deliver(1);
     FakeSubmission.retire();
     try std.testing.expectEqual(@as(usize, 1), Tracked.disposals);

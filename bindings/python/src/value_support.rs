@@ -104,8 +104,11 @@ impl<'a, T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>>
     fn new(state: &'a Mutex<S>) -> PyResult<Option<Self>> {
         let mut guard = state.lock().unwrap_or_else(|p| p.into_inner());
         let owner = guard.owner_state();
-        if owner.closing || owner.active_reads != 0 {
-            return Err(invalid_state_error("handle has an active read or close"));
+        if owner.closing {
+            return Err(owner.lifecycle_error("is closing"));
+        }
+        if owner.active_reads != 0 {
+            return Err(owner.lifecycle_error("is in use"));
         }
         let Some(handle) = owner.id.take() else {
             return Ok(None);
@@ -160,9 +163,7 @@ impl<'a, T: maplibre_core::handle::NativeHandle, S: GeneratedOwnerState<T>>
     fn new(state: &'a Mutex<S>) -> PyResult<Self> {
         let mut guard = state.lock().unwrap_or_else(|p| p.into_inner());
         let owner = guard.owner_state();
-        let handle = owner
-            .live_handle()
-            .ok_or_else(|| invalid_state_error("handle is closed"))?;
+        let handle = owner.require_live()?;
         owner.active_reads += 1;
         Ok(Self { state, handle })
     }
@@ -384,8 +385,7 @@ impl GeneratedReadScope {
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .owner_state()
-            .live_handle()
-            .ok_or_else(|| invalid_state_error("borrowed view owner is closed"))?;
+            .require_live()?;
         let mut token = ptr::null_mut();
         maplibre_core::check(|diagnostic| unsafe {
             generated_native_call(py, || begin(handle, &mut token, diagnostic))
@@ -412,7 +412,8 @@ impl GeneratedReadScope {
         {
             let mut guard = state.lock().unwrap_or_else(|p| p.into_inner());
             let owner = guard.owner_state();
-            if owner.live_handle().is_none() || !owner.views_valid {
+            owner.require_live()?;
+            if !owner.views_valid {
                 return Err(invalid_state_error("borrowed view owner is no longer live"));
             }
             owner.active_reads += 1;
