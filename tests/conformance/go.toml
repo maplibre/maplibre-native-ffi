@@ -8,9 +8,9 @@
 # Metal, and Vulkan preset, including the Android and OpenHarmony emulator
 # presets, whose runners push tests/graphics beside the test binaries. WGL
 # presets build no render tests, since the Go wrapper of tests/graphics has no
-# WGL context. EX-01 is `mise run
-# //examples/go-map:smoke <preset>` on an EGL preset, since go-map drives
-# OpenGL directly; its smoke run renders one frame in a hidden window.
+# WGL context. EX-01 is `mise run //examples/go-map:smoke <preset>` on an EGL
+# preset, since go-map drives OpenGL directly. Its smoke run renders one frame
+# in a hidden window.
 #
 # CB-04: the Go binding contains a callback's panic and reports it nowhere
 # else. The callback returns its declared failure value to native, and the

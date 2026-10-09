@@ -361,10 +361,10 @@ their own context on a display from `tests/graphics`.
 
 The log callback, the async log mask, and the network status belong to the
 process, and the browser, emulator, and simulator runs share one process across
-every group. Only `abi/base/logging.c` and `abi/runtime/network_status.c` change
-them. Each case in those files runs its body under `TEST_PROTECT` and then
-restores the default, so a failed assertion still leaves the next group the
-state that it expects.
+every group. Only `abi/base/logging.c`, `abi/runtime/network_status.c`, and the
+parse-warning case in `abi/map/mlt_option.c` change them. Each of those cases
+runs its body under `TEST_PROTECT` and then restores the default, so a failed
+assertion still leaves the next group the state that it expects.
 
 ## Handle hygiene
 

@@ -349,9 +349,9 @@ static bool still_completed_under_keepalive(void* context) {
 
 // A pending still image on a static map must complete while the host's
 // keep-alive demands all resolve on the render-if-needed fast path. Worker
-// results and the observer delivery that completes the still ride the session
-// scheduler; only a rendering demand used to drain it, which stranded this
-// exact await shape.
+// results and the observer delivery that completes the still run on the
+// session scheduler, so a demand that resolves without rendering still drains
+// that scheduler.
 static void still_image_completes_under_if_needed_keepalive_demands(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();

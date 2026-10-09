@@ -15,7 +15,7 @@
 "LIFE-03" = { na = "An isolate runs on one thread at a time and shares no objects with another isolate, so no borrow of a handle can be in progress on another thread; the borrow within an isolate is VIEW-01" }
 # A native finalizer disposes an abandoned owner at collection, with no Dart
 # code on the stack, and a Dart finalizer then writes the leak to standard
-# error. The test observes both: native no longer knows the runtime, and the
+# error. The test observes both: native has disposed the runtime, and the
 # warning reaches stderr through IOOverrides.
 "LIFE-04" = "bindings/dart/test/collection_test.dart::an abandoned runtime is disposed and reported when collected"
 "LIFE-05" = "bindings/dart/test/collection_test.dart::a map keeps its runtime reachable"

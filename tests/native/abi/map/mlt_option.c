@@ -147,9 +147,7 @@ static void a_plain_tile_decodes_when_the_option_is_off(void) {
   destroy_mlt_map(&map);
 }
 
-static void a_fast_pfor_tile_logs_a_parse_warning_when_the_option_is_off(void) {
-  atomic_store(&mlt_parse_warning_logged, false);
-  MLN_TEST_OK(mln_log_set_callback(record_mlt_parse_warning, NULL, NULL, NULL));
+static void log_mlt_fast_pfor_tile_with_the_option_off(void) {
   mlt_map map = {0};
   render_recorded_tile(&map, "map/issue12432/0-0-0-fastpfor.mlt", false);
   // MapLibre may deliver a warning from its logging thread after the tile
@@ -159,7 +157,17 @@ static void a_fast_pfor_tile_logs_a_parse_warning_when_the_option_is_off(void) {
     "the map logged no MLT parse warning"
   );
   destroy_mlt_map(&map);
-  MLN_TEST_OK(mln_log_clear_callback(NULL));
+}
+
+// The log callback belongs to the process, so the case clears it even when an
+// assertion fails, and Unity still reports the failure.
+static void a_fast_pfor_tile_logs_a_parse_warning_when_the_option_is_off(void) {
+  atomic_store(&mlt_parse_warning_logged, false);
+  MLN_TEST_OK(mln_log_set_callback(record_mlt_parse_warning, NULL, NULL, NULL));
+  if (TEST_PROTECT()) {
+    log_mlt_fast_pfor_tile_with_the_option_off();
+  }
+  (void)mln_log_clear_callback(NULL);
 }
 
 MLN_TEST_GROUP {
