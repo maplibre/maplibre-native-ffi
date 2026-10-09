@@ -176,6 +176,22 @@ order. Regressions cover reordered locations and plugin paint switching between
 uniform and feature-driven bindings. Upstream:
 [maplibre-native#4708](https://github.com/maplibre/maplibre-native/pull/4708).
 
+`0036-platform-locale-expression-options.patch` preserves omitted fraction
+limits at the platform formatter boundary. Android can retain currency defaults
+while honoring explicit limits. The other implementations retain their existing
+defaults. See
+[issue #797](https://github.com/maplibre/maplibre-native-ffi/issues/797).
+Upstream:
+[maplibre-native#4744](https://github.com/maplibre/maplibre-native/pull/4744).
+
+`0037-platform-locale-expression-errors.patch` converts C++ failures from
+platform number formatters and collators into expression evaluation errors.
+Collator comparison helpers allow exceptions to reach the evaluator. A failed
+layer filter excludes the feature, and a failed property expression uses its
+default value. This lets Android JNI failures follow Native's expression error
+handling instead of terminating the process. Upstream:
+[maplibre-native#4745](https://github.com/maplibre/maplibre-native/pull/4745).
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy

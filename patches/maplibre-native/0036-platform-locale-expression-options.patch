@@ -1,0 +1,178 @@
+diff --git a/include/mln/i18n/number_format.hpp b/include/mln/i18n/number_format.hpp
+index 6d1c6aeae1b0..5d75c91d13ca 100644
+--- a/include/mln/i18n/number_format.hpp
++++ b/include/mln/i18n/number_format.hpp
+@@ -1,6 +1,7 @@
+ #pragma once
+ 
+ #include <cstdint>
++#include <optional>
+ #include <string>
+ 
+ namespace mln {
+@@ -9,8 +10,8 @@ namespace platform {
+ std::string formatNumber(double number,
+                          const std::string& localeId,
+                          const std::string& currency,
+-                         uint8_t minFractionDigits,
+-                         uint8_t maxFractionDigits);
++                         std::optional<uint8_t> minFractionDigits,
++                         std::optional<uint8_t> maxFractionDigits);
+ 
+ } // namespace platform
+ } // namespace mln
+diff --git a/platform/android/MapLibreAndroid/src/cpp/i18n/number_format.cpp b/platform/android/MapLibreAndroid/src/cpp/i18n/number_format.cpp
+index c87e20455ba4..2427e64e1a8f 100644
+--- a/platform/android/MapLibreAndroid/src/cpp/i18n/number_format.cpp
++++ b/platform/android/MapLibreAndroid/src/cpp/i18n/number_format.cpp
+@@ -54,8 +54,8 @@ namespace platform {
+ std::string formatNumber(double number,
+                          const std::string& localeId,
+                          const std::string& currency,
+-                         uint8_t minFractionDigits,
+-                         uint8_t maxFractionDigits) {
++                         std::optional<uint8_t> minFractionDigits,
++                         std::optional<uint8_t> maxFractionDigits) {
+     auto env{android::AttachEnv()};
+ 
+     jni::Global<jni::Object<android::Locale>> locale;
+@@ -74,8 +74,10 @@ std::string formatNumber(double number,
+     jni::Global<jni::Object<android::NumberFormat>> formatter;
+     if (currency.empty()) {
+         formatter = jni::NewGlobal(*env, android::NumberFormat::getInstance(*env, locale));
+-        android::NumberFormat::setMinimumFractionDigits(*env, formatter, static_cast<jni::jint>(minFractionDigits));
+-        android::NumberFormat::setMaximumFractionDigits(*env, formatter, static_cast<jni::jint>(maxFractionDigits));
++        android::NumberFormat::setMinimumFractionDigits(
++            *env, formatter, static_cast<jni::jint>(minFractionDigits.value_or(0)));
++        android::NumberFormat::setMaximumFractionDigits(
++            *env, formatter, static_cast<jni::jint>(maxFractionDigits.value_or(3)));
+     } else {
+         formatter = jni::NewGlobal(*env, android::NumberFormat::getCurrencyInstance(*env, locale));
+     }
+diff --git a/platform/android/src/test/number_format_test_stub.cpp b/platform/android/src/test/number_format_test_stub.cpp
+index ca38b354123b..eaa554464cd7 100644
+--- a/platform/android/src/test/number_format_test_stub.cpp
++++ b/platform/android/src/test/number_format_test_stub.cpp
+@@ -6,8 +6,8 @@ namespace platform {
+ std::string formatNumber(double /*number*/,
+                          const std::string& /*localeId */,
+                          const std::string& /*currency*/,
+-                         uint8_t /*minFractionDigits*/,
+-                         uint8_t /*maxFractionDigits*/
++                         std::optional<uint8_t> /*minFractionDigits*/,
++                         std::optional<uint8_t> /*maxFractionDigits*/
+ ) {
+     return "";
+ }
+diff --git a/platform/darwin/core/number_format.mm b/platform/darwin/core/number_format.mm
+index 875ef7e48a98..95f632514313 100644
+--- a/platform/darwin/core/number_format.mm
++++ b/platform/darwin/core/number_format.mm
+@@ -6,7 +6,8 @@
+ namespace platform {
+ 
+ std::string formatNumber(double number, const std::string& localeId, const std::string& currency,
+-                         uint8_t minFractionDigits, uint8_t maxFractionDigits) {
++                         std::optional<uint8_t> minFractionDigits,
++                         std::optional<uint8_t> maxFractionDigits) {
+   // Create a new formatter each time to avoid state pollution between calls
+   NSNumberFormatter* numberFormatter = [[NSNumberFormatter alloc] init];
+ 
+@@ -15,8 +16,8 @@
+   numberFormatter.currencyCode = !currency.empty() ? @(currency.c_str()) : nil;
+ 
+   if (currency.empty()) {
+-    numberFormatter.minimumFractionDigits = minFractionDigits;
+-    numberFormatter.maximumFractionDigits = maxFractionDigits;
++    numberFormatter.minimumFractionDigits = minFractionDigits.value_or(0);
++    numberFormatter.maximumFractionDigits = maxFractionDigits.value_or(3);
+     numberFormatter.numberStyle = NSNumberFormatterDecimalStyle;
+   } else {
+     numberFormatter.numberStyle = NSNumberFormatterCurrencyStyle;
+diff --git a/platform/default/src/mln/i18n/number_format.cpp b/platform/default/src/mln/i18n/number_format.cpp
+index 131595a7cb57..9ea6e77663cf 100644
+--- a/platform/default/src/mln/i18n/number_format.cpp
++++ b/platform/default/src/mln/i18n/number_format.cpp
+@@ -14,8 +14,8 @@ namespace platform {
+ std::string formatNumber(double number,
+                          const std::string& localeId,
+                          const std::string& currency,
+-                         uint8_t minFractionDigits,
+-                         uint8_t maxFractionDigits) {
++                         std::optional<uint8_t> minFractionDigits,
++                         std::optional<uint8_t> maxFractionDigits) {
+     UErrorCode status = U_ZERO_ERROR;
+     icu::UnicodeString ustr;
+     std::string formatted;
+@@ -31,7 +31,8 @@ std::string formatNumber(double number,
+                    .toString(status);
+     } else {
+         ustr = icu::number::NumberFormatter::with()
+-                   .precision(icu::number::Precision::minMaxFraction(minFractionDigits, maxFractionDigits))
++                   .precision(icu::number::Precision::minMaxFraction(minFractionDigits.value_or(0),
++                                                                     maxFractionDigits.value_or(3)))
+                    .locale(locale)
+                    .formatDouble(number, status)
+                    .toString(status);
+@@ -39,7 +40,8 @@ std::string formatNumber(double number,
+     return ustr.toUTF8String(formatted);
+ }
+ #else
+-std::string formatNumber(double number, const std::string&, const std::string&, uint8_t, uint8_t) {
++std::string formatNumber(
++    double number, const std::string&, const std::string&, std::optional<uint8_t>, std::optional<uint8_t>) {
+     return std::to_string(number);
+ }
+ #endif
+diff --git a/platform/qt/src/mln/number_format.cpp b/platform/qt/src/mln/number_format.cpp
+index e64dfa171d15..b049708c02e3 100644
+--- a/platform/qt/src/mln/number_format.cpp
++++ b/platform/qt/src/mln/number_format.cpp
+@@ -1,4 +1,4 @@
+-#include <mln/util/platform.hpp>
++#include <mln/i18n/number_format.hpp>
+ 
+ #include <QLocale>
+ #include <QString>
+@@ -9,8 +9,8 @@ namespace platform {
+ std::string formatNumber(double number,
+                          const std::string& localeId,
+                          const std::string& currency,
+-                         uint8_t minFractionDigits,
+-                         uint8_t maxFractionDigits) {
++                         std::optional<uint8_t> minFractionDigits,
++                         std::optional<uint8_t> maxFractionDigits) {
+     QString formatted;
+     // Qt Locale::toString() API takes only one precision argument
+     (void)minFractionDigits;
+@@ -19,7 +19,7 @@ std::string formatNumber(double number,
+     if (!currency.empty()) {
+         formatted = locale.toCurrencyString(number);
+     } else {
+-        formatted = locale.toString(number, 'f', maxFractionDigits);
++        formatted = locale.toString(number, 'f', maxFractionDigits.value_or(3));
+     }
+     return formatted.toStdString();
+ }
+diff --git a/src/mln/style/expression/number_format.cpp b/src/mln/style/expression/number_format.cpp
+index d6c6ce21a66e..25abd14c189b 100644
+--- a/src/mln/style/expression/number_format.cpp
++++ b/src/mln/style/expression/number_format.cpp
+@@ -53,7 +53,7 @@ EvaluationResult NumberFormat::evaluate(const EvaluationContext& params) const {
+         evaluatedCurrency = toString(*currencyResult);
+     }
+ 
+-    uint8_t evaluatedMinFractionDigits = 0;
++    std::optional<uint8_t> evaluatedMinFractionDigits;
+     if (minFractionDigits) {
+         auto minDigitsResult = minFractionDigits->evaluate(params);
+         if (!minDigitsResult) {
+@@ -62,7 +62,7 @@ EvaluationResult NumberFormat::evaluate(const EvaluationContext& params) const {
+         evaluatedMinFractionDigits = static_cast<uint8_t>(minDigitsResult->get<double>());
+     }
+ 
+-    uint8_t evaluatedMaxFractionDigits = 3;
++    std::optional<uint8_t> evaluatedMaxFractionDigits;
+     if (maxFractionDigits) {
+         auto maxDigitsResult = maxFractionDigits->evaluate(params);
+         if (!maxDigitsResult) {

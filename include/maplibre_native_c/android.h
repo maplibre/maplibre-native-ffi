@@ -13,13 +13,11 @@ extern "C" {
 #endif
 
 /**
- * Initializes Android platform services that require access to the host app.
+ * Initializes Android platform services.
  *
- * This function is required before Android HTTP requests can validate TLS using
- * the app's platform trust policy, and before `asset://` or
- * `file:///android_asset/` URLs can read files from the APK `assets/`
- * directory. The host must package the rustls-platform-verifier Android
- * component in the APK or AAB.
+ * Required once per Android process, before creating a runtime. Configures
+ * locale services, TLS verification, and APK asset access. The host must
+ * package the rustls-platform-verifier Android component in the APK or AAB.
  *
  * `jni_env` must be a `JNIEnv*` valid for the calling thread. `jni_class` is
  * accepted for static JNI binding adapters and ignored by the implementation;
@@ -36,8 +34,7 @@ extern "C" {
  * - MLN_STATUS_OK when initialization succeeds or was already completed;
  * - MLN_STATUS_INVALID_ARGUMENT when `jni_env` or `context` is null;
  * - MLN_STATUS_UNSUPPORTED when this library was not built for Android;
- * - MLN_STATUS_NATIVE_ERROR when Android verifier or AssetManager
- *   initialization fails.
+ * - MLN_STATUS_NATIVE_ERROR when platform initialization fails.
  */
 MLN_API mln_status
 mln_android_init(void* jni_env, void* jni_class, void* context) MLN_NOEXCEPT;
