@@ -1,0 +1,16 @@
+diff --git a/src/mln/renderer/tile_pyramid.cpp b/src/mln/renderer/tile_pyramid.cpp
+index 2d3faebc03d55cc9cdf58086ae81b6ac5d26d107..4bb08a55d994b95ec4d267c03f2822f53c626f99 100644
+--- a/src/mln/renderer/tile_pyramid.cpp
++++ b/src/mln/renderer/tile_pyramid.cpp
+@@ -406,8 +406,9 @@ std::unordered_map<std::string, std::vector<Feature>> TilePyramid::queryRendered
+                 // Shrinking sky corners preserves their horizon location. Allow projection roundoff before
+                 // interpreting a bounds miss as an antimeridian crossing.
+                 constexpr double epsilon = 16.0 * std::numeric_limits<double>::epsilon();
+-                return bounds.min.x - epsilon <= c.x && c.x <= bounds.max.x + epsilon &&
+-                       bounds.min.y - epsilon <= c.y && c.y <= bounds.max.y + epsilon;
++                // Longitude identifies the world copy. Horizon latitude bounds can expand
++                // when a screen rectangle shrinks, without crossing the antimeridian.
++                return bounds.min.x - epsilon <= c.x && c.x <= bounds.max.x + epsilon;
+             });
+         if (!covered) {
+             for (auto& c : queryGeometry) {

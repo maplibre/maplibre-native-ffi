@@ -197,3 +197,57 @@ every listed patch's paths, the sync prints the path first. A forced checkout
 also removes an untracked file that sits where a new pin adds a tracked one, and
 the sync removes a file that a listed patch adds before applying that patch
 again.
+
+`0037-globe-projection.patch` imports globe projection for OpenGL, Metal,
+Vulkan, and WebGPU from
+[maplibre-native#4533](https://github.com/maplibre/maplibre-native/pull/4533),
+at commit `ba5cdfee6d5da8d6497ee2d13f8a6af4a2ac2470`. It carries the core,
+shader, CMake, and sample n-gon plugin changes; upstream tests, fixtures, and
+SDK examples stay upstream. A style selects the globe with
+`"projection": {"type": "globe"}`. The patch applies before the other carried
+changes so that camera animations, location indicators, queries, and source-free
+styles preserve their FFI behavior.
+
+`0038-globe-query-horizon-roundoff.patch` allows projection roundoff when the
+globe query path checks whether a rectangle crosses the antimeridian. Shrinking
+corners outside the sphere preserves their horizon locations, but floating-point
+roundoff can move them just outside the original bounds. Treating that as a wrap
+moves the query away from visible features. The check includes the rectangle
+center to detect a real antimeridian crossing when all four corners lie in the
+sky. This patch follows the globe import and remains separate for submission to
+its upstream branch.
+
+`0039-projection-location-occlusion.patch` exposes the globe horizon query on
+Native’s standalone `MapProjection` helper. It delegates to the copied
+transform, so coordinate conversion and occlusion can use the same camera
+snapshot.
+
+`0040-globe-query-longitude-wrap.patch` checks longitude alone when identifying
+an antimeridian crossing. Shrinking a screen rectangle can expand its latitude
+bounds at the globe horizon; this previously moved the query to another world
+copy and excluded visible features, including the n-gon sample plugin.
+
+`0041-globe-horizon-visibility.patch` converts sphere vectors with `atan2` and
+uses one roundoff-aware horizon predicate for location and tile-point queries.
+Locations returned by off-globe screen unprojection remain visible at the
+horizon, while points beyond it remain occluded.
+
+`0042-coordinate-projection-world-copy.patch` projects coordinates into the
+camera's internal world copy in both `Map` and `MapProjection`. An anchored
+Mercator move across the antimeridian previously left the reported center's
+pixel a full world away from the viewport center.
+
+`0043-globe-location-image-displacement.patch` computes the top-image and shadow
+displacement direction at the globe puck and handles coincident horizon samples.
+Sampling the viewport bottom can produce a zero direction when that pixel lies
+outside the globe, causing location images to disappear.
+
+`0044-location-indicator-drawable-recreation.patch` binds cached geometry and
+textures to newly created location drawables. Changing projection rebuilds the
+drawables with different shaders; the previous dirty flags suppressed their
+initial vertex uploads and texture bindings, making the images disappear.
+
+`0045-globe-query-east-copy.patch` includes the eastern tile copy in globe
+feature queries. Query padding near the eastern antimeridian can reach a feature
+on a tile's western edge, even when the query itself does not cross the seam.
+The existing per-tile deduplication preserves one result per feature.

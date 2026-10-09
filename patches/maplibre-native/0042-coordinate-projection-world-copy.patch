@@ -1,0 +1,34 @@
+diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
+index 5028e570c35cd11e03e6efdefae45b26f43f51ce..b2223656d327da1938b5c946acb821648232dacf 100644
+--- a/src/mln/map/map.cpp
++++ b/src/mln/map/map.cpp
+@@ -608,7 +608,11 @@ ScreenCoordinate Map::pixelForLatLng(const LatLng& latLng) const {
+     // antimeridian, we unwrap the point longitude so it would be seen if
+     // e.g. the next antimeridian side is visible.
+     LatLng unwrappedLatLng = latLng.wrapped();
+-    unwrappedLatLng.unwrapForShortestPath(impl->transform.getLatLng());
++    const LatLng center = impl->transform.getLatLng(LatLng::Unwrapped);
++    const LatLng wrappedCenter = center.wrapped();
++    unwrappedLatLng.unwrapForShortestPath(wrappedCenter);
++    unwrappedLatLng = {unwrappedLatLng.latitude(),
++                       unwrappedLatLng.longitude() + center.longitude() - wrappedCenter.longitude()};
+     return impl->transform.latLngToScreenCoordinate(unwrappedLatLng);
+ }
+ 
+diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
+index 5aa51067e627659a8cfb7d58d9621a961f9a90ef..3b304928203b2920e91846ce7003616c7f2092de 100644
+--- a/src/mln/map/map_projection.cpp
++++ b/src/mln/map/map_projection.cpp
+@@ -20,7 +20,11 @@ bool MapProjection::isLocationOccluded(const LatLng& latLng) const {
+ ScreenCoordinate MapProjection::pixelForLatLng(const LatLng& latLng) const {
+     // The implementation is just a copy from map.cpp
+     LatLng unwrappedLatLng = latLng.wrapped();
+-    unwrappedLatLng.unwrapForShortestPath(transform->getLatLng());
++    const LatLng center = transform->getLatLng(LatLng::Unwrapped);
++    const LatLng wrappedCenter = center.wrapped();
++    unwrappedLatLng.unwrapForShortestPath(wrappedCenter);
++    unwrappedLatLng = {unwrappedLatLng.latitude(),
++                       unwrappedLatLng.longitude() + center.longitude() - wrappedCenter.longitude()};
+     return transform->latLngToScreenCoordinate(unwrappedLatLng);
+ }
+ 

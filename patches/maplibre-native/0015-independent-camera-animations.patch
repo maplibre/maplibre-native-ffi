@@ -1,5 +1,5 @@
 diff --git a/include/mln/map/camera.hpp b/include/mln/map/camera.hpp
-index 63e7d2b92c20..a67ab2dddec5 100644
+index 63e7d2b92c20674298044f93dc4daae4e1ab51ca..a67ab2dddec598380cc980adad612dfa8cb602d6 100644
 --- a/include/mln/map/camera.hpp
 +++ b/include/mln/map/camera.hpp
 @@ -13,6 +13,10 @@ namespace mln {
@@ -26,7 +26,7 @@ index 63e7d2b92c20..a67ab2dddec5 100644
  
      /** Creates an animation with no options specified. */
 diff --git a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
-index 56059f023100..30b02b65d597 100644
+index 56059f02310032380ac0d093973d6e99f353eb88..30b02b65d5972811d10209188370651d546db2fd 100644
 --- a/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
 +++ b/platform/android/MapLibreAndroid/src/main/java/org/maplibre/android/maps/MapLibreMap.java
 @@ -877,6 +877,9 @@ public final class MapLibreMap {
@@ -60,7 +60,7 @@ index 56059f023100..30b02b65d597 100644
    }
  
 diff --git a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
-index dd722a6003b7..0831b6239e7e 100644
+index dd722a6003b7c3c212e1549ee3320ca7feb483df..0831b6239e7e281ba308d55bf80e6dbacd4044c0 100644
 --- a/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
 +++ b/platform/android/MapLibreAndroid/src/test/java/org/maplibre/android/maps/MapLibreMapTest.kt
 @@ -106,6 +106,7 @@ class MapLibreMapTest : BaseTest() {
@@ -88,7 +88,7 @@ index dd722a6003b7..0831b6239e7e 100644
      }
  
 diff --git a/platform/macos/src/MLNMapView.mm b/platform/macos/src/MLNMapView.mm
-index 90a44dd7888f..55dd1e77fdc0 100644
+index 90a44dd7888ffdf48b2f4601bd43ae81ca769ac3..55dd1e77fdc016edfc6be517444a5faa81000eb4 100644
 --- a/platform/macos/src/MLNMapView.mm
 +++ b/platform/macos/src/MLNMapView.mm
 @@ -1307,6 +1307,9 @@ - (void)setCenterCoordinate:(CLLocationCoordinate2D)centerCoordinate
@@ -132,10 +132,10 @@ index 90a44dd7888f..55dd1e77fdc0 100644
    _mbglMap->easeTo(mln::CameraOptions().withBearing(direction).withPadding(
                         MLNEdgeInsetsFromNSEdgeInsets(self.contentInsets)),
 diff --git a/src/mln/map/transform.cpp b/src/mln/map/transform.cpp
-index c05acb105252..f091f2d5cf35 100644
+index 1554c316b8b04c95b196bc86777d759014625841..f0c3996080ac6503400b6c63d3bdb0f28bf17b53 100644
 --- a/src/mln/map/transform.cpp
 +++ b/src/mln/map/transform.cpp
-@@ -95,8 +95,7 @@ CameraOptions Transform::getCameraOptions(const std::optional<EdgeInsets>& paddi
+@@ -96,8 +96,7 @@ CameraOptions Transform::getCameraOptions(const std::optional<EdgeInsets>& paddi
  
  /**
   * Change any combination of center, zoom, bearing, and pitch, without
@@ -145,7 +145,7 @@ index c05acb105252..f091f2d5cf35 100644
   */
  void Transform::jumpTo(const CameraOptions& camera) {
      easeTo(camera);
-@@ -104,8 +103,8 @@ void Transform::jumpTo(const CameraOptions& camera) {
+@@ -105,8 +104,8 @@ void Transform::jumpTo(const CameraOptions& camera) {
  
  /**
   * Change any combination of center, zoom, bearing, pitch and edgeInsets, with a
@@ -156,7 +156,7 @@ index c05acb105252..f091f2d5cf35 100644
   */
  void Transform::easeTo(const CameraOptions& inputCamera, const AnimationOptions& animation) {
      CameraOptions camera = inputCamera;
-@@ -163,49 +162,33 @@ void Transform::easeTo(const CameraOptions& inputCamera, const AnimationOptions&
+@@ -171,17 +170,12 @@ void Transform::easeTo(const CameraOptions& inputCamera, const AnimationOptions&
  
      // Minimize rotation by taking the shorter path around the circle.
      bearing = _normalizeAngle(bearing, state.getBearing());
@@ -174,15 +174,40 @@ index c05acb105252..f091f2d5cf35 100644
 -                            .withRotatingInProgress(bearing != startBearing));
      const EdgeInsets startEdgeInsets = state.getEdgeInsets();
  
+     // On the globe the zoom is eased in equator terms so the planet holds its size as the latitude changes, and the
+@@ -201,15 +195,17 @@ void Transform::easeTo(const CameraOptions& inputCamera, const AnimationOptions&
+                                         : 0.0;
+ 
      startTransition(
 -        camera,
-+        inputCamera,
++        globe && inputCamera.center && !inputCamera.zoom ? CameraOptions(inputCamera).withZoom(zoom) : inputCamera,
          animation,
          [=, this](double t) {
-             Point<double> framePoint = util::interpolate(startPoint, endPoint, t);
-             LatLng frameLatLng = Projection::unproject(framePoint, state.zoomScale(startZoom));
-             double frameZoom = util::interpolate(startZoom, zoom, t);
--            state.setLatLngZoom(frameLatLng, frameZoom);
++            LatLng frameLatLng = latLng;
++            double frameZoom = zoom;
+             if (globe) {
+                 // An anchor moves the center a frame at a time (see startTransition), so it stays, and the zoom
+                 // follows its latitude to keep the planet's size.
+                 const bool movesAroundAnchor = camera.anchor && !camera.center;
+-                LatLng frameLatLng = movesAroundAnchor ? state.getLatLng() : latLng;
+-                double frameZoom = zoom;
++                frameLatLng = movesAroundAnchor ? state.getLatLng() : latLng;
++                frameZoom = zoom;
+                 if (movesAroundAnchor) {
+                     frameZoom = util::interpolate(normalizedStartZoom, normalizedZoom, t) +
+                                 VerticalPerspectiveProjection::zoomAdjustment(0, frameLatLng.latitude());
+@@ -223,35 +219,24 @@ void Transform::easeTo(const CameraOptions& inputCamera, const AnimationOptions&
+                                           VerticalPerspectiveProjection::zoomAdjustment(0, frameLatLng.latitude())
+                                     : startZoom;
+                 }
+-                state.setLatLngZoom(frameLatLng, frameZoom);
++
+             } else {
+                 Point<double> framePoint = util::interpolate(startPoint, endPoint, t);
+-                LatLng frameLatLng = Projection::unproject(framePoint, state.zoomScale(startZoom));
+-                double frameZoom = util::interpolate(startZoom, zoom, t);
+-                state.setLatLngZoom(frameLatLng, frameZoom);
+-            }
 -            state.setCenterAltitude(util::interpolate(startCenterAlt, centerAlt, t));
 -            if (bearing != startBearing) {
 -                state.setBearing(util::wrap(util::interpolate(startBearing, bearing, t), -pi, pi));
@@ -204,7 +229,9 @@ index c05acb105252..f091f2d5cf35 100644
 -            }
 -            if (fov != startFov) {
 -                state.setFieldOfView(util::interpolate(startFov, fov, t));
--            }
++                frameLatLng = Projection::unproject(framePoint, state.zoomScale(startZoom));
++                frameZoom = util::interpolate(startZoom, zoom, t);
+             }
 +            return CameraOptions()
 +                .withCenter(frameLatLng)
 +                .withZoom(frameZoom)
@@ -220,7 +247,7 @@ index c05acb105252..f091f2d5cf35 100644
          },
          duration);
  }
-@@ -257,9 +240,8 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+@@ -310,9 +295,8 @@ void Transform::flyTo(const CameraOptions& inputCamera,
  
      // Minimize rotation by taking the shorter path around the circle.
      bearing = _normalizeAngle(bearing, state.getBearing());
@@ -231,7 +258,7 @@ index c05acb105252..f091f2d5cf35 100644
      const double startPitch = state.getPitch();
      const double startRoll = state.getRoll();
      const double startFov = state.getFieldOfView();
-@@ -339,23 +321,11 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+@@ -417,15 +401,6 @@ void Transform::flyTo(const CameraOptions& inputCamera,
          }
          duration = std::chrono::duration_cast<Duration>(std::chrono::duration<double>(S / velocity));
      }
@@ -245,6 +272,12 @@ index c05acb105252..f091f2d5cf35 100644
 -    }
 -
      const double startScale = state.getScale();
+     const double deltaLatitude = globe ? VerticalPerspectiveProjection::differenceOfAnglesDegrees(
+                                              startLatLng.latitude(), latLng.latitude())
+@@ -433,13 +408,10 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+     const double deltaLongitude = globe ? VerticalPerspectiveProjection::differenceOfAnglesDegrees(
+                                               startLatLng.longitude(), latLng.longitude())
+                                         : 0.0;
 -    state.setProperties(
 -        TransformStateProperties().withPanningInProgress(true).withScalingInProgress(true).withRotatingInProgress(
 -            bearing != startBearing));
@@ -256,11 +289,43 @@ index c05acb105252..f091f2d5cf35 100644
          animation,
          [=, this](double k) {
              /// s: The distance traveled along the flight path, measured in
-@@ -375,31 +345,21 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+@@ -447,9 +419,11 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+             double s = k * S;
+             double us = k == 1.0 ? 1.0 : u(s);
  
-             // Convert to geographic coordinates and set the new viewpoint.
-             LatLng frameLatLng = Projection::unproject(framePoint, startScale);
--            state.setLatLngZoom(frameLatLng, frameZoom);
++            LatLng frameLatLng = latLng;
++            double frameZoom = zoom;
+             if (globe) {
+-                LatLng frameLatLng = latLng;
+-                double frameZoom = zoom;
++                frameLatLng = latLng;
++                frameZoom = zoom;
+                 if (k < 1.0) {
+                     frameLatLng = VerticalPerspectiveProjection::interpolateLatLng(
+                                       startLatLng, deltaLatitude, deltaLongitude, us)
+@@ -463,12 +437,12 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+                         frameZoom = zoom;
+                     }
+                 }
+-                state.setLatLngZoom(frameLatLng, frameZoom);
++
+             } else {
+                 // Calculate the current point and zoom level along the flight path.
+                 Point<double> framePoint = util::interpolate(startPoint, endPoint, us);
+-                double frameZoom = linearZoomInterpolation ? util::interpolate(startZoom, zoom, k)
+-                                                           : startZoom + state.scaleZoom(1 / w(s));
++                frameZoom = linearZoomInterpolation ? util::interpolate(startZoom, zoom, k)
++                                                    : startZoom + state.scaleZoom(1 / w(s));
+ 
+                 // Zoom can be NaN if size is empty.
+                 if (std::isnan(frameZoom)) {
+@@ -476,33 +450,23 @@ void Transform::flyTo(const CameraOptions& inputCamera,
+                 }
+ 
+                 // Convert to geographic coordinates and set the new viewpoint.
+-                LatLng frameLatLng = Projection::unproject(framePoint, startScale);
+-                state.setLatLngZoom(frameLatLng, frameZoom);
+-            }
 -            state.setCenterAltitude(util::interpolate(startCenterAlt, centerAlt, us));
 -            if (bearing != startBearing) {
 -                state.setBearing(util::wrap(util::interpolate(startBearing, bearing, k), -pi, pi));
@@ -282,7 +347,8 @@ index c05acb105252..f091f2d5cf35 100644
 -            }
 -            if (fov != startFov) {
 -                state.setFieldOfView(util::interpolate(startFov, fov, k));
--            }
++                frameLatLng = Projection::unproject(framePoint, startScale);
+             }
 +            return CameraOptions()
 +                .withCenter(frameLatLng)
 +                .withZoom(frameZoom)
@@ -302,7 +368,7 @@ index c05acb105252..f091f2d5cf35 100644
  }
  
  // MARK: - Position
-@@ -585,130 +545,177 @@ ProjectionMode Transform::getProjectionMode() const {
+@@ -696,142 +660,190 @@ ProjectionMode Transform::getProjectionMode() const {
  
  // MARK: - Transition
  
@@ -418,12 +484,13 @@ index c05acb105252..f091f2d5cf35 100644
  
 -    transitionFrameFn = [isAnimated, animation, frame, anchor, anchorLatLng, this](const TimePoint now) {
 -        float t = isAnimated ? (std::chrono::duration<float>(now - transitionStart) / transitionDuration) : 1.0f;
+-        // On the globe the anchor is re-read every frame and the zoom around it is GL JS's blend of the exact
+-        // solution and a damped heuristic; the exact solution alone jumps near the horizon.
+-        const bool globeZoomAround = anchor && state.isGlobeRendering();
+-        const LatLng zoomLocation = globeZoomAround ? state.screenCoordinateToLatLng(*anchor) : anchorLatLng;
+-        const double zoomBefore = state.getZoom();
 -        if (t >= 1.0) {
 -            frame(1.0);
--        } else {
--            util::UnitBezier ease = animation.easing ? *animation.easing : util::DEFAULT_TRANSITION_EASE;
--            frame(ease.solve(t, 0.001));
--        }
 +    // Compose the camera before applying constraints. In particular, padding
 +    // and field of view determine the pitch limit, and center and zoom jointly
 +    // determine the geographic bounds and altitude scale.
@@ -432,13 +499,35 @@ index c05acb105252..f091f2d5cf35 100644
 +    state.setBearing(util::deg2rad(-*camera.bearing));
 +    state.setRoll(util::deg2rad(*camera.roll));
 +    state.setPitch(std::min(getMaxPitchForEdgeInsets(*camera.padding), util::deg2rad(*camera.pitch)));
++    if (projectionForZoom) state.setProjectionDefinition(projectionForZoom(*camera.zoom));
 +    state.constrainCameraAndZoomToBounds(camera, *camera.zoom);
++    const bool globeZoomAround = anchored && state.isGlobeRendering();
++    const auto anchorLocation = globeZoomAround ? state.screenCoordinateToLatLng(*anchored->anchor)
++                                : anchored      ? anchored->anchorLatLng
++                                                : LatLng{};
++    const double zoomBefore = state.getZoom();
 +    state.setLatLngZoom(*camera.center, *camera.zoom);
-+    if (anchored) state.moveLatLng(anchored->anchorLatLng, *anchored->anchor);
++    if (anchored) {
++        if (globeZoomAround && state.getZoom() != zoomBefore) {
++            VerticalPerspectiveProjection::zoomAroundPoint(
++                state, *anchored->anchor, anchorLocation, state.getZoom() - zoomBefore);
+         } else {
+-            util::UnitBezier ease = animation.easing ? *animation.easing : util::DEFAULT_TRANSITION_EASE;
+-            frame(ease.solve(t, 0.001));
++            state.moveLatLng(anchored->anchorLatLng, *anchored->anchor);
+         }
++    }
 +    state.setCenterAltitude(*camera.centerAltitude);
 +}
  
--        if (anchor) state.moveLatLng(anchorLatLng, *anchor);
+-        if (anchor) {
+-            if (globeZoomAround && state.getZoom() != zoomBefore) {
+-                VerticalPerspectiveProjection::zoomAroundPoint(
+-                    state, *anchor, zoomLocation, state.getZoom() - zoomBefore);
+-            } else {
+-                state.moveLatLng(anchorLatLng, *anchor);
+-            }
+-        }
 +void Transform::updateMovementFlags() {
 +    uint16_t moving = 0;
 +    for (const auto& transition : transitions) moving |= transition->fields & transition->movingFields;
@@ -581,7 +670,7 @@ index c05acb105252..f091f2d5cf35 100644
  
  void Transform::setGestureInProgress(bool inProgress) {
 diff --git a/src/mln/map/transform.hpp b/src/mln/map/transform.hpp
-index d9ec6acf284a..3107c308b74b 100644
+index f032ad1f499b4d8d821f85371823454d9ad02ad1..2e8812ebe501ed26d37b6fd55afaf3855d3afc94 100644
 --- a/src/mln/map/transform.hpp
 +++ b/src/mln/map/transform.hpp
 @@ -13,6 +13,8 @@
@@ -593,7 +682,7 @@ index d9ec6acf284a..3107c308b74b 100644
  
  namespace mln {
  
-@@ -113,8 +115,10 @@ public:
+@@ -116,8 +118,10 @@ public:
      // Transitions
      bool inTransition() const;
      void updateTransitions(const TimePoint& now);
@@ -606,7 +695,7 @@ index d9ec6acf284a..3107c308b74b 100644
      void cancelTransitions();
  
      // Gesture
-@@ -144,16 +148,49 @@ private:
+@@ -148,16 +152,49 @@ private:
  
      void startTransition(const CameraOptions&,
                           const AnimationOptions&,
@@ -659,11 +748,11 @@ index d9ec6acf284a..3107c308b74b 100644
 +    Duration latestTransitionDuration;
 +    std::vector<std::shared_ptr<Transition>> transitions;
 +    bool updatingTransitions = false;
+     std::function<ProjectionDefinition(double)> projectionForZoom;
  };
  
- } // namespace mln
 diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
-index 3a886f6622c9..8547b69fcdf2 100644
+index 3a886f6622c93bd5dc545c92e97c45e04d77ea42..8547b69fcdf2b19bb9d00ed65c51e1308341bc39 100644
 --- a/test/map/transform.test.cpp
 +++ b/test/map/transform.test.cpp
 @@ -45,7 +45,7 @@ TEST(Transform, InvalidZoom) {

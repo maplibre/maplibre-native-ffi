@@ -1,0 +1,25 @@
+diff --git a/include/mln/map/map_projection.hpp b/include/mln/map/map_projection.hpp
+--- a/include/mln/map/map_projection.hpp
++++ b/include/mln/map/map_projection.hpp
+@@ -15,6 +15,7 @@
+     explicit MapProjection(const TransformState&);
+     ~MapProjection();
+ 
++    bool isLocationOccluded(const LatLng&) const;
+     ScreenCoordinate pixelForLatLng(const LatLng&) const;
+     LatLng latLngForPixel(const ScreenCoordinate&, LatLng::WrapMode = LatLng::Wrapped) const;
+ 
+diff --git a/src/mln/map/map_projection.cpp b/src/mln/map/map_projection.cpp
+--- a/src/mln/map/map_projection.cpp
++++ b/src/mln/map/map_projection.cpp
+@@ -12,6 +12,10 @@
+     : transform(std::make_unique<Transform>(state)) {}
+ 
+ MapProjection::~MapProjection() = default;
++
++bool MapProjection::isLocationOccluded(const LatLng& latLng) const {
++    return transform->isLocationOccluded(latLng);
++}
+ 
+ ScreenCoordinate MapProjection::pixelForLatLng(const LatLng& latLng) const {
+     // The implementation is just a copy from map.cpp

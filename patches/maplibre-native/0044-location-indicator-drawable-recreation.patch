@@ -1,0 +1,22 @@
+diff --git a/src/mln/renderer/layers/render_location_indicator_layer.cpp b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+index 3cd4f4489f5e53b99a8dda12aa5372861cdc4151..c6669ae3b090e9bc18c4c1caeedf2b39b55a1938 100644
+--- a/src/mln/renderer/layers/render_location_indicator_layer.cpp
++++ b/src/mln/renderer/layers/render_location_indicator_layer.cpp
+@@ -1322,6 +1322,9 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+             createQuadGeometry(*drawable, drawableInfo.geometry);
+ 
+             drawableInfo.drawable.emplace(*drawable);
++            // A new drawable needs the cached vertices and texture bound again.
++            drawableInfo.dirty = true;
++            drawableInfo.textureInfo.dirty = true;
+ 
+             // add drawable to layer group
+             localLayerGroup->addDrawable(std::move(drawable));
+@@ -1347,6 +1350,7 @@ void RenderLocationIndicatorLayer::update(gfx::ShaderRegistry& shaders,
+         };
+ 
+         const auto createCircleDrawable = [&]() {
++            renderImpl->circleDrawableInfo.dirty = true;
+             // circle[0] is the center
+             const auto& geometry = renderImpl->circleDrawableInfo.geometry;
+             const uint16_t vertexCount = static_cast<uint16_t>(geometry.size());

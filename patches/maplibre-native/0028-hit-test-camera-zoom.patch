@@ -1,5 +1,5 @@
 diff --git a/CHANGELOG.md b/CHANGELOG.md
-index 3b42e4119476..c8c03057ca79 100644
+index 3b42e4119476a905f8328d1febcb79260a04f27a..c8c03057ca790f88538a792ba5775a436e546a48 100644
 --- a/CHANGELOG.md
 +++ b/CHANGELOG.md
 @@ -34,6 +34,7 @@
@@ -11,31 +11,20 @@ index 3b42e4119476..c8c03057ca79 100644
  - [OpenGL] Fix invisible raster layers on Adreno 3xx by avoiding an in-place alpha assignment in the fragment shader.
  - [core] Draw numbers and short uppercase codes upright in vertical CJK line labels ([#4565](https://github.com/maplibre/maplibre-native/issues/4565)), compat to [maplibre-gl-js#8205](https://github.com/maplibre/maplibre-gl-js/pull/8205).
 diff --git a/src/mln/geometry/feature_index.cpp b/src/mln/geometry/feature_index.cpp
-index 2edfd668fe64..ecfd8c969643 100644
+index 88814c847dd4a2550a7c30e47d7c445f3065fba1..45b72e1246f48eb9233946b1f5ed1f94489af018 100644
 --- a/src/mln/geometry/feature_index.cpp
 +++ b/src/mln/geometry/feature_index.cpp
-@@ -290,9 +290,16 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
- 
-         bool needsCrossTileIndex = renderLayer->baseImpl->getTypeInfo()->crossTileIndex ==
+@@ -294,7 +294,7 @@ void FeatureIndex::addFeature(std::unordered_map<std::string, std::vector<Featur
                                     style::LayerTypeInfo::CrossTileIndex::Required;
--        if (!needsCrossTileIndex &&
--            !renderLayer->queryIntersectsFeature(
--                queryGeometry, *geometryTileFeature, tileID.z, transformState, pixelsToTileUnits, posMatrix, state)) {
-+        // we use the float camera zoom here, not the integer tile ID zoom,
-+        // because for the query we take into account the actual rendered
-+        // size of the geometry (#2781)
-+        if (!needsCrossTileIndex && !renderLayer->queryIntersectsFeature(queryGeometry,
-+                                                                         *geometryTileFeature,
-+                                                                         static_cast<float>(transformState.getZoom()),
-+                                                                         transformState,
-+                                                                         pixelsToTileUnits,
-+                                                                         posMatrix,
-+                                                                         state)) {
+         if (!needsCrossTileIndex &&
+             !renderLayer->queryIntersectsFeature(
+-                queryGeometry, *geometryTileFeature, tileID.z, transformState, pixelsToTileUnits, projector, state)) {
++                queryGeometry, *geometryTileFeature, static_cast<float>(transformState.getZoom()), transformState, pixelsToTileUnits, projector, state)) {
              continue;
          }
  
 diff --git a/test/api/query.test.cpp b/test/api/query.test.cpp
-index dea165d1cf4e..b94f10253df4 100644
+index dea165d1cf4e856ca5262b86355d35f451d12867..b94f10253df4cf7364875a8e80c27f65b7ee2b6a 100644
 --- a/test/api/query.test.cpp
 +++ b/test/api/query.test.cpp
 @@ -438,3 +438,59 @@ TEST(Query, QueryRenderedFeaturesLineOffsetEndpoint) {
