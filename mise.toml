@@ -372,14 +372,21 @@ ctest --preset "$usage_preset"
 '''
 
 [tasks."android-sdk-packages"]
-description = "Install the pinned Android SDK packages into $ANDROID_HOME."
-usage = 'flag "--ndk-only" help="Install only the NDK for native compilation"'
+description = "Install the pinned packages into the selected Android SDK."
+usage = '''
+flag "--sdk-root <path>" default="{{env.ANDROID_HOME | default(value='')}}" help="Android SDK directory; defaults to ANDROID_HOME"
+flag "--ndk-only" help="Install only the NDK for native compilation"
+'''
 run = '''
 args=()
 if [[ "$usage_ndk_only" == true ]]; then
   args+=(--ndk-only)
 fi
-bash .mise/bin/sync-android-packages "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
+if [[ -z "$usage_sdk_root" ]]; then
+  echo "Set ANDROID_HOME or pass --sdk-root; install the repository SDK with mise -E android install." >&2
+  exit 1
+fi
+bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
 '''
 
 [tasks."android-emulator:boot"]

@@ -68,18 +68,34 @@ case "$1" in
     export "$rustflags_variable=${rustflags# }"
     ;;
   android-*)
-    ndk_prebuilt="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt/linux-x86_64"
+    descriptor="$MISE_MONOREPO_ROOT/build/$1/install/share/maplibre-native-c/artifact.json"
+    zig_target=$(sed -n 's/^[[:space:]]*"zigTarget":[[:space:]]*"\([^"]*\)".*/\1/p' "$descriptor")
+    if [[ ! "$zig_target" =~ ^((aarch64|x86_64|arm)-linux-android)\.([0-9]+)$ ]]; then
+      echo "The Android native artifact has an invalid Zig target: $zig_target" >&2
+      return 2
+    fi
+    android_api=${BASH_REMATCH[3]}
+    ndk_prebuilt_root="$ANDROID_HOME/ndk/$MLN_FFI_ANDROID_NDK_VERSION/toolchains/llvm/prebuilt"
+    ndk_host_prebuilts=()
+    while IFS= read -r ndk_host_prebuilt; do
+      ndk_host_prebuilts+=("$ndk_host_prebuilt")
+    done < <(find "$ndk_prebuilt_root" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort)
+    if (( ${#ndk_host_prebuilts[@]} != 1 )); then
+      echo "The pinned Android NDK must contain one host prebuilt under $ndk_prebuilt_root." >&2
+      return 2
+    fi
+    ndk_prebuilt=${ndk_host_prebuilts[0]}
     compiler_target="$cargo_target"
     if [[ "$cargo_target" == armv7-linux-androideabi ]]; then
       compiler_target=armv7a-linux-androideabi
     fi
     target_env="${cargo_target//-/_}"
-    export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=$cargo_target --sysroot=$ndk_prebuilt/sysroot"
-    export "CC_$target_env=$ndk_prebuilt/bin/${compiler_target}24-clang"
-    export "CXX_$target_env=$ndk_prebuilt/bin/${compiler_target}24-clang++"
+    export "BINDGEN_EXTRA_CLANG_ARGS_$target_env=--target=${compiler_target}${android_api} --sysroot=\"$ndk_prebuilt/sysroot\""
+    export "CC_$target_env=$ndk_prebuilt/bin/${compiler_target}${android_api}-clang"
+    export "CXX_$target_env=$ndk_prebuilt/bin/${compiler_target}${android_api}-clang++"
     # tr rather than ${var^^}: macOS tasks can run under Bash 3.2.
     target_env_upper="$(printf '%s' "$target_env" | tr '[:lower:]' '[:upper:]')"
-    export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_prebuilt/bin/${compiler_target}24-clang"
+    export "CARGO_TARGET_${target_env_upper}_LINKER=$ndk_prebuilt/bin/${compiler_target}${android_api}-clang"
     ;;
   ohos-*64-*)
     # The OHOS SDK clang target drops the `-unknown` vendor from the cargo target.
