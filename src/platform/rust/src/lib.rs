@@ -4,4 +4,6 @@
 mod android;
 #[cfg(not(target_os = "emscripten"))]
 mod http_client;
+#[cfg(all(target_os = "linux", not(target_env = "ohos")))]
+mod i18n;
 mod image;

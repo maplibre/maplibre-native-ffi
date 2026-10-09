@@ -36,6 +36,21 @@ aligned with the style specification across every layer type. Typed entry points
 cover behavior beyond construction, such as source-type validation and per-frame
 property updates.
 
+### Locale expressions on Linux
+
+Linux GNU and musl builds bundle ICU4X data for `number-format`, `collator`, and
+`resolved-locale`. Currency formatting uses ICU4X's experimental currency data
+with explicit fraction-digit options. A collator retains its selected locale,
+which `resolved-locale` reports with supported collation extensions.
+
+An explicit locale uses a BCP 47 language tag, such as `sv-SE` or
+`de-DE-u-co-phonebk`. An omitted or unsupported locale uses `LC_ALL`, then
+`LC_COLLATE` for comparison or `LC_NUMERIC` for formatting, then `LANG`.
+Environment locale names can include underscores and an encoding suffix, such as
+`sv_SE.UTF-8`. The `C`, `POSIX`, and unsupported default locales use `en-US`.
+Locale data comes from the library, so these expressions work without installed
+system locale archives.
+
 ## Render session
 
 A render session renders one map to one render target. A map carries at most one

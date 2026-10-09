@@ -1,6 +1,8 @@
 use std::cell::Cell;
 
 mod invalidation;
+#[cfg(all(target_os = "linux", not(target_env = "ohos")))]
+mod locale;
 use std::error::Error as StdError;
 #[cfg(not(target_os = "emscripten"))]
 use std::ffi::CStr;

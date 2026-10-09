@@ -13,6 +13,18 @@ crate-type = ["staticlib", "rlib"]
 # same pixels everywhere.
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }
 
+[target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dependencies]
+# Currency patterns use experimental provider APIs; keep their ICU4X versions aligned.
+fixed_decimal = { version = "0.7.2", features = ["ryu"] }
+icu_collator = "=2.3.0"
+icu_decimal = "=2.3.0"
+icu_experimental = "=0.6.0"
+icu_locale = "=2.3.1"
+icu_locale_core = "=2.3.0"
+icu_provider = "2.3.1"
+tinystr = "0.8.4"
+writeable = "0.6.4"
+
 # The browser gets its HTTP from emscripten_fetch instead, so it needs none of
 # the transport stack: no sockets, no TLS, no worker pool.
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
