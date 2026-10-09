@@ -2419,6 +2419,7 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           MISE_TASK_SKIP: //:build
+          GALLIUM_DRIVER: d3d12
         run: mise run //examples/compose-map:smoke windows-x64-wgl
       - id: suite-10
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

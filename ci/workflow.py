@@ -94,6 +94,17 @@ def runner(preset: str) -> str:
 
 
 def suite_commands(source: dict[str, object], preset: str) -> list[str]:
+    return [line for line, _ in suite_steps(source, preset)]
+
+
+def suite_environment(source: dict[str, object], preset: str) -> dict[str, dict]:
+    """The step environment of each suite command that sets one, by command."""
+    return {line: env for line, env in suite_steps(source, preset) if env}
+
+
+def suite_steps(
+    source: dict[str, object], preset: str
+) -> list[tuple[str, dict[str, str]]]:
     commands = []
     for suite in source["suites"]:
         if platform(preset) not in suite["platforms"]:
@@ -119,7 +130,7 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
             line = f"mise run {shlex.join(arguments)}"
             if command.get("display") and platform(preset) == "linux-gnu":
                 line = f"{XVFB_RUN} {line}"
-            commands.append(line)
+            commands.append((line, dict(command.get("env", {}))))
     return commands
 
 
@@ -373,6 +384,7 @@ def target_rows(
             "boot": device_boot(preset),
             "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
+            "environment": suite_environment(source, preset),
         }
         claimed_runners.add(row_runner)
         if preset in packaged:

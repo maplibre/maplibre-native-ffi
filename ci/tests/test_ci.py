@@ -413,6 +413,33 @@ class WorkflowTest(unittest.TestCase):
         self.assertTrue(linux["zig"])
         self.assertTrue(linux["gradle"])
 
+    def test_a_command_environment_reaches_only_its_own_step(self):
+        source = copy.deepcopy(self.source)
+        command = "mise run //examples/c-map:smoke windows-x64-wgl"
+        source["suites"].append(
+            {
+                "platforms": ["windows"],
+                "commands": [
+                    {
+                        "task": "//examples/c-map:smoke",
+                        "include": ["windows-x64-wgl"],
+                        "env": {"STEP_PROBE": "1"},
+                    }
+                ],
+            }
+        )
+        jobs = suite(source, self.presets, "extended")["jobs"]
+        environments = [
+            step.get("env", {})
+            for job in jobs.values()
+            for step in job.get("steps", [])
+            if "STEP_PROBE" in step.get("env", {}) or step.get("run") == command
+        ]
+        # The packaged target's consumer environment still applies.
+        self.assertEqual(
+            environments, [{"MISE_TASK_SKIP": "//:build", "STEP_PROBE": "1"}]
+        )
+
     def test_every_android_emulator_target_smoke_runs_the_map_example(self):
         rows = {row["preset"]: row for row in target_rows(self.source, self.presets)}
         for preset in ("android-x64-egl", "android-x64-vulkan"):

@@ -125,8 +125,10 @@ def target_job(row: dict) -> dict:
             f"${{{{ !cancelled() && steps.{prerequisites[-1]}.outcome == 'success' }}}}"
         )
 
-    def add_suite(command: str, **fields) -> None:
+    def add_suite(command: str, env: dict[str, str] | None = None) -> None:
         suites.append(f"suite-{len(suites) + 1}")
+        env = {**(env or {}), **row["environment"].get(command, {})}
+        fields = {"env": env} if env else {}
         steps.append(run(command, id=suites[-1], **{"if": guard()}, **fields))
 
     for command in checks:
@@ -146,7 +148,7 @@ def target_job(row: dict) -> dict:
             steps.append(run(command, name=name, id=step_id, **{"if": guard()}))
             prerequisites.append(step_id)
         for command in row["consumer_commands"]:
-            add_suite(command, env={"MISE_TASK_SKIP": "//:build"})
+            add_suite(command, {"MISE_TASK_SKIP": "//:build"})
     # A failed job must not claim the immutable shared Zig cache with a partial
     # set of packages. Only rows covering every Zig project can save it.
     if row["zig"]:

@@ -53,6 +53,9 @@ runs:
         New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
         New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
 
+        # The x64 driver also carries d3d12, which Mesa prefers when it is
+        # present. The suites draw with llvmpipe, and a step that needs d3d12
+        # selects it in its own environment.
         "GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV
         # Software rendering is slower than hardware, so the native suites
         # stretch their waits and hang watchdog to match.

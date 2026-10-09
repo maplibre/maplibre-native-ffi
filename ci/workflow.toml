@@ -15,7 +15,8 @@ ready = [
 #
 # Every example's `smoke` task renders one frame and exits. A command marked
 # `display` opens a window, so on Linux, whose runners have no display server,
-# it runs under Xvfb and draws with Mesa's software drivers.
+# it runs under Xvfb and draws with Mesa's software drivers. A command's `env`
+# sets environment variables for its step alone.
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [
@@ -57,11 +58,16 @@ commands = [
 # compose-map on Windows Vulkan shares its frames with Skiko's Direct3D 12
 # through VK_KHR_external_memory_win32, which Lavapipe, the runners' only Vulkan
 # driver, does not offer, so no driver there can render it and it only builds.
+#
+# On Windows WGL it imports Skiko's Direct3D 12 texture into OpenGL. Of Mesa's
+# drivers only d3d12 opens that shared handle, so the x64 step selects it, and
+# the rest of the job keeps llvmpipe.
 [[suites]]
 platforms = ["linux-gnu", "macos", "windows"]
 commands = [
   { task = "//bindings/kotlin:test" },
-  { task = "//examples/compose-map:smoke", exclude = ["windows-x64-vulkan", "windows-arm64-vulkan"], display = true },
+  { task = "//examples/compose-map:smoke", exclude = ["windows-x64-wgl", "windows-x64-vulkan", "windows-arm64-vulkan"], display = true },
+  { task = "//examples/compose-map:smoke", include = ["windows-x64-wgl"], display = true, env = { GALLIUM_DRIVER = "d3d12" } },
   { task = "//examples/compose-map:build", include = ["windows-x64-vulkan", "windows-arm64-vulkan"] },
   { task = "//examples/lwjgl-map:smoke", display = true },
 ]
