@@ -151,11 +151,6 @@ icons on existing tiles. Native pixel regressions cover late registration with
 synchronous and asynchronous GeoJSON, with and without text. Upstream:
 [maplibre-native#4714](https://github.com/maplibre/maplibre-native/pull/4714).
 
-`0031-custom-geometry-query-before-data.patch` returns an empty source query
-while a custom geometry tile awaits its first data. The Native tile regression
-queries before delivery and after parsing. Upstream:
-[maplibre-native#4718](https://github.com/maplibre/maplibre-native/pull/4718).
-
 `0032-webgpu-frame-stats.patch` resets WebGPU's per-frame draw count and
 advances the frame count when a render pass begins, matching Metal and Vulkan
 cleanup. Each drawable draw also advances the cumulative count in WebGPU, Metal,
@@ -213,3 +208,33 @@ every listed patch's paths, the sync prints the path first. A forced checkout
 also removes an untracked file that sits where a new pin adds a tracked one, and
 the sync removes a file that a listed patch adds before applying that patch
 again.
+
+`0047-globe-projection.patch` imports globe projection for OpenGL, Metal,
+Vulkan, and WebGPU from
+[maplibre-native#4533](https://github.com/maplibre/maplibre-native/pull/4533),
+at commit `37772b25ea25e34fc07508729043aa8dd4cf64c1`. It carries the core,
+shader, CMake, and sample n-gon plugin changes; upstream tests, fixtures, and
+SDK examples stay upstream. A style selects the globe with
+`"projection": {"type": "globe"}`. The patch applies before the other carried
+changes so that camera animations, location indicators, queries, and source-free
+styles preserve their FFI behavior. The import includes the upstream fixes for
+whole-viewport and eastern antimeridian queries, location-image displacement,
+and location drawable recreation.
+
+`0039-projection-location-occlusion.patch` exposes the globe horizon query on
+Native’s standalone `MapProjection` helper. It delegates to the copied
+transform, so coordinate conversion and occlusion can use the same camera
+snapshot.
+
+`0041-globe-horizon-visibility.patch` converts sphere vectors with `atan2` and
+uses one roundoff-aware horizon predicate for location and tile-point queries.
+Locations returned by off-globe screen unprojection remain visible at the
+horizon, while points beyond it remain occluded.
+
+`0046-antimeridian-anchor-center.patch` wraps the Mercator center after an
+anchored move across the antimeridian, while preserving the longitude range of
+explicit bounds. This keeps coordinate conversion aligned with the camera in
+both `Map` and `MapProjection` and replaces our coordinate-projection world-copy
+patch. The patch includes the upstream Map and Transform regressions. Upstream:
+[maplibre-native#4746](https://github.com/maplibre/maplibre-native/pull/4746),
+at commit `f5284ee74e52bce8072307c19a7d7807c6a0d83e`.

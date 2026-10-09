@@ -1668,3 +1668,41 @@ fn global_state_defaults_updates_and_style_replacement() {
     map.set_global_state_property("theme", b"null").unwrap();
     assert_eq!(map.get_global_state().unwrap(), br#"{"theme":null}"#);
 }
+
+#[test]
+fn coordinate_projection_follows_the_camera_world_copy_after_anchored_moves() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    map.set_style_json(VALID_STYLE_JSON.as_bytes()).unwrap();
+    for direction in [-1.0, 1.0] {
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(0.0, direction * 179.0));
+        camera.zoom = Some(4.0);
+        map.jump_to(&camera).unwrap();
+        for zoom in [5.0, 6.0] {
+            let mut anchored = CameraOptions::default();
+            anchored.zoom = Some(zoom);
+            anchored.anchor = Some(ScreenPoint::new(256.0 + direction * 128.0, 256.0));
+            map.jump_to(&anchored).unwrap();
+            let center = map.camera().unwrap().center.unwrap();
+            assert!(center.longitude * direction < -175.0);
+            let projection = map.create_projection().unwrap();
+            for offset in [-0.25, 0.0, 0.25] {
+                let coordinate = LatLng::new(center.latitude, center.longitude + offset);
+                let expected_x = 256.0 + offset * 512.0 * 2.0_f64.powf(zoom) / 360.0;
+                let point = map.pixel_for_lat_lng(coordinate).unwrap();
+                let copied_point = projection.pixel_for_lat_lng(coordinate).unwrap();
+                assert!(
+                    (point.x - expected_x).abs() < 1e-3,
+                    "{point:?} at {coordinate:?}"
+                );
+                assert!((point.y - 256.0).abs() < 1e-3);
+                assert!((copied_point.x - expected_x).abs() < 1e-3);
+                assert!((copied_point.y - 256.0).abs() < 1e-3);
+            }
+            projection.close().unwrap();
+        }
+    }
+    map.close().unwrap();
+    runtime.close().unwrap();
+}

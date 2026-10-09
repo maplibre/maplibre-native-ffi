@@ -5357,6 +5357,21 @@ final class mln_plugin_query_context_v1 extends ffi.Struct {
 
   @ffi.Uint32()
   external int viewport_height;
+
+  @ffi.Double()
+  external double projection_transition;
+
+  @ffi.Array.multi([4])
+  external ffi.Array<ffi.Double> tile_mercator_coords;
+
+  @ffi.Array.multi([16])
+  external ffi.Array<ffi.Double> projection_matrix;
+
+  @ffi.Array.multi([4])
+  external ffi.Array<ffi.Double> clipping_plane;
+
+  @ffi.Double()
+  external double pixels_to_sphere_radians;
 }
 
 typedef mln_plugin_query_feature_fn =
@@ -5658,6 +5673,21 @@ final class mln_plugin_uniform_context_v1 extends ffi.Struct {
 
   @ffi.Float()
   external double pixel_ratio;
+
+  @ffi.Float()
+  external double projection_transition;
+
+  @ffi.Array.multi([4])
+  external ffi.Array<ffi.Float> tile_mercator_coords;
+
+  @ffi.Array.multi([16])
+  external ffi.Array<ffi.Float> projection_matrix;
+
+  @ffi.Array.multi([4])
+  external ffi.Array<ffi.Float> clipping_plane;
+
+  @ffi.Float()
+  external double pixels_to_sphere_radians;
 }
 
 enum mln_plugin_uniform_scope_v1 {

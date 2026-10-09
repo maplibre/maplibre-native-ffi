@@ -4568,3 +4568,356 @@ fn projection_captures_last_rendered_update_and_survives_session() {
     .join()
     .unwrap();
 }
+
+#[test]
+fn globe_background_renders_a_sphere_and_projection_snapshot_survives_map() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(512, 512, 1.0),
+    )
+    .unwrap();
+    map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#0000ff"}}]}"##).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(0.0, 0.0));
+    camera.zoom = Some(0.0);
+    map.jump_to(&camera).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let image = loop {
+        runtime.pump(Some(Duration::ZERO), None).unwrap();
+        session.render_update().unwrap();
+        match session.texture_image_info() {
+            Ok(info) => {
+                let mut pixels = vec![0; info.byte_length];
+                session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                let center = (256 * 512 + 256) * 4;
+                if pixels[center..center + 4] == [0, 0, 255, 255] {
+                    break pixels;
+                }
+            }
+            Err(error) if error.kind() == ErrorKind::InvalidState => {}
+            Err(error) => panic!("unexpected globe readback error: {error:?}"),
+        }
+        assert!(Instant::now() < deadline, "globe background did not render");
+    };
+    assert_eq!(image[3], 0, "the corner lies outside the globe");
+    let coordinate = LatLng::new(20.0, 30.0);
+    let map_point = map.pixel_for_lat_lng(coordinate).unwrap();
+    let projection = session.create_projection().unwrap();
+    let point = projection.pixel_for_lat_lng(coordinate).unwrap();
+    assert!((point.x - map_point.x).abs() < 1e-6);
+    assert!((point.y - map_point.y).abs() < 1e-6);
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+    std::thread::spawn(move || {
+        let result = projection.lat_lng_for_pixel(point).unwrap();
+        assert!((result.latitude - coordinate.latitude).abs() < 1e-6);
+        assert!((result.longitude - coordinate.longitude).abs() < 1e-6);
+        projection.close().unwrap();
+    })
+    .join()
+    .unwrap();
+}
+
+#[test]
+fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    for (width, height, pitch, bearing) in [
+        (512, 512, 0.0, 0.0),
+        (64, 64, 40.0, 25.0),
+        (512, 128, 0.0, 0.0),
+    ] {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(width, height, 1.0)).unwrap();
+        let (_context, session) = create_owned_texture_session(
+            &map.attach_ref().unwrap(),
+            RenderTargetExtent::new(width, height, 1.0),
+        )
+        .unwrap();
+        map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{"points":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"front","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}},{"type":"Feature","id":"back","properties":{},"geometry":{"type":"Point","coordinates":[180,0]}}]}}},"layers":[{"id":"points","type":"circle","source":"points","paint":{"circle-radius":12,"circle-color":"red"}}]}"##).unwrap();
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(0.0, 0.0));
+        camera.zoom = Some(0.0);
+        camera.pitch = Some(pitch);
+        camera.bearing = Some(bearing);
+        map.jump_to(&camera).unwrap();
+        let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
+            ScreenPoint::new(0.0, 0.0),
+            ScreenPoint::new(f64::from(width), f64::from(height)),
+        ));
+        let mut options = RenderedFeatureQueryOptions::default();
+        options.layer_ids = Some(vec!["points".into()]);
+        let centers = [
+            (0.0, "front"),
+            (179.999, "back"),
+            (180.0, "back"),
+            (-180.0, "back"),
+            (-179.999, "back"),
+        ];
+        for (longitude, expected_id) in centers {
+            camera.center = Some(LatLng::new(0.0, longitude));
+            map.jump_to(&camera).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let features = loop {
+                runtime.pump(Some(Duration::ZERO), None).unwrap();
+                session.render_update().unwrap();
+                if let Ok(info) = session.texture_image_info() {
+                    let mut pixels = vec![0; info.byte_length];
+                    session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                    let center = ((height / 2 * width + width / 2) * 4) as usize;
+                    if pixels[center] > 200 {
+                        break session
+                            .query_rendered_features(&geometry, Some(&options))
+                            .unwrap();
+                    }
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "the visible globe point did not render at {longitude}"
+                );
+            };
+            assert_eq!(
+                features.len(),
+                1,
+                "width={width} height={height} pitch={pitch} bearing={bearing} longitude={longitude}"
+            );
+            let feature: JsonValue = serde_json::from_slice(&features[0].feature).unwrap();
+            assert_eq!(feature["id"], expected_id);
+            let center_query = RenderedQueryGeometry::point(ScreenPoint::new(
+                f64::from(width) / 2.0,
+                f64::from(height) / 2.0,
+            ));
+            let center = session
+                .query_rendered_features(&center_query, Some(&options))
+                .unwrap();
+            assert_eq!(
+                center.len(),
+                1,
+                "width={width} height={height} pitch={pitch} bearing={bearing} longitude={longitude}"
+            );
+            let feature: JsonValue = serde_json::from_slice(&center[0].feature).unwrap();
+            assert_eq!(feature["id"], expected_id);
+        }
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+}
+
+#[test]
+fn location_bearing_accuracy_sector_keeps_its_direction_on_globe_and_mercator() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(256, 256, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(256, 256, 1.0),
+    )
+    .unwrap();
+    for projection in ["mercator", "globe"] {
+        for bearing in [0, 90] {
+            let style = json!({"version":8,"transition":{"duration":0},"projection":{"type":projection},"sources":{},"layers":[{
+                "id":"location","type":"location-indicator","paint":{
+                    "location":[0,0,0], "bearing":bearing, "bearing-accuracy":30,
+                    "bearing-accuracy-radius":40, "bearing-accuracy-color":"red"
+                }
+            }]});
+            map.set_style_json(&serde_json::to_vec(&style).unwrap())
+                .unwrap();
+            let mut camera = CameraOptions::default();
+            camera.center = Some(LatLng::new(0.0, 0.0));
+            camera.zoom = Some(3.0);
+            map.jump_to(&camera).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let pixels = loop {
+                runtime.pump(Some(Duration::ZERO), None).unwrap();
+                session.render_update().unwrap();
+                if let Ok(info) = session.texture_image_info() {
+                    let mut pixels = vec![0; info.byte_length];
+                    session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                    if pixels.chunks_exact(4).any(|p| p[0] > 100) {
+                        break pixels;
+                    }
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "bearing sector did not render on {projection}"
+                );
+            };
+            let mut north = 0u64;
+            let mut south = 0u64;
+            let mut east = 0u64;
+            let mut west = 0u64;
+            for (i, pixel) in pixels.chunks_exact(4).enumerate() {
+                let x = i % 256;
+                let y = i / 256;
+                if y < 128 {
+                    north += u64::from(pixel[0]);
+                } else {
+                    south += u64::from(pixel[0]);
+                }
+                if x < 128 {
+                    west += u64::from(pixel[0]);
+                } else {
+                    east += u64::from(pixel[0]);
+                }
+            }
+            if bearing == 0 {
+                assert!(
+                    north > 4 * south,
+                    "north sector points elsewhere on {projection}"
+                );
+            } else {
+                assert!(
+                    east > 4 * west,
+                    "east sector points elsewhere on {projection}: N={north} S={south} E={east} W={west}"
+                );
+            }
+        }
+    }
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+fn globe_location_top_image_renders_when_the_viewport_bottom_is_in_the_sky() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    for projection in ["mercator", "globe"] {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+        let (_context, session) = create_owned_texture_session(
+            &map.attach_ref().unwrap(),
+            RenderTargetExtent::new(512, 512, 1.0),
+        )
+        .unwrap();
+        map.set_style_json(&serde_json::to_vec(&json!({"version":8,"transition":{"duration":0},"projection":{"type":projection},"sources":{},"layers":[{
+            "id":"location","type":"location-indicator","layout":{"top-image":"green","bearing-image":"blue"},"paint":{"location":[0,0,0]}
+        }]})).unwrap()).unwrap();
+        for (name, color) in [("green", [0u8, 255, 0, 255]), ("blue", [0u8, 0, 255, 255])] {
+            let image = PremultipliedRgba8Image::new(
+                TextureImageInfo::new(16, 16, 64, 1024),
+                color.repeat(256),
+            );
+            map.set_style_image(name, &image, None).unwrap();
+        }
+        for pitch in [0.0, 40.0] {
+            let mut camera = CameraOptions::default();
+            camera.center = Some(LatLng::new(0.0, 0.0));
+            camera.zoom = Some(0.0);
+            camera.pitch = Some(pitch);
+            map.jump_to(&camera).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                runtime.pump(Some(Duration::ZERO), None).unwrap();
+                session.render_update().unwrap();
+                if let Ok(info) = session.texture_image_info() {
+                    let mut pixels = vec![0; info.byte_length];
+                    session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                    let green = pixels
+                        .chunks_exact(4)
+                        .filter(|p| p[1] > 200 && p[2] < 20)
+                        .count();
+                    if green > 100 {
+                        break;
+                    }
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "top image did not render on {projection} at pitch {pitch}"
+                );
+            }
+        }
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+}
+
+#[test]
+fn location_drawables_keep_images_and_accuracy_circle_across_projection_changes() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+    let (_context, session) = create_owned_texture_session(
+        &map.attach_ref().unwrap(),
+        RenderTargetExtent::new(512, 512, 1.0),
+    )
+    .unwrap();
+    for projection in ["mercator", "mercator", "globe", "globe", "mercator"] {
+        map.set_style_json(&serde_json::to_vec(&json!({"version":8,"transition":{"duration":0},"projection":{"type":projection},"sources":{},"layers":[{
+            "id":"location","type":"location-indicator","layout":{"top-image":"green","bearing-image":"blue","shadow-image":"yellow"},"paint":{"location":[0,0,0],"accuracy-radius":3000000,"accuracy-radius-color":"red"}
+        }]})).unwrap()).unwrap();
+        for (name, size, color) in [
+            ("green", 8, [0u8, 255, 0, 255]),
+            ("blue", 16, [0u8, 0, 255, 255]),
+            ("yellow", 24, [255u8, 255, 0, 255]),
+        ] {
+            let pixels = color.repeat((size * size) as usize);
+            let image = PremultipliedRgba8Image::new(
+                TextureImageInfo::new(size, size, size * 4, pixels.len()),
+                pixels,
+            );
+            map.set_style_image(name, &image, None).unwrap();
+        }
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(0.0, 0.0));
+        camera.zoom = Some(0.0);
+        map.jump_to(&camera).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        loop {
+            runtime.pump(Some(Duration::ZERO), None).unwrap();
+            session.render_update().unwrap();
+            if let Ok(info) = session.texture_image_info() {
+                let mut pixels = vec![0; info.byte_length];
+                session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                let center = (256 * 512 + 256) * 4;
+                let blue = pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[2] > 200 && p[0] < 20 && p[1] < 20)
+                    .count();
+                let yellow = pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[0] > 200 && p[1] > 200 && p[2] < 20)
+                    .count();
+                let red = pixels
+                    .chunks_exact(4)
+                    .filter(|p| p[0] > 200 && p[1] < 20 && p[2] < 20)
+                    .count();
+                if pixels[center + 1] > 200
+                    && pixels[center] < 20
+                    && blue > 100
+                    && yellow > 100
+                    && red > 100
+                {
+                    break;
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "location components disappeared on {projection}: center={:?} blue={blue} yellow={yellow} red={red}",
+                    &pixels[center..center + 4]
+                );
+            }
+            assert!(
+                Instant::now() < deadline,
+                "location frame did not render on {projection}"
+            );
+        }
+    }
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}

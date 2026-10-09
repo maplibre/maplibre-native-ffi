@@ -1,0 +1,81 @@
+diff --git a/src/mln/map/transform_state.cpp b/src/mln/map/transform_state.cpp
+index 19ca709748b6ba2c856476a2af229371f5194634..2ce7151c753d49b7dd33ae26c088f147ec69c318 100644
+--- a/src/mln/map/transform_state.cpp
++++ b/src/mln/map/transform_state.cpp
+@@ -1140,7 +1140,9 @@ void TransformState::moveLatLng(const LatLng& latLng, const ScreenCoordinate& an
+     auto centerCoord = Projection::project(getLatLng(LatLng::Unwrapped), scale);
+     auto latLngCoord = Projection::project(latLng, scale);
+     auto anchorCoord = Projection::project(screenCoordinateToLatLng(anchor), scale);
+-    setLatLngZoom(Projection::unproject(centerCoord + latLngCoord - anchorCoord, scale), getZoom());
++    const LatLng center = Projection::unproject(centerCoord + latLngCoord - anchorCoord, scale);
++    // Wrapped, as easeTo and GL JS's setLocationAtPoint leave it, unless bounds keep it in their range.
++    setLatLngZoom(bounds == LatLngBounds() ? center.wrapped() : center, getZoom());
+ }
+ 
+ void TransformState::setLatLngZoom(const LatLng& latLng, double zoom) {
+diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
+index e3e4fa317cff92d9ebe9786a45645fcb04a8f9aa..3437b619802e3ca2dd3ffcbf28437ea96d71b4ad 100644
+--- a/test/map/map.test.cpp
++++ b/test/map/map.test.cpp
+@@ -401,6 +401,26 @@ TEST(Map, LatLngForPixelUnwrapped) {
+     EXPECT_NEAR(-135.0, projection.latLngForPixel({2048.0, 256.0}).longitude(), 1e-4);
+ }
+ 
++// A zoom around a point keeps the place under it. Across the antimeridian the center comes back wrapped, as GL JS's
++// setLocationAtPoint leaves it, or pixelForLatLng puts every place a world away.
++TEST(Map, PixelForLatLngAfterZoomAroundAPointAcrossTheAntimeridian) {
++    MapTest<> test;
++    test.map.setSize({256, 256});
++    test.map.jumpTo(CameraOptions().withCenter(LatLng{0.0, 179.9}).withZoom(5.0));
++
++    const ScreenCoordinate anchor{230.0, 128.0};
++    const LatLng place = test.map.latLngForPixel(anchor);
++    test.map.jumpTo(CameraOptions().withZoom(6.0).withAnchor(anchor));
++
++    EXPECT_LE(std::abs(test.map.getCameraOptions().center->longitude()), 180.0);
++    const ScreenCoordinate point = test.map.pixelForLatLng(place);
++    EXPECT_NEAR(anchor.x, point.x, 1e-6);
++    EXPECT_NEAR(anchor.y, point.y, 1e-6);
++    const ScreenCoordinate projected = MapProjection(test.map).pixelForLatLng(place);
++    EXPECT_NEAR(anchor.x, projected.x, 1e-6);
++    EXPECT_NEAR(anchor.y, projected.y, 1e-6);
++}
++
+ TEST(Map, Offline) {
+     MapTest<MainResourceLoader> test{":memory:", "."};
+ 
+diff --git a/test/map/transform.test.cpp b/test/map/transform.test.cpp
+index 8547b69fcdf2b19bb9d00ed65c51e1308341bc39..8c176138da5451e7e3d29d169029b59dac1d3563 100644
+--- a/test/map/transform.test.cpp
++++ b/test/map/transform.test.cpp
+@@ -465,6 +465,30 @@ TEST(Transform, Antimeridian) {
+     ASSERT_NEAR(coordinateWaikiri.longitude(), coordinateFromPixel.longitude(), 1e-4);
+ }
+ 
++// A zoom around a point across the antimeridian leaves the center wrapped, as GL JS's setLocationAtPoint does. Bounds
++// across the antimeridian keep it in their range, as easeTo does.
++TEST(Transform, ZoomAroundAPointAcrossTheAntimeridian) {
++    for (const bool bounded : {false, true}) {
++        SCOPED_TRACE(bounded ? "bounds from 170 to 190 degrees" : "no bounds");
++        Transform transform;
++        transform.resize({256, 256});
++        if (bounded) {
++            transform.setLatLngBounds(LatLngBounds::hull({-10.0, 170.0}, {10.0, 190.0}));
++        }
++        transform.jumpTo(CameraOptions().withCenter(LatLng{0.0, 179.9}).withZoom(5.0));
++        transform.jumpTo(CameraOptions().withZoom(6.0).withAnchor(ScreenCoordinate{230.0, 128.0}));
++
++        const double longitude = transform.getLatLng(LatLng::Unwrapped).longitude();
++        if (bounded) {
++            EXPECT_GT(longitude, 180.0);
++            EXPECT_LT(longitude, 190.0);
++        } else {
++            EXPECT_GT(longitude, -180.0);
++            EXPECT_LT(longitude, -178.0);
++        }
++    }
++}
++
+ TEST(Transform, Camera) {
+     Transform transform;
+     transform.resize({1000, 1000});
