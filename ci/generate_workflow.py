@@ -117,10 +117,10 @@ def target_job(row: dict) -> dict:
     suites: list[str] = []
 
     def guard() -> str:
-        # A suite runs after an earlier suite failed, so one failure no longer
-        # hides the rest, but not without the build or device it needs. Each
-        # prerequisite runs only after the ones before it succeeded, so the
-        # last one stands for them all.
+        # A suite runs even after an earlier suite failed, so one run reports
+        # every failed suite, but only when its build and device succeeded.
+        # Each prerequisite runs only after the ones before it succeeded, so
+        # the last one stands for them all.
         return (
             f"${{{{ !cancelled() && steps.{prerequisites[-1]}.outcome == 'success' }}}}"
         )

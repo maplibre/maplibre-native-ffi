@@ -60,10 +60,10 @@ query them.
 
 ## Replace, detach, or abandon
 
-Resize and target replacement are ordered asynchronous calls. They may start from any
-thread. A caller driver applies them when the host next services ready work on
-the graphics thread. Resize assigns a new extent generation; later frame demands
-capture that generation.
+Resize and target replacement are ordered asynchronous calls. They may start
+from any thread. A caller driver applies them when the host next services ready
+work on the graphics thread. Resize assigns a new extent generation; later frame
+demands capture that generation.
 
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
@@ -81,14 +81,14 @@ A session's scale factor is fixed at attachment because its shaders use a fixed
 pixel ratio, so a resize that names a different one reports an invalid-argument
 status. Detach the session and attach a new one at the new scale factor.
 Map-owned feature state survives that, and the next render update pushes it into
-the new renderer.
+the new session.
 
 Normal detach completes asynchronously. The selected driver destroys graphics
-resources on its owner and detaches the map. Continue servicing a caller driver
-until the completion runs, then destroy the detached session handle from any
-thread.
+resources on its graphics thread and detaches the map. Continue servicing a
+caller driver until the completion runs, then destroy the detached session
+handle from any thread.
 
-Abandon is the failure path for an owner that can no longer service graphics
+Abandon is the failure path for a host that can no longer service graphics
 work. It closes control and mailboxes, invalidates graphics accessors, detaches
 the map in CPU state, and performs no graphics calls. On a core-worker session
 it first waits for the worker's current driver call to end, since that call can

@@ -76,7 +76,7 @@ not add a handwritten runtime case.
 | Zig     | Allocator-aware futures and synchronization remain. Generated values provide recursive disposal, including handles; abandoned creation results require an allocation-free release submission.                                                                                                      |
 | Go      | Completion channels, cgo handle tokens, and callback ingress remain. Generated C trampolines and typed Go converters honor cgo pointer lifetime rules. Retained native storage contains tokens rather than Go pointers.                                                                            |
 | .NET    | Task completion, GCHandle roots, handle state, and unmanaged callback ingress remain. Generated partial classes and static converters avoid reflection and dynamic dispatch over records.                                                                                                          |
-| Kotlin  | Common public types and operations are generated once. JVM FFM, Android JavaCPP, and Kotlin/Native emit direct platform calls over a shared semantic plan. Arenas, JNI/thread attachment, stable references, and continuation delivery remain platform runtime mechanisms.                         |
+| Kotlin  | Common public types and operations are generated once. JVM FFM, Android JNI, and Kotlin/Native emit direct platform calls over a shared semantic plan. Arenas, JNI/thread attachment, stable references, and continuation delivery remain platform runtime mechanisms.                             |
 | Python  | PyO3 handles native callback ingress and releases the GIL around calls that can wait for callbacks. Generated native methods, Python methods, values, and stubs share one plan. Redundant Python forwarding may be removed when PyO3 preserves the public asynchronous and introspection contract. |
 | Dart    | Native code captures borrowed callback storage before posting to an isolate. Generated native copiers and Dart decoders share value semantics. Listener tokens, isolate delivery, and native record release remain runtime mechanisms.                                                             |
 
@@ -145,12 +145,13 @@ exactly one allocation for a nested result. The shared generator suite passes 55
 tests. Dart's 85 integration tests and static analysis pass against this
 worktree's rebuilt macOS ARM64 Metal library.
 
-The host microbenchmark in `tests/bindgen/capture_benchmark.cpp` captures 64
-layer records, each containing four 64-byte strings. Seven samples each run
-20,000 iterations. Median time fell from 5,717 ns with the previous native
-adapter to 1,473.2 ns with generated capture, about 74% lower. This measures
-adapter creation, copying, listener delivery, and destruction on this host; it
-does not measure map rendering or other platforms.
+The host microbenchmark `tests/bindgen/capture_benchmark.cpp`, which commit
+`0de5d956a` added and the branch does not keep, captures 64 layer records, each
+containing four 64-byte strings. Seven samples each run 20,000 iterations.
+Median time fell from 5,717 ns with the previous native adapter to 1,473.2 ns
+with generated capture, about 74% lower. This measures adapter creation,
+copying, listener delivery, and destruction on this host; it does not measure
+map rendering or other platforms.
 
 ## Creation-result ownership
 

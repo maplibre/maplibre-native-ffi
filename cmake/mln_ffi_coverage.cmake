@@ -8,8 +8,7 @@
 #
 # The coverage presets in CMakePresets.json are local tools. Their `vendor`
 # settings set `maplibre-native-ffi.ci` to false, and ci/workflow.py leaves
-# every
-# preset with that setting out of the generated CI jobs.
+# every preset with that setting out of the generated CI jobs.
 
 option(MLN_FFI_ENABLE_COVERAGE
        "Instrument the C API sources for source-based code coverage" OFF)
@@ -34,8 +33,7 @@ function(mln_ffi_coverage_runtime out_var)
     COMMAND "${CMAKE_CXX_COMPILER}" --print-file-name=libclang_rt.profile_osx.a
     OUTPUT_VARIABLE runtime OUTPUT_STRIP_TRAILING_WHITESPACE
     RESULT_VARIABLE result)
-  if(NOT result EQUAL 0
-     OR NOT EXISTS "${runtime}")
+  if(NOT result EQUAL 0 OR NOT EXISTS "${runtime}")
     message(FATAL_ERROR "The compiler resolved no clang profile runtime")
   endif()
   set(${out_var} "${runtime}" PARENT_SCOPE)

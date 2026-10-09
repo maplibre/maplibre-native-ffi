@@ -321,11 +321,16 @@ local fixture: a resource provider, a file, or the native suite's loopback HTTP
 server on 127.0.0.1. The `test-hygiene` check in hk runs
 `scripts/check-test-hygiene.py`, which fails on a sleep or on a public or
 reserved host in test code. Its baseline, `scripts/test-hygiene-baseline.toml`,
-counts the violations that predate the check, and a count may only fall. The
-`export-calls` check runs `mise run check-export-calls`, which fails when the
-ABI suite leaves an exported function uncalled by name, and calls from the
-internal suite do not count. Its baseline, `tests/uncalled-exports.txt`, also
-only shrinks.
+counts the violations that predate the check, and a count may only fall.
+
+The `export-calls` check in hk runs `mise run check-export-calls`. It fails when
+a function that a public header declares with `MLN_API` appears by name in no
+source of the C ABI suite, which is `tests/native` outside `internal/`. The
+internal suite links the static library, so its calls prove nothing about the
+export. A name inside a macro counts only when a test uses that macro.
+`tests/uncalled-exports.txt` lists the functions that no ABI test calls yet. The
+check also fails when a listed function is called, so the list only shrinks;
+`mise run check-export-calls --prune` removes those names.
 
 A test that cannot run on a target is skipped by that target or its build, never
 by what the environment provides. Most suites leave such a test out when they
@@ -386,12 +391,3 @@ line. Each listed line needs a C test, or a reason that the C suite cannot reach
 it on that preset. Coverage records which lines ran and nothing about what a
 test asserted, so check that a C test asserts the behavior that the binding test
 checked.
-
-`mise run check-export-calls` runs with the other repository checks. It fails
-when a function that a public header declares with `MLN_API` appears by name in
-no source of the C ABI suite, which is `tests/native` outside `internal/`. The
-internal suite links the static library, so its calls prove nothing about the
-export. A name inside a macro counts only when a test uses that macro.
-`tests/uncalled-exports.txt` lists the functions that no ABI test calls yet. The
-check also fails when a listed function is called, so the list only shrinks;
-`mise run check-export-calls --prune` removes those names.

@@ -23,8 +23,8 @@ host receiver; the receiver drains and copies the complete queued batch.
 
 Runtime creation returns its handle after the scheduler thread is ready, so the
 creating thread blocks until then. A browser host therefore creates the runtime
-on a Web Worker. Map creation is ordered runtime work. Its one-shot completion reports the map
-handle, or a terminal error, exactly once.
+on a Web Worker. Map creation is ordered runtime work. Its one-shot completion
+reports the map handle, or a terminal error, exactly once.
 
 ## Choose the initial map state
 

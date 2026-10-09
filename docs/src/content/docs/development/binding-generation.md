@@ -42,9 +42,10 @@ calls. The handwritten runtime declares `mln_diagnostic`, because the frontend
 removes it from every signature.
 
 A generated operation names its C function and maps its parameters, then passes
-the call to a handwritten helper. The helpers own admission, status checks,
-completion wiring, and callback registration, so a change to one of those
-mechanisms is a runtime change that every operation shares.
+the call to a handwritten runtime helper. The helpers own callback admission,
+receiver access, input and output conversion, status checks, and completion
+wiring, so a change to one of those steps changes one helper that every
+operation shares.
 
 Use the execution category that describes the native operation. Commands report
 mutation disposition and generation; queries return ordered values. Published
@@ -65,11 +66,6 @@ Resolve a new relationship once in the semantic model and let every emitter
 consume that result. Keep language-specific code focused on its runtime: library
 loading, exception conversion, garbage collector roots, completion delivery, and
 scoped native access.
-
-The steps that every operation takes belong to the runtime as generic helpers:
-callback admission, receiver access, input conversion, status checks, and
-completion and output conversion. A generated operation names its native
-function and maps each parameter, so a change to one step changes one helper.
 
 A retained callback transfers its root only after native acceptance. Rejected
 registration releases the temporary root locally; accepted registration releases

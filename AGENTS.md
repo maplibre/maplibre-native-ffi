@@ -8,13 +8,17 @@ interop or the popular MapLibre Android/iOS SDKs.
 
 - `include/` — Public C API headers (the stable ABI surface).
 - `src/` — C++ implementation behind the C headers, plus render backend adapters
-  (Vulkan, Metal, OpenGL) and the Zig test support shim.
+  (Vulkan, Metal, OpenGL, WebGPU) and the Zig test support shim.
+- `tools/bindgen/` — The binding generator, which compiles the C headers into
+  each binding's native declarations and public API.
 - `tests/` — Native C test suites (`tests/native`), generator tests
-  (`tests/bindgen`), and the shared graphics test fixtures (`tests/graphics`).
+  (`tests/bindgen`), binding conformance cases (`tests/conformance`), and the
+  shared graphics test fixtures (`tests/graphics`).
 - `bindings/` — Language bindings (Kotlin, Rust, Swift, Zig, .NET, Python, Go,
   Dart) that wrap the C API in idiomatic target-language interfaces.
-- `examples/` — Small demo apps per language/backend (`c-map`, `zig-map`,
-  `rust-map`, `zig-readback`, `lwjgl-map`, `swift-map`).
+- `examples/` — Small demo apps per language and toolkit (`c-map`, `zig-map`,
+  `go-map`, `rust-map`, `lwjgl-map`, `dotnet-map`, `compose-map`, `swift-map`,
+  `android-map`, and the headless `zig-readback`).
 - `third_party/` — Vendored dependencies, primarily the MapLibre Native git
   submodule.
 - `docs/` — Astro/Starlight documentation site and generated API reference.

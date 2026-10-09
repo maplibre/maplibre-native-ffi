@@ -193,8 +193,8 @@ function. A submission's completion reports an asynchronous application failure
 and a borrowed diagnostic that the binding copies before returning.
 
 Each binding surfaces these channels in its own idiom: an exception, a result
-type, an asynchronous result, or an event stream. Render-driver calls continue
-to report their graphics-thread failures directly.
+type, an asynchronous result, or an event stream. Render-driver calls report
+their graphics-thread failures in their returned status.
 
 A style entity that doesn't exist, such as a source, layer, or image ID, is
 reported through the completion. A command that targets it completes with

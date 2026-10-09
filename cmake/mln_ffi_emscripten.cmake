@@ -9,7 +9,8 @@ if(NOT EMSCRIPTEN)
   return()
 endif()
 
-# The shared map teardown lane is reserved before map worker pools start.
+# The pool holds one thread beyond MapLibre's workers for the process-wide map
+# teardown lane, which starts before any map's worker pool.
 set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "17"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
 set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"

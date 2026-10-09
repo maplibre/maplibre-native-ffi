@@ -20,9 +20,9 @@ Register each one with an any-thread runtime command.
 
 MapLibre can invoke any of these callbacks concurrently on network and worker
 threads. Protect every value that a callback reads and return quickly because
-the resource request waits. A transform callback sets a replacement URL. A header transform callback sets
-header names and values. A provider callback operates only on the request
-handle that it received.
+the resource request waits. A transform callback sets a replacement URL. A
+header transform callback sets header names and values. A provider callback
+operates only on the request handle that it received.
 
 ## Rewrite a URL with a transform
 

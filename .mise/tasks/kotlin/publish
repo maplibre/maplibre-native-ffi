@@ -382,8 +382,8 @@ case "$operation" in
         ;;
     esac
     if [[ "$partition" == linux ]]; then
-      # The Linux partition generates the Android JavaCPP JNI bridge with the
-      # pinned NDK compiler, even when the native libraries are prebuilt.
+      # The Linux partition compiles the Android JNI shim with the pinned NDK
+      # compiler, even when the native libraries are prebuilt.
       mise run //:android-sdk-packages
     fi
     staging_root="${staging_base}/maven-staging-${partition}"

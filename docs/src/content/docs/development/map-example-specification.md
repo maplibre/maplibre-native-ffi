@@ -286,8 +286,6 @@ exactly one line from this table:
 - Release each frame with consumer-completion sync that covers the compositor's
   reads, or with CPU-complete sync after those reads finish. A held frame keeps
   its ring slot, and a demand waits for a free slot.
-- Release the held frame before a session resize. The session rejects a resize
-  while a frame is acquired.
 
 #### `borrowed-texture`
 

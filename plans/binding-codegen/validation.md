@@ -62,10 +62,11 @@ WebGPU native suite.
 
 ## Callback-copy measurement
 
-`tests/bindgen/capture_benchmark.cpp` loads either library through the same
-small host executable. Each completion contains 64 layer records with four
-64-byte strings each. Seven samples each execute 20,000 create/copy/destroy
-cycles, and a checksum verifies the copied payload is consumed.
+`tests/bindgen/capture_benchmark.cpp`, which commit `0de5d956a` added and the
+branch does not keep, loads either library through the same small host
+executable. Each completion contains 64 layer records with four 64-byte strings
+each. Seven samples each execute 20,000 create/copy/destroy cycles, and a
+checksum verifies the copied payload is consumed.
 
 On this macOS ARM64 host, the median changed from 5,717 ns to 1,473.2 ns per
 completion, about 74% less time. A separate compiled test verifies exactly one
