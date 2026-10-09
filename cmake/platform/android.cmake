@@ -44,8 +44,6 @@ function(mln_ffi_configure_platform target)
   include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_ANDROID_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/collator.cpp
-      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/local_glyph_rasterizer.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/i18n.cpp
@@ -53,8 +51,11 @@ function(mln_ffi_configure_platform target)
       ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/util/string_stdlib.cpp)
 
   set(MLN_FFI_ANDROID_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/platform/android/asset_file_source.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/file_sources.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/asset_manager.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/i18n.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/collator.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/number_format.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/logging_logcat.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/run_loop/async_task.cpp
@@ -65,10 +66,6 @@ function(mln_ffi_configure_platform target)
 
   mln_ffi_target_vendor_sources(${target} ${MLN_FFI_VENDOR_ANDROID_SOURCES})
   mln_ffi_target_project_sources(${target} ${MLN_FFI_ANDROID_SOURCES})
-
-  set_source_files_properties(
-    ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/i18n/number_format.cpp
-    PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
 
   target_include_directories(
     ${target}

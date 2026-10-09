@@ -44,8 +44,14 @@ function(mln_ffi_configure_platform_dependencies target)
   set_target_properties(
     ${target}
     PROPERTIES
-      MLN_FFI_DEFAULT_LOGGING_STDERR FALSE MLN_FFI_DEFAULT_THREAD_LOCAL TRUE
-      MLN_FFI_SHARED_SUPPORTED TRUE)
+      MLN_FFI_DEFAULT_LOGGING_STDERR
+      FALSE
+      MLN_FFI_DEFAULT_THREAD_LOCAL
+      TRUE
+      MLN_FFI_SHARED_SUPPORTED
+      TRUE
+      MLN_FFI_STATIC_ARCHIVES
+      mbgl-vendor-icu)
 
   mln_ffi_apple_is_simulator(MLN_FFI_APPLE_SIMULATOR)
   mln_ffi_apple_is_maccatalyst(MLN_FFI_APPLE_MACCATALYST)
@@ -131,8 +137,10 @@ function(mln_ffi_configure_platform_dependencies target)
 endfunction()
 
 function(mln_ffi_configure_platform target)
+  include("${MLN_FFI_SOURCE_DIR}/vendor/icu.cmake")
+
   set(MLN_FFI_VENDOR_APPLE_SOURCES
-      ${MLN_FFI_SOURCE_DIR}/platform/qt/src/mln/bidi.cpp
+      ${MLN_FFI_SOURCE_DIR}/platform/default/src/mln/text/bidi.cpp
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/async_task.mm
       ${MLN_FFI_SOURCE_DIR}/platform/darwin/core/collator.mm
       ${CMAKE_CURRENT_FUNCTION_LIST_DIR}/../../src/platform/apple/http_file_source.mm
@@ -160,7 +168,7 @@ function(mln_ffi_configure_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE mbgl-vendor-metal-cpp MLN_FFI::PlatformDependencies)
+    PRIVATE mbgl-vendor-icu mbgl-vendor-metal-cpp MLN_FFI::PlatformDependencies)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set_target_properties(

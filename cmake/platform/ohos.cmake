@@ -19,16 +19,7 @@ function(mln_ffi_configure_platform_dependencies target)
      AND MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     set(ohos_test_supported TRUE)
   endif()
-  foreach(
-    library
-    IN
-    ITEMS
-    image_source
-    pixelmap
-    hilog_ndk.z
-    net_http
-    uv
-    z)
+  foreach(library IN ITEMS image_source pixelmap hilog_ndk.z net_http uv z)
     string(MAKE_C_IDENTIFIER "${library}" identifier)
     find_library(MLN_FFI_OHOS_${identifier}_LIBRARY NAMES "${library}" REQUIRED)
     target_link_libraries(

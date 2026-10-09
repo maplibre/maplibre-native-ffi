@@ -59,7 +59,8 @@ actionlint_version = "1.7.12"
 # these.
 android_cmdline_tools_version = "22.0"
 android_cmake_version = "4.1.2"
-android_ndk_version = "28.2.13676358"
+# NDK r30 is the 2026 LTS. Update this pin through validated toolchain upgrades.
+android_ndk_version = "30.0.16248370"
 # The emulator task installs one architecture of this image on demand. The AOSP
 # image carries no Google APIs and is the smallest image with a full graphics
 # stack.
@@ -217,6 +218,7 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = [
+  'case "$usage_preset" in android-*) mise run //:android-sdk-packages --ndk-only ;; esac',
   { task = "//:build-preset", args = ["{{usage.preset}}"] },
   { task = "//:check-exports", args = ["{{usage.preset}}"] },
   { task = "//:select-clangd-preset", args = ["{{usage.preset}}"] },
@@ -232,6 +234,7 @@ sources = [
   "Cargo.lock",
   "Cargo.toml",
   "LICENSE",
+  "mise.toml",
   "build/dependencies/rustls-platform-verifier/android-release-support/Cargo.toml",
   "build/dependencies/rustls-platform-verifier/android-release-support/src/**/*.rs",
   "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/Cargo.toml",
@@ -277,7 +280,7 @@ description = "Verify the SDK a cross-compilation preset builds against is avail
 hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 # A preset whose SDK is missing says how to get one rather than failing inside CMake
-# on a toolchain path with an empty prefix.
+# on a toolchain path that is empty or that names an NDK the SDK does not carry.
 run = '''
 case "$usage_preset" in
   android-*) variable=ANDROID_HOME environment=android ;;
@@ -291,6 +294,16 @@ if [[ -z "${!variable:-}" ]]; then
   echo "Point $variable at an SDK of your own, or install the pinned one with:" >&2
   echo "  mise -E $environment install" >&2
   exit 1
+fi
+
+if [[ "$environment" == android ]]; then
+  toolchain="$ANDROID_HOME/ndk/${MLN_FFI_ANDROID_NDK_VERSION}/build/cmake/android.toolchain.cmake"
+  if [[ ! -f "$toolchain" ]]; then
+    echo "error: $usage_preset needs NDK $MLN_FFI_ANDROID_NDK_VERSION under $ANDROID_HOME" >&2
+    echo "Install the pinned packages with:" >&2
+    echo "  mise run android-sdk-packages" >&2
+    exit 1
+  fi
 fi
 '''
 
@@ -402,10 +415,22 @@ description = "Check that the C tests call every exported function by name."
 run = 'python3 scripts/check-export-calls.py "$@"'
 
 [tasks."android-sdk-packages"]
-description = "Install the pinned Android SDK packages into $ANDROID_HOME."
-# The `android-*` presets name the pinned NDK, so an SDK without it configures no
-# Android build.
-run = 'bash .mise/bin/sync-android-packages "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_cmake_version}}"'
+description = "Install the pinned packages into the selected Android SDK."
+usage = '''
+flag "--sdk-root <path>" default="{{env.ANDROID_HOME | default(value='')}}" help="Android SDK directory; defaults to ANDROID_HOME"
+flag "--ndk-only" help="Install only the NDK for native compilation"
+'''
+run = '''
+args=()
+if [[ "$usage_ndk_only" == true ]]; then
+  args+=(--ndk-only)
+fi
+if [[ -z "$usage_sdk_root" ]]; then
+  echo "Set ANDROID_HOME or pass --sdk-root; install the repository SDK with mise -E android install." >&2
+  exit 1
+fi
+bash .mise/bin/sync-android-packages "$usage_sdk_root" "{{vars.java_version}}" "{{vars.android_ndk_version}}" "{{vars.android_cmake_version}}" "${args[@]}"
+'''
 
 [tasks."android-emulator:boot"]
 description = "Boot the Android emulator and wait until it is ready."

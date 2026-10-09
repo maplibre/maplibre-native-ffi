@@ -8,11 +8,10 @@ import org.maplibre.nativeffi.internal.status.NativeDiagnostics
 /** Android-only platform integration entry points. */
 public object MaplibreAndroid {
   /**
-   * Initializes Android platform services that require an app [Context].
+   * Initializes Android platform services.
    *
-   * This forwards to `mln_android_init`. Call it before creating a runtime that may issue Android
-   * HTTP requests or load `asset://` and `file:///android_asset/` URLs from the APK. Pass an
-   * Activity or Application; `asset://` URLs read that [Context]'s AssetManager.
+   * Required once during Android host setup, before creating a runtime. Pass an Activity or
+   * Application; APK assets use that [Context]'s AssetManager.
    */
   public fun initialize(context: Context) {
     ensureNativeLibrary()

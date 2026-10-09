@@ -56,13 +56,6 @@ Upstream:
 The Android and macOS SDK camera entry points cancel transitions before partial
 commands to preserve their existing behavior.
 
-`0016-location-indicator-color-transitions.patch` refreshes the location
-indicator's evaluated paint properties each frame so that accuracy-circle fill
-and border colors reach their transition targets. It includes the upstream
-pixel-readback regression. Upstream:
-[maplibre-native#4639](https://github.com/maplibre/maplibre-native/pull/4639),
-at commit `c6b6de35de0001d1b6005105199cc639a7956fa0`.
-
 `0017-location-indicator-top-image-hit-testing.patch` includes the location
 indicator's top image in rendered-feature queries. Each top and bearing image
 has independent bounds, and a hit returns the feature once with
@@ -115,10 +108,11 @@ at commit `02ddb45fbfad`.
 
 `0026-empty-symbol-placement.patch` clears deferred symbol placement and query
 state when no layers supply placement data. Source fade bookkeeping and paint
-transitions continue, and symbols that return receive a fresh placement. Native
-regressions cover repeated background-only frames, paint transitions, and symbol
-removal and reappearance within the placement update interval. See
-[issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
+transitions continue, and symbols that return receive a fresh placement. A
+Native regression checks that repeated background-only frames stop requesting
+repaints while paint transitions still request frames. Upstream:
+[maplibre-native#4722](https://github.com/maplibre/maplibre-native/pull/4722).
+See [issue #735](https://github.com/maplibre/maplibre-native-ffi/issues/735).
 
 `0027-line-hit-test-endpoint-offset.patch` applies the full line offset to the
 last vertex during rendered-feature hit testing. The Native regression checks
@@ -137,25 +131,59 @@ The Native regression covers symbols and circles at fractional and overzoomed
 camera zooms. Upstream:
 [maplibre-native#4704](https://github.com/maplibre/maplibre-native/pull/4704).
 
-`0030-custom-geometry-query-before-data.patch` returns no features from a custom
-geometry tile that has no data yet, as GeoJSON and vector tiles already do. A
-source-feature query that reached a fetched tile before the host delivered its
-data otherwise dereferenced null. The C suite's custom source cases cover it.
-Upstream: not yet filed.
+`0030-late-style-image-layout.patch` rebuilds tile layout when an image is added
+after the tile requested it. This lets asynchronous image registration show
+icons on existing tiles. Native pixel regressions cover late registration with
+synchronous and asynchronous GeoJSON, with and without text. Upstream:
+[maplibre-native#4714](https://github.com/maplibre/maplibre-native/pull/4714).
 
-`0031-webgpu-frame-stats.patch` counts frames in the WebGPU backend's rendering
-stats and resets its per-frame draw call count at the start of each frame, as
-the Metal, Vulkan, and OpenGL backends do. It also adds each draw to the total
-draw call count. The WebGPU frame count otherwise stayed at zero. The C suite's
-render lifecycle case covers it. Upstream: not yet filed.
+`0031-custom-geometry-query-before-data.patch` returns an empty source query
+while a custom geometry tile awaits its first data. The Native tile regression
+queries before delivery and after parsing. Upstream:
+[maplibre-native#4718](https://github.com/maplibre/maplibre-native/pull/4718).
 
-`0032-in-memory-database-reset.patch` keeps a reset of the in-memory database
-from deleting a file named `:memory:`. The reset removed that path relative to
-the working directory, which deleted any such file there and failed where the
-directory was read-only. The C suite's ambient cache reset case covers it.
-Upstream: not yet filed.
+`0032-webgpu-frame-stats.patch` resets WebGPU's per-frame draw count and
+advances the frame count when a render pass begins, matching Metal and Vulkan
+cleanup. Each drawable draw also advances the cumulative count in WebGPU, Metal,
+and Vulkan. A Native map regression checks frame progression and draw counts
+before and after hiding a layer; the Rust browser regression also covers the
+binding’s statistics. Upstream:
+[maplibre-native#4719](https://github.com/maplibre/maplibre-native/pull/4719).
 
-`0033-destroy-thread-local-run-loop.patch` keeps the destructor of the run loop
+`0034-opengl-large-uniform-blocks.patch` fixes allocator alignment at the 8 KiB
+page boundary and updates dedicated OpenGL uniform buffers without reading an
+absent CPU copy. The regression reads back allocations and repeated updates at
+both sides of the boundary. Upstream:
+[maplibre-native#4707](https://github.com/maplibre/maplibre-native/pull/4707).
+
+`0035-plugin-gl-attributes-by-name.patch` matches reflected OpenGL attributes by
+name, preserving stable attribute IDs when linked locations differ from metadata
+order. Regressions cover reordered locations and plugin paint switching between
+uniform and feature-driven bindings. Upstream:
+[maplibre-native#4708](https://github.com/maplibre/maplibre-native/pull/4708).
+
+`0036-platform-locale-expression-options.patch` preserves omitted fraction
+limits at the platform formatter boundary. Android can retain currency defaults
+while honoring explicit limits. The other implementations retain their existing
+defaults. See
+[issue #797](https://github.com/maplibre/maplibre-native-ffi/issues/797).
+Upstream:
+[maplibre-native#4744](https://github.com/maplibre/maplibre-native/pull/4744).
+
+`0037-platform-locale-expression-errors.patch` converts C++ failures from
+platform number formatters and collators into expression evaluation errors.
+Collator comparison helpers allow exceptions to reach the evaluator. A failed
+layer filter excludes the feature, and a failed property expression uses its
+default value. This lets Android JNI failures follow Native's expression error
+handling instead of terminating the process. Upstream:
+[maplibre-native#4745](https://github.com/maplibre/maplibre-native/pull/4745).
+
+`0038-apple-locale-expressions.patch` applies explicit fraction limits to
+Foundation decimal and currency formatters while retaining omitted defaults.
+Apple locale expressions reject malformed UTF-8 as expression errors and
+preserve embedded null characters during string conversion.
+
+`0039-destroy-thread-local-run-loop.patch` keeps the destructor of the run loop
 that `Scheduler::GetCurrent()` creates for a thread with no scheduler. The
 library compiles MapLibre Native without static destructors, so that nothing a
 MapLibre thread reads is destroyed while the process exits, and that option also
@@ -170,6 +198,7 @@ Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy
 properties, and the query-filter patch preserves the preceding camera-zoom fix.
+Tests reuse includes from earlier patches.
 
 Drop a patch once the pin moves to a commit that carries it. The sync checks out
 the pinned commit with `--force`, so it discards whatever the last sync applied

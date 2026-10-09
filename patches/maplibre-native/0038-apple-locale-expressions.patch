@@ -1,0 +1,109 @@
+diff --git a/platform/darwin/core/collator.mm b/platform/darwin/core/collator.mm
+--- a/platform/darwin/core/collator.mm
++++ b/platform/darwin/core/collator.mm
+@@ -1,6 +1,6 @@
+ #include <mln/i18n/collator.hpp>
+ 
+-#include <sstream>
++#include "utf8.hpp"
+ 
+ #import <Foundation/Foundation.h>
+ 
+@@ -12,8 +12,9 @@
+   Impl(bool caseSensitive, bool diacriticSensitive, const std::optional<std::string>& locale_)
+       : options((caseSensitive ? 0 : NSCaseInsensitiveSearch) |
+                 (diacriticSensitive ? 0 : NSDiacriticInsensitiveSearch)),
+-        locale(locale_ ? [[NSLocale alloc] initWithLocaleIdentifier:@((*locale_).c_str())]
+-                       : [NSLocale currentLocale]) {}
++        locale(locale_
++                   ? [[NSLocale alloc] initWithLocaleIdentifier:detail::stringFromUTF8(*locale_)]
++                   : [NSLocale currentLocale]) {}
+ 
+   bool operator==(const Impl& other) const {
+     return options == other.options &&
+@@ -21,8 +22,8 @@
+   }
+ 
+   int compare(const std::string& lhs, const std::string& rhs) const {
+-    NSString* nsLhs = @(lhs.c_str());
+-    NSString* nsRhs = @(rhs.c_str());
++    NSString* nsLhs = detail::stringFromUTF8(lhs);
++    NSString* nsRhs = detail::stringFromUTF8(rhs);
+     // Limiting the compare range to the length of the LHS seems weird, but
+     // experimentally we've checked that if LHS is a prefix of RHS compare returns -1
+     // https://developer.apple.com/documentation/foundation/nsstring/1414561-compare
+diff --git a/platform/darwin/core/number_format.mm b/platform/darwin/core/number_format.mm
+--- a/platform/darwin/core/number_format.mm
++++ b/platform/darwin/core/number_format.mm
+@@ -1,6 +1,8 @@
+ #import <Foundation/Foundation.h>
+ 
+ #include <mln/i18n/number_format.hpp>
++
++#include "utf8.hpp"
+ 
+ namespace mln {
+ namespace platform {
+@@ -12,19 +14,33 @@
+   NSNumberFormatter* numberFormatter = [[NSNumberFormatter alloc] init];
+ 
+   numberFormatter.locale =
+-      !localeId.empty() ? [NSLocale localeWithLocaleIdentifier:@(localeId.c_str())] : nil;
+-  numberFormatter.currencyCode = !currency.empty() ? @(currency.c_str()) : nil;
++      !localeId.empty() ? [NSLocale localeWithLocaleIdentifier:detail::stringFromUTF8(localeId)]
++                        : nil;
++  numberFormatter.currencyCode = !currency.empty() ? detail::stringFromUTF8(currency) : nil;
+ 
+   if (currency.empty()) {
+-    numberFormatter.minimumFractionDigits = minFractionDigits.value_or(0);
+-    numberFormatter.maximumFractionDigits = maxFractionDigits.value_or(3);
+     numberFormatter.numberStyle = NSNumberFormatterDecimalStyle;
+   } else {
+     numberFormatter.numberStyle = NSNumberFormatterCurrencyStyle;
+   }
++  if (minFractionDigits) {
++    numberFormatter.minimumFractionDigits = *minFractionDigits;
++    if (!maxFractionDigits && numberFormatter.maximumFractionDigits < *minFractionDigits) {
++      numberFormatter.maximumFractionDigits = *minFractionDigits;
++    }
++  }
++  if (maxFractionDigits) {
++    numberFormatter.maximumFractionDigits = *maxFractionDigits;
++    if (!minFractionDigits && numberFormatter.minimumFractionDigits > *maxFractionDigits) {
++      numberFormatter.minimumFractionDigits = *maxFractionDigits;
++    }
++  }
+   NSString* formatted = [numberFormatter stringFromNumber:@(number)];
+-  std::string result = std::string([formatted UTF8String]);
+-  return result;
++  const char* utf8 = formatted.UTF8String;
++  if (!utf8) {
++    throw std::runtime_error("Platform number formatting failed");
++  }
++  return std::string(utf8, [formatted lengthOfBytesUsingEncoding:NSUTF8StringEncoding]);
+ }
+ 
+ }  // namespace platform
+diff --git a/platform/darwin/core/utf8.hpp b/platform/darwin/core/utf8.hpp
+new file mode 100644
+--- /dev/null
++++ b/platform/darwin/core/utf8.hpp
+@@ -0,0 +1,18 @@
++#pragma once
++
++#import <Foundation/Foundation.h>
++
++#include <stdexcept>
++#include <string>
++
++namespace mln::platform::detail {
++
++inline NSString* stringFromUTF8(const std::string& value) {
++    NSString* result = [[NSString alloc] initWithBytes:value.data() length:value.size() encoding:NSUTF8StringEncoding];
++    if (!result) {
++        throw std::invalid_argument("Invalid UTF-8 in locale expression");
++    }
++    return result;
++}
++
++} // namespace mln::platform::detail

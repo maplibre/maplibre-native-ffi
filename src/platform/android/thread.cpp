@@ -11,6 +11,8 @@
 #include <sys/prctl.h>
 #include <sys/resource.h>
 
+#include "platform/android/i18n.hpp"
+
 namespace mln::platform {
 
 auto getCurrentThreadName() -> std::string {
@@ -51,9 +53,9 @@ void setCurrentThreadPriority(double priority) {
   }
 }
 
-void attachThread() {}
+void attachThread() { android::attach_thread(); }
 
-void detachThread() {}
+void detachThread() { android::detach_thread(); }
 
 void runTask(const std::function<void()>& task) { task(); }
 

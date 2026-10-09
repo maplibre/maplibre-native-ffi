@@ -327,6 +327,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
   val licenseDirectory = licenseInstall.resolve("share/maplibre-native-c/licenses")
   tasks.withType<Zip>().configureEach {
     if (name == "bundleAndroidMainAar") {
+      dependsOn(":bindings:kotlin:androidSdkPackages")
       // A missing directory would otherwise be skipped silently and ship an AAR
       // with no native notices at all.
       doFirst {

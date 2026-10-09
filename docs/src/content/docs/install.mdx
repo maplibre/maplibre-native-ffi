@@ -299,9 +299,9 @@ android {
 }
 ```
 
-Initialize the platform once before you create a runtime, passing an
-`android.content.Context`. Every binding exposes this call under its own name.
-The call is required for HTTPS and for reading APK assets.
+Android platform initialization is required once per process, before creating
+a runtime. Pass an `android.content.Context`; every binding exposes this call
+under its own name.
 
 ### iOS
 

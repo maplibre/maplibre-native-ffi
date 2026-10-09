@@ -32,6 +32,20 @@ val androidNdkPrebuilt = androidSdkDirectory.map {
 val androidNdkNotice = androidSdkDirectory.map { it.file("ndk/$androidNdkVersion/NOTICE") }
 val repositoryRoot = rootProject.layout.projectDirectory.asFile
 
+val androidSdkPackages =
+  tasks.register<Exec>("androidSdkPackages") {
+    group = "build setup"
+    description = "Installs the pinned packages into the SDK selected by Gradle."
+    workingDir(repositoryRoot)
+    commandLine(
+      "mise",
+      "run",
+      "//:android-sdk-packages",
+      "--sdk-root",
+      androidSdkDirectory.get().asFile.absolutePath,
+    )
+  }
+
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 // plugin.h includes upstream's mln/plugin/plugin_api.h from the submodule.
 val upstreamPluginHeaders =
@@ -78,6 +92,7 @@ val packageAndroidNativeLibraries =
 // NDK's notice.
 tasks.withType<Zip>().configureEach {
   if (name == "bundleAndroidMainAar") {
+    dependsOn(androidSdkPackages)
     from(androidNdkNotice) { into("META-INF/licenses/android-ndk") }
   }
 }
@@ -108,6 +123,7 @@ androidTargets.forEach { target ->
     tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {
       group = "build"
       description = "Builds and installs MapLibre Native C for Android ${target.ndkAbi}."
+      dependsOn(androidSdkPackages)
       doNotTrackState("CMake owns native incremental build state")
       workingDir(repositoryRoot)
       executable("cmake")
@@ -120,7 +136,7 @@ androidTargets.forEach { target ->
     tasks.register<Exec>("buildAndroidJni${target.taskSuffix}") {
       group = "build"
       description = "Builds the Android ${target.ndkAbi} JNI shim."
-      dependsOn(buildNative)
+      dependsOn(androidSdkPackages, buildNative)
       inputs.dir(jniSources).withPropertyName("jniSources")
       inputs.dir(checkedInCHeaders).withPropertyName("maplibreNativeCHeaders")
       inputs.file(nativeLibrary).withPropertyName("maplibreNativeCLibrary")

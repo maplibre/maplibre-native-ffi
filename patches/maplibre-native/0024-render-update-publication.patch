@@ -1,5 +1,5 @@
 diff --git a/src/mln/map/map.cpp b/src/mln/map/map.cpp
-index 08160f6f3f55..ef034b4bd8b1 100644
+index 08160f6f3f5528a942ead01ee6d0b616cd0cc8aa..ef034b4bd8b10fe9b940b748e8f3ca7ab98ba0c1 100644
 --- a/src/mln/map/map.cpp
 +++ b/src/mln/map/map.cpp
 @@ -529,7 +529,9 @@ void Map::enableRenderingStatsView(bool value) {
@@ -63,7 +63,7 @@ index 08160f6f3f55..ef034b4bd8b1 100644
  
  TileLodMode Map::getTileLodMode() const {
 diff --git a/src/mln/style/layers/background_layer.cpp b/src/mln/style/layers/background_layer.cpp
-index a20468ecdce2..cdc892db90f6 100644
+index a20468ecdce2ea2dcec6187d0c148ac24b7368bf..cdc892db90f61b1b85eea4a26a03b06b574c8428 100644
 --- a/src/mln/style/layers/background_layer.cpp
 +++ b/src/mln/style/layers/background_layer.cpp
 @@ -87,6 +87,7 @@ void BackgroundLayer::setBackgroundColorTransition(const TransitionOptions& opti
@@ -91,7 +91,7 @@ index a20468ecdce2..cdc892db90f6 100644
  
  TransitionOptions BackgroundLayer::getBackgroundPatternTransition() const {
 diff --git a/src/mln/style/layers/circle_layer.cpp b/src/mln/style/layers/circle_layer.cpp
-index 522f8a2030d7..cc4ba986b71a 100644
+index 522f8a2030d7b8ae4e1e5ef3bde2598f7f70ec8b..cc4ba986b71afe47330a2c3e274dc895b0c32c23 100644
 --- a/src/mln/style/layers/circle_layer.cpp
 +++ b/src/mln/style/layers/circle_layer.cpp
 @@ -103,6 +103,7 @@ void CircleLayer::setCircleBlurTransition(const TransitionOptions& options) {
@@ -183,7 +183,7 @@ index 522f8a2030d7..cc4ba986b71a 100644
  
  TransitionOptions CircleLayer::getCircleTranslateAnchorTransition() const {
 diff --git a/src/mln/style/layers/color_relief_layer.cpp b/src/mln/style/layers/color_relief_layer.cpp
-index 7427f46b940f..cac7dd33b3ae 100644
+index 7427f46b940f1347e390b5ce79f610573d20824d..cac7dd33b3aef723d23d3562dc943f3e204600b7 100644
 --- a/src/mln/style/layers/color_relief_layer.cpp
 +++ b/src/mln/style/layers/color_relief_layer.cpp
 @@ -87,6 +87,7 @@ void ColorReliefLayer::setColorReliefColorTransition(const TransitionOptions& op
@@ -203,7 +203,7 @@ index 7427f46b940f..cac7dd33b3ae 100644
  
  TransitionOptions ColorReliefLayer::getColorReliefOpacityTransition() const {
 diff --git a/src/mln/style/layers/fill_extrusion_layer.cpp b/src/mln/style/layers/fill_extrusion_layer.cpp
-index 7f5580b9edbe..7fae3ceb1893 100644
+index 7f5580b9edbeffa2aa9a4665dce3eb2eeed4f035..7fae3ceb18937146d98cbd8c8452a288329bc529 100644
 --- a/src/mln/style/layers/fill_extrusion_layer.cpp
 +++ b/src/mln/style/layers/fill_extrusion_layer.cpp
 @@ -103,6 +103,7 @@ void FillExtrusionLayer::setFillExtrusionBaseTransition(const TransitionOptions&
@@ -271,7 +271,7 @@ index 7f5580b9edbe..7fae3ceb1893 100644
  
  TransitionOptions FillExtrusionLayer::getFillExtrusionVerticalGradientTransition() const {
 diff --git a/src/mln/style/layers/fill_layer.cpp b/src/mln/style/layers/fill_layer.cpp
-index 79d04339cd3f..5492ee35dbde 100644
+index 79d04339cd3f3627a67eedde9d00f09b87428703..5492ee35dbde3e0a8bce870b678ce8f8c8291a56 100644
 --- a/src/mln/style/layers/fill_layer.cpp
 +++ b/src/mln/style/layers/fill_layer.cpp
 @@ -103,6 +103,7 @@ void FillLayer::setFillAntialiasTransition(const TransitionOptions& options) {
@@ -331,7 +331,7 @@ index 79d04339cd3f..5492ee35dbde 100644
  
  TransitionOptions FillLayer::getFillTranslateAnchorTransition() const {
 diff --git a/src/mln/style/layers/heatmap_layer.cpp b/src/mln/style/layers/heatmap_layer.cpp
-index 2be73fe01458..f45d76bb7715 100644
+index 2be73fe01458fc8d3ea53f8230f57d74e8ff8fa4..f45d76bb77151f06fb4387ee67f76ffe19e566d3 100644
 --- a/src/mln/style/layers/heatmap_layer.cpp
 +++ b/src/mln/style/layers/heatmap_layer.cpp
 @@ -89,6 +89,7 @@ void HeatmapLayer::setHeatmapColorTransition(const TransitionOptions& options) {
@@ -375,7 +375,7 @@ index 2be73fe01458..f45d76bb7715 100644
  
  TransitionOptions HeatmapLayer::getHeatmapWeightTransition() const {
 diff --git a/src/mln/style/layers/hillshade_layer.cpp b/src/mln/style/layers/hillshade_layer.cpp
-index 1255f7a92cfc..bfc30362b59c 100644
+index 1255f7a92cfca49b3ace14d01281e796642fa245..bfc30362b59cd14fbeeca6230ee10263d96e12b3 100644
 --- a/src/mln/style/layers/hillshade_layer.cpp
 +++ b/src/mln/style/layers/hillshade_layer.cpp
 @@ -87,6 +87,7 @@ void HillshadeLayer::setHillshadeAccentColorTransition(const TransitionOptions&
@@ -443,7 +443,7 @@ index 1255f7a92cfc..bfc30362b59c 100644
  
  TransitionOptions HillshadeLayer::getHillshadeShadowColorTransition() const {
 diff --git a/src/mln/style/layers/layer.cpp.ejs b/src/mln/style/layers/layer.cpp.ejs
-index 81748c5c68d9..1454b02e5c71 100644
+index 81748c5c68d911a3d022fe75071999dd17417f72..1454b02e5c71761d1ddae31d8aba06b5d1bc4db3 100644
 --- a/src/mln/style/layers/layer.cpp.ejs
 +++ b/src/mln/style/layers/layer.cpp.ejs
 @@ -212,6 +212,7 @@ void <%- camelize(type) %>Layer::set<%- camelize(property.name) %>Transition(con
@@ -455,7 +455,7 @@ index 81748c5c68d9..1454b02e5c71 100644
  
  TransitionOptions <%- camelize(type) %>Layer::get<%- camelize(property.name) %>Transition() const {
 diff --git a/src/mln/style/layers/line_layer.cpp b/src/mln/style/layers/line_layer.cpp
-index 9e08e3d9458a..9410bbafa521 100644
+index 9e08e3d9458a03f569037b1bcf5b3e80c38315c7..9410bbafa521669fef686d66c2ab3ecbd0ee6dd0 100644
 --- a/src/mln/style/layers/line_layer.cpp
 +++ b/src/mln/style/layers/line_layer.cpp
 @@ -163,6 +163,7 @@ void LineLayer::setLineBlurTransition(const TransitionOptions& options) {
@@ -547,7 +547,7 @@ index 9e08e3d9458a..9410bbafa521 100644
  
  TransitionOptions LineLayer::getLineWidthTransition() const {
 diff --git a/src/mln/style/layers/location_indicator_layer.cpp b/src/mln/style/layers/location_indicator_layer.cpp
-index 06d020050a18..b89c32cf7342 100644
+index 06d020050a1839f8a48944d5d70b112f27a447e5..b89c32cf7342ffa3b2c55d265bdf633f77c39775 100644
 --- a/src/mln/style/layers/location_indicator_layer.cpp
 +++ b/src/mln/style/layers/location_indicator_layer.cpp
 @@ -133,6 +133,7 @@ void LocationIndicatorLayer::setAccuracyRadiusTransition(const TransitionOptions
@@ -655,7 +655,7 @@ index 06d020050a18..b89c32cf7342 100644
  
  TransitionOptions LocationIndicatorLayer::getTopImageSizeTransition() const {
 diff --git a/src/mln/style/layers/raster_layer.cpp b/src/mln/style/layers/raster_layer.cpp
-index e9ae47813a7a..f848a28b8915 100644
+index e9ae47813a7afd37bade97927473789a1bf83b2b..f848a28b8915c16cbe02a55045a9ef86c2319f5a 100644
 --- a/src/mln/style/layers/raster_layer.cpp
 +++ b/src/mln/style/layers/raster_layer.cpp
 @@ -87,6 +87,7 @@ void RasterLayer::setRasterBrightnessMaxTransition(const TransitionOptions& opti
@@ -723,7 +723,7 @@ index e9ae47813a7a..f848a28b8915 100644
  
  TransitionOptions RasterLayer::getRasterSaturationTransition() const {
 diff --git a/src/mln/style/layers/symbol_layer.cpp b/src/mln/style/layers/symbol_layer.cpp
-index dd5ccf081467..1ec9862a4aaf 100644
+index dd5ccf0814676200ec263ca090fb7d0748edec77..1ec9862a4aaf189caa8e93e5b9229ba1a91af40b 100644
 --- a/src/mln/style/layers/symbol_layer.cpp
 +++ b/src/mln/style/layers/symbol_layer.cpp
 @@ -733,6 +733,7 @@ void SymbolLayer::setIconColorTransition(const TransitionOptions& options) {
@@ -839,7 +839,7 @@ index dd5ccf081467..1ec9862a4aaf 100644
  
  TransitionOptions SymbolLayer::getTextTranslateAnchorTransition() const {
 diff --git a/src/mln/style/style_impl.cpp b/src/mln/style/style_impl.cpp
-index 5c9634227e40..6240b4106283 100644
+index 5c9634227e40b666406e4f8020e88b804bbe7825..6240b4106283e5c9a728c89c5dd18f4967fc9db0 100644
 --- a/src/mln/style/style_impl.cpp
 +++ b/src/mln/style/style_impl.cpp
 @@ -160,7 +160,11 @@ std::string Style::Impl::getURL() const {
@@ -879,12 +879,12 @@ index 5c9634227e40..6240b4106283 100644
  
  std::optional<Immutable<style::Image::Impl>> Style::Impl::getImage(const std::string& id) const {
 diff --git a/test/map/map.test.cpp b/test/map/map.test.cpp
-index fb3fba226b51..1464d2bd7535 100644
+index b454119315db0e85e9ad5031532d385a02ca5544..a97ff40616c3a1fa4c64a11bebed9616a47b3ed0 100644
 --- a/test/map/map.test.cpp
 +++ b/test/map/map.test.cpp
-@@ -2466,3 +2466,37 @@ TEST(Map, LocationIndicatorAccuracyColorsTransition) {
-     }
-     EXPECT_GT(greenPixels, 0u) << "The accuracy border should finish transitioning to green";
+@@ -2461,3 +2461,37 @@ TEST(Map, LocationIndicatorWithoutImages) {
+     // Neither the accuracy circle nor any image should produce a draw call.
+     EXPECT_EQ(test.frontend.render(test.map).stats.numDrawCalls, 0);
  }
 +
 +TEST(Map, TileSelectionOptionsPublishUpdates) {
@@ -921,7 +921,7 @@ index fb3fba226b51..1464d2bd7535 100644
 +    check(&Map::setTileLodMode, &UpdateParameters::tileLodMode, TileLodMode::Distance);
 +}
 diff --git a/test/style/style.test.cpp b/test/style/style.test.cpp
-index 374109a281f0..b89c38f110c2 100644
+index 374109a281f091f115a5597852a290c27ad0ce60..b89c38f110c2d8b8cace679184965ad36f956f92 100644
 --- a/test/style/style.test.cpp
 +++ b/test/style/style.test.cpp
 @@ -1,4 +1,8 @@

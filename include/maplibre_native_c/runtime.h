@@ -384,10 +384,12 @@ typedef struct mln_runtime_options {
   /** No flags are currently defined. Must be zero. */
   uint32_t flags;
   /**
-   * Filesystem root for asset:// URLs. Copied during runtime creation.
+   * Directory root for asset:// URLs. Copied during runtime creation.
+   * Null or empty selects `/android_asset` on Android and `.` elsewhere.
    *
-   * On Android, asset:// URLs read the APK `assets/` directory after
-   * mln_android_init. This field is unused there.
+   * On Android, paths under `/android_asset/` read the APK `assets/`
+   * directory after mln_android_init. Other paths read the filesystem.
+   * Explicit file:// URLs use their own paths, independently of this root.
    */
   const char* asset_path
     MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
