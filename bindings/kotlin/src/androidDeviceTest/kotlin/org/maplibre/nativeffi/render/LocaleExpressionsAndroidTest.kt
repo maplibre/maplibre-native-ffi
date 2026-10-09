@@ -1,0 +1,256 @@
+package org.maplibre.nativeffi.render
+
+import java.util.Locale
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
+import org.junit.Assume.assumeTrue
+import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.ScreenBox
+import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
+import org.maplibre.nativeffi.query.RenderedQueryGeometry
+import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
+import org.maplibre.nativeffi.runtime.RuntimeEventType
+import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.runtime.RuntimeOptions
+
+class LocaleExpressionsAndroidTest {
+  @Test
+  fun formattingUsesTheRequestedLocaleCurrencyAndFractionLimits() {
+    assertCases(
+      """["==", ["number-format", ["get","amount"], {
+        "locale": ["get","locale"], "currency": ["get","currency"],
+        "min-fraction-digits": ["get","min"], "max-fraction-digits": ["get","max"]
+      }], ["get","expected"]]""",
+      """{"amount":1234.5,"locale":"de-DE","currency":"","min":2,"max":2,"expected":"1.234,50"}""",
+      """{"amount":1234.5,"locale":"en-US","currency":"EUR","min":2,"max":2,"expected":"€1,234.50"}""",
+      """{"amount":1234.5678,"locale":"en-US","currency":"USD","min":0,"max":1,"expected":"$1,234.6"}""",
+      """{"amount":12.3,"locale":"en-US","currency":"USD","min":3,"max":3,"expected":"$12.300"}""",
+      """{"amount":12.3,"locale":"en-US","currency":"","min":2,"max":4,"expected":"12.30"}""",
+    )
+  }
+
+  @Test
+  fun omittedFractionLimitsRetainDecimalAndCurrencyDefaults() {
+    assertCases(
+      """["==", ["number-format", ["get","amount"], {
+        "locale":"en-US", "currency":["get","currency"]
+      }], ["get","expected"]]""",
+      """{"amount":1234.5,"currency":"","expected":"1,234.5"}""",
+      """{"amount":1234.5,"currency":"USD","expected":"$1,234.50"}""",
+      """{"amount":1234.56,"currency":"JPY","expected":"¥1,235"}""",
+    )
+    assertCases(
+      """["==",["slice",["number-format",["get","amount"],{
+        "locale":"en-US","currency":"KWD"
+      }],-4],".500"]""",
+      """{"amount":1234.5}""",
+    )
+    assertCases(
+      """["==", ["number-format", ["get","amount"], {
+        "locale":"en-US", "currency":["get","currency"], "min-fraction-digits":4
+      }], ["get","expected"]]""",
+      """{"amount":12.3,"currency":"","expected":"12.3000"}""",
+      """{"amount":12.3,"currency":"USD","expected":"$12.3000"}""",
+    )
+    assertCases(
+      """["==", ["number-format", ["get","amount"], {
+        "locale":"en-US", "currency":"USD", "max-fraction-digits":0
+      }], "\u002412"]""",
+      """{"amount":12.3}""",
+    )
+  }
+
+  @Test
+  fun currencyApiFailuresRemainExpressionErrorsAndLaterCallsSucceed() {
+    assertCases(
+      """["==",["number-format",["get","amount"],{
+        "locale":"en-US","currency":["get","currency"]
+      }],"$12.30"]""",
+      """{"amount":12.3,"currency":"invalid"}""",
+      """{"amount":12.3,"currency":"USD"}""",
+      expectedIndices = setOf(1),
+    )
+  }
+
+  @Test
+  fun constantFormattingIsEvaluatedWhileParsingTheStyle() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      MapHandle.create(runtime, MapOptions()).use { map ->
+        map.setStyleJson(
+          jsonBytes(
+            """{"version":8,"sources":{},"layers":[{
+          "id":"background","type":"background","paint":{
+            "background-opacity":["case",
+              ["==",["number-format",1234.5,{"locale":"de-DE","min-fraction-digits":2,"max-fraction-digits":2}],"1.234,50"],
+              0.25,0.75]
+          }
+        }]}"""
+          )
+        )
+        assertEquals(
+          "0.25",
+          map.layerProperty("background", "background-opacity")?.decodeToString(),
+        )
+      }
+    }
+  }
+
+  @Test
+  fun collationHonorsLocaleAndEverySensitivityCombination() {
+    val cases = mutableListOf<String>()
+    for (caseSensitive in listOf(false, true)) {
+      for (accentSensitive in listOf(false, true)) {
+        cases +=
+          """{"lhs":"e","rhs":"E","case":$caseSensitive,"accent":$accentSensitive,"equal":${!caseSensitive}}"""
+        cases +=
+          """{"lhs":"e","rhs":"é","case":$caseSensitive,"accent":$accentSensitive,"equal":${!accentSensitive}}"""
+        cases +=
+          """{"lhs":"é","rhs":"É","case":$caseSensitive,"accent":$accentSensitive,"equal":${!caseSensitive}}"""
+        cases +=
+          """{"lhs":"é","rhs":"e\u0301","case":$caseSensitive,"accent":$accentSensitive,"equal":true}"""
+        cases +=
+          """{"lhs":"😀\u0000a","rhs":"😀\u0000b","case":$caseSensitive,"accent":$accentSensitive,"equal":false}"""
+      }
+    }
+    assertCases(
+      """["==", ["==",["get","lhs"],["get","rhs"], ["collator",{
+        "locale":"en-US", "case-sensitive":["get","case"], "diacritic-sensitive":["get","accent"]
+      }]], ["get","equal"]]""",
+      *cases.toTypedArray(),
+    )
+    assertCases(
+      """["==", ["<",["get","lhs"],["get","rhs"], ["collator",{
+        "locale":["get","locale"],"case-sensitive":true,"diacritic-sensitive":false
+      }]], ["get","less"]]""",
+      """{"lhs":"z","rhs":"ä","locale":"sv-SE","less":true}""",
+      """{"lhs":"z","rhs":"ä","locale":"de-DE","less":false}""",
+    )
+    assertCases(
+      """["==",["get","lhs"],["get","rhs"],["collator",{"locale":"tr-TR"}]]""",
+      """{"lhs":"I","rhs":"ı"}""",
+      """{"lhs":"i","rhs":"İ"}""",
+    )
+  }
+
+  @Test
+  fun collationExtensionsUsePlatformTailoring() {
+    assertCases(
+      """["==",["==",["get","lhs"],["get","rhs"],["collator",{
+        "locale":["get","locale"]
+      }]],["get","equal"]]""",
+      """{"lhs":"ä","rhs":"ae","locale":"de-DE-u-co-phonebk","equal":true}""",
+      """{"lhs":"ä","rhs":"ae","locale":"de-DE","equal":false}""",
+    )
+    assertCases(
+      """["==",["<",["get","lhs"],["get","rhs"],["collator",{
+        "locale":["get","locale"]
+      }]],["get","less"]]""",
+      """{"lhs":"2","rhs":"10","locale":"en-US-u-kn-true","less":true}""",
+      """{"lhs":"2","rhs":"10","locale":"en-US","less":false}""",
+    )
+    assertCases(
+      """["in",["resolved-locale",["collator",{"locale":["get","locale"]}]],
+        ["get","resolved"]]""",
+      """{"locale":"de-DE-u-co-phonebk","resolved":["de-u-co-phonebk","de-DE-u-co-phonebk"]}""",
+      """{"locale":"de-DE-u-co-foobar","resolved":["de","de-DE"]}""",
+    )
+  }
+
+  @Test
+  fun resolvedLocaleReportsTheSelectedLocaleAndSystemFallback() {
+    val previous = Locale.getDefault()
+    try {
+      Locale.setDefault(Locale.US)
+      assertCases(
+        """["==", ["slice", ["resolved-locale", ["collator",{
+          "locale":["get","locale"]
+        }]], 0, 2], ["get","language"]]""",
+        """{"locale":"sv-SE","language":"sv"}""",
+        """{"locale":"tr-TR","language":"tr"}""",
+        """{"locale":"xx-ZZ","language":"en"}""",
+      )
+      assertCases("""["==",["slice",["resolved-locale",["collator",{}]],0,2],"en"]""", """{}""")
+    } finally {
+      Locale.setDefault(previous)
+    }
+  }
+
+  private fun assertCases(
+    filter: String,
+    vararg properties: String,
+    expectedIndices: Set<Int> = properties.indices.toSet(),
+  ) {
+    // Public feature queries require a render session; this fixture supports EGL.
+    assumeTrue(
+      "EGL feature-query fixture",
+      RenderBackend.OPENGL in Maplibre.supportedRenderBackends(),
+    )
+    withOwnedTextureSession(width = 64, height = 64) { runtime, map, owned ->
+      val session = owned.session
+      val features =
+        properties
+          .mapIndexed { index, value ->
+            """{"type":"Feature","id":"case-$index","geometry":{"type":"Point","coordinates":[0,0]},"properties":$value}"""
+          }
+          .joinToString(",")
+      map.jumpTo(
+        CameraOptions().apply {
+          center = LatLng(0.0, 0.0)
+          zoom = 2.0
+        }
+      )
+      map.setStyleJson(
+        jsonBytes(
+          """{"version":8,"sources":{"point":{"type":"geojson","data":{
+          "type":"FeatureCollection","features":[$features]
+        }}},"layers":[{"id":"cases","type":"circle","source":"point",
+          "filter":$filter,"paint":{"circle-radius":4}
+        }]}"""
+        )
+      )
+      val started = TimeSource.Monotonic.markNow()
+      while (!map.isFullyLoaded && started.elapsedNow() < 10.seconds) {
+        runtime.pump(1000)
+        val events = runtime.drainEvents().events
+        events
+          .firstOrNull { it.type == RuntimeEventType.MAP_LOADING_FAILED }
+          ?.let { error(it.message) }
+        if (events.any { it.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE }) {
+          session.renderUpdate()
+        }
+      }
+      assertTrue(map.isFullyLoaded, "locale fixture did not finish loading: $filter")
+      val expected = expectedIndices.map { "case-$it" }.toSet()
+      val source =
+        session.querySourceFeatures(
+          "point",
+          SourceFeatureQueryOptions().apply { this.filter = jsonBytes(filter) },
+        )
+      assertEquals(
+        expected,
+        source.map { stringMember(it.feature, "id") }.toSet(),
+        "source query: $filter",
+      )
+      val geometry =
+        RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(0.0, 0.0), ScreenPoint(64.0, 64.0)))
+      val rendered =
+        session.queryRenderedFeatures(
+          geometry,
+          RenderedFeatureQueryOptions().apply { layerIds = listOf("cases") },
+        )
+      assertEquals(
+        expected,
+        rendered.map { stringMember(it.feature, "id") }.toSet(),
+        "worker layer filter: $filter",
+      )
+    }
+  }
+}

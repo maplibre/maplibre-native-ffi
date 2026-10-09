@@ -40,9 +40,8 @@ public object MaplibreAndroid {
   /**
    * Initializes Android platform services using JNI handles from the host.
    *
-   * Call this before creating a runtime that may issue Android HTTP requests or load `asset://` and
-   * `file:///android_asset/` URLs from the APK. APK asset URLs read the provided Context's
-   * AssetManager.
+   * Required once during Android host setup, before creating a runtime. APK assets use the provided
+   * Context's AssetManager.
    */
   public fun initialize(jniEnvironment: AndroidJniEnvironment, context: AndroidContextReference) {
     Status.check(

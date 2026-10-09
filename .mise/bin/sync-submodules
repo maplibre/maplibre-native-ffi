@@ -77,6 +77,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0032-webgpu-frame-stats.patch"
   "$repo_root/patches/maplibre-native/0034-opengl-large-uniform-blocks.patch"
   "$repo_root/patches/maplibre-native/0035-plugin-gl-attributes-by-name.patch"
+  "$repo_root/patches/maplibre-native/0036-platform-locale-expression-options.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the
