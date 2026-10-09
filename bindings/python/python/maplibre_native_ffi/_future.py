@@ -53,26 +53,17 @@ class NativeFuture[T](Future[T]):
         super().add_done_callback(fn)
 
 
-def map_future[T, U](
-    source: Future[T],
-    transform: Callable[[T], U],
-    *,
-    retained: object = None,
-) -> Future[U]:
+def map_future[T, U](source: Future[T], transform: Callable[[T], U]) -> Future[U]:
     """Return an eager future that transforms a native completion result.
 
-    Native work is already running once its submission is accepted, so the
-    derived future refuses ``cancel()`` for the same reason its source does,
-    and it always reports the source's outcome.
-
-    ``retained`` is kept alive until the source future is terminal, for a
-    completion whose native side borrows a Python-owned handle.
+    Native work is already running once its submission is accepted, so
+    ``cancel()`` on the derived future returns False, as it does on its
+    source. The derived future always reports the source's outcome.
     """
     result: Future[U] = NativeFuture()
     result.set_running_or_notify_cancel()
 
     def complete(completed: Future[T]) -> None:
-        nonlocal retained
         try:
             try:
                 raw = completed.result()
@@ -89,9 +80,6 @@ def map_future[T, U](
             error.add_note("".join(traceback.format_tb(trace)).rstrip())
             del trace
             result.set_exception(error)
-        finally:
-            # Future keeps its callbacks after completion; release the owner now.
-            retained = None
 
     if isinstance(source, NativeFuture):
         source._add_internal_callback(complete)

@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::sync::{OnceLock, mpsc};
 
 struct Policy {
     operations: &'static [&'static str],
@@ -52,11 +53,6 @@ pub fn finalize(action: impl FnOnce() + Send + 'static) {
         action();
         return;
     }
-    defer(Box::new(action));
-}
-
-pub(crate) fn defer(action: Box<dyn FnOnce() + Send>) {
-    use std::sync::{OnceLock, mpsc};
     static QUEUE: OnceLock<mpsc::Sender<Box<dyn FnOnce() + Send>>> = OnceLock::new();
     let queue = QUEUE.get_or_init(|| {
         let (sender, receiver) = mpsc::channel::<Box<dyn FnOnce() + Send>>();
@@ -70,7 +66,7 @@ pub(crate) fn defer(action: Box<dyn FnOnce() + Send>) {
             .expect("start native finalization worker");
         sender
     });
-    let _ = queue.send(action);
+    let _ = queue.send(Box::new(action));
 }
 
 #[cfg(test)]

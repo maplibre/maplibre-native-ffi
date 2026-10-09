@@ -30,7 +30,7 @@ pub fn validate_abi_version() -> Result<()> {
     validate_abi_version_value(unsafe { sys::mln_c_version() })
 }
 
-pub fn validate_abi_version_value(actual: u32) -> Result<()> {
+fn validate_abi_version_value(actual: u32) -> Result<()> {
     if actual == EXPECTED_C_ABI_VERSION {
         Ok(())
     } else {

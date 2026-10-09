@@ -317,7 +317,7 @@ struct PyCompletionBridge {
     discard: Option<unsafe fn(&sys::mln_completion_result)>,
 }
 
-fn new_python_future(py: Python<'_>) -> PyResult<Py<PyAny>> {
+fn new_python_future(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
     let future = py
         .import("maplibre_native_ffi._future")?
         .getattr("NativeFuture")?
@@ -325,7 +325,7 @@ fn new_python_future(py: Python<'_>) -> PyResult<Py<PyAny>> {
     // Native work is already running once its C submission is accepted. Mark
     // the future accordingly so cancel() cannot claim that it stopped the work.
     future.call_method0("set_running_or_notify_cancel")?;
-    Ok(future.unbind())
+    Ok(future)
 }
 
 unsafe extern "C" fn complete_python_future(
@@ -384,7 +384,12 @@ unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
     }
 }
 
-fn submit_python_future_with<S, C>(
+/// Submits a completion-based call and returns the future it resolves.
+///
+/// With `accept_error_status`, `convert` also receives a failed result, for a
+/// command whose completion reports its own disposition. `discard` disposes a
+/// value that the result transfers when the interpreter has already gone.
+fn submit_python_future<S, C>(
     py: Python<'_>,
     submit: S,
     convert: C,
@@ -395,7 +400,7 @@ where
     S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
 {
-    let future = new_python_future(py)?;
+    let future = new_python_future(py)?.unbind();
     let bridge = Box::new(PyCompletionBridge {
         future: future.clone_ref(py),
         convert: Mutex::new(Some(Box::new(convert))),
@@ -417,39 +422,8 @@ where
     Ok(future)
 }
 
-fn submit_python_future<S, C>(py: Python<'_>, submit: S, convert: C) -> PyResult<Py<PyAny>>
-where
-    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
-    C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
-{
-    submit_python_future_with(py, submit, convert, false, None)
-}
-
-fn submit_python_owned_future<S, C>(
-    py: Python<'_>,
-    submit: S,
-    convert: C,
-    discard: unsafe fn(&sys::mln_completion_result),
-) -> PyResult<Py<PyAny>>
-where
-    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
-    C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
-{
-    submit_python_future_with(py, submit, convert, false, Some(discard))
-}
-
-fn submit_python_command_future<S>(py: Python<'_>, submit: S) -> PyResult<Py<PyAny>>
-where
-    S: FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
-{
-    submit_python_future_with(py, submit, py_command, true, None)
-}
-
 fn completed_python_future(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    let future = py
-        .import("maplibre_native_ffi._future")?
-        .getattr("NativeFuture")?
-        .call0()?;
+    let future = new_python_future(py)?;
     future.call_method1("set_result", (py.None(),))?;
     Ok(future.unbind())
 }

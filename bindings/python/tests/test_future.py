@@ -15,7 +15,7 @@ def test_derived_future_reports_the_transformed_source_result() -> None:
 
     source.set_result(21)
 
-    assert result.result(timeout=5) == 42
+    assert result.result(timeout=TIMEOUT) == 42
 
 
 @pytest.mark.parametrize(
@@ -28,7 +28,7 @@ def test_derived_future_reports_a_source_failure(failure: BaseException) -> None
     source.set_exception(failure)
 
     with pytest.raises(type(failure)) as raised:
-        result.result(timeout=5)
+        result.result(timeout=TIMEOUT)
     assert raised.value is failure
 
 
@@ -44,7 +44,7 @@ def test_derived_future_reports_a_transform_failure(failure: BaseException) -> N
     source.set_result(0)
 
     with pytest.raises(type(failure)) as raised:
-        result.result(timeout=5)
+        result.result(timeout=TIMEOUT)
     assert raised.value is failure
 
 
@@ -55,24 +55,7 @@ def test_accepted_derived_future_refuses_cancellation() -> None:
     assert result.cancel() is False
     source.set_result(42)
 
-    assert result.result(timeout=5) == 42
-
-
-def test_retained_owner_lives_until_the_source_is_terminal() -> None:
-    class Owner:
-        pass
-
-    source: Future[int] = Future()
-    owner = Owner()
-    alive = weakref.ref(owner)
-    result = map_future(source, lambda value: value, retained=owner)
-    del owner
-
-    assert alive() is not None
-
-    source.set_result(7)
-    assert result.result(timeout=5) == 7
-    assert alive() is None
+    assert result.result(timeout=TIMEOUT) == 42
 
 
 def test_downstream_callback_failure_preserves_the_completed_result(caplog) -> None:
@@ -88,8 +71,8 @@ def test_downstream_callback_failure_preserves_the_completed_result(caplog) -> N
     result.add_done_callback(lambda _: finished.set())
     source.set_result(21)
 
-    assert finished.wait(5)
-    assert result.result(timeout=5) == 42
+    assert finished.wait(TIMEOUT)
+    assert result.result(timeout=TIMEOUT) == 42
     assert "exception in native future callback" in caplog.text
 
 

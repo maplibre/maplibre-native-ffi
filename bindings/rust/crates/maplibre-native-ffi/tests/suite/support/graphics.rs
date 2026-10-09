@@ -43,7 +43,7 @@ const BACKEND: u32 = if cfg!(mln_render_backend = "metal") {
 
 /// Whether this build's sessions share a context that the host makes current,
 /// which ties their driver to the host's graphics thread.
-pub const USES_CURRENT_CONTEXT: bool = BACKEND == BACKEND_EGL || BACKEND == BACKEND_WGL;
+const USES_CURRENT_CONTEXT: bool = BACKEND == BACKEND_EGL || BACKEND == BACKEND_WGL;
 
 /// mln_test_graphics_context, field for field.
 #[repr(C)]
@@ -150,7 +150,7 @@ impl Graphics {
     /// The driver an owned-texture session on this context takes by default:
     /// the calling thread when it shares a current context, and otherwise the
     /// core's own worker.
-    pub fn default_driver() -> RenderDriverKind {
+    fn default_driver() -> RenderDriverKind {
         if USES_CURRENT_CONTEXT {
             RenderDriverKind::CallerGraphicsThread
         } else {

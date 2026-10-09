@@ -127,7 +127,6 @@ const DeferringProvider = struct {
     url: []const u8,
     taken: support.Counter = .{},
     handles: [4]maplibre.ResourceRequestHandle = undefined,
-    cancel: ?maplibre.ResourceRequestCancelCallback = null,
 
     fn provide(context: ?*anyopaque, request: maplibre.ResourceRequest, handle: maplibre.ResourceRequestHandle) maplibre.Error!maplibre.ResourceProviderDecision {
         const self: *DeferringProvider = @ptrCast(@alignCast(context.?));
@@ -223,9 +222,9 @@ const CancelProbe = struct {
     }
 };
 
-// A cancel callback registered after cancellation is rejected through its
-// accepted_unless output. The binding then leaves the context unrooted, so
-// neither the callback nor release_context ever runs.
+// Registering a cancel callback after cancellation returns true, and native
+// takes no ownership of the registration. The binding then leaves the context
+// unrooted, so neither the callback nor release_context ever runs.
 test "a registration that reports cancellation is never rooted" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();

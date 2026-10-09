@@ -61,7 +61,7 @@ impl<H: NativeHandle> OwnerState<H> {
         self.handle.is_closed()
     }
 
-    /// The live handle, outside every callback's reentry contract.
+    /// The live handle, for a call made outside every native callback.
     pub(crate) fn native(&self) -> Result<H> {
         maplibre_core::callback::check("", 0)?;
         self.handle
@@ -195,24 +195,14 @@ impl<T: NativeHandle> ConcurrentNativeHandle<T> {
     }
 
     pub(crate) fn live_handle(&self) -> Option<T> {
-        match *self
-            .state
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-        {
+        match *lock(&self.state) {
             ConcurrentHandleState::Live(handle, _) => Some(handle),
             ConcurrentHandleState::Closing | ConcurrentHandleState::Closed => None,
         }
     }
 
     pub(crate) fn is_closed(&self) -> bool {
-        matches!(
-            *self
-                .state
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()),
-            ConcurrentHandleState::Closed
-        )
+        matches!(*lock(&self.state), ConcurrentHandleState::Closed)
     }
 
     pub(crate) fn read_handle(&self) -> Result<NativeRead<'_, T>> {

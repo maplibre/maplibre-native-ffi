@@ -140,6 +140,22 @@ fn nativeStatusError(raw_status: i32) NativeStatusError {
     };
 }
 
+/// The status that reports `err` to native code.
+pub fn rawStatus(err: Error) c.mln_status {
+    return switch (err) {
+        error.InvalidArgument => c.MLN_STATUS_INVALID_ARGUMENT,
+        error.InvalidState => c.MLN_STATUS_INVALID_STATE,
+        error.WrongThread => c.MLN_STATUS_WRONG_THREAD,
+        error.Unsupported => c.MLN_STATUS_UNSUPPORTED,
+        error.Cancelled => c.MLN_STATUS_CANCELLED,
+        error.Busy => c.MLN_STATUS_BUSY,
+        error.TargetLost => c.MLN_STATUS_TARGET_LOST,
+        error.NotReady => c.MLN_STATUS_NOT_READY,
+        error.NotFound => c.MLN_STATUS_NOT_FOUND,
+        else => c.MLN_STATUS_NATIVE_ERROR,
+    };
+}
+
 test "statuses map both ways, keep an unknown code, and carry the diagnostic" {
     const table = .{
         .{ c.MLN_STATUS_INVALID_ARGUMENT, error.InvalidArgument },
@@ -190,19 +206,4 @@ test "ABI version validation reports mismatch diagnostics" {
     try std.testing.expectError(error.AbiVersionMismatch, validateAbiVersionValue(1, 0, &diagnostic));
     try std.testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
     try std.testing.expect(std.mem.indexOf(u8, diagnostic.message(), "expected 0, got 1") != null);
-}
-
-pub fn rawStatus(err: Error) c.mln_status {
-    return switch (err) {
-        error.InvalidArgument => c.MLN_STATUS_INVALID_ARGUMENT,
-        error.InvalidState => c.MLN_STATUS_INVALID_STATE,
-        error.WrongThread => c.MLN_STATUS_WRONG_THREAD,
-        error.Unsupported => c.MLN_STATUS_UNSUPPORTED,
-        error.Cancelled => c.MLN_STATUS_CANCELLED,
-        error.Busy => c.MLN_STATUS_BUSY,
-        error.TargetLost => c.MLN_STATUS_TARGET_LOST,
-        error.NotReady => c.MLN_STATUS_NOT_READY,
-        error.NotFound => c.MLN_STATUS_NOT_FOUND,
-        else => c.MLN_STATUS_NATIVE_ERROR,
-    };
 }

@@ -122,7 +122,7 @@ pub fn status_for_error(error: &Error) -> sys::mln_status {
     }
 }
 
-pub fn kind_for_status(status: i32) -> ErrorKind {
+fn kind_for_status(status: i32) -> ErrorKind {
     match status {
         sys::MLN_STATUS_INVALID_ARGUMENT => ErrorKind::InvalidArgument,
         sys::MLN_STATUS_INVALID_STATE => ErrorKind::InvalidState,

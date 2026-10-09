@@ -1,63 +1,19 @@
 use std::ffi::{CStr, CString};
-use std::marker::PhantomData;
 use std::os::raw::c_char;
-use std::ptr;
 use std::str;
 
 use maplibre_native_ffi_sys as sys;
 
 use crate::error::{Error, Result};
 
-#[derive(Debug, Clone, Copy)]
-pub struct StringView<'a> {
-    raw: sys::mln_buffer_view,
-    _lifetime: PhantomData<&'a str>,
-}
-
-impl<'a> StringView<'a> {
-    pub fn new(value: &'a str) -> Self {
-        let bytes = value.as_bytes();
-        let data = if bytes.is_empty() {
-            ptr::null()
-        } else {
-            bytes.as_ptr().cast()
-        };
-        Self {
-            raw: sys::mln_buffer_view {
-                data,
-                size: bytes.len(),
-            },
-            _lifetime: PhantomData,
-        }
-    }
-
-    pub fn raw(&self) -> sys::mln_buffer_view {
-        self.raw
-    }
-}
-
-impl<'a> From<&'a str> for StringView<'a> {
-    fn from(value: &'a str) -> Self {
-        Self::new(value)
-    }
-}
-
 pub fn c_string(value: &str) -> Result<CString> {
     CString::new(value).map_err(|_| embedded_nul_error())
-}
-
-pub fn optional_c_string(value: Option<&str>) -> Result<Option<CString>> {
-    value.map(c_string).transpose()
-}
-
-pub fn string_view(value: &str) -> StringView<'_> {
-    StringView::new(value)
 }
 
 pub fn buffer_view(value: &[u8]) -> sys::mln_buffer_view {
     sys::mln_buffer_view {
         data: if value.is_empty() {
-            ptr::null()
+            std::ptr::null()
         } else {
             value.as_ptr().cast()
         },
@@ -141,7 +97,7 @@ mod tests {
     #[test]
     fn invalid_native_string_views_are_rejected() {
         let view = sys::mln_buffer_view {
-            data: ptr::null(),
+            data: std::ptr::null(),
             size: 1,
         };
 

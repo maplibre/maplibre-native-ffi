@@ -1,6 +1,9 @@
 """Attach generated operations to their public owner for introspection."""
 
+from contextlib import ExitStack
 from typing import Any
+
+from ._future import map_future
 
 
 class GeneratedOperations:
@@ -8,11 +11,11 @@ class GeneratedOperations:
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
-        from . import _generated_operations
+        from . import _generated_operations, _generated_values
 
+        # The generated modules import owner classes only for type checking,
+        # so their string annotations resolve through these entries.
         vars(_generated_operations)[cls.__name__] = cls
-        from . import _generated_values
-
         vars(_generated_values)[cls.__name__] = cls
         for base in cls.__bases__:
             if not issubclass(base, GeneratedOperations):
@@ -33,14 +36,10 @@ def _adopt_value(raw, owner, parent=None):
 
 
 def _adopt_future(source, owner, parent):
-    from ._future import map_future
-
     return map_future(source, lambda raw: _adopt_value(raw, owner, parent))
 
 
 def _with_view(owner, read, convert, callback):
-    from contextlib import ExitStack
-
     parents = []
     while owner is not None:
         parents.append(owner)

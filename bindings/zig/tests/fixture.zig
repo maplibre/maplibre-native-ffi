@@ -176,7 +176,7 @@ pub const Fixture = struct {
         runtime_options.value.asset_path = options.asset_path;
         runtime_options.value.event_wake = self.events.wake();
         self.runtime = try maplibre.runtimeCreate(testing.allocator, runtime_options.value, null);
-        errdefer closeRuntime(self.runtime) catch self.runtime.deinit();
+        errdefer closeRuntimeHandle(self.runtime) catch self.runtime.deinit();
         try self.setProvider(denying_provider);
         var map_options = try maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
@@ -193,7 +193,7 @@ pub const Fixture = struct {
             std.log.err("fixture map close failed: {s}", .{@errorName(err)});
             self.map.deinit();
         };
-        if (self.runtime_open) self.closeRuntime_() catch |err| {
+        if (self.runtime_open) self.closeRuntime() catch |err| {
             std.log.err("fixture runtime close failed: {s}", .{@errorName(err)});
             self.runtime.deinit();
         };
@@ -205,8 +205,8 @@ pub const Fixture = struct {
         self.map_open = false;
     }
 
-    fn closeRuntime_(self: *Fixture) !void {
-        try closeRuntime(self.runtime);
+    fn closeRuntime(self: *Fixture) !void {
+        try closeRuntimeHandle(self.runtime);
         self.runtime_open = false;
     }
 
@@ -261,7 +261,7 @@ pub const Fixture = struct {
     }
 };
 
-pub fn closeRuntime(runtime: maplibre.Runtime) !void {
+pub fn closeRuntimeHandle(runtime: maplibre.Runtime) !void {
     try resolve(try maplibre.runtimeRelease(runtime, null));
 }
 
@@ -387,7 +387,7 @@ pub const OwnedTexture = struct {
             _ = maplibre.renderSessionAbandon(self.session, null) catch {};
             maplibre.renderSessionDestroy(self.session, null) catch {};
         }
-        try self.finish(attachment.ready);
+        try self.resolve(attachment.ready);
         return self;
     }
 
@@ -410,7 +410,7 @@ pub const OwnedTexture = struct {
     }
 
     pub fn detach(self: *OwnedTexture) !void {
-        try self.finish(try maplibre.renderSessionDetach(self.session, null));
+        try self.resolve(try maplibre.renderSessionDetach(self.session, null));
         self.attached = false;
     }
 
@@ -427,10 +427,6 @@ pub const OwnedTexture = struct {
             }
         }.ready);
         return future.wait(null);
-    }
-
-    fn finish(self: *OwnedTexture, future: maplibre.Future(void)) !void {
-        try self.resolve(future);
     }
 
     fn service(self: *OwnedTexture) !void {

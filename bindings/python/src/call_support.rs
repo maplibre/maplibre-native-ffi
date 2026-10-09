@@ -44,10 +44,16 @@ impl<'py> GeneratedCall<'py> {
         submit: impl FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
     ) -> PyResult<Py<PyAny>> {
         let py = self.py;
-        submit_python_command_future(py, |completion, diagnostic| {
-            // SAFETY: the caller upholds the native call contract.
-            unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
-        })
+        submit_python_future(
+            py,
+            |completion, diagnostic| {
+                // SAFETY: the caller upholds the native call contract.
+                unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
+            },
+            py_command,
+            true,
+            None,
+        )
     }
 
     /// Submits an operation whose completion `convert` copies.
@@ -67,6 +73,8 @@ impl<'py> GeneratedCall<'py> {
                 unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
             },
             convert,
+            false,
+            None,
         )
     }
 
@@ -82,14 +90,15 @@ impl<'py> GeneratedCall<'py> {
         C: FnOnce(Python<'_>, &sys::mln_completion_result) -> PyResult<Py<PyAny>> + Send + 'static,
     {
         let py = self.py;
-        submit_python_owned_future(
+        submit_python_future(
             py,
             |completion, diagnostic| {
                 // SAFETY: the caller upholds the native call contract.
                 unsafe { generated_native_call(py, || submit(completion, diagnostic)) }
             },
             convert,
-            discard,
+            false,
+            Some(discard),
         )
     }
 
@@ -221,6 +230,8 @@ macro_rules! generated_owner {
             }
 
             fn __clear__(&self) {
+                // Dropping a callback can run Python code that reenters this
+                // owner, so the drop happens after the state lock is released.
                 let callbacks = self.state().take_callbacks();
                 drop(callbacks);
             }

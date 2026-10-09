@@ -72,7 +72,8 @@ pub(crate) fn invoke_status(
 }
 
 /// Drops a registration's state of type `S` once native can no longer call
-/// it, outside every callback's reentry contract.
+/// it. The drop admits no native call, so a handle that it disposes finalizes
+/// off the native callback stack.
 ///
 /// # Safety
 ///

@@ -17,15 +17,17 @@ impl<'py> GeneratedInputStorage<'py> {
                 size: 0,
             });
         }
-        let mut view = if text {
-            maplibre_core::string::buffer_view(value.extract::<&str>()?.as_bytes())
+        let bytes = if text {
+            value.extract::<&str>()?.as_bytes()
         } else {
-            maplibre_core::string::buffer_view(value.cast::<PyBytes>()?.as_bytes())
+            value.cast::<PyBytes>()?.as_bytes()
         };
-        if view.data.is_null() {
-            // A present empty value has a nonnull pointer; None alone denotes absence.
-            view.data = std::ptr::NonNull::<u8>::dangling().as_ptr().cast();
-        }
+        // A slice pointer is never null, so a present empty value keeps a
+        // nonnull pointer, and None alone denotes absence.
+        let view = sys::mln_buffer_view {
+            data: bytes.as_ptr().cast(),
+            size: bytes.len(),
+        };
         self.roots.push(value);
         Ok(view)
     }
@@ -472,6 +474,7 @@ impl GeneratedCallbackGuard {
             thread: std::thread::current().id(),
         })
     }
+
     fn scope(&self) -> GeneratedCallbackScope {
         self.0.clone()
     }

@@ -1,4 +1,3 @@
-pub use crate::error::status_for_error;
 use crate::{Error, ErrorKind, Result};
 use maplibre_native_ffi_sys as sys;
 use std::sync::{Arc, Mutex};
