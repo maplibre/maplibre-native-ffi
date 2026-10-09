@@ -72,8 +72,7 @@ function(mln_native_collect_abi_tests out_sources out_symbols)
        CONFIGURE_DEPENDS "${MLN_NATIVE_TESTS_DIR}/abi/*.c")
   foreach(relative IN LISTS all_sources)
     string(REGEX MATCH "^([^/]+)/[^/]+$" matched "${relative}")
-    if(NOT matched
-       OR NOT CMAKE_MATCH_1 IN_LIST MLN_NATIVE_ABI_DOMAINS)
+    if(NOT matched OR NOT CMAKE_MATCH_1 IN_LIST MLN_NATIVE_ABI_DOMAINS)
       message(
         FATAL_ERROR
           "tests/native/abi/${relative} is outside the domain directories; "
