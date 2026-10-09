@@ -4629,56 +4629,80 @@ fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
-    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
-    let (_context, session) = create_owned_texture_session(
-        &map.attach_ref().unwrap(),
-        RenderTargetExtent::new(512, 512, 1.0),
-    )
-    .unwrap();
-    map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{"points":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"front","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}},{"type":"Feature","id":"back","properties":{},"geometry":{"type":"Point","coordinates":[180,0]}}]}}},"layers":[{"id":"points","type":"circle","source":"points","paint":{"circle-radius":12,"circle-color":"red"}}]}"##).unwrap();
-    let mut camera = CameraOptions::default();
-    camera.center = Some(LatLng::new(0.0, 0.0));
-    camera.zoom = Some(0.0);
-    map.jump_to(&camera).unwrap();
-    let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
-        ScreenPoint::new(0.0, 0.0),
-        ScreenPoint::new(512.0, 512.0),
-    ));
-    let mut options = RenderedFeatureQueryOptions::default();
-    options.layer_ids = Some(vec!["points".into()]);
-    for (longitude, expected_id) in [(0.0, "front"), (180.0, "back")] {
-        camera.center = Some(LatLng::new(0.0, longitude));
+    for (size, pitch, bearing) in [(512, 0.0, 0.0), (64, 40.0, 25.0)] {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(size, size, 1.0)).unwrap();
+        let (_context, session) = create_owned_texture_session(
+            &map.attach_ref().unwrap(),
+            RenderTargetExtent::new(size, size, 1.0),
+        )
+        .unwrap();
+        map.set_style_json(br##"{"version":8,"projection":{"type":"globe"},"sources":{"points":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"front","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}},{"type":"Feature","id":"back","properties":{},"geometry":{"type":"Point","coordinates":[180,0]}}]}}},"layers":[{"id":"points","type":"circle","source":"points","paint":{"circle-radius":12,"circle-color":"red"}}]}"##).unwrap();
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(0.0, 0.0));
+        camera.zoom = Some(0.0);
+        camera.pitch = Some(pitch);
+        camera.bearing = Some(bearing);
         map.jump_to(&camera).unwrap();
-        let deadline = Instant::now() + Duration::from_secs(5);
-        let features = loop {
-            runtime.pump(Some(Duration::ZERO), None).unwrap();
-            session.render_update().unwrap();
-            let features = session
-                .query_rendered_features(&geometry, Some(&options))
-                .unwrap();
-            if !features.is_empty() {
-                break features;
-            }
-            assert!(
-                Instant::now() < deadline,
-                "the visible globe point did not render at {longitude}"
-            );
+        let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
+            ScreenPoint::new(0.0, 0.0),
+            ScreenPoint::new(f64::from(size), f64::from(size)),
+        ));
+        let mut options = RenderedFeatureQueryOptions::default();
+        options.layer_ids = Some(vec!["points".into()]);
+        let centers: &[(f64, &str)] = if size == 512 {
+            &[(0.0, "front"), (180.0, "back")]
+        } else {
+            &[(0.0, "front")]
         };
-        assert_eq!(features.len(), 1);
-        let feature: JsonValue = serde_json::from_slice(&features[0].feature).unwrap();
-        assert_eq!(feature["id"], expected_id);
-        let center_query = RenderedQueryGeometry::point(ScreenPoint::new(256.0, 256.0));
-        let center = session
-            .query_rendered_features(&center_query, Some(&options))
-            .unwrap();
-        assert_eq!(center.len(), 1);
-        let feature: JsonValue = serde_json::from_slice(&center[0].feature).unwrap();
-        assert_eq!(feature["id"], expected_id);
+        for &(longitude, expected_id) in centers {
+            camera.center = Some(LatLng::new(0.0, longitude));
+            map.jump_to(&camera).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            let features = loop {
+                runtime.pump(Some(Duration::ZERO), None).unwrap();
+                session.render_update().unwrap();
+                if let Ok(info) = session.texture_image_info() {
+                    let mut pixels = vec![0; info.byte_length];
+                    session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                    let center = ((size / 2 * size + size / 2) * 4) as usize;
+                    if pixels[center] > 200 {
+                        break session
+                            .query_rendered_features(&geometry, Some(&options))
+                            .unwrap();
+                    }
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "the visible globe point did not render at {longitude}"
+                );
+            };
+            assert_eq!(
+                features.len(),
+                1,
+                "size={size} pitch={pitch} bearing={bearing} longitude={longitude}"
+            );
+            let feature: JsonValue = serde_json::from_slice(&features[0].feature).unwrap();
+            assert_eq!(feature["id"], expected_id);
+            let center_query = RenderedQueryGeometry::point(ScreenPoint::new(
+                f64::from(size) / 2.0,
+                f64::from(size) / 2.0,
+            ));
+            let center = session
+                .query_rendered_features(&center_query, Some(&options))
+                .unwrap();
+            assert_eq!(
+                center.len(),
+                1,
+                "size={size} pitch={pitch} bearing={bearing} longitude={longitude}"
+            );
+            let feature: JsonValue = serde_json::from_slice(&center[0].feature).unwrap();
+            assert_eq!(feature["id"], expected_id);
+        }
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
     }
-    session.close().unwrap();
-    map.close().unwrap();
-    runtime.close().unwrap();
 }
 
 #[test]
@@ -4757,4 +4781,60 @@ fn location_bearing_accuracy_sector_keeps_its_direction_on_globe_and_mercator() 
     session.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();
+}
+
+#[test]
+fn globe_location_top_image_renders_when_the_viewport_bottom_is_in_the_sky() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    for projection in ["mercator", "globe"] {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
+        let (_context, session) = create_owned_texture_session(
+            &map.attach_ref().unwrap(),
+            RenderTargetExtent::new(512, 512, 1.0),
+        )
+        .unwrap();
+        map.set_style_json(&serde_json::to_vec(&json!({"version":8,"transition":{"duration":0},"projection":{"type":projection},"sources":{},"layers":[{
+            "id":"location","type":"location-indicator","layout":{"top-image":"green","bearing-image":"blue"},"paint":{"location":[0,0,0]}
+        }]})).unwrap()).unwrap();
+        for (name, color) in [("green", [0u8, 255, 0, 255]), ("blue", [0u8, 0, 255, 255])] {
+            let image = PremultipliedRgba8Image::new(
+                TextureImageInfo::new(16, 16, 64, 1024),
+                color.repeat(256),
+            );
+            map.set_style_image(name, &image, None).unwrap();
+        }
+        for pitch in [0.0, 40.0] {
+            let mut camera = CameraOptions::default();
+            camera.center = Some(LatLng::new(0.0, 0.0));
+            camera.zoom = Some(0.0);
+            camera.pitch = Some(pitch);
+            map.jump_to(&camera).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                runtime.pump(Some(Duration::ZERO), None).unwrap();
+                session.render_update().unwrap();
+                if let Ok(info) = session.texture_image_info() {
+                    let mut pixels = vec![0; info.byte_length];
+                    session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+                    let green = pixels
+                        .chunks_exact(4)
+                        .filter(|p| p[1] > 200 && p[2] < 20)
+                        .count();
+                    if green > 100 {
+                        break;
+                    }
+                }
+                assert!(
+                    Instant::now() < deadline,
+                    "top image did not render on {projection} at pitch {pitch}"
+                );
+            }
+        }
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
 }

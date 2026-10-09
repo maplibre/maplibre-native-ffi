@@ -1,0 +1,77 @@
+diff --git a/src/mln/map/transform_state.cpp b/src/mln/map/transform_state.cpp
+index 81ea00ab202dddb3c7434f6e562832e624e28838..e7ee97362599f72907f566cd0d841ceea3c1a26d 100644
+--- a/src/mln/map/transform_state.cpp
++++ b/src/mln/map/transform_state.cpp
+@@ -873,7 +873,7 @@ bool TransformState::isLocationOccluded(const LatLng& latLng) const {
+     }
+     const vec3 surface = VerticalPerspectiveProjection::surfaceVector(latLng);
+     const vec4& plane = getGlobeClippingPlane();
+-    return plane[0] * surface[0] + plane[1] * surface[1] + plane[2] * surface[2] + plane[3] < 0.0;
++    return VerticalPerspectiveProjection::isSurfacePointOccluded(surface, plane);
+ }
+ 
+ TileCoordinate TransformState::screenCoordinateToTileCoordinate(const ScreenCoordinate& point, uint8_t atZoom) const {
+diff --git a/src/mln/map/vertical_perspective_projection.cpp b/src/mln/map/vertical_perspective_projection.cpp
+index b1bda15e97775600b376b947c629f345aa1387c7..626937756d08e0cdc66a640d87d85080a528a422 100644
+--- a/src/mln/map/vertical_perspective_projection.cpp
++++ b/src/mln/map/vertical_perspective_projection.cpp
+@@ -9,6 +9,7 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <limits>
+ #include <numbers>
+ #include <optional>
+ #include <tuple>
+@@ -235,6 +236,13 @@ vec3 VerticalPerspectiveProjection::cameraPosition(const TransformState& state,
+     return position;
+ }
+ 
++bool VerticalPerspectiveProjection::isSurfacePointOccluded(const vec3& surface, const vec4& plane) {
++    // The plane is normalized and the surface lies on the unit sphere. Account
++    // for arithmetic and geographic roundoff at their common horizon.
++    constexpr double epsilon = 16.0 * std::numeric_limits<double>::epsilon();
++    return pointPlaneSignedDistance(plane, surface) < -epsilon;
++}
++
+ vec3 VerticalPerspectiveProjection::surfaceVector(const LatLng& latLng) {
+     const double lng = util::deg2rad(latLng.longitude());
+     const double lat = util::deg2rad(latLng.latitude());
+@@ -243,13 +251,12 @@ vec3 VerticalPerspectiveProjection::surfaceVector(const LatLng& latLng) {
+ }
+ 
+ LatLng VerticalPerspectiveProjection::surfaceVectorToLatLng(const vec3& surface) {
+-    const double latitude = util::rad2deg(std::asin(std::clamp(surface[1], -1.0, 1.0)));
+-    const double lengthXZ = std::sqrt(surface[0] * surface[0] + surface[2] * surface[2]);
++    const double lengthXZ = std::hypot(surface[0], surface[2]);
++    const double latitude = util::rad2deg(std::atan2(surface[1], lengthXZ));
+     if (lengthXZ <= 1e-6) {
+         return {latitude, 0.0};
+     }
+-    const double acosZ = std::acos(std::clamp(surface[2] / lengthXZ, -1.0, 1.0));
+-    const double longitude = util::rad2deg(surface[0] > 0 ? acosZ : -acosZ);
++    const double longitude = util::rad2deg(std::atan2(surface[0], surface[2]));
+     return LatLng{latitude, longitude, LatLng::Wrapped};
+ }
+ 
+@@ -489,7 +496,7 @@ ProjectedTilePoint VerticalPerspectiveProjection::projectTilePoint(const Project
+     // GL JS: the horizon plane hides a point on the surface, and only the planet itself hides a raised one.
+     const auto& plane = data.clippingPlane;
+     const bool occluded = heightScale <= 1.0
+-                              ? plane[0] * surface[0] + plane[1] * surface[1] + plane[2] * surface[2] + plane[3] < 0.0
++                              ? isSurfacePointOccluded(surface, plane)
+                               : lineOfSightBlocked(data.cameraPosition, sphere);
+     return {.point = {pos[0] / pos[3], pos[1] / pos[3]}, .signedDistanceFromCamera = pos[3], .occluded = occluded};
+ }
+diff --git a/src/mln/map/vertical_perspective_projection.hpp b/src/mln/map/vertical_perspective_projection.hpp
+index 7e0b530ea36303b2e3e726a05f2687dd4a7c2c7f..42ee7557b950669669e903f4d942e9a87c1a3e3e 100644
+--- a/src/mln/map/vertical_perspective_projection.hpp
++++ b/src/mln/map/vertical_perspective_projection.hpp
+@@ -49,6 +49,7 @@ public:
+     /// Camera position in unit-sphere space.
+     static vec3 cameraPosition(const TransformState&, double globeRadiusPixels);
+ 
++    static bool isSurfacePointOccluded(const vec3& surface, const vec4& plane);
+     static vec3 surfaceVector(const LatLng&);
+     static LatLng surfaceVectorToLatLng(const vec3&);
+ 
