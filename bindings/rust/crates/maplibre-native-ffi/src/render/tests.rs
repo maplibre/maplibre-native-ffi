@@ -4650,12 +4650,14 @@ fn globe_rendered_query_excludes_the_point_behind_the_horizon() {
         ));
         let mut options = RenderedFeatureQueryOptions::default();
         options.layer_ids = Some(vec!["points".into()]);
-        let centers: &[(f64, &str)] = if size == 512 {
-            &[(0.0, "front"), (180.0, "back")]
-        } else {
-            &[(0.0, "front")]
-        };
-        for &(longitude, expected_id) in centers {
+        let centers = [
+            (0.0, "front"),
+            (179.999, "back"),
+            (180.0, "back"),
+            (-180.0, "back"),
+            (-179.999, "back"),
+        ];
+        for (longitude, expected_id) in centers {
             camera.center = Some(LatLng::new(0.0, longitude));
             map.jump_to(&camera).unwrap();
             let deadline = Instant::now() + Duration::from_secs(5);

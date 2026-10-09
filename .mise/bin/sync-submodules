@@ -85,6 +85,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0042-coordinate-projection-world-copy.patch"
   "$repo_root/patches/maplibre-native/0043-globe-location-image-displacement.patch"
   "$repo_root/patches/maplibre-native/0044-location-indicator-drawable-recreation.patch"
+  "$repo_root/patches/maplibre-native/0045-globe-query-east-copy.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the
