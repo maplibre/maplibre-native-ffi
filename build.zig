@@ -216,6 +216,10 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
     });
     addTranslateCIncludePaths(translate_c, options.include_dirs);
     addPlatformSystemHeaderPaths(b, translate_c, options.target, options.system_root);
+    if (options.target.result.abi.isAndroid()) {
+        // Zig's C translator needs the API level from the resolved Android target.
+        translate_c.defineCMacro("__ANDROID_MIN_SDK_VERSION__", b.fmt("{d}", .{options.target.result.os.version_range.linux.android}));
+    }
     for (options.c_macros) |c_macro| {
         translate_c.defineCMacro(c_macro.name, c_macro.value);
     }

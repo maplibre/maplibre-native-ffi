@@ -25,6 +25,10 @@ if [[ ! -d "$native_install_dir" ]]; then
 fi
 
 mise run //:android-sdk-packages
+# Rust and bindgen use the toolchain and API level of the native artifact.
+# Preserve these explicit paths when cibuildwheel selects its isolated SDK.
+# shellcheck source=scripts/rust-cross-env.sh
+source "$MISE_MONOREPO_ROOT/scripts/rust-cross-env.sh" "$preset"
 if [[ "$preset" == android-x64-egl ]]; then
   # CPython 3.14's x86_64 Android runtime uses the legacy open syscall during
   # mimalloc initialization. API 26 rejects that syscall before Python can
@@ -57,7 +61,8 @@ export CIBW_BUILD=cp314-android_x86_64
 export CIBW_ARCHS_ANDROID=x86_64
 export CIBW_BUILD_FRONTEND='build[uv]'
 export CIBW_CONFIG_SETTINGS_ANDROID='build-args=--no-default-features'
-export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=$native_install_dir"
+bindgen_args_variable="BINDGEN_EXTRA_CLANG_ARGS_${cargo_target//-/_}"
+export CIBW_ENVIRONMENT_ANDROID="MAPLIBRE_NATIVE_C_INSTALL_DIR=\"$native_install_dir\" $bindgen_args_variable='${!bindgen_args_variable}'"
 # The graphics loader comes from Android, so wheel repair leaves it external.
 export CIBW_REPAIR_WHEEL_COMMAND_ANDROID="auditwheel repair --exclude $system_graphics_library --ldpaths {ldpaths} -w {dest_dir} {wheel}"
 export CIBW_TEST_COMMAND_ANDROID='python -m pytest tests'

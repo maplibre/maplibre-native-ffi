@@ -61,10 +61,9 @@ runs:
         Set-ItemProperty -Path $reporting -Name DontShowUI -Value 1 -Type DWord
 
     # Each job asks for the SDK its target builds with, and every other job installs
-    # none. No Windows target cross-compiles, and Android is never asked for: the
-    # runner image ships an SDK and points ANDROID_HOME at it, which costs nothing to
-    # reuse. The Android emulator job installs its emulator and system image into
-    # that SDK when it boots.
+    # none. No Windows target cross-compiles. Android reuses the SDK the runner image
+    # already points ANDROID_HOME at. Repository build tasks install missing Android
+    # packages there, and the emulator task installs its system image when it boots.
     #
     # The Oniro emulator image ships with the OpenHarmony SDK, and only the suite
     # that boots it needs the image, so the other ohos jobs subtract it.
