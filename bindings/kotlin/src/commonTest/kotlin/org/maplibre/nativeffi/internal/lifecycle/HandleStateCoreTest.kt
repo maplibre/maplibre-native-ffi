@@ -13,6 +13,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.internal.status.Status
@@ -24,7 +25,7 @@ class HandleStateCoreTest {
     var releases = 0
     state.withLive {
       val error =
-        assertFailsWith<org.maplibre.nativeffi.error.MaplibreException> {
+        assertFailsWith<MaplibreException> {
           state.retire(
             call = {
               releases++

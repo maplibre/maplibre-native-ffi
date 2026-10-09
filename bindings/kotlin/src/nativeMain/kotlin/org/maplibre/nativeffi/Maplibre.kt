@@ -16,7 +16,7 @@ public actual object Maplibre {
   }
 
   public actual fun pluginRegisterFunctionV1(): NativePointer {
-    loadNativeLibrary()
+    ensureNativeLibrary()
     return NativePointer.ofAddress(C.mln_plugin_get_register_function_v1())
   }
 }

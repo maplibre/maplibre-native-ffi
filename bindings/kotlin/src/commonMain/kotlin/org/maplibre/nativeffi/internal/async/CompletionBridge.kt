@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.internal.callback.NativeRoots
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readAddress
 import org.maplibre.nativeffi.internal.memory.readI32
+import org.maplibre.nativeffi.internal.memory.readSize
 import org.maplibre.nativeffi.internal.memory.readU32
 import org.maplibre.nativeffi.internal.memory.readU64
 import org.maplibre.nativeffi.internal.memory.readViewString
@@ -152,6 +153,5 @@ internal object CompletionBridge {
   fun valuePointer(result: Long): Long = readAddress(result + CompletionResultLayout.VALUE)
 
   /** The `value_count` of the result at [result]. */
-  fun valueCount(result: Long): ULong =
-    org.maplibre.nativeffi.internal.memory.readSize(result + CompletionResultLayout.VALUE_COUNT)
+  fun valueCount(result: Long): ULong = readSize(result + CompletionResultLayout.VALUE_COUNT)
 }

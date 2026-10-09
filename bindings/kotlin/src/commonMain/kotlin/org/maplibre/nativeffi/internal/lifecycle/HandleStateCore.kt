@@ -5,6 +5,8 @@ import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.error.MaplibreException
+import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.callback.CallbackAdmission
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -80,9 +82,9 @@ internal class HandleStateCore(
     if (releaseState.load() == STATE_CLOSED) return false
     if (!readers.compareAndSet(0, -1)) {
       if (readers.load() > 0)
-        throw org.maplibre.nativeffi.error.MaplibreException(
-          org.maplibre.nativeffi.error.MaplibreStatus.BUSY,
-          org.maplibre.nativeffi.error.MaplibreStatus.BUSY.nativeCode,
+        throw MaplibreException(
+          MaplibreStatus.BUSY,
+          MaplibreStatus.BUSY.nativeCode,
           "$typeName has an active borrowed value copy",
         )
       if (releaseState.load() == STATE_CLOSED) return false

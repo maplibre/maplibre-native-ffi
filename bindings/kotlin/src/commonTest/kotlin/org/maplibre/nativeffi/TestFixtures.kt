@@ -5,6 +5,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -26,6 +27,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Wake
+import org.maplibre.nativeffi.runtime.AsyncReleasable
 
 /** How long one test may run before it fails instead of hanging the suite. */
 internal val TEST_TIMEOUT: Duration = 60.seconds
@@ -45,7 +47,7 @@ internal fun <T> runSuspendTest(block: suspend CoroutineScope.() -> T): T = runB
 internal suspend fun <T> Deferred<T>.awaitWithin(what: String): T =
   try {
     withTimeout(WAIT_TIMEOUT) { await() }
-  } catch (timeout: kotlinx.coroutines.TimeoutCancellationException) {
+  } catch (timeout: TimeoutCancellationException) {
     throw AssertionError("timed out waiting for $what", timeout)
   }
 
@@ -117,7 +119,7 @@ private constructor(val runtime: RuntimeHandle, private val wakes: Channel<Unit>
         }
         match
       }
-    } catch (timeout: kotlinx.coroutines.TimeoutCancellationException) {
+    } catch (timeout: TimeoutCancellationException) {
       throw AssertionError("timed out waiting for $what", timeout)
     }
 
@@ -182,10 +184,7 @@ internal suspend fun <T> withMap(
  * Runs [block], then releases [owners] in order. Every release runs, and the first failure wins, so
  * a teardown failure never hides the failure that caused it.
  */
-internal suspend fun <T> runThenRelease(
-  owners: List<org.maplibre.nativeffi.runtime.AsyncReleasable>,
-  block: suspend () -> T,
-): T {
+internal suspend fun <T> runThenRelease(owners: List<AsyncReleasable>, block: suspend () -> T): T {
   var failure: Throwable? = null
   val result =
     try {

@@ -64,7 +64,7 @@ internal object NativeAccess {
     checkNativeAccessAndAbi(::cVersion)
   }
 
-  internal fun cVersion(): Long = Integer.toUnsignedLong(C.mln_c_version())
+  private fun cVersion(): Long = Integer.toUnsignedLong(C.mln_c_version())
 
   private fun nativeAccessFailure(cause: Throwable): IllegalStateException =
     IllegalStateException(

@@ -161,20 +161,11 @@ internal class DecisionOwnerCore(
     private val state = AtomicInt(STATE_PENDING)
 
     fun markProviderOwned() {
-      while (true) {
-        when (state.load()) {
-          STATE_PENDING -> if (state.compareAndSet(STATE_PENDING, STATE_PROVIDER_OWNED)) return
-          else -> return
-        }
-      }
+      state.compareAndSet(STATE_PENDING, STATE_PROVIDER_OWNED)
     }
 
     fun markNativeWillRelease() {
-      while (true) {
-        val current = state.load()
-        if (current == STATE_RELEASE_ACCOUNTED) return
-        if (state.compareAndSet(current, STATE_RELEASE_ACCOUNTED)) return
-      }
+      state.store(STATE_RELEASE_ACCOUNTED)
     }
 
     fun releaseIfOwned() {

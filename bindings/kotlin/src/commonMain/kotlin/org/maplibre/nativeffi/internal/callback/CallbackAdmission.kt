@@ -6,11 +6,10 @@ internal expect object CallbackContext {
   var current: CallbackScope?
 }
 
-internal class CallbackScope
-internal constructor(
-  internal val owner: Long?,
-  internal val allowed: Set<String>?,
-  internal val parent: CallbackScope?,
+internal class CallbackScope(
+  val owner: Long?,
+  val allowed: Set<String>?,
+  val parent: CallbackScope?,
 ) : AutoCloseable {
   private var active = true
 

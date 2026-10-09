@@ -47,8 +47,7 @@ class CustomSourceCallbackTest {
 
   @Test
   fun elevenLiveCustomSourcesStayRegistered(): Unit = runSuspendTest {
-    // The Android binding hands native callbacks from a ten-slot function-pointer pool, so an
-    // eleventh live source of each kind must still get its own slot.
+    // Each live source roots its own callbacks, so eleven sources of each kind run side by side.
     withMap(mapMode = MapMode.STATIC) {
       loadStyle()
       val geometryOptions = CustomGeometrySourceOptions(fetchTile = {})
@@ -61,7 +60,7 @@ class CustomSourceCallbackTest {
         assertNotNull(map.getStyleSourceInfo(id).awaitWithin("source $id"), id)
       }
 
-      // A slot a removed source frees serves the next registration.
+      // Removing a source leaves the others registered and makes room for the next one.
       map.removeStyleSource("custom-1").awaitCommitted()
       map.removeStyleSource("custom-mvt-1").awaitCommitted()
       map.addCustomGeometrySource("custom-12", geometryOptions).awaitCommitted()

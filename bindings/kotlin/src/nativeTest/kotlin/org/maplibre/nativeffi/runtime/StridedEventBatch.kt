@@ -6,9 +6,9 @@ import org.maplibre.nativeffi.generated.RuntimeEvent
 import org.maplibre.nativeffi.generated.RuntimeEventPayload
 
 /**
- * The batch each emitter's strided-batch test builds by hand: [STRIDED_EVENT_COUNT] events a
- * [STRIDE_PADDING]-byte gap apart, as a later header with a wider payload would lay them out, each
- * with discriminants and a payload tag this binding does not know.
+ * The number of events in the batch that [RuntimeEventNativeTest] builds by hand. The events lie a
+ * [STRIDE_PADDING]-byte gap apart, as a later header with a wider payload would lay them out, and
+ * each has discriminants and a payload tag that this binding does not know.
  */
 internal const val STRIDED_EVENT_COUNT = 2
 

@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.render
 
-import kotlinx.coroutines.CloseableCoroutineDispatcher
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.newSingleThreadContext
@@ -88,7 +88,7 @@ internal enum class TestBackend(val graphicsBackend: UInt) {
  */
 @OptIn(DelicateCoroutinesApi::class, ExperimentalCoroutinesApi::class)
 internal object TestGraphics {
-  val thread: CloseableCoroutineDispatcher = newSingleThreadContext("maplibre-test-graphics")
+  val thread: CoroutineDispatcher = newSingleThreadContext("maplibre-test-graphics")
 
   val backend: TestBackend by lazy { TestBackend.ofBuild() }
 

@@ -10,6 +10,7 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.c.C
 import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
 import org.maplibre.nativeffi.internal.memory.NativeArena
+import org.maplibre.nativeffi.internal.memory.w
 import org.maplibre.nativeffi.internal.memory.writeU32
 
 class NativeStatusDiagnosticTest {
@@ -58,6 +59,6 @@ class NativeStatusDiagnosticTest {
 
   private companion object {
     /** `sizeof(mln_resource_transform_response)`: a size, a URL pointer, and a context pointer. */
-    val RESOURCE_TRANSFORM_RESPONSE_SIZE = org.maplibre.nativeffi.internal.memory.w(12, 24)
+    val RESOURCE_TRANSFORM_RESPONSE_SIZE = w(12, 24)
   }
 }

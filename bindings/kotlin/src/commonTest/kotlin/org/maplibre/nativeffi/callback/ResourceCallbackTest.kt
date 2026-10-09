@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.generated.ResourceResponseStatus
 import org.maplibre.nativeffi.generated.ResourceTransform
 import org.maplibre.nativeffi.generated.ResourceTransformResponse
 import org.maplibre.nativeffi.generated.RuntimeEventType
+import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -103,7 +104,7 @@ class ResourceCallbackTest {
   @Test
   fun aForbiddenCallInsideACallbackFailsAndAnAllowedOneSucceeds(): Unit = runSuspendTest {
     val outcome = CompletableDeferred<List<Throwable?>>()
-    lateinit var fixtureRuntime: org.maplibre.nativeffi.generated.RuntimeHandle
+    lateinit var fixtureRuntime: RuntimeHandle
     val provider = denyingProvider { request, handle ->
       if (request.requestedUrl != STYLE_URL) return@denyingProvider null
       val results =
