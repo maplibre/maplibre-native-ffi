@@ -192,6 +192,11 @@ default value. This lets Android JNI failures follow Native's expression error
 handling instead of terminating the process. Upstream:
 [maplibre-native#4745](https://github.com/maplibre/maplibre-native/pull/4745).
 
+`0038-apple-locale-expressions.patch` applies explicit fraction limits to
+Foundation decimal and currency formatters while retaining omitted defaults.
+Apple locale expressions reject malformed UTF-8 as expression errors and
+preserve embedded null characters during string conversion.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy
