@@ -52,7 +52,7 @@ internal static unsafe class NativeCompletion
                 (CommandDisposition)result->disposition,
                 result->generation,
                 (int)result->status,
-                StateBase.Diagnostic(result->diagnostic)
+                ValueStructs.CopyUtf8View(result->diagnostic)
             ),
             true
         );
@@ -115,11 +115,6 @@ internal static unsafe class NativeCompletion
     private abstract class StateBase
     {
         internal abstract void Complete(mln_completion_result* result);
-
-        internal static string Diagnostic(mln_buffer_view view) =>
-            view.data is null || view.size == 0
-                ? string.Empty
-                : Marshal.PtrToStringUTF8((nint)view.data, checked((int)view.size)) ?? string.Empty;
     }
 
     private sealed class State<T>(CompletionConverter<T> convert, bool acceptErrorStatus)
@@ -135,11 +130,11 @@ internal static unsafe class NativeCompletion
         {
             try
             {
-                if (!acceptErrorStatus)
-                {
-                    if ((int)result->status != 0)
-                        NativeStatus.Check((int)result->status, Diagnostic(result->diagnostic));
-                }
+                if (!acceptErrorStatus && result->status != mln_status.MLN_STATUS_OK)
+                    NativeStatus.Check(
+                        (int)result->status,
+                        ValueStructs.CopyUtf8View(result->diagnostic)
+                    );
                 source.TrySetResult(convert(result));
             }
             catch (Exception error)

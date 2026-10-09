@@ -79,11 +79,11 @@ copy of the same library.
 
 ## Ownership and execution
 
-Runtime and map handles have an idempotent `close()`. Runtime close remains
-asynchronous in Dart so callback roots stay alive through native teardown. Close
-child maps, render sessions, frames, snapshots, request handles, and offline
-operations before their parent runtime. Scoped backend values remain valid only
-until their frame or owner is closed.
+Owned handles have an idempotent `close()`, and an acquired frame ends with
+`release()` or `dispose()`. Runtime and map close are asynchronous, so callback
+roots stay alive through native teardown. Close child maps, render sessions,
+frames, and request handles before their parent runtime. A scoped backend value
+is valid until its frame or owner closes.
 
 Close every handle explicitly. When the collector reclaims a handle that is
 still open, a native finalizer disposes it, and the binding writes
@@ -92,17 +92,18 @@ That warning comes from a Dart finalizer, which runs from the event loop after
 the collection, and it is skipped for handles that the isolate's shutdown
 disposes.
 
-Projection handles are created asynchronously and are synchronous after that:
-every projection call, `close()` included, runs on the calling isolate's thread,
-may be made from any isolate, and never observes map changes made after creation
-and remains usable after its source map and runtime close.
+A map creates a projection handle asynchronously, and every later projection
+call is synchronous. Any isolate can make those calls, `close()` included, and
+each one runs on the calling isolate's thread. A projection never observes map
+changes made after its creation, and it remains usable after its source map and
+runtime close.
 
-Create runtimes and maps with `await`. Runtime and map commands copy their input
-and return `Future` values. Snapshot methods synchronously copy immutable state.
-Ordered queries and lifecycle operations also return `Future` values. Direct
-wake callbacks report queued events without participating in future completion.
-Read queued events with `RuntimeHandle.drainEvents()`. Narrow what a map or a
-runtime queues with `setEventMask`.
+Map creation, commands, ordered queries, and lifecycle operations return
+`Future` values, and a command copies its input before it returns. Snapshot
+methods synchronously copy immutable state. A wake callback reports that events
+are queued and has no part in completing a future. Read queued events with
+`RuntimeHandle.drainEvents()`, and narrow what a map or a runtime queues with
+`setEventMask`.
 
 Runtime, map, camera, and projection calls remain valid when Dart resumes an
 isolate on another native thread after `await`. Attach a render session directly

@@ -7,7 +7,6 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import '../error/maplibre_exception.dart';
-import '../log/log.dart';
 import '../internal/callback/completion.dart';
 import '../internal/callback/retained.dart';
 import '../internal/c/maplibre_native_c.dart'
@@ -19,10 +18,10 @@ import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
 import '../internal/value/uint64.dart';
 import '../render/native_pointer.dart';
+import '../values.dart';
 
 part 'generated_operations.dart';
 part 'native_calls.dart';
-part 'runtime_offline.dart';
 
 /// Native release roots for the adapter rule contexts.
 ///
@@ -199,7 +198,6 @@ void Function(dynamic) _callbackPortHandler(
 /// Decodes a synthetic native batch through the production generated converter.
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   raw.mln_runtime_event_batch_view batch,
-  RuntimeHandle runtime,
 ) => _readRuntimeEventBatchView(batch).events;
 
 /// Starts a command and decodes its receipt, including failed dispositions.

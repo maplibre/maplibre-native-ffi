@@ -31,9 +31,7 @@ NativeUtf8CString nativeUtf8CString(String value, Allocator allocator) {
 
   final bytes = utf8.encode(value);
   final data = allocator<Uint8>(bytes.length + 1);
-  for (var index = 0; index < bytes.length; index += 1) {
-    data[index] = bytes[index];
-  }
+  data.asTypedList(bytes.length).setAll(0, bytes);
   data[bytes.length] = 0;
 
   return NativeUtf8CString(data.cast<Utf8>(), bytes.length);
@@ -64,9 +62,7 @@ raw.mln_buffer_view nativeBufferView(Uint8List value, Allocator allocator) {
 NativeStringView nativeStringView(String value, Allocator allocator) {
   final bytes = utf8.encode(value);
   final data = allocator<Uint8>(bytes.isEmpty ? 1 : bytes.length);
-  for (var index = 0; index < bytes.length; index += 1) {
-    data[index] = bytes[index];
-  }
+  data.asTypedList(bytes.length).setAll(0, bytes);
 
   final view = allocator<raw.mln_buffer_view>();
   view.ref.data = data.cast<Void>();

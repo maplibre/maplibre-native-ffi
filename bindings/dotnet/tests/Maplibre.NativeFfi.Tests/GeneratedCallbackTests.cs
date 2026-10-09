@@ -42,12 +42,12 @@ public sealed unsafe class GeneratedCallbackTests
     {
         var accepted = Prepare(accept: true);
         var rejected = Prepare(accept: false);
-        Collect();
+        Gc.Collect();
         Assert.True(accepted.Root.IsAlive);
         Assert.False(rejected.Root.IsAlive);
 
         accepted.Native.release_user_data(accepted.Native.user_data);
-        Collect();
+        Gc.Collect();
         Assert.False(accepted.Root.IsAlive);
     }
 
@@ -58,13 +58,13 @@ public sealed unsafe class GeneratedCallbackTests
         var first = PrepareOwned(owner);
         owner.Retire();
         var late = PrepareOwned(owner);
-        Collect();
+        Gc.Collect();
         Assert.True(first.Root.IsAlive);
         Assert.True(late.Root.IsAlive);
         first.Native.fetch_tile(first.Native.user_data, default);
         first.Native.release_user_data(first.Native.user_data);
         late.Native.release_user_data(late.Native.user_data);
-        Collect();
+        Gc.Collect();
         Assert.False(first.Root.IsAlive);
         Assert.False(late.Root.IsAlive);
         first.Native.fetch_tile(first.Native.user_data, default);
@@ -100,12 +100,5 @@ public sealed unsafe class GeneratedCallbackTests
         if (accept)
             scope.Accept();
         return (native, weak);
-    }
-
-    private static void Collect()
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
     }
 }

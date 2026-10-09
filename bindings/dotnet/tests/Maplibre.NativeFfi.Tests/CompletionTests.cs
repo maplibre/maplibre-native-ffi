@@ -118,7 +118,9 @@ public sealed class CompletionTests
         using var cancellation = new CancellationTokenSource();
         var stillImage = fixture.Map.RequestStillImageAsync(cancellation.Token);
 
-        await Assert.ThrowsAsync<TimeoutException>(() => stillImage.WaitAsync(TimeSpan.Zero));
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            stillImage.WaitAsync(TimeSpan.Zero, TestWaits.Token)
+        );
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => stillImage);
 

@@ -22,7 +22,9 @@ public sealed class ProcessExitTests
 
         var output = process.StandardOutput.ReadToEndAsync(TestWaits.Token);
         var error = process.StandardError.ReadToEndAsync(TestWaits.Token);
-        await process.WaitForExitAsync(TestWaits.Token).WaitAsync(TestWaits.Deadline);
+        await process
+            .WaitForExitAsync(TestWaits.Token)
+            .WaitAsync(TestWaits.Deadline, TestWaits.Token);
 
         Assert.True(
             process.ExitCode == 0,

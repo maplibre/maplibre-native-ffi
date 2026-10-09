@@ -45,7 +45,7 @@ public sealed unsafe class NativeHandleStateTests
     }
 
     [Fact]
-    public void PointerFailsWhileCloseIsInProgress()
+    public void HandleFailsWhileCloseIsInProgress()
     {
         using var destroy = new BlockingDestroy();
         var state = new NativeHandleState<MlnRuntime>(

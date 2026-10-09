@@ -44,7 +44,6 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
     private readonly StatusDestroy<T> destroy;
     private readonly StatusDestroy<T>? disposeAbandoned;
     private readonly string typeName;
-    private readonly ulong issued;
     private readonly T handle;
     private readonly object? retainedParent;
     private bool closed;
@@ -97,7 +96,6 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
         this.disposeAbandoned = disposeAbandoned;
         this.typeName = typeName;
         this.handle = handle;
-        issued = handle.Value;
     }
 
     ~NativeHandleState()
@@ -114,7 +112,8 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
 
     private void FinalizeOwner()
     {
-        if (issued == 0 || pendingDecision)
+        // A constructor that rejected the null handle leaves nothing to finalize.
+        if (handle.Value == 0 || pendingDecision)
             return;
         if (!closed)
         {
@@ -134,27 +133,13 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
             {
                 // A finalizer reports failed retirement without unwinding.
             }
-            var current = issued;
             NativeLeakReporter.Report(
-                new NativeLeakReport(
-                    NativeLeakReportKind.LeakedHandle,
-                    typeName,
-                    current,
-                    null,
-                    $"Leaked {typeName} native handle 0x{current:x}; call Close() before releasing the wrapper."
-                )
+                $"Leaked {typeName} native handle 0x{handle.Value:x}; call Close() before releasing the wrapper."
             );
         }
     }
 
     internal T IssuedHandle => handle;
-
-    internal RetainedScope Retain() => new(this);
-
-    internal readonly ref struct RetainedScope(NativeHandleState<T> owner)
-    {
-        public void Dispose() => GC.KeepAlive(owner);
-    }
 
     internal bool IsClosed
     {
@@ -284,10 +269,6 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
             {
                 return;
             }
-        }
-
-        lock (gate)
-        {
             if (pendingDecision)
             {
                 pendingRelease = true;

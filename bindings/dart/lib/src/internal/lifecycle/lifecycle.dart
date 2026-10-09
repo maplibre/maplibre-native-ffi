@@ -99,7 +99,7 @@ final class NativeHandleState<H extends NativeHandle> implements Finalizable {
     final token = _createOwnerToken(handle.raw);
     if (token == nullptr) {
       throw MaplibreException.forNativeStatusCode(
-        -5,
+        nativeStatusNativeError,
         'Could not allocate $typeName finalizer state',
       );
     }

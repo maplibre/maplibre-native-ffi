@@ -1,10 +1,4 @@
-using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Internal.C;
-using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Loader;
-using Maplibre.NativeFfi.Internal.Status;
-using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Map;
 
 namespace Maplibre.NativeFfi;
 

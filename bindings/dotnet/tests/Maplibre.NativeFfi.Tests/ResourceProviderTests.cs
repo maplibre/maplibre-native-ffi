@@ -34,7 +34,7 @@ public sealed class ResourceProviderTests
                     retained = handle;
                     reentry = Record.Exception(() =>
                     {
-                        _ = owner!.Runtime.BarrierAsync();
+                        _ = owner!.Runtime.BarrierAsync(TestWaits.Token);
                     });
                     waitReentry = Record.Exception(handle.WaitUntilRetired);
                     handle.Complete(StyleResponse());

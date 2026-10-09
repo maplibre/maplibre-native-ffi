@@ -238,6 +238,15 @@ int _nativeInteger(int value, int minimum, int maximum) {
   return value;
 }
 
+/// Copies a native byte view into a Dart-owned list.
+Uint8List _copyBufferView(raw.mln_buffer_view view) {
+  if (view.size == 0) return Uint8List(0);
+  if (view.data == nullptr) {
+    throwInvalidState('native completion returned an invalid buffer');
+  }
+  return Uint8List.fromList(view.data.cast<Uint8>().asTypedList(view.size));
+}
+
 /// Decodes one message from the UTF-8 arena of a native record array.
 String _arenaUtf8(Pointer<Uint8> data, int size, int offset, int length) {
   if (offset < 0 || length < 0 || offset > size || length > size - offset) {

@@ -187,7 +187,7 @@ void main() {
         batch.ref.event_count = 3;
         batch.ref.messages = messages.cast<Char>();
         batch.ref.messages_size = messageBytes.length;
-        final decoded = decodeRuntimeEventBatchForTesting(batch.ref, runtime);
+        final decoded = decodeRuntimeEventBatchForTesting(batch.ref);
         // Every field is copied before the drain returns, so overwriting the
         // arena cannot change what the host already holds.
         unknownWindow.fillRange(0, unknownWindow.length, 9);
