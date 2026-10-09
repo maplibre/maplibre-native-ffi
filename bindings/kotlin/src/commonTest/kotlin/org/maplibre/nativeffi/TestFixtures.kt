@@ -24,6 +24,7 @@ import org.maplibre.nativeffi.generated.RuntimeEvent
 import org.maplibre.nativeffi.generated.RuntimeEventSourceType
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
+import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Wake
 
 /** How long one test may run before it fails instead of hanging the suite. */
@@ -126,18 +127,17 @@ private constructor(val runtime: RuntimeHandle, private val wakes: Channel<Unit>
 
   companion object {
     /**
-     * Runs [block] against a fresh runtime with [provider] installed, and releases the runtime
-     * afterwards even when [block] fails.
+     * Runs [block] against a fresh runtime created from [options] with [provider] installed, and
+     * releases the runtime afterwards even when [block] fails. The fixture owns the event wake.
      */
     suspend fun <T> use(
       provider: ResourceProvider = denyingProvider(),
+      options: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
       block: suspend RuntimeFixture.() -> T,
     ): T {
       val wakes = Channel<Unit>(Channel.CONFLATED)
       val runtime =
-        GeneratedApi.runtimeCreate(
-          GeneratedApi.runtimeOptionsDefault().copy(eventWake = Wake { wakes.trySend(Unit) })
-        )
+        GeneratedApi.runtimeCreate(options.copy(eventWake = Wake { wakes.trySend(Unit) }))
       val fixture = RuntimeFixture(runtime, wakes)
       return runThenRelease(listOf(runtime)) {
         runtime.setResourceProvider(provider).awaitWithin("the resource provider")
@@ -163,16 +163,17 @@ internal class MapFixture(val runtimeFixture: RuntimeFixture, val map: MapHandle
 }
 
 /**
- * Runs [block] against a fresh runtime and small map, with [provider] answering every resource
- * request, and releases both afterwards.
+ * Runs [block] against a fresh runtime created from [runtimeOptions] and a small map, with
+ * [provider] answering every resource request, and releases both afterwards.
  */
 internal suspend fun <T> withMap(
   mapMode: MapMode = MapMode.CONTINUOUS,
   provider: ResourceProvider = denyingProvider(),
   options: MapOptions = smallMapOptions(mapMode),
+  runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
   block: suspend MapFixture.() -> T,
 ): T =
-  RuntimeFixture.use(provider) {
+  RuntimeFixture.use(provider, runtimeOptions) {
     val map = runtime.mapCreate(options).awaitWithin("the map")
     runThenRelease(listOf(map)) { MapFixture(this, map).block() }
   }

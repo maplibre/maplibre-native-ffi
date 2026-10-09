@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
+import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderFrameResult
@@ -23,6 +24,7 @@ import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderSessionState
 import org.maplibre.nativeffi.generated.ResourceProvider
+import org.maplibre.nativeffi.generated.RuntimeOptions
 import org.maplibre.nativeffi.generated.Wake
 import org.maplibre.nativeffi.runtime.assertCommitted
 import org.maplibre.nativeffi.smallMapOptions
@@ -162,7 +164,8 @@ internal class OwnedTextureFixture(
 
 /**
  * Runs [block] against a map with an attached caller-driven owned-texture session of [width] x
- * [height] on the build's backend, and abandons and closes the session afterwards.
+ * [height] on the build's backend, and abandons and closes the session afterwards. The map's
+ * runtime is created from [runtimeOptions].
  */
 internal suspend fun <T> withOwnedTexture(
   width: Int = 32,
@@ -170,9 +173,10 @@ internal suspend fun <T> withOwnedTexture(
   mapMode: MapMode = MapMode.STATIC,
   textureRingDepth: UInt = 1u,
   provider: ResourceProvider = denyingProvider(),
+  runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
   block: suspend OwnedTextureFixture.() -> T,
 ): T =
-  withMap(mapMode, provider, smallMapOptions(mapMode, width, height)) {
+  withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
     val wakes = Channel<Unit>(Channel.CONFLATED)
     val options =
       RenderSessionAttachOptions(

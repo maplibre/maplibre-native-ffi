@@ -2,26 +2,15 @@ package org.maplibre.nativeffi.render
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
-import org.maplibre.nativeffi.Maplibre
-import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.geo.ScreenBox
-import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.map.MapOptions
-import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
-import org.maplibre.nativeffi.query.RenderedQueryGeometry
-import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
-import org.maplibre.nativeffi.runtime.RuntimeEventType
-import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.runtime.awaitCommitted
+import org.maplibre.nativeffi.withMap
 
+/** Locale-sensitive style expressions, which Apple platforms evaluate with Foundation. */
 class LocaleExpressionsAppleTest {
   @Test
-  fun formattingRetainsDefaultsAndHonorsExplicitFractionLimits() {
+  fun formattingRetainsDefaultsAndHonorsExplicitFractionLimits(): Unit = runSuspendTest {
     val cases =
       listOf(
         "" to "12.3",
@@ -34,117 +23,60 @@ class LocaleExpressionsAppleTest {
         "\"max-fraction-digits\":0" to "12",
         "\"min-fraction-digits\":2,\"max-fraction-digits\":4" to "12.30",
       )
-    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
-      MapHandle.create(runtime, MapOptions()).use { map ->
-        map.setStyleJson(
-          jsonBytes(
-            """{"version":8,"sources":{},"layers":[{
-          "id":"background","type":"background"}]}"""
-          )
-        )
-        for ((options, expected) in cases) {
-          map.setLayerProperty(
+    withMap {
+      loadStyle("""{"version":8,"sources":{},"layers":[{"id":"background","type":"background"}]}""")
+      for ((options, expected) in cases) {
+        val format = if (options.isEmpty()) "" else ",$options"
+        map
+          .setLayerProperty(
             "background",
             "background-opacity",
-            jsonBytes(
-              """["case",["==",["number-format",12.3,{"locale":"en-US"${if (options.isEmpty()) "" else ",$options"}}],"$expected"],0.25,0.75]"""
-            ),
+            """["case",["==",["number-format",12.3,{"locale":"en-US"$format}],"$expected"],0.25,0.75]"""
+              .encodeToByteArray(),
           )
-          assertEquals(
-            "0.25",
-            map.layerProperty("background", "background-opacity")?.decodeToString(),
-            options,
-          )
-        }
+          .awaitCommitted()
+        assertEquals(
+          "0.25",
+          map
+            .getLayerProperty("background", "background-opacity")
+            .awaitWithin("the layer property")
+            ?.decodeToString(),
+          options,
+        )
       }
     }
   }
 
   @Test
-  fun collationRejectsMalformedUTF8AndPreservesEmbeddedNulls() {
-    // Feature queries use the existing Metal fixture; other Apple backends have no fixture here.
-    if (RenderBackend.METAL !in Maplibre.supportedRenderBackends()) return
+  fun collationRejectsMalformedUTF8AndPreservesEmbeddedNulls(): Unit = runSuspendTest {
     val collator =
       """["collator",{"locale":"en-US","case-sensitive":false,"diacritic-sensitive":false}]"""
     assertMatches(
       """["==",["get","name"],"cafe",$collator]""",
-      listOf("cafe", "café", "__INVALID_UTF8__"),
-      setOf("case-0", "case-1"),
+      listOf("cafe", "café", INVALID_UTF8),
+      setOf(0, 1),
     )
-    assertMatches(
-      """["==",["get","name"],"__INVALID_UTF8__",$collator]""",
-      listOf("cafe"),
-      emptySet(),
-    )
+    assertMatches("""["==",["get","name"],"$INVALID_UTF8",$collator]""", listOf("cafe"), emptySet())
     assertMatches(
       """["==",["get","name"],"a\u0000b",$collator]""",
       listOf("""a\u0000b""", """a\u0000c"""),
-      setOf("case-0"),
+      setOf(0),
     )
   }
 
-  private fun assertMatches(filter: String, names: List<String>, expected: Set<String>) {
-    withOwnedTextureSession(width = 64, height = 64) { runtime, map, owned ->
-      val session = owned.session
-      val features =
-        names
-          .mapIndexed { index, name ->
-            """{"type":"Feature","id":"case-$index","geometry":{"type":"Point","coordinates":[0,0]},"properties":{"name":"$name"}}"""
-          }
-          .joinToString(",")
-      map.jumpTo(
-        CameraOptions().apply {
-          center = LatLng(0.0, 0.0)
-          zoom = 2.0
-        }
-      )
-      map.setStyleJson(
-        rawJSON(
-          """{"version":8,"sources":{"point":{"type":"geojson","data":{
-        "type":"FeatureCollection","features":[$features]}}},"layers":[{
-        "id":"cases","type":"circle","source":"point","filter":$filter,"paint":{"circle-radius":4}}]}"""
-        )
-      )
-      val started = TimeSource.Monotonic.markNow()
-      while (!map.isFullyLoaded && started.elapsedNow() < 10.seconds) {
-        runtime.pump(1000)
-        val events = runtime.drainEvents().events
-        events
-          .firstOrNull { it.type == RuntimeEventType.MAP_LOADING_FAILED }
-          ?.let { error(it.message) }
-        if (events.any { it.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE })
-          session.renderUpdate()
-      }
-      assertTrue(map.isFullyLoaded, "locale fixture did not finish loading")
-      val source =
-        session.querySourceFeatures(
-          "point",
-          SourceFeatureQueryOptions().apply { this.filter = rawJSON(filter) },
-        )
-      assertEquals(
-        expected,
-        source.map { stringMember(it.feature, "id") }.toSet(),
-        "source query: $filter",
-      )
-      val rendered =
-        session.queryRenderedFeatures(
-          RenderedQueryGeometry.Box(ScreenBox(ScreenPoint(0.0, 0.0), ScreenPoint(64.0, 64.0))),
-          RenderedFeatureQueryOptions().apply { layerIds = listOf("cases") },
-        )
-      assertEquals(
-        expected,
-        rendered.map { stringMember(it.feature, "id") }.toSet(),
-        "worker filter: $filter",
-      )
-    }
+  private suspend fun assertMatches(filter: String, names: List<String>, expected: Set<Int>) {
+    assertFilterSelects(filter, names.map { """{"name":"$it"}""" }, expected, ::withInvalidUtf8)
   }
 
-  private fun rawJSON(value: String): ByteArray {
-    val parts = value.trimIndent().split("__INVALID_UTF8__")
-    return if (parts.size == 1) parts.single().encodeToByteArray()
-    else
-      parts.first().encodeToByteArray() +
-        byteArrayOf(0xFF.toByte()) +
-        parts.last().encodeToByteArray()
+  /** Encodes [json], replacing each [INVALID_UTF8] marker with a byte that is never valid UTF-8. */
+  private fun withInvalidUtf8(json: String): ByteArray =
+    json
+      .trimIndent()
+      .split(INVALID_UTF8)
+      .map { it.encodeToByteArray() }
+      .reduce { encoded, next -> encoded + byteArrayOf(0xFF.toByte()) + next }
+
+  private companion object {
+    const val INVALID_UTF8 = "__INVALID_UTF8__"
   }
 }
