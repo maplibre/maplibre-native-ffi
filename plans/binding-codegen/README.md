@@ -1,65 +1,60 @@
 # Generate bindings from the C API
 
-The goal is to maintain each public API declaration once, in the C headers, and
-generate its language bindings from shared executable rules. All eight bindings
-now account for every public declaration. [Completion](completion.md) tracks the
-final integration and validation gates.
+Each public API declaration is maintained once, in the C headers. The eight
+language bindings are generated from those declarations by shared executable
+rules. The generator derives behavior from declarations and general rules,
+because a table of source snippets for individual functions would keep the
+maintenance burden that generation removes.
 
-PR #760 targets `main` and includes the executor work from the closed PR #631.
-Implementation began at `5f6976bdf6ff826428e7d92a94ce5899246205da` in branch
-`sargunv/binding-codegen`.
+PR #760 targets `main` from the branch `sargunv/binding-codegen`, and includes
+the executor work from the closed PR #631. The branch first moves execution into
+the native core, ending at "Port the C example to native execution". Binding
+generation starts at "Compile binding contracts from the C headers".
 
 ## Compiler and runtime
 
-1. `tools/bindgen/frontend.py` reads public declarations with libclang,
-   retaining typedef identity, layout, callback signatures, and source
-   locations.
-2. Header annotations describe information C types erase: execution category,
-   pointer cardinality, ownership, presence, enum relationships, and variants.
-3. `tools/bindgen/semantic.py` validates those relationships and resolves shared
+1. `tools/bindgen/frontend.py` reads the declarations that
+   `include/binding-interfaces.toml` selects, using libclang. It retains typedef
+   identity, layout, callback signatures, and source locations.
+2. `MLN_BINDING` header annotations describe information that C types erase:
+   execution category, pointer cardinality, ownership, presence, enum
+   relationships, and variants. `tools/bindgen/schema.py` validates them.
+3. `tools/bindgen/semantic.py` resolves those relationships into shared
    operation, value, callback, registration, and handle plans.
-4. Static language backends generate supported public APIs and conversions.
-   `tools/bindgen/native_capture.py` generates completion copies for deferred
-   delivery from the same value plans.
-5. Handwritten runtimes provide loading, callback rooting and scheduling,
-   close-once state, and platform graphics mechanisms. Native code owns call
-   leases and retirement.
+4. The emitters in `tools/bindgen/emitters/` generate public APIs, values, and
+   conversions for each language. `tools/bindgen/native_capture.py` generates
+   native copies for deferred delivery from the same value plans.
+5. Handwritten runtimes provide library loading, callback roots and scheduling,
+   close-once handle state, and platform graphics mechanisms. Native code owns
+   call leases and retirement.
 
-The generator must derive behavior from declarations and general rules. A table
-of source snippets for individual functions would preserve the maintenance
-burden and does not satisfy the goal. Each generated production operation must
-replace its handwritten implementation and pass public integration tests.
+The [generator README](../../tools/bindgen/README.md) describes how to change a
+declaration and test the generator.
 
-## Design and review
+## Design records
 
-The current [architecture](architecture.md) follows correctness and performance
-first, readability second, usability third, code size fourth, and compatibility
-last. Breaking API changes are intentional where they improve that ordering.
+- [Architecture](architecture.md) states the priorities, the decisions that
+  follow from them, and the known limits.
+- [Compiler design](compiler-design.md) describes the semantic model, the
+  runtime boundary per language, native capture, and the ownership protocols.
+- [Native ownership](core-design.md) describes disposal, retirement, and
+  render-session ownership in the native core.
 
-The [review surface](review-surface.md) compares maintained and generated files
-with both `main` and the executor parent, and defines the counting rules.
+## Review and testing
 
 The [PR #760 review guide](https://claude.ai/artifact/Uo1dN7sLvs6XhSpxChjbAA)
 tracks open findings and decisions. The
 [test architecture plan](https://claude.ai/code/artifact/316f77f8-166a-420d-9a82-ccaae2a74af5)
-records the test rewrite's design and its decisions.
+records the design of the test rewrite and its decisions.
 
-The Astra team split implementation and independent review across the
-[semantic model](architecture-review.md), [native retirement](core-design.md),
-and [callback compiler and host runtimes](compiler-design.md). The coordinator
-integrates the language backends and validation. Earlier prototype findings
-remain in [header-model.md](header-model.md),
-[native-languages.md](native-languages.md),
-[managed-languages.md](managed-languages.md), and [python.md](python.md); those
-files describe the initial implementation, including tests against the parent
-checkout's artifact.
+Review the C contracts and shared compiler rules first, then each language's
+emitter and handwritten runtime. Header mutations, lifetime regressions, and
+public binding suites exercise the generated behavior. Wholly generated files
+carry the `linguist-generated` attribute, so the review diff separates them from
+the code that maintainers change. Deterministic regeneration checks the
+committed output against the rules.
 
-Current results and platform limits are recorded in
-[completion.md](completion.md) and [validation.md](validation.md).
-
-## Reproduction and completion
-
-Run through the repository's mise environment:
+Run the generator tasks through the repository's mise environment:
 
 ```sh
 mise run bindings:generate
@@ -67,19 +62,8 @@ mise run bindings:check
 mise run bindings:test-generator
 ```
 
-The task names are defined in the root mise configuration. The underlying
-commands are `python -m tools.bindgen generate`, the same command with
-`--check --require-complete`, and
-`python -m unittest discover -s tests/bindgen`.
-
-`bindings/generated-coverage.json` records generated files, semantic support
-relationships, and per-language operation coverage. Ambiguous contracts stop
-generation. Unsupported public lowering remains explicit, and
-`python -m tools.bindgen generate --check --require-complete` fails until the
-migration is complete.
-
-The validation includes header mutations that compile and execute generated
-nested captures and values, allocation-failure disposal tests, existing public
-binding suites, and deterministic regeneration. Current native changes require
-this checkout's built library. Local host evidence does not substitute for
-Android, browser, Windows, or Linux CI.
+`bindings/generated-coverage.json` records the generated files, the semantic
+support relationships, and the operation coverage of each language. The check
+task fails on an ambiguous contract, on an unsupported public declaration, and
+on committed output that differs from regeneration. Native changes require a
+build of this checkout's library before the binding suites run against it.
