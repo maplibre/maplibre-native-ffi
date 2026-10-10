@@ -456,24 +456,6 @@ class RenderableSlotRing {
     return true;
   }
 
-  // Calls `rebuild(slot, resource)` for every slot that has a resource, the
-  // selected one in the backend's `selected_resource` included, and records
-  // `size` for each. A backend that keeps GPU state keyed on a resource
-  // retargets it in place through this rather than dropping it.
-  template <typename Rebuild>
-  auto rebuild_each(
-    mln::Size size,
-    std::unique_ptr<mln::gfx::RenderableResource>& selected_resource,
-    Rebuild&& rebuild
-  ) -> void {
-    for (auto slot = std::size_t{}; slot < resources_.size(); ++slot) {
-      auto& resource = slot == selected_ ? selected_resource : resources_[slot];
-      if (resource == nullptr) continue;
-      rebuild(slot, *resource);
-      sizes_[slot] = size;
-    }
-  }
-
   // Drops every parked resource and starts over with `depth` empty slots. The
   // caller drops the selected resource, which it holds.
   auto reset(std::size_t depth) -> void {

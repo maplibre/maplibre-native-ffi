@@ -53,10 +53,10 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   using VulkanQueueAccess::release_queue_access;
 
   auto getDefaultRenderable() -> mln::gfx::Renderable& override;
-  // Follows a new physical size. Each ring slot keeps its resource until the
-  // slot is selected again, which rebuilds it at the new size.
+  // Follows a new physical size. Each ring slot keeps its image until the slot
+  // is selected again, which rebuilds it at the new size.
   void set_ring_size(mln::Size new_size);
-  // Whether replacement images can use the render passes already built.
+  // Whether replacement images can use the render pass already built.
   [[nodiscard]] auto matches_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) const -> bool;
@@ -77,6 +77,7 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   void prepareRenderResources();
   // The image of the slot this backend is rendering into.
   auto frame_resources() -> VulkanTextureFrameResources;
+  // Renders into `slot` from the next prepareRenderResources() on.
   auto select_slot(std::size_t slot) -> bool;
 
  protected:
@@ -96,10 +97,11 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // The caller's image for each slot, or empty for a session-owned ring.
   std::vector<mln_vulkan_borrowed_texture> borrowed_images_;
   bool uses_borrowed_texture_ = false;
-  // Set once a slot builds its render pass, which fixes the format and the
-  // layouts every later image must match.
-  bool borrowed_pass_built_ = false;
-  RenderableSlotRing ring_;
+  std::size_t slot_count_;
+  std::size_t selected_slot_ = 0;
+  // Set by select_slot() and set_borrowed_target(), so the next
+  // prepareRenderResources() builds the selected slot at the current size.
+  bool selection_pending_ = true;
 };
 
 }  // namespace mln::core
