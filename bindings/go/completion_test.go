@@ -36,7 +36,7 @@ func TestCompletionDeliversExactlyOnce(t *testing.T) {
 	}
 
 	f := newRuntimeFixture(t)
-	owned, err := mapCreateFailingAfterAdoptionForTest(f.runtime)
+	owned, err := createMapFailingAfterAdoptionForTest(f.runtime)
 	if err != nil {
 		t.Fatal(err)
 	}

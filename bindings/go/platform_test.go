@@ -53,7 +53,7 @@ func exitWithLiveHandles(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.runtime = runtime
-	f.m = await(t, submitted(runtime.MapCreate(DefaultMapOptions())))
+	f.m = await(t, submitted(runtime.CreateMap(DefaultMapOptions())))
 	f.serveStyle(t, "custom://style.json")
 	if _, err := f.m.SetStyleUrl("custom://style.json"); err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func exitWithLiveHandles(t *testing.T) {
 func TestCollectorDisposesAndLogsALeakedHandle(t *testing.T) {
 	leaks := captureLeakLogs(t)
 	f := newRuntimeFixture(t)
-	dropped := await(t, submitted(f.runtime.MapCreate(DefaultMapOptions())))
+	dropped := await(t, submitted(f.runtime.CreateMap(DefaultMapOptions())))
 	id, err := dropped.Id()
 	if err != nil {
 		t.Fatal(err)
@@ -143,9 +143,9 @@ func (handler leakLogHandler) Handle(_ context.Context, record slog.Record) erro
 // disposes it, and the runtime then closes.
 func TestCollectorRetiresUnclosedMaps(t *testing.T) {
 	f := newRuntimeFixture(t)
-	dropped := await(t, submitted(f.runtime.MapCreate(DefaultMapOptions())))
+	dropped := await(t, submitted(f.runtime.CreateMap(DefaultMapOptions())))
 	awaitCommitted(t, submitted(dropped.SetStyleJson([]byte(emptyStyle))))
-	unclaimed, err := f.runtime.MapCreate(DefaultMapOptions())
+	unclaimed, err := f.runtime.CreateMap(DefaultMapOptions())
 	if err != nil {
 		t.Fatal(err)
 	}

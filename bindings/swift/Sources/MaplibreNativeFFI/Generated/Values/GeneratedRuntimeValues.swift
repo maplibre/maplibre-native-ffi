@@ -68,7 +68,7 @@ public struct HttpHeaderTransform: Sendable {
 }
 
 private let allowedHttpHeaderTransformCallback: Set<String> =
-  ["mln_http_header_transform_response_set"]
+  ["mln_http_header_transform_response_set_header"]
 private func invokeHttpHeaderTransformCallback(
   user_data: UnsafeMutableRawPointer?,
   kind: UInt32,
@@ -380,7 +380,7 @@ public struct ResourceProvider: Sendable {
 
 private let allowedResourceProviderCallback: Set<String> = [
   "mln_resource_request_complete",
-  "mln_resource_request_cancelled",
+  "mln_resource_request_is_cancelled",
   "mln_resource_request_set_cancel_callback",
   "mln_resource_request_release",
 ]
@@ -1021,7 +1021,7 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
 public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   public var regionId: Int64
   /// Region status. This member keeps its own size field because the same
-  /// struct is also returned by `mln_runtime_offline_region_get_status()`.
+  /// struct is also returned by `mln_runtime_get_offline_region_status()`.
   public var status: OfflineRegionStatus
   public static var `default`: Self {
     Self(raw: mln_runtime_event_offline_region_status())

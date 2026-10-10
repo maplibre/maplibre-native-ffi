@@ -79,7 +79,7 @@ class NativeCaptureTests(unittest.TestCase):
             self.api,
             functions=tuple(
                 replace(function, metadata={**function.metadata, "shape": "array"})
-                if function.name == "mln_map_create"
+                if function.name == "mln_runtime_create_map"
                 else function
                 for function in self.api.functions
             ),

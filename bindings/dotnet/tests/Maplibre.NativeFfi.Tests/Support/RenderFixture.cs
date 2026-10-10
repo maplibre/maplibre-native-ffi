@@ -64,7 +64,7 @@ internal sealed class RenderFixture : IDisposable
             Runtime = RuntimeHandle.Create(RuntimeOptions.Default);
             Complete(Runtime.SetResourceProviderAsync(NativeFixture.DenyingProvider));
             Map = Complete(
-                Runtime.MapCreateAsync(
+                Runtime.CreateMapAsync(
                     MapOptions.Default with
                     {
                         InitialExtent = new LogicalExtent(Width, Height, 1),
@@ -244,7 +244,7 @@ internal sealed class RenderFixture : IDisposable
         var context = Graphics.Context;
         return Backend switch
         {
-            TestGraphicsBackend.Metal => Map.MetalOwnedTextureAttach(
+            TestGraphicsBackend.Metal => Map.AttachMetalOwnedTexture(
                 new MetalOwnedTextureDescriptor
                 {
                     Extent = extent,
@@ -252,7 +252,7 @@ internal sealed class RenderFixture : IDisposable
                 },
                 options
             ),
-            TestGraphicsBackend.Vulkan => Map.VulkanOwnedTextureAttach(
+            TestGraphicsBackend.Vulkan => Map.AttachVulkanOwnedTexture(
                 new VulkanOwnedTextureDescriptor
                 {
                     Extent = extent,
@@ -269,7 +269,7 @@ internal sealed class RenderFixture : IDisposable
                 },
                 options
             ),
-            TestGraphicsBackend.Egl => Map.OpenglOwnedTextureAttach(
+            TestGraphicsBackend.Egl => Map.AttachOpenglOwnedTexture(
                 new OpenglOwnedTextureDescriptor
                 {
                     Extent = extent,
@@ -287,7 +287,7 @@ internal sealed class RenderFixture : IDisposable
                 },
                 options
             ),
-            TestGraphicsBackend.Wgl => Map.OpenglOwnedTextureAttach(
+            TestGraphicsBackend.Wgl => Map.AttachOpenglOwnedTexture(
                 new OpenglOwnedTextureDescriptor
                 {
                     Extent = extent,

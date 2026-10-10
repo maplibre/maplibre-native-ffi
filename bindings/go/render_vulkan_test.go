@@ -12,7 +12,7 @@ const (
 func attachOwnedTexture(
 	m *MapHandle, context testsupport.Context, extent RenderTargetExtent, options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	attachment, err := m.VulkanOwnedTextureAttach(VulkanOwnedTextureDescriptor{
+	attachment, err := m.AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor{
 		Extent: extent,
 		Context: VulkanContextDescriptor{
 			Instance:                 context.VulkanInstance,

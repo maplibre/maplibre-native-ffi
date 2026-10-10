@@ -99,7 +99,7 @@ public sealed class ResourceProviderTests
                 reports.Add(report);
             // The handler runs on the provider's stack, where the binding refuses every native
             // call.
-            reentry = Record.Exception(() => Maplibre.NetworkStatusGet());
+            reentry = Record.Exception(() => Maplibre.NetworkGetStatus());
         };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeResourceProvider(
@@ -190,7 +190,7 @@ public sealed class ResourceProviderTests
         await fixture.Map.SetStyleUrlAsync(StyleUrl, TestWaits.Token);
         using var handle = await received.Task.WaitAsync(TestWaits.Deadline, TestWaits.Token);
         await fixture.Map.CloseAsync();
-        Assert.True(handle.Cancelled());
+        Assert.True(handle.IsCancelled());
         var calls = 0;
 
         var (cancelled, captured) = RegisterCapturing(
@@ -226,7 +226,7 @@ public sealed class ResourceProviderTests
         Assert.NotNull(escaped);
         Assert.True(escaped.IsClosed);
         Assert.Equal(0, calls);
-        Assert.Throws<InvalidStateException>(() => escaped.Cancelled());
+        Assert.Throws<InvalidStateException>(() => escaped.IsCancelled());
     }
 
     [Fact]

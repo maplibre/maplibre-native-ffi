@@ -556,7 +556,8 @@ auto opengl_surface_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
-    out_session, completion, valueless_completion<&mln_opengl_surface_attach>()
+    out_session, completion,
+    valueless_completion<&mln_map_attach_opengl_surface>()
   );
 }
 
@@ -585,7 +586,8 @@ auto opengl_surface_set_target_start(
         }
       );
     },
-    completion, valueless_completion<&mln_opengl_surface_set_target>()
+    completion,
+    valueless_completion<&mln_render_session_set_opengl_surface_target>()
   );
 }
 

@@ -43,6 +43,20 @@ category.
 | `event_batch`   | Drains queued events or frame results into an owned batch      |
 | `render_driver` | Services graphics work on the thread that the driver requires  |
 
+## Name a declaration
+
+Name a function `mln_<owner>_<verb>[_<object>]`. The owner is the handle that
+the function acts on, its first parameter, so a binding's member reads as a verb
+on that object: `mln_map_get_style_layer`, `mln_runtime_create_map`,
+`mln_render_session_set_metal_surface_target`. A read uses `get_`, a read of
+every object uses `list_`, and a predicate uses `is_`. A callback helper names
+the record that it fills, as in `mln_resource_transform_response_set_url`. A
+function with no handle parameter names the subsystem or record that it belongs
+to: `mln_log_set_callback`, `mln_network_get_status`,
+`mln_camera_options_default`. A coordinate conversion names its result and its
+input, as in `mln_map_pixel_for_lat_lng`, and a function that reports a fixed
+fact of the library is a noun, as in `mln_c_version`.
+
 ## Follow the ABI rules
 
 Each declaration follows these rules, which every binding relies on:

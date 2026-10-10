@@ -52,7 +52,7 @@ final class MapState {
     )
     let map: MapHandle
     do {
-      map = try await runtime.mapCreate(options: MapOptions(
+      map = try await runtime.createMap(options: MapOptions(
         initialExtent: LogicalExtent(
           width: viewport.logicalWidth,
           height: viewport.logicalHeight,

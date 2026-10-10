@@ -43,7 +43,7 @@ impl MapState {
             map_mode: MapMode::Continuous,
             ..MapOptions::default()
         };
-        let map = match runtime.map_create(&map_options).and_then(|future| {
+        let map = match runtime.create_map(&map_options).and_then(|future| {
             if !future.wait(Duration::from_secs(30))? {
                 return Err(maplibre_native_ffi::Error::new(
                     maplibre_native_ffi::ErrorKind::NotReady,

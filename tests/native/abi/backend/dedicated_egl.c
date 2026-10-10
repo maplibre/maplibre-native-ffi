@@ -97,9 +97,9 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   mln_render_frame_batch_release(batch);
 
   mln_test_completion readback = mln_test_completion_readback();
-  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
-    fixture.session, &readback.descriptor, NULL
-  ));
+  MLN_TEST_OK(
+    mln_render_session_read_texture(fixture.session, &readback.descriptor, NULL)
+  );
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &readback));
   mln_texture_readback_result readback_result = {0};
   TEST_ASSERT_TRUE(mln_test_completion_copy_value(

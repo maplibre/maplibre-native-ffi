@@ -134,7 +134,7 @@ class OwnedTexture:
                     raise self.service_errors[0]
             if not opengl:
                 self.graphics = graphics.Graphics(_GRAPHICS[backend])
-            self.map = harness.map_create(
+            self.map = harness.create_map(
                 map_mode=mln.MapMode.CONTINUOUS,
                 initial_extent=mln.LogicalExtent(WIDTH, HEIGHT, 1.0),
             )
@@ -163,7 +163,7 @@ class OwnedTexture:
         extent = mln.RenderTargetExtent(WIDTH, HEIGHT, 1.0)
         context = self.graphics.context
         if self.backend == "metal":
-            return self.map.metal_owned_texture_attach(
+            return self.map.attach_metal_owned_texture(
                 mln.MetalOwnedTextureDescriptor(
                     extent=extent,
                     context=mln.MetalContextDescriptor(
@@ -173,7 +173,7 @@ class OwnedTexture:
                 options,
             )
         if self.backend == "vulkan":
-            return self.map.vulkan_owned_texture_attach(
+            return self.map.attach_vulkan_owned_texture(
                 mln.VulkanOwnedTextureDescriptor(
                     extent=extent,
                     context=mln.VulkanContextDescriptor(
@@ -189,7 +189,7 @@ class OwnedTexture:
                 ),
                 options,
             )
-        return self.map.opengl_owned_texture_attach(
+        return self.map.attach_opengl_owned_texture(
             mln.OpenglOwnedTextureDescriptor(
                 extent=extent, context=_opengl_context(self.backend, context)
             ),
@@ -266,7 +266,7 @@ class OwnedTexture:
         deadline = time.monotonic() + TIMEOUT
         while True:
             assert self.render().disposition == mln.RenderResult.RENDERED
-            image = result(self.session.texture_read_premultiplied_rgba8())
+            image = result(self.session.read_texture())
             if image.data[:4] == RED_PIXEL:
                 return image
             if time.monotonic() > deadline:

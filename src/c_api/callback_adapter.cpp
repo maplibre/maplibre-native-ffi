@@ -884,7 +884,7 @@ extern "C" MLN_API auto mln_adapter_http_header_transform_callback(
         header.name == nullptr ? 0 : std::strlen(header.name);
       const auto value_size =
         header.value == nullptr ? 0 : std::strlen(header.value);
-      const auto status = mln_http_header_transform_response_set(
+      const auto status = mln_http_header_transform_response_set_header(
         out_response, header.name, name_size, header.value, value_size, nullptr
       );
       if (status != MLN_STATUS_OK) {

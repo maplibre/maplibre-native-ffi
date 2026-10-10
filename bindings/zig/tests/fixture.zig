@@ -181,7 +181,7 @@ pub const Fixture = struct {
         var map_options = try maplibre.mapOptionsDefault();
         map_options.initial_extent = options.extent;
         map_options.map_mode = options.map_mode;
-        self.map = try resolve(try maplibre.mapCreate(testing.allocator, self.runtime, map_options, null));
+        self.map = try resolve(try maplibre.runtimeCreateMap(testing.allocator, self.runtime, map_options, null));
         return self;
     }
 
@@ -377,11 +377,11 @@ pub const OwnedTexture = struct {
             .driver_work_wake = self.wakes.wake(),
         };
         const attachment = if (build_options.supports_metal)
-            try maplibre.metalOwnedTextureAttach(testing.allocator, map, .{ .extent = extent, .context = .{ .device = self.graphics.context.metal_device } }, options, null)
+            try maplibre.mapAttachMetalOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = .{ .device = self.graphics.context.metal_device } }, options, null)
         else if (build_options.supports_vulkan)
-            try maplibre.vulkanOwnedTextureAttach(testing.allocator, map, .{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
+            try maplibre.mapAttachVulkanOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = self.graphics.vulkanContext() }, options, null)
         else
-            try maplibre.openglOwnedTextureAttach(testing.allocator, map, .{ .extent = extent, .context = self.graphics.openglContext() }, options, null);
+            try maplibre.mapAttachOpenglOwnedTexture(testing.allocator, map, .{ .extent = extent, .context = self.graphics.openglContext() }, options, null);
         self.session = attachment.session;
         errdefer {
             _ = maplibre.renderSessionAbandon(self.session, null) catch {};

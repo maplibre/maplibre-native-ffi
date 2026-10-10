@@ -568,6 +568,330 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Starts attachment of a caller-owned Metal texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_metal_borrowed_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachMetalBorrowedTexture(
+        MetalBorrowedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_metal_borrowed_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_metal_borrowed_texture(
+                    Handle,
+                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a session-owned Metal texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_metal_owned_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachMetalOwnedTexture(
+        MetalOwnedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_metal_owned_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_metal_owned_texture(
+                    Handle,
+                    scope.Value(NativeMetalOwnedTextureDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a Metal surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_metal_surface</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachMetalSurface(
+        MetalSurfaceDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_metal_surface");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_metal_surface(
+                    Handle,
+                    scope.Value(NativeMetalSurfaceDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a caller-owned OpenGL texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_opengl_borrowed_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachOpenglBorrowedTexture(
+        OpenglBorrowedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_opengl_borrowed_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_opengl_borrowed_texture(
+                    Handle,
+                    scope.Value(NativeOpenglBorrowedTextureDescriptor(descriptor, scope)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a session-owned OpenGL texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_opengl_owned_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachOpenglOwnedTexture(
+        OpenglOwnedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_opengl_owned_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_opengl_owned_texture(
+                    Handle,
+                    scope.Value(NativeOpenglOwnedTextureDescriptor(descriptor, scope)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of an OpenGL surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_opengl_surface</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachOpenglSurface(
+        OpenglSurfaceDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_opengl_surface");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_opengl_surface(
+                    Handle,
+                    scope.Value(NativeOpenglSurfaceDescriptor(descriptor, scope)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a caller-owned Vulkan texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_vulkan_borrowed_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachVulkanBorrowedTexture(
+        VulkanBorrowedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_vulkan_borrowed_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_vulkan_borrowed_texture(
+                    Handle,
+                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a session-owned Vulkan texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_vulkan_owned_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachVulkanOwnedTexture(
+        VulkanOwnedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_vulkan_owned_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_vulkan_owned_texture(
+                    Handle,
+                    scope.Value(NativeVulkanOwnedTextureDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a Vulkan surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_vulkan_surface</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachVulkanSurface(
+        VulkanSurfaceDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_vulkan_surface");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_vulkan_surface(
+                    Handle,
+                    scope.Value(NativeVulkanSurfaceDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a caller-owned WebGPU texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_webgpu_borrowed_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachWebgpuBorrowedTexture(
+        WebgpuBorrowedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_webgpu_borrowed_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_webgpu_borrowed_texture(
+                    Handle,
+                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a session-owned WebGPU texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_webgpu_owned_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachWebgpuOwnedTexture(
+        WebgpuOwnedTextureDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_webgpu_owned_texture");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_webgpu_owned_texture(
+                    Handle,
+                    scope.Value(NativeWebgpuOwnedTextureDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
+    /// Starts attachment of a WebGPU surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_attach_webgpu_surface</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
+    public RenderSessionHandle AttachWebgpuSurface(
+        WebgpuSurfaceDescriptor descriptor,
+        RenderSessionAttachOptions options
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_attach_webgpu_surface");
+        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
+            (output, completion, diagnostic) =>
+                NativeMethods.mln_map_attach_webgpu_surface(
+                    Handle,
+                    scope.Value(NativeWebgpuSurfaceDescriptor(descriptor)),
+                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
+                    output,
+                    completion,
+                    diagnostic
+                ),
+            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
+        );
+    }
+
+    /// <summary>
     /// Begins a command group, which holds this map's render updates until the
     /// group ends.
     /// </summary>
@@ -673,47 +997,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts an ordered camera read.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_camera_query</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CameraQueryResult> CameraQueryAsync(CancellationToken cancellationToken = default)
-    {
-        using var scope = new NativeCallScope(this, "mln_map_camera_query");
-        return scope.Query<mln_camera_query_result, CameraQueryResult>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_camera_query(Handle, completion, diagnostic),
-            CopyCameraQueryResult,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies the camera from the latest immutable map snapshot.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_camera_snapshot_get</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public (CameraOptions Camera, ulong Generation) CameraSnapshotGet()
-    {
-        using var read = state.Read(this, "mln_map_camera_snapshot_get");
-        var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
-        ulong outGeneration = default;
-        Check(
-            NativeMethods.mln_map_camera_snapshot_get(
-                read.Handle,
-                &outCamera,
-                &outGeneration,
-                Diagnostic
-            )
-        );
-        return (CopyCameraOptions(outCamera), outGeneration);
-    }
-
-    /// <summary>
     /// Cancels the camera transitions running when this command commits.
     /// </summary>
     /// <remarks>
@@ -728,6 +1011,27 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_cancel_transitions(Handle, completion, diagnostic),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Starts creation of a standalone projection from the map's ordered
+    /// transform state.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_create_projection</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<MapProjectionHandle> CreateProjectionAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_create_projection");
+        return scope.Query<MlnMapProjection, MapProjectionHandle>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_create_projection(Handle, completion, diagnostic),
+            handle => MapProjectionHandle.Adopt(handle),
             cancellationToken
         );
     }
@@ -767,6 +1071,47 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_end_command_group(Handle, completion, diagnostic),
             cancellationToken
         );
+    }
+
+    /// <summary>
+    /// Starts an ordered camera read.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_camera</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CameraQueryResult> GetCameraAsync(CancellationToken cancellationToken = default)
+    {
+        using var scope = new NativeCallScope(this, "mln_map_get_camera");
+        return scope.Query<mln_camera_query_result, CameraQueryResult>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_get_camera(Handle, completion, diagnostic),
+            CopyCameraQueryResult,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Copies the camera from the latest immutable map snapshot.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_camera_snapshot</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
+    public (CameraOptions Camera, ulong Generation) GetCameraSnapshot()
+    {
+        using var read = state.Read(this, "mln_map_get_camera_snapshot");
+        var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
+        ulong outGeneration = default;
+        Check(
+            NativeMethods.mln_map_get_camera_snapshot(
+                read.Handle,
+                &outCamera,
+                &outGeneration,
+                Diagnostic
+            )
+        );
+        return (CopyCameraOptions(outCamera), outGeneration);
     }
 
     /// <summary>
@@ -842,57 +1187,36 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Serializes one layer filter as a style-spec JSON value.
+    /// Starts an ordered copy of the last successfully parsed style document.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_get_layer_filter</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// See <c>mln_map_get_loaded_style_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetLayerFilterAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
+    public Task<byte[]> GetLoadedStyleJsonAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_layer_filter");
-        return scope.QueryOptional<mln_buffer_view, byte[]>(
+        using var scope = new NativeCallScope(this, "mln_map_get_loaded_style_json");
+        return scope.Query<mln_buffer_view, byte[]>(
             (completion, diagnostic) =>
-                NativeMethods.mln_map_get_layer_filter(
-                    Handle,
-                    scope.Utf8(layerId),
-                    completion,
-                    diagnostic
-                ),
+                NativeMethods.mln_map_get_loaded_style_json(Handle, completion, diagnostic),
             ValueStructs.CopyBufferView,
             cancellationToken
         );
     }
 
     /// <summary>
-    /// Serializes one layer property as a style-spec JSON value.
+    /// Copies the latest immutable state published by the map worker.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_get_layer_property</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// See <c>mln_map_get_snapshot</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<byte[]?> GetLayerPropertyAsync(
-        string layerId,
-        string propertyName,
-        CancellationToken cancellationToken = default
-    )
+    public MapSnapshot GetSnapshot()
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_layer_property");
-        return scope.QueryOptional<mln_buffer_view, byte[]>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_get_layer_property(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(propertyName),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyBufferView,
-            cancellationToken
-        );
+        using var read = state.Read(this, "mln_map_get_snapshot");
+        var outSnapshot = new mln_map_snapshot { size = (uint)sizeof(mln_map_snapshot) };
+        Check(NativeMethods.mln_map_get_snapshot(read.Handle, &outSnapshot, Diagnostic));
+        return CopyMapSnapshot(outSnapshot);
     }
 
     /// <summary>
@@ -948,6 +1272,32 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Serializes one layer filter as a style-spec JSON value.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_layer_filter</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<byte[]?> GetStyleLayerFilterAsync(
+        string layerId,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_get_style_layer_filter");
+        return scope.QueryOptional<mln_buffer_view, byte[]>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_get_style_layer_filter(
+                    Handle,
+                    scope.Utf8(layerId),
+                    completion,
+                    diagnostic
+                ),
+            ValueStructs.CopyBufferView,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Serializes one style layer as a full style-spec layer JSON object.
     /// </summary>
     /// <remarks>
@@ -965,6 +1315,34 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                 NativeMethods.mln_map_get_style_layer_json(
                     Handle,
                     scope.Utf8(layerId),
+                    completion,
+                    diagnostic
+                ),
+            ValueStructs.CopyBufferView,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Serializes one layer property as a style-spec JSON value.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_layer_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<byte[]?> GetStyleLayerPropertyAsync(
+        string layerId,
+        string propertyName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_get_style_layer_property");
+        return scope.QueryOptional<mln_buffer_view, byte[]>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_get_style_layer_property(
+                    Handle,
+                    scope.Utf8(layerId),
+                    scope.Utf8(propertyName),
                     completion,
                     diagnostic
                 ),
@@ -1041,6 +1419,24 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_style_transition_options(Handle, completion, diagnostic),
             CopyStyleTransitionOptions,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Starts an ordered copy of the last requested style URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<string> GetStyleUrlAsync(CancellationToken cancellationToken = default)
+    {
+        using var scope = new NativeCallScope(this, "mln_map_get_style_url");
+        return scope.Query<mln_buffer_view, string>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_get_style_url(Handle, completion, diagnostic),
+            ValueStructs.CopyUtf8View,
             cancellationToken
         );
     }
@@ -1343,24 +1739,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts an ordered copy of the last successfully parsed style document.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_loaded_style_json</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<byte[]> LoadedStyleJsonAsync(CancellationToken cancellationToken = default)
-    {
-        using var scope = new NativeCallScope(this, "mln_map_loaded_style_json");
-        return scope.Query<mln_buffer_view, byte[]>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_loaded_style_json(Handle, completion, diagnostic),
-            ValueStructs.CopyBufferView,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Starts an ordered query of meters per logical pixel at a latitude and
     /// the current map zoom. The completion borrows one double.
     /// </summary>
@@ -1464,27 +1842,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     diagnostic
                 ),
             CopyScreenPoint,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts creation of a standalone projection from the map's ordered
-    /// transform state.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_projection_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<MapProjectionHandle> ProjectionCreateAsync(
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_projection_create");
-        return scope.Query<MlnMapProjection, MapProjectionHandle>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_projection_create(Handle, completion, diagnostic),
-            handle => MapProjectionHandle.Adopt(handle),
             cancellationToken
         );
     }
@@ -2085,197 +2442,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Sets or clears one layer filter.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_layer_filter</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLayerFilterAsync(
-        string layerId,
-        byte[]? filter,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_layer_filter");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_layer_filter(
-                    Handle,
-                    scope.Utf8(layerId),
-                    filter is null ? null : scope.Value(scope.Buffer(filter)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets the highest zoom at which one layer draws.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_layer_max_zoom</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLayerMaxZoomAsync(
-        string layerId,
-        double maxZoom,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_layer_max_zoom");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_layer_max_zoom(
-                    Handle,
-                    scope.Utf8(layerId),
-                    maxZoom,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets the lowest zoom at which one layer draws.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_layer_min_zoom</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLayerMinZoomAsync(
-        string layerId,
-        double minZoom,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_layer_min_zoom");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_layer_min_zoom(
-                    Handle,
-                    scope.Utf8(layerId),
-                    minZoom,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets one layer property using its MapLibre style-spec property name.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_layer_property</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLayerPropertyAsync(
-        string layerId,
-        string propertyName,
-        byte[] value,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_layer_property");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_layer_property(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(propertyName),
-                    scope.Buffer(value),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets one layer's source ID.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_layer_source_id</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLayerSourceIdAsync(
-        string layerId,
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_layer_source_id");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_layer_source_id(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(sourceId),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets one layer's source-layer ID.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_layer_source_layer</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLayerSourceLayerAsync(
-        string layerId,
-        string sourceLayer,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_layer_source_layer");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_layer_source_layer(
-                    Handle,
-                    scope.Utf8(layerId),
-                    scope.Utf8(sourceLayer),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Sets whether one layer draws.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_set_layer_visibility</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<CommandCompletion> SetLayerVisibilityAsync(
-        string layerId,
-        StyleLayerVisibility visibility,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_set_layer_visibility");
-        return scope.Command(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_set_layer_visibility(
-                    Handle,
-                    scope.Utf8(layerId),
-                    (uint)visibility,
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Sets a location indicator layer accuracy radius in meters.
     /// </summary>
     /// <remarks>
@@ -2495,6 +2661,197 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Sets or clears one layer filter.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_layer_filter</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleLayerFilterAsync(
+        string layerId,
+        byte[]? filter,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_filter");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_style_layer_filter(
+                    Handle,
+                    scope.Utf8(layerId),
+                    filter is null ? null : scope.Value(scope.Buffer(filter)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Sets the highest zoom at which one layer draws.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_layer_max_zoom</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleLayerMaxZoomAsync(
+        string layerId,
+        double maxZoom,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_max_zoom");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_style_layer_max_zoom(
+                    Handle,
+                    scope.Utf8(layerId),
+                    maxZoom,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Sets the lowest zoom at which one layer draws.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_layer_min_zoom</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleLayerMinZoomAsync(
+        string layerId,
+        double minZoom,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_min_zoom");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_style_layer_min_zoom(
+                    Handle,
+                    scope.Utf8(layerId),
+                    minZoom,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Sets one layer property using its MapLibre style-spec property name.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_layer_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleLayerPropertyAsync(
+        string layerId,
+        string propertyName,
+        byte[] value,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_property");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_style_layer_property(
+                    Handle,
+                    scope.Utf8(layerId),
+                    scope.Utf8(propertyName),
+                    scope.Buffer(value),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Sets one layer's source ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_layer_source_id</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleLayerSourceIdAsync(
+        string layerId,
+        string sourceId,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_source_id");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_style_layer_source_id(
+                    Handle,
+                    scope.Utf8(layerId),
+                    scope.Utf8(sourceId),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Sets one layer's source-layer ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_layer_source_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleLayerSourceLayerAsync(
+        string layerId,
+        string sourceLayer,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_source_layer");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_style_layer_source_layer(
+                    Handle,
+                    scope.Utf8(layerId),
+                    scope.Utf8(sourceLayer),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Sets whether one layer draws.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_layer_visibility</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> SetStyleLayerVisibilityAsync(
+        string layerId,
+        StyleLayerVisibility visibility,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_set_style_layer_visibility");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_set_style_layer_visibility(
+                    Handle,
+                    scope.Utf8(layerId),
+                    (uint)visibility,
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Sets the style light from a style-spec light JSON object.
     /// </summary>
     /// <remarks>
@@ -2676,39 +3033,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Copies the latest immutable state published by the map worker.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_snapshot_get</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
-    /// </remarks>
-    public MapSnapshot SnapshotGet()
-    {
-        using var read = state.Read(this, "mln_map_snapshot_get");
-        var outSnapshot = new mln_map_snapshot { size = (uint)sizeof(mln_map_snapshot) };
-        Check(NativeMethods.mln_map_snapshot_get(read.Handle, &outSnapshot, Diagnostic));
-        return CopyMapSnapshot(outSnapshot);
-    }
-
-    /// <summary>
-    /// Starts an ordered copy of the last requested style URL.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_style_url</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<string> StyleUrlAsync(CancellationToken cancellationToken = default)
-    {
-        using var scope = new NativeCallScope(this, "mln_map_style_url");
-        return scope.Query<mln_buffer_view, string>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_style_url(Handle, completion, diagnostic),
-            ValueStructs.CopyUtf8View,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Submits one atomic camera update.
     /// </summary>
     /// <remarks>
@@ -2730,330 +3054,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     diagnostic
                 ),
             cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a caller-owned Metal texture target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_metal_borrowed_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle MetalBorrowedTextureAttach(
-        MetalBorrowedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_metal_borrowed_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_metal_borrowed_texture_attach(
-                    Handle,
-                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a session-owned Metal texture ring.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_metal_owned_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle MetalOwnedTextureAttach(
-        MetalOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_metal_owned_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_metal_owned_texture_attach(
-                    Handle,
-                    scope.Value(NativeMetalOwnedTextureDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a Metal surface target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_metal_surface_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle MetalSurfaceAttach(
-        MetalSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_metal_surface_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_metal_surface_attach(
-                    Handle,
-                    scope.Value(NativeMetalSurfaceDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a caller-owned OpenGL texture target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_opengl_borrowed_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle OpenglBorrowedTextureAttach(
-        OpenglBorrowedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_opengl_borrowed_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_opengl_borrowed_texture_attach(
-                    Handle,
-                    scope.Value(NativeOpenglBorrowedTextureDescriptor(descriptor, scope)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a session-owned OpenGL texture ring.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_opengl_owned_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle OpenglOwnedTextureAttach(
-        OpenglOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_opengl_owned_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_opengl_owned_texture_attach(
-                    Handle,
-                    scope.Value(NativeOpenglOwnedTextureDescriptor(descriptor, scope)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of an OpenGL surface target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_opengl_surface_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle OpenglSurfaceAttach(
-        OpenglSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_opengl_surface_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_opengl_surface_attach(
-                    Handle,
-                    scope.Value(NativeOpenglSurfaceDescriptor(descriptor, scope)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a caller-owned Vulkan texture target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_vulkan_borrowed_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle VulkanBorrowedTextureAttach(
-        VulkanBorrowedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_vulkan_borrowed_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_vulkan_borrowed_texture_attach(
-                    Handle,
-                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a session-owned Vulkan texture ring.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_vulkan_owned_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle VulkanOwnedTextureAttach(
-        VulkanOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_vulkan_owned_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_vulkan_owned_texture_attach(
-                    Handle,
-                    scope.Value(NativeVulkanOwnedTextureDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a Vulkan surface target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_vulkan_surface_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle VulkanSurfaceAttach(
-        VulkanSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_vulkan_surface_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_vulkan_surface_attach(
-                    Handle,
-                    scope.Value(NativeVulkanSurfaceDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a caller-owned WebGPU texture target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_webgpu_borrowed_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle WebgpuBorrowedTextureAttach(
-        WebgpuBorrowedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_webgpu_borrowed_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_webgpu_borrowed_texture_attach(
-                    Handle,
-                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a session-owned WebGPU texture ring.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_webgpu_owned_texture_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle WebgpuOwnedTextureAttach(
-        WebgpuOwnedTextureDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_webgpu_owned_texture_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_webgpu_owned_texture_attach(
-                    Handle,
-                    scope.Value(NativeWebgpuOwnedTextureDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
-        );
-    }
-
-    /// <summary>
-    /// Starts attachment of a WebGPU surface target.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_webgpu_surface_attach</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public RenderSessionHandle WebgpuSurfaceAttach(
-        WebgpuSurfaceDescriptor descriptor,
-        RenderSessionAttachOptions options
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_webgpu_surface_attach");
-        return scope.Attach<MlnRenderSession, RenderSessionHandle>(
-            (output, completion, diagnostic) =>
-                NativeMethods.mln_webgpu_surface_attach(
-                    Handle,
-                    scope.Value(NativeWebgpuSurfaceDescriptor(descriptor)),
-                    scope.Value(NativeRenderSessionAttachOptions(options, scope)),
-                    output,
-                    completion,
-                    diagnostic
-                ),
-            (handle, attachment) => RenderSessionHandle.Adopt(this, handle, attachment)
         );
     }
 }

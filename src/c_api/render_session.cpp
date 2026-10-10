@@ -4,7 +4,7 @@
 #include "maplibre_native_c.h"
 #include "render/render_session_common.hpp"
 
-auto mln_render_session_projection_create(
+auto mln_render_session_create_projection(
   mln_render_session session, mln_map_projection* out_projection,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {

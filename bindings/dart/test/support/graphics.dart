@@ -146,7 +146,7 @@ final class TestGraphics {
     NativePointer pointer(Pointer<Void> value) => NativePointer(value.address);
     switch (context.backend) {
       case _backendMetal:
-        return map.metalOwnedTextureAttach(
+        return map.attachMetalOwnedTexture(
           MetalOwnedTextureDescriptor(
             extent: extent,
             context: MetalContextDescriptor(
@@ -156,7 +156,7 @@ final class TestGraphics {
           options,
         );
       case _backendVulkan:
-        return map.vulkanOwnedTextureAttach(
+        return map.attachVulkanOwnedTexture(
           VulkanOwnedTextureDescriptor(
             extent: extent,
             context: VulkanContextDescriptor(
@@ -172,7 +172,7 @@ final class TestGraphics {
           options,
         );
       case _backendEgl:
-        return map.openglOwnedTextureAttach(
+        return map.attachOpenglOwnedTexture(
           OpenglOwnedTextureDescriptor(
             extent: extent,
             context: OpenglContextDescriptor(

@@ -55,7 +55,7 @@ public sealed class GeneratedValueTests
             },
             TestWaits.Token
         );
-        var camera = (await fixture.Map.CameraQueryAsync(TestWaits.Token)).Camera;
+        var camera = (await fixture.Map.GetCameraAsync(TestWaits.Token)).Camera;
 
         Assert.NotNull(camera.Center);
         Assert.Equal(10, camera.Center.Value.Latitude, 6);

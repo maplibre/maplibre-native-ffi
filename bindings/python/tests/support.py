@@ -128,9 +128,9 @@ class Harness:
         handle.complete(denied_response())
         return mln.ResourceProviderDecision.HANDLE
 
-    def map_create(self, **options: object) -> mln.MapHandle:
+    def create_map(self, **options: object) -> mln.MapHandle:
         map_handle = result(
-            self.runtime.map_create(replace(mln.MapOptions.default(), **options))
+            self.runtime.create_map(replace(mln.MapOptions.default(), **options))
         )
         self._maps.append(map_handle)
         return map_handle

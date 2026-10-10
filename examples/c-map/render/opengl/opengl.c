@@ -596,7 +596,7 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         opengl_context_descriptor(&target->as.owned.compositor.context);
-      status = mln_opengl_owned_texture_attach(
+      status = mln_map_attach_opengl_owned_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -606,7 +606,7 @@ app_error render_target_attach(
         borrowed_texture_descriptor(
           target, target->as.borrowed.texture, current_viewport
         );
-      status = mln_opengl_borrowed_texture_attach(
+      status = mln_map_attach_opengl_borrowed_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -614,7 +614,7 @@ app_error render_target_attach(
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
       const mln_opengl_surface_descriptor descriptor =
         surface_descriptor(target, current_viewport);
-      status = mln_opengl_surface_attach(
+      status = mln_map_attach_opengl_surface(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -681,7 +681,7 @@ static app_error resize_borrowed(
   if (entry != nullptr) {
     const mln_opengl_borrowed_texture_descriptor descriptor =
       borrowed_texture_descriptor(target, replacement, current_viewport);
-    status = mln_opengl_borrowed_texture_set_target(
+    status = mln_render_session_set_opengl_borrowed_texture_target(
       target->session.handle, &descriptor, &completion, &diagnostic
     );
     texture_replacements_queue(
@@ -721,7 +721,7 @@ static app_error resize_surface(
   const mln_completion completion =
     diagnostics_completion("OpenGL surface set target failed");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_opengl_surface_set_target(
+  const mln_status status = mln_render_session_set_opengl_surface_target(
     target->session.handle, &descriptor, &completion, &diagnostic
   );
   if (status != MLN_STATUS_OK) {

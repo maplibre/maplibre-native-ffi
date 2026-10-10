@@ -46,7 +46,7 @@ internal object Upcalls {
       Unit,
       setOf(
         "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
+        "mln_resource_request_is_cancelled",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_release",
       ),
@@ -109,7 +109,7 @@ internal object Upcalls {
       "mln_http_header_transform_callback",
       userData,
       -5,
-      setOf("mln_http_header_transform_response_set"),
+      setOf("mln_http_header_transform_response_set_header"),
       { outResponse },
     ) { value, scope ->
       value.callback(
@@ -128,7 +128,7 @@ internal object Upcalls {
       0,
       setOf(
         "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
+        "mln_resource_request_is_cancelled",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_release",
       ),

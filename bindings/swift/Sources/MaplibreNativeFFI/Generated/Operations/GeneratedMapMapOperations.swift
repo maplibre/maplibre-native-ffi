@@ -67,13 +67,44 @@ public extension MapHandle {
 
   /// Starts an ordered copy of the last successfully parsed style document.
   ///
-  /// See `mln_map_loaded_style_json` in the
+  /// See `mln_map_get_loaded_style_json` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func loadedStyleJson() async throws -> Data {
+  func getLoadedStyleJson() async throws -> Data {
     try await nativeStart(
-      "mln_map_loaded_style_json",
+      "mln_map_get_loaded_style_json",
       convert: { result in try NativeCompletion.data(result) }
-    ) { raw, _, completion, diagnostic in mln_map_loaded_style_json(
+    ) { raw, _, completion, diagnostic in mln_map_get_loaded_style_json(
+      raw,
+      completion,
+      diagnostic
+    ) }
+  }
+
+  /// Copies the latest immutable state published by the map worker.
+  ///
+  /// See `mln_map_get_snapshot` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  func getSnapshot() throws -> MapSnapshot {
+    var value0 = mln_map_snapshot()
+    value0.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
+    return try nativeInvoke("mln_map_get_snapshot") { raw, _, diagnostic in
+      mln_map_get_snapshot(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: { MapSnapshot(raw: value0) }
+  }
+
+  /// Starts an ordered copy of the last requested style URL.
+  ///
+  /// See `mln_map_get_style_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  func getStyleUrl() async throws -> String {
+    try await nativeStart(
+      "mln_map_get_style_url",
+      convert: { result in try NativeCompletion.string(result) }
+    ) { raw, _, completion, diagnostic in mln_map_get_style_url(
       raw,
       completion,
       diagnostic
@@ -234,36 +265,5 @@ public extension MapHandle {
         diagnostic
       )
     }
-  }
-
-  /// Copies the latest immutable state published by the map worker.
-  ///
-  /// See `mln_map_snapshot_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func snapshotGet() throws -> MapSnapshot {
-    var value0 = mln_map_snapshot()
-    value0.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
-    return try nativeInvoke("mln_map_snapshot_get") { raw, _, diagnostic in
-      mln_map_snapshot_get(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { MapSnapshot(raw: value0) }
-  }
-
-  /// Starts an ordered copy of the last requested style URL.
-  ///
-  /// See `mln_map_style_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  func styleUrl() async throws -> String {
-    try await nativeStart(
-      "mln_map_style_url",
-      convert: { result in try NativeCompletion.string(result) }
-    ) { raw, _, completion, diagnostic in mln_map_style_url(
-      raw,
-      completion,
-      diagnostic
-    ) }
   }
 }

@@ -95,7 +95,7 @@ void binding_mln_resource_request_set_cancel_callback_registration_callback(
 ) {
   static const uint32_t operations[] = {
     binding_operation_mln_resource_request_complete,
-    binding_operation_mln_resource_request_cancelled,
+    binding_operation_mln_resource_request_is_cancelled,
     binding_operation_mln_resource_request_set_cancel_callback,
     binding_operation_mln_resource_request_release
   };
@@ -115,7 +115,7 @@ mln_status binding_mln_http_header_transform_callback(
   mln_http_header_transform_response* out_response
 ) {
   static const uint32_t operations[] = {
-    binding_operation_mln_http_header_transform_response_set
+    binding_operation_mln_http_header_transform_response_set_header
   };
   binding_policy policy = {
     NULL, operations, 1, (uint64_t)(uintptr_t)out_response
@@ -138,7 +138,7 @@ uint32_t binding_mln_resource_provider_callback(
 ) {
   static const uint32_t operations[] = {
     binding_operation_mln_resource_request_complete,
-    binding_operation_mln_resource_request_cancelled,
+    binding_operation_mln_resource_request_is_cancelled,
     binding_operation_mln_resource_request_set_cancel_callback,
     binding_operation_mln_resource_request_release
   };

@@ -1144,7 +1144,7 @@ pub const HttpHeaderTransform = struct {
                     return c.MLN_STATUS_NATIVE_ERROR;
                 };
                 var scope: callback.Scope = .{};
-                scope.enter(&.{"mln_http_header_transform_response_set"}, @intFromPtr(callback_arg_3));
+                scope.enter(&.{"mln_http_header_transform_response_set_header"}, @intFromPtr(callback_arg_3));
                 defer scope.leave();
                 var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
                 defer arena.deinit();
@@ -3048,7 +3048,7 @@ pub const ResourceProvider = struct {
                     return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
                 };
                 var scope: callback.Scope = .{};
-                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, callback_arg_2);
+                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, callback_arg_2);
                 defer scope.leave();
                 const request = try ResourceRequestHandle.beginDecision(callback_arg_2);
                 errdefer _ = request.finishDecision(false);
@@ -3459,7 +3459,7 @@ pub const RuntimeEventOfflineRegionResponseError = struct {
 pub const RuntimeEventOfflineRegionStatus = struct {
     region_id: i64 = std.mem.zeroes(i64),
     /// Region status. This member keeps its own size field because the same
-    /// struct is also returned by `mln_runtime_offline_region_get_status()`.
+    /// struct is also returned by `mln_runtime_get_offline_region_status()`.
     status: OfflineRegionStatus = .{},
     pub fn toNative(self: RuntimeEventOfflineRegionStatus) c.mln_runtime_event_offline_region_status {
         var raw = std.mem.zeroes(c.mln_runtime_event_offline_region_status);
@@ -5338,10 +5338,10 @@ pub fn gpuSyncDefault() status.Error!GpuSync {
 
 /// Sets one outgoing HTTP request header for the current transform invocation.
 ///
-/// See `mln_http_header_transform_response_set` in the
+/// See `mln_http_header_transform_response_set_header` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn httpHeaderTransformResponseSet(response: HttpHeaderTransformResponse, name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_http_header_transform_response_set", .scoped, response, null, diagnostic, .{ name, name.len, value, value.len });
+pub fn httpHeaderTransformResponseSetHeader(response: HttpHeaderTransformResponse, name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_http_header_transform_response_set_header", .scoped, response, null, diagnostic, .{ name, name.len, value, value.len });
 }
 
 /// Converts spherical Mercator projected meters to a geographic coordinate.
@@ -5560,6 +5560,114 @@ pub fn mapApplyCameraDelta(allocator: std.mem.Allocator, map: Map, delta: Camera
     return call.submit("mln_map_apply_camera_delta", .lease, map, call.command, allocator, diagnostic, .{delta});
 }
 
+/// Starts attachment of a caller-owned Metal texture target.
+///
+/// See `mln_map_attach_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachMetalBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_metal_borrowed_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a session-owned Metal texture ring.
+///
+/// See `mln_map_attach_metal_owned_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachMetalOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_metal_owned_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a Metal surface target.
+///
+/// See `mln_map_attach_metal_surface` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn mapAttachMetalSurface(allocator: std.mem.Allocator, map: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_metal_surface", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a caller-owned OpenGL texture target.
+///
+/// See `mln_map_attach_opengl_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachOpenglBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_opengl_borrowed_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a session-owned OpenGL texture ring.
+///
+/// See `mln_map_attach_opengl_owned_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachOpenglOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_opengl_owned_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of an OpenGL surface target.
+///
+/// See `mln_map_attach_opengl_surface` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn mapAttachOpenglSurface(allocator: std.mem.Allocator, map: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_opengl_surface", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a caller-owned Vulkan texture target.
+///
+/// See `mln_map_attach_vulkan_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachVulkanBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_vulkan_borrowed_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a session-owned Vulkan texture ring.
+///
+/// See `mln_map_attach_vulkan_owned_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachVulkanOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_vulkan_owned_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a Vulkan surface target.
+///
+/// See `mln_map_attach_vulkan_surface` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn mapAttachVulkanSurface(allocator: std.mem.Allocator, map: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_vulkan_surface", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a caller-owned WebGPU texture target.
+///
+/// See `mln_map_attach_webgpu_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachWebgpuBorrowedTexture(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_webgpu_borrowed_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a session-owned WebGPU texture ring.
+///
+/// See `mln_map_attach_webgpu_owned_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn mapAttachWebgpuOwnedTexture(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_webgpu_owned_texture", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
+/// Starts attachment of a WebGPU surface target.
+///
+/// See `mln_map_attach_webgpu_surface` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn mapAttachWebgpuSurface(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
+    const started = try call.submit("mln_map_attach_webgpu_surface", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
+    return .{ .session = started.outputs, .ready = started.ready };
+}
+
 /// Begins a command group, which holds this map's render updates until the
 /// group ends.
 ///
@@ -5593,23 +5701,6 @@ pub fn mapCameraForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
     return call.submit("mln_map_camera_for_lat_lngs", .lease, map, call.value(CameraOptions, c.mln_camera_options), allocator, diagnostic, .{ coordinates, coordinates.len, fit_options });
 }
 
-/// Starts an ordered camera read.
-///
-/// See `mln_map_camera_query` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapCameraQuery(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraQueryResult) {
-    return call.submit("mln_map_camera_query", .lease, map, call.value(CameraQueryResult, c.mln_camera_query_result), null, diagnostic, .{});
-}
-
-/// Copies the camera from the latest immutable map snapshot.
-///
-/// See `mln_map_camera_snapshot_get` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapCameraSnapshotGet(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { camera: CameraOptions, generation: u64 } {
-    const out = try call.invoke("mln_map_camera_snapshot_get", .lease, map, null, diagnostic, .{ call.sizedOut(CameraOptions), call.out(u64) });
-    return .{ .camera = out[0], .generation = out[1] };
-}
-
 /// Cancels the camera transitions running when this command commits.
 ///
 /// See `mln_map_cancel_transitions` in the
@@ -5618,12 +5709,13 @@ pub fn mapCancelTransitions(map: Map, diagnostic: ?*diagnostics.Diagnostic) stat
     return call.submit("mln_map_cancel_transitions", .lease, map, call.command, null, diagnostic, .{});
 }
 
-/// Creates a map on the runtime worker.
+/// Starts creation of a standalone projection from the map's ordered transform
+/// state.
 ///
-/// See `mln_map_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapCreate(allocator: std.mem.Allocator, runtime: Runtime, options: MapOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(Map) {
-    return call.submit("mln_map_create", .lease, runtime, call.handle(Map, c.mln_map, .receiver), allocator, diagnostic, .{options});
+/// See `mln_map_create_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+pub fn mapCreateProjection(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(MapProjection) {
+    return call.submit("mln_map_create_projection", .lease, map, call.handle(MapProjection, c.mln_map_projection, .none), null, diagnostic, .{});
 }
 
 /// Consumes a map handle without observing its asynchronous retirement.
@@ -5648,6 +5740,23 @@ pub fn mapDumpDebugLogs(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.E
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub fn mapEndCommandGroup(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     return call.submit("mln_map_end_command_group", .lease, map, call.command, null, diagnostic, .{});
+}
+
+/// Starts an ordered camera read.
+///
+/// See `mln_map_get_camera` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+pub fn mapGetCamera(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraQueryResult) {
+    return call.submit("mln_map_get_camera", .lease, map, call.value(CameraQueryResult, c.mln_camera_query_result), null, diagnostic, .{});
+}
+
+/// Copies the camera from the latest immutable map snapshot.
+///
+/// See `mln_map_get_camera_snapshot` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+pub fn mapGetCameraSnapshot(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { camera: CameraOptions, generation: u64 } {
+    const out = try call.invoke("mln_map_get_camera_snapshot", .lease, map, null, diagnostic, .{ call.sizedOut(CameraOptions), call.out(u64) });
+    return .{ .camera = out[0], .generation = out[1] };
 }
 
 /// Starts an ordered read of per-feature state from this map.
@@ -5675,20 +5784,20 @@ pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, sour
     return call.submit("mln_map_get_image_source_coordinates", .lease, map, call.orNull(call.slice(LatLng, c.mln_lat_lng)), allocator, diagnostic, .{source_id});
 }
 
-/// Serializes one layer filter as a style-spec JSON value.
+/// Starts an ordered copy of the last successfully parsed style document.
 ///
-/// See `mln_map_get_layer_filter` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_get_layer_filter", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{layer_id});
+/// See `mln_map_get_loaded_style_json` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn mapGetLoadedStyleJson(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
+    return call.submit("mln_map_get_loaded_style_json", .lease, map, call.value(OwnedValue([]const u8), c.mln_buffer_view), allocator, diagnostic, .{});
 }
 
-/// Serializes one layer property as a style-spec JSON value.
+/// Copies the latest immutable state published by the map worker.
 ///
-/// See `mln_map_get_layer_property` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, property_name: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_get_layer_property", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{ layer_id, property_name });
+/// See `mln_map_get_snapshot` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn mapGetSnapshot(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapSnapshot {
+    return call.invoke("mln_map_get_snapshot", .lease, map, null, diagnostic, .{call.sizedOut(MapSnapshot)});
 }
 
 /// Copies one complete runtime style image.
@@ -5707,12 +5816,28 @@ pub fn mapGetStyleLayer(allocator: std.mem.Allocator, map: Map, layer_id: []cons
     return call.submit("mln_map_get_style_layer", .lease, map, call.orNull(call.value(OwnedValue(StyleLayerInfo), c.mln_style_layer_info)), allocator, diagnostic, .{layer_id});
 }
 
+/// Serializes one layer filter as a style-spec JSON value.
+///
+/// See `mln_map_get_style_layer_filter` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapGetStyleLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
+    return call.submit("mln_map_get_style_layer_filter", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{layer_id});
+}
+
 /// Serializes one style layer as a full style-spec layer JSON object.
 ///
 /// See `mln_map_get_style_layer_json` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn mapGetStyleLayerJson(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
     return call.submit("mln_map_get_style_layer_json", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{layer_id});
+}
+
+/// Serializes one layer property as a style-spec JSON value.
+///
+/// See `mln_map_get_style_layer_property` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapGetStyleLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, property_name: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
+    return call.submit("mln_map_get_style_layer_property", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{ layer_id, property_name });
 }
 
 /// Serializes one style light property as a style-spec JSON value.
@@ -5737,6 +5862,14 @@ pub fn mapGetStyleSource(allocator: std.mem.Allocator, map: Map, source_id: []co
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub fn mapGetStyleTransitionOptions(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(StyleTransitionOptions) {
     return call.submit("mln_map_get_style_transition_options", .lease, map, call.value(StyleTransitionOptions, c.mln_style_transition_options), null, diagnostic, .{});
+}
+
+/// Starts an ordered copy of the last requested style URL.
+///
+/// See `mln_map_get_style_url` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn mapGetStyleUrl(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
+    return call.submit("mln_map_get_style_url", .lease, map, call.value(OwnedValue([]const u8), c.mln_buffer_view), allocator, diagnostic, .{});
 }
 
 /// Invalidates custom geometry source data inside one geographic region.
@@ -5829,14 +5962,6 @@ pub fn mapListStyleSources(allocator: std.mem.Allocator, map: Map, diagnostic: ?
     return call.submit("mln_map_list_style_sources", .lease, map, call.slice(StyleSourceInfo, c.mln_style_source_info), allocator, diagnostic, .{});
 }
 
-/// Starts an ordered copy of the last successfully parsed style document.
-///
-/// See `mln_map_loaded_style_json` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapLoadedStyleJson(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
-    return call.submit("mln_map_loaded_style_json", .lease, map, call.value(OwnedValue([]const u8), c.mln_buffer_view), allocator, diagnostic, .{});
-}
-
 /// Starts an ordered query of meters per logical pixel at a latitude and the
 /// current map zoom. The completion borrows one double.
 ///
@@ -5884,15 +6009,6 @@ pub fn mapPixelsForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: 
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 pub fn mapProjectionClose(projection: MapProjection, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_map_projection_close", .close, projection, null, diagnostic, .{});
-}
-
-/// Starts creation of a standalone projection from the map's ordered transform
-/// state.
-///
-/// See `mln_map_projection_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionCreate(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(MapProjection) {
-    return call.submit("mln_map_projection_create", .lease, map, call.handle(MapProjection, c.mln_map_projection, .none), null, diagnostic, .{});
 }
 
 /// Copies the projection camera into out_camera.
@@ -6145,62 +6261,6 @@ pub fn mapSetImageSourceUrl(map: Map, source_id: []const u8, url: []const u8, di
     return call.submit("mln_map_set_image_source_url", .lease, map, call.command, null, diagnostic, .{ source_id, url });
 }
 
-/// Sets or clears one layer filter.
-///
-/// See `mln_map_set_layer_filter` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, filter: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_layer_filter", .lease, map, call.command, allocator, diagnostic, .{ layer_id, filter });
-}
-
-/// Sets the highest zoom at which one layer draws.
-///
-/// See `mln_map_set_layer_max_zoom` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLayerMaxZoom(map: Map, layer_id: []const u8, max_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_layer_max_zoom", .lease, map, call.command, null, diagnostic, .{ layer_id, max_zoom });
-}
-
-/// Sets the lowest zoom at which one layer draws.
-///
-/// See `mln_map_set_layer_min_zoom` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLayerMinZoom(map: Map, layer_id: []const u8, min_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_layer_min_zoom", .lease, map, call.command, null, diagnostic, .{ layer_id, min_zoom });
-}
-
-/// Sets one layer property using its MapLibre style-spec property name.
-///
-/// See `mln_map_set_layer_property` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLayerProperty(map: Map, layer_id: []const u8, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_layer_property", .lease, map, call.command, null, diagnostic, .{ layer_id, property_name, value });
-}
-
-/// Sets one layer's source ID.
-///
-/// See `mln_map_set_layer_source_id` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLayerSourceId(map: Map, layer_id: []const u8, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_layer_source_id", .lease, map, call.command, null, diagnostic, .{ layer_id, source_id });
-}
-
-/// Sets one layer's source-layer ID.
-///
-/// See `mln_map_set_layer_source_layer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLayerSourceLayer(map: Map, layer_id: []const u8, source_layer: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_layer_source_layer", .lease, map, call.command, null, diagnostic, .{ layer_id, source_layer });
-}
-
-/// Sets whether one layer draws.
-///
-/// See `mln_map_set_layer_visibility` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapSetLayerVisibility(map: Map, layer_id: []const u8, visibility: StyleLayerVisibility, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_map_set_layer_visibility", .lease, map, call.command, null, diagnostic, .{ layer_id, visibility });
-}
-
 /// Sets a location indicator layer accuracy radius in meters.
 ///
 /// See `mln_map_set_location_indicator_accuracy_radius` in the
@@ -6265,6 +6325,62 @@ pub fn mapSetStyleJson(map: Map, json: []const u8, diagnostic: ?*diagnostics.Dia
     return call.submit("mln_map_set_style_json", .lease, map, call.command, null, diagnostic, .{json});
 }
 
+/// Sets or clears one layer filter.
+///
+/// See `mln_map_set_style_layer_filter` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetStyleLayerFilter(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, filter: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_layer_filter", .lease, map, call.command, allocator, diagnostic, .{ layer_id, filter });
+}
+
+/// Sets the highest zoom at which one layer draws.
+///
+/// See `mln_map_set_style_layer_max_zoom` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetStyleLayerMaxZoom(map: Map, layer_id: []const u8, max_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_layer_max_zoom", .lease, map, call.command, null, diagnostic, .{ layer_id, max_zoom });
+}
+
+/// Sets the lowest zoom at which one layer draws.
+///
+/// See `mln_map_set_style_layer_min_zoom` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetStyleLayerMinZoom(map: Map, layer_id: []const u8, min_zoom: f64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_layer_min_zoom", .lease, map, call.command, null, diagnostic, .{ layer_id, min_zoom });
+}
+
+/// Sets one layer property using its MapLibre style-spec property name.
+///
+/// See `mln_map_set_style_layer_property` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetStyleLayerProperty(map: Map, layer_id: []const u8, property_name: []const u8, value: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_layer_property", .lease, map, call.command, null, diagnostic, .{ layer_id, property_name, value });
+}
+
+/// Sets one layer's source ID.
+///
+/// See `mln_map_set_style_layer_source_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetStyleLayerSourceId(map: Map, layer_id: []const u8, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_layer_source_id", .lease, map, call.command, null, diagnostic, .{ layer_id, source_id });
+}
+
+/// Sets one layer's source-layer ID.
+///
+/// See `mln_map_set_style_layer_source_layer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetStyleLayerSourceLayer(map: Map, layer_id: []const u8, source_layer: ?[]const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_layer_source_layer", .lease, map, call.command, null, diagnostic, .{ layer_id, source_layer });
+}
+
+/// Sets whether one layer draws.
+///
+/// See `mln_map_set_style_layer_visibility` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub fn mapSetStyleLayerVisibility(map: Map, layer_id: []const u8, visibility: StyleLayerVisibility, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_set_style_layer_visibility", .lease, map, call.command, null, diagnostic, .{ layer_id, visibility });
+}
+
 /// Sets the style light from a style-spec light JSON object.
 ///
 /// See `mln_map_set_style_light_json` in the
@@ -6321,22 +6437,6 @@ pub fn mapSetViewportOptions(allocator: std.mem.Allocator, map: Map, options: Ma
     return call.submit("mln_map_set_viewport_options", .lease, map, call.command, allocator, diagnostic, .{options});
 }
 
-/// Copies the latest immutable state published by the map worker.
-///
-/// See `mln_map_snapshot_get` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapSnapshotGet(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapSnapshot {
-    return call.invoke("mln_map_snapshot_get", .lease, map, null, diagnostic, .{call.sizedOut(MapSnapshot)});
-}
-
-/// Starts an ordered copy of the last requested style URL.
-///
-/// See `mln_map_style_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn mapStyleUrl(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const u8)) {
-    return call.submit("mln_map_style_url", .lease, map, call.value(OwnedValue([]const u8), c.mln_buffer_view), allocator, diagnostic, .{});
-}
-
 /// Returns empty tile tuning options initialized for this C API version.
 ///
 /// See `mln_map_tile_options_default` in the
@@ -6361,38 +6461,12 @@ pub fn mapViewportOptionsDefault() status.Error!MapViewportOptions {
     return call.direct("mln_map_viewport_options_default", .none, {}, MapViewportOptions, null, .{});
 }
 
-/// Starts attachment of a caller-owned Metal texture target.
-///
-/// See `mln_metal_borrowed_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn metalBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_metal_borrowed_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
-}
-
 /// Returns Metal borrowed-texture descriptor defaults for this C API version.
 ///
 /// See `mln_metal_borrowed_texture_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn metalBorrowedTextureDescriptorDefault() status.Error!MetalBorrowedTextureDescriptor {
     return call.direct("mln_metal_borrowed_texture_descriptor_default", .none, {}, MetalBorrowedTextureDescriptor, null, .{});
-}
-
-/// Starts an ordered caller-owned Metal texture replacement.
-///
-/// See `mln_metal_borrowed_texture_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn metalBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_metal_borrowed_texture_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
-}
-
-/// Starts attachment of a session-owned Metal texture ring.
-///
-/// See `mln_metal_owned_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn metalOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_metal_owned_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
 }
 
 /// Returns Metal owned-texture descriptor defaults for this C API version.
@@ -6403,15 +6477,6 @@ pub fn metalOwnedTextureDescriptorDefault() status.Error!MetalOwnedTextureDescri
     return call.direct("mln_metal_owned_texture_descriptor_default", .none, {}, MetalOwnedTextureDescriptor, null, .{});
 }
 
-/// Starts attachment of a Metal surface target.
-///
-/// See `mln_metal_surface_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn metalSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: MetalSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_metal_surface_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
-}
-
 /// Returns Metal surface descriptor defaults for this C API version.
 ///
 /// See `mln_metal_surface_descriptor_default` in the
@@ -6420,37 +6485,20 @@ pub fn metalSurfaceDescriptorDefault() status.Error!MetalSurfaceDescriptor {
     return call.direct("mln_metal_surface_descriptor_default", .none, {}, MetalSurfaceDescriptor, null, .{});
 }
 
-/// Starts an ordered Metal surface replacement.
-///
-/// See `mln_metal_surface_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn metalSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_metal_surface_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
-}
-
 /// Reads MapLibre Native's process-global network status.
 ///
-/// See `mln_network_status_get` in the
+/// See `mln_network_get_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn networkStatusGet(diagnostic: ?*diagnostics.Diagnostic) status.Error!NetworkStatus {
-    return call.invoke("mln_network_status_get", .none, {}, null, diagnostic, .{call.out(NetworkStatus)});
+pub fn networkGetStatus(diagnostic: ?*diagnostics.Diagnostic) status.Error!NetworkStatus {
+    return call.invoke("mln_network_get_status", .none, {}, null, diagnostic, .{call.out(NetworkStatus)});
 }
 
 /// Sets MapLibre Native's process-global network status.
 ///
-/// See `mln_network_status_set` in the
+/// See `mln_network_set_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn networkStatusSet(status_input: NetworkStatus, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    return call.invoke("mln_network_status_set", .none, {}, null, diagnostic, .{status_input});
-}
-
-/// Starts attachment of a caller-owned OpenGL texture target.
-///
-/// See `mln_opengl_borrowed_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn openglBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_opengl_borrowed_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
+pub fn networkSetStatus(status_input: NetworkStatus, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_network_set_status", .none, {}, null, diagnostic, .{status_input});
 }
 
 /// Returns OpenGL borrowed-texture descriptor defaults for this C API version.
@@ -6459,23 +6507,6 @@ pub fn openglBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descr
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn openglBorrowedTextureDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglBorrowedTextureDescriptor) {
     return call.direct("mln_opengl_borrowed_texture_descriptor_default", .none, {}, OwnedValue(OpenglBorrowedTextureDescriptor), allocator, .{});
-}
-
-/// Starts an ordered caller-owned OpenGL texture replacement.
-///
-/// See `mln_opengl_borrowed_texture_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn openglBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_opengl_borrowed_texture_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
-}
-
-/// Starts attachment of a session-owned OpenGL texture ring.
-///
-/// See `mln_opengl_owned_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn openglOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_opengl_owned_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
 }
 
 /// Returns OpenGL owned-texture descriptor defaults for this C API version.
@@ -6494,29 +6525,12 @@ pub fn openglSupportedContextProviderMask() status.Error!OpenglContextProviderFl
     return call.direct("mln_opengl_supported_context_provider_mask", .none, {}, OpenglContextProviderFlag, null, .{});
 }
 
-/// Starts attachment of an OpenGL surface target.
-///
-/// See `mln_opengl_surface_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn openglSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: OpenglSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_opengl_surface_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
-}
-
 /// Returns OpenGL surface descriptor defaults for this C API version.
 ///
 /// See `mln_opengl_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn openglSurfaceDescriptorDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(OpenglSurfaceDescriptor) {
     return call.direct("mln_opengl_surface_descriptor_default", .none, {}, OwnedValue(OpenglSurfaceDescriptor), allocator, .{});
-}
-
-/// Starts an ordered OpenGL surface replacement.
-///
-/// See `mln_opengl_surface_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn openglSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_opengl_surface_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
 }
 
 /// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
@@ -6619,6 +6633,18 @@ pub fn renderSessionClearData(session: RenderSession, diagnostic: ?*diagnostics.
     return call.submit("mln_render_session_clear_data", .lease, session, call.unit, null, diagnostic, .{});
 }
 
+/// Copies the last completed rendered transform into an independent projection.
+/// Callable from any thread. Returns invalid state before a completed render,
+/// after an extent or target change, or after detachment. The caller owns the
+/// returned projection, which remains usable after the session is released.
+/// out_projection must point to a null handle.
+///
+/// See `mln_render_session_create_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+pub fn renderSessionCreateProjection(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
+    return call.invoke("mln_render_session_create_projection", .lease, session, null, diagnostic, .{call.adopt(MapProjection, .none)});
+}
+
 /// Retires a detached or abandoned session handle. The call is CPU-only and may
 /// run on any native thread, including from one of the session's own
 /// completions. If an abandonment is still in progress on another thread, this
@@ -6679,18 +6705,6 @@ pub fn renderSessionGetSnapshot(session: RenderSession, diagnostic: ?*diagnostic
     return call.invoke("mln_render_session_get_snapshot", .lease, session, null, diagnostic, .{call.sizedOut(RenderSessionSnapshot)});
 }
 
-/// Copies the last completed rendered transform into an independent projection.
-/// Callable from any thread. Returns invalid state before a completed render,
-/// after an extent or target change, or after detachment. The caller owns the
-/// returned projection, which remains usable after the session is released.
-/// out_projection must point to a null handle.
-///
-/// See `mln_render_session_projection_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderSessionProjectionCreate(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
-    return call.invoke("mln_render_session_projection_create", .lease, session, null, diagnostic, .{call.adopt(MapProjection, .none)});
-}
-
 /// Starts a feature-extension query against the latest driver state. The
 /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count 1),
 /// valid only for the callback.
@@ -6717,6 +6731,15 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub fn renderSessionQuerySourceFeatures(allocator: std.mem.Allocator, session: RenderSession, source_id: []const u8, options: ?SourceFeatureQueryOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const QueriedFeature)) {
     return call.submit("mln_render_session_query_source_features", .lease, session, call.slice(QueriedFeature, c.mln_queried_feature), allocator, diagnostic, .{ source_id, options });
+}
+
+/// Reads back the latest frame of the session's owned texture as premultiplied
+/// RGBA8.
+///
+/// See `mln_render_session_read_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn renderSessionReadTexture(allocator: std.mem.Allocator, session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(TextureReadbackResult)) {
+    return call.submit("mln_render_session_read_texture", .lease, session, call.value(OwnedValue(TextureReadbackResult), c.mln_texture_readback_result), allocator, diagnostic, .{});
 }
 
 /// Starts best-effort release of renderer caches.
@@ -6756,6 +6779,70 @@ pub fn renderSessionResize(allocator: std.mem.Allocator, session: RenderSession,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub fn renderSessionServiceDriverWork(session: RenderSession, max_work: usize, diagnostic: ?*diagnostics.Diagnostic) status.Error!usize {
     return call.invoke("mln_render_session_service_driver_work", .lease, session, null, diagnostic, .{ max_work, call.out(usize) });
+}
+
+/// Starts an ordered caller-owned Metal texture replacement.
+///
+/// See `mln_render_session_set_metal_borrowed_texture_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn renderSessionSetMetalBorrowedTextureTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_metal_borrowed_texture_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
+}
+
+/// Starts an ordered Metal surface replacement.
+///
+/// See `mln_render_session_set_metal_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn renderSessionSetMetalSurfaceTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: MetalSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_metal_surface_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
+}
+
+/// Starts an ordered caller-owned OpenGL texture replacement.
+///
+/// See `mln_render_session_set_opengl_borrowed_texture_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn renderSessionSetOpenglBorrowedTextureTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_opengl_borrowed_texture_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
+}
+
+/// Starts an ordered OpenGL surface replacement.
+///
+/// See `mln_render_session_set_opengl_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn renderSessionSetOpenglSurfaceTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: OpenglSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_opengl_surface_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
+}
+
+/// Starts an ordered caller-owned Vulkan texture replacement.
+///
+/// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn renderSessionSetVulkanBorrowedTextureTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_vulkan_borrowed_texture_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
+}
+
+/// Starts an ordered Vulkan surface replacement.
+///
+/// See `mln_render_session_set_vulkan_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn renderSessionSetVulkanSurfaceTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_vulkan_surface_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
+}
+
+/// Starts an ordered caller-owned WebGPU texture replacement.
+///
+/// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+pub fn renderSessionSetWebgpuBorrowedTextureTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_webgpu_borrowed_texture_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
+}
+
+/// Starts an ordered WebGPU surface replacement.
+///
+/// See `mln_render_session_set_webgpu_surface_target` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+pub fn renderSessionSetWebgpuSurfaceTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_render_session_set_webgpu_surface_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
 }
 
 /// Computes the physical device-pixel size of a logical render target extent.
@@ -6799,20 +6886,20 @@ pub fn renderedQueryGeometryPoint(allocator: std.mem.Allocator, point: ScreenPoi
     return call.direct("mln_rendered_query_geometry_point", .none, {}, OwnedValue(RenderedQueryGeometry), allocator, .{point});
 }
 
-/// Reports whether MapLibre has cancelled a C API resource provider request.
-///
-/// See `mln_resource_request_cancelled` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestCancelled(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
-    return call.invoke("mln_resource_request_cancelled", .lease, handle, null, diagnostic, .{call.out(bool)});
-}
-
 /// Completes a C API resource provider request.
 ///
 /// See `mln_resource_request_complete` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn resourceRequestComplete(allocator: std.mem.Allocator, handle: ResourceRequestHandle, response: ResourceResponse, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
     return call.invoke("mln_resource_request_complete", .complete, handle, allocator, diagnostic, .{response});
+}
+
+/// Reports whether MapLibre has cancelled a C API resource provider request.
+///
+/// See `mln_resource_request_is_cancelled` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub fn resourceRequestIsCancelled(handle: ResourceRequestHandle, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
+    return call.invoke("mln_resource_request_is_cancelled", .lease, handle, null, diagnostic, .{call.out(bool)});
 }
 
 /// Releases the provider's reference to a resource request handle.
@@ -6836,7 +6923,7 @@ pub const ResourceRequestCancelCallback = struct {
                     return;
                 };
                 var scope: callback.Scope = .{};
-                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.value.owner);
+                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_is_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.value.owner);
                 defer scope.leave();
                 host(state.value.context) catch |err| {
                     callback.reportError("mln_resource_request_cancel_callback", err);
@@ -6936,6 +7023,30 @@ pub fn runtimeCreate(allocator: std.mem.Allocator, options: RuntimeOptions, diag
     return call.invoke("mln_runtime_create", .none, {}, allocator, diagnostic, .{ options, call.adopt(Runtime, .none) });
 }
 
+/// Creates a map on the runtime worker.
+///
+/// See `mln_runtime_create_map` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn runtimeCreateMap(allocator: std.mem.Allocator, runtime: Runtime, options: MapOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(Map) {
+    return call.submit("mln_runtime_create_map", .lease, runtime, call.handle(Map, c.mln_map, .receiver), allocator, diagnostic, .{options});
+}
+
+/// Starts creating an offline region.
+///
+/// See `mln_runtime_create_offline_region` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn runtimeCreateOfflineRegion(allocator: std.mem.Allocator, runtime: Runtime, definition: OfflineRegionDefinition, metadata: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
+    return call.submit("mln_runtime_create_offline_region", .lease, runtime, call.value(OwnedValue(OfflineRegionInfo), c.mln_offline_region_info), allocator, diagnostic, .{ definition, metadata, metadata.len });
+}
+
+/// Deletes an offline region.
+///
+/// See `mln_runtime_delete_offline_region` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn runtimeDeleteOfflineRegion(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_runtime_delete_offline_region", .lease, runtime, call.unit, null, diagnostic, .{region_id});
+}
+
 /// Consumes a runtime handle without observing its asynchronous retirement.
 ///
 /// See `mln_runtime_dispose` in the
@@ -6960,84 +7071,44 @@ pub fn runtimeGetEventMask(runtime: Runtime, diagnostic: ?*diagnostics.Diagnosti
     return call.invoke("mln_runtime_get_event_mask", .lease, runtime, null, diagnostic, .{call.out(RuntimeEventMask)});
 }
 
-/// Starts creating an offline region.
-///
-/// See `mln_runtime_offline_region_create` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionCreate(allocator: std.mem.Allocator, runtime: Runtime, definition: OfflineRegionDefinition, metadata: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
-    return call.submit("mln_runtime_offline_region_create", .lease, runtime, call.value(OwnedValue(OfflineRegionInfo), c.mln_offline_region_info), allocator, diagnostic, .{ definition, metadata, metadata.len });
-}
-
-/// Deletes an offline region.
-///
-/// See `mln_runtime_offline_region_delete` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionDelete(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_runtime_offline_region_delete", .lease, runtime, call.unit, null, diagnostic, .{region_id});
-}
-
 /// Starts getting one offline region by ID.
 ///
-/// See `mln_runtime_offline_region_get` in the
+/// See `mln_runtime_get_offline_region` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionGet(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(OfflineRegionInfo)) {
-    return call.submit("mln_runtime_offline_region_get", .lease, runtime, call.orNull(call.value(OwnedValue(OfflineRegionInfo), c.mln_offline_region_info)), allocator, diagnostic, .{region_id});
+pub fn runtimeGetOfflineRegion(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(OfflineRegionInfo)) {
+    return call.submit("mln_runtime_get_offline_region", .lease, runtime, call.orNull(call.value(OwnedValue(OfflineRegionInfo), c.mln_offline_region_info)), allocator, diagnostic, .{region_id});
 }
 
 /// Starts getting the current download status for an offline region.
 ///
-/// See `mln_runtime_offline_region_get_status` in the
+/// See `mln_runtime_get_offline_region_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionGetStatus(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OfflineRegionStatus) {
-    return call.submit("mln_runtime_offline_region_get_status", .lease, runtime, call.value(OfflineRegionStatus, c.mln_offline_region_status), null, diagnostic, .{region_id});
+pub fn runtimeGetOfflineRegionStatus(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OfflineRegionStatus) {
+    return call.submit("mln_runtime_get_offline_region_status", .lease, runtime, call.value(OfflineRegionStatus, c.mln_offline_region_status), null, diagnostic, .{region_id});
 }
 
 /// Invalidates cached resources for an offline region.
 ///
-/// See `mln_runtime_offline_region_invalidate` in the
+/// See `mln_runtime_invalidate_offline_region` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionInvalidate(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_runtime_offline_region_invalidate", .lease, runtime, call.unit, null, diagnostic, .{region_id});
-}
-
-/// Sets an offline region's native download state.
-///
-/// See `mln_runtime_offline_region_set_download_state` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionSetDownloadState(runtime: Runtime, region_id: i64, state: OfflineRegionDownloadState, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_runtime_offline_region_set_download_state", .lease, runtime, call.unit, null, diagnostic, .{ region_id, state });
-}
-
-/// Enables or disables runtime events for an offline region.
-///
-/// See `mln_runtime_offline_region_set_observed` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionSetObserved(runtime: Runtime, region_id: i64, observed: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_runtime_offline_region_set_observed", .lease, runtime, call.unit, null, diagnostic, .{ region_id, observed });
-}
-
-/// Starts updating opaque binary metadata for an offline region.
-///
-/// See `mln_runtime_offline_region_update_metadata` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionUpdateMetadata(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64, metadata: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
-    return call.submit("mln_runtime_offline_region_update_metadata", .lease, runtime, call.value(OwnedValue(OfflineRegionInfo), c.mln_offline_region_info), allocator, diagnostic, .{ region_id, metadata, metadata.len });
+pub fn runtimeInvalidateOfflineRegion(runtime: Runtime, region_id: i64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_runtime_invalidate_offline_region", .lease, runtime, call.unit, null, diagnostic, .{region_id});
 }
 
 /// Starts listing the offline regions in the runtime database.
 ///
-/// See `mln_runtime_offline_regions_list` in the
+/// See `mln_runtime_list_offline_regions` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionsList(allocator: std.mem.Allocator, runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
-    return call.submit("mln_runtime_offline_regions_list", .lease, runtime, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{});
+pub fn runtimeListOfflineRegions(allocator: std.mem.Allocator, runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
+    return call.submit("mln_runtime_list_offline_regions", .lease, runtime, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{});
 }
 
 /// Starts merging offline regions from another MapLibre offline database.
 ///
-/// See `mln_runtime_offline_regions_merge_database` in the
+/// See `mln_runtime_merge_offline_regions` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub fn runtimeOfflineRegionsMergeDatabase(allocator: std.mem.Allocator, runtime: Runtime, side_database_path: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
-    return call.submit("mln_runtime_offline_regions_merge_database", .lease, runtime, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{call.cString(side_database_path)});
+pub fn runtimeMergeOfflineRegions(allocator: std.mem.Allocator, runtime: Runtime, side_database_path: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const OfflineRegionInfo)) {
+    return call.submit("mln_runtime_merge_offline_regions", .lease, runtime, call.slice(OfflineRegionInfo, c.mln_offline_region_info), allocator, diagnostic, .{call.cString(side_database_path)});
 }
 
 /// Returns runtime options initialized for this C API version.
@@ -7088,6 +7159,22 @@ pub fn runtimeSetMaximumAmbientCacheSize(runtime: Runtime, size: u64, diagnostic
     return call.submit("mln_runtime_set_maximum_ambient_cache_size", .lease, runtime, call.unit, null, diagnostic, .{size});
 }
 
+/// Sets an offline region's native download state.
+///
+/// See `mln_runtime_set_offline_region_download_state` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn runtimeSetOfflineRegionDownloadState(runtime: Runtime, region_id: i64, state: OfflineRegionDownloadState, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_runtime_set_offline_region_download_state", .lease, runtime, call.unit, null, diagnostic, .{ region_id, state });
+}
+
+/// Enables or disables runtime events for an offline region.
+///
+/// See `mln_runtime_set_offline_region_observed` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn runtimeSetOfflineRegionObserved(runtime: Runtime, region_id: i64, observed: bool, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
+    return call.submit("mln_runtime_set_offline_region_observed", .lease, runtime, call.unit, null, diagnostic, .{ region_id, observed });
+}
+
 /// Registers or replaces a runtime-scoped network resource provider.
 ///
 /// See `mln_runtime_set_resource_provider` in the
@@ -7102,6 +7189,14 @@ pub fn runtimeSetResourceProvider(allocator: std.mem.Allocator, runtime: Runtime
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub fn runtimeSetResourceTransform(allocator: std.mem.Allocator, runtime: Runtime, transform: ResourceTransform, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     return call.submit("mln_runtime_set_resource_transform", .lease, runtime, call.unit, allocator, diagnostic, .{transform});
+}
+
+/// Starts updating opaque binary metadata for an offline region.
+///
+/// See `mln_runtime_update_offline_region_metadata` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn runtimeUpdateOfflineRegionMetadata(allocator: std.mem.Allocator, runtime: Runtime, region_id: i64, metadata: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(OfflineRegionInfo)) {
+    return call.submit("mln_runtime_update_offline_region_metadata", .lease, runtime, call.value(OwnedValue(OfflineRegionInfo), c.mln_offline_region_info), allocator, diagnostic, .{ region_id, metadata, metadata.len });
 }
 
 /// Returns default source feature query options.
@@ -7152,46 +7247,12 @@ pub fn textureImageInfoDefault() status.Error!TextureImageInfo {
     return call.direct("mln_texture_image_info_default", .none, {}, TextureImageInfo, null, .{});
 }
 
-/// Starts readback of the latest rendered texture frame.
-///
-/// See `mln_texture_read_premultiplied_rgba8` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn textureReadPremultipliedRgba8(allocator: std.mem.Allocator, session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue(TextureReadbackResult)) {
-    return call.submit("mln_texture_read_premultiplied_rgba8", .lease, session, call.value(OwnedValue(TextureReadbackResult), c.mln_texture_readback_result), allocator, diagnostic, .{});
-}
-
-/// Starts attachment of a caller-owned Vulkan texture target.
-///
-/// See `mln_vulkan_borrowed_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn vulkanBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_vulkan_borrowed_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
-}
-
 /// Returns Vulkan borrowed-texture descriptor defaults for this C API version.
 ///
 /// See `mln_vulkan_borrowed_texture_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub fn vulkanBorrowedTextureDescriptorDefault() status.Error!VulkanBorrowedTextureDescriptor {
     return call.direct("mln_vulkan_borrowed_texture_descriptor_default", .none, {}, VulkanBorrowedTextureDescriptor, null, .{});
-}
-
-/// Starts an ordered caller-owned Vulkan texture replacement.
-///
-/// See `mln_vulkan_borrowed_texture_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn vulkanBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_vulkan_borrowed_texture_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
-}
-
-/// Starts attachment of a session-owned Vulkan texture ring.
-///
-/// See `mln_vulkan_owned_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn vulkanOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_vulkan_owned_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
 }
 
 /// Returns Vulkan owned-texture descriptor defaults for this C API version.
@@ -7202,38 +7263,12 @@ pub fn vulkanOwnedTextureDescriptorDefault() status.Error!VulkanOwnedTextureDesc
     return call.direct("mln_vulkan_owned_texture_descriptor_default", .none, {}, VulkanOwnedTextureDescriptor, null, .{});
 }
 
-/// Starts attachment of a Vulkan surface target.
-///
-/// See `mln_vulkan_surface_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn vulkanSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: VulkanSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_vulkan_surface_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
-}
-
 /// Returns Vulkan surface descriptor defaults for this C API version.
 ///
 /// See `mln_vulkan_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn vulkanSurfaceDescriptorDefault() status.Error!VulkanSurfaceDescriptor {
     return call.direct("mln_vulkan_surface_descriptor_default", .none, {}, VulkanSurfaceDescriptor, null, .{});
-}
-
-/// Starts an ordered Vulkan surface replacement.
-///
-/// See `mln_vulkan_surface_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn vulkanSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: VulkanSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_vulkan_surface_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
-}
-
-/// Starts attachment of a caller-owned WebGPU texture target.
-///
-/// See `mln_webgpu_borrowed_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn webgpuBorrowedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuBorrowedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_webgpu_borrowed_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
 }
 
 /// Returns WebGPU borrowed-texture descriptor defaults for this C API version.
@@ -7244,23 +7279,6 @@ pub fn webgpuBorrowedTextureDescriptorDefault() status.Error!WebgpuBorrowedTextu
     return call.direct("mln_webgpu_borrowed_texture_descriptor_default", .none, {}, WebgpuBorrowedTextureDescriptor, null, .{});
 }
 
-/// Starts an ordered caller-owned WebGPU texture replacement.
-///
-/// See `mln_webgpu_borrowed_texture_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn webgpuBorrowedTextureSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuBorrowedTextureDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_webgpu_borrowed_texture_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
-}
-
-/// Starts attachment of a session-owned WebGPU texture ring.
-///
-/// See `mln_webgpu_owned_texture_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-pub fn webgpuOwnedTextureAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuOwnedTextureDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_webgpu_owned_texture_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
-}
-
 /// Returns WebGPU owned-texture descriptor defaults for this C API version.
 ///
 /// See `mln_webgpu_owned_texture_descriptor_default` in the
@@ -7269,27 +7287,10 @@ pub fn webgpuOwnedTextureDescriptorDefault() status.Error!WebgpuOwnedTextureDesc
     return call.direct("mln_webgpu_owned_texture_descriptor_default", .none, {}, WebgpuOwnedTextureDescriptor, null, .{});
 }
 
-/// Starts attachment of a WebGPU surface target.
-///
-/// See `mln_webgpu_surface_attach` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn webgpuSurfaceAttach(allocator: std.mem.Allocator, map: Map, descriptor: WebgpuSurfaceDescriptor, options: RenderSessionAttachOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { session: RenderSession, ready: completion.Future(void) } {
-    const started = try call.submit("mln_webgpu_surface_attach", .lease, map, call.unit, allocator, diagnostic, .{ descriptor, options, call.adopt(RenderSession, .receiver) });
-    return .{ .session = started.outputs, .ready = started.ready };
-}
-
 /// Returns WebGPU surface descriptor defaults for this C API version.
 ///
 /// See `mln_webgpu_surface_descriptor_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn webgpuSurfaceDescriptorDefault() status.Error!WebgpuSurfaceDescriptor {
     return call.direct("mln_webgpu_surface_descriptor_default", .none, {}, WebgpuSurfaceDescriptor, null, .{});
-}
-
-/// Starts an ordered WebGPU surface replacement.
-///
-/// See `mln_webgpu_surface_set_target` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-pub fn webgpuSurfaceSetTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
-    return call.submit("mln_webgpu_surface_set_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
 }

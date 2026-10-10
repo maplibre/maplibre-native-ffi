@@ -50,7 +50,7 @@ internal suspend fun abandonAMapAndAwaitItsDisposal() {
       }
       holder.map = null
       awaitWhileCollecting("the abandoned map's disposal to cancel its request", cancelled)
-      assertTrue(request.cancelled())
+      assertTrue(request.isCancelled())
     } finally {
       request.close()
     }
@@ -64,7 +64,7 @@ private class MapHolder {
 
 /** Creates a map in [holder] and starts its style load, keeping no other reference to the map. */
 private suspend fun startStyleLoad(runtime: RuntimeHandle, holder: MapHolder) {
-  val map = runtime.mapCreate(smallMapOptions()).awaitWithin("the map")
+  val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
   holder.map = map
   map.setStyleUrl(ABANDONED_STYLE_URL).awaitWithin("the style command")
 }

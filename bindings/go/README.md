@@ -4,7 +4,7 @@ The Go API is generated from the C headers. Commands return a future with their
 terminal disposition and committed generation; queries return a future with a
 copied result. Published snapshots return their result immediately.
 
-Create a runtime with `RuntimeCreate` and a map with `RuntimeHandle.MapCreate`.
+Create a runtime with `RuntimeCreate` and a map with `RuntimeHandle.CreateMap`.
 Closing either handle returns a future for native teardown. Keep servicing a
 caller-driver render session while its attachment or detachment is pending.
 

@@ -70,106 +70,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned Metal texture replacement.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_metal_borrowed_texture_set_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task MetalBorrowedTextureSetTargetAsync(
-        MetalBorrowedTextureDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_metal_borrowed_texture_set_target");
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_metal_borrowed_texture_set_target(
-                    Handle,
-                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered Metal surface replacement.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_metal_surface_set_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task MetalSurfaceSetTargetAsync(
-        MetalSurfaceDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_metal_surface_set_target");
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_metal_surface_set_target(
-                    Handle,
-                    scope.Value(NativeMetalSurfaceDescriptor(descriptor)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered caller-owned OpenGL texture replacement.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_opengl_borrowed_texture_set_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task OpenglBorrowedTextureSetTargetAsync(
-        OpenglBorrowedTextureDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_opengl_borrowed_texture_set_target");
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_opengl_borrowed_texture_set_target(
-                    Handle,
-                    scope.Value(NativeOpenglBorrowedTextureDescriptor(descriptor, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Starts an ordered OpenGL surface replacement.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_opengl_surface_set_target</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task OpenglSurfaceSetTargetAsync(
-        OpenglSurfaceDescriptor descriptor,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_opengl_surface_set_target");
-        return scope.Run(
-            (completion, diagnostic) =>
-                NativeMethods.mln_opengl_surface_set_target(
-                    Handle,
-                    scope.Value(NativeOpenglSurfaceDescriptor(descriptor, scope)),
-                    completion,
-                    diagnostic
-                ),
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Irreversibly closes control and mailboxes without graphics calls.
     /// </summary>
     /// <remarks>
@@ -242,6 +142,27 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
                 NativeMethods.mln_render_session_clear_data(Handle, completion, diagnostic),
             cancellationToken
         );
+    }
+
+    /// <summary>
+    /// Copies the last completed rendered transform into an independent
+    /// projection. Callable from any thread. Returns invalid state before a
+    /// completed render, after an extent or target change, or after detachment.
+    /// The caller owns the returned projection, which remains usable after the
+    /// session is released. out_projection must point to a null handle.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_create_projection</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
+    public MapProjectionHandle CreateProjection()
+    {
+        using var call = Enter(this, "mln_render_session_create_projection");
+        MlnMapProjection outProjection = default;
+        Check(
+            NativeMethods.mln_render_session_create_projection(Handle, &outProjection, Diagnostic)
+        );
+        return MapProjectionHandle.Adopt(outProjection);
     }
 
     /// <summary>
@@ -360,27 +281,6 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Copies the last completed rendered transform into an independent
-    /// projection. Callable from any thread. Returns invalid state before a
-    /// completed render, after an extent or target change, or after detachment.
-    /// The caller owns the returned projection, which remains usable after the
-    /// session is released. out_projection must point to a null handle.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_session_projection_create</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
-    /// </remarks>
-    public MapProjectionHandle ProjectionCreate()
-    {
-        using var call = Enter(this, "mln_render_session_projection_create");
-        MlnMapProjection outProjection = default;
-        Check(
-            NativeMethods.mln_render_session_projection_create(Handle, &outProjection, Diagnostic)
-        );
-        return MapProjectionHandle.Adopt(outProjection);
-    }
-
-    /// <summary>
     /// Starts a feature-extension query against the latest driver state. The
     /// completion borrows one <c>mln_buffer_view</c> holding UTF-8 JSON
     /// (value_count 1), valid only for the callback.
@@ -480,6 +380,27 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
+    /// Reads back the latest frame of the session's owned texture as
+    /// premultiplied RGBA8.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_read_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<TextureReadbackResult> ReadTextureAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_render_session_read_texture");
+        return scope.Query<mln_texture_readback_result, TextureReadbackResult>(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_read_texture(Handle, completion, diagnostic),
+            CopyTextureReadbackResult,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Starts best-effort release of renderer caches.
     /// </summary>
     /// <remarks>
@@ -566,21 +487,109 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts readback of the latest rendered texture frame.
+    /// Starts an ordered caller-owned Metal texture replacement.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_texture_read_premultiplied_rgba8</c> in the <see
+    /// See <c>mln_render_session_set_metal_borrowed_texture_target</c> in the
+    /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<TextureReadbackResult> TextureReadPremultipliedRgba8Async(
+    public Task SetMetalBorrowedTextureTargetAsync(
+        MetalBorrowedTextureDescriptor descriptor,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_texture_read_premultiplied_rgba8");
-        return scope.Query<mln_texture_readback_result, TextureReadbackResult>(
+        using var scope = new NativeCallScope(
+            this,
+            "mln_render_session_set_metal_borrowed_texture_target"
+        );
+        return scope.Run(
             (completion, diagnostic) =>
-                NativeMethods.mln_texture_read_premultiplied_rgba8(Handle, completion, diagnostic),
-            CopyTextureReadbackResult,
+                NativeMethods.mln_render_session_set_metal_borrowed_texture_target(
+                    Handle,
+                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Starts an ordered Metal surface replacement.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_set_metal_surface_target</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task SetMetalSurfaceTargetAsync(
+        MetalSurfaceDescriptor descriptor,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_render_session_set_metal_surface_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_set_metal_surface_target(
+                    Handle,
+                    scope.Value(NativeMetalSurfaceDescriptor(descriptor)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Starts an ordered caller-owned OpenGL texture replacement.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_set_opengl_borrowed_texture_target</c> in the
+    /// <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task SetOpenglBorrowedTextureTargetAsync(
+        OpenglBorrowedTextureDescriptor descriptor,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(
+            this,
+            "mln_render_session_set_opengl_borrowed_texture_target"
+        );
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_set_opengl_borrowed_texture_target(
+                    Handle,
+                    scope.Value(NativeOpenglBorrowedTextureDescriptor(descriptor, scope)),
+                    completion,
+                    diagnostic
+                ),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Starts an ordered OpenGL surface replacement.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_render_session_set_opengl_surface_target</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task SetOpenglSurfaceTargetAsync(
+        OpenglSurfaceDescriptor descriptor,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_render_session_set_opengl_surface_target");
+        return scope.Run(
+            (completion, diagnostic) =>
+                NativeMethods.mln_render_session_set_opengl_surface_target(
+                    Handle,
+                    scope.Value(NativeOpenglSurfaceDescriptor(descriptor, scope)),
+                    completion,
+                    diagnostic
+                ),
             cancellationToken
         );
     }
@@ -589,18 +598,22 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// Starts an ordered caller-owned Vulkan texture replacement.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_vulkan_borrowed_texture_set_target</c> in the <see
+    /// See <c>mln_render_session_set_vulkan_borrowed_texture_target</c> in the
+    /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task VulkanBorrowedTextureSetTargetAsync(
+    public Task SetVulkanBorrowedTextureTargetAsync(
         VulkanBorrowedTextureDescriptor descriptor,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_vulkan_borrowed_texture_set_target");
+        using var scope = new NativeCallScope(
+            this,
+            "mln_render_session_set_vulkan_borrowed_texture_target"
+        );
         return scope.Run(
             (completion, diagnostic) =>
-                NativeMethods.mln_vulkan_borrowed_texture_set_target(
+                NativeMethods.mln_render_session_set_vulkan_borrowed_texture_target(
                     Handle,
                     scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor)),
                     completion,
@@ -614,18 +627,18 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// Starts an ordered Vulkan surface replacement.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_vulkan_surface_set_target</c> in the <see
+    /// See <c>mln_render_session_set_vulkan_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public Task VulkanSurfaceSetTargetAsync(
+    public Task SetVulkanSurfaceTargetAsync(
         VulkanSurfaceDescriptor descriptor,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_vulkan_surface_set_target");
+        using var scope = new NativeCallScope(this, "mln_render_session_set_vulkan_surface_target");
         return scope.Run(
             (completion, diagnostic) =>
-                NativeMethods.mln_vulkan_surface_set_target(
+                NativeMethods.mln_render_session_set_vulkan_surface_target(
                     Handle,
                     scope.Value(NativeVulkanSurfaceDescriptor(descriptor)),
                     completion,
@@ -639,18 +652,22 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// Starts an ordered caller-owned WebGPU texture replacement.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_webgpu_borrowed_texture_set_target</c> in the <see
+    /// See <c>mln_render_session_set_webgpu_borrowed_texture_target</c> in the
+    /// <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public Task WebgpuBorrowedTextureSetTargetAsync(
+    public Task SetWebgpuBorrowedTextureTargetAsync(
         WebgpuBorrowedTextureDescriptor descriptor,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_webgpu_borrowed_texture_set_target");
+        using var scope = new NativeCallScope(
+            this,
+            "mln_render_session_set_webgpu_borrowed_texture_target"
+        );
         return scope.Run(
             (completion, diagnostic) =>
-                NativeMethods.mln_webgpu_borrowed_texture_set_target(
+                NativeMethods.mln_render_session_set_webgpu_borrowed_texture_target(
                     Handle,
                     scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor)),
                     completion,
@@ -664,18 +681,18 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// Starts an ordered WebGPU surface replacement.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_webgpu_surface_set_target</c> in the <see
+    /// See <c>mln_render_session_set_webgpu_surface_target</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
     /// </remarks>
-    public Task WebgpuSurfaceSetTargetAsync(
+    public Task SetWebgpuSurfaceTargetAsync(
         WebgpuSurfaceDescriptor descriptor,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_webgpu_surface_set_target");
+        using var scope = new NativeCallScope(this, "mln_render_session_set_webgpu_surface_target");
         return scope.Run(
             (completion, diagnostic) =>
-                NativeMethods.mln_webgpu_surface_set_target(
+                NativeMethods.mln_render_session_set_webgpu_surface_target(
                     Handle,
                     scope.Value(NativeWebgpuSurfaceDescriptor(descriptor)),
                     completion,

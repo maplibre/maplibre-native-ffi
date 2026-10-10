@@ -119,14 +119,14 @@ public static unsafe partial class Maplibre
     /// Reads MapLibre Native's process-global network status.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_network_status_get</c> in the <see
+    /// See <c>mln_network_get_status</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public static NetworkStatus NetworkStatusGet()
+    public static NetworkStatus NetworkGetStatus()
     {
-        using var call = Enter(null, "mln_network_status_get");
+        using var call = Enter(null, "mln_network_get_status");
         uint outStatus = default;
-        Check(NativeMethods.mln_network_status_get(&outStatus, Diagnostic));
+        Check(NativeMethods.mln_network_get_status(&outStatus, Diagnostic));
         return (NetworkStatus)outStatus;
     }
 
@@ -134,13 +134,13 @@ public static unsafe partial class Maplibre
     /// Sets MapLibre Native's process-global network status.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_network_status_set</c> in the <see
+    /// See <c>mln_network_set_status</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public static void NetworkStatusSet(NetworkStatus status)
+    public static void NetworkSetStatus(NetworkStatus status)
     {
-        using var call = Enter(null, "mln_network_status_set");
-        Check(NativeMethods.mln_network_status_set((uint)status, Diagnostic));
+        using var call = Enter(null, "mln_network_set_status");
+        Check(NativeMethods.mln_network_set_status((uint)status, Diagnostic));
     }
 
     /// <summary>

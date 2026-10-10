@@ -188,7 +188,7 @@ bool mln_test_backend_attach(
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.context = context;
-  *out_status = mln_opengl_owned_texture_attach(
+  *out_status = mln_map_attach_opengl_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;
@@ -250,7 +250,7 @@ bool mln_test_transferred_webgl_surface_create(
     .user_data = &fixture->driver_wakes
   };
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status = mln_opengl_surface_attach(
+  const mln_status status = mln_map_attach_opengl_surface(
     map, &descriptor, &options, &fixture->session, &completion.descriptor,
     MLN_TEST_DIAGNOSTIC
   );

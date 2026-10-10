@@ -122,23 +122,23 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   TEST_ASSERT_EQUAL_DOUBLE(-INFINITY, probe.info.min_zoom);
   TEST_ASSERT_EQUAL_DOUBLE(INFINITY, probe.info.max_zoom);
 
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_min_zoom(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_min_zoom(
     map, MLN_BUFFER_LITERAL("info-layer"), 3.0, &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_max_zoom(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_max_zoom(
     map, MLN_BUFFER_LITERAL("info-layer"), 12.0, &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_visibility(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_visibility(
     map, MLN_BUFFER_LITERAL("info-layer"), MLN_STYLE_LAYER_VISIBILITY_NONE,
     &completion.descriptor, NULL
   ));
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "visibility is invalid",
-    mln_map_set_layer_visibility(
+    mln_map_set_style_layer_visibility(
       map, MLN_BUFFER_LITERAL("info-layer"), 7, &completion.descriptor, NULL
     )
   );
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_layer(
     map, MLN_BUFFER_LITERAL("info-layer"), MLN_BUFFER_LITERAL("roads"),
     &completion.descriptor, NULL
   ));
@@ -173,7 +173,7 @@ static mln_status read_layer_property(
   mln_map map, const char* layer, const char* name, char* out, size_t capacity
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  MLN_TEST_OK(mln_map_get_layer_property(
+  MLN_TEST_OK(mln_map_get_style_layer_property(
     map, mln_test_view_of(layer), mln_test_view_of(name),
     &completion.descriptor, NULL
   ));
@@ -184,7 +184,7 @@ static mln_status read_layer_filter(
   mln_map map, const char* layer, char* out, size_t capacity
 ) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  MLN_TEST_OK(mln_map_get_layer_filter(
+  MLN_TEST_OK(mln_map_get_style_layer_filter(
     map, mln_test_view_of(layer), &completion.descriptor, NULL
   ));
   return mln_test_style_finish_text(&completion, out, capacity, NULL);
@@ -212,12 +212,12 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   );
 
   EXPECT_LAYER_PROPERTY("", map, "dots", "circle-radius");
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
     MLN_BUFFER_LITERAL("4"), &completion.descriptor, NULL
   ));
   EXPECT_LAYER_PROPERTY("4.0", map, "dots", "circle-radius");
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-color"),
     MLN_BUFFER_LITERAL("\"#ff0000\""), &completion.descriptor, NULL
   ));
@@ -227,21 +227,21 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "layer property",
-    mln_map_set_layer_property(
+    mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("fill-color"),
       MLN_BUFFER_LITERAL("\"#00ff00\""), &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "layer property",
-    mln_map_set_layer_property(
+    mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
       MLN_BUFFER_LITERAL("\"wide\""), &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "layer property",
-    mln_map_set_layer_property(
+    mln_map_set_style_layer_property(
       map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("circle-radius"),
       MLN_BUFFER_LITERAL("{\"radius\":"), &completion.descriptor, NULL
     )
@@ -255,7 +255,7 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
   TEST_ASSERT_EQUAL_STRING("", filter);
   const mln_buffer_view kind_filter =
     MLN_BUFFER_LITERAL("[\"==\",[\"get\",\"kind\"],\"park\"]");
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_filter(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_filter(
     map, MLN_BUFFER_LITERAL("dots"), &kind_filter, &completion.descriptor, NULL
   ));
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
@@ -264,14 +264,14 @@ static void layer_properties_and_filters_round_trip_through_json(void) {
     MLN_BUFFER_LITERAL("[\"no-such-operator\",1]");
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "filter",
-    mln_map_set_layer_filter(
+    mln_map_set_style_layer_filter(
       map, MLN_BUFFER_LITERAL("dots"), &bad_filter, &completion.descriptor, NULL
     )
   );
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
   TEST_ASSERT_EQUAL_STRING("[\"==\",[\"get\",\"kind\"],\"park\"]", filter);
   // A null filter clears it.
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_filter(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_filter(
     map, MLN_BUFFER_LITERAL("dots"), NULL, &completion.descriptor, NULL
   ));
   MLN_TEST_OK(read_layer_filter(map, "dots", filter, sizeof(filter)));
@@ -302,7 +302,7 @@ static void layer_json_serializes_the_current_layer(void) {
     "\"background-color\":\"#ff0000\"}}",
     ""
   );
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_min_zoom(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_min_zoom(
     map, MLN_BUFFER_LITERAL("paper"), 2.0, &completion.descriptor, NULL
   ));
 
@@ -396,20 +396,20 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   );
   add_layer(map, "{\"id\":\"paper\",\"type\":\"background\"}", "");
 
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_id(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_id(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("not-yet-added"),
     &completion.descriptor, NULL
   ));
   layer_probe probe = take_layer_result(runtime, map, "dots");
   TEST_ASSERT_EQUAL_STRING("not-yet-added", probe.source_id);
   TEST_ASSERT_EQUAL_STRING("", probe.source_layer);
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_layer(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("pois"),
     &completion.descriptor, NULL
   ));
   probe = take_layer_result(runtime, map, "dots");
   TEST_ASSERT_EQUAL_STRING("pois", probe.source_layer);
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_source_layer(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
     &completion.descriptor, NULL
   ));
@@ -418,14 +418,14 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "does not take a source",
-    mln_map_set_layer_source_id(
+    mln_map_set_style_layer_source_id(
       map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("points"),
       &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "does not take a source-layer",
-    mln_map_set_layer_source_layer(
+    mln_map_set_style_layer_source_layer(
       map, MLN_BUFFER_LITERAL("paper"), MLN_BUFFER_LITERAL("pois"),
       &completion.descriptor, NULL
     )
@@ -503,7 +503,7 @@ static void terrain_layers_require_a_raster_dem_source(void) {
   TEST_ASSERT_EQUAL_STRING("paper", ids.entries[2].id);
 
   // The color ramp is an ordinary property of the color-relief layer.
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("relief"), MLN_BUFFER_LITERAL("color-relief-color"),
     MLN_BUFFER_LITERAL(
       "[\"interpolate\",[\"linear\"],[\"elevation\"],0,\"#000000\",1000,"

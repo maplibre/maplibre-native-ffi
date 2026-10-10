@@ -18,7 +18,7 @@ test "generated owners preserve rejected release and copied event snapshots" {
     try testing.expect(copied.value.events.len != 0);
     const saved = fixture.map;
     try fixture.closeMap();
-    try testing.expectError(error.InvalidState, maplibre.mapSnapshotGet(saved, null));
+    try testing.expectError(error.InvalidState, maplibre.mapGetSnapshot(saved, null));
 }
 
 const ProviderProbe = struct {

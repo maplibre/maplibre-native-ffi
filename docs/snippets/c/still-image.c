@@ -93,7 +93,7 @@ static mln_status attach_owned_texture(still_image_job* job) {
     .callback = attach_finished,
     .user_data = job,
   };
-  return mln_opengl_owned_texture_attach(
+  return mln_map_attach_opengl_owned_texture(
     job->map, &descriptor, &options, &job->session, &completion, NULL
   );
   // #endregion attach
@@ -123,7 +123,7 @@ mln_status start_still_image(still_image_job* job) {
     .callback = map_created,
     .user_data = job,
   };
-  return mln_map_create(job->runtime, &options, &completion, NULL);
+  return mln_runtime_create_map(job->runtime, &options, &completion, NULL);
   // #endregion create
 }
 
@@ -226,7 +226,7 @@ void advance_still_image(still_image_job* job) {
       .user_data = job,
     };
     job->status =
-      mln_texture_read_premultiplied_rgba8(job->session, &readback, NULL);
+      mln_render_session_read_texture(job->session, &readback, NULL);
     if (job->status != MLN_STATUS_OK) job->finished(job->user_data, job);
   }
   // #endregion start-readback

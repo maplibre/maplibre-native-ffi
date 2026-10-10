@@ -41,7 +41,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
     try {
       ownedMap = runBlocking {
         runtime
-          .mapCreate(
+          .createMap(
             GeneratedApi.mapOptionsDefault()
               .copy(
                 initialExtent =
@@ -98,7 +98,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
 
   /** Eases to the next whole zoom level, as `round(zoom) + 1`, about [anchor]. */
   fun zoomToNextWholeLevel(anchor: ScreenPoint) {
-    val zoom = map.cameraSnapshotGet().camera.zoom ?: 0.0
+    val zoom = map.getCameraSnapshot().camera.zoom ?: 0.0
     map.applyCameraDelta(
       CameraDelta(
         kind = CameraDeltaKind.SCALE,

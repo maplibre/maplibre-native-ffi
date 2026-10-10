@@ -109,7 +109,7 @@ func TestChildKeepsItsParentAlive(t *testing.T) {
 		t.Fatal(err)
 	}
 	parent := weak.Make(runtime.bindingOwner)
-	m := await(t, submitted(runtime.MapCreate(DefaultMapOptions())))
+	m := await(t, submitted(runtime.CreateMap(DefaultMapOptions())))
 	t.Cleanup(func() {
 		if m != nil {
 			await(t, submitted(m.Close()))

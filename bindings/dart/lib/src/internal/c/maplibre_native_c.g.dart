@@ -2650,7 +2650,7 @@ external mln_gpu_sync mln_gpu_sync_default();
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_http_header_transform_response_set(
+external int mln_http_header_transform_response_set_header(
   Pointer<mln_http_header_transform_response> response,
   Pointer<Char> name,
   int name_size,
@@ -3033,6 +3033,234 @@ external int mln_map_apply_camera_delta(
 );
 
 @Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_metal_borrowed_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_metal_borrowed_texture(
+  int map,
+  Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_metal_owned_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_metal_owned_texture(
+  int map,
+  Pointer<mln_metal_owned_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_metal_surface_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_metal_surface(
+  int map,
+  Pointer<mln_metal_surface_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_opengl_borrowed_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_opengl_borrowed_texture(
+  int map,
+  Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_opengl_owned_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_opengl_owned_texture(
+  int map,
+  Pointer<mln_opengl_owned_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_opengl_surface_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_opengl_surface(
+  int map,
+  Pointer<mln_opengl_surface_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_vulkan_borrowed_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_vulkan_borrowed_texture(
+  int map,
+  Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_vulkan_owned_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_vulkan_owned_texture(
+  int map,
+  Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_vulkan_surface_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_vulkan_surface(
+  int map,
+  Pointer<mln_vulkan_surface_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_webgpu_borrowed_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_webgpu_borrowed_texture(
+  int map,
+  Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_webgpu_owned_texture_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_webgpu_owned_texture(
+  int map,
+  Pointer<mln_webgpu_owned_texture_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_webgpu_surface_descriptor>,
+    Pointer<mln_render_session_attach_options>,
+    Pointer<mln_render_session>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_attach_webgpu_surface(
+  int map,
+  Pointer<mln_webgpu_surface_descriptor> descriptor,
+  Pointer<mln_render_session_attach_options> options,
+  Pointer<mln_render_session> out_session,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
   Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
 external int mln_map_begin_command_group(
@@ -3097,30 +3325,6 @@ external int mln_map_camera_for_lat_lngs(
 @Native<
   Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
-external int mln_map_camera_query(
-  int map,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_camera_options>,
-    Pointer<Uint64>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_camera_snapshot_get(
-  int map,
-  Pointer<mln_camera_options> out_camera,
-  Pointer<Uint64> out_generation,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
->()
 external int mln_map_cancel_transitions(
   int map,
   Pointer<mln_completion> completion,
@@ -3128,16 +3332,10 @@ external int mln_map_cancel_transitions(
 );
 
 @Native<
-  Int32 Function(
-    mln_runtime,
-    Pointer<mln_map_options>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
+  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
-external int mln_map_create(
-  int runtime,
-  Pointer<mln_map_options> options,
+external int mln_map_create_projection(
+  int map,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -3160,6 +3358,30 @@ external int mln_map_dump_debug_logs(
 external int mln_map_end_command_group(
   int map,
   Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+>()
+external int mln_map_get_camera(
+  int map,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Pointer<mln_camera_options>,
+    Pointer<Uint64>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_get_camera_snapshot(
+  int map,
+  Pointer<mln_camera_options> out_camera,
+  Pointer<Uint64> out_generation,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -3203,34 +3425,20 @@ external int mln_map_get_image_source_coordinates(
 );
 
 @Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
+  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
-external int mln_map_get_layer_filter(
+external int mln_map_get_loaded_style_json(
   int map,
-  mln_buffer_view layer_id,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
+  Int32 Function(mln_map, Pointer<mln_map_snapshot>, Pointer<mln_diagnostic>)
 >()
-external int mln_map_get_layer_property(
+external int mln_map_get_snapshot(
   int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view property_name,
-  Pointer<mln_completion> completion,
+  Pointer<mln_map_snapshot> out_snapshot,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -3272,9 +3480,41 @@ external int mln_map_get_style_layer(
     Pointer<mln_diagnostic>,
   )
 >()
+external int mln_map_get_style_layer_filter(
+  int map,
+  mln_buffer_view layer_id,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
 external int mln_map_get_style_layer_json(
   int map,
   mln_buffer_view layer_id,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_get_style_layer_property(
+  int map,
+  mln_buffer_view layer_id,
+  mln_buffer_view property_name,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -3313,6 +3553,15 @@ external int mln_map_get_style_source(
   Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
 external int mln_map_get_style_transition_options(
+  int map,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+>()
+external int mln_map_get_style_url(
   int map,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
@@ -3482,15 +3731,6 @@ external int mln_map_list_style_sources(
 );
 
 @Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
->()
-external int mln_map_loaded_style_json(
-  int map,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
   Int32 Function(
     mln_map,
     Double,
@@ -3560,15 +3800,6 @@ external int mln_map_pixels_for_lat_lngs(
 @Native<Int32 Function(mln_map_projection, Pointer<mln_diagnostic>)>()
 external int mln_map_projection_close(
   int projection,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
->()
-external int mln_map_projection_create(
-  int map,
-  Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4051,127 +4282,6 @@ external int mln_map_set_image_source_url(
   Int32 Function(
     mln_map,
     mln_buffer_view,
-    Pointer<mln_buffer_view>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_layer_filter(
-  int map,
-  mln_buffer_view layer_id,
-  Pointer<mln_buffer_view> filter,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_layer_max_zoom(
-  int map,
-  mln_buffer_view layer_id,
-  double max_zoom,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Double,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_layer_min_zoom(
-  int map,
-  mln_buffer_view layer_id,
-  double min_zoom,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_layer_property(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view property_name,
-  mln_buffer_view value,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_layer_source_id(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view source_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_layer_source_layer(
-  int map,
-  mln_buffer_view layer_id,
-  mln_buffer_view source_layer,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Uint32,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_set_layer_visibility(
-  int map,
-  mln_buffer_view layer_id,
-  int visibility,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
     Double,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
@@ -4308,6 +4418,127 @@ external int mln_map_set_style_json(
   Int32 Function(
     mln_map,
     mln_buffer_view,
+    Pointer<mln_buffer_view>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_style_layer_filter(
+  int map,
+  mln_buffer_view layer_id,
+  Pointer<mln_buffer_view> filter,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    Double,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_style_layer_max_zoom(
+  int map,
+  mln_buffer_view layer_id,
+  double max_zoom,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    Double,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_style_layer_min_zoom(
+  int map,
+  mln_buffer_view layer_id,
+  double min_zoom,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_style_layer_property(
+  int map,
+  mln_buffer_view layer_id,
+  mln_buffer_view property_name,
+  mln_buffer_view value,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_style_layer_source_id(
+  int map,
+  mln_buffer_view layer_id,
+  mln_buffer_view source_id,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    mln_buffer_view,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_style_layer_source_layer(
+  int map,
+  mln_buffer_view layer_id,
+  mln_buffer_view source_layer,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
+    Uint32,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_set_style_layer_visibility(
+  int map,
+  mln_buffer_view layer_id,
+  int visibility,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    mln_buffer_view,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
@@ -4413,24 +4644,6 @@ external int mln_map_set_viewport_options(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(mln_map, Pointer<mln_map_snapshot>, Pointer<mln_diagnostic>)
->()
-external int mln_map_snapshot_get(
-  int map,
-  Pointer<mln_map_snapshot> out_snapshot,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
->()
-external int mln_map_style_url(
-  int map,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_map_tile_options Function()>()
 external mln_map_tile_options mln_map_tile_options_default();
 
@@ -4452,172 +4665,32 @@ external int mln_map_update_camera(
 @Native<mln_map_viewport_options Function()>()
 external mln_map_viewport_options mln_map_viewport_options_default();
 
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_metal_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_metal_borrowed_texture_attach(
-  int map,
-  Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_metal_borrowed_texture_descriptor Function()>()
 external mln_metal_borrowed_texture_descriptor
 mln_metal_borrowed_texture_descriptor_default();
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_metal_borrowed_texture_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_metal_borrowed_texture_set_target(
-  int session,
-  Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_metal_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_metal_owned_texture_attach(
-  int map,
-  Pointer<mln_metal_owned_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
 
 @Native<mln_metal_owned_texture_descriptor Function()>()
 external mln_metal_owned_texture_descriptor
 mln_metal_owned_texture_descriptor_default();
 
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_metal_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_metal_surface_attach(
-  int map,
-  Pointer<mln_metal_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_metal_surface_descriptor Function()>()
 external mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
 
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_metal_surface_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_metal_surface_set_target(
-  int session,
-  Pointer<mln_metal_surface_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<Int32 Function(Pointer<Uint32>, Pointer<mln_diagnostic>)>()
-external int mln_network_status_get(
+external int mln_network_get_status(
   Pointer<Uint32> out_status,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @Native<Int32 Function(Uint32, Pointer<mln_diagnostic>)>()
-external int mln_network_status_set(
+external int mln_network_set_status(
   int status,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_opengl_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_opengl_borrowed_texture_attach(
-  int map,
-  Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @Native<mln_opengl_borrowed_texture_descriptor Function()>()
 external mln_opengl_borrowed_texture_descriptor
 mln_opengl_borrowed_texture_descriptor_default();
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_opengl_borrowed_texture_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_opengl_borrowed_texture_set_target(
-  int session,
-  Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_opengl_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_opengl_owned_texture_attach(
-  int map,
-  Pointer<mln_opengl_owned_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
 
 @Native<mln_opengl_owned_texture_descriptor Function()>()
 external mln_opengl_owned_texture_descriptor
@@ -4626,42 +4699,8 @@ mln_opengl_owned_texture_descriptor_default();
 @Native<Uint32 Function()>()
 external int mln_opengl_supported_context_provider_mask();
 
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_opengl_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_opengl_surface_attach(
-  int map,
-  Pointer<mln_opengl_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_opengl_surface_descriptor Function()>()
 external mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_opengl_surface_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_opengl_surface_set_target(
-  int session,
-  Pointer<mln_opengl_surface_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
 
 @Native<Pointer<Void> Function()>()
 external Pointer<Void> mln_plugin_get_register_function_v1();
@@ -4768,6 +4807,19 @@ external int mln_render_session_clear_data(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_map_projection>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_create_projection(
+  int session,
+  Pointer<mln_map_projection> out_projection,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
 @Native<Int32 Function(mln_render_session, Pointer<mln_diagnostic>)>()
 external int mln_render_session_destroy(
   int session,
@@ -4848,19 +4900,6 @@ external int mln_render_session_get_snapshot(
 @Native<
   Int32 Function(
     mln_render_session,
-    Pointer<mln_map_projection>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_session_projection_create(
-  int session,
-  Pointer<mln_map_projection> out_projection,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_render_session,
     mln_buffer_view,
     mln_buffer_view,
     mln_buffer_view,
@@ -4911,6 +4950,19 @@ external int mln_render_session_query_source_features(
   int session,
   mln_buffer_view source_id,
   Pointer<mln_source_feature_query_options> options,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_read_texture(
+  int session,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -4973,6 +5025,126 @@ external int mln_render_session_service_driver_work(
 
 @Native<
   Int32 Function(
+    mln_render_session,
+    Pointer<mln_metal_borrowed_texture_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_metal_borrowed_texture_target(
+  int session,
+  Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_metal_surface_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_metal_surface_target(
+  int session,
+  Pointer<mln_metal_surface_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_opengl_borrowed_texture_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_opengl_borrowed_texture_target(
+  int session,
+  Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_opengl_surface_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_opengl_surface_target(
+  int session,
+  Pointer<mln_opengl_surface_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_vulkan_borrowed_texture_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_vulkan_borrowed_texture_target(
+  int session,
+  Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_vulkan_surface_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_vulkan_surface_target(
+  int session,
+  Pointer<mln_vulkan_surface_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_webgpu_borrowed_texture_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_webgpu_borrowed_texture_target(
+  int session,
+  Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_webgpu_surface_descriptor>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_render_session_set_webgpu_surface_target(
+  int session,
+  Pointer<mln_webgpu_surface_descriptor> descriptor,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
     Pointer<mln_render_target_extent>,
     Pointer<Uint32>,
     Pointer<Uint32>,
@@ -5009,19 +5181,6 @@ external mln_rendered_query_geometry mln_rendered_query_geometry_point(
 @Native<
   Int32 Function(
     mln_resource_request_handle,
-    Pointer<Bool>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_resource_request_cancelled(
-  int handle,
-  Pointer<Bool> out_cancelled,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_resource_request_handle,
     Pointer<mln_resource_response>,
     Pointer<mln_diagnostic>,
   )
@@ -5029,6 +5188,19 @@ external int mln_resource_request_cancelled(
 external int mln_resource_request_complete(
   int handle,
   Pointer<mln_resource_response> response,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_resource_request_handle,
+    Pointer<Bool>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_resource_request_is_cancelled(
+  int handle,
+  Pointer<Bool> out_cancelled,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -5124,6 +5296,55 @@ external int mln_runtime_create(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
+@Native<
+  Int32 Function(
+    mln_runtime,
+    Pointer<mln_map_options>,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_create_map(
+  int runtime,
+  Pointer<mln_map_options> options,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_runtime,
+    Pointer<mln_offline_region_definition>,
+    Pointer<Uint8>,
+    Size,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_create_offline_region(
+  int runtime,
+  Pointer<mln_offline_region_definition> definition,
+  Pointer<Uint8> metadata,
+  int metadata_size,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_runtime,
+    Int64,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_delete_offline_region(
+  int runtime,
+  int region_id,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
 @Native<Int32 Function(mln_runtime, Pointer<mln_diagnostic>)>()
 external int mln_runtime_dispose(
   int runtime,
@@ -5149,31 +5370,12 @@ external int mln_runtime_get_event_mask(
 @Native<
   Int32 Function(
     mln_runtime,
-    Pointer<mln_offline_region_definition>,
-    Pointer<Uint8>,
-    Size,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_runtime_offline_region_create(
-  int runtime,
-  Pointer<mln_offline_region_definition> definition,
-  Pointer<Uint8> metadata,
-  int metadata_size,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_runtime,
     Int64,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_runtime_offline_region_delete(
+external int mln_runtime_get_offline_region(
   int runtime,
   int region_id,
   Pointer<mln_completion> completion,
@@ -5188,7 +5390,7 @@ external int mln_runtime_offline_region_delete(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_runtime_offline_region_get(
+external int mln_runtime_get_offline_region_status(
   int runtime,
   int region_id,
   Pointer<mln_completion> completion,
@@ -5203,77 +5405,9 @@ external int mln_runtime_offline_region_get(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_runtime_offline_region_get_status(
+external int mln_runtime_invalidate_offline_region(
   int runtime,
   int region_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_runtime,
-    Int64,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_runtime_offline_region_invalidate(
-  int runtime,
-  int region_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_runtime,
-    Int64,
-    Uint32,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_runtime_offline_region_set_download_state(
-  int runtime,
-  int region_id,
-  int state,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_runtime,
-    Int64,
-    Bool,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_runtime_offline_region_set_observed(
-  int runtime,
-  int region_id,
-  bool observed,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_runtime,
-    Int64,
-    Pointer<Uint8>,
-    Size,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_runtime_offline_region_update_metadata(
-  int runtime,
-  int region_id,
-  Pointer<Uint8> metadata,
-  int metadata_size,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -5281,7 +5415,7 @@ external int mln_runtime_offline_region_update_metadata(
 @Native<
   Int32 Function(mln_runtime, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
-external int mln_runtime_offline_regions_list(
+external int mln_runtime_list_offline_regions(
   int runtime,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
@@ -5295,7 +5429,7 @@ external int mln_runtime_offline_regions_list(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_runtime_offline_regions_merge_database(
+external int mln_runtime_merge_offline_regions(
   int runtime,
   Pointer<Char> side_database_path,
   Pointer<mln_completion> completion,
@@ -5369,6 +5503,40 @@ external int mln_runtime_set_maximum_ambient_cache_size(
 @Native<
   Int32 Function(
     mln_runtime,
+    Int64,
+    Uint32,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_set_offline_region_download_state(
+  int runtime,
+  int region_id,
+  int state,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_runtime,
+    Int64,
+    Bool,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_set_offline_region_observed(
+  int runtime,
+  int region_id,
+  bool observed,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_runtime,
     Pointer<mln_resource_provider>,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
@@ -5396,6 +5564,25 @@ external int mln_runtime_set_resource_transform(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
+@Native<
+  Int32 Function(
+    mln_runtime,
+    Int64,
+    Pointer<Uint8>,
+    Size,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_runtime_update_offline_region_metadata(
+  int runtime,
+  int region_id,
+  Pointer<Uint8> metadata,
+  int metadata_size,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
 @Native<mln_source_feature_query_options Function()>()
 external mln_source_feature_query_options
 mln_source_feature_query_options_default();
@@ -5415,211 +5602,24 @@ external int mln_supported_render_backend_mask();
 @Native<mln_texture_image_info Function()>()
 external mln_texture_image_info mln_texture_image_info_default();
 
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_texture_read_premultiplied_rgba8(
-  int session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_vulkan_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_vulkan_borrowed_texture_attach(
-  int map,
-  Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_vulkan_borrowed_texture_descriptor Function()>()
 external mln_vulkan_borrowed_texture_descriptor
 mln_vulkan_borrowed_texture_descriptor_default();
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_vulkan_borrowed_texture_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_vulkan_borrowed_texture_set_target(
-  int session,
-  Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_vulkan_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_vulkan_owned_texture_attach(
-  int map,
-  Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
 
 @Native<mln_vulkan_owned_texture_descriptor Function()>()
 external mln_vulkan_owned_texture_descriptor
 mln_vulkan_owned_texture_descriptor_default();
 
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_vulkan_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_vulkan_surface_attach(
-  int map,
-  Pointer<mln_vulkan_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_vulkan_surface_descriptor Function()>()
 external mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_vulkan_surface_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_vulkan_surface_set_target(
-  int session,
-  Pointer<mln_vulkan_surface_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_webgpu_borrowed_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_webgpu_borrowed_texture_attach(
-  int map,
-  Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
 
 @Native<mln_webgpu_borrowed_texture_descriptor Function()>()
 external mln_webgpu_borrowed_texture_descriptor
 mln_webgpu_borrowed_texture_descriptor_default();
 
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_webgpu_borrowed_texture_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_webgpu_borrowed_texture_set_target(
-  int session,
-  Pointer<mln_webgpu_borrowed_texture_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_webgpu_owned_texture_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_webgpu_owned_texture_attach(
-  int map,
-  Pointer<mln_webgpu_owned_texture_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_webgpu_owned_texture_descriptor Function()>()
 external mln_webgpu_owned_texture_descriptor
 mln_webgpu_owned_texture_descriptor_default();
 
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_webgpu_surface_descriptor>,
-    Pointer<mln_render_session_attach_options>,
-    Pointer<mln_render_session>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_webgpu_surface_attach(
-  int map,
-  Pointer<mln_webgpu_surface_descriptor> descriptor,
-  Pointer<mln_render_session_attach_options> options,
-  Pointer<mln_render_session> out_session,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
 @Native<mln_webgpu_surface_descriptor Function()>()
 external mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
-
-@Native<
-  Int32 Function(
-    mln_render_session,
-    Pointer<mln_webgpu_surface_descriptor>,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_webgpu_surface_set_target(
-  int session,
-  Pointer<mln_webgpu_surface_descriptor> descriptor,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);

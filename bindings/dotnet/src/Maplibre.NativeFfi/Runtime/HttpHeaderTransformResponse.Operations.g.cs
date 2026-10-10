@@ -12,17 +12,17 @@ public sealed unsafe partial class HttpHeaderTransformResponse
     /// invocation.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_http_header_transform_response_set</c> in the <see
+    /// See <c>mln_http_header_transform_response_set_header</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public void Set(string name, string value)
+    public void SetHeader(string name, string value)
     {
-        using var call = Enter(this, "mln_http_header_transform_response_set");
+        using var call = Enter(this, "mln_http_header_transform_response_set_header");
         using var scope = new NativeCallScope();
         var bufferName = scope.Utf8(name);
         var bufferValue = scope.Utf8(value);
         Check(
-            NativeMethods.mln_http_header_transform_response_set(
+            NativeMethods.mln_http_header_transform_response_set_header(
                 Pointer,
                 (sbyte*)bufferName.data,
                 checked((nuint)bufferName.size),

@@ -21,7 +21,7 @@ public sealed class RenderTests
                 fixture.RenderFrame();
 
                 var image = fixture.Await(
-                    fixture.Session.TextureReadPremultipliedRgba8Async(TestWaits.Token),
+                    fixture.Session.ReadTextureAsync(TestWaits.Token),
                     "the readback"
                 );
 

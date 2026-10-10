@@ -7,7 +7,7 @@
  * run later on the map worker, in runtime order. Its completion reports
  * committed, superseded, failed, or cancelled disposition. Committed
  * completions carry the map snapshot generation they published, so a caller can
- * fence a later mln_map_snapshot_get() on it.
+ * fence a later mln_map_get_snapshot() on it.
  *
  * Every query is ordered. It copies its inputs before returning and observes
  * all commands accepted earlier by the runtime. Its completion borrows the
@@ -1691,7 +1691,7 @@ MLN_API mln_status mln_map_add_hillshade_layer(
  *
  * layer_id, source_id, and before_layer_id are borrowed for the call. Passing
  * an empty before_layer_id appends the layer; otherwise the layer is inserted
- * before that existing layer. Use mln_map_set_layer_property() with
+ * before that existing layer. Use mln_map_set_style_layer_property() with
  * color-relief-color to set the color ramp expression.
  *
  * Returns:
@@ -2127,7 +2127,7 @@ MLN_API mln_status mln_map_get_style_transition_options(
  *   layer, or the value cannot be converted for that property.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_layer_property(
+MLN_API mln_status mln_map_set_style_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value MLN_BINDING("encoding=json"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -2153,7 +2153,7 @@ MLN_BINDING(
   "execution=query;result=mln_buffer_view;nullable=true;"
   "encoding=json"
 )
-MLN_API mln_status mln_map_get_layer_property(
+MLN_API mln_status mln_map_get_style_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -2179,7 +2179,7 @@ MLN_API mln_status mln_map_get_layer_property(
  * - MLN_STATUS_INVALID_ARGUMENT when the filter cannot be converted.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_layer_filter(
+MLN_API mln_status mln_map_set_style_layer_filter(
   mln_map map, mln_buffer_view layer_id,
   const mln_buffer_view* filter MLN_BINDING("encoding=json;nullable=true"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -2205,7 +2205,7 @@ MLN_BINDING(
   "execution=query;result=mln_buffer_view;nullable=true;"
   "encoding=json"
 )
-MLN_API mln_status mln_map_get_layer_filter(
+MLN_API mln_status mln_map_get_style_layer_filter(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -2231,7 +2231,7 @@ MLN_API mln_status mln_map_get_layer_filter(
  * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_layer_source_layer(
+MLN_API mln_status mln_map_set_style_layer_source_layer(
   mln_map map, mln_buffer_view layer_id,
   mln_buffer_view source_layer MLN_BINDING("optional=empty"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -2259,7 +2259,7 @@ MLN_API mln_status mln_map_set_layer_source_layer(
  * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_layer_source_id(
+MLN_API mln_status mln_map_set_style_layer_source_id(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -2281,7 +2281,7 @@ MLN_API mln_status mln_map_set_layer_source_id(
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_layer_min_zoom(
+MLN_API mln_status mln_map_set_style_layer_min_zoom(
   mln_map map, mln_buffer_view layer_id, double min_zoom,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -2303,7 +2303,7 @@ MLN_API mln_status mln_map_set_layer_min_zoom(
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_layer_max_zoom(
+MLN_API mln_status mln_map_set_style_layer_max_zoom(
   mln_map map, mln_buffer_view layer_id, double max_zoom,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -2325,7 +2325,7 @@ MLN_API mln_status mln_map_set_layer_max_zoom(
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_BINDING("execution=command")
-MLN_API mln_status mln_map_set_layer_visibility(
+MLN_API mln_status mln_map_set_style_layer_visibility(
   mln_map map, mln_buffer_view layer_id,
   uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic

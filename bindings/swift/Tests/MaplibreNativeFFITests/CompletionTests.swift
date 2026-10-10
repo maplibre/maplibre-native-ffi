@@ -94,7 +94,7 @@ private struct ConversionFailure: Error {}
 @Test func cancellingACreationWaitRetiresTheCreatedMap() async throws {
   let runtime = try MapFixture.makeRuntime()
   let creation = Task {
-    try await runtime.mapCreate(options: MapOptions(
+    try await runtime.createMap(options: MapOptions(
       initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
     ))
   }

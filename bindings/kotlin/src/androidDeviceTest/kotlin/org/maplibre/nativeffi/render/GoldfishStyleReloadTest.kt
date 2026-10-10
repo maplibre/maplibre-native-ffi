@@ -35,7 +35,7 @@ class GoldfishStyleReloadTest {
   /** Renders the still image the map owes this test, then reads its center pixel. */
   private suspend fun OwnedTextureFixture.captureCenterPixel(): ByteArray {
     renderStill()
-    val readback = complete(session.textureReadPremultipliedRgba8())
+    val readback = complete(session.readTexture())
     val center = SNAPSHOT_SIZE / 2 * readback.info.stride.toInt() + SNAPSHOT_SIZE / 2 * 4
     return readback.data.copyOfRange(center, center + 4)
   }

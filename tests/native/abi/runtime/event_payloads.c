@@ -873,7 +873,7 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
   };
   mln_test_completion create =
     mln_test_completion_default(sizeof(mln_offline_region_info));
-  MLN_TEST_OK(mln_runtime_offline_region_create(
+  MLN_TEST_OK(mln_runtime_create_offline_region(
     runtime, &definition, NULL, 0, &create.descriptor, NULL
   ));
   mln_offline_region_info info = {.size = sizeof(info)};
@@ -882,10 +882,10 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
   mln_test_drain_all(runtime);
   log_reset(&scenario_log);
 
-  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_observed(
+  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_observed(
     runtime, info.id, true, &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
     runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
     &completion.descriptor, NULL
   ));
@@ -894,7 +894,7 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
     "an offline response error"
   ));
   log_drain(runtime, &scenario_log);
-  MLN_TEST_AWAIT_OK(mln_runtime_offline_region_set_download_state(
+  MLN_TEST_AWAIT_OK(mln_runtime_set_offline_region_download_state(
     runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
     &completion.descriptor, NULL
   ));

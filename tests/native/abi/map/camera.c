@@ -40,7 +40,7 @@ static void jump(mln_map map, mln_camera_options camera) {
 static mln_camera_query_result query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
-  MLN_TEST_OK(mln_map_camera_query(map, &query.descriptor, NULL));
+  MLN_TEST_OK(mln_map_get_camera(map, &query.descriptor, NULL));
   mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
   MLN_TEST_OK(
     mln_test_completion_finish_value(&query, &result, sizeof(result))
@@ -194,7 +194,7 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   mln_test_drain_all(runtime);
 
   mln_map_snapshot before = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_snapshot_get(map, &before, NULL));
+  MLN_TEST_OK(mln_map_get_snapshot(map, &before, NULL));
 
   mln_camera_update update = mln_camera_update_default();
   update.camera = test_camera();
@@ -222,14 +222,14 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, result.generation);
 
   mln_map_snapshot after = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_snapshot_get(map, &after, NULL));
+  MLN_TEST_OK(mln_map_get_snapshot(map, &after, NULL));
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, after.generation);
   TEST_ASSERT_EQUAL_DOUBLE(-122.4194, after.camera.longitude);
 
   mln_camera_options published = mln_camera_options_default();
   uint64_t published_generation = 0;
   MLN_TEST_OK(
-    mln_map_camera_snapshot_get(map, &published, &published_generation, NULL)
+    mln_map_get_camera_snapshot(map, &published, &published_generation, NULL)
   );
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, published_generation);
   TEST_ASSERT_EQUAL_DOUBLE(11.0, published.zoom);
@@ -338,7 +338,7 @@ static void every_camera_field_round_trips_through_the_snapshot(void) {
     assert_camera_field(row->label, &row->camera, &queried.camera);
 
     mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-    MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+    MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
     TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
       queried.generation, snapshot.generation
     );
@@ -347,7 +347,7 @@ static void every_camera_field_round_trips_through_the_snapshot(void) {
     mln_camera_options published = mln_camera_options_default();
     uint64_t generation = 0;
     MLN_TEST_OK(
-      mln_map_camera_snapshot_get(map, &published, &generation, NULL)
+      mln_map_get_camera_snapshot(map, &published, &generation, NULL)
     );
     assert_camera_field(row->label, &row->camera, &published);
 
@@ -830,7 +830,7 @@ static double jumped_longitude(mln_map map, double longitude) {
 static mln_bound_options read_bounds(mln_runtime runtime, mln_map map) {
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   return snapshot.bounds;
 }
 
@@ -875,11 +875,11 @@ static void camera_calls_reject_what_they_cannot_express(void) {
   {
     uint64_t generation = 0;
     mln_camera_options camera = mln_camera_options_default();
-    MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, NULL, &generation, NULL));
-    MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, &camera, NULL, NULL));
+    MLN_TEST_INVALID(mln_map_get_camera_snapshot(map, NULL, &generation, NULL));
+    MLN_TEST_INVALID(mln_map_get_camera_snapshot(map, &camera, NULL, NULL));
     mln_completion rejected = mln_test_discard_completion();
     MLN_TEST_INVALID(mln_map_update_camera(map, NULL, &rejected, NULL));
-    MLN_TEST_INVALID(mln_map_camera_query(map, NULL, NULL));
+    MLN_TEST_INVALID(mln_map_get_camera(map, NULL, NULL));
 
     const mln_camera_update defaults = mln_camera_update_default();
     mln_test_run_validation_table(

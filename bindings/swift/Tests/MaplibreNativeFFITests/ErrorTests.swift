@@ -45,7 +45,7 @@ import Testing
 
     let binding = await expectMaplibreError(.invalidState) {
       try await fixture.map.close()
-      return try fixture.map.snapshotGet()
+      return try fixture.map.getSnapshot()
     }
     #expect(binding?.rawStatus == nil)
     #expect(binding?.diagnostic == "MapHandle is closed")

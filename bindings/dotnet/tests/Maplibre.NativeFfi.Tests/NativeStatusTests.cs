@@ -72,7 +72,7 @@ public sealed class NativeStatusTests
     public void ANativeFailureRaisesItsStatusWithTheCallDiagnostic()
     {
         var error = Assert.Throws<InvalidArgumentException>(() =>
-            Maplibre.NetworkStatusSet((NetworkStatus)999_999)
+            Maplibre.NetworkSetStatus((NetworkStatus)999_999)
         );
 
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);

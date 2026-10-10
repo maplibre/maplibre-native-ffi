@@ -13,19 +13,6 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Reports whether MapLibre has cancelled a C API resource provider request.
-   *
-   * See `mln_resource_request_cancelled` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-   */
-  public fun cancelled(): Boolean =
-    nativeCall(this, binding, "mln_resource_request_cancelled", Access.READ) {
-      val out = allocate(1)
-      check(C.mln_resource_request_cancelled(handle, out, diagnostic))
-      readBool(out)
-    }
-
-  /**
    * Completes a C API resource provider request.
    *
    * See `mln_resource_request_complete` in the
@@ -34,6 +21,19 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
   public fun complete(response: ResourceResponse): Unit =
     nativeComplete(this, binding, "mln_resource_request_complete") {
       check(C.mln_resource_request_complete(handle, writeResourceResponse(response), diagnostic))
+    }
+
+  /**
+   * Reports whether MapLibre has cancelled a C API resource provider request.
+   *
+   * See `mln_resource_request_is_cancelled` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+   */
+  public fun isCancelled(): Boolean =
+    nativeCall(this, binding, "mln_resource_request_is_cancelled", Access.READ) {
+      val out = allocate(1)
+      check(C.mln_resource_request_is_cancelled(handle, out, diagnostic))
+      readBool(out)
     }
 
   /**

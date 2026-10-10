@@ -29,7 +29,7 @@ class CompletionTest {
       val before = pendingCompletionsForTesting()
       // Native rejects the unknown state before it takes the completion, so the bridge frees its
       // state and fails the Deferred with the rejection.
-      val rejected = runtime.offlineRegionSetDownloadState(1, OfflineRegionDownloadState(900u))
+      val rejected = runtime.setOfflineRegionDownloadState(1, OfflineRegionDownloadState(900u))
       assertEquals(before, pendingCompletionsForTesting())
       val failure = assertFailsWith<InvalidArgumentException> { rejected.await() }
       assertTrue(failure.diagnostic.isNotEmpty(), "the rejection carries its diagnostic")

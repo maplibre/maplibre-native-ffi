@@ -119,12 +119,12 @@ internal object TestGraphics {
     val extent = RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0)
     return when (backend) {
       TestBackend.METAL ->
-        map.metalOwnedTextureAttach(
+        map.attachMetalOwnedTexture(
           MetalOwnedTextureDescriptor(extent, MetalContextDescriptor(pointer(context.metalDevice))),
           options,
         )
       TestBackend.VULKAN ->
-        map.vulkanOwnedTextureAttach(
+        map.attachVulkanOwnedTexture(
           VulkanOwnedTextureDescriptor(
             extent,
             VulkanContextDescriptor(
@@ -140,7 +140,7 @@ internal object TestGraphics {
           options,
         )
       TestBackend.EGL ->
-        map.openglOwnedTextureAttach(
+        map.attachOpenglOwnedTexture(
           OpenglOwnedTextureDescriptor(
             extent,
             OpenglContextDescriptor(
@@ -159,7 +159,7 @@ internal object TestGraphics {
           options,
         )
       TestBackend.WGL ->
-        map.openglOwnedTextureAttach(
+        map.attachOpenglOwnedTexture(
           OpenglOwnedTextureDescriptor(
             extent,
             OpenglContextDescriptor(

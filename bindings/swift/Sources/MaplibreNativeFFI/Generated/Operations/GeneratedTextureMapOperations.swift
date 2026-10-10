@@ -6,18 +6,18 @@ import Foundation
 public extension MapHandle {
   /// Starts attachment of a caller-owned Metal texture target.
   ///
-  /// See `mln_metal_borrowed_texture_attach` in the
+  /// See `mln_map_attach_metal_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func metalBorrowedTextureAttach(
+  func attachMetalBorrowedTexture(
     descriptor bindingArg0: MetalBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_metal_borrowed_texture_attach",
+      "mln_map_attach_metal_borrowed_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_metal_borrowed_texture_attach(
+      try mln_map_attach_metal_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -30,18 +30,18 @@ public extension MapHandle {
 
   /// Starts attachment of a session-owned Metal texture ring.
   ///
-  /// See `mln_metal_owned_texture_attach` in the
+  /// See `mln_map_attach_metal_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func metalOwnedTextureAttach(
+  func attachMetalOwnedTexture(
     descriptor bindingArg0: MetalOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_metal_owned_texture_attach",
+      "mln_map_attach_metal_owned_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_metal_owned_texture_attach(
+      try mln_map_attach_metal_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -54,18 +54,18 @@ public extension MapHandle {
 
   /// Starts attachment of a caller-owned OpenGL texture target.
   ///
-  /// See `mln_opengl_borrowed_texture_attach` in the
+  /// See `mln_map_attach_opengl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func openglBorrowedTextureAttach(
+  func attachOpenglBorrowedTexture(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_opengl_borrowed_texture_attach",
+      "mln_map_attach_opengl_borrowed_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_opengl_borrowed_texture_attach(
+      try mln_map_attach_opengl_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -78,18 +78,18 @@ public extension MapHandle {
 
   /// Starts attachment of a session-owned OpenGL texture ring.
   ///
-  /// See `mln_opengl_owned_texture_attach` in the
+  /// See `mln_map_attach_opengl_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func openglOwnedTextureAttach(
+  func attachOpenglOwnedTexture(
     descriptor bindingArg0: OpenglOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_opengl_owned_texture_attach",
+      "mln_map_attach_opengl_owned_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_opengl_owned_texture_attach(
+      try mln_map_attach_opengl_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -102,18 +102,18 @@ public extension MapHandle {
 
   /// Starts attachment of a caller-owned Vulkan texture target.
   ///
-  /// See `mln_vulkan_borrowed_texture_attach` in the
+  /// See `mln_map_attach_vulkan_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func vulkanBorrowedTextureAttach(
+  func attachVulkanBorrowedTexture(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_vulkan_borrowed_texture_attach",
+      "mln_map_attach_vulkan_borrowed_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_vulkan_borrowed_texture_attach(
+      try mln_map_attach_vulkan_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -126,18 +126,18 @@ public extension MapHandle {
 
   /// Starts attachment of a session-owned Vulkan texture ring.
   ///
-  /// See `mln_vulkan_owned_texture_attach` in the
+  /// See `mln_map_attach_vulkan_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func vulkanOwnedTextureAttach(
+  func attachVulkanOwnedTexture(
     descriptor bindingArg0: VulkanOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_vulkan_owned_texture_attach",
+      "mln_map_attach_vulkan_owned_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_vulkan_owned_texture_attach(
+      try mln_map_attach_vulkan_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -150,18 +150,18 @@ public extension MapHandle {
 
   /// Starts attachment of a caller-owned WebGPU texture target.
   ///
-  /// See `mln_webgpu_borrowed_texture_attach` in the
+  /// See `mln_map_attach_webgpu_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func webgpuBorrowedTextureAttach(
+  func attachWebgpuBorrowedTexture(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_webgpu_borrowed_texture_attach",
+      "mln_map_attach_webgpu_borrowed_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_webgpu_borrowed_texture_attach(
+      try mln_map_attach_webgpu_borrowed_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
         arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -174,18 +174,18 @@ public extension MapHandle {
 
   /// Starts attachment of a session-owned WebGPU texture ring.
   ///
-  /// See `mln_webgpu_owned_texture_attach` in the
+  /// See `mln_map_attach_webgpu_owned_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func webgpuOwnedTextureAttach(
+  func attachWebgpuOwnedTexture(
     descriptor bindingArg0: WebgpuOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_webgpu_owned_texture_attach",
+      "mln_map_attach_webgpu_owned_texture",
       as: RenderSessionAttachment.init
     ) { raw, arena, completion, diagnostic in
-      try mln_webgpu_owned_texture_attach(
+      try mln_map_attach_webgpu_owned_texture(
         raw,
         arena.store(bindingArg0.nativeValue()),
         arena.store(bindingArg1.nativeValue(arena: arena)),

@@ -91,7 +91,7 @@ void cancel_callback_skips_a_completed_request() {
   );
   TEST_ASSERT_EQUAL_INT(0, probe.cancel_count.load());
   auto cancelled = true;
-  MLN_TEST_OK(mln_resource_request_cancelled(handle, &cancelled, nullptr));
+  MLN_TEST_OK(mln_resource_request_is_cancelled(handle, &cancelled, nullptr));
   TEST_ASSERT_FALSE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, probe.release_count.load());
 
@@ -131,7 +131,7 @@ void block_in_cancel(void* user_data) {
     // other entry point reports it as such.
     auto cancelled = false;
     probe.status_after_self_release =
-      mln_resource_request_cancelled(handle, &cancelled, nullptr);
+      mln_resource_request_is_cancelled(handle, &cancelled, nullptr);
     const auto response = style_response();
     probe.complete_status_after_self_release =
       mln_resource_request_complete(handle, &response, nullptr);
@@ -202,7 +202,7 @@ void run_release_waits_for_in_flight_cancel_callback(BlockingCancel& probe) {
   }
   auto cancelled = false;
   MLN_TEST_INVALID_STATE(
-    mln_resource_request_cancelled(handle, &cancelled, nullptr)
+    mln_resource_request_is_cancelled(handle, &cancelled, nullptr)
   );
   mln_test_destroy_runtime(runtime);
 }

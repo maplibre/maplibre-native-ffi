@@ -108,7 +108,7 @@ private func withOwnedTextureSession<Result>(
   try await withOwnedTextureSession(style: redStyle) { rendered in
     #expect(try await rendered.session.awaitRenderedFrame() != nil)
 
-    let readback = try await rendered.session.textureReadPremultipliedRgba8()
+    let readback = try await rendered.session.readTexture()
     #expect(readback.info.width == 32)
     #expect(readback.info.height == 32)
     let pixels = [UInt8](readback.data)
@@ -227,7 +227,7 @@ private func withOwnedTextureSession<Result>(
     try session.requestFrame(demand: FrameDemand(flags: [.ifNeeded], token: 1))
     try await fixture.map.setStyleJson(json: redStyle)
     #expect(try await session.awaitRenderedFrame()?.disposition == .rendered)
-    let readback = try await session.textureReadPremultipliedRgba8()
+    let readback = try await session.readTexture()
     #expect(Array(readback.data.prefix(4)) == [255, 0, 0, 255])
 
     // Detaching needs the driver serviced; closing needs the thread done with

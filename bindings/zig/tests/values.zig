@@ -47,7 +47,7 @@ test "optional fields and masks round-trip through presence bits" {
         .mode = .jump,
         .camera = .{ .zoom = 5.0 },
     }, null));
-    const snapshot = try maplibre.mapCameraSnapshotGet(fixture.map, null);
+    const snapshot = try maplibre.mapGetCameraSnapshot(fixture.map, null);
     try testing.expectEqual(@as(?f64, 5.0), snapshot.camera.zoom);
     try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.camera.pitch.?, 1e-9);
 
@@ -106,7 +106,7 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     defer fixture.destroy();
     try fixture.loadStyle();
 
-    const rejected = try support.resolve(try maplibre.mapSetLayerVisibility(fixture.map, "background", @enumFromInt(900), null));
+    const rejected = try support.resolve(try maplibre.mapSetStyleLayerVisibility(fixture.map, "background", @enumFromInt(900), null));
     try testing.expectEqual(maplibre.CommandDisposition.failed, rejected.disposition);
     try testing.expectError(error.InvalidArgument, rejected.statusError());
 

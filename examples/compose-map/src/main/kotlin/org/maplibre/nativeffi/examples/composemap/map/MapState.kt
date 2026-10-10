@@ -47,7 +47,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
     try {
       ownedMap = runBlocking {
         runtime
-          .mapCreate(
+          .createMap(
             GeneratedApi.mapOptionsDefault()
               .copy(
                 initialExtent =

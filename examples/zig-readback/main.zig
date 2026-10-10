@@ -120,7 +120,7 @@ pub fn main(init_args: std.process.Init) !void {
         .map_still_image_finished = true,
         .map_still_image_failed = true,
     };
-    var map_future = try maplibre.mapCreate(allocator, runtime, options, &diagnostic);
+    var map_future = try maplibre.runtimeCreateMap(allocator, runtime, options, &diagnostic);
     defer map_future.deinit();
     var map = try map_future.wait(&diagnostic);
     defer map.deinit();
@@ -195,7 +195,7 @@ fn renderWithDriver(
     defer still_image.deinit();
     try renderStillImage(allocator, runtime, map, session, &still_image, signal);
 
-    var readback = try maplibre.textureReadPremultipliedRgba8(allocator, session, null);
+    var readback = try maplibre.renderSessionReadTexture(allocator, session, null);
     defer readback.deinit();
     var image = try waitForSessionFuture(session, &readback, signal, null);
     defer image.deinit();
@@ -333,17 +333,17 @@ fn attachOwnedTexture(
         .driver_work_wake = if (uses_caller_driver) signal.wake() else .{},
     };
     const result = if (build_options.supports_vulkan)
-        try maplibre.vulkanOwnedTextureAttach(allocator, map.*, .{
+        try maplibre.mapAttachVulkanOwnedTexture(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
         }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_metal)
-        try maplibre.metalOwnedTextureAttach(allocator, map.*, .{
+        try maplibre.mapAttachMetalOwnedTexture(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
         }, withDriver(wakes, .core_worker), null)
     else if (build_options.supports_opengl)
-        try maplibre.openglOwnedTextureAttach(allocator, map.*, .{
+        try maplibre.mapAttachOpenglOwnedTexture(allocator, map.*, .{
             .extent = extent,
             .context = context.descriptor(),
         }, withDriver(wakes, if (supports_egl) .core_worker else .caller_graphics_thread), null)

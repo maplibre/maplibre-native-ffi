@@ -33,7 +33,7 @@ pub const MapState = struct {
         // load, so the map queues render updates from the first tile response.
         // The render loop re-arms from the frame result's repaint flag, so the
         // map only has to report updates that arrive between frames.
-        var map_future = maplibre.mapCreate(allocator, runtime, .{
+        var map_future = maplibre.runtimeCreateMap(allocator, runtime, .{
             .initial_extent = .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor },
             .map_mode = .continuous,
             .event_mask = .{ .map_render_update_available = true },

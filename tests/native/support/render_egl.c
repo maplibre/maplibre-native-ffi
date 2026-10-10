@@ -160,7 +160,7 @@ bool mln_test_dedicated_egl_surface_create(
     mln_render_session_attach_options_default();
   options.driver = fixture->driver;
   mln_test_completion attach = mln_test_completion_default(0);
-  const mln_status attach_status = mln_opengl_surface_attach(
+  const mln_status attach_status = mln_map_attach_opengl_surface(
     map, &descriptor, &options, &fixture->session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   );
@@ -194,7 +194,7 @@ bool mln_test_dedicated_egl_texture_create(
   options.driver = fixture->driver;
   options.requested_texture_ring_depth = 3;
   mln_test_completion attach = mln_test_completion_default(0);
-  const mln_status attach_status = mln_opengl_owned_texture_attach(
+  const mln_status attach_status = mln_map_attach_opengl_owned_texture(
     map, &descriptor, &options, &fixture->session, &attach.descriptor,
     MLN_TEST_DIAGNOSTIC
   );

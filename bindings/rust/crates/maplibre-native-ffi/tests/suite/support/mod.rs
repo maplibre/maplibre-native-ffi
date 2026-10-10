@@ -251,7 +251,7 @@ impl Fixture {
         })
         .unwrap();
         wait_for(runtime.set_resource_provider(denying_provider()));
-        let map = wait_for(runtime.map_create(&map_options));
+        let map = wait_for(runtime.create_map(&map_options));
         Self {
             runtime: Some(Arc::new(runtime)),
             map: Some(map),
@@ -452,8 +452,7 @@ impl Session {
 
     /// Reads the newest frame back as premultiplied RGBA8.
     pub fn read_back(&self) -> TextureReadbackResult {
-        self.drive(self.handle.texture_read_premultiplied_rgba8().unwrap())
-            .unwrap()
+        self.drive(self.handle.read_texture().unwrap()).unwrap()
     }
 
     /// Detaches and destroys the session.

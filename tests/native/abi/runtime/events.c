@@ -387,9 +387,9 @@ static void event_masks_select_every_type_and_keep_foreign_bits(void) {
     );
 
     MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, NULL, NULL));
-    MLN_TEST_INVALID(mln_map_snapshot_get(map, NULL, NULL));
+    MLN_TEST_INVALID(mln_map_get_snapshot(map, NULL, NULL));
     mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
-    MLN_TEST_INVALID(mln_map_snapshot_get(map, &undersized, NULL));
+    MLN_TEST_INVALID(mln_map_get_snapshot(map, &undersized, NULL));
   }
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

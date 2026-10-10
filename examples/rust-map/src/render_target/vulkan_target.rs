@@ -56,7 +56,7 @@ impl RenderTarget {
                     context: context_descriptor(vk),
                 };
                 let session = Session::new(
-                    unsafe { map.vulkan_owned_texture_attach(&descriptor, &options) }?,
+                    unsafe { map.attach_vulkan_owned_texture(&descriptor, &options) }?,
                     &options,
                     mode,
                     wakes,
@@ -72,7 +72,7 @@ impl RenderTarget {
                 })?;
                 let descriptor = borrowed_descriptor(vk, viewport, &image);
                 let session = Session::new(
-                    unsafe { map.vulkan_borrowed_texture_attach(&descriptor, &options) }?,
+                    unsafe { map.attach_vulkan_borrowed_texture(&descriptor, &options) }?,
                     &options,
                     mode,
                     wakes,
@@ -92,7 +92,7 @@ impl RenderTarget {
                 };
                 Ok(Self::Surface {
                     session: Session::new(
-                        unsafe { map.vulkan_surface_attach(&descriptor, &options) }?,
+                        unsafe { map.attach_vulkan_surface(&descriptor, &options) }?,
                         &options,
                         mode,
                         wakes,
@@ -143,7 +143,7 @@ impl RenderTarget {
                 let completion = unsafe {
                     session
                         .handle()
-                        .vulkan_borrowed_texture_set_target(&descriptor)
+                        .set_vulkan_borrowed_texture_target(&descriptor)
                 }?;
                 replacements.push(completion, replacement, wakes);
                 compositor.resize(viewport).map_err(|error| {

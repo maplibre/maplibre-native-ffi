@@ -57,7 +57,7 @@ final class MapFixture: Sendable {
       try await runtime
         .setResourceProvider(provider: denyingProvider(routes: routes))
       let map = try await runtime
-        .mapCreate(options: MapOptions(initialExtent: extent))
+        .createMap(options: MapOptions(initialExtent: extent))
       return MapFixture(runtime: runtime, map: map)
     } catch {
       try? await runtime.close()

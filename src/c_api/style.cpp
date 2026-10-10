@@ -319,7 +319,7 @@ auto mln_map_set_style_json(
   });
 }
 
-auto mln_map_loaded_style_json(
+auto mln_map_get_loaded_style_json(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -327,7 +327,7 @@ auto mln_map_loaded_style_json(
   });
 }
 
-auto mln_map_style_url(
+auto mln_map_get_style_url(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -1604,7 +1604,7 @@ auto mln_map_get_style_transition_options(
     });                                                                      \
   }
 
-auto mln_map_set_layer_property(
+auto mln_map_set_style_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -1633,7 +1633,7 @@ auto mln_map_set_layer_property(
   });
 }
 
-auto mln_map_get_layer_property(
+auto mln_map_get_style_layer_property(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -1646,7 +1646,7 @@ auto mln_map_get_layer_property(
     }
     auto id = OwnedView{layer_id};
     auto name = OwnedView{property_name};
-    return mln::core::start_style_operation<&mln_map_get_layer_property>(
+    return mln::core::start_style_operation<&mln_map_get_style_layer_property>(
       map,
       [id = std::move(id), name = std::move(name)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
@@ -1664,7 +1664,7 @@ auto mln_map_get_layer_property(
   });
 }
 
-auto mln_map_set_layer_filter(
+auto mln_map_set_style_layer_filter(
   mln_map map, mln_buffer_view layer_id, const mln_buffer_view* filter,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -1696,7 +1696,7 @@ auto mln_map_set_layer_filter(
   });
 }
 
-auto mln_map_get_layer_filter(
+auto mln_map_get_style_layer_filter(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -1705,7 +1705,7 @@ auto mln_map_get_layer_filter(
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto owned = OwnedView{layer_id};
-    return mln::core::start_style_operation<&mln_map_get_layer_filter>(
+    return mln::core::start_style_operation<&mln_map_get_style_layer_filter>(
       map,
       [owned = std::move(owned)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
@@ -1723,7 +1723,7 @@ auto mln_map_get_layer_filter(
   });
 }
 
-auto mln_map_set_layer_source_layer(
+auto mln_map_set_style_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -1749,7 +1749,7 @@ auto mln_map_set_layer_source_layer(
   });
 }
 
-auto mln_map_set_layer_source_id(
+auto mln_map_set_style_layer_source_id(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -1776,13 +1776,13 @@ auto mln_map_set_layer_source_id(
 }
 
 MLN_STYLE_SCALAR_COMMAND(
-  mln_map_set_layer_min_zoom, map_set_layer_min_zoom, double
+  mln_map_set_style_layer_min_zoom, map_set_layer_min_zoom, double
 )
 MLN_STYLE_SCALAR_COMMAND(
-  mln_map_set_layer_max_zoom, map_set_layer_max_zoom, double
+  mln_map_set_style_layer_max_zoom, map_set_layer_max_zoom, double
 )
 MLN_STYLE_SCALAR_COMMAND(
-  mln_map_set_layer_visibility, map_set_layer_visibility, uint32_t
+  mln_map_set_style_layer_visibility, map_set_layer_visibility, uint32_t
 )
 
 #undef MLN_STYLE_SCALAR_COMMAND

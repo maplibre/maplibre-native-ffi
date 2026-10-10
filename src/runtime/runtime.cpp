@@ -1642,7 +1642,7 @@ auto present_regions(
 auto present_region_status(
   const std::shared_ptr<Completion>& completion, std::any result
 ) -> void {
-  CompletionValue<&mln_runtime_offline_region_get_status>::complete(
+  CompletionValue<&mln_runtime_get_offline_region_status>::complete(
     completion, std::any_cast<mln_offline_region_status>(std::move(result))
   );
 }
@@ -1816,7 +1816,7 @@ auto offline_region_create_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return submit_offline_operation(
-    live, present_regions<&mln_runtime_offline_region_create>, completion,
+    live, present_regions<&mln_runtime_create_offline_region>, completion,
     [native_definition = std::move(native_definition),
      native_metadata = std::move(native_metadata)](
       const OfflineOperationState& state, const OfflineDatabase& database
@@ -1857,7 +1857,7 @@ auto offline_region_get_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, present_regions<&mln_runtime_offline_region_get>, completion,
+    live, present_regions<&mln_runtime_get_offline_region>, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1903,7 +1903,7 @@ auto offline_regions_list_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, present_regions<&mln_runtime_offline_regions_list>, completion,
+    live, present_regions<&mln_runtime_list_offline_regions>, completion,
     [](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1981,8 +1981,7 @@ auto offline_regions_merge_database_start(
   }
 
   return submit_offline_operation(
-    live, present_regions<&mln_runtime_offline_regions_merge_database>,
-    completion,
+    live, present_regions<&mln_runtime_merge_offline_regions>, completion,
     [path = std::string{side_database_path}](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2031,7 +2030,7 @@ auto offline_region_update_metadata_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return submit_offline_operation(
-    live, present_regions<&mln_runtime_offline_region_update_metadata>,
+    live, present_regions<&mln_runtime_update_offline_region_metadata>,
     completion,
     [region_id, native_metadata = std::move(native_metadata)](
       const OfflineOperationState& state, const OfflineDatabase& database
@@ -2155,7 +2154,7 @@ auto offline_region_set_observed_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, present_nothing<&mln_runtime_offline_region_set_observed>, completion,
+    live, present_nothing<&mln_runtime_set_offline_region_observed>, completion,
     [region_id, observed, offline_event_state = live->offline_event_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2222,7 +2221,7 @@ auto offline_region_set_download_state_start(
   }
 
   return submit_offline_operation(
-    live, present_nothing<&mln_runtime_offline_region_set_download_state>,
+    live, present_nothing<&mln_runtime_set_offline_region_download_state>,
     completion,
     [region_id = request.region_id, download_state = *native_state](
       const OfflineOperationState& state, const OfflineDatabase& database
@@ -2265,7 +2264,7 @@ auto offline_region_invalidate_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, present_nothing<&mln_runtime_offline_region_invalidate>, completion,
+    live, present_nothing<&mln_runtime_invalidate_offline_region>, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2310,7 +2309,7 @@ auto offline_region_delete_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, present_nothing<&mln_runtime_offline_region_delete>, completion,
+    live, present_nothing<&mln_runtime_delete_offline_region>, completion,
     [region_id, offline_event_state = live->offline_event_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {

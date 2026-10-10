@@ -48,7 +48,7 @@ void main() {
     final (request, handle) = await within(handed.future, 'the provider');
     expect(request.requestedUrl, styleUrl);
     expect(request.kind, ResourceKind.style);
-    expect(handle.cancelled(), isFalse);
+    expect(handle.isCancelled(), isFalse);
 
     // A response the C API cannot represent is refused and leaves the
     // request open for a valid one.
@@ -74,7 +74,7 @@ void main() {
     handle.close();
     handle.waitUntilRetired();
     handle.close();
-    expect(handle.cancelled, throwsA(isA<InvalidStateException>()));
+    expect(handle.isCancelled, throwsA(isA<InvalidStateException>()));
     expect(
       () => handle.complete(emptyStyleResponse),
       throwsA(isA<InvalidStateException>()),
@@ -116,7 +116,7 @@ void main() {
       () => openRuntime(
         provider: routedProvider([styleRoute(styleUrl)], (_, handle) {
           final alreadyCancelled = handle.setCancelCallback(() {
-            cancelled.complete(handle.cancelled());
+            cancelled.complete(handle.isCancelled());
             throw StateError('cancel callback failed');
           });
           expect(alreadyCancelled, isFalse);
@@ -193,7 +193,7 @@ void main() {
 
       await within(map.close(), 'map close');
       await within(fixture.runtime.close(), 'runtime close');
-      expect(handle.cancelled(), isTrue);
+      expect(handle.isCancelled(), isTrue);
 
       // Native reports the cancellation through the registration's output
       // instead of storing the callback, so the binding keeps no root for it.

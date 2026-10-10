@@ -12,7 +12,7 @@ static void a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it(
   TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
 
   uint32_t network_status = 0;
-  MLN_TEST_OK(mln_network_status_get(&network_status, &diagnostic));
+  MLN_TEST_OK(mln_network_get_status(&network_status, &diagnostic));
   TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
 }
 

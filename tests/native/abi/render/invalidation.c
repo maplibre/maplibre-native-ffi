@@ -86,7 +86,7 @@ static void read_center_pixel(
   const mln_test_render_fixture* fixture, uint8_t out[4]
 ) {
   mln_test_completion readback = mln_test_completion_readback();
-  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+  MLN_TEST_OK(mln_render_session_read_texture(
     fixture->session, &readback.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &readback));
@@ -117,7 +117,7 @@ static void expect_center_pixel(
 }
 
 static void set_property(mln_map map, const char* property, const char* value) {
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("background"), mln_test_view_of(property),
     mln_test_view_of(value), &completion.descriptor, NULL
   ));
@@ -502,7 +502,7 @@ static void each_mutation_publishes_a_render_update_only_when_it_changes(void) {
     NULL, &state.data, NULL
   ));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   state.initial_tile = snapshot.tile;
 
   for (size_t index = 0; index < sizeof(update_rows) / sizeof(update_rows[0]);
@@ -602,12 +602,12 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
     "an if-needed demand never found the map settled"
   );
 
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("bg"),
     MLN_BUFFER_LITERAL("background-color-transition"),
     MLN_BUFFER_LITERAL("{\"duration\":60000}"), &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
     MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
   ));
@@ -677,7 +677,7 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
     second.total_draw_call_count
   );
 
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("circle"), MLN_BUFFER_LITERAL("visibility"),
     MLN_BUFFER_LITERAL("\"none\""), &completion.descriptor, NULL
   ));

@@ -99,7 +99,7 @@ void undelivered_dart_completion_disposes_its_owned_result() {
     MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map),
     reinterpret_cast<void*>(post), 23, 31, &completion, nullptr
   ));
-  MLN_TEST_OK(mln_map_create(runtime, nullptr, &completion, nullptr));
+  MLN_TEST_OK(mln_runtime_create_map(runtime, nullptr, &completion, nullptr));
   TEST_ASSERT_TRUE(
     await([&] { return deliveries.load() == 1; }, "the completion post")
   );

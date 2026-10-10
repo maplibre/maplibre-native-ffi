@@ -4,21 +4,6 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension ResourceRequestHandle {
-  /// Reports whether MapLibre has cancelled a C API resource provider request.
-  ///
-  /// See `mln_resource_request_cancelled` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func cancelled() throws -> Bool {
-    var value0 = false
-    return try nativeInvoke("mln_resource_request_cancelled") { raw, _, diagnostic in
-      mln_resource_request_cancelled(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { value0 }
-  }
-
   /// Completes a C API resource provider request.
   ///
   /// See `mln_resource_request_complete` in the
@@ -31,6 +16,21 @@ public extension ResourceRequestHandle {
       arena.store(bindingArg0.nativeValue(arena: arena)),
       diagnostic
     ) }
+  }
+
+  /// Reports whether MapLibre has cancelled a C API resource provider request.
+  ///
+  /// See `mln_resource_request_is_cancelled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func isCancelled() throws -> Bool {
+    var value0 = false
+    return try nativeInvoke("mln_resource_request_is_cancelled") { raw, _, diagnostic in
+      mln_resource_request_is_cancelled(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: { value0 }
   }
 
   /// Releases the provider's reference to a resource request handle.
@@ -108,7 +108,7 @@ private func invokeMlnResourceRequestSetCancelCallback(
     owner: owner,
     operations: [
       "mln_resource_request_complete",
-      "mln_resource_request_cancelled",
+      "mln_resource_request_is_cancelled",
       "mln_resource_request_set_cancel_callback",
       "mln_resource_request_release",
     ]

@@ -14,7 +14,7 @@ const (
 func attachOwnedTexture(
 	m *MapHandle, context testsupport.Context, extent RenderTargetExtent, options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	attachment, err := m.OpenglOwnedTextureAttach(OpenglOwnedTextureDescriptor{
+	attachment, err := m.AttachOpenglOwnedTexture(OpenglOwnedTextureDescriptor{
 		Extent: extent,
 		Context: OpenglContextDescriptor{
 			Ownership: OpenglContextOwnershipShared,

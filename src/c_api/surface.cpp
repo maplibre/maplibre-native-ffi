@@ -24,7 +24,7 @@ auto mln_webgpu_surface_descriptor_default(void) noexcept
   return mln::core::webgpu_surface_descriptor_default();
 }
 
-auto mln_metal_surface_attach(
+auto mln_map_attach_metal_surface(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -37,7 +37,7 @@ auto mln_metal_surface_attach(
   });
 }
 
-auto mln_vulkan_surface_attach(
+auto mln_map_attach_vulkan_surface(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -50,7 +50,7 @@ auto mln_vulkan_surface_attach(
   });
 }
 
-auto mln_opengl_surface_attach(
+auto mln_map_attach_opengl_surface(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -63,7 +63,7 @@ auto mln_opengl_surface_attach(
   });
 }
 
-auto mln_webgpu_surface_attach(
+auto mln_map_attach_webgpu_surface(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -76,7 +76,7 @@ auto mln_webgpu_surface_attach(
   });
 }
 
-auto mln_metal_surface_set_target(
+auto mln_render_session_set_metal_surface_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -87,7 +87,7 @@ auto mln_metal_surface_set_target(
   });
 }
 
-auto mln_vulkan_surface_set_target(
+auto mln_render_session_set_vulkan_surface_target(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -98,7 +98,7 @@ auto mln_vulkan_surface_set_target(
   });
 }
 
-auto mln_opengl_surface_set_target(
+auto mln_render_session_set_opengl_surface_target(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -109,7 +109,7 @@ auto mln_opengl_surface_set_target(
   });
 }
 
-auto mln_webgpu_surface_set_target(
+auto mln_render_session_set_webgpu_surface_target(
   mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {

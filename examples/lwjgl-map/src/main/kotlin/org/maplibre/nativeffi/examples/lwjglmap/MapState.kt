@@ -127,7 +127,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
         try {
           runBlocking {
             runtime
-              .mapCreate(
+              .createMap(
                 GeneratedApi.mapOptionsDefault()
                   .copy(
                     initialExtent =

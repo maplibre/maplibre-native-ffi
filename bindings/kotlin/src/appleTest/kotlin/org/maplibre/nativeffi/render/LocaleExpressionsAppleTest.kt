@@ -28,7 +28,7 @@ class LocaleExpressionsAppleTest {
       for ((options, expected) in cases) {
         val format = if (options.isEmpty()) "" else ",$options"
         map
-          .setLayerProperty(
+          .setStyleLayerProperty(
             "background",
             "background-opacity",
             """["case",["==",["number-format",12.3,{"locale":"en-US"$format}],"$expected"],0.25,0.75]"""
@@ -38,7 +38,7 @@ class LocaleExpressionsAppleTest {
         assertEquals(
           "0.25",
           map
-            .getLayerProperty("background", "background-opacity")
+            .getStyleLayerProperty("background", "background-opacity")
             .awaitWithin("the layer property")
             ?.decodeToString(),
           options,

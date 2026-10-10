@@ -16,7 +16,7 @@ static mln_map_projection create_session_projection(
 ) {
   mln_map_projection projection = MLN_HANDLE_NULL;
   MLN_TEST_OK_MESSAGE(
-    mln_render_session_projection_create(
+    mln_render_session_create_projection(
       fixture->session, &projection, MLN_TEST_DIAGNOSTIC
     ),
     mln_test_last_error()
@@ -29,7 +29,7 @@ static void expect_no_projection(const mln_test_render_fixture* fixture) {
   mln_map_projection projection = MLN_HANDLE_NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_projection_create(fixture->session, &projection, NULL)
+    mln_render_session_create_projection(fixture->session, &projection, NULL)
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, projection);
 }
@@ -75,7 +75,7 @@ static mln_status submit_projection(
   (void)context;
   const projection_call* call = descriptor;
   mln_map_projection projection = call->preset;
-  const mln_status status = mln_render_session_projection_create(
+  const mln_status status = mln_render_session_create_projection(
     call->session, call->null_output ? NULL : &projection, diagnostic
   );
   if (status == MLN_STATUS_OK) {

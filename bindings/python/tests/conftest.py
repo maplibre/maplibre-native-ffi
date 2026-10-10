@@ -25,4 +25,4 @@ def harness() -> Iterator[Harness]:
 
 @pytest.fixture
 def map_handle(harness: Harness) -> mln.MapHandle:
-    return harness.map_create()
+    return harness.create_map()

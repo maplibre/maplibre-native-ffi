@@ -110,7 +110,7 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
     mln_test_text_response(inline_style_json);
   bool cancelled = false;
   MLN_TEST_INVALID(
-    mln_resource_request_cancelled(MLN_HANDLE_NULL, &cancelled, NULL)
+    mln_resource_request_is_cancelled(MLN_HANDLE_NULL, &cancelled, NULL)
   );
   MLN_TEST_INVALID(
     mln_resource_request_complete(MLN_HANDLE_NULL, &response, NULL)
@@ -522,7 +522,7 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   TEST_ASSERT_FALSE(atomic_load(&probe.released_before_cancel));
 
   bool cancelled = false;
-  MLN_TEST_OK(mln_resource_request_cancelled(handle, &cancelled, NULL));
+  MLN_TEST_OK(mln_resource_request_is_cancelled(handle, &cancelled, NULL));
   TEST_ASSERT_TRUE(cancelled);
   const mln_resource_response response =
     mln_test_text_response(inline_style_json);
@@ -563,7 +563,7 @@ typedef struct cancelled_poll {
 static bool request_reports_cancelled(void* context) {
   cancelled_poll* poll = context;
   poll->status =
-    mln_resource_request_cancelled(poll->handle, &poll->cancelled, NULL);
+    mln_resource_request_is_cancelled(poll->handle, &poll->cancelled, NULL);
   return poll->status != MLN_STATUS_OK || poll->cancelled;
 }
 

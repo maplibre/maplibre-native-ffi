@@ -9,7 +9,7 @@
 
 static uint64_t render_update_generation(mln_map map) {
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   return snapshot.latest_render_update_generation;
 }
 
@@ -105,7 +105,7 @@ static void a_group_publishes_one_render_update_at_its_end(void) {
   begin_group(map);
   add_background_layer(map, "{\"id\":\"a\",\"type\":\"background\"}");
   add_background_layer(map, "{\"id\":\"b\",\"type\":\"background\"}");
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("a"), MLN_BUFFER_LITERAL("background-color"),
     MLN_BUFFER_LITERAL("\"#ff0000\""), &completion.descriptor, NULL
   ));

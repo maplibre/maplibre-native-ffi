@@ -35,7 +35,7 @@ func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runti
 	// A map update becomes a frame demand; the frame result's repaint flag
 	// covers updates that a rendering frame asks for.
 	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable
-	mapFuture, err := runtimeHandle.MapCreate(mapOptions)
+	mapFuture, err := runtimeHandle.CreateMap(mapOptions)
 	if err != nil {
 		_ = state.Close()
 		return nil, fmt.Errorf("map create failed: %w", err)

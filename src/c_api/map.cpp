@@ -24,7 +24,7 @@ auto mln_map_options_default(void) noexcept -> mln_map_options {
   return mln::core::map_options_default();
 }
 
-auto mln_map_create(
+auto mln_runtime_create_map(
   mln_runtime runtime, const mln_map_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -41,7 +41,7 @@ auto mln_map_release(
   });
 }
 
-auto mln_map_snapshot_get(
+auto mln_map_get_snapshot(
   mln_map map, mln_map_snapshot* out_snapshot, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

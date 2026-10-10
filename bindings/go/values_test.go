@@ -28,8 +28,8 @@ func TestStringsCrossInTheirDeclaredShape(t *testing.T) {
 	if _, err := f.m.SetStyleUrl(url); err != nil {
 		t.Fatal(err)
 	}
-	if got := await(t, submitted(f.m.StyleUrl())); got != url {
-		t.Fatalf("StyleUrl() = %q, want %q", got, url)
+	if got := await(t, submitted(f.m.GetStyleUrl())); got != url {
+		t.Fatalf("GetStyleUrl() = %q, want %q", got, url)
 	}
 }
 

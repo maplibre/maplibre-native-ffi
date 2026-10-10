@@ -61,7 +61,7 @@ auto mln_resource_request_complete(
   });
 }
 
-auto mln_resource_request_cancelled(
+auto mln_resource_request_is_cancelled(
   mln_resource_request_handle handle, bool* out_cancelled,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -134,7 +134,7 @@ auto mln_runtime_set_http_header_transform(
   });
 }
 
-auto mln_http_header_transform_response_set(
+auto mln_http_header_transform_response_set_header(
   mln_http_header_transform_response* response, const char* name,
   size_t name_size, const char* value, size_t value_size,
   mln_diagnostic* out_diagnostic
@@ -177,7 +177,7 @@ auto mln_runtime_set_maximum_ambient_cache_size(
   });
 }
 
-auto mln_runtime_offline_region_create(
+auto mln_runtime_create_offline_region(
   mln_runtime runtime, const mln_offline_region_definition* definition,
   const uint8_t* metadata, size_t metadata_size,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -189,7 +189,7 @@ auto mln_runtime_offline_region_create(
   });
 }
 
-auto mln_runtime_offline_region_get(
+auto mln_runtime_get_offline_region(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -198,7 +198,7 @@ auto mln_runtime_offline_region_get(
   });
 }
 
-auto mln_runtime_offline_regions_list(
+auto mln_runtime_list_offline_regions(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -207,7 +207,7 @@ auto mln_runtime_offline_regions_list(
   });
 }
 
-auto mln_runtime_offline_regions_merge_database(
+auto mln_runtime_merge_offline_regions(
   mln_runtime runtime, const char* side_database_path,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -218,7 +218,7 @@ auto mln_runtime_offline_regions_merge_database(
   });
 }
 
-auto mln_runtime_offline_region_update_metadata(
+auto mln_runtime_update_offline_region_metadata(
   mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
   size_t metadata_size, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -230,7 +230,7 @@ auto mln_runtime_offline_region_update_metadata(
   });
 }
 
-auto mln_runtime_offline_region_get_status(
+auto mln_runtime_get_offline_region_status(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -241,7 +241,7 @@ auto mln_runtime_offline_region_get_status(
   });
 }
 
-auto mln_runtime_offline_region_set_observed(
+auto mln_runtime_set_offline_region_observed(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -252,7 +252,7 @@ auto mln_runtime_offline_region_set_observed(
   });
 }
 
-auto mln_runtime_offline_region_set_download_state(
+auto mln_runtime_set_offline_region_download_state(
   mln_runtime runtime, mln_offline_region_id region_id, uint32_t state,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -267,7 +267,7 @@ auto mln_runtime_offline_region_set_download_state(
   });
 }
 
-auto mln_runtime_offline_region_invalidate(
+auto mln_runtime_invalidate_offline_region(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -278,7 +278,7 @@ auto mln_runtime_offline_region_invalidate(
   });
 }
 
-auto mln_runtime_offline_region_delete(
+auto mln_runtime_delete_offline_region(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {

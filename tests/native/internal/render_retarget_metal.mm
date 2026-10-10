@@ -81,7 +81,7 @@ auto retarget_retains_submission(mln_map map) -> const char* {
     mln_render_session session = MLN_HANDLE_NULL;
     auto attach = mln_test_completion_default(0);
     if (
-      mln_metal_surface_attach(
+      mln_map_attach_metal_surface(
         map, &descriptor, &options, &session, &attach.descriptor, nullptr
       ) != MLN_STATUS_OK
     ) {
@@ -119,7 +119,7 @@ auto retarget_retains_submission(mln_map map) -> const char* {
     probe = nil;
     descriptor.layer = (__bridge void*)replacement_layer;
     auto replacement = mln_test_completion_default(0);
-    const auto replacement_status = mln_metal_surface_set_target(
+    const auto replacement_status = mln_render_session_set_metal_surface_target(
       session, &descriptor, &replacement.descriptor, nullptr
     );
     replacement_layer = nil;

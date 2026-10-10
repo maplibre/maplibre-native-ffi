@@ -85,7 +85,9 @@ static inline mln_status mln_test_adapter_clear_provider(mln_runtime runtime) {
 // disposed it, before destroying the runtime.
 static inline mln_map mln_test_adapter_create_map(mln_runtime runtime) {
   mln_test_completion completion = mln_test_completion_default(sizeof(mln_map));
-  MLN_TEST_OK(mln_map_create(runtime, NULL, &completion.descriptor, NULL));
+  MLN_TEST_OK(
+    mln_runtime_create_map(runtime, NULL, &completion.descriptor, NULL)
+  );
   mln_map map = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_test_completion_finish_value(&completion, &map, sizeof(map)));
   TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);

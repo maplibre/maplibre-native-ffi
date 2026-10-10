@@ -306,7 +306,7 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 	target := &openGLOwnedTextureTarget{callerDriver: driver, compositor: compositor}
 	target.present = target.drawFrame
 	target.releaseFrames = target.releaseHeld
-	attachment, err := m.OpenglOwnedTextureAttach(
+	attachment, err := m.AttachOpenglOwnedTexture(
 		maplibre.OpenglOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor},
 		target.attachOptions(ownedTextureRingDepth),
 	)
@@ -415,8 +415,8 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 	descriptor, err := target.describe(v)
 	if err == nil {
 		target.texture = descriptor.Texture
-		var attachment maplibre.OpenglBorrowedTextureAttachResult
-		attachment, err = m.OpenglBorrowedTextureAttach(descriptor, target.attachOptions(0))
+		var attachment maplibre.MapAttachOpenglBorrowedTextureResult
+		attachment, err = m.AttachOpenglBorrowedTexture(descriptor, target.attachOptions(0))
 		if err == nil {
 			err = target.attach(attachment.Session, attachment.Completion)
 		}
@@ -470,7 +470,7 @@ func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	future, err := target.session.OpenglBorrowedTextureSetTarget(descriptor)
+	future, err := target.session.SetOpenglBorrowedTextureTarget(descriptor)
 	if err != nil {
 		target.deleteTexture(descriptor.Texture)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
@@ -508,7 +508,7 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 	}
 	target := &openGLSurfaceTarget{callerDriver: driver, context: context, mapRef: m}
 	target.presents = true
-	attachment, err := m.OpenglSurfaceAttach(
+	attachment, err := m.AttachOpenglSurface(
 		maplibre.OpenglSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()},
 		target.attachOptions(0),
 	)
@@ -537,7 +537,7 @@ func (target *openGLSurfaceTarget) Resize(v viewport) error {
 	if err != nil {
 		return err
 	}
-	if err := target.replaceTarget(target.session.OpenglSurfaceSetTarget(maplibre.OpenglSurfaceDescriptor{
+	if err := target.replaceTarget(target.session.SetOpenglSurfaceTarget(maplibre.OpenglSurfaceDescriptor{
 		Extent:  v.extent(),
 		Context: descriptor,
 		Surface: target.context.surface(),

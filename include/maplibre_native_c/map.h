@@ -558,7 +558,7 @@ typedef struct mln_offline_region_info {
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info")
-MLN_API mln_status mln_runtime_offline_region_create(
+MLN_API mln_status mln_runtime_create_offline_region(
   mln_runtime runtime, const mln_offline_region_definition* definition,
   const uint8_t* metadata MLN_BINDING("length=metadata_size;encoding=bytes"),
   size_t metadata_size, const mln_completion* completion,
@@ -586,7 +586,7 @@ MLN_API mln_status mln_runtime_offline_region_create(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=query;result=mln_offline_region_info;nullable=true")
-MLN_API mln_status mln_runtime_offline_region_get(
+MLN_API mln_status mln_runtime_get_offline_region(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -610,7 +610,7 @@ MLN_API mln_status mln_runtime_offline_region_get(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=query;result=mln_offline_region_info;shape=array")
-MLN_API mln_status mln_runtime_offline_regions_list(
+MLN_API mln_status mln_runtime_list_offline_regions(
   mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -650,7 +650,7 @@ MLN_API mln_status mln_runtime_offline_regions_list(
  * - MLN_STATUS_NATIVE_ERROR when the merge fails, including a schema mismatch.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info;shape=array")
-MLN_API mln_status mln_runtime_offline_regions_merge_database(
+MLN_API mln_status mln_runtime_merge_offline_regions(
   mln_runtime runtime, const char* side_database_path,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -676,7 +676,7 @@ MLN_API mln_status mln_runtime_offline_regions_merge_database(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=operation;result=mln_offline_region_info")
-MLN_API mln_status mln_runtime_offline_region_update_metadata(
+MLN_API mln_status mln_runtime_update_offline_region_metadata(
   mln_runtime runtime, mln_offline_region_id region_id,
   const uint8_t* metadata MLN_BINDING("length=metadata_size;encoding=bytes"),
   size_t metadata_size, const mln_completion* completion,
@@ -702,7 +702,7 @@ MLN_API mln_status mln_runtime_offline_region_update_metadata(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=query;result=mln_offline_region_status")
-MLN_API mln_status mln_runtime_offline_region_get_status(
+MLN_API mln_status mln_runtime_get_offline_region_status(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -727,7 +727,7 @@ MLN_API mln_status mln_runtime_offline_region_get_status(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_runtime_offline_region_set_observed(
+MLN_API mln_status mln_runtime_set_offline_region_observed(
   mln_runtime runtime, mln_offline_region_id region_id, bool observed,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -736,7 +736,7 @@ MLN_API mln_status mln_runtime_offline_region_set_observed(
  * Sets an offline region's native download state.
  *
  * Register observation separately with
- * mln_runtime_offline_region_set_observed() to receive progress and error
+ * mln_runtime_set_offline_region_observed() to receive progress and error
  * events. The completion reports the terminal status and carries no value.
  *
  * Returns:
@@ -752,7 +752,7 @@ MLN_API mln_status mln_runtime_offline_region_set_observed(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_runtime_offline_region_set_download_state(
+MLN_API mln_status mln_runtime_set_offline_region_download_state(
   mln_runtime runtime, mln_offline_region_id region_id,
   uint32_t state MLN_BINDING("enum=mln_offline_region_download_state"),
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -776,7 +776,7 @@ MLN_API mln_status mln_runtime_offline_region_set_download_state(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_runtime_offline_region_invalidate(
+MLN_API mln_status mln_runtime_invalidate_offline_region(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -799,7 +799,7 @@ MLN_API mln_status mln_runtime_offline_region_invalidate(
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_runtime_offline_region_delete(
+MLN_API mln_status mln_runtime_delete_offline_region(
   mln_runtime runtime, mln_offline_region_id region_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -945,7 +945,7 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  *   worker.
  */
 MLN_BINDING("execution=lifecycle;result=mln_map")
-MLN_API mln_status mln_map_create(
+MLN_API mln_status mln_runtime_create_map(
   mln_runtime runtime, const mln_map_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -961,7 +961,7 @@ MLN_API mln_status mln_map_create(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=snapshot")
-MLN_API mln_status mln_map_snapshot_get(
+MLN_API mln_status mln_map_get_snapshot(
   mln_map map, mln_map_snapshot* out_snapshot MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -1288,7 +1288,7 @@ MLN_API mln_status mln_map_set_style_json(
  * - MLN_STATUS_NATIVE_ERROR when the copy throws on the map worker.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
-MLN_API mln_status mln_map_loaded_style_json(
+MLN_API mln_status mln_map_get_loaded_style_json(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1308,7 +1308,7 @@ MLN_API mln_status mln_map_loaded_style_json(
  * - MLN_STATUS_NATIVE_ERROR when the copy throws on the map worker.
  */
 MLN_BINDING("execution=query;result=mln_buffer_view")
-MLN_API mln_status mln_map_style_url(
+MLN_API mln_status mln_map_get_style_url(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1322,7 +1322,7 @@ MLN_API mln_status mln_map_style_url(
  *
  * This call reads the bits in MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS and ignores
  * the rest, so MLN_RUNTIME_EVENT_MASK_ALL selects every map-originated type.
- * mln_map_snapshot_get() reports the last committed mask.
+ * mln_map_get_snapshot() reports the last committed mask.
  *
  * A map that has not been narrowed selects every map-originated event type this
  * library reports, which covers types a caller's header may not declare. A new

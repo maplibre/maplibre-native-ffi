@@ -1466,7 +1466,7 @@ impl HttpHeaderTransform {
         callback::invoke_status(
             "mln_http_header_transform_callback",
             Some((
-                &["mln_http_header_transform_response_set"],
+                &["mln_http_header_transform_response_set_header"],
                 out_response as usize as u64,
             )),
             sys::MLN_STATUS_NATIVE_ERROR,
@@ -1515,17 +1515,17 @@ impl HttpHeaderTransformResponse<'_> {
     /// Sets one outgoing HTTP request header for the current transform
     /// invocation.
     ///
-    /// See `mln_http_header_transform_response_set` in the
+    /// See `mln_http_header_transform_response_set_header` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set(&mut self, name: &str, value: &str) -> Result<()> {
+    pub fn set_header(&mut self, name: &str, value: &str) -> Result<()> {
         maplibre_core::callback::check(
-            "mln_http_header_transform_response_set",
+            "mln_http_header_transform_response_set_header",
             self.raw.as_ptr() as usize as u64,
         )?;
         let name_size = convert::count(name.len())?;
         let value_size = convert::count(value.len())?;
         maplibre_core::check(|out_diagnostic| unsafe {
-            sys::mln_http_header_transform_response_set(
+            sys::mln_http_header_transform_response_set_header(
                 self.raw.as_ptr(),
                 name.as_ptr().cast(),
                 name_size,
@@ -3996,7 +3996,7 @@ impl ResourceProvider {
         let _policy = callback::enter(Some((
             &[
                 "mln_resource_request_complete",
-                "mln_resource_request_cancelled",
+                "mln_resource_request_is_cancelled",
                 "mln_resource_request_set_cancel_callback",
                 "mln_resource_request_release",
             ],
@@ -4134,14 +4134,14 @@ impl ResourceRequestHandle {
     /// Reports whether MapLibre has cancelled a C API resource provider
     /// request.
     ///
-    /// See `mln_resource_request_cancelled` in the
+    /// See `mln_resource_request_is_cancelled` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn cancelled(&self) -> Result<bool> {
+    pub fn is_cancelled(&self) -> Result<bool> {
         let native = self.state.native_for_call()?;
-        maplibre_core::callback::check("mln_resource_request_cancelled", native.0)?;
+        maplibre_core::callback::check("mln_resource_request_is_cancelled", native.0)?;
         let mut cancelled = false;
         maplibre_core::check(|out_diagnostic| unsafe {
-            sys::mln_resource_request_cancelled(native, &mut cancelled, out_diagnostic)
+            sys::mln_resource_request_is_cancelled(native, &mut cancelled, out_diagnostic)
         })?;
         Ok(cancelled)
     }
@@ -4566,7 +4566,7 @@ impl FromNative<sys::mln_runtime_event_offline_region_response_error>
 pub struct RuntimeEventOfflineRegionStatus {
     pub region_id: i64,
     /// Region status. This member keeps its own size field because the same
-    /// struct is also returned by `mln_runtime_offline_region_get_status()`.
+    /// struct is also returned by `mln_runtime_get_offline_region_status()`.
     pub status: OfflineRegionStatus,
 }
 impl RuntimeEventOfflineRegionStatus {
@@ -6635,7 +6635,7 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         sys::mln_resource_request_set_cancel_callback,
         &[
             "mln_resource_request_complete",
-            "mln_resource_request_cancelled",
+            "mln_resource_request_is_cancelled",
             "mln_resource_request_set_cancel_callback",
             "mln_resource_request_release",
         ],

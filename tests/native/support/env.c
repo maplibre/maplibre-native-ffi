@@ -129,7 +129,7 @@ mln_status mln_test_map_create_status(
 ) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(*out_map));
-  mln_status status = mln_map_create(
+  mln_status status = mln_runtime_create_map(
     runtime, options, &completion.descriptor, MLN_TEST_DIAGNOSTIC
   );
   if (status != MLN_STATUS_OK) {
@@ -173,7 +173,7 @@ mln_status mln_test_map_get_event_mask(mln_map map, uint64_t* out_mask) {
   }
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   const mln_status status =
-    mln_map_snapshot_get(map, &snapshot, MLN_TEST_DIAGNOSTIC);
+    mln_map_get_snapshot(map, &snapshot, MLN_TEST_DIAGNOSTIC);
   if (status == MLN_STATUS_OK) {
     *out_mask = snapshot.event_mask;
   }
@@ -187,7 +187,7 @@ mln_status mln_test_map_get_camera(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   uint64_t generation = 0;
-  return mln_map_camera_snapshot_get(
+  return mln_map_get_camera_snapshot(
     map, out_camera, &generation, MLN_TEST_DIAGNOSTIC
   );
 }
@@ -227,7 +227,7 @@ mln_map mln_test_create_map_with_options(
   mln_map map = MLN_HANDLE_NULL;
   mln_test_completion completion = mln_test_completion_default(sizeof(map));
   reserve_map_slot();
-  MLN_TEST_OK(mln_map_create(
+  MLN_TEST_OK(mln_runtime_create_map(
     runtime, options, &completion.descriptor, MLN_TEST_DIAGNOSTIC
   ));
   TEST_ASSERT_TRUE(mln_test_completion_wait(&completion, -1));

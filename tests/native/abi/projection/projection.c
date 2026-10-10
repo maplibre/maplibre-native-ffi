@@ -10,7 +10,7 @@
 static mln_map_projection create_projection(mln_map map) {
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_map_projection));
-  MLN_TEST_OK(mln_map_projection_create(map, &completion.descriptor, NULL));
+  MLN_TEST_OK(mln_map_create_projection(map, &completion.descriptor, NULL));
   mln_map_projection projection = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_test_completion_finish_value(
     &completion, &projection, sizeof(projection)
@@ -28,10 +28,10 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  MLN_TEST_INVALID(mln_map_projection_create(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_create_projection(map, NULL, NULL));
   mln_test_completion completion =
     mln_test_completion_default(sizeof(mln_map_projection));
-  MLN_TEST_OK(mln_map_projection_create(map, &completion.descriptor, NULL));
+  MLN_TEST_OK(mln_map_create_projection(map, &completion.descriptor, NULL));
   mln_test_destroy_map(map);
   MLN_TEST_OK(mln_test_completion_finish(&completion));
 

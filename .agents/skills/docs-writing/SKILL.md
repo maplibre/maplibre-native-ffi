@@ -109,8 +109,8 @@ Use one term per concept, across every page.
 Render targets have three kinds, and the kind belongs to the target. "Surface
 session" and "texture session" are not terms.
 
-| Target                  | Owned by | Attach with                             |
-| ----------------------- | -------- | --------------------------------------- |
-| native surface          | caller   | `mln_<backend>_surface_attach`          |
-| owned texture target    | session  | `mln_<backend>_owned_texture_attach`    |
-| borrowed texture target | caller   | `mln_<backend>_borrowed_texture_attach` |
+| Target                  | Owned by | Attach with                                 |
+| ----------------------- | -------- | ------------------------------------------- |
+| native surface          | caller   | `mln_map_attach_<backend>_surface`          |
+| owned texture target    | session  | `mln_map_attach_<backend>_owned_texture`    |
+| borrowed texture target | caller   | `mln_map_attach_<backend>_borrowed_texture` |

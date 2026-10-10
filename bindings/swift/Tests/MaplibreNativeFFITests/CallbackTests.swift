@@ -113,7 +113,7 @@ func installProvider(
       var forbidden: MaplibreError?
       do { _ = try runtime.getEventMask() }
       catch let error as MaplibreError { forbidden = error }
-      let cancelled = try? handle.cancelled()
+      let cancelled = try? handle.isCancelled()
       try handle.complete(response: ResourceResponse(
         status: .ok,
         bytes: emptyStyle
@@ -232,7 +232,7 @@ func installProvider(
     // Closing the map discards its pending style request.
     try await fixture.map.close()
     try await awaitCondition("the request's cancellation") {
-      try request.cancelled()
+      try request.isCancelled()
     }
 
     let releases = LockedBox(0)

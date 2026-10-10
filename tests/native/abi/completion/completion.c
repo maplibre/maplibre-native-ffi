@@ -41,7 +41,7 @@ static void an_accepted_completion_runs_and_releases_exactly_once(void) {
   mln_completion completion = probed_completion(&probe);
 
   const mln_map_options options = mln_map_options_default();
-  MLN_TEST_OK(mln_map_create(runtime, &options, &completion, NULL));
+  MLN_TEST_OK(mln_runtime_create_map(runtime, &options, &completion, NULL));
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_UINT32(1, atomic_load(&probe.releases));
@@ -59,7 +59,7 @@ static void a_rejected_submission_leaves_callback_state_with_the_caller(void) {
   const mln_map_options options = mln_map_options_default();
 
   MLN_TEST_INVALID(
-    mln_map_create(MLN_HANDLE_NULL, &options, &completion, NULL)
+    mln_runtime_create_map(MLN_HANDLE_NULL, &options, &completion, NULL)
   );
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.calls));
   TEST_ASSERT_EQUAL_UINT32(0, atomic_load(&probe.releases));

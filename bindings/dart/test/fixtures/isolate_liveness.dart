@@ -42,7 +42,7 @@ Future<(RuntimeHandle, MapHandle)> _register() async {
       ),
     ),
   );
-  final map = await runtime.mapCreate(mapOptionsDefault());
+  final map = await runtime.createMap(mapOptionsDefault());
   await map.setStyleJson(_json(_styleJson));
   await map.addCustomGeometrySource(
     'source',

@@ -11,11 +11,11 @@ def test_native_statuses_raise_their_exception_with_code_and_diagnostic(
     # An accepted call reports its status through the future; a rejected
     # submission raises before returning one.
     with pytest.raises(mln.NotFoundError) as not_found:
-        result(map_handle.get_layer_property("missing", "visibility"))
+        result(map_handle.get_style_layer_property("missing", "visibility"))
     with pytest.raises(mln.InvalidStateError) as invalid_state:
         harness.runtime.close()
     with pytest.raises(mln.InvalidArgumentError) as invalid_argument:
-        mln.network_status_set(mln.NetworkStatus(999_001))
+        mln.network_set_status(mln.NetworkStatus(999_001))
 
     for raised, status in (
         (not_found, mln.Status.NOT_FOUND),
@@ -46,7 +46,7 @@ def test_a_binding_failure_carries_no_native_status() -> None:
     result(runtime.close())
 
     with pytest.raises(mln.InvalidStateError) as raised:
-        runtime.map_create()
+        runtime.create_map()
 
     assert raised.value.status == mln.Status.INVALID_STATE
     assert raised.value.native_status_code is None

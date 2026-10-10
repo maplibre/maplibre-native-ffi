@@ -118,34 +118,38 @@ static void missing_style_ids_report_not_found(void) {
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_layer_property(
+    mln_map_set_style_layer_property(
       map, layer, MLN_BUFFER_LITERAL("circle-radius"), MLN_BUFFER_LITERAL("4"),
       &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_layer_filter(map, layer, NULL, &completion.descriptor, NULL)
+    mln_map_set_style_layer_filter(
+      map, layer, NULL, &completion.descriptor, NULL
+    )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_layer_visibility(
+    mln_map_set_style_layer_visibility(
       map, layer, MLN_STYLE_LAYER_VISIBILITY_NONE, &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_layer_min_zoom(map, layer, 2.0, &completion.descriptor, NULL)
+    mln_map_set_style_layer_min_zoom(
+      map, layer, 2.0, &completion.descriptor, NULL
+    )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_layer_source_id(
+    mln_map_set_style_layer_source_id(
       map, layer, MLN_BUFFER_LITERAL("points"), &completion.descriptor, NULL
     )
   );
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_NOT_FOUND, missing_layer,
-    mln_map_set_layer_source_layer(
+    mln_map_set_style_layer_source_layer(
       map, layer, MLN_BUFFER_LITERAL("roads"), &completion.descriptor, NULL
     )
   );
@@ -215,14 +219,14 @@ static void missing_style_ids_report_not_found(void) {
 
   // A query that reads one attribute of a missing layer has no disposition.
   MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_NOT_FOUND, mln_map_get_layer_property(
+    MLN_STATUS_NOT_FOUND, mln_map_get_style_layer_property(
                             map, layer, MLN_BUFFER_LITERAL("circle-radius"),
                             &completion.descriptor, NULL
                           )
   );
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_NOT_FOUND,
-    mln_map_get_layer_filter(map, layer, &completion.descriptor, NULL)
+    mln_map_get_style_layer_filter(map, layer, &completion.descriptor, NULL)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -308,7 +312,7 @@ static void global_state_reads_back_defaults_and_set_properties(void) {
 
 static void read_loaded_style_json(mln_map map, char* out, size_t capacity) {
   mln_test_completion completion = mln_test_completion_buffer_view();
-  MLN_TEST_OK(mln_map_loaded_style_json(map, &completion.descriptor, NULL));
+  MLN_TEST_OK(mln_map_get_loaded_style_json(map, &completion.descriptor, NULL));
   bool found = false;
   MLN_TEST_OK(mln_test_style_finish_text(&completion, out, capacity, &found));
   TEST_ASSERT_TRUE(found);

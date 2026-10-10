@@ -692,7 +692,7 @@ internal static unsafe class GeneratedValues
 
     private static readonly string[] AllowedHttpHeaderTransformCallback =
     [
-        "mln_http_header_transform_response_set",
+        "mln_http_header_transform_response_set_header",
     ];
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -1820,7 +1820,7 @@ internal static unsafe class GeneratedValues
     private static readonly string[] AllowedResourceProviderCallback =
     [
         "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
+        "mln_resource_request_is_cancelled",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_release",
     ];
@@ -3253,7 +3253,7 @@ internal static unsafe class GeneratedValues
     private static readonly string[] AllowedResourceRequestCancelCallback =
     [
         "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
+        "mln_resource_request_is_cancelled",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_release",
     ];

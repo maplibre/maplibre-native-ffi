@@ -34,7 +34,7 @@ internal sealed class MapState : IDisposable
         try
         {
             map = runtime
-                .MapCreateAsync(
+                .CreateMapAsync(
                     MapOptions.Default with
                     {
                         InitialExtent = new LogicalExtent(

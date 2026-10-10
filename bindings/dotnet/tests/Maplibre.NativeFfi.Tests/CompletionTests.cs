@@ -129,7 +129,7 @@ public sealed class CompletionTests
         await fixture.Map.CloseAsync();
 
         // Native creates this map although its wait ended before submission.
-        var created = fixture.Runtime.MapCreateAsync(NativeFixture.SmallMap, cancellation.Token);
+        var created = fixture.Runtime.CreateMapAsync(NativeFixture.SmallMap, cancellation.Token);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => created);
         await fixture.Runtime.BarrierAsync(TestWaits.Token);
         // Runtime release refuses a runtime that still owns a map, so it succeeds only because

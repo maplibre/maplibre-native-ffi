@@ -22,7 +22,7 @@ internal object MetalRenderTarget {
       RenderTargetMode.NATIVE_SURFACE ->
         NativeSurfaceTarget(
           AttachedSession.attach(driver) { options ->
-            map.metalSurfaceAttach(
+            map.attachMetalSurface(
               MetalSurfaceDescriptor(
                 RenderTarget.extent(viewport),
                 descriptor(context),
@@ -47,7 +47,7 @@ internal object MetalRenderTarget {
     try {
       val attached =
         AttachedSession.attach(driver, RenderTarget.OWNED_TEXTURE_RING_DEPTH) { options ->
-          map.metalOwnedTextureAttach(
+          map.attachMetalOwnedTexture(
             MetalOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context)),
             options,
           )
@@ -72,7 +72,7 @@ internal object MetalRenderTarget {
       compositor = MetalTextureCompositor(context)
       val attached =
         AttachedSession.attach(driver) { options ->
-          map.metalBorrowedTextureAttach(borrowedDescriptor(viewport, texture), options)
+          map.attachMetalBorrowedTexture(borrowedDescriptor(viewport, texture), options)
         }
       return BorrowedTexture(attached, map, context, compositor, texture)
     } catch (error: RuntimeException) {
@@ -133,7 +133,7 @@ internal object MetalRenderTarget {
       MetalBorrowedTexture(context, viewport)
 
     override fun setTarget(viewport: Viewport, replacement: MetalBorrowedTexture): Deferred<Unit> =
-      session.metalBorrowedTextureSetTarget(borrowedDescriptor(viewport, replacement))
+      session.setMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement))
 
     override fun draw(texture: MetalBorrowedTexture): Boolean =
       compositor.drawTexture(texture.texture())

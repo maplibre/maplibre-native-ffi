@@ -82,7 +82,7 @@ class LocaleExpressionsAndroidTest {
       assertEquals(
         "0.25",
         map
-          .getLayerProperty("background", "background-opacity")
+          .getStyleLayerProperty("background", "background-opacity")
           .awaitWithin("the layer property")
           ?.decodeToString(),
       )

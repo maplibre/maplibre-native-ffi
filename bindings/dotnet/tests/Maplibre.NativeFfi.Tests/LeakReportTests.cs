@@ -49,7 +49,7 @@ public sealed class LeakReportTests
         RuntimeHandle runtime
     )
     {
-        var map = runtime.MapCreateAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
         // A state whose disposal throws stands in for a native disposal that fails.
         var undisposable = new NativeHandleState<MlnRuntime>(
             SyntheticHandles.Runtime(5678),
@@ -93,7 +93,7 @@ public sealed class LeakReportTests
     ) CreateUnreachableRuntimeAndMap()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = runtime.MapCreateAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
         runtime.BarrierAsync().GetAwaiter().GetResult();
         return (new WeakReference(runtime), runtime.Id, new WeakReference(map), map.Id);
     }
@@ -108,7 +108,7 @@ public sealed class LeakReportTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        var created = runtime.MapCreateAsync(NativeFixture.SmallMap, cancellation.Token);
+        var created = runtime.CreateMapAsync(NativeFixture.SmallMap, cancellation.Token);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => created);
         // The creation completes before the barrier, so the late map has arrived.
         await runtime.BarrierAsync(TestWaits.Token);

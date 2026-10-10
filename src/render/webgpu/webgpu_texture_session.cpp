@@ -1168,7 +1168,7 @@ auto webgpu_owned_texture_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_webgpu_owned_texture_attach>()
+    valueless_completion<&mln_map_attach_webgpu_owned_texture>()
   );
 #endif
 }
@@ -1235,7 +1235,7 @@ auto webgpu_borrowed_texture_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_webgpu_borrowed_texture_attach>()
+    valueless_completion<&mln_map_attach_webgpu_borrowed_texture>()
   );
 #endif
 }
@@ -1280,7 +1280,9 @@ auto webgpu_borrowed_texture_set_target_start(
         }
       );
     },
-    completion, valueless_completion<&mln_webgpu_borrowed_texture_set_target>()
+    completion,
+    valueless_completion<
+      &mln_render_session_set_webgpu_borrowed_texture_target>()
   );
 }
 
@@ -1334,7 +1336,8 @@ auto webgpu_surface_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
-    out_session, completion, valueless_completion<&mln_webgpu_surface_attach>()
+    out_session, completion,
+    valueless_completion<&mln_map_attach_webgpu_surface>()
   );
 #endif
 }
@@ -1363,7 +1366,8 @@ auto webgpu_surface_set_target_start(
         }
       );
     },
-    completion, valueless_completion<&mln_webgpu_surface_set_target>()
+    completion,
+    valueless_completion<&mln_render_session_set_webgpu_surface_target>()
   );
 }
 

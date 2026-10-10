@@ -56,7 +56,7 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
 /**
  * Submits a debug-overlay command.
  *
- * The committed mask is visible through mln_map_snapshot_get as
+ * The committed mask is visible through mln_map_get_snapshot as
  * snapshot.debug_options.
  *
  * Returns:
@@ -77,7 +77,7 @@ MLN_API mln_status mln_map_set_debug_options(
 /**
  * Submits a rendering-stats visibility command.
  *
- * The committed value is visible through mln_map_snapshot_get as
+ * The committed value is visible through mln_map_get_snapshot as
  * snapshot.rendering_stats_view_enabled.
  *
  * Returns:
@@ -116,7 +116,7 @@ MLN_API mln_status mln_map_dump_debug_logs(
 /**
  * Submits a copied viewport-options command.
  *
- * The committed options are visible through mln_map_snapshot_get as
+ * The committed options are visible through mln_map_get_snapshot as
  * snapshot.viewport.
  *
  * Returns:
@@ -138,7 +138,7 @@ MLN_API mln_status mln_map_set_viewport_options(
 /**
  * Submits a copied tile-options command.
  *
- * The committed options are visible through mln_map_snapshot_get as
+ * The committed options are visible through mln_map_get_snapshot as
  * snapshot.tile.
  *
  * Returns:
@@ -172,7 +172,7 @@ MLN_API mln_status mln_map_set_tile_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=snapshot")
-MLN_API mln_status mln_map_camera_snapshot_get(
+MLN_API mln_status mln_map_get_camera_snapshot(
   mln_map map, mln_camera_options* out_camera MLN_BINDING("direction=out"),
   uint64_t* out_generation MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -276,7 +276,7 @@ MLN_API mln_status mln_map_cancel_transitions(
  * - MLN_STATUS_NATIVE_ERROR when reading the camera throws on the map worker.
  */
 MLN_BINDING("execution=query;result=mln_camera_query_result")
-MLN_API mln_status mln_map_camera_query(
+MLN_API mln_status mln_map_get_camera(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -411,7 +411,7 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
 /**
  * Submits a copied camera-constraint command.
  *
- * The committed constraints are visible through mln_map_snapshot_get as
+ * The committed constraints are visible through mln_map_get_snapshot as
  * snapshot.bounds.
  *
  * Returns:
@@ -434,7 +434,7 @@ MLN_API mln_status mln_map_set_bounds(
 /**
  * Submits a copied free-camera command.
  *
- * The committed options are visible through mln_map_snapshot_get as
+ * The committed options are visible through mln_map_get_snapshot as
  * snapshot.free_camera.
  *
  * Returns:

@@ -2860,7 +2860,7 @@ auto create_map_start(
       }
       const auto map = (*pending)->value();
       (*pending)->transfer();
-      CompletionValue<&mln_map_create>::complete(completion_state, map);
+      CompletionValue<&mln_runtime_create_map>::complete(completion_state, map);
     });
   const auto submit_status = submit_runtime_operation(
     runtime_state, state, [runtime, effective, state]() mutable -> void {
@@ -3747,7 +3747,7 @@ auto map_remove_feature_state(
 
 auto map_loaded_style_json_start(mln_map map, const mln_completion* completion)
   -> mln_status {
-  return start_map_string_operation<&mln_map_loaded_style_json>(
+  return start_map_string_operation<&mln_map_get_loaded_style_json>(
     map, completion, [](MapObject& live) -> std::string {
       return live.map->getStyle().getJSON();
     }
@@ -3756,7 +3756,7 @@ auto map_loaded_style_json_start(mln_map map, const mln_completion* completion)
 
 auto map_style_url_start(mln_map map, const mln_completion* completion)
   -> mln_status {
-  return start_map_string_operation<&mln_map_style_url>(
+  return start_map_string_operation<&mln_map_get_style_url>(
     map, completion,
     [](MapObject& live) -> std::string { return live.map->getStyle().getURL(); }
   );
@@ -4044,23 +4044,23 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
   auto completion_state = std::make_shared<Completion>(*completion);
-  auto state = std::make_shared<OperationObject>([completion_state](
-                                                   mln_status status,
-                                                   std::string diagnostic,
-                                                   std::any result
-                                                 ) {
-    auto* value = std::any_cast<mln_camera_query_result>(&result);
-    if (status != MLN_STATUS_OK || value == nullptr) {
-      complete_failure(
-        completion_state,
-        status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
-        status == MLN_STATUS_OK ? "camera query produced an invalid result"
-                                : std::move(diagnostic)
-      );
-      return;
-    }
-    CompletionValue<&mln_map_camera_query>::complete(completion_state, *value);
-  });
+  auto state =
+    std::make_shared<OperationObject>([completion_state](
+                                        mln_status status,
+                                        std::string diagnostic, std::any result
+                                      ) {
+      auto* value = std::any_cast<mln_camera_query_result>(&result);
+      if (status != MLN_STATUS_OK || value == nullptr) {
+        complete_failure(
+          completion_state,
+          status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+          status == MLN_STATUS_OK ? "camera query produced an invalid result"
+                                  : std::move(diagnostic)
+        );
+        return;
+      }
+      CompletionValue<&mln_map_get_camera>::complete(completion_state, *value);
+    });
   const auto runtime = live->runtime_state;
   const auto submit_status = submit_runtime_operation(
     runtime, state,
@@ -4438,7 +4438,7 @@ auto map_projection_create_start(mln_map map, const mln_completion* completion)
       return;
     }
     const auto handle = handle_table<MapProjectionObject>().insert(*projection);
-    CompletionValue<&mln_map_projection_create>::complete(
+    CompletionValue<&mln_map_create_projection>::complete(
       completion_state, handle
     );
   });

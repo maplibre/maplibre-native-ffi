@@ -3000,7 +3000,7 @@ public data class RuntimeEventOfflineRegionStatus(
   public val regionId: Long = 0L,
   /**
    * Region status. This member keeps its own size field because the same struct is also returned by
-   * `mln_runtime_offline_region_get_status()`.
+   * `mln_runtime_get_offline_region_status()`.
    */
   public val status: OfflineRegionStatus = OfflineRegionStatus(),
 )
@@ -3141,6 +3141,33 @@ public data class FeatureStateSelector(
 )
 
 /**
+ * Immutable map state copied from the latest published generation.
+ *
+ * See `mln_map_snapshot` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class MapSnapshot(
+  /** Debug overlay mask of `mln_map_debug_option` values. */
+  public val debugOptions: MapDebugOption,
+  public val generation: ULong = 0uL,
+  public val camera: CameraOptions = CameraOptions(),
+  public val logicalExtent: LogicalExtent = LogicalExtent(),
+  public val projectionMode: ProjectionMode = ProjectionMode(),
+  public val viewport: MapViewportOptions = MapViewportOptions(),
+  /** True once every requested style and tile resource finished loading. */
+  public val fullyLoaded: Boolean = false,
+  public val renderingStatsViewEnabled: Boolean = false,
+  public val repaintDemand: Boolean = false,
+  /** True while the map is inside a gesture. */
+  public val gestureInProgress: Boolean = false,
+  public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
+  public val latestRenderUpdateGeneration: ULong = 0uL,
+  public val tile: MapTileOptions = MapTileOptions(),
+  public val bounds: BoundOptions = BoundOptions(),
+  public val freeCamera: FreeCameraOptions = FreeCameraOptions(),
+)
+
+/**
  * One complete runtime style image, borrowed for a completion callback.
  *
  * See `mln_style_image_info` in the
@@ -3238,31 +3265,90 @@ public data class StyleSourceInfo(
   public val rasterEncoding: StyleRasterDemEncoding? = null,
 )
 
+public data class RenderAbandonResult(
+  /** One `mln_render_abandon_disposition` value. */
+  public val disposition: RenderAbandonDisposition = RenderAbandonDisposition(0u),
+  /** Backend resource groups intentionally retained until process exit. */
+  public val quarantinedResourceCount: UInt = 0u,
+)
+
 /**
- * Immutable map state copied from the latest published generation.
+ * Driver and target capabilities fixed for one attached render session.
  *
- * See `mln_map_snapshot` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ * See `mln_render_session_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
-public data class MapSnapshot(
-  /** Debug overlay mask of `mln_map_debug_option` values. */
-  public val debugOptions: MapDebugOption,
+public data class RenderSessionCapabilities(
+  /** One `mln_render_driver_kind` value. */
+  public val driver: RenderDriverKind,
+  /** Granted owned-texture slot count, or zero for a target without a ring. */
+  public val textureRingDepth: UInt = 0u,
+  /** A bitwise OR of `mln_render_session_capability_flag` values. */
+  public val flags: RenderSessionCapabilityFlag,
+)
+
+/**
+ * Any-thread render-session snapshot.
+ *
+ * See `mln_render_session_snapshot` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class RenderSessionSnapshot(
+  /** One `mln_render_session_state` value. */
+  public val state: RenderSessionState,
+  /** One `mln_render_driver_kind` value. */
+  public val driver: RenderDriverKind,
+  /** Most recent terminal `mln_render_result` value. */
+  public val latestResult: RenderResult = RenderResult(0u),
+  public val extent: RenderTargetExtent = RenderTargetExtent(),
   public val generation: ULong = 0uL,
-  public val camera: CameraOptions = CameraOptions(),
-  public val logicalExtent: LogicalExtent = LogicalExtent(),
-  public val projectionMode: ProjectionMode = ProjectionMode(),
-  public val viewport: MapViewportOptions = MapViewportOptions(),
-  /** True once every requested style and tile resource finished loading. */
-  public val fullyLoaded: Boolean = false,
-  public val renderingStatsViewEnabled: Boolean = false,
-  public val repaintDemand: Boolean = false,
-  /** True while the map is inside a gesture. */
-  public val gestureInProgress: Boolean = false,
-  public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
-  public val latestRenderUpdateGeneration: ULong = 0uL,
-  public val tile: MapTileOptions = MapTileOptions(),
-  public val bounds: BoundOptions = BoundOptions(),
-  public val freeCamera: FreeCameraOptions = FreeCameraOptions(),
+  public val mapUpdateGeneration: ULong = 0uL,
+  public val renderedUpdateGeneration: ULong = 0uL,
+  public val extentGeneration: ULong = 0uL,
+  public val frameGeneration: ULong = 0uL,
+  public val latestDemandToken: ULong = 0uL,
+  public val pendingDemandCount: UInt = 0u,
+  public val acquiredFrameCount: UInt = 0u,
+  public val targetReady: Boolean = false,
+  public val pendingChanges: Boolean = false,
+)
+
+/**
+ * One query hit borrowed for a completion callback.
+ *
+ * See `mln_queried_feature` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class QueriedFeature(
+  public val feature: ByteArray = byteArrayOf(),
+  public val sourceId: String? = null,
+  public val sourceLayerId: String? = null,
+  public val state: ByteArray? = null,
+)
+
+/**
+ * Texture readback borrowed for a completion callback.
+ *
+ * See `mln_texture_readback_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class TextureReadbackResult(
+  /** Borrowed pixel bytes, valid only during the callback. */
+  public val data: ByteArray = byteArrayOf(),
+  public val info: TextureImageInfo = TextureImageInfo(),
+)
+
+public data class ResourceResponse(
+  public val status: ResourceResponseStatus = ResourceResponseStatus(0u),
+  public val errorReason: ResourceErrorReason = ResourceErrorReason(0u),
+  /** Response bytes. May be null only when byte_count is 0. */
+  public val bytes: ByteArray = byteArrayOf(),
+  public val errorMessage: String? = null,
+  public val mustRevalidate: Boolean = false,
+  public val modifiedUnixMs: Long? = null,
+  public val expiresUnixMs: Long? = null,
+  public val etag: String? = null,
+  public val retryAfterUnixMs: Long? = null,
 )
 
 /**
@@ -3364,92 +3450,6 @@ public data class ResourceRequest(
   public val priorData: ByteArray = byteArrayOf(),
 )
 
-public data class RenderAbandonResult(
-  /** One `mln_render_abandon_disposition` value. */
-  public val disposition: RenderAbandonDisposition = RenderAbandonDisposition(0u),
-  /** Backend resource groups intentionally retained until process exit. */
-  public val quarantinedResourceCount: UInt = 0u,
-)
-
-/**
- * Driver and target capabilities fixed for one attached render session.
- *
- * See `mln_render_session_capabilities` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class RenderSessionCapabilities(
-  /** One `mln_render_driver_kind` value. */
-  public val driver: RenderDriverKind,
-  /** Granted owned-texture slot count, or zero for a target without a ring. */
-  public val textureRingDepth: UInt = 0u,
-  /** A bitwise OR of `mln_render_session_capability_flag` values. */
-  public val flags: RenderSessionCapabilityFlag,
-)
-
-/**
- * Any-thread render-session snapshot.
- *
- * See `mln_render_session_snapshot` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-public data class RenderSessionSnapshot(
-  /** One `mln_render_session_state` value. */
-  public val state: RenderSessionState,
-  /** One `mln_render_driver_kind` value. */
-  public val driver: RenderDriverKind,
-  /** Most recent terminal `mln_render_result` value. */
-  public val latestResult: RenderResult = RenderResult(0u),
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
-  public val generation: ULong = 0uL,
-  public val mapUpdateGeneration: ULong = 0uL,
-  public val renderedUpdateGeneration: ULong = 0uL,
-  public val extentGeneration: ULong = 0uL,
-  public val frameGeneration: ULong = 0uL,
-  public val latestDemandToken: ULong = 0uL,
-  public val pendingDemandCount: UInt = 0u,
-  public val acquiredFrameCount: UInt = 0u,
-  public val targetReady: Boolean = false,
-  public val pendingChanges: Boolean = false,
-)
-
-/**
- * One query hit borrowed for a completion callback.
- *
- * See `mln_queried_feature` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class QueriedFeature(
-  public val feature: ByteArray = byteArrayOf(),
-  public val sourceId: String? = null,
-  public val sourceLayerId: String? = null,
-  public val state: ByteArray? = null,
-)
-
-/**
- * Texture readback borrowed for a completion callback.
- *
- * See `mln_texture_readback_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class TextureReadbackResult(
-  /** Borrowed pixel bytes, valid only during the callback. */
-  public val data: ByteArray = byteArrayOf(),
-  public val info: TextureImageInfo = TextureImageInfo(),
-)
-
-public data class ResourceResponse(
-  public val status: ResourceResponseStatus = ResourceResponseStatus(0u),
-  public val errorReason: ResourceErrorReason = ResourceErrorReason(0u),
-  /** Response bytes. May be null only when byte_count is 0. */
-  public val bytes: ByteArray = byteArrayOf(),
-  public val errorMessage: String? = null,
-  public val mustRevalidate: Boolean = false,
-  public val modifiedUnixMs: Long? = null,
-  public val expiresUnixMs: Long? = null,
-  public val etag: String? = null,
-  public val retryAfterUnixMs: Long? = null,
-)
-
 public data class ResourceRequestRange(
   public val rangeStart: ULong = 0uL,
   public val rangeEnd: ULong = 0uL,
@@ -3465,7 +3465,7 @@ public data class RenderTargetExtentPhysicalSizeResult(
   public val height: UInt,
 )
 
-public data class MapCameraSnapshotGetResult(
+public data class MapGetCameraSnapshotResult(
   public val camera: CameraOptions,
   public val generation: ULong,
 )
@@ -3579,6 +3579,14 @@ internal constructor(
   internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
 )
 
+/**
+ * Reports that MapLibre cancelled a C API resource provider request.
+ *
+ * See `mln_resource_request_cancel_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public typealias ResourceRequestCancelCallback = () -> Unit
+
 public data class HttpHeaderTransform(public val callback: HttpHeaderTransformCallback)
 
 /**
@@ -3611,14 +3619,6 @@ public data class ResourceTransform(public val callback: ResourceTransformCallba
  */
 public typealias ResourceTransformCallback =
   (kind: ResourceKind, url: String, outResponse: ResourceTransformResponse) -> Unit
-
-/**
- * Reports that MapLibre cancelled a C API resource provider request.
- *
- * See `mln_resource_request_cancel_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public typealias ResourceRequestCancelCallback = () -> Unit
 
 internal class GeneratedLogCallbackRegistration(val callback: LogCallback)
 

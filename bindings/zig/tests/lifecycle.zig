@@ -13,7 +13,7 @@ test "copied handles share one close and close twice safely" {
     defer fixture.destroy();
     const map_copy = fixture.map;
     const runtime_copy = fixture.runtime;
-    const projection = try support.resolve(try maplibre.mapProjectionCreate(fixture.map, null));
+    const projection = try support.resolve(try maplibre.mapCreateProjection(fixture.map, null));
     const projection_copy = projection;
 
     try maplibre.mapProjectionClose(projection, null);
@@ -23,7 +23,7 @@ test "copied handles share one close and close twice safely" {
     try fixture.closeMap();
     try support.closeMapHandle(map_copy);
     var diagnostic: maplibre.Diagnostic = .{};
-    try testing.expectError(error.InvalidState, maplibre.mapSnapshotGet(map_copy, &diagnostic));
+    try testing.expectError(error.InvalidState, maplibre.mapGetSnapshot(map_copy, &diagnostic));
     try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
     try testing.expectEqualStrings("Map is closed", diagnostic.message());
 
@@ -62,11 +62,11 @@ test "a child map keeps its disposed runtime's callbacks alive" {
     defer options.deinit();
     options.value.event_wake = .{ .callback = ignoreWake, .context = &wake_releases, .release_context = countRelease };
     var runtime = try maplibre.runtimeCreate(testing.allocator, options.value, null);
-    var map = try support.resolve(try maplibre.mapCreate(testing.allocator, runtime, try maplibre.mapOptionsDefault(), null));
+    var map = try support.resolve(try maplibre.runtimeCreateMap(testing.allocator, runtime, try maplibre.mapOptionsDefault(), null));
 
     runtime.deinit();
     try testing.expectError(error.InvalidState, maplibre.runtimeGetEventMask(runtime, null));
-    _ = try maplibre.mapSnapshotGet(map, null);
+    _ = try maplibre.mapGetSnapshot(map, null);
     // No fence can follow the disposal: native refuses the map's commands
     // once its runtime is disposed. The count stays zero without one because
     // native releases the wake only when it retires the runtime, which this
@@ -84,10 +84,10 @@ test "discarding a creation future retires the map it creates" {
     defer fixture.destroy();
     try fixture.closeMap();
 
-    var completed = try maplibre.mapCreate(testing.allocator, fixture.runtime, try maplibre.mapOptionsDefault(), null);
+    var completed = try maplibre.runtimeCreateMap(testing.allocator, fixture.runtime, try maplibre.mapOptionsDefault(), null);
     while (!try completed.poll()) try fixture.barrier();
     completed.deinit();
-    var pending = try maplibre.mapCreate(testing.allocator, fixture.runtime, try maplibre.mapOptionsDefault(), null);
+    var pending = try maplibre.runtimeCreateMap(testing.allocator, fixture.runtime, try maplibre.mapOptionsDefault(), null);
     pending.deinit();
     try fixture.barrier();
 

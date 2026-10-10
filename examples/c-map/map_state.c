@@ -35,7 +35,7 @@ static app_error create_map(map_state* state, viewport initial_viewport) {
   MAP_TRY(awaited_completion_init(&created, &completion));
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
-    mln_map_create(state->runtime, &options, &completion, &diagnostic);
+    mln_runtime_create_map(state->runtime, &options, &completion, &diagnostic);
   if (status == MLN_STATUS_OK) {
     awaited_completion_wait(&created, -1);
   }

@@ -177,7 +177,7 @@ static mln_adapter_completion_record* post_map_record(
     MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), fake_post_address(), 23,
     31, &completion, NULL
   ));
-  MLN_TEST_OK(mln_map_create(runtime, NULL, &completion, NULL));
+  MLN_TEST_OK(mln_runtime_create_map(runtime, NULL, &completion, NULL));
   mln_adapter_completion_record* record =
     assert_pointer_message(0, 23, 31, out_finalizer);
   MLN_TEST_OK(record->result.status);
@@ -233,7 +233,9 @@ static void a_rejected_dart_completion_posts_nothing(void) {
     MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), fake_post_address(), 23,
     31, &completion, NULL
   ));
-  MLN_TEST_INVALID(mln_map_create(MLN_HANDLE_NULL, NULL, &completion, NULL));
+  MLN_TEST_INVALID(
+    mln_runtime_create_map(MLN_HANDLE_NULL, NULL, &completion, NULL)
+  );
   mln_adapter_completion_reject(&completion);
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&posted_count));
 }

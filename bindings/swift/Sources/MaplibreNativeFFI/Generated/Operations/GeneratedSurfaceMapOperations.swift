@@ -6,17 +6,17 @@ import Foundation
 public extension MapHandle {
   /// Starts attachment of a Metal surface target.
   ///
-  /// See `mln_metal_surface_attach` in the
+  /// See `mln_map_attach_metal_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func metalSurfaceAttach(
+  func attachMetalSurface(
     descriptor bindingArg0: MetalSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_metal_surface_attach",
+      "mln_map_attach_metal_surface",
       as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_metal_surface_attach(
+    ) { raw, arena, completion, diagnostic in try mln_map_attach_metal_surface(
       raw,
       arena.store(bindingArg0.nativeValue()),
       arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -28,17 +28,17 @@ public extension MapHandle {
 
   /// Starts attachment of an OpenGL surface target.
   ///
-  /// See `mln_opengl_surface_attach` in the
+  /// See `mln_map_attach_opengl_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func openglSurfaceAttach(
+  func attachOpenglSurface(
     descriptor bindingArg0: OpenglSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_opengl_surface_attach",
+      "mln_map_attach_opengl_surface",
       as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_opengl_surface_attach(
+    ) { raw, arena, completion, diagnostic in try mln_map_attach_opengl_surface(
       raw,
       arena.store(bindingArg0.nativeValue(arena: arena)),
       arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -50,17 +50,17 @@ public extension MapHandle {
 
   /// Starts attachment of a Vulkan surface target.
   ///
-  /// See `mln_vulkan_surface_attach` in the
+  /// See `mln_map_attach_vulkan_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func vulkanSurfaceAttach(
+  func attachVulkanSurface(
     descriptor bindingArg0: VulkanSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_vulkan_surface_attach",
+      "mln_map_attach_vulkan_surface",
       as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_vulkan_surface_attach(
+    ) { raw, arena, completion, diagnostic in try mln_map_attach_vulkan_surface(
       raw,
       arena.store(bindingArg0.nativeValue()),
       arena.store(bindingArg1.nativeValue(arena: arena)),
@@ -72,17 +72,17 @@ public extension MapHandle {
 
   /// Starts attachment of a WebGPU surface target.
   ///
-  /// See `mln_webgpu_surface_attach` in the
+  /// See `mln_map_attach_webgpu_surface` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func webgpuSurfaceAttach(
+  func attachWebgpuSurface(
     descriptor bindingArg0: WebgpuSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
   ) throws -> RenderSessionAttachment {
     var value0: mln_render_session = 0
     return try nativeAttach(
-      "mln_webgpu_surface_attach",
+      "mln_map_attach_webgpu_surface",
       as: RenderSessionAttachment.init
-    ) { raw, arena, completion, diagnostic in try mln_webgpu_surface_attach(
+    ) { raw, arena, completion, diagnostic in try mln_map_attach_webgpu_surface(
       raw,
       arena.store(bindingArg0.nativeValue()),
       arena.store(bindingArg1.nativeValue(arena: arena)),

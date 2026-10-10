@@ -74,7 +74,7 @@ static void a_registered_layer_type_renders_through_the_c_api(void) {
     mln_render_frame_batch_release(batch);
     if (result.disposition == MLN_RENDER_RESULT_RENDERED) {
       mln_test_completion readback = mln_test_completion_readback();
-      MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+      MLN_TEST_OK(mln_render_session_read_texture(
         fixture.session, &readback.descriptor, NULL
       ));
       MLN_TEST_OK(

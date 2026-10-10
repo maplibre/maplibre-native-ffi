@@ -24,7 +24,7 @@ mln_status attach_to_window(
   descriptor.context = *context;
   descriptor.surface = egl_surface;
   const mln_render_session_attach_options options = caller_driver();
-  return mln_opengl_surface_attach(
+  return mln_map_attach_opengl_surface(
     map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion surface
@@ -43,7 +43,7 @@ mln_status attach_to_own_texture(
   descriptor.extent.scale_factor = scale_factor;
   descriptor.context = *context;
   const mln_render_session_attach_options options = caller_driver();
-  return mln_opengl_owned_texture_attach(
+  return mln_map_attach_opengl_owned_texture(
     map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion owned
@@ -67,7 +67,7 @@ mln_status attach_to_host_texture(
   descriptor.texture = texture;
   descriptor.target = texture_target;
   const mln_render_session_attach_options options = caller_driver();
-  return mln_opengl_borrowed_texture_attach(
+  return mln_map_attach_opengl_borrowed_texture(
     map, &descriptor, &options, out_session, completion, NULL
   );
   // #endregion borrowed
@@ -98,7 +98,9 @@ mln_status resize_window_target(
   descriptor.extent.scale_factor = scale_factor;
   descriptor.context = *context;
   descriptor.surface = egl_surface;
-  return mln_opengl_surface_set_target(session, &descriptor, completion, NULL);
+  return mln_render_session_set_opengl_surface_target(
+    session, &descriptor, completion, NULL
+  );
   // #endregion set-target
 }
 

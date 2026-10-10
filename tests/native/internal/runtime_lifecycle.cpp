@@ -31,7 +31,7 @@ void a_deferred_runtime_release_does_not_hold_other_retirements() {
 
   auto create_map = mln_test_completion_default(sizeof(mln_map));
   MLN_TEST_OK(
-    mln_map_create(waiting, nullptr, &create_map.descriptor, nullptr)
+    mln_runtime_create_map(waiting, nullptr, &create_map.descriptor, nullptr)
   );
   auto map = mln_map{MLN_HANDLE_NULL};
   MLN_TEST_OK(mln_test_completion_finish_value(&create_map, &map, sizeof(map)));

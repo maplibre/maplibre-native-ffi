@@ -70,8 +70,8 @@ internal object MapLibreNativeSurfaceAdapter {
     return BorrowedTarget(
       sessionKey = SessionKey.Metal(target.device, target.pixelFormat, extent.scaleFactor),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map, options -> map.metalBorrowedTextureAttach(descriptor, options) },
-      setTarget = { session -> session.metalBorrowedTextureSetTarget(descriptor) },
+      attach = { map, options -> map.attachMetalBorrowedTexture(descriptor, options) },
+      setTarget = { session -> session.setMetalBorrowedTextureTarget(descriptor) },
     )
   }
 
@@ -98,8 +98,8 @@ internal object MapLibreNativeSurfaceAdapter {
           scaleFactor = extent.scaleFactor,
         ),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map, options -> map.vulkanBorrowedTextureAttach(descriptor, options) },
-      setTarget = { session -> session.vulkanBorrowedTextureSetTarget(descriptor) },
+      attach = { map, options -> map.attachVulkanBorrowedTexture(descriptor, options) },
+      setTarget = { session -> session.setVulkanBorrowedTextureTarget(descriptor) },
     )
   }
 
@@ -116,8 +116,8 @@ internal object MapLibreNativeSurfaceAdapter {
     return BorrowedTarget(
       sessionKey = SessionKey.OpenGl(target.context, extent.scaleFactor),
       targetKey = TargetKey(target.generation, extent),
-      attach = { map, options -> map.openglBorrowedTextureAttach(descriptor, options) },
-      setTarget = { session -> session.openglBorrowedTextureSetTarget(descriptor) },
+      attach = { map, options -> map.attachOpenglBorrowedTexture(descriptor, options) },
+      setTarget = { session -> session.setOpenglBorrowedTextureTarget(descriptor) },
     )
   }
 

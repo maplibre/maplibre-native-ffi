@@ -404,74 +404,74 @@ static void empty_views_are_rejected_at_submission(void) {
   );
   EXPECT_EMPTY_REJECTED(
     "layer_id",
-    mln_map_set_layer_property(
+    mln_map_set_style_layer_property(
       map, empty, id, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   EXPECT_EMPTY_REJECTED(
     "property_name",
-    mln_map_set_layer_property(
+    mln_map_set_style_layer_property(
       map, id, empty, json, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   EXPECT_EMPTY_REJECTED(
-    "value", mln_map_set_layer_property(
+    "value", mln_map_set_style_layer_property(
                map, id, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
              )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_get_layer_property(
+    "layer_id", mln_map_get_style_layer_property(
                   map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
   EXPECT_EMPTY_REJECTED(
     "property_name",
-    mln_map_get_layer_property(
+    mln_map_get_style_layer_property(
       map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_layer_filter(
+    "layer_id", mln_map_set_style_layer_filter(
                   map, empty, NULL, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "filter", mln_map_set_layer_filter(
+    "filter", mln_map_set_style_layer_filter(
                 map, id, &empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
               )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_get_layer_filter(
+    "layer_id", mln_map_get_style_layer_filter(
                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_layer_source_layer(
+    "layer_id", mln_map_set_style_layer_source_layer(
                   map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_layer_source_id(
+    "layer_id", mln_map_set_style_layer_source_id(
                   map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_set_layer_source_id(
+    "source_id", mln_map_set_style_layer_source_id(
                    map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                  )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_layer_min_zoom(
+    "layer_id", mln_map_set_style_layer_min_zoom(
                   map, empty, 0, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_layer_max_zoom(
+    "layer_id", mln_map_set_style_layer_max_zoom(
                   map, empty, 0, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_set_layer_visibility(
+    "layer_id", mln_map_set_style_layer_visibility(
                   map, empty, MLN_STYLE_LAYER_VISIBILITY_NONE,
                   &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )

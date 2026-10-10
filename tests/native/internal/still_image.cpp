@@ -29,7 +29,7 @@ void read_center_pixel(
   const mln_test_render_fixture& fixture, std::uint8_t (&out_rgba)[4]
 ) {
   auto readback = mln_test_completion_readback();
-  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+  MLN_TEST_OK(mln_render_session_read_texture(
     fixture.session, &readback.descriptor, nullptr
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &readback));

@@ -11,7 +11,7 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 /// <param name="Status">
 /// Region status. This member keeps its own size field because the same struct
-/// is also returned by <c>mln_runtime_offline_region_get_status()</c>.
+/// is also returned by <c>mln_runtime_get_offline_region_status()</c>.
 /// </param>
 public readonly partial record struct RuntimeEventOfflineRegionStatus(
     long RegionId,

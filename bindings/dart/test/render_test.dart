@@ -38,12 +38,7 @@ void main() {
 
     final result = await worker.renderFrame();
     expect(result.frameGeneration, greaterThan(BigInt.zero));
-    _expectRed(
-      await within(
-        worker.session.textureReadPremultipliedRgba8(),
-        'texture readback',
-      ),
-    );
+    _expectRed(await within(worker.session.readTexture(), 'texture readback'));
   }, skip: _wglSkip);
 
   test('a drain before any demand returns no batch', () async {

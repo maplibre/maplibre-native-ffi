@@ -461,7 +461,7 @@ auto validate_live_attached_texture(
 
 namespace {
 
-auto texture_read_premultiplied_rgba8(
+auto read_texture(
   mln_render_session texture, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info
 ) -> mln_status {
@@ -551,7 +551,7 @@ struct TextureReadbackResult {
 
 }  // namespace
 
-auto texture_read_premultiplied_rgba8_start(
+auto read_texture_start(
   mln_render_session texture, const mln_completion* completion
 ) -> mln_status {
   return enqueue_driver_result_operation(
@@ -561,12 +561,10 @@ auto texture_read_premultiplied_rgba8_start(
         .bytes = {},
         .info = texture_image_info_default(),
       };
-      auto status = texture_read_premultiplied_rgba8(
-        target.self, nullptr, 0, &readback.info
-      );
+      auto status = read_texture(target.self, nullptr, 0, &readback.info);
       if (status != MLN_STATUS_OK) return status;
       readback.bytes.resize(readback.info.byte_length);
-      status = texture_read_premultiplied_rgba8(
+      status = read_texture(
         target.self, reinterpret_cast<uint8_t*>(readback.bytes.data()),
         readback.bytes.size(), &readback.info
       );
@@ -589,7 +587,7 @@ auto texture_read_premultiplied_rgba8_start(
             .data = {.data = bytes.data(), .size = bytes.size()},
             .info = info,
           };
-          CompletionValue<&mln_texture_read_premultiplied_rgba8>::deliver(
+          CompletionValue<&mln_render_session_read_texture>::deliver(
             descriptor, value
           );
         });

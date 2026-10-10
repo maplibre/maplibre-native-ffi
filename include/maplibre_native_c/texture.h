@@ -403,7 +403,7 @@ mln_texture_image_info_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_metal_owned_texture_attach(
+MLN_API mln_status mln_map_attach_metal_owned_texture(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -442,7 +442,7 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_metal_borrowed_texture_attach(
+MLN_API mln_status mln_map_attach_metal_borrowed_texture(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -482,7 +482,7 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_vulkan_owned_texture_attach(
+MLN_API mln_status mln_map_attach_vulkan_owned_texture(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -523,7 +523,7 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_vulkan_borrowed_texture_attach(
+MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -568,7 +568,7 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_opengl_owned_texture_attach(
+MLN_API mln_status mln_map_attach_opengl_owned_texture(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -608,7 +608,7 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_opengl_borrowed_texture_attach(
+MLN_API mln_status mln_map_attach_opengl_borrowed_texture(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -646,7 +646,7 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_webgpu_owned_texture_attach(
+MLN_API mln_status mln_map_attach_webgpu_owned_texture(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -687,7 +687,7 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_webgpu_borrowed_texture_attach(
+MLN_API mln_status mln_map_attach_webgpu_borrowed_texture(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -719,7 +719,7 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_metal_borrowed_texture_set_target(
+MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -750,7 +750,7 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
+MLN_API mln_status mln_render_session_set_vulkan_borrowed_texture_target(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -779,7 +779,7 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_opengl_borrowed_texture_set_target(
+MLN_API mln_status mln_render_session_set_opengl_borrowed_texture_target(
   mln_render_session session,
   const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -811,14 +811,15 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
+MLN_API mln_status mln_render_session_set_webgpu_borrowed_texture_target(
   mln_render_session session,
   const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Starts readback of the latest rendered texture frame.
+ * Reads back the latest frame of the session's owned texture as premultiplied
+ * RGBA8.
  *
  * The completion delivers one mln_texture_readback_result as its value, with a
  * value_count of one. Its pixel bytes are borrowed for the duration of the
@@ -841,7 +842,7 @@ MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=query;result=mln_texture_readback_result")
-MLN_API mln_status mln_texture_read_premultiplied_rgba8(
+MLN_API mln_status mln_render_session_read_texture(
   mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

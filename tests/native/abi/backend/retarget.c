@@ -102,12 +102,12 @@ static void finish(
 // Repaints the red style's background blue, with no transition, so the next
 // frame shows the change.
 static void paint_background_blue(mln_map map) {
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("bg"),
     MLN_BUFFER_LITERAL("background-color-transition"),
     MLN_BUFFER_LITERAL("{\"duration\":0}"), &completion.descriptor, NULL
   ));
-  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+  MLN_TEST_AWAIT_OK(mln_map_set_style_layer_property(
     map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
     MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
   ));
@@ -178,7 +178,7 @@ static void expect_owned_color(
   const char* what
 ) {
   mln_test_completion readback = mln_test_completion_readback();
-  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+  MLN_TEST_OK(mln_render_session_read_texture(
     fixture->session, &readback.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &readback));
@@ -473,7 +473,7 @@ static mln_status submit_metal_texture(
   descriptor.physical_width = MLN_TEST_HOST_TARGET_SIZE;
   descriptor.physical_height = MLN_TEST_HOST_TARGET_SIZE;
   descriptor.texture = texture;
-  return mln_metal_borrowed_texture_set_target(
+  return mln_render_session_set_metal_borrowed_texture_target(
     fixture->session, &descriptor, &completion->descriptor, MLN_TEST_DIAGNOSTIC
   );
 #else

@@ -1088,492 +1088,6 @@ StyleTileSourceOptions _readStyleTileSourceOptions(
       : null,
 );
 
-CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
-    CameraQueryResult(
-      generation: uint64FromNative(source.generation),
-      camera: _readCameraOptions(source.camera),
-    );
-
-Pointer<raw.mln_logical_extent> _writeLogicalExtent(
-  LogicalExtent value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_logical_extent>();
-  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
-  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
-  result.ref.scale_factor = value.scaleFactor;
-  return result;
-}
-
-LogicalExtent _readLogicalExtent(raw.mln_logical_extent source) =>
-    LogicalExtent(
-      width: source.width,
-      height: source.height,
-      scaleFactor: source.scale_factor,
-    );
-
-Pointer<raw.mln_map_options> _writeMapOptions(MapOptions value, Arena arena) {
-  final result = arena<raw.mln_map_options>();
-  result.ref = raw.mln_map_options_default();
-  result.ref.initial_extent = _writeLogicalExtent(
-    value.initialExtent,
-    arena,
-  ).ref;
-  result.ref.map_mode = value.mapMode.rawValue;
-  result.ref.fast_pfor_enabled = value.fastPforEnabled;
-  result.ref.event_mask = value.eventMask.rawValue;
-  return result;
-}
-
-MapOptions _readMapOptions(raw.mln_map_options source) => MapOptions(
-  initialExtent: _readLogicalExtent(source.initial_extent),
-  mapMode: MapMode.fromRawValue(source.map_mode),
-  fastPforEnabled: source.fast_pfor_enabled,
-  eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
-);
-
-Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
-  FeatureStateSelector value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_feature_state_selector>();
-  result.ref.size = sizeOf<raw.mln_feature_state_selector>();
-  result.ref.source_id = nativeStringView(value.sourceId, arena).value;
-  if (value.sourceLayerId != null) {
-    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-    result.ref.source_layer_id = nativeStringView(
-      value.sourceLayerId!,
-      arena,
-    ).value;
-  }
-  if (value.featureId != null) {
-    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-    result.ref.feature_id = nativeStringView(value.featureId!, arena).value;
-  }
-  if (value.stateKey != null) {
-    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-    result.ref.state_key = nativeStringView(value.stateKey!, arena).value;
-  }
-  return result;
-}
-
-Pointer<raw.mln_image_stretch> _writeImageStretch(
-  ImageStretch value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_image_stretch>();
-  result.ref.from = value.from;
-  result.ref.to = value.to;
-  return result;
-}
-
-ImageStretch _readImageStretch(raw.mln_image_stretch source) =>
-    ImageStretch(source.from, source.to);
-
-Pointer<raw.mln_image_content> _writeImageContent(
-  ImageContent value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_image_content>();
-  result.ref.left = value.left;
-  result.ref.top = value.top;
-  result.ref.right = value.right;
-  result.ref.bottom = value.bottom;
-  return result;
-}
-
-ImageContent _readImageContent(raw.mln_image_content source) => ImageContent(
-  left: source.left,
-  top: source.top,
-  right: source.right,
-  bottom: source.bottom,
-);
-
-StyleImageInfo _readStyleImageInfo(
-  raw.mln_style_image_info source,
-) => StyleImageInfo(
-  width: source.width,
-  height: source.height,
-  pixels: _copyBufferView(source.pixels),
-  stretchX: List<ImageStretch>.unmodifiable(
-    List.generate(
-      source.stretch_x_count,
-      (index) => _readImageStretch(source.stretch_x[index]),
-    ),
-  ),
-  stretchY: List<ImageStretch>.unmodifiable(
-    List.generate(
-      source.stretch_y_count,
-      (index) => _readImageStretch(source.stretch_y[index]),
-    ),
-  ),
-  content: (source.fields & raw.MLN_STYLE_IMAGE_INFO_CONTENT) != 0
-      ? _readImageContent(source.content)
-      : null,
-  textFitWidth: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0
-      ? StyleImageTextFit.fromRawValue(source.text_fit_width)
-      : null,
-  textFitHeight: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0
-      ? StyleImageTextFit.fromRawValue(source.text_fit_height)
-      : null,
-  pixelRatio: source.pixel_ratio,
-  sdf: source.sdf,
-);
-
-StyleLayerInfo _readStyleLayerInfo(raw.mln_style_layer_info source) =>
-    StyleLayerInfo(
-      id: utf8.decode(_copyBufferView(source.id)),
-      type: utf8.decode(_copyBufferView(source.type)),
-      sourceId: source.source_id.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.source_id)),
-      sourceLayer: source.source_layer.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.source_layer)),
-      minZoom: source.min_zoom,
-      maxZoom: source.max_zoom,
-      visibility: StyleLayerVisibility.fromRawValue(source.visibility),
-    );
-
-StyleSourceTileInfo _readStyleSourceTileInfo(
-  raw.mln_style_source_tile_info source,
-) => StyleSourceTileInfo(
-  tileUrls: List<String>.unmodifiable(
-    List.generate(
-      source.tile_url_count,
-      (index) => utf8.decode(_copyBufferView(source.tile_urls[index])),
-    ),
-  ),
-  minZoom: source.min_zoom,
-  maxZoom: source.max_zoom,
-  scheme: StyleTileScheme.fromRawValue(source.scheme),
-);
-
-StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
-    StyleSourceInfo(
-      id: utf8.decode(_copyBufferView(source.id)),
-      type: StyleSourceType.fromRawValue(source.type),
-      isVolatile: source.is_volatile,
-      attribution: (source.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
-          ? utf8.decode(_copyBufferView(source.attribution))
-          : null,
-      url: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
-          ? utf8.decode(_copyBufferView(source.url))
-          : null,
-      tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
-          ? _readStyleSourceTileInfo(source.tilejson)
-          : null,
-      bounds: (source.fields & raw.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0
-          ? _readLatLngBounds(source.bounds)
-          : null,
-      tileSize: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0
-          ? source.tile_size
-          : null,
-      vectorEncoding:
-          (source.fields & raw.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0
-          ? StyleVectorTileEncoding.fromRawValue(source.vector_encoding)
-          : null,
-      rasterEncoding:
-          (source.fields & raw.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0
-          ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
-          : null,
-    );
-
-Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
-  StyleTransitionOptions value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_style_transition_options>();
-  result.ref = raw.mln_style_transition_options_default();
-  if (value.durationMs != null) {
-    result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DURATION;
-    result.ref.duration_ms = value.durationMs!;
-  }
-  if (value.delayMs != null) {
-    result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DELAY;
-    result.ref.delay_ms = value.delayMs!;
-  }
-  if (value.enablePlacementTransitions != null) {
-    result.ref.fields |=
-        raw.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
-    result.ref.enable_placement_transitions = value.enablePlacementTransitions!;
-  }
-  return result;
-}
-
-StyleTransitionOptions _readStyleTransitionOptions(
-  raw.mln_style_transition_options source,
-) => StyleTransitionOptions(
-  durationMs: (source.fields & raw.MLN_STYLE_TRANSITION_OPTION_DURATION) != 0
-      ? source.duration_ms
-      : null,
-  delayMs: (source.fields & raw.MLN_STYLE_TRANSITION_OPTION_DELAY) != 0
-      ? source.delay_ms
-      : null,
-  enablePlacementTransitions:
-      (source.fields &
-              raw.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) !=
-          0
-      ? source.enable_placement_transitions
-      : null,
-);
-
-Pointer<raw.mln_projection_mode> _writeProjectionMode(
-  ProjectionMode value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_projection_mode>();
-  result.ref = raw.mln_projection_mode_default();
-  if (value.axonometric != null) {
-    result.ref.fields |= raw.MLN_PROJECTION_MODE_AXONOMETRIC;
-    result.ref.axonometric = value.axonometric!;
-  }
-  if (value.xSkew != null) {
-    result.ref.fields |= raw.MLN_PROJECTION_MODE_X_SKEW;
-    result.ref.x_skew = value.xSkew!;
-  }
-  if (value.ySkew != null) {
-    result.ref.fields |= raw.MLN_PROJECTION_MODE_Y_SKEW;
-    result.ref.y_skew = value.ySkew!;
-  }
-  return result;
-}
-
-ProjectionMode _readProjectionMode(raw.mln_projection_mode source) =>
-    ProjectionMode(
-      axonometric: (source.fields & raw.MLN_PROJECTION_MODE_AXONOMETRIC) != 0
-          ? source.axonometric
-          : null,
-      xSkew: (source.fields & raw.MLN_PROJECTION_MODE_X_SKEW) != 0
-          ? source.x_skew
-          : null,
-      ySkew: (source.fields & raw.MLN_PROJECTION_MODE_Y_SKEW) != 0
-          ? source.y_skew
-          : null,
-    );
-
-Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
-  StyleImageOptions value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_style_image_options>();
-  result.ref = raw.mln_style_image_options_default();
-  if (value.stretchX != null) {
-    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
-    result.ref.stretch_x = arena<raw.mln_image_stretch>(
-      value.stretchX!.isEmpty ? 1 : value.stretchX!.length,
-    );
-    result.ref.stretch_x_count = value.stretchX!.length;
-    for (var index = 0; index < value.stretchX!.length; index++) {
-      result.ref.stretch_x[index] = _writeImageStretch(
-        value.stretchX![index],
-        arena,
-      ).ref;
-    }
-  }
-  if (value.stretchY != null) {
-    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
-    result.ref.stretch_y = arena<raw.mln_image_stretch>(
-      value.stretchY!.isEmpty ? 1 : value.stretchY!.length,
-    );
-    result.ref.stretch_y_count = value.stretchY!.length;
-    for (var index = 0; index < value.stretchY!.length; index++) {
-      result.ref.stretch_y[index] = _writeImageStretch(
-        value.stretchY![index],
-        arena,
-      ).ref;
-    }
-  }
-  if (value.content != null) {
-    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_CONTENT;
-    result.ref.content = _writeImageContent(value.content!, arena).ref;
-  }
-  if (value.textFitWidth != null) {
-    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
-    result.ref.text_fit_width = value.textFitWidth!.rawValue;
-  }
-  if (value.textFitHeight != null) {
-    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
-    result.ref.text_fit_height = value.textFitHeight!.rawValue;
-  }
-  if (value.pixelRatio != null) {
-    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
-    result.ref.pixel_ratio = value.pixelRatio!;
-  }
-  if (value.sdf != null) {
-    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_SDF;
-    result.ref.sdf = value.sdf!;
-  }
-  return result;
-}
-
-StyleImageOptions _readStyleImageOptions(raw.mln_style_image_options source) =>
-    StyleImageOptions(
-      stretchX: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X) != 0
-          ? List<ImageStretch>.unmodifiable(
-              List.generate(
-                source.stretch_x_count,
-                (index) => _readImageStretch(source.stretch_x[index]),
-              ),
-            )
-          : null,
-      stretchY: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_Y) != 0
-          ? List<ImageStretch>.unmodifiable(
-              List.generate(
-                source.stretch_y_count,
-                (index) => _readImageStretch(source.stretch_y[index]),
-              ),
-            )
-          : null,
-      content: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_CONTENT) != 0
-          ? _readImageContent(source.content)
-          : null,
-      textFitWidth:
-          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH) != 0
-          ? StyleImageTextFit.fromRawValue(source.text_fit_width)
-          : null,
-      textFitHeight:
-          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT) != 0
-          ? StyleImageTextFit.fromRawValue(source.text_fit_height)
-          : null,
-      pixelRatio: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) != 0
-          ? source.pixel_ratio
-          : null,
-      sdf: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_SDF) != 0
-          ? source.sdf
-          : null,
-    );
-
-Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
-  MapTileOptions value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_map_tile_options>();
-  result.ref = raw.mln_map_tile_options_default();
-  if (value.prefetchZoomDelta != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
-    result.ref.prefetch_zoom_delta = _nativeInteger(
-      value.prefetchZoomDelta!,
-      0,
-      4294967295,
-    );
-  }
-  if (value.lodMinRadius != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
-    result.ref.lod_min_radius = value.lodMinRadius!;
-  }
-  if (value.lodScale != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_SCALE;
-    result.ref.lod_scale = value.lodScale!;
-  }
-  if (value.lodPitchThreshold != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
-    result.ref.lod_pitch_threshold = value.lodPitchThreshold!;
-  }
-  if (value.lodZoomShift != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
-    result.ref.lod_zoom_shift = value.lodZoomShift!;
-  }
-  if (value.lodMode != null) {
-    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MODE;
-    result.ref.lod_mode = value.lodMode!.rawValue;
-  }
-  return result;
-}
-
-MapTileOptions _readMapTileOptions(
-  raw.mln_map_tile_options source,
-) => MapTileOptions(
-  prefetchZoomDelta:
-      (source.fields & raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0
-      ? source.prefetch_zoom_delta
-      : null,
-  lodMinRadius: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0
-      ? source.lod_min_radius
-      : null,
-  lodScale: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_SCALE) != 0
-      ? source.lod_scale
-      : null,
-  lodPitchThreshold:
-      (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0
-      ? source.lod_pitch_threshold
-      : null,
-  lodZoomShift: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0
-      ? source.lod_zoom_shift
-      : null,
-  lodMode: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MODE) != 0
-      ? TileLodMode.fromRawValue(source.lod_mode)
-      : null,
-);
-
-Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
-  MapViewportOptions value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_map_viewport_options>();
-  result.ref = raw.mln_map_viewport_options_default();
-  if (value.northOrientation != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
-    result.ref.north_orientation = value.northOrientation!.rawValue;
-  }
-  if (value.constrainMode != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
-    result.ref.constrain_mode = value.constrainMode!.rawValue;
-  }
-  if (value.viewportMode != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
-    result.ref.viewport_mode = value.viewportMode!.rawValue;
-  }
-  if (value.frustumOffset != null) {
-    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
-    result.ref.frustum_offset = _writeEdgeInsets(
-      value.frustumOffset!,
-      arena,
-    ).ref;
-  }
-  return result;
-}
-
-MapViewportOptions _readMapViewportOptions(
-  raw.mln_map_viewport_options source,
-) => MapViewportOptions(
-  northOrientation:
-      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0
-      ? NorthOrientation.fromRawValue(source.north_orientation)
-      : null,
-  constrainMode:
-      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0
-      ? ConstrainMode.fromRawValue(source.constrain_mode)
-      : null,
-  viewportMode: (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0
-      ? ViewportMode.fromRawValue(source.viewport_mode)
-      : null,
-  frustumOffset:
-      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0
-      ? _readEdgeInsets(source.frustum_offset)
-      : null,
-);
-
-MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
-  debugOptions: MapDebugOption.fromRawValue(source.debug_options),
-  generation: uint64FromNative(source.generation),
-  camera: _readCameraOptions(source.camera),
-  logicalExtent: _readLogicalExtent(source.logical_extent),
-  projectionMode: _readProjectionMode(source.projection_mode),
-  viewport: _readMapViewportOptions(source.viewport),
-  fullyLoaded: source.fully_loaded,
-  renderingStatsViewEnabled: source.rendering_stats_view_enabled,
-  repaintDemand: source.repaint_demand,
-  gestureInProgress: source.gesture_in_progress,
-  eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
-  latestRenderUpdateGeneration: uint64FromNative(
-    source.latest_render_update_generation,
-  ),
-  tile: _readMapTileOptions(source.tile),
-  bounds: _readBoundOptions(source.bounds),
-  freeCamera: _readFreeCameraOptions(source.free_camera),
-);
-
 Pointer<raw.mln_render_target_extent> _writeRenderTargetExtent(
   RenderTargetExtent value,
   Arena arena,
@@ -1952,6 +1466,729 @@ OpenglSurfaceDescriptor _readOpenglSurfaceDescriptor(
   surface: NativePointer(source.surface.address),
 );
 
+Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
+  VulkanContextDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_vulkan_context_descriptor>();
+  result.ref.size = sizeOf<raw.mln_vulkan_context_descriptor>();
+  result.ref.instance = Pointer<Void>.fromAddress(
+    value.instance.address,
+  ).cast();
+  result.ref.physical_device = Pointer<Void>.fromAddress(
+    value.physicalDevice.address,
+  ).cast();
+  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
+  result.ref.graphics_queue = Pointer<Void>.fromAddress(
+    value.graphicsQueue.address,
+  ).cast();
+  result.ref.graphics_queue_family_index = _nativeInteger(
+    value.graphicsQueueFamilyIndex,
+    0,
+    4294967295,
+  );
+  result.ref.get_instance_proc_addr = Pointer<Void>.fromAddress(
+    value.getInstanceProcAddr.address,
+  ).cast();
+  result.ref.get_device_proc_addr = Pointer<Void>.fromAddress(
+    value.getDeviceProcAddr.address,
+  ).cast();
+  return result;
+}
+
+VulkanContextDescriptor _readVulkanContextDescriptor(
+  raw.mln_vulkan_context_descriptor source,
+) => VulkanContextDescriptor(
+  instance: NativePointer(source.instance.address),
+  physicalDevice: NativePointer(source.physical_device.address),
+  device: NativePointer(source.device.address),
+  graphicsQueue: NativePointer(source.graphics_queue.address),
+  graphicsQueueFamilyIndex: source.graphics_queue_family_index,
+  getInstanceProcAddr: NativePointer(source.get_instance_proc_addr.address),
+  getDeviceProcAddr: NativePointer(source.get_device_proc_addr.address),
+);
+
+Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
+_writeVulkanBorrowedTextureDescriptor(
+  VulkanBorrowedTextureDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_vulkan_borrowed_texture_descriptor>();
+  result.ref = raw.mln_vulkan_borrowed_texture_descriptor_default();
+  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
+  result.ref.image = uint64ToNative(
+    value.image,
+    'mln_vulkan_non_dispatchable_handle',
+  );
+  result.ref.image_view = uint64ToNative(
+    value.imageView,
+    'mln_vulkan_non_dispatchable_handle',
+  );
+  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
+  result.ref.initial_layout = _nativeInteger(
+    value.initialLayout,
+    0,
+    4294967295,
+  );
+  result.ref.final_layout = _nativeInteger(value.finalLayout, 0, 4294967295);
+  return result;
+}
+
+VulkanBorrowedTextureDescriptor _readVulkanBorrowedTextureDescriptor(
+  raw.mln_vulkan_borrowed_texture_descriptor source,
+) => VulkanBorrowedTextureDescriptor(
+  extent: _readRenderTargetExtent(source.extent),
+  physicalWidth: source.physical_width,
+  physicalHeight: source.physical_height,
+  context: _readVulkanContextDescriptor(source.context),
+  image: uint64FromNative(source.image),
+  imageView: uint64FromNative(source.image_view),
+  format: source.format,
+  initialLayout: source.initial_layout,
+  finalLayout: source.final_layout,
+);
+
+Pointer<raw.mln_vulkan_owned_texture_descriptor>
+_writeVulkanOwnedTextureDescriptor(
+  VulkanOwnedTextureDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_vulkan_owned_texture_descriptor>();
+  result.ref = raw.mln_vulkan_owned_texture_descriptor_default();
+  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
+  return result;
+}
+
+VulkanOwnedTextureDescriptor _readVulkanOwnedTextureDescriptor(
+  raw.mln_vulkan_owned_texture_descriptor source,
+) => VulkanOwnedTextureDescriptor(
+  extent: _readRenderTargetExtent(source.extent),
+  context: _readVulkanContextDescriptor(source.context),
+);
+
+Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
+  VulkanSurfaceDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_vulkan_surface_descriptor>();
+  result.ref = raw.mln_vulkan_surface_descriptor_default();
+  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
+  result.ref.surface = uint64ToNative(
+    value.surface,
+    'mln_vulkan_non_dispatchable_handle',
+  );
+  return result;
+}
+
+VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
+  raw.mln_vulkan_surface_descriptor source,
+) => VulkanSurfaceDescriptor(
+  extent: _readRenderTargetExtent(source.extent),
+  context: _readVulkanContextDescriptor(source.context),
+  surface: uint64FromNative(source.surface),
+);
+
+Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
+  WebgpuContextDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_webgpu_context_descriptor>();
+  result.ref.size = sizeOf<raw.mln_webgpu_context_descriptor>();
+  result.ref.instance = Pointer<Void>.fromAddress(
+    value.instance.address,
+  ).cast();
+  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
+  result.ref.queue = Pointer<Void>.fromAddress(value.queue.address).cast();
+  return result;
+}
+
+WebgpuContextDescriptor _readWebgpuContextDescriptor(
+  raw.mln_webgpu_context_descriptor source,
+) => WebgpuContextDescriptor(
+  instance: NativePointer(source.instance.address),
+  device: NativePointer(source.device.address),
+  queue: NativePointer(source.queue.address),
+);
+
+Pointer<raw.mln_webgpu_borrowed_texture_descriptor>
+_writeWebgpuBorrowedTextureDescriptor(
+  WebgpuBorrowedTextureDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_webgpu_borrowed_texture_descriptor>();
+  result.ref = raw.mln_webgpu_borrowed_texture_descriptor_default();
+  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.physical_width = _nativeInteger(
+    value.physicalWidth,
+    0,
+    4294967295,
+  );
+  result.ref.physical_height = _nativeInteger(
+    value.physicalHeight,
+    0,
+    4294967295,
+  );
+  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
+  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  result.ref.texture_view = Pointer<Void>.fromAddress(
+    value.textureView.address,
+  ).cast();
+  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
+  return result;
+}
+
+WebgpuBorrowedTextureDescriptor _readWebgpuBorrowedTextureDescriptor(
+  raw.mln_webgpu_borrowed_texture_descriptor source,
+) => WebgpuBorrowedTextureDescriptor(
+  extent: _readRenderTargetExtent(source.extent),
+  physicalWidth: source.physical_width,
+  physicalHeight: source.physical_height,
+  context: _readWebgpuContextDescriptor(source.context),
+  texture: NativePointer(source.texture.address),
+  textureView: NativePointer(source.texture_view.address),
+  format: source.format,
+);
+
+Pointer<raw.mln_webgpu_owned_texture_descriptor>
+_writeWebgpuOwnedTextureDescriptor(
+  WebgpuOwnedTextureDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_webgpu_owned_texture_descriptor>();
+  result.ref = raw.mln_webgpu_owned_texture_descriptor_default();
+  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
+  return result;
+}
+
+WebgpuOwnedTextureDescriptor _readWebgpuOwnedTextureDescriptor(
+  raw.mln_webgpu_owned_texture_descriptor source,
+) => WebgpuOwnedTextureDescriptor(
+  extent: _readRenderTargetExtent(source.extent),
+  context: _readWebgpuContextDescriptor(source.context),
+);
+
+Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
+  WebgpuSurfaceDescriptor value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_webgpu_surface_descriptor>();
+  result.ref = raw.mln_webgpu_surface_descriptor_default();
+  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
+  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
+  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
+  return result;
+}
+
+WebgpuSurfaceDescriptor _readWebgpuSurfaceDescriptor(
+  raw.mln_webgpu_surface_descriptor source,
+) => WebgpuSurfaceDescriptor(
+  extent: _readRenderTargetExtent(source.extent),
+  context: _readWebgpuContextDescriptor(source.context),
+  surface: NativePointer(source.surface.address),
+  format: source.format,
+);
+
+CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
+    CameraQueryResult(
+      generation: uint64FromNative(source.generation),
+      camera: _readCameraOptions(source.camera),
+    );
+
+Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
+  FeatureStateSelector value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_feature_state_selector>();
+  result.ref.size = sizeOf<raw.mln_feature_state_selector>();
+  result.ref.source_id = nativeStringView(value.sourceId, arena).value;
+  if (value.sourceLayerId != null) {
+    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+    result.ref.source_layer_id = nativeStringView(
+      value.sourceLayerId!,
+      arena,
+    ).value;
+  }
+  if (value.featureId != null) {
+    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+    result.ref.feature_id = nativeStringView(value.featureId!, arena).value;
+  }
+  if (value.stateKey != null) {
+    result.ref.fields |= raw.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+    result.ref.state_key = nativeStringView(value.stateKey!, arena).value;
+  }
+  return result;
+}
+
+Pointer<raw.mln_logical_extent> _writeLogicalExtent(
+  LogicalExtent value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_logical_extent>();
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
+  result.ref.scale_factor = value.scaleFactor;
+  return result;
+}
+
+LogicalExtent _readLogicalExtent(raw.mln_logical_extent source) =>
+    LogicalExtent(
+      width: source.width,
+      height: source.height,
+      scaleFactor: source.scale_factor,
+    );
+
+Pointer<raw.mln_projection_mode> _writeProjectionMode(
+  ProjectionMode value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_projection_mode>();
+  result.ref = raw.mln_projection_mode_default();
+  if (value.axonometric != null) {
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_AXONOMETRIC;
+    result.ref.axonometric = value.axonometric!;
+  }
+  if (value.xSkew != null) {
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_X_SKEW;
+    result.ref.x_skew = value.xSkew!;
+  }
+  if (value.ySkew != null) {
+    result.ref.fields |= raw.MLN_PROJECTION_MODE_Y_SKEW;
+    result.ref.y_skew = value.ySkew!;
+  }
+  return result;
+}
+
+ProjectionMode _readProjectionMode(raw.mln_projection_mode source) =>
+    ProjectionMode(
+      axonometric: (source.fields & raw.MLN_PROJECTION_MODE_AXONOMETRIC) != 0
+          ? source.axonometric
+          : null,
+      xSkew: (source.fields & raw.MLN_PROJECTION_MODE_X_SKEW) != 0
+          ? source.x_skew
+          : null,
+      ySkew: (source.fields & raw.MLN_PROJECTION_MODE_Y_SKEW) != 0
+          ? source.y_skew
+          : null,
+    );
+
+Pointer<raw.mln_map_viewport_options> _writeMapViewportOptions(
+  MapViewportOptions value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_map_viewport_options>();
+  result.ref = raw.mln_map_viewport_options_default();
+  if (value.northOrientation != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+    result.ref.north_orientation = value.northOrientation!.rawValue;
+  }
+  if (value.constrainMode != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+    result.ref.constrain_mode = value.constrainMode!.rawValue;
+  }
+  if (value.viewportMode != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+    result.ref.viewport_mode = value.viewportMode!.rawValue;
+  }
+  if (value.frustumOffset != null) {
+    result.ref.fields |= raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+    result.ref.frustum_offset = _writeEdgeInsets(
+      value.frustumOffset!,
+      arena,
+    ).ref;
+  }
+  return result;
+}
+
+MapViewportOptions _readMapViewportOptions(
+  raw.mln_map_viewport_options source,
+) => MapViewportOptions(
+  northOrientation:
+      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0
+      ? NorthOrientation.fromRawValue(source.north_orientation)
+      : null,
+  constrainMode:
+      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0
+      ? ConstrainMode.fromRawValue(source.constrain_mode)
+      : null,
+  viewportMode: (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0
+      ? ViewportMode.fromRawValue(source.viewport_mode)
+      : null,
+  frustumOffset:
+      (source.fields & raw.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0
+      ? _readEdgeInsets(source.frustum_offset)
+      : null,
+);
+
+Pointer<raw.mln_map_tile_options> _writeMapTileOptions(
+  MapTileOptions value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_map_tile_options>();
+  result.ref = raw.mln_map_tile_options_default();
+  if (value.prefetchZoomDelta != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+    result.ref.prefetch_zoom_delta = _nativeInteger(
+      value.prefetchZoomDelta!,
+      0,
+      4294967295,
+    );
+  }
+  if (value.lodMinRadius != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+    result.ref.lod_min_radius = value.lodMinRadius!;
+  }
+  if (value.lodScale != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_SCALE;
+    result.ref.lod_scale = value.lodScale!;
+  }
+  if (value.lodPitchThreshold != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+    result.ref.lod_pitch_threshold = value.lodPitchThreshold!;
+  }
+  if (value.lodZoomShift != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+    result.ref.lod_zoom_shift = value.lodZoomShift!;
+  }
+  if (value.lodMode != null) {
+    result.ref.fields |= raw.MLN_MAP_TILE_OPTION_LOD_MODE;
+    result.ref.lod_mode = value.lodMode!.rawValue;
+  }
+  return result;
+}
+
+MapTileOptions _readMapTileOptions(
+  raw.mln_map_tile_options source,
+) => MapTileOptions(
+  prefetchZoomDelta:
+      (source.fields & raw.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0
+      ? source.prefetch_zoom_delta
+      : null,
+  lodMinRadius: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0
+      ? source.lod_min_radius
+      : null,
+  lodScale: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_SCALE) != 0
+      ? source.lod_scale
+      : null,
+  lodPitchThreshold:
+      (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0
+      ? source.lod_pitch_threshold
+      : null,
+  lodZoomShift: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0
+      ? source.lod_zoom_shift
+      : null,
+  lodMode: (source.fields & raw.MLN_MAP_TILE_OPTION_LOD_MODE) != 0
+      ? TileLodMode.fromRawValue(source.lod_mode)
+      : null,
+);
+
+MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
+  debugOptions: MapDebugOption.fromRawValue(source.debug_options),
+  generation: uint64FromNative(source.generation),
+  camera: _readCameraOptions(source.camera),
+  logicalExtent: _readLogicalExtent(source.logical_extent),
+  projectionMode: _readProjectionMode(source.projection_mode),
+  viewport: _readMapViewportOptions(source.viewport),
+  fullyLoaded: source.fully_loaded,
+  renderingStatsViewEnabled: source.rendering_stats_view_enabled,
+  repaintDemand: source.repaint_demand,
+  gestureInProgress: source.gesture_in_progress,
+  eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
+  latestRenderUpdateGeneration: uint64FromNative(
+    source.latest_render_update_generation,
+  ),
+  tile: _readMapTileOptions(source.tile),
+  bounds: _readBoundOptions(source.bounds),
+  freeCamera: _readFreeCameraOptions(source.free_camera),
+);
+
+Pointer<raw.mln_image_stretch> _writeImageStretch(
+  ImageStretch value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_image_stretch>();
+  result.ref.from = value.from;
+  result.ref.to = value.to;
+  return result;
+}
+
+ImageStretch _readImageStretch(raw.mln_image_stretch source) =>
+    ImageStretch(source.from, source.to);
+
+Pointer<raw.mln_image_content> _writeImageContent(
+  ImageContent value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_image_content>();
+  result.ref.left = value.left;
+  result.ref.top = value.top;
+  result.ref.right = value.right;
+  result.ref.bottom = value.bottom;
+  return result;
+}
+
+ImageContent _readImageContent(raw.mln_image_content source) => ImageContent(
+  left: source.left,
+  top: source.top,
+  right: source.right,
+  bottom: source.bottom,
+);
+
+StyleImageInfo _readStyleImageInfo(
+  raw.mln_style_image_info source,
+) => StyleImageInfo(
+  width: source.width,
+  height: source.height,
+  pixels: _copyBufferView(source.pixels),
+  stretchX: List<ImageStretch>.unmodifiable(
+    List.generate(
+      source.stretch_x_count,
+      (index) => _readImageStretch(source.stretch_x[index]),
+    ),
+  ),
+  stretchY: List<ImageStretch>.unmodifiable(
+    List.generate(
+      source.stretch_y_count,
+      (index) => _readImageStretch(source.stretch_y[index]),
+    ),
+  ),
+  content: (source.fields & raw.MLN_STYLE_IMAGE_INFO_CONTENT) != 0
+      ? _readImageContent(source.content)
+      : null,
+  textFitWidth: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_width)
+      : null,
+  textFitHeight: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_height)
+      : null,
+  pixelRatio: source.pixel_ratio,
+  sdf: source.sdf,
+);
+
+StyleLayerInfo _readStyleLayerInfo(raw.mln_style_layer_info source) =>
+    StyleLayerInfo(
+      id: utf8.decode(_copyBufferView(source.id)),
+      type: utf8.decode(_copyBufferView(source.type)),
+      sourceId: source.source_id.size == 0
+          ? null
+          : utf8.decode(_copyBufferView(source.source_id)),
+      sourceLayer: source.source_layer.size == 0
+          ? null
+          : utf8.decode(_copyBufferView(source.source_layer)),
+      minZoom: source.min_zoom,
+      maxZoom: source.max_zoom,
+      visibility: StyleLayerVisibility.fromRawValue(source.visibility),
+    );
+
+StyleSourceTileInfo _readStyleSourceTileInfo(
+  raw.mln_style_source_tile_info source,
+) => StyleSourceTileInfo(
+  tileUrls: List<String>.unmodifiable(
+    List.generate(
+      source.tile_url_count,
+      (index) => utf8.decode(_copyBufferView(source.tile_urls[index])),
+    ),
+  ),
+  minZoom: source.min_zoom,
+  maxZoom: source.max_zoom,
+  scheme: StyleTileScheme.fromRawValue(source.scheme),
+);
+
+StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
+    StyleSourceInfo(
+      id: utf8.decode(_copyBufferView(source.id)),
+      type: StyleSourceType.fromRawValue(source.type),
+      isVolatile: source.is_volatile,
+      attribution: (source.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
+          ? utf8.decode(_copyBufferView(source.attribution))
+          : null,
+      url: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
+          ? utf8.decode(_copyBufferView(source.url))
+          : null,
+      tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
+          ? _readStyleSourceTileInfo(source.tilejson)
+          : null,
+      bounds: (source.fields & raw.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0
+          ? _readLatLngBounds(source.bounds)
+          : null,
+      tileSize: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0
+          ? source.tile_size
+          : null,
+      vectorEncoding:
+          (source.fields & raw.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0
+          ? StyleVectorTileEncoding.fromRawValue(source.vector_encoding)
+          : null,
+      rasterEncoding:
+          (source.fields & raw.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0
+          ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
+          : null,
+    );
+
+Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
+  StyleTransitionOptions value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_style_transition_options>();
+  result.ref = raw.mln_style_transition_options_default();
+  if (value.durationMs != null) {
+    result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DURATION;
+    result.ref.duration_ms = value.durationMs!;
+  }
+  if (value.delayMs != null) {
+    result.ref.fields |= raw.MLN_STYLE_TRANSITION_OPTION_DELAY;
+    result.ref.delay_ms = value.delayMs!;
+  }
+  if (value.enablePlacementTransitions != null) {
+    result.ref.fields |=
+        raw.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+    result.ref.enable_placement_transitions = value.enablePlacementTransitions!;
+  }
+  return result;
+}
+
+StyleTransitionOptions _readStyleTransitionOptions(
+  raw.mln_style_transition_options source,
+) => StyleTransitionOptions(
+  durationMs: (source.fields & raw.MLN_STYLE_TRANSITION_OPTION_DURATION) != 0
+      ? source.duration_ms
+      : null,
+  delayMs: (source.fields & raw.MLN_STYLE_TRANSITION_OPTION_DELAY) != 0
+      ? source.delay_ms
+      : null,
+  enablePlacementTransitions:
+      (source.fields &
+              raw.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) !=
+          0
+      ? source.enable_placement_transitions
+      : null,
+);
+
+Pointer<raw.mln_map_options> _writeMapOptions(MapOptions value, Arena arena) {
+  final result = arena<raw.mln_map_options>();
+  result.ref = raw.mln_map_options_default();
+  result.ref.initial_extent = _writeLogicalExtent(
+    value.initialExtent,
+    arena,
+  ).ref;
+  result.ref.map_mode = value.mapMode.rawValue;
+  result.ref.fast_pfor_enabled = value.fastPforEnabled;
+  result.ref.event_mask = value.eventMask.rawValue;
+  return result;
+}
+
+MapOptions _readMapOptions(raw.mln_map_options source) => MapOptions(
+  initialExtent: _readLogicalExtent(source.initial_extent),
+  mapMode: MapMode.fromRawValue(source.map_mode),
+  fastPforEnabled: source.fast_pfor_enabled,
+  eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
+);
+
+Pointer<raw.mln_style_image_options> _writeStyleImageOptions(
+  StyleImageOptions value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_style_image_options>();
+  result.ref = raw.mln_style_image_options_default();
+  if (value.stretchX != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+    result.ref.stretch_x = arena<raw.mln_image_stretch>(
+      value.stretchX!.isEmpty ? 1 : value.stretchX!.length,
+    );
+    result.ref.stretch_x_count = value.stretchX!.length;
+    for (var index = 0; index < value.stretchX!.length; index++) {
+      result.ref.stretch_x[index] = _writeImageStretch(
+        value.stretchX![index],
+        arena,
+      ).ref;
+    }
+  }
+  if (value.stretchY != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+    result.ref.stretch_y = arena<raw.mln_image_stretch>(
+      value.stretchY!.isEmpty ? 1 : value.stretchY!.length,
+    );
+    result.ref.stretch_y_count = value.stretchY!.length;
+    for (var index = 0; index < value.stretchY!.length; index++) {
+      result.ref.stretch_y[index] = _writeImageStretch(
+        value.stretchY![index],
+        arena,
+      ).ref;
+    }
+  }
+  if (value.content != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_CONTENT;
+    result.ref.content = _writeImageContent(value.content!, arena).ref;
+  }
+  if (value.textFitWidth != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+    result.ref.text_fit_width = value.textFitWidth!.rawValue;
+  }
+  if (value.textFitHeight != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+    result.ref.text_fit_height = value.textFitHeight!.rawValue;
+  }
+  if (value.pixelRatio != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+    result.ref.pixel_ratio = value.pixelRatio!;
+  }
+  if (value.sdf != null) {
+    result.ref.fields |= raw.MLN_STYLE_IMAGE_OPTION_SDF;
+    result.ref.sdf = value.sdf!;
+  }
+  return result;
+}
+
+StyleImageOptions _readStyleImageOptions(raw.mln_style_image_options source) =>
+    StyleImageOptions(
+      stretchX: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_X) != 0
+          ? List<ImageStretch>.unmodifiable(
+              List.generate(
+                source.stretch_x_count,
+                (index) => _readImageStretch(source.stretch_x[index]),
+              ),
+            )
+          : null,
+      stretchY: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_STRETCH_Y) != 0
+          ? List<ImageStretch>.unmodifiable(
+              List.generate(
+                source.stretch_y_count,
+                (index) => _readImageStretch(source.stretch_y[index]),
+              ),
+            )
+          : null,
+      content: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_CONTENT) != 0
+          ? _readImageContent(source.content)
+          : null,
+      textFitWidth:
+          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH) != 0
+          ? StyleImageTextFit.fromRawValue(source.text_fit_width)
+          : null,
+      textFitHeight:
+          (source.fields & raw.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT) != 0
+          ? StyleImageTextFit.fromRawValue(source.text_fit_height)
+          : null,
+      pixelRatio: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) != 0
+          ? source.pixel_ratio
+          : null,
+      sdf: (source.fields & raw.MLN_STYLE_IMAGE_OPTION_SDF) != 0
+          ? source.sdf
+          : null,
+    );
+
 RenderAbandonResult _readRenderAbandonResult(
   raw.mln_render_abandon_result source,
 ) => RenderAbandonResult(
@@ -2164,6 +2401,21 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
         )
       : null,
   filter: source.filter == nullptr ? null : _copyBufferView(source.filter.ref),
+);
+
+TextureImageInfo _readTextureImageInfo(raw.mln_texture_image_info source) =>
+    TextureImageInfo(
+      width: source.width,
+      height: source.height,
+      stride: source.stride,
+      byteLength: source.byte_length,
+    );
+
+TextureReadbackResult _readTextureReadbackResult(
+  raw.mln_texture_readback_result source,
+) => TextureReadbackResult(
+  data: _copyBufferView(source.data),
+  info: _readTextureImageInfo(source.info),
 );
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
@@ -2729,258 +2981,6 @@ _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
   }
 }
 
-TextureImageInfo _readTextureImageInfo(raw.mln_texture_image_info source) =>
-    TextureImageInfo(
-      width: source.width,
-      height: source.height,
-      stride: source.stride,
-      byteLength: source.byte_length,
-    );
-
-TextureReadbackResult _readTextureReadbackResult(
-  raw.mln_texture_readback_result source,
-) => TextureReadbackResult(
-  data: _copyBufferView(source.data),
-  info: _readTextureImageInfo(source.info),
-);
-
-Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
-  VulkanContextDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_vulkan_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_vulkan_context_descriptor>();
-  result.ref.instance = Pointer<Void>.fromAddress(
-    value.instance.address,
-  ).cast();
-  result.ref.physical_device = Pointer<Void>.fromAddress(
-    value.physicalDevice.address,
-  ).cast();
-  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
-  result.ref.graphics_queue = Pointer<Void>.fromAddress(
-    value.graphicsQueue.address,
-  ).cast();
-  result.ref.graphics_queue_family_index = _nativeInteger(
-    value.graphicsQueueFamilyIndex,
-    0,
-    4294967295,
-  );
-  result.ref.get_instance_proc_addr = Pointer<Void>.fromAddress(
-    value.getInstanceProcAddr.address,
-  ).cast();
-  result.ref.get_device_proc_addr = Pointer<Void>.fromAddress(
-    value.getDeviceProcAddr.address,
-  ).cast();
-  return result;
-}
-
-VulkanContextDescriptor _readVulkanContextDescriptor(
-  raw.mln_vulkan_context_descriptor source,
-) => VulkanContextDescriptor(
-  instance: NativePointer(source.instance.address),
-  physicalDevice: NativePointer(source.physical_device.address),
-  device: NativePointer(source.device.address),
-  graphicsQueue: NativePointer(source.graphics_queue.address),
-  graphicsQueueFamilyIndex: source.graphics_queue_family_index,
-  getInstanceProcAddr: NativePointer(source.get_instance_proc_addr.address),
-  getDeviceProcAddr: NativePointer(source.get_device_proc_addr.address),
-);
-
-Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
-_writeVulkanBorrowedTextureDescriptor(
-  VulkanBorrowedTextureDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_vulkan_borrowed_texture_descriptor>();
-  result.ref = raw.mln_vulkan_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  result.ref.image = uint64ToNative(
-    value.image,
-    'mln_vulkan_non_dispatchable_handle',
-  );
-  result.ref.image_view = uint64ToNative(
-    value.imageView,
-    'mln_vulkan_non_dispatchable_handle',
-  );
-  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
-  result.ref.initial_layout = _nativeInteger(
-    value.initialLayout,
-    0,
-    4294967295,
-  );
-  result.ref.final_layout = _nativeInteger(value.finalLayout, 0, 4294967295);
-  return result;
-}
-
-VulkanBorrowedTextureDescriptor _readVulkanBorrowedTextureDescriptor(
-  raw.mln_vulkan_borrowed_texture_descriptor source,
-) => VulkanBorrowedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
-  physicalWidth: source.physical_width,
-  physicalHeight: source.physical_height,
-  context: _readVulkanContextDescriptor(source.context),
-  image: uint64FromNative(source.image),
-  imageView: uint64FromNative(source.image_view),
-  format: source.format,
-  initialLayout: source.initial_layout,
-  finalLayout: source.final_layout,
-);
-
-Pointer<raw.mln_vulkan_owned_texture_descriptor>
-_writeVulkanOwnedTextureDescriptor(
-  VulkanOwnedTextureDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_vulkan_owned_texture_descriptor>();
-  result.ref = raw.mln_vulkan_owned_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  return result;
-}
-
-VulkanOwnedTextureDescriptor _readVulkanOwnedTextureDescriptor(
-  raw.mln_vulkan_owned_texture_descriptor source,
-) => VulkanOwnedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
-  context: _readVulkanContextDescriptor(source.context),
-);
-
-Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
-  VulkanSurfaceDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_vulkan_surface_descriptor>();
-  result.ref = raw.mln_vulkan_surface_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  result.ref.surface = uint64ToNative(
-    value.surface,
-    'mln_vulkan_non_dispatchable_handle',
-  );
-  return result;
-}
-
-VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
-  raw.mln_vulkan_surface_descriptor source,
-) => VulkanSurfaceDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
-  context: _readVulkanContextDescriptor(source.context),
-  surface: uint64FromNative(source.surface),
-);
-
-Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
-  WebgpuContextDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_webgpu_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_webgpu_context_descriptor>();
-  result.ref.instance = Pointer<Void>.fromAddress(
-    value.instance.address,
-  ).cast();
-  result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
-  result.ref.queue = Pointer<Void>.fromAddress(value.queue.address).cast();
-  return result;
-}
-
-WebgpuContextDescriptor _readWebgpuContextDescriptor(
-  raw.mln_webgpu_context_descriptor source,
-) => WebgpuContextDescriptor(
-  instance: NativePointer(source.instance.address),
-  device: NativePointer(source.device.address),
-  queue: NativePointer(source.queue.address),
-);
-
-Pointer<raw.mln_webgpu_borrowed_texture_descriptor>
-_writeWebgpuBorrowedTextureDescriptor(
-  WebgpuBorrowedTextureDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_webgpu_borrowed_texture_descriptor>();
-  result.ref = raw.mln_webgpu_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.physical_width = _nativeInteger(
-    value.physicalWidth,
-    0,
-    4294967295,
-  );
-  result.ref.physical_height = _nativeInteger(
-    value.physicalHeight,
-    0,
-    4294967295,
-  );
-  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
-  result.ref.texture_view = Pointer<Void>.fromAddress(
-    value.textureView.address,
-  ).cast();
-  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
-  return result;
-}
-
-WebgpuBorrowedTextureDescriptor _readWebgpuBorrowedTextureDescriptor(
-  raw.mln_webgpu_borrowed_texture_descriptor source,
-) => WebgpuBorrowedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
-  physicalWidth: source.physical_width,
-  physicalHeight: source.physical_height,
-  context: _readWebgpuContextDescriptor(source.context),
-  texture: NativePointer(source.texture.address),
-  textureView: NativePointer(source.texture_view.address),
-  format: source.format,
-);
-
-Pointer<raw.mln_webgpu_owned_texture_descriptor>
-_writeWebgpuOwnedTextureDescriptor(
-  WebgpuOwnedTextureDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_webgpu_owned_texture_descriptor>();
-  result.ref = raw.mln_webgpu_owned_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
-  return result;
-}
-
-WebgpuOwnedTextureDescriptor _readWebgpuOwnedTextureDescriptor(
-  raw.mln_webgpu_owned_texture_descriptor source,
-) => WebgpuOwnedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
-  context: _readWebgpuContextDescriptor(source.context),
-);
-
-Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
-  WebgpuSurfaceDescriptor value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_webgpu_surface_descriptor>();
-  result.ref = raw.mln_webgpu_surface_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
-  result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
-  result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
-  result.ref.format = _nativeInteger(value.format, 0, 4294967295);
-  return result;
-}
-
-WebgpuSurfaceDescriptor _readWebgpuSurfaceDescriptor(
-  raw.mln_webgpu_surface_descriptor source,
-) => WebgpuSurfaceDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
-  context: _readWebgpuContextDescriptor(source.context),
-  surface: NativePointer(source.surface.address),
-  format: source.format,
-);
-
 final _resultCameraOptions = _CompletionValue(
   raw.MLN_ADAPTER_COMPLETION_COPY_CAMERA_OPTIONS,
   sizeOf<raw.mln_camera_options>(),
@@ -3393,22 +3393,22 @@ MetalSurfaceDescriptor metalSurfaceDescriptorDefault() {
 
 /// Reads MapLibre Native's process-global network status.
 ///
-/// See `mln_network_status_get` in the
+/// See `mln_network_get_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-NetworkStatus networkStatusGet() => withNativeArena((arena) {
+NetworkStatus networkGetStatus() => withNativeArena((arena) {
   ensureAbiVersion();
   final outStatus = arena<Uint32>();
-  _check(raw.mln_network_status_get(outStatus, nativeDiagnostic));
+  _check(raw.mln_network_get_status(outStatus, nativeDiagnostic));
   return NetworkStatus.fromRawValue(outStatus.value);
 });
 
 /// Sets MapLibre Native's process-global network status.
 ///
-/// See `mln_network_status_set` in the
+/// See `mln_network_set_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-void networkStatusSet(NetworkStatus status) {
+void networkSetStatus(NetworkStatus status) {
   ensureAbiVersion();
-  return _check(raw.mln_network_status_set(status.rawValue, nativeDiagnostic));
+  return _check(raw.mln_network_set_status(status.rawValue, nativeDiagnostic));
 }
 
 /// Returns OpenGL borrowed-texture descriptor defaults for this C API
@@ -4416,6 +4416,402 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
+  /// Starts attachment of a caller-owned Metal texture target.
+  ///
+  /// See `mln_map_attach_metal_borrowed_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachMetalBorrowedTexture(
+    MetalBorrowedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_metal_borrowed_texture(
+          _handle.raw,
+          _writeMetalBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a session-owned Metal texture ring.
+  ///
+  /// See `mln_map_attach_metal_owned_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachMetalOwnedTexture(
+    MetalOwnedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_metal_owned_texture(
+          _handle.raw,
+          _writeMetalOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a Metal surface target.
+  ///
+  /// See `mln_map_attach_metal_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+  RenderSessionAttachment attachMetalSurface(
+    MetalSurfaceDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_metal_surface(
+          _handle.raw,
+          _writeMetalSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a caller-owned OpenGL texture target.
+  ///
+  /// See `mln_map_attach_opengl_borrowed_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachOpenglBorrowedTexture(
+    OpenglBorrowedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_opengl_borrowed_texture(
+          _handle.raw,
+          _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a session-owned OpenGL texture ring.
+  ///
+  /// See `mln_map_attach_opengl_owned_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachOpenglOwnedTexture(
+    OpenglOwnedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_opengl_owned_texture(
+          _handle.raw,
+          _writeOpenglOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of an OpenGL surface target.
+  ///
+  /// See `mln_map_attach_opengl_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+  RenderSessionAttachment attachOpenglSurface(
+    OpenglSurfaceDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_opengl_surface(
+          _handle.raw,
+          _writeOpenglSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a caller-owned Vulkan texture target.
+  ///
+  /// See `mln_map_attach_vulkan_borrowed_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachVulkanBorrowedTexture(
+    VulkanBorrowedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_vulkan_borrowed_texture(
+          _handle.raw,
+          _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a session-owned Vulkan texture ring.
+  ///
+  /// See `mln_map_attach_vulkan_owned_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachVulkanOwnedTexture(
+    VulkanOwnedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_vulkan_owned_texture(
+          _handle.raw,
+          _writeVulkanOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a Vulkan surface target.
+  ///
+  /// See `mln_map_attach_vulkan_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+  RenderSessionAttachment attachVulkanSurface(
+    VulkanSurfaceDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_vulkan_surface(
+          _handle.raw,
+          _writeVulkanSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a caller-owned WebGPU texture target.
+  ///
+  /// See `mln_map_attach_webgpu_borrowed_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachWebgpuBorrowedTexture(
+    WebgpuBorrowedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_webgpu_borrowed_texture(
+          _handle.raw,
+          _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a session-owned WebGPU texture ring.
+  ///
+  /// See `mln_map_attach_webgpu_owned_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  RenderSessionAttachment attachWebgpuOwnedTexture(
+    WebgpuOwnedTextureDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_webgpu_owned_texture(
+          _handle.raw,
+          _writeWebgpuOwnedTextureDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
+  /// Starts attachment of a WebGPU surface target.
+  ///
+  /// See `mln_map_attach_webgpu_surface` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+  RenderSessionAttachment attachWebgpuSurface(
+    WebgpuSurfaceDescriptor descriptor,
+    RenderSessionAttachOptions options,
+  ) {
+    final registrations = _NativeRegistrations(_NativeCallbackPorts());
+    return _attach(
+      (arena, completion, outSession) => registrations.run(
+        () => raw.mln_map_attach_webgpu_surface(
+          _handle.raw,
+          _writeWebgpuSurfaceDescriptor(descriptor, arena),
+          _writeRenderSessionAttachOptions(options, arena, registrations),
+          outSession,
+          completion,
+          nativeDiagnostic,
+        ),
+      ),
+      (handle) => _adoptOwned(
+        handle,
+        () =>
+            (RenderSessionHandle._(this, NativeRenderSession(handle))
+              .._state.retain(registrations)),
+        (handle) {
+          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
+        },
+      ),
+      RenderSessionAttachment.new,
+    );
+  }
+
   /// Begins a command group, which holds this map's render updates until the
   /// group ends.
   ///
@@ -4489,38 +4885,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   });
 
-  /// Starts an ordered camera read.
-  ///
-  /// See `mln_map_camera_query` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CameraQueryResult> cameraQuery() => _query(
-    _resultCameraQueryResult,
-    (arena, completion) =>
-        raw.mln_map_camera_query(_handle.raw, completion, nativeDiagnostic),
-  );
-
-  /// Copies the camera from the latest immutable map snapshot.
-  ///
-  /// See `mln_map_camera_snapshot_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  (CameraOptions, BigInt) cameraSnapshotGet() => withNativeArena((arena) {
-    final outCamera = arena<raw.mln_camera_options>();
-    outCamera.ref = raw.mln_camera_options_default();
-    final outGeneration = arena<Uint64>();
-    _check(
-      raw.mln_map_camera_snapshot_get(
-        _handle.raw,
-        outCamera,
-        outGeneration,
-        nativeDiagnostic,
-      ),
-    );
-    return (
-      _readCameraOptions(outCamera.ref),
-      uint64FromNative(outGeneration.value),
-    );
-  });
-
   /// Cancels the camera transitions running when this command commits.
   ///
   /// See `mln_map_cancel_transitions` in the
@@ -4530,6 +4894,27 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       _handle.raw,
       completion,
       nativeDiagnostic,
+    ),
+  );
+
+  /// Starts creation of a standalone projection from the map's ordered
+  /// transform state.
+  ///
+  /// See `mln_map_create_projection` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+  Future<MapProjectionHandle> createProjection() => _queryOwned(
+    raw.MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
+    (arena, completion) => raw.mln_map_create_projection(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+    (handle) => _adoptOwned(
+      handle,
+      () => MapProjectionHandle._(NativeMapProjection(handle)),
+      (handle) {
+        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
+      },
     ),
   );
 
@@ -4562,6 +4947,38 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered camera read.
+  ///
+  /// See `mln_map_get_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  Future<CameraQueryResult> getCamera() => _query(
+    _resultCameraQueryResult,
+    (arena, completion) =>
+        raw.mln_map_get_camera(_handle.raw, completion, nativeDiagnostic),
+  );
+
+  /// Copies the camera from the latest immutable map snapshot.
+  ///
+  /// See `mln_map_get_camera_snapshot` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  (CameraOptions, BigInt) getCameraSnapshot() => withNativeArena((arena) {
+    final outCamera = arena<raw.mln_camera_options>();
+    outCamera.ref = raw.mln_camera_options_default();
+    final outGeneration = arena<Uint64>();
+    _check(
+      raw.mln_map_get_camera_snapshot(
+        _handle.raw,
+        outCamera,
+        outGeneration,
+        nativeDiagnostic,
+      ),
+    );
+    return (
+      _readCameraOptions(outCamera.ref),
+      uint64FromNative(outGeneration.value),
+    );
+  });
 
   /// Starts an ordered read of per-feature state from this map.
   ///
@@ -4603,35 +5020,31 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
         ),
       );
 
-  /// Serializes one layer filter as a style-spec JSON value.
+  /// Starts an ordered copy of the last successfully parsed style document.
   ///
-  /// See `mln_map_get_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List?> getLayerFilter(String layerId) => _queryOptional(
-    _resultUint8ListOrNull,
-    (arena, completion) => raw.mln_map_get_layer_filter(
+  /// See `mln_map_get_loaded_style_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<Uint8List> getLoadedStyleJson() => _query(
+    _resultUint8List,
+    (arena, completion) => raw.mln_map_get_loaded_style_json(
       _handle.raw,
-      nativeStringView(layerId, arena).value,
       completion,
       nativeDiagnostic,
     ),
   );
 
-  /// Serializes one layer property as a style-spec JSON value.
+  /// Copies the latest immutable state published by the map worker.
   ///
-  /// See `mln_map_get_layer_property` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List?> getLayerProperty(String layerId, String propertyName) =>
-      _queryOptional(
-        _resultUint8ListOrNull,
-        (arena, completion) => raw.mln_map_get_layer_property(
-          _handle.raw,
-          nativeStringView(layerId, arena).value,
-          nativeStringView(propertyName, arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
+  /// See `mln_map_get_snapshot` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  MapSnapshot getSnapshot() => withNativeArena((arena) {
+    final outSnapshot = arena<raw.mln_map_snapshot>();
+    outSnapshot.ref.size = sizeOf<raw.mln_map_snapshot>();
+    _check(
+      raw.mln_map_get_snapshot(_handle.raw, outSnapshot, nativeDiagnostic),
+    );
+    return _readMapSnapshot(outSnapshot.ref);
+  });
 
   /// Copies one complete runtime style image.
   ///
@@ -4661,6 +5074,20 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
+  /// Serializes one layer filter as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_style_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<Uint8List?> getStyleLayerFilter(String layerId) => _queryOptional(
+    _resultUint8ListOrNull,
+    (arena, completion) => raw.mln_map_get_style_layer_filter(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Serializes one style layer as a full style-spec layer JSON object.
   ///
   /// See `mln_map_get_style_layer_json` in the
@@ -4670,6 +5097,24 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     (arena, completion) => raw.mln_map_get_style_layer_json(
       _handle.raw,
       nativeStringView(layerId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Serializes one layer property as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_style_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<Uint8List?> getStyleLayerProperty(
+    String layerId,
+    String propertyName,
+  ) => _queryOptional(
+    _resultUint8ListOrNull,
+    (arena, completion) => raw.mln_map_get_style_layer_property(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView(propertyName, arena).value,
       completion,
       nativeDiagnostic,
     ),
@@ -4715,6 +5160,16 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       completion,
       nativeDiagnostic,
     ),
+  );
+
+  /// Starts an ordered copy of the last requested style URL.
+  ///
+  /// See `mln_map_get_style_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<String> getStyleUrl() => _query(
+    _resultString,
+    (arena, completion) =>
+        raw.mln_map_get_style_url(_handle.raw, completion, nativeDiagnostic),
   );
 
   /// Invalidates custom geometry source data inside one geographic region.
@@ -4896,19 +5351,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Starts an ordered copy of the last successfully parsed style document.
-  ///
-  /// See `mln_map_loaded_style_json` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<Uint8List> loadedStyleJson() => _query(
-    _resultUint8List,
-    (arena, completion) => raw.mln_map_loaded_style_json(
-      _handle.raw,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Starts an ordered query of meters per logical pixel at a latitude and the
   /// current map zoom. The completion borrows one double.
   ///
@@ -4979,27 +5421,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         );
       });
-
-  /// Starts creation of a standalone projection from the map's ordered
-  /// transform state.
-  ///
-  /// See `mln_map_projection_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  Future<MapProjectionHandle> projectionCreate() => _queryOwned(
-    raw.MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
-    (arena, completion) => raw.mln_map_projection_create(
-      _handle.raw,
-      completion,
-      nativeDiagnostic,
-    ),
-    (handle) => _adoptOwned(
-      handle,
-      () => MapProjectionHandle._(NativeMapProjection(handle)),
-      (handle) {
-        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
-      },
-    ),
-  );
 
   /// Releases a map after synchronous state preflight.
   ///
@@ -5349,127 +5770,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
         ),
       );
 
-  /// Sets or clears one layer filter.
-  ///
-  /// See `mln_map_set_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLayerFilter(
-    String layerId, {
-    Uint8List? filter,
-  }) => _command(
-    (arena, completion) => raw.mln_map_set_layer_filter(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      filter == null
-          ? nullptr
-          : (() {
-              final storage = arena<raw.mln_buffer_view>();
-              storage.ref = nativeBufferView(filter, arena);
-              return storage;
-            })(),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets the highest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_layer_max_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLayerMaxZoom(String layerId, double maxZoom) =>
-      _command(
-        (arena, completion) => raw.mln_map_set_layer_max_zoom(
-          _handle.raw,
-          nativeStringView(layerId, arena).value,
-          maxZoom,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
-
-  /// Sets the lowest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_layer_min_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLayerMinZoom(String layerId, double minZoom) =>
-      _command(
-        (arena, completion) => raw.mln_map_set_layer_min_zoom(
-          _handle.raw,
-          nativeStringView(layerId, arena).value,
-          minZoom,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
-
-  /// Sets one layer property using its MapLibre style-spec property name.
-  ///
-  /// See `mln_map_set_layer_property` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLayerProperty(
-    String layerId,
-    String propertyName,
-    Uint8List value,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_layer_property(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView(propertyName, arena).value,
-      nativeBufferView(value, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets one layer's source ID.
-  ///
-  /// See `mln_map_set_layer_source_id` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLayerSourceId(String layerId, String sourceId) =>
-      _command(
-        (arena, completion) => raw.mln_map_set_layer_source_id(
-          _handle.raw,
-          nativeStringView(layerId, arena).value,
-          nativeStringView(sourceId, arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
-
-  /// Sets one layer's source-layer ID.
-  ///
-  /// See `mln_map_set_layer_source_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLayerSourceLayer(
-    String layerId, {
-    String? sourceLayer,
-  }) => _command(
-    (arena, completion) => raw.mln_map_set_layer_source_layer(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      nativeStringView((sourceLayer ?? ''), arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Sets whether one layer draws.
-  ///
-  /// See `mln_map_set_layer_visibility` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<CommandCompletion> setLayerVisibility(
-    String layerId,
-    StyleLayerVisibility visibility,
-  ) => _command(
-    (arena, completion) => raw.mln_map_set_layer_visibility(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      visibility.rawValue,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Sets a location indicator layer accuracy radius in meters.
   ///
   /// See `mln_map_set_location_indicator_accuracy_radius` in the
@@ -5601,6 +5901,133 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
+  /// Sets or clears one layer filter.
+  ///
+  /// See `mln_map_set_style_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setStyleLayerFilter(
+    String layerId, {
+    Uint8List? filter,
+  }) => _command(
+    (arena, completion) => raw.mln_map_set_style_layer_filter(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      filter == null
+          ? nullptr
+          : (() {
+              final storage = arena<raw.mln_buffer_view>();
+              storage.ref = nativeBufferView(filter, arena);
+              return storage;
+            })(),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets the highest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_style_layer_max_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setStyleLayerMaxZoom(
+    String layerId,
+    double maxZoom,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_layer_max_zoom(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      maxZoom,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets the lowest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_style_layer_min_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setStyleLayerMinZoom(
+    String layerId,
+    double minZoom,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_layer_min_zoom(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      minZoom,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets one layer property using its MapLibre style-spec property name.
+  ///
+  /// See `mln_map_set_style_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setStyleLayerProperty(
+    String layerId,
+    String propertyName,
+    Uint8List value,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_layer_property(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView(propertyName, arena).value,
+      nativeBufferView(value, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets one layer's source ID.
+  ///
+  /// See `mln_map_set_style_layer_source_id` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setStyleLayerSourceId(
+    String layerId,
+    String sourceId,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_layer_source_id(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView(sourceId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets one layer's source-layer ID.
+  ///
+  /// See `mln_map_set_style_layer_source_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setStyleLayerSourceLayer(
+    String layerId, {
+    String? sourceLayer,
+  }) => _command(
+    (arena, completion) => raw.mln_map_set_style_layer_source_layer(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      nativeStringView((sourceLayer ?? ''), arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Sets whether one layer draws.
+  ///
+  /// See `mln_map_set_style_layer_visibility` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  Future<CommandCompletion> setStyleLayerVisibility(
+    String layerId,
+    StyleLayerVisibility visibility,
+  ) => _command(
+    (arena, completion) => raw.mln_map_set_style_layer_visibility(
+      _handle.raw,
+      nativeStringView(layerId, arena).value,
+      visibility.rawValue,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Sets the style light from a style-spec light JSON object.
   ///
   /// See `mln_map_set_style_light_json` in the
@@ -5704,29 +6131,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
         ),
       );
 
-  /// Copies the latest immutable state published by the map worker.
-  ///
-  /// See `mln_map_snapshot_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  MapSnapshot snapshotGet() => withNativeArena((arena) {
-    final outSnapshot = arena<raw.mln_map_snapshot>();
-    outSnapshot.ref.size = sizeOf<raw.mln_map_snapshot>();
-    _check(
-      raw.mln_map_snapshot_get(_handle.raw, outSnapshot, nativeDiagnostic),
-    );
-    return _readMapSnapshot(outSnapshot.ref);
-  });
-
-  /// Starts an ordered copy of the last requested style URL.
-  ///
-  /// See `mln_map_style_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<String> styleUrl() => _query(
-    _resultString,
-    (arena, completion) =>
-        raw.mln_map_style_url(_handle.raw, completion, nativeDiagnostic),
-  );
-
   /// Submits one atomic camera update.
   ///
   /// See `mln_map_update_camera` in the
@@ -5739,402 +6143,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
-
-  /// Starts attachment of a caller-owned Metal texture target.
-  ///
-  /// See `mln_metal_borrowed_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment metalBorrowedTextureAttach(
-    MetalBorrowedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_metal_borrowed_texture_attach(
-          _handle.raw,
-          _writeMetalBorrowedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a session-owned Metal texture ring.
-  ///
-  /// See `mln_metal_owned_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment metalOwnedTextureAttach(
-    MetalOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_metal_owned_texture_attach(
-          _handle.raw,
-          _writeMetalOwnedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a Metal surface target.
-  ///
-  /// See `mln_metal_surface_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment metalSurfaceAttach(
-    MetalSurfaceDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_metal_surface_attach(
-          _handle.raw,
-          _writeMetalSurfaceDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a caller-owned OpenGL texture target.
-  ///
-  /// See `mln_opengl_borrowed_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment openglBorrowedTextureAttach(
-    OpenglBorrowedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_opengl_borrowed_texture_attach(
-          _handle.raw,
-          _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a session-owned OpenGL texture ring.
-  ///
-  /// See `mln_opengl_owned_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment openglOwnedTextureAttach(
-    OpenglOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_opengl_owned_texture_attach(
-          _handle.raw,
-          _writeOpenglOwnedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of an OpenGL surface target.
-  ///
-  /// See `mln_opengl_surface_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment openglSurfaceAttach(
-    OpenglSurfaceDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_opengl_surface_attach(
-          _handle.raw,
-          _writeOpenglSurfaceDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a caller-owned Vulkan texture target.
-  ///
-  /// See `mln_vulkan_borrowed_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment vulkanBorrowedTextureAttach(
-    VulkanBorrowedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_vulkan_borrowed_texture_attach(
-          _handle.raw,
-          _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a session-owned Vulkan texture ring.
-  ///
-  /// See `mln_vulkan_owned_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment vulkanOwnedTextureAttach(
-    VulkanOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_vulkan_owned_texture_attach(
-          _handle.raw,
-          _writeVulkanOwnedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a Vulkan surface target.
-  ///
-  /// See `mln_vulkan_surface_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment vulkanSurfaceAttach(
-    VulkanSurfaceDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_vulkan_surface_attach(
-          _handle.raw,
-          _writeVulkanSurfaceDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a caller-owned WebGPU texture target.
-  ///
-  /// See `mln_webgpu_borrowed_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment webgpuBorrowedTextureAttach(
-    WebgpuBorrowedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_webgpu_borrowed_texture_attach(
-          _handle.raw,
-          _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a session-owned WebGPU texture ring.
-  ///
-  /// See `mln_webgpu_owned_texture_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  RenderSessionAttachment webgpuOwnedTextureAttach(
-    WebgpuOwnedTextureDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_webgpu_owned_texture_attach(
-          _handle.raw,
-          _writeWebgpuOwnedTextureDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
-
-  /// Starts attachment of a WebGPU surface target.
-  ///
-  /// See `mln_webgpu_surface_attach` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  RenderSessionAttachment webgpuSurfaceAttach(
-    WebgpuSurfaceDescriptor descriptor,
-    RenderSessionAttachOptions options,
-  ) {
-    final registrations = _NativeRegistrations(_NativeCallbackPorts());
-    return _attach(
-      (arena, completion, outSession) => registrations.run(
-        () => raw.mln_webgpu_surface_attach(
-          _handle.raw,
-          _writeWebgpuSurfaceDescriptor(descriptor, arena),
-          _writeRenderSessionAttachOptions(options, arena, registrations),
-          outSession,
-          completion,
-          nativeDiagnostic,
-        ),
-      ),
-      (handle) => _adoptOwned(
-        handle,
-        () =>
-            (RenderSessionHandle._(this, NativeRenderSession(handle))
-              .._state.retain(registrations)),
-        (handle) {
-          _check(raw.mln_render_session_dispose(handle, nativeDiagnostic));
-        },
-      ),
-      RenderSessionAttachment.new,
-    );
-  }
 }
 
 /// Issued `mln_map_projection` handle id.
@@ -6398,63 +6406,6 @@ final class RenderSessionHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  /// Starts an ordered caller-owned Metal texture replacement.
-  ///
-  /// See `mln_metal_borrowed_texture_set_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  Future<void> metalBorrowedTextureSetTarget(
-    MetalBorrowedTextureDescriptor descriptor,
-  ) => _run(
-    (arena, completion) => raw.mln_metal_borrowed_texture_set_target(
-      _handle.raw,
-      _writeMetalBorrowedTextureDescriptor(descriptor, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Starts an ordered Metal surface replacement.
-  ///
-  /// See `mln_metal_surface_set_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> metalSurfaceSetTarget(MetalSurfaceDescriptor descriptor) => _run(
-    (arena, completion) => raw.mln_metal_surface_set_target(
-      _handle.raw,
-      _writeMetalSurfaceDescriptor(descriptor, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Starts an ordered caller-owned OpenGL texture replacement.
-  ///
-  /// See `mln_opengl_borrowed_texture_set_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  Future<void> openglBorrowedTextureSetTarget(
-    OpenglBorrowedTextureDescriptor descriptor,
-  ) => _run(
-    (arena, completion) => raw.mln_opengl_borrowed_texture_set_target(
-      _handle.raw,
-      _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Starts an ordered OpenGL surface replacement.
-  ///
-  /// See `mln_opengl_surface_set_target` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> openglSurfaceSetTarget(OpenglSurfaceDescriptor descriptor) =>
-      _run(
-        (arena, completion) => raw.mln_opengl_surface_set_target(
-          _handle.raw,
-          _writeOpenglSurfaceDescriptor(descriptor, arena),
-          completion,
-          nativeDiagnostic,
-        ),
-      );
-
   /// Irreversibly closes control and mailboxes without graphics calls.
   ///
   /// See `mln_render_session_abandon` in the
@@ -6518,6 +6469,32 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Copies the last completed rendered transform into an independent
+  /// projection. Callable from any thread. Returns invalid state before a
+  /// completed render, after an extent or target change, or after detachment.
+  /// The caller owns the returned projection, which remains usable after the
+  /// session is released. out_projection must point to a null handle.
+  ///
+  /// See `mln_render_session_create_projection` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+  MapProjectionHandle createProjection() => withNativeArena((arena) {
+    final outProjection = arena<Uint64>();
+    _check(
+      raw.mln_render_session_create_projection(
+        _handle.raw,
+        outProjection,
+        nativeDiagnostic,
+      ),
+    );
+    return _adoptOwned(
+      outProjection.value,
+      () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
+      (handle) {
+        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
+      },
+    );
+  });
 
   /// Retires a detached or abandoned session handle. The call is CPU-only and
   /// may run on any native thread, including from one of the session's own
@@ -6622,32 +6599,6 @@ final class RenderSessionHandle implements Finalizable {
     return _readRenderSessionSnapshot(outSnapshot.ref);
   });
 
-  /// Copies the last completed rendered transform into an independent
-  /// projection. Callable from any thread. Returns invalid state before a
-  /// completed render, after an extent or target change, or after detachment.
-  /// The caller owns the returned projection, which remains usable after the
-  /// session is released. out_projection must point to a null handle.
-  ///
-  /// See `mln_render_session_projection_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  MapProjectionHandle projectionCreate() => withNativeArena((arena) {
-    final outProjection = arena<Uint64>();
-    _check(
-      raw.mln_render_session_projection_create(
-        _handle.raw,
-        outProjection,
-        nativeDiagnostic,
-      ),
-    );
-    return _adoptOwned(
-      outProjection.value,
-      () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
-      (handle) {
-        _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
-      },
-    );
-  });
-
   /// Starts a feature-extension query against the latest driver state. The
   /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
   /// 1), valid only for the callback.
@@ -6722,6 +6673,20 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
+  /// Reads back the latest frame of the session's owned texture as
+  /// premultiplied RGBA8.
+  ///
+  /// See `mln_render_session_read_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  Future<TextureReadbackResult> readTexture() => _query(
+    _resultTextureReadbackResult,
+    (arena, completion) => raw.mln_render_session_read_texture(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Starts best-effort release of renderer caches.
   ///
   /// See `mln_render_session_reduce_memory_use` in the
@@ -6789,41 +6754,88 @@ final class RenderSessionHandle implements Finalizable {
     return outServiced.value;
   });
 
-  /// Starts readback of the latest rendered texture frame.
+  /// Starts an ordered caller-owned Metal texture replacement.
   ///
-  /// See `mln_texture_read_premultiplied_rgba8` in the
+  /// See `mln_render_session_set_metal_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  Future<TextureReadbackResult> textureReadPremultipliedRgba8() => _query(
-    _resultTextureReadbackResult,
-    (arena, completion) => raw.mln_texture_read_premultiplied_rgba8(
+  Future<void> setMetalBorrowedTextureTarget(
+    MetalBorrowedTextureDescriptor descriptor,
+  ) => _run(
+    (arena, completion) =>
+        raw.mln_render_session_set_metal_borrowed_texture_target(
+          _handle.raw,
+          _writeMetalBorrowedTextureDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
+  );
+
+  /// Starts an ordered Metal surface replacement.
+  ///
+  /// See `mln_render_session_set_metal_surface_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+  Future<void> setMetalSurfaceTarget(MetalSurfaceDescriptor descriptor) => _run(
+    (arena, completion) => raw.mln_render_session_set_metal_surface_target(
       _handle.raw,
+      _writeMetalSurfaceDescriptor(descriptor, arena),
       completion,
       nativeDiagnostic,
     ),
   );
 
+  /// Starts an ordered caller-owned OpenGL texture replacement.
+  ///
+  /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  Future<void> setOpenglBorrowedTextureTarget(
+    OpenglBorrowedTextureDescriptor descriptor,
+  ) => _run(
+    (arena, completion) =>
+        raw.mln_render_session_set_opengl_borrowed_texture_target(
+          _handle.raw,
+          _writeOpenglBorrowedTextureDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
+  );
+
+  /// Starts an ordered OpenGL surface replacement.
+  ///
+  /// See `mln_render_session_set_opengl_surface_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+  Future<void> setOpenglSurfaceTarget(OpenglSurfaceDescriptor descriptor) =>
+      _run(
+        (arena, completion) => raw.mln_render_session_set_opengl_surface_target(
+          _handle.raw,
+          _writeOpenglSurfaceDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
+      );
+
   /// Starts an ordered caller-owned Vulkan texture replacement.
   ///
-  /// See `mln_vulkan_borrowed_texture_set_target` in the
+  /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  Future<void> vulkanBorrowedTextureSetTarget(
+  Future<void> setVulkanBorrowedTextureTarget(
     VulkanBorrowedTextureDescriptor descriptor,
   ) => _run(
-    (arena, completion) => raw.mln_vulkan_borrowed_texture_set_target(
-      _handle.raw,
-      _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
-      completion,
-      nativeDiagnostic,
-    ),
+    (arena, completion) =>
+        raw.mln_render_session_set_vulkan_borrowed_texture_target(
+          _handle.raw,
+          _writeVulkanBorrowedTextureDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
   );
 
   /// Starts an ordered Vulkan surface replacement.
   ///
-  /// See `mln_vulkan_surface_set_target` in the
+  /// See `mln_render_session_set_vulkan_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> vulkanSurfaceSetTarget(VulkanSurfaceDescriptor descriptor) =>
+  Future<void> setVulkanSurfaceTarget(VulkanSurfaceDescriptor descriptor) =>
       _run(
-        (arena, completion) => raw.mln_vulkan_surface_set_target(
+        (arena, completion) => raw.mln_render_session_set_vulkan_surface_target(
           _handle.raw,
           _writeVulkanSurfaceDescriptor(descriptor, arena),
           completion,
@@ -6833,26 +6845,27 @@ final class RenderSessionHandle implements Finalizable {
 
   /// Starts an ordered caller-owned WebGPU texture replacement.
   ///
-  /// See `mln_webgpu_borrowed_texture_set_target` in the
+  /// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  Future<void> webgpuBorrowedTextureSetTarget(
+  Future<void> setWebgpuBorrowedTextureTarget(
     WebgpuBorrowedTextureDescriptor descriptor,
   ) => _run(
-    (arena, completion) => raw.mln_webgpu_borrowed_texture_set_target(
-      _handle.raw,
-      _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
-      completion,
-      nativeDiagnostic,
-    ),
+    (arena, completion) =>
+        raw.mln_render_session_set_webgpu_borrowed_texture_target(
+          _handle.raw,
+          _writeWebgpuBorrowedTextureDescriptor(descriptor, arena),
+          completion,
+          nativeDiagnostic,
+        ),
   );
 
   /// Starts an ordered WebGPU surface replacement.
   ///
-  /// See `mln_webgpu_surface_set_target` in the
+  /// See `mln_render_session_set_webgpu_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  Future<void> webgpuSurfaceSetTarget(WebgpuSurfaceDescriptor descriptor) =>
+  Future<void> setWebgpuSurfaceTarget(WebgpuSurfaceDescriptor descriptor) =>
       _run(
-        (arena, completion) => raw.mln_webgpu_surface_set_target(
+        (arena, completion) => raw.mln_render_session_set_webgpu_surface_target(
           _handle.raw,
           _writeWebgpuSurfaceDescriptor(descriptor, arena),
           completion,
@@ -6885,22 +6898,6 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  /// Reports whether MapLibre has cancelled a C API resource provider request.
-  ///
-  /// See `mln_resource_request_cancelled` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  bool cancelled() => withNativeArena((arena) {
-    final outCancelled = arena<Bool>();
-    _check(
-      raw.mln_resource_request_cancelled(
-        _handle.raw,
-        outCancelled,
-        nativeDiagnostic,
-      ),
-    );
-    return outCancelled.value;
-  });
-
   /// Completes a C API resource provider request.
   ///
   /// See `mln_resource_request_complete` in the
@@ -6913,6 +6910,22 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
         nativeDiagnostic,
       ),
     );
+  });
+
+  /// Reports whether MapLibre has cancelled a C API resource provider request.
+  ///
+  /// See `mln_resource_request_is_cancelled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  bool isCancelled() => withNativeArena((arena) {
+    final outCancelled = arena<Bool>();
+    _check(
+      raw.mln_resource_request_is_cancelled(
+        _handle.raw,
+        outCancelled,
+        nativeDiagnostic,
+      ),
+    );
+    return outCancelled.value;
   });
 
   /// Releases the provider's reference to a resource request handle.
@@ -7009,27 +7022,6 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  /// Creates a map on the runtime worker.
-  ///
-  /// See `mln_map_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<MapHandle> mapCreate(MapOptions options) => _queryOwned(
-    raw.MLN_ADAPTER_COMPLETION_COPY_MAP,
-    (arena, completion) => raw.mln_map_create(
-      _handle.raw,
-      _writeMapOptions(options, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-    (handle) => _adoptOwned(
-      handle,
-      () => MapHandle._(this, NativeMap(handle)),
-      (handle) {
-        _check(raw.mln_map_dispose(handle, nativeDiagnostic));
-      },
-    ),
-  );
-
   /// Starts an ordered runtime barrier.
   ///
   /// See `mln_runtime_barrier` in the
@@ -7075,6 +7067,59 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
+  /// Creates a map on the runtime worker.
+  ///
+  /// See `mln_runtime_create_map` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<MapHandle> createMap(MapOptions options) => _queryOwned(
+    raw.MLN_ADAPTER_COMPLETION_COPY_MAP,
+    (arena, completion) => raw.mln_runtime_create_map(
+      _handle.raw,
+      _writeMapOptions(options, arena),
+      completion,
+      nativeDiagnostic,
+    ),
+    (handle) => _adoptOwned(
+      handle,
+      () => MapHandle._(this, NativeMap(handle)),
+      (handle) {
+        _check(raw.mln_map_dispose(handle, nativeDiagnostic));
+      },
+    ),
+  );
+
+  /// Starts creating an offline region.
+  ///
+  /// See `mln_runtime_create_offline_region` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<OfflineRegionInfo> createOfflineRegion(
+    OfflineRegionDefinition definition,
+    Uint8List metadata,
+  ) => _query(_resultOfflineRegionInfo, (arena, completion) {
+    final bytesmetadata = nativeBufferView(metadata, arena);
+    return raw.mln_runtime_create_offline_region(
+      _handle.raw,
+      _writeOfflineRegionDefinition(definition, arena),
+      bytesmetadata.data.cast(),
+      bytesmetadata.size,
+      completion,
+      nativeDiagnostic,
+    );
+  });
+
+  /// Deletes an offline region.
+  ///
+  /// See `mln_runtime_delete_offline_region` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<void> deleteOfflineRegion(int regionId) => _run(
+    (arena, completion) => raw.mln_runtime_delete_offline_region(
+      _handle.raw,
+      regionId,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Consumes a runtime handle without observing its asynchronous retirement.
   ///
   /// See `mln_runtime_dispose` in the
@@ -7113,45 +7158,13 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
     return RuntimeEventMask.fromRawValue(outMask.value);
   });
 
-  /// Starts creating an offline region.
-  ///
-  /// See `mln_runtime_offline_region_create` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<OfflineRegionInfo> offlineRegionCreate(
-    OfflineRegionDefinition definition,
-    Uint8List metadata,
-  ) => _query(_resultOfflineRegionInfo, (arena, completion) {
-    final bytesmetadata = nativeBufferView(metadata, arena);
-    return raw.mln_runtime_offline_region_create(
-      _handle.raw,
-      _writeOfflineRegionDefinition(definition, arena),
-      bytesmetadata.data.cast(),
-      bytesmetadata.size,
-      completion,
-      nativeDiagnostic,
-    );
-  });
-
-  /// Deletes an offline region.
-  ///
-  /// See `mln_runtime_offline_region_delete` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<void> offlineRegionDelete(int regionId) => _run(
-    (arena, completion) => raw.mln_runtime_offline_region_delete(
-      _handle.raw,
-      regionId,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Starts getting one offline region by ID.
   ///
-  /// See `mln_runtime_offline_region_get` in the
+  /// See `mln_runtime_get_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<OfflineRegionInfo?> offlineRegionGet(int regionId) => _queryOptional(
+  Future<OfflineRegionInfo?> getOfflineRegion(int regionId) => _queryOptional(
     _resultOfflineRegionInfo,
-    (arena, completion) => raw.mln_runtime_offline_region_get(
+    (arena, completion) => raw.mln_runtime_get_offline_region(
       _handle.raw,
       regionId,
       completion,
@@ -7161,11 +7174,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
 
   /// Starts getting the current download status for an offline region.
   ///
-  /// See `mln_runtime_offline_region_get_status` in the
+  /// See `mln_runtime_get_offline_region_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<OfflineRegionStatus> offlineRegionGetStatus(int regionId) => _query(
+  Future<OfflineRegionStatus> getOfflineRegionStatus(int regionId) => _query(
     _resultOfflineRegionStatus,
-    (arena, completion) => raw.mln_runtime_offline_region_get_status(
+    (arena, completion) => raw.mln_runtime_get_offline_region_status(
       _handle.raw,
       regionId,
       completion,
@@ -7175,74 +7188,24 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
 
   /// Invalidates cached resources for an offline region.
   ///
-  /// See `mln_runtime_offline_region_invalidate` in the
+  /// See `mln_runtime_invalidate_offline_region` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<void> offlineRegionInvalidate(int regionId) => _run(
-    (arena, completion) => raw.mln_runtime_offline_region_invalidate(
+  Future<void> invalidateOfflineRegion(int regionId) => _run(
+    (arena, completion) => raw.mln_runtime_invalidate_offline_region(
       _handle.raw,
       regionId,
       completion,
       nativeDiagnostic,
     ),
   );
-
-  /// Sets an offline region's native download state.
-  ///
-  /// See `mln_runtime_offline_region_set_download_state` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<void> offlineRegionSetDownloadState(
-    int regionId,
-    OfflineRegionDownloadState state,
-  ) => _run(
-    (arena, completion) => raw.mln_runtime_offline_region_set_download_state(
-      _handle.raw,
-      regionId,
-      state.rawValue,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Enables or disables runtime events for an offline region.
-  ///
-  /// See `mln_runtime_offline_region_set_observed` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<void> offlineRegionSetObserved(int regionId, bool observed) => _run(
-    (arena, completion) => raw.mln_runtime_offline_region_set_observed(
-      _handle.raw,
-      regionId,
-      observed,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Starts updating opaque binary metadata for an offline region.
-  ///
-  /// See `mln_runtime_offline_region_update_metadata` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<OfflineRegionInfo> offlineRegionUpdateMetadata(
-    int regionId,
-    Uint8List metadata,
-  ) => _query(_resultOfflineRegionInfo, (arena, completion) {
-    final bytesmetadata = nativeBufferView(metadata, arena);
-    return raw.mln_runtime_offline_region_update_metadata(
-      _handle.raw,
-      regionId,
-      bytesmetadata.data.cast(),
-      bytesmetadata.size,
-      completion,
-      nativeDiagnostic,
-    );
-  });
 
   /// Starts listing the offline regions in the runtime database.
   ///
-  /// See `mln_runtime_offline_regions_list` in the
+  /// See `mln_runtime_list_offline_regions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<List<OfflineRegionInfo>> offlineRegionsList() => _queryList(
+  Future<List<OfflineRegionInfo>> listOfflineRegions() => _queryList(
     _resultOfflineRegionInfo,
-    (arena, completion) => raw.mln_runtime_offline_regions_list(
+    (arena, completion) => raw.mln_runtime_list_offline_regions(
       _handle.raw,
       completion,
       nativeDiagnostic,
@@ -7251,13 +7214,13 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
 
   /// Starts merging offline regions from another MapLibre offline database.
   ///
-  /// See `mln_runtime_offline_regions_merge_database` in the
+  /// See `mln_runtime_merge_offline_regions` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-  Future<List<OfflineRegionInfo>> offlineRegionsMergeDatabase(
+  Future<List<OfflineRegionInfo>> mergeOfflineRegions(
     String sideDatabasePath,
   ) => _queryList(
     _resultOfflineRegionInfo,
-    (arena, completion) => raw.mln_runtime_offline_regions_merge_database(
+    (arena, completion) => raw.mln_runtime_merge_offline_regions(
       _handle.raw,
       nativeUtf8CString(sideDatabasePath, arena).pointer.cast<Char>(),
       completion,
@@ -7334,6 +7297,37 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
+  /// Sets an offline region's native download state.
+  ///
+  /// See `mln_runtime_set_offline_region_download_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<void> setOfflineRegionDownloadState(
+    int regionId,
+    OfflineRegionDownloadState state,
+  ) => _run(
+    (arena, completion) => raw.mln_runtime_set_offline_region_download_state(
+      _handle.raw,
+      regionId,
+      state.rawValue,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
+  /// Enables or disables runtime events for an offline region.
+  ///
+  /// See `mln_runtime_set_offline_region_observed` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<void> setOfflineRegionObserved(int regionId, bool observed) => _run(
+    (arena, completion) => raw.mln_runtime_set_offline_region_observed(
+      _handle.raw,
+      regionId,
+      observed,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Registers or replaces a runtime-scoped network resource provider.
   ///
   /// See `mln_runtime_set_resource_provider` in the
@@ -7375,6 +7369,25 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
           ),
         );
       });
+
+  /// Starts updating opaque binary metadata for an offline region.
+  ///
+  /// See `mln_runtime_update_offline_region_metadata` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<OfflineRegionInfo> updateOfflineRegionMetadata(
+    int regionId,
+    Uint8List metadata,
+  ) => _query(_resultOfflineRegionInfo, (arena, completion) {
+    final bytesmetadata = nativeBufferView(metadata, arena);
+    return raw.mln_runtime_update_offline_region_metadata(
+      _handle.raw,
+      regionId,
+      bytesmetadata.data.cast(),
+      bytesmetadata.size,
+      completion,
+      nativeDiagnostic,
+    );
+  });
 }
 
 /// A new session and the completion of the attachment that created it.

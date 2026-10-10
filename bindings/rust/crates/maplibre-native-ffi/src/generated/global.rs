@@ -285,25 +285,25 @@ pub fn metal_surface_descriptor_default() -> Result<MetalSurfaceDescriptor> {
 
 /// Reads MapLibre Native's process-global network status.
 ///
-/// See `mln_network_status_get` in the
+/// See `mln_network_get_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn network_status_get() -> Result<NetworkStatus> {
-    let mut call = Call::global("mln_network_status_get")?;
+pub fn network_get_status() -> Result<NetworkStatus> {
+    let mut call = Call::global("mln_network_get_status")?;
     let mut out_status: u32 = Default::default();
     call.status(|_, out_diagnostic| unsafe {
-        sys::mln_network_status_get(&mut out_status, out_diagnostic)
+        sys::mln_network_get_status(&mut out_status, out_diagnostic)
     })?;
     Ok(unsafe { from_native(out_status) }?)
 }
 
 /// Sets MapLibre Native's process-global network status.
 ///
-/// See `mln_network_status_set` in the
+/// See `mln_network_set_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn network_status_set(status: NetworkStatus) -> Result<()> {
-    let mut call = Call::global("mln_network_status_set")?;
+pub fn network_set_status(status: NetworkStatus) -> Result<()> {
+    let mut call = Call::global("mln_network_set_status")?;
     call.status(|_, out_diagnostic| unsafe {
-        sys::mln_network_status_set(status.to_native(), out_diagnostic)
+        sys::mln_network_set_status(status.to_native(), out_diagnostic)
     })?;
     Ok(())
 }
