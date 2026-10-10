@@ -107,22 +107,42 @@ object RenderSessionExitProbe {
     if (TestGraphics.backend == TestBackend.WGL) {
       // WGL has no core-worker owned texture, so the completion arrives inside driver service on
       // the host's graphics thread instead.
-      withOwnedTexture { complete(exitOnCompletion(session.reduceMemoryUse())) }
+      withOwnedTexture { exitInsideCompletion(session::reduceMemoryUse) { complete(it) } }
     } else {
       withMap(MapMode.STATIC, options = smallMapOptions(MapMode.STATIC, WIDTH, HEIGHT)) {
         val attachment = withContext(TestGraphics.thread) { attachCoreWorkerTexture(map) }
         attachment.ready.await()
-        exitOnCompletion(attachment.session.reduceMemoryUse())
-        // Exit ends the process from the core worker while this thread waits.
-        CountDownLatch(1).await()
+        exitInsideCompletion(attachment.session::reduceMemoryUse) {}
       }
     }
   }
 
-  private fun exitOnCompletion(completion: Deferred<Unit>): Deferred<Unit> = completion.also {
-    it.invokeOnCompletion {
-      println(EXITING_FROM_CALLBACK)
-      exitProcess(0)
+  /**
+   * Submits until a completion arrives inside the MapLibre callback that delivers it, exits from
+   * that callback, and never returns. A submission that completes before its handler is registered
+   * runs the handler inline on this thread, outside any callback, so it does not count. [deliver]
+   * drives a submission to completion when no core worker does.
+   */
+  private suspend fun exitInsideCompletion(
+    submit: () -> Deferred<Unit>,
+    deliver: suspend (Deferred<Unit>) -> Unit,
+  ): Nothing {
+    val submitter = Thread.currentThread()
+    while (true) {
+      var completedInline = false
+      val completion = submit()
+      completion.invokeOnCompletion {
+        if (Thread.currentThread() === submitter) {
+          completedInline = true
+        } else {
+          println(EXITING_FROM_CALLBACK)
+          exitProcess(0)
+        }
+      }
+      if (completedInline) continue
+      deliver(completion)
+      // Exit ends the process from the delivering thread while this thread waits.
+      CountDownLatch(1).await()
     }
   }
 
