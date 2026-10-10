@@ -62,12 +62,10 @@ class StatusMappingTest {
       val selector = FeatureStateSelector("source", featureId = "feature")
       val notAnObject =
         assertFailsWith<InvalidArgumentException> {
-          map.setFeatureState(selector, "[]".encodeToByteArray()).await()
+          map.setFeatureState(selector, "[]".encodeToByteArray())
         }
       val empty =
-        assertFailsWith<InvalidArgumentException> {
-          map.setFeatureState(selector, ByteArray(0)).await()
-        }
+        assertFailsWith<InvalidArgumentException> { map.setFeatureState(selector, ByteArray(0)) }
       assertTrue(notAnObject.diagnostic.isNotEmpty())
       assertTrue(empty.diagnostic.isNotEmpty())
       // A later call reports its own failure rather than an earlier call's.

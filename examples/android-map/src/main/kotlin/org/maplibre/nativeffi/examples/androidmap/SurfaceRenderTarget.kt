@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.examples.androidmap
 
 import android.util.Log
 import java.util.concurrent.Semaphore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.FrameDemand
@@ -84,32 +85,44 @@ private constructor(
   /**
    * Points the session at the surface the graphics context presents through now, and at the
    * viewport. A session resize carries the map's extent itself. An EGL surface replacement changes
-   * only the graphics resource, so that path submits the map resize alongside it. A caller whose
-   * outgoing surface is about to go passes the returned completion to [await], and a failure
+   * only the graphics resource, so that path submits the map resize alongside it, and the map logs
+   * that resize's own rejection or failure.
+   *
+   * The returned handover fails when native rejects the session's command or the command fails. A
+   * caller whose outgoing surface is about to go passes the handover to [await], and a failure
    * otherwise reaches [onFailure].
    */
   fun follow(
-    map: MapHandle,
+    state: MapState,
     graphics: GraphicsContext,
     viewport: Viewport,
     onFailure: (Throwable) -> Unit,
-  ): Deferred<*> {
+  ): Deferred<Unit> {
     this.viewport = viewport
-    val completion =
+    val handover = CompletableDeferred<Unit>()
+    handover.invokeOnCompletion { error -> if (error != null) onFailure(error) }
+    try {
       when (graphics) {
         is EglGraphicsContext -> {
-          val replacement =
-            session.setOpenglSurfaceTarget(
+          session
+            .setOpenglSurfaceTarget(
               OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
             )
-          map.resize(viewport.extent)
-          replacement
+            .invokeOnCompletion(handover::settle)
+          state.resize(viewport)
         }
-        is VulkanGraphicsContext -> session.resize(viewport.extent)
+        is VulkanGraphicsContext -> {
+          val resize = session.resize(viewport.extent)
+          resize.invokeOnCompletion { error ->
+            handover.settle(error ?: resize.terminalFailure("render session resize"))
+          }
+        }
         else -> error("Unsupported graphics context: ${graphics::class.java.name}")
       }
-    completion.invokeOnCompletion { error -> if (error != null) onFailure(error) }
-    return completion
+    } catch (error: RuntimeException) {
+      handover.completeExceptionally(error)
+    }
+    return handover
   }
 
   /**
@@ -236,4 +249,8 @@ private constructor(
       return target
     }
   }
+}
+
+private fun CompletableDeferred<Unit>.settle(error: Throwable?) {
+  if (error == null) complete(Unit) else completeExceptionally(error)
 }

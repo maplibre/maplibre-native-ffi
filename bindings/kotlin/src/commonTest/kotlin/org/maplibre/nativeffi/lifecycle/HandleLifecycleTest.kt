@@ -38,7 +38,7 @@ class HandleLifecycleTest {
     // A second release reports the same native teardown instead of starting another.
     assertSame(teardown, runtime.release())
     teardown.awaitWithin("the runtime teardown")
-    val failure = assertFailsWith<InvalidStateException> { runtime.barrier().await() }
+    val failure = assertFailsWith<InvalidStateException> { runtime.barrier() }
     assertEquals("RuntimeHandle is closed", failure.diagnostic)
     assertNull(failure.nativeStatusCode)
   }
@@ -48,8 +48,9 @@ class HandleLifecycleTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
 
-    // Native refuses to release a runtime with a live map, and the handle rolls back to live.
-    assertFailsWith<InvalidStateException> { runtime.release().await() }
+    // Native refuses to release a runtime with a live map, so the call throws and the handle rolls
+    // back to live.
+    assertFailsWith<InvalidStateException> { runtime.release() }
     assertFalse(runtime.isClosed)
     runtime.barrier().awaitWithin("a barrier on the refused runtime")
 

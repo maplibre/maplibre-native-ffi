@@ -71,7 +71,10 @@ internal class HandleStateCore(
     })
   }
 
-  /** Runs the owner's asynchronous release once; later calls share its result. */
+  /**
+   * Runs the owner's asynchronous release once; later calls share its result. A release that native
+   * rejects throws and leaves the handle live for a retry.
+   */
   fun retireHandle(call: (Long) -> Deferred<Unit>): Deferred<Unit> = retire({ call(handleId) })
 
   /**
@@ -147,8 +150,9 @@ internal class HandleStateCore(
       try {
         call()
       } catch (failure: Throwable) {
+        // The caller sees the rejection from the call, and concurrent waiters through the claim.
         rejectRetirement(claim, failure)
-        return claim
+        throw failure
       }
     completeClose(afterSuccess)
     completion.invokeOnCompletion { failure ->
@@ -180,6 +184,9 @@ internal class HandleStateCore(
     fun markReleased() {
       released.store(1)
     }
+
+    /** Whether the owner released its handle, or [report] has claimed it. */
+    fun isReleased(): Boolean = released.load() != 0
 
     /**
      * Disposes a handle nobody released, then reports the leak through [writeLine], with the

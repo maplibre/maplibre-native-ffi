@@ -180,31 +180,6 @@ fun configureJvmRuntimeArtifacts(
     }
   }
 
-  val verifyPublicationInputs = tasks.register("verifyJvmRuntimePublicationInputs")
-  classifierTargetPlatforms.forEach { (classifier, targetPlatform) ->
-    val propertyName = "maplibre.runtime.$backend.jvm.$classifier.installDir"
-    val configuredInstall = providers.gradleProperty(propertyName)
-    val selectedInstall =
-      configuredInstall.map(rootProject::file).getOrElse(maplibreNativeC.installDir)
-    val verifyInput =
-      registerRuntimeInstallVerification(
-        taskName = "verifyJvm${classifier.taskSuffix()}RuntimePublicationInput",
-        installDirectory = providers.provider { selectedInstall },
-        installPropertyName = propertyName,
-        explicitlyConfigured = configuredInstall.isPresent,
-        requireExplicitInput = true,
-        backend = backend,
-        targetPlatform = targetPlatform,
-      )
-    verifyPublicationInputs.configure { dependsOn(verifyInput) }
-  }
-
-  tasks.configureEach {
-    if (name.startsWith("publishJvmPublicationTo")) {
-      dependsOn(verifyPublicationInputs)
-    }
-  }
-
   plugins.withId("maven-publish") {
     extensions.configure<PublishingExtension> {
       publications

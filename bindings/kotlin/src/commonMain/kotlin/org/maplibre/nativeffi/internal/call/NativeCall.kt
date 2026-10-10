@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.internal.call
 
 import kotlinx.coroutines.Deferred
+import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.internal.async.CompletionBridge
 import org.maplibre.nativeffi.internal.async.adoptOwned
 import org.maplibre.nativeffi.internal.callback.CallbackAdmission
@@ -12,6 +13,7 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.OwnerState
 import org.maplibre.nativeffi.internal.lifecycle.ViewScope
 import org.maplibre.nativeffi.internal.lifecycle.bindingKeepAlive
+import org.maplibre.nativeffi.internal.lifecycle.endGraphicsAtExit
 import org.maplibre.nativeffi.internal.loader.ensureNativeLibrary
 import org.maplibre.nativeffi.internal.memory.NativeArena
 import org.maplibre.nativeffi.internal.memory.readAddress
@@ -76,24 +78,26 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
     adopt(out, dispose, create).let { owner -> accept(owner, callbacks(owner)) { drop(owner) } }
 
   /**
-   * Runs an attach: [submit] receives an out slot and a completion, writes the new owner to the
-   * slot at once, and reports readiness through the completion. A refused call throws before
-   * anything is adopted. Otherwise the owner is adopted as [adoptRegistered] does, or as [adopt]
-   * does when [callbacks] is null, and [result] pairs it with the readiness.
+   * Runs a render-session attach: [submit] receives an out slot and a completion, writes the new
+   * session to the slot at once, and reports readiness through the completion. A refused call
+   * throws before anything is adopted. Otherwise the session is adopted as [adoptRegistered] does,
+   * or as [adopt] does when [callbacks] is null, and held for abandonment at process exit. [result]
+   * pairs it with the readiness.
    */
-  fun <H, R> attach(
+  fun <R> attach(
     submit: (out: Long, completion: Long) -> Int,
     dispose: (Long) -> Unit,
-    create: (Long) -> H,
-    callbacks: ((H) -> CallbackOwner)?,
-    drop: (H) -> Unit,
-    result: (H, Deferred<Unit>) -> R,
+    create: (Long) -> RenderSessionHandle,
+    callbacks: ((RenderSessionHandle) -> CallbackOwner)?,
+    drop: (RenderSessionHandle) -> Unit,
+    result: (RenderSessionHandle, Deferred<Unit>) -> R,
   ): R {
     val out = allocate(8)
-    val ready = CompletionBridge.unitChecked { completion -> check(submit(out, completion)) }
+    val ready = CompletionBridge.unit { completion -> check(submit(out, completion)) }
     val owner =
       if (callbacks == null) adopt(out, dispose, create)
       else adoptRegistered(out, dispose, create, callbacks, drop)
+    endGraphicsAtExit(owner.binding.issued(), owner.binding.leakReport)
     return result(owner, ready)
   }
 
@@ -212,7 +216,10 @@ internal fun nativeUnit(
     CompletionBridge.unit { completion -> run(handle, completion, callbacks, body) }
   }
 
-/** Submits an ordered command, whose failure arrives as data. */
+/**
+ * Submits an ordered command. A rejected submission throws; a terminal failure arrives as data in
+ * its completion.
+ */
 internal fun nativeCommand(
   owner: Any?,
   state: OwnerState?,
@@ -312,9 +319,7 @@ internal fun nativeRetire(
     CallbackAdmission.checkOperation(name)
     state.retireHandle { handle ->
       CallbackAdmission.check(handle, name)
-      CompletionBridge.unitChecked { completion ->
-        NativeCall(handle, completion).use { it.body() }
-      }
+      CompletionBridge.unit { completion -> NativeCall(handle, completion).use { it.body() } }
     }
   } finally {
     bindingKeepAlive(owner)

@@ -151,7 +151,7 @@ internal class OwnedTextureFixture(
 /**
  * Runs [block] against a map with an attached caller-driven owned-texture session of [width] x
  * [height] on the build's backend, and abandons and closes the session afterwards. The map's
- * runtime is created from [runtimeOptions].
+ * runtime is created from [runtimeOptions], and [onFrameWake] runs on each frame wake.
  */
 internal suspend fun <T> withOwnedTexture(
   width: Int = 32,
@@ -160,6 +160,7 @@ internal suspend fun <T> withOwnedTexture(
   textureRingDepth: UInt = 1u,
   provider: ResourceProvider = denyingProvider(),
   runtimeOptions: RuntimeOptions = GeneratedApi.runtimeOptionsDefault(),
+  onFrameWake: () -> Unit = {},
   block: suspend OwnedTextureFixture.() -> T,
 ): T =
   withMap(mapMode, provider, smallMapOptions(mapMode, width, height), runtimeOptions) {
@@ -168,7 +169,11 @@ internal suspend fun <T> withOwnedTexture(
       RenderSessionAttachOptions(
         driver = RenderDriverKind.CALLER_GRAPHICS_THREAD,
         requestedTextureRingDepth = textureRingDepth,
-        frameWake = Wake { wakes.trySend(Unit) },
+        frameWake =
+          Wake {
+            wakes.trySend(Unit)
+            onFrameWake()
+          },
         driverWorkWake = Wake { wakes.trySend(Unit) },
       )
     val attachment =

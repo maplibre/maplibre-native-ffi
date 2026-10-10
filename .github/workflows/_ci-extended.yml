@@ -2841,8 +2841,8 @@ jobs:
       publish: false
       run_id: ${{ github.run_id }}
       sha: ${{ github.sha }}
-      verified_retention_days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
-      version: 0.1.0-SNAPSHOT
+      verified_retention_days: ${{ github.event_name == 'pull_request' && 7 || 30 }}
+      version: ${{ github.event_name == 'pull_request' && format('0.1.0-pr{0}.{1}', github.event.pull_request.number, github.run_id) || '0.1.0-SNAPSHOT' }}
     if: contains(fromJSON(inputs.jobs), 'kotlin-maven')
   verified:
     name: verified (${{ github.sha }} / ${{ inputs.scope }})

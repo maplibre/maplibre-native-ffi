@@ -22,15 +22,15 @@ internal class MapState
 private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
   fun cancelTransitions() {
-    map.cancelTransitions().reportFailure("camera transition cancel")
+    submit("camera transition cancel") { map.cancelTransitions() }
   }
 
   fun setGestureInProgress(inProgress: Boolean) {
-    map
-      .updateCamera(
+    submit("gesture update") {
+      map.updateCamera(
         CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
       )
-      .reportFailure("gesture update")
+    }
   }
 
   fun moveBy(dx: Double, dy: Double, durationMs: Double? = null) {
@@ -54,19 +54,19 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   }
 
   private fun update(camera: CameraOptions, durationMs: Double? = null) {
-    map
-      .updateCamera(
+    submit("camera update") {
+      map.updateCamera(
         CameraUpdate(
           mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
           camera = camera,
           animation = animation(durationMs),
         )
       )
-      .reportFailure("camera update")
+    }
   }
 
   private fun delta(delta: CameraDelta) {
-    map.applyCameraDelta(delta).reportFailure("camera delta")
+    submit("camera delta") { map.applyCameraDelta(delta) }
   }
 
   private fun animation(durationMs: Double?): AnimationOptions =

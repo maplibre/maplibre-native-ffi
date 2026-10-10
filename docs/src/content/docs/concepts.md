@@ -56,6 +56,19 @@ isolate's shutdown finalizes its open sessions without starting graphics calls,
 but a driver call already in flight can outlast it, so a Dart host ends its
 sessions' graphics calls itself before exit.
 
+The Kotlin binding on the JVM and Android abandons the sessions that it still
+holds from a shutdown hook, unless exit starts inside a MapLibre callback. The
+hook abandons every session that a core worker drives. It abandons a session
+that a graphics thread drives only when that thread is outside driver service as
+the hook runs, because abandon during driver service returns a busy status. A
+host whose sessions a core worker drives can therefore call `System.exit` or
+return from `main` directly. A host that services a session on its own graphics
+thread stops that service and then abandons or detaches the session before it
+starts exit. A shutdown hook is too late for this step: the JVM runs every
+shutdown hook concurrently with the binding's hook and keeps the graphics thread
+running. A Kotlin/Native host and a host that exits from a callback end every
+session's graphics calls themselves.
+
 ## Map
 
 A map belongs to a runtime. It owns style documents, sources, layers, images,
@@ -77,8 +90,14 @@ cover behavior beyond construction, such as source-type validation and per-frame
 property updates.
 
 Map mutations are commands. A command copies its input before returning
-acceptance and later invokes one completion with its terminal disposition.
-Ordered queries and lifecycle transitions use typed completions. Bindings expose
+acceptance and later invokes one completion with its terminal disposition. Every
+binding reports a submission that native rejects from the call itself, and a
+command's terminal failure as data in its completion. A host that does not wait
+on a command still observes its completion, through a handler or a task, to see
+a terminal failure. Superseded and cancelled are terminal dispositions, not
+failures: a later command replaced a superseded command, and native abandoned a
+cancelled command, such as when its owner closed before the command ran. Ordered
+queries and lifecycle transitions use typed completions. Bindings expose
 one-shot work through their normal future, promise, task, suspension, or
 explicit async idiom.
 

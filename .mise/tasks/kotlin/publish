@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# [MISE] description="Stage and verify Kotlin Maven artifacts."
+# [MISE] description="Stage, verify, or locally publish Kotlin Maven artifacts."
 # [MISE] shell="bash"
 # [MISE] tools={java="{{vars.java_version}}"}
 
@@ -8,10 +8,31 @@ set -euo pipefail
 input_root="${MISE_MONOREPO_ROOT}/build/packages/native/maven-input"
 install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
 staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
+local_repository="${staging_base}/maven-local"
+local_install_root="${staging_base}/local-install"
 
 usage() {
   echo "usage: $(basename "$0") stage <linux|apple> [version]" >&2
   echo "       $(basename "$0") verify <maven-staging> [version]" >&2
+  echo "       $(basename "$0") local <preset>..." >&2
+  echo "local publishes at \$MAPLIBRE_MAVEN_VERSION, or by default at" >&2
+  echo "0.1.0-local.<commit>, with .dirty-<hash> of the worktree appended for" >&2
+  echo "uncommitted changes." >&2
+}
+
+# Prints a short hash of the worktree's tracked and untracked content, so each
+# uncommitted state publishes at its own version and the repository never mixes
+# modules built from different edits under one version. The MapLibre Native
+# submodule's own edits need no part: before every task, the submodules
+# dependency resets it to the pinned commit and patches, which this tree holds.
+worktree_tree() {
+  local index tree
+  index="$(mktemp)"
+  cp "$(git rev-parse --git-path index)" "$index"
+  GIT_INDEX_FILE="$index" git add --all
+  tree="$(GIT_INDEX_FILE="$index" git write-tree)"
+  rm -f "$index"
+  printf '%s' "${tree:0:12}"
 }
 
 extract_preset() {
@@ -48,16 +69,8 @@ prepare_native_inputs() {
       )
       ;;
     apple)
-      # macOS enables every Kotlin/Native target, so cinterop commonization can
-      # schedule cinterop tasks for the Android and Linux targets even though
-      # the Linux partition publishes them; their install dirs must exist here.
+      # The Linux and Windows installs feed the JVM runtime classifiers.
       presets=(
-        android-arm-egl
-        android-arm-vulkan
-        android-arm64-egl
-        android-arm64-vulkan
-        android-x64-egl
-        android-x64-vulkan
         linux-gnu-x64-egl
         linux-gnu-arm64-egl
         linux-gnu-x64-vulkan
@@ -87,6 +100,14 @@ prepare_native_inputs() {
   done
 }
 
+publication_task() {
+  echo "${1}:publish${2}PublicationTo${3}"
+}
+
+lower_first() {
+  printf '%s%s' "$(printf '%s' "${1:0:1}" | tr '[:upper:]' '[:lower:]')" "${1:1}"
+}
+
 publish_tasks() {
   local project="$1"
   local repository="$2"
@@ -94,7 +115,7 @@ publish_tasks() {
 
   local tasks=()
   while [[ "$1" != "--" ]]; do
-    tasks+=("${project}:publish${1}PublicationTo${repository}")
+    tasks+=("$(publication_task "$project" "$1" "$repository")")
     shift
   done
   shift
@@ -108,23 +129,18 @@ publish_linux_leaves() {
   local common=(
     -Pmaplibre.android.prebuiltInstallRoot="$install_root"
   )
-  # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
-  # target of a runtime module that the host supports, not just the
-  # publications named on the command line, so each invocation configures
-  # install dirs for all of them.
-  local opengl=(
+  # A runtime publication runs cinterop only for its own Kotlin/Native target,
+  # because the runtimes' gradle.properties disable cinterop commonization, so
+  # each invocation names the install dirs of the targets it publishes.
+  local opengl_android=(
     -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
     -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
   )
-  local vulkan=(
+  local vulkan_android=(
     -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
   )
 
   publish_tasks \
@@ -141,7 +157,7 @@ publish_linux_leaves() {
     Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
-    "${opengl[@]}" \
+    "${opengl_android[@]}" \
     -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
     -Pmaplibre.android.backend=opengl
 
@@ -151,7 +167,7 @@ publish_linux_leaves() {
     Android AndroidNativeArm32 AndroidNativeArm64 AndroidNativeX64 -- \
     "$@" \
     "${common[@]}" \
-    "${vulkan[@]}" \
+    "${vulkan_android[@]}" \
     -Pmaplibre.android.abis=armeabi-v7a,arm64-v8a,x86_64 \
     -Pmaplibre.android.backend=vulkan
 
@@ -174,7 +190,7 @@ publish_linux_leaves() {
     "$repository" \
     LinuxX64 -- \
     "$@" \
-    "${opengl[@]}"
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
 
   publish_tasks \
     :bindings:kotlin:runtimes:opengl \
@@ -182,14 +198,14 @@ publish_linux_leaves() {
     LinuxArm64 -- \
     "$@" \
     -Pkotlin.native.enableKlibsCrossCompilation=true \
-    "${opengl[@]}"
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
     "$repository" \
     LinuxX64 -- \
     "$@" \
-    "${vulkan[@]}"
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
 
   publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
@@ -197,7 +213,7 @@ publish_linux_leaves() {
     LinuxArm64 -- \
     "$@" \
     -Pkotlin.native.enableKlibsCrossCompilation=true \
-    "${vulkan[@]}"
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
 
   # linuxTest links libEGL from the host. The x64 Maven staging job
   # cross-compiles linuxArm64 KLIBs above; ARM CI links and runs the tests
@@ -213,15 +229,9 @@ publish_linux_leaves() {
 publish_apple_leaves() {
   local repository="$1"
   shift
-  # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
-  # target of a runtime module, not just the publications named on the command
-  # line, so each invocation configures install dirs for all of them.
+  # As in publish_linux_leaves, each invocation names the install dirs of the
+  # targets and JVM classifiers it publishes.
   local opengl=(
-    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
-    -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
-    -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
     -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-gnu-x64-egl"
     -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-gnu-arm64-egl"
@@ -230,11 +240,6 @@ publish_apple_leaves() {
     -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
   )
   local vulkan=(
-    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
-    -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
     -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-gnu-x64-vulkan"
     -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-gnu-arm64-vulkan"
@@ -282,56 +287,16 @@ publish_apple_leaves() {
 publish_apple_roots() {
   local repository="$1"
   shift
-  local opengl=(
-    -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
-    -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
-    -Pmaplibre.runtime.opengl.androidNativeX64.installDir="$install_root/android-x64-egl"
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-gnu-arm64-egl"
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-gnu-x64-egl"
-    -Pmaplibre.runtime.opengl.macosArm64.installDir="$install_root/macos-arm64-egl"
-  )
-  local vulkan=(
-    -Pmaplibre.runtime.vulkan.androidNativeArm32.installDir="$install_root/android-arm-vulkan"
-    -Pmaplibre.runtime.vulkan.androidNativeArm64.installDir="$install_root/android-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.androidNativeX64.installDir="$install_root/android-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-gnu-arm64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-gnu-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.macosArm64.installDir="$install_root/macos-arm64-vulkan"
-  )
-  local metal=(
-    -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
-    -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
-    -Pmaplibre.runtime.metal.tvosArm64.installDir="$install_root/tvos-arm64-metal"
-    -Pmaplibre.runtime.metal.tvosSimulatorArm64.installDir="$install_root/tvos-simulator-arm64-metal"
-    -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
-  )
-
-  publish_tasks \
+  # Root modules take no native install dirs: the runtime roots run no cinterop,
+  # and the binding's cinterop reads only the public headers.
+  local project
+  for project in \
     :bindings:kotlin \
-    "$repository" \
-    KotlinMultiplatform -- \
-    "$@"
-
-  publish_tasks \
     :bindings:kotlin:runtimes:opengl \
-    "$repository" \
-    KotlinMultiplatform -- \
-    "$@" \
-    "${opengl[@]}"
-
-  publish_tasks \
     :bindings:kotlin:runtimes:vulkan \
-    "$repository" \
-    KotlinMultiplatform -- \
-    "$@" \
-    "${vulkan[@]}"
-
-  publish_tasks \
-    :bindings:kotlin:runtimes:metal \
-    "$repository" \
-    KotlinMultiplatform -- \
-    "$@" \
-    "${metal[@]}"
+    :bindings:kotlin:runtimes:metal; do
+    publish_tasks "$project" "$repository" KotlinMultiplatform -- "$@"
+  done
 }
 
 publish_leaf_partition() {
@@ -364,11 +329,229 @@ publish_partition() {
   fi
 }
 
+host_os() {
+  case "$(uname -s)" in
+    Darwin) echo macos ;;
+    Linux) echo linux ;;
+    MINGW* | MSYS* | CYGWIN*) echo windows ;;
+    *) uname -s ;;
+  esac
+}
+
+# Describes the Kotlin publications a native preset feeds: its runtime backend,
+# Kotlin/Native target, JVM classifier, Android ABI, and the host OS that builds
+# it. An empty field means the preset feeds no publication of that kind.
+describe_local_preset() {
+  preset_target=""
+  preset_classifier=""
+  preset_abi=""
+  preset_host=any
+  case "$1" in
+    *-metal) preset_backend=metal ;;
+    *-vulkan) preset_backend=vulkan ;;
+    *-egl | *-wgl) preset_backend=opengl ;;
+  esac
+  case "$1" in
+    macos-arm64-metal | macos-arm64-vulkan | macos-arm64-egl)
+      preset_target=MacosArm64 preset_classifier=natives-macos-arm64 preset_host=macos
+      ;;
+    ios-arm64-metal) preset_target=IosArm64 preset_host=macos ;;
+    ios-simulator-arm64-metal) preset_target=IosSimulatorArm64 preset_host=macos ;;
+    tvos-arm64-metal) preset_target=TvosArm64 preset_host=macos ;;
+    tvos-simulator-arm64-metal) preset_target=TvosSimulatorArm64 preset_host=macos ;;
+    linux-gnu-x64-egl | linux-gnu-x64-vulkan)
+      preset_target=LinuxX64 preset_classifier=natives-linux-x64 preset_host=linux
+      ;;
+    linux-gnu-arm64-egl | linux-gnu-arm64-vulkan)
+      preset_target=LinuxArm64 preset_classifier=natives-linux-arm64 preset_host=linux
+      ;;
+    windows-x64-wgl | windows-x64-vulkan)
+      preset_classifier=natives-windows-x64 preset_host=windows
+      ;;
+    windows-arm64-wgl | windows-arm64-vulkan)
+      preset_classifier=natives-windows-arm64 preset_host=windows
+      ;;
+    android-arm-egl | android-arm-vulkan) preset_target=AndroidNativeArm32 preset_abi=armeabi-v7a ;;
+    android-arm64-egl | android-arm64-vulkan) preset_target=AndroidNativeArm64 preset_abi=arm64-v8a ;;
+    android-x64-egl | android-x64-vulkan) preset_target=AndroidNativeX64 preset_abi=x86_64 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Prints the comma-separated ABI list with one more ABI, keeping each once.
+add_abi() {
+  case ",$1," in
+    *",$2,"*) printf '%s' "$1" ;;
+    *) printf '%s' "${1:+$1,}$2" ;;
+  esac
+}
+
+# Succeeds when every ABI of the first comma-separated list is in the second.
+covers_abis() {
+  local abi
+  for abi in ${1//,/ }; do
+    [[ ",$2," == *",$abi,"* ]] || return 1
+  done
+}
+
+# Publishes the binding and the runtimes that the named presets feed, at a
+# version of their own, into a repository that keeps what earlier runs added.
+publish_local() {
+  if [[ "$#" -eq 0 ]]; then
+    usage
+    return 2
+  fi
+
+  local host preset
+  local opengl_abis="" vulkan_abis="" all_abis=""
+  host="$(host_os)"
+  for preset in "$@"; do
+    if ! describe_local_preset "$preset"; then
+      echo "$preset feeds no Kotlin publication" >&2
+      return 2
+    fi
+    if [[ "$preset_host" != any && "$preset_host" != "$host" ]]; then
+      echo "$preset builds only on a $preset_host host" >&2
+      return 2
+    fi
+    if [[ -n "$preset_abi" ]]; then
+      all_abis="$(add_abi "$all_abis" "$preset_abi")"
+      if [[ "$preset_backend" == opengl ]]; then
+        opengl_abis="$(add_abi "$opengl_abis" "$preset_abi")"
+      else
+        vulkan_abis="$(add_abi "$vulkan_abis" "$preset_abi")"
+      fi
+    fi
+  done
+
+  # The binding's AAR links its JNI shim against one backend's library for every
+  # ABI it carries, so one backend must cover every requested ABI.
+  local binding_backend=""
+  if [[ -n "$all_abis" ]]; then
+    if [[ -z "${ANDROID_HOME:-}" ]]; then
+      echo "Android presets build against \$ANDROID_HOME, which is unset; to use the pinned SDK, run:" >&2
+      echo "  mise -E android run //:kotlin:publish local $*" >&2
+      return 2
+    fi
+    if covers_abis "$all_abis" "$opengl_abis"; then
+      binding_backend=opengl
+    elif covers_abis "$all_abis" "$vulkan_abis"; then
+      binding_backend=vulkan
+    else
+      echo "The Android binding needs one backend built for every ABI: $all_abis" >&2
+      return 2
+    fi
+  fi
+
+  local version="${MAPLIBRE_MAVEN_VERSION:-}"
+  if [[ -z "$version" ]]; then
+    local base
+    base="$(sed -n 's/^maplibre\.maven\.version=//p' "${MISE_MONOREPO_ROOT}/gradle.properties")"
+    version="${base%-SNAPSHOT}-local.$(git rev-parse --short=12 HEAD)"
+    if [[ -n "$(git status --porcelain)" ]]; then
+      version="${version}.dirty-$(worktree_tree)"
+    fi
+  fi
+
+  # The build task also installs the loader and test-graphics components into
+  # each build tree, which the package leaves out, so each preset installs anew
+  # into a prefix of its own with only the components the package carries.
+  for preset in "$@"; do
+    mise run build "$preset"
+    rm -rf "${local_install_root:?}/${preset}"
+    cmake --install "${MISE_MONOREPO_ROOT}/build/${preset}" \
+      --prefix "${local_install_root}/${preset}"
+  done
+
+  local binding=:bindings:kotlin
+  local repository=MavenStagingRepository
+  local common=(
+    "-Pmaplibre.maven.localRepository=${local_repository}"
+    "-Pmaplibre.maven.version=${version}"
+  )
+  local tasks=() cross_tasks=() opengl_tasks=() vulkan_tasks=()
+  local cross_install="" install runtime task
+  tasks+=("$(publication_task "$binding" KotlinMultiplatform "$repository")")
+  for preset in "$@"; do
+    describe_local_preset "$preset"
+    install="${local_install_root}/${preset}"
+    runtime="${binding}:runtimes:${preset_backend}"
+    # Gradle runs a task named twice once, so presets may repeat publications.
+    tasks+=("$(publication_task "$runtime" KotlinMultiplatform "$repository")")
+    if [[ -n "$preset_classifier" ]]; then
+      tasks+=(
+        "$(publication_task "$binding" Jvm "$repository")"
+        "$(publication_task "$runtime" Jvm "$repository")"
+      )
+      common+=("-Pmaplibre.runtime.${preset_backend}.jvm.${preset_classifier}.installDir=${install}")
+    fi
+    if [[ -z "$preset_target" ]]; then
+      continue
+    fi
+    common+=("-Pmaplibre.runtime.${preset_backend}.$(lower_first "$preset_target").installDir=${install}")
+    task="$(publication_task "$runtime" "$preset_target" "$repository")"
+    if [[ -n "$preset_abi" && "$preset_backend" == opengl ]]; then
+      opengl_tasks+=("$task")
+    elif [[ -n "$preset_abi" ]]; then
+      vulkan_tasks+=("$task")
+    elif [[ "$preset_target" == LinuxArm64 ]]; then
+      # As in the Linux partition, the Linux arm64 KLIBs publish separately
+      # with Kotlin/Native cross-compilation enabled.
+      cross_tasks+=("$(publication_task "$binding" LinuxArm64 "$repository")" "$task")
+      cross_install="$install"
+    else
+      tasks+=("$(publication_task "$binding" "$preset_target" "$repository")" "$task")
+    fi
+  done
+
+  ./gradlew "${tasks[@]}" "${common[@]}"
+
+  if [[ -n "$cross_install" ]]; then
+    ./gradlew "${cross_tasks[@]}" "${common[@]}" \
+      -Pkotlin.native.enableKlibsCrossCompilation=true \
+      -PmaplibreNativeCInstallDir="$cross_install"
+  fi
+
+  local backend abis
+  for backend in opengl vulkan; do
+    if [[ "$backend" == opengl ]]; then
+      abis="$opengl_abis"
+    else
+      abis="$vulkan_abis"
+    fi
+    if [[ -z "$abis" ]]; then
+      continue
+    fi
+    tasks=("$(publication_task "${binding}:runtimes:${backend}" Android "$repository")")
+    if [[ "$backend" == opengl ]]; then
+      tasks+=("${opengl_tasks[@]}")
+    else
+      tasks+=("${vulkan_tasks[@]}")
+    fi
+    if [[ "$backend" == "$binding_backend" ]]; then
+      tasks+=("$(publication_task "$binding" Android "$repository")")
+      for task in "${opengl_tasks[@]+"${opengl_tasks[@]}"}" "${vulkan_tasks[@]+"${vulkan_tasks[@]}"}"; do
+        tasks+=("${binding}:${task##*:}")
+      done
+    fi
+    ./gradlew "${tasks[@]}" "${common[@]}" \
+      -Pmaplibre.android.prebuiltInstallRoot="$local_install_root" \
+      -Pmaplibre.android.abis="$abis" \
+      -Pmaplibre.android.backend="$backend"
+  done
+
+  echo "Published Kotlin ${version} to ${local_repository}"
+}
+
 operation="${1:-}"
 partition="${2:-}"
 version="${3:-}"
 
 case "$operation" in
+  local)
+    shift
+    publish_local "$@"
+    ;;
   stage)
     if [[ "$#" -lt 2 || "$#" -gt 3 ]]; then
       usage
