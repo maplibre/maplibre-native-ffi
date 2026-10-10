@@ -1134,10 +1134,7 @@ auto submit_driver_work(
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
@@ -1169,7 +1166,13 @@ auto submit_driver_work(
 auto lease_render_session(mln_render_session session)
   -> std::shared_ptr<mln_render_session_object> {
   auto live = handle_table<mln_render_session_object>().lease(session);
-  return live && !live->disposal_requested.load() ? live : nullptr;
+  if (live != nullptr && live->disposal_requested.load()) {
+    static_cast<void>(report_handle_fault(
+      HandleTraits<mln_render_session_object>::kind, session, HandleFault::Stale
+    ));
+    return nullptr;
+  }
+  return live;
 }
 
 auto enqueue_driver_operation(
@@ -1283,8 +1286,7 @@ auto start_attach_render_session(
   }
 
   const auto map = handle_table<MapObject>().lease(session->map);
-  // A failed lease has recorded the handle fault.
-  if (map == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  if (map == nullptr) return recorded_handle_fault_status();
   if (
     map->runtime_state == nullptr || map->runtime_state->event_queue == nullptr
   ) {
@@ -1491,7 +1493,8 @@ auto validate_render_session(
   mln_render_session session, mln_render_session_object*& out_session
 ) -> mln_status {
   out_session = handle_table<mln_render_session_object>().resolve(session);
-  return out_session == nullptr ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
+  return out_session == nullptr ? recorded_handle_fault_status()
+                                : MLN_STATUS_OK;
 }
 
 auto validate_live_attached_render_session(
@@ -1551,10 +1554,7 @@ auto validate_render_session_retarget_submission(
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   const auto lock = std::scoped_lock{live->control_mutex};
   if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
@@ -1909,7 +1909,7 @@ auto render_session_projection_create(
   mln_render_session session, mln_map_projection* out_projection
 ) -> mln_status {
   auto live = lease_render_session(session);
-  if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
   // An output error takes precedence over a missing frame, as it does for
   // every other call.
   if (out_projection == nullptr) {
@@ -1936,7 +1936,7 @@ auto render_session_projection_create(
 
 auto render_session_destroy(mln_render_session session) -> mln_status {
   const auto live = lease_render_session(session);
-  if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
   return destroy_render_session(live);
 }
 
@@ -1968,7 +1968,12 @@ auto destroy_render_session(
         return live->abandonment_complete;
       });
     }
-    if (live->destruction_started) return MLN_STATUS_INVALID_ARGUMENT;
+    if (live->destruction_started) {
+      return report_handle_fault(
+        HandleTraits<mln_render_session_object>::kind, live->self,
+        HandleFault::Stale
+      );
+    }
     if (
       live->state != MLN_RENDER_SESSION_STATE_DETACHED &&
       live->state != MLN_RENDER_SESSION_STATE_ABANDONED
@@ -2519,10 +2524,7 @@ auto render_session_get_capabilities(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const auto lock = std::scoped_lock{live->control_mutex};
   *out_capabilities = live->capabilities;
   return MLN_STATUS_OK;
@@ -2538,10 +2540,7 @@ auto render_session_get_snapshot(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const auto lock = std::scoped_lock{live->control_mutex};
   *out_snapshot = mln_render_session_snapshot{
     .size = sizeof(*out_snapshot),
@@ -2585,10 +2584,7 @@ auto render_session_request_frame(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const auto lock = std::scoped_lock{live->control_mutex};
   if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
     set_thread_error("render session is not attached");
@@ -2635,15 +2631,14 @@ auto render_session_service_driver_work(
   }
   *out_serviced = 0;
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->disposal_requested.load()) {
-      set_thread_error("render session is being disposed");
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return report_handle_fault(
+        HandleTraits<mln_render_session_object>::kind, session,
+        HandleFault::Stale
+      );
     }
     if (live->views_invalidated) {
       set_thread_error("render session has lost its target");
@@ -2720,10 +2715,7 @@ auto render_session_drain_frame_results(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   auto results = std::deque<mln_render_frame_result>{};
   {
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -2747,10 +2739,7 @@ auto render_frame_batch_count(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_render_frame_batch_object>().lease(batch);
-  if (live == nullptr) {
-    set_thread_error("frame result batch handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   *out_count = live->results.size();
   return MLN_STATUS_OK;
 }
@@ -2764,10 +2753,7 @@ auto render_frame_batch_get(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_render_frame_batch_object>().lease(batch);
-  if (live == nullptr) {
-    set_thread_error("frame result batch handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (index >= live->results.size()) {
     set_thread_error("frame result index is out of range");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2790,10 +2776,7 @@ auto render_session_acquire_frame(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   auto frame = std::make_shared<mln_acquired_frame_object>();
   {
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -2850,9 +2833,11 @@ auto lease_valid_acquired_frame(
   std::shared_ptr<mln_acquired_frame_object>& out_frame
 ) -> mln_status {
   auto live = handle_table<mln_acquired_frame_object>().lease(frame);
-  if (live == nullptr || !live->valid.load()) {
-    set_thread_error("acquired frame handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
+  if (!live->valid.load()) {
+    return report_handle_fault(
+      HandleTraits<mln_acquired_frame_object>::kind, frame, HandleFault::Stale
+    );
   }
   {
     const auto lock = std::scoped_lock{live->session->control_mutex};
@@ -2878,11 +2863,12 @@ auto acquired_frame_view_begin(mln_acquired_frame frame, void** out_scope)
   }
   *out_scope = nullptr;
   auto live = handle_table<mln_acquired_frame_object>().lease(frame);
-  if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
   const auto lock = std::scoped_lock{live->session->control_mutex};
   if (!live->valid.load()) {
-    set_thread_error("acquired frame handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return report_handle_fault(
+      HandleTraits<mln_acquired_frame_object>::kind, frame, HandleFault::Stale
+    );
   }
   if (
     live->session->views_invalidated ||
@@ -2963,10 +2949,7 @@ auto acquired_frame_release(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_acquired_frame_object>().lease(*frame);
-  if (live == nullptr) {
-    set_thread_error("acquired frame handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   // Reject an unsupported sync before consuming the handle: the host keeps
   // frame ownership, and a slot never returns to the ring without its wait.
   {
@@ -3164,10 +3147,7 @@ auto render_session_resize_start(
   );
   if (valid != MLN_STATUS_OK) return valid;
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
@@ -3275,10 +3255,7 @@ auto render_session_barrier_start(
   mln_render_session session, const mln_completion* completion
 ) -> mln_status {
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
@@ -3346,10 +3323,7 @@ auto render_session_detach_start(
   mln_render_session session, const mln_completion* completion
 ) -> mln_status {
   const auto live = lease_render_session(session);
-  if (live == nullptr) {
-    set_thread_error("render session handle is not live");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
@@ -3431,7 +3405,7 @@ auto render_session_abandon(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
-  if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
   return abandon_render_session(live, out_result);
 }
 
@@ -3607,17 +3581,20 @@ auto dispose_render_session(
 
 auto render_session_dispose(mln_render_session session) -> mln_status {
   auto live = lease_render_session(session);
-  if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
   dispose_render_session(live);
   return MLN_STATUS_OK;
 }
 
 auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
   auto live = handle_table<mln_acquired_frame_object>().lease(frame);
-  if (!live) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
   auto expected = true;
-  if (!live->valid.compare_exchange_strong(expected, false))
-    return MLN_STATUS_INVALID_STATE;
+  if (!live->valid.compare_exchange_strong(expected, false)) {
+    return report_handle_fault(
+      HandleTraits<mln_acquired_frame_object>::kind, frame, HandleFault::Stale
+    );
+  }
   static_cast<void>(handle_table<mln_acquired_frame_object>().remove(frame));
   live->disposal_owner = live;
   live->disposal_task.context = live.get();

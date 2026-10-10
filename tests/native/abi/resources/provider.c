@@ -542,7 +542,7 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
 
   mln_resource_request_release(handle);
-  MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
+  MLN_TEST_INVALID_STATE(mln_resource_request_set_cancel_callback(
     handle, count_cancel, &probe, NULL, &cancelled, NULL
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
@@ -610,7 +610,7 @@ static void cancel_callback_may_release_the_request(void) {
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
   bool cancelled = false;
-  MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
+  MLN_TEST_INVALID_STATE(mln_resource_request_set_cancel_callback(
     handle, count_cancel, &probe, NULL, &cancelled, NULL
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));

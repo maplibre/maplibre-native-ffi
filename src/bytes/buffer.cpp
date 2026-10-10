@@ -35,9 +35,7 @@ auto buffer_get(mln_buffer buffer, mln_buffer_view* out_view) -> mln_status {
   }
   const auto lock = std::scoped_lock{buffer_table().mutex()};
   const auto* object = buffer_table().resolve_locked(buffer);
-  if (object == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (object == nullptr) return recorded_handle_fault_status();
   *out_view = mln_buffer_view{
     .data = object->bytes.data(),
     .size = object->bytes.size(),

@@ -197,11 +197,13 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   mln_render_session_snapshot snapshot = {
     .size = sizeof(mln_render_session_snapshot)
   };
-  MLN_TEST_INVALID(mln_render_session_get_snapshot(detached, &snapshot, NULL));
-  MLN_TEST_INVALID(
+  MLN_TEST_INVALID_STATE(
+    mln_render_session_get_snapshot(detached, &snapshot, NULL)
+  );
+  MLN_TEST_INVALID_STATE(
     mln_render_session_reduce_memory_use(detached, &discard, NULL)
   );
-  MLN_TEST_INVALID(mln_render_session_destroy(detached, NULL));
+  MLN_TEST_INVALID_STATE(mln_render_session_destroy(detached, NULL));
   MLN_TEST_INVALID(
     mln_render_session_reduce_memory_use(MLN_HANDLE_NULL, &discard, NULL)
   );
@@ -631,7 +633,7 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   TEST_ASSERT_FALSE(atomic_load(&retired));
   MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
   mln_render_session_snapshot snapshot = {.size = sizeof(snapshot)};
-  MLN_TEST_INVALID(
+  MLN_TEST_INVALID_STATE(
     mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
   );
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&retired));

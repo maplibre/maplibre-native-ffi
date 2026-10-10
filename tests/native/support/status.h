@@ -13,6 +13,8 @@
 #define MLN_TEST_OK(...) MLN_TEST_STATUS(MLN_STATUS_OK, __VA_ARGS__)
 #define MLN_TEST_INVALID(...) \
   MLN_TEST_STATUS(MLN_STATUS_INVALID_ARGUMENT, __VA_ARGS__)
+#define MLN_TEST_INVALID_STATE(...) \
+  MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, __VA_ARGS__)
 
 // Asserts that `actual` is MLN_STATUS_OK, reporting `message` instead of the
 // call, such as a table row's label.

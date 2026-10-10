@@ -847,7 +847,9 @@ auto database_source_for_runtime(RuntimeObject* runtime)
 auto lease_runtime(mln_runtime runtime) -> std::shared_ptr<RuntimeObject> {
   auto live = handle_table<RuntimeObject>().lease(runtime);
   if (live != nullptr && live->disposal_requested.load()) {
-    set_thread_error("runtime handle has been disposed");
+    static_cast<void>(report_handle_fault(
+      HandleTraits<RuntimeObject>::kind, runtime, HandleFault::Stale
+    ));
     return {};
   }
   return live;
@@ -1196,9 +1198,7 @@ auto set_resource_transform(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (validate_completion(completion) != MLN_STATUS_OK)
     return MLN_STATUS_INVALID_ARGUMENT;
   if (transform == nullptr) {
@@ -1278,9 +1278,7 @@ auto clear_resource_transform(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (validate_completion(completion) != MLN_STATUS_OK)
     return MLN_STATUS_INVALID_ARGUMENT;
 
@@ -1299,9 +1297,7 @@ auto set_http_header_transform(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (validate_completion(completion) != MLN_STATUS_OK)
     return MLN_STATUS_INVALID_ARGUMENT;
   if (transform == nullptr) {
@@ -1567,9 +1563,7 @@ auto clear_http_header_transform(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (validate_completion(completion) != MLN_STATUS_OK)
     return MLN_STATUS_INVALID_ARGUMENT;
 
@@ -1752,9 +1746,7 @@ auto run_ambient_cache_operation_start(
   mln_runtime runtime, uint32_t operation, const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   switch (operation) {
     case MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE:
     case MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE:
@@ -1803,9 +1795,7 @@ auto set_maximum_ambient_cache_size_start(
   mln_runtime runtime, std::uint64_t size, const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE, completion,
@@ -1829,9 +1819,7 @@ auto offline_region_create_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const auto definition_status = validate_offline_region_definition(definition);
   if (definition_status != MLN_STATUS_OK) {
     return definition_status;
@@ -1886,9 +1874,7 @@ auto offline_region_get_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_GET, completion,
@@ -1934,9 +1920,7 @@ auto offline_regions_list_start(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGIONS_LIST, completion,
@@ -2009,9 +1993,7 @@ auto offline_regions_merge_database_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const auto path_status =
     validate_offline_side_database_path(side_database_path);
   if (path_status != MLN_STATUS_OK) {
@@ -2056,9 +2038,7 @@ auto offline_region_update_metadata_start(
   size_t metadata_size, const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (metadata == nullptr && metadata_size != 0) {
     set_thread_error("offline region metadata must not be null when non-empty");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2133,9 +2113,7 @@ auto offline_region_get_status_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_GET_STATUS, completion,
@@ -2192,9 +2170,7 @@ auto offline_region_set_observed_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED, completion,
@@ -2256,9 +2232,7 @@ auto offline_region_set_download_state_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const auto native_state = to_native_download_state(request.state);
   if (!native_state) {
     set_thread_error("offline region download state is invalid");
@@ -2305,9 +2279,7 @@ auto offline_region_invalidate_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_INVALIDATE, completion,
@@ -2352,9 +2324,7 @@ auto offline_region_delete_start(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
     live, MLN_OFFLINE_OPERATION_REGION_DELETE, completion,
@@ -2414,9 +2384,7 @@ auto set_resource_provider(
   const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (validate_completion(completion) != MLN_STATUS_OK)
     return MLN_STATUS_INVALID_ARGUMENT;
   if (provider == nullptr) {
@@ -2454,9 +2422,7 @@ auto clear_resource_provider(
   mln_runtime runtime, const mln_completion* completion
 ) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (validate_completion(completion) != MLN_STATUS_OK)
     return MLN_STATUS_INVALID_ARGUMENT;
 
@@ -2522,9 +2488,7 @@ auto runtime_barrier_start(
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   auto completion_state = std::make_shared<Completion>(*completion);
   auto state = std::make_shared<OperationObject>(
     [completion_state](mln_status status, std::string diagnostic, std::any) {
@@ -2572,7 +2536,7 @@ auto runtime_barrier_start(
 
 auto dispose_runtime(mln_runtime runtime) -> mln_status {
   auto live = lease_runtime(runtime);
-  if (live == nullptr) return MLN_STATUS_INVALID_ARGUMENT;
+  if (live == nullptr) return recorded_handle_fault_status();
   {
     const auto lock = std::scoped_lock{live->submission_mutex};
     const auto status = live->control.begin_close(true);
@@ -2634,9 +2598,7 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
     return completion_status;
   }
   auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   auto teardown_completion = std::shared_ptr<Completion>{};
   try {
     teardown_completion = std::make_shared<Completion>(*completion);
@@ -2733,9 +2695,7 @@ auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   }
 
   const auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (!live->control.acquire()) {
     set_thread_error("runtime is closing");
     return MLN_STATUS_INVALID_STATE;
@@ -2756,9 +2716,7 @@ auto get_event_batch(
   mln_event_batch batch, mln_runtime_event_batch_view* out_view
 ) -> mln_status {
   const auto live = handle_table<EventBatchObject>().lease(batch);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (
     out_view == nullptr || out_view->size < sizeof(mln_runtime_event_batch_view)
   ) {
@@ -2784,9 +2742,7 @@ auto release_event_batch(mln_event_batch batch) noexcept -> void {
 
 auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status {
   const auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (!live->control.acquire()) {
     set_thread_error("runtime is closing");
     return MLN_STATUS_INVALID_STATE;
@@ -2809,9 +2765,7 @@ auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (!live->control.acquire()) {
     set_thread_error("runtime is closing");
     return MLN_STATUS_INVALID_STATE;
@@ -2823,9 +2777,7 @@ auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)
 
 auto retain_runtime_map(mln_runtime runtime) -> mln_status {
   const auto live = lease_runtime(runtime);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   if (!live->control.retain_child()) {
     return MLN_STATUS_INVALID_STATE;
   }

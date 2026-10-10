@@ -90,12 +90,12 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(MLN_HANDLE_NULL);
   count = 99;
-  MLN_TEST_INVALID(mln_render_frame_batch_count(batch, &count, NULL));
+  MLN_TEST_INVALID_STATE(mln_render_frame_batch_count(batch, &count, NULL));
   TEST_ASSERT_EQUAL_size_t(99, count);
   mln_render_frame_result result = {
     .size = sizeof(mln_render_frame_result), .token = 99
   };
-  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, 0, &result, NULL));
+  MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, 0, &result, NULL));
   MLN_TEST_INVALID(
     mln_render_frame_batch_get(MLN_HANDLE_NULL, 0, &result, NULL)
   );

@@ -392,10 +392,10 @@ static void one_prepared_handle_serves_many_sources_and_outlives_itself(void) {
   mln_geojson_source_data_destroy(data);
   mln_geojson_source_data_destroy(MLN_HANDLE_NULL);
   mln_completion rejected = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_set_geojson_source_data(
+  MLN_TEST_INVALID_STATE(mln_map_set_geojson_source_data(
     map, MLN_BUFFER_LITERAL("first"), data, &rejected, NULL
   ));
-  MLN_TEST_INVALID(mln_map_add_geojson_source_data(
+  MLN_TEST_INVALID_STATE(mln_map_add_geojson_source_data(
     map, MLN_BUFFER_LITERAL("fourth"), data, &rejected, NULL
   ));
 

@@ -90,34 +90,42 @@ static void runtime_creation_validates_its_options(void) {
   TEST_ASSERT_EQUAL_UINT64(1, runtime);
 }
 
-// The null handle, a released runtime, and a live handle of another kind each
-// name no runtime, and every entry point that takes a runtime rejects them the
-// same way.
+// Every entry point that takes a runtime reports `expected` for `handle`
+// without creating anything.
+static void expect_runtime_calls_reject(
+  mln_runtime handle, mln_status expected
+) {
+  const mln_completion discard = mln_test_discard_completion();
+  const mln_map_options map_options = mln_map_options_default();
+  mln_event_batch batch = MLN_HANDLE_NULL;
+  uint64_t mask = 0;
+  MLN_TEST_STATUS(expected, mln_runtime_release(handle, &discard, NULL));
+  MLN_TEST_STATUS(expected, mln_runtime_barrier(handle, &discard, NULL));
+  MLN_TEST_STATUS(expected, mln_runtime_dispose(handle, NULL));
+  MLN_TEST_STATUS(expected, mln_runtime_drain_events(handle, &batch, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+  MLN_TEST_STATUS(expected, mln_runtime_get_event_mask(handle, &mask, NULL));
+  MLN_TEST_STATUS(
+    expected,
+    mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
+  );
+  MLN_TEST_STATUS(
+    expected, mln_map_create(handle, &map_options, &discard, NULL)
+  );
+}
+
+// The null handle and a live handle of another kind name no runtime, so every
+// runtime entry point rejects them as invalid arguments. A released runtime
+// once named one, so the same entry points report it as invalid state.
 static void runtime_calls_reject_a_value_that_names_no_runtime(void) {
   mln_runtime live = mln_test_create_runtime();
   mln_map map = mln_test_create_map(live);
   mln_runtime released = mln_test_create_runtime();
   mln_test_destroy_runtime(released);
 
-  const mln_runtime handles[] = {MLN_HANDLE_NULL, released, map};
-  const mln_completion discard = mln_test_discard_completion();
-  const mln_map_options map_options = mln_map_options_default();
-  for (size_t index = 0; index < sizeof(handles) / sizeof(*handles);
-       index += 1) {
-    const mln_runtime handle = handles[index];
-    mln_event_batch batch = MLN_HANDLE_NULL;
-    uint64_t mask = 0;
-    MLN_TEST_INVALID(mln_runtime_release(handle, &discard, NULL));
-    MLN_TEST_INVALID(mln_runtime_barrier(handle, &discard, NULL));
-    MLN_TEST_INVALID(mln_runtime_dispose(handle, NULL));
-    MLN_TEST_INVALID(mln_runtime_drain_events(handle, &batch, NULL));
-    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
-    MLN_TEST_INVALID(mln_runtime_get_event_mask(handle, &mask, NULL));
-    MLN_TEST_INVALID(
-      mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
-    );
-    MLN_TEST_INVALID(mln_map_create(handle, &map_options, &discard, NULL));
-  }
+  expect_runtime_calls_reject(MLN_HANDLE_NULL, MLN_STATUS_INVALID_ARGUMENT);
+  expect_runtime_calls_reject(map, MLN_STATUS_INVALID_ARGUMENT);
+  expect_runtime_calls_reject(released, MLN_STATUS_INVALID_STATE);
 
   // The map named as a runtime is unaffected.
   MLN_TEST_OK(mln_test_map_request_repaint(map));
@@ -167,20 +175,22 @@ static void map_creation_validates_its_options_and_completion(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Every map entry point below rejects a released map without running its
-// completion.
+// Every map entry point below reports a released map as invalid state without
+// running its completion.
 static void a_released_map_accepts_no_call(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_destroy_map(map);
-  MLN_TEST_INVALID(mln_test_map_close(map));
-  MLN_TEST_INVALID(mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL("{}")));
-  MLN_TEST_INVALID(mln_test_map_request_repaint(map));
+  MLN_TEST_INVALID_STATE(mln_test_map_close(map));
+  MLN_TEST_INVALID_STATE(
+    mln_test_map_set_style_json(map, MLN_BUFFER_LITERAL("{}"))
+  );
+  MLN_TEST_INVALID_STATE(mln_test_map_request_repaint(map));
   mln_completion completion = mln_test_discard_completion();
-  MLN_TEST_INVALID(mln_map_request_still_image(map, &completion, NULL));
+  MLN_TEST_INVALID_STATE(mln_map_request_still_image(map, &completion, NULL));
   mln_camera_options camera = mln_camera_options_default();
-  MLN_TEST_INVALID(mln_test_map_get_camera(map, &camera));
-  MLN_TEST_INVALID(mln_map_dispose(map, NULL));
+  MLN_TEST_INVALID_STATE(mln_test_map_get_camera(map, &camera));
+  MLN_TEST_INVALID_STATE(mln_map_dispose(map, NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -349,7 +359,7 @@ static void accepted_close_is_any_thread_and_retires_the_handle(void) {
   MLN_TEST_OK(atomic_load(&probe.status));
 
   uint64_t mask = 0;
-  MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, &mask, NULL));
+  MLN_TEST_INVALID_STATE(mln_runtime_get_event_mask(runtime, &mask, NULL));
 }
 
 static void disposal_wake(void* user_data) { (void)user_data; }
@@ -371,7 +381,7 @@ static void disposal_waits_for_children_and_retires_callback_state(void) {
   MLN_TEST_OK(mln_test_map_create_status(runtime, NULL, &map));
   MLN_TEST_OK(mln_runtime_dispose(runtime, NULL));
   uint64_t mask = 0;
-  MLN_TEST_INVALID(mln_runtime_get_event_mask(runtime, &mask, NULL));
+  MLN_TEST_INVALID_STATE(mln_runtime_get_event_mask(runtime, &mask, NULL));
   TEST_ASSERT_FALSE(atomic_load(&released));
   MLN_TEST_OK(mln_map_dispose(map, NULL));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&released));

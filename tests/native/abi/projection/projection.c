@@ -47,15 +47,19 @@ static void projection_outlives_its_source_map_and_runtime(void) {
 
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
 
-  // Every call with the retired handle reports an invalid argument.
-  MLN_TEST_INVALID(mln_map_projection_close(projection, NULL));
+  // Every call with the retired handle reports invalid state.
+  MLN_TEST_INVALID_STATE(mln_map_projection_close(projection, NULL));
   mln_camera_options camera = mln_camera_options_default();
-  MLN_TEST_INVALID(mln_map_projection_get_camera(projection, &camera, NULL));
+  MLN_TEST_INVALID_STATE(
+    mln_map_projection_get_camera(projection, &camera, NULL)
+  );
   camera.fields = MLN_CAMERA_OPTION_ZOOM;
   camera.zoom = 2.0;
-  MLN_TEST_INVALID(mln_map_projection_set_camera(projection, &camera, NULL));
+  MLN_TEST_INVALID_STATE(
+    mln_map_projection_set_camera(projection, &camera, NULL)
+  );
   mln_screen_point point = {0};
-  MLN_TEST_INVALID(mln_map_projection_pixel_for_lat_lng(
+  MLN_TEST_INVALID_STATE(mln_map_projection_pixel_for_lat_lng(
     projection, (mln_lat_lng){.latitude = 0.0, .longitude = 0.0}, &point, NULL
   ));
 }
@@ -368,7 +372,7 @@ static void visible_geometry_fits_like_its_coordinates(void) {
   TEST_ASSERT_EQUAL_DOUBLE(geometry_fit.longitude, unchanged.longitude);
 
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
-  MLN_TEST_INVALID(mln_map_projection_set_visible_geometry(
+  MLN_TEST_INVALID_STATE(mln_map_projection_set_visible_geometry(
     projection,
     MLN_BUFFER_LITERAL("{\"type\":\"Point\",\"coordinates\":[0,0]}"), padding,
     NULL

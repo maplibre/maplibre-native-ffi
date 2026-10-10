@@ -28,8 +28,8 @@ static void a_drain_rejects_a_nonnull_output_or_a_stale_runtime(void) {
 
   mln_test_destroy_runtime(runtime);
   batch = MLN_HANDLE_NULL;
-  MLN_TEST_INVALID(mln_runtime_drain_events(runtime, &batch, NULL));
-  MLN_TEST_INVALID(
+  MLN_TEST_INVALID_STATE(mln_runtime_drain_events(runtime, &batch, NULL));
+  MLN_TEST_INVALID_STATE(
     mln_runtime_set_event_mask(runtime, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
   );
 }
@@ -427,7 +427,7 @@ static void a_drained_batch_is_an_owned_handle(void) {
     mln_event_batch_release(first);
   }
   // A drained batch is an owned handle: releasing it twice is a no-op,
-  // releasing the null handle is a no-op, and a released handle names no batch.
+  // releasing the null handle is a no-op, and a released handle is stale.
   {
     mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
 
@@ -441,7 +441,7 @@ static void a_drained_batch_is_an_owned_handle(void) {
     mln_runtime_event_batch_view view = {
       .size = sizeof(mln_runtime_event_batch_view), .event_count = 99
     };
-    MLN_TEST_INVALID(mln_event_batch_get(batch, &view, NULL));
+    MLN_TEST_INVALID_STATE(mln_event_batch_get(batch, &view, NULL));
     TEST_ASSERT_EQUAL_size_t(99, view.event_count);
     MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, NULL));
     TEST_ASSERT_EQUAL_size_t(99, view.event_count);

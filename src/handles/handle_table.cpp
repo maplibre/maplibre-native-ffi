@@ -28,6 +28,11 @@ auto handle_to_hex(std::uint64_t handle) -> std::string {
   return text;
 }
 
+auto recorded_fault_status() noexcept -> mln_status& {
+  thread_local auto value = MLN_STATUS_INVALID_ARGUMENT;
+  return value;
+}
+
 }  // namespace
 
 auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
@@ -57,7 +62,7 @@ auto handle_kind_name(std::uint8_t kind) noexcept -> const char* {
 }
 
 auto classify_handle_fault(
-  HandleKind expected, std::uint64_t handle, bool index_in_range
+  HandleKind expected, std::uint64_t handle, bool issued
 ) noexcept -> HandleFault {
   if (handle == 0) {
     return HandleFault::Null;
@@ -69,15 +74,13 @@ auto classify_handle_fault(
   if (kind != static_cast<std::uint8_t>(expected)) {
     return HandleFault::WrongKind;
   }
-  if (!index_in_range) {
-    return HandleFault::Unknown;
-  }
-  return HandleFault::Stale;
+  return issued ? HandleFault::Stale : HandleFault::Unknown;
 }
 
-auto set_handle_fault_error(
+auto report_handle_fault(
   HandleKind expected, std::uint64_t handle, HandleFault fault
-) noexcept -> void {
+) noexcept -> mln_status {
+  recorded_fault_status() = handle_fault_status(fault);
   try {
     const auto* expected_name =
       handle_kind_name(static_cast<std::uint8_t>(expected));
@@ -102,13 +105,18 @@ auto set_handle_fault_error(
       case HandleFault::Stale:
         message = std::string{expected_name} + " handle " +
                   handle_to_hex(handle) +
-                  " is stale; the object it named was destroyed";
+                  " is stale; the object it named has been released";
         break;
     }
     set_thread_error(message.c_str());
   } catch (...) {
     set_thread_error("handle is not live");
   }
+  return handle_fault_status(fault);
+}
+
+auto recorded_handle_fault_status() noexcept -> mln_status {
+  return recorded_fault_status();
 }
 
 }  // namespace mln::core

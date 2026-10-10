@@ -653,9 +653,7 @@ auto mln_map_add_geojson_source_data(
     // The lease taken at submit keeps the prepared index alive until the
     // command runs, so the host may destroy the handle right after this call.
     auto prepared = mln::core::geojson_source_data_table().lease(data);
-    if (prepared == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
+    if (prepared == nullptr) return mln::core::recorded_handle_fault_status();
     auto id = OwnedView{source_id};
     return mln::core::submit_map_command(
       map,
@@ -710,9 +708,7 @@ auto mln_map_set_geojson_source_data(
     // The lease taken at submit keeps the prepared index alive until the
     // command runs, so the host may destroy the handle right after this call.
     auto prepared = mln::core::geojson_source_data_table().lease(data);
-    if (prepared == nullptr) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
+    if (prepared == nullptr) return mln::core::recorded_handle_fault_status();
     auto id = OwnedView{source_id};
     return mln::core::submit_map_command(
       map,

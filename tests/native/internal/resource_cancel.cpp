@@ -195,13 +195,15 @@ void run_release_waits_for_in_flight_cancel_callback(BlockingCancel& probe) {
   );
   TEST_ASSERT_TRUE(callback_returned_before_release);
   if (probe.self_release) {
-    MLN_TEST_INVALID(probe.status_after_self_release.load());
-    MLN_TEST_INVALID(probe.complete_status_after_self_release.load());
+    MLN_TEST_INVALID_STATE(probe.status_after_self_release.load());
+    MLN_TEST_INVALID_STATE(probe.complete_status_after_self_release.load());
   } else {
     mln_resource_request_release(handle);
   }
   auto cancelled = false;
-  MLN_TEST_INVALID(mln_resource_request_cancelled(handle, &cancelled, nullptr));
+  MLN_TEST_INVALID_STATE(
+    mln_resource_request_cancelled(handle, &cancelled, nullptr)
+  );
   mln_test_destroy_runtime(runtime);
 }
 

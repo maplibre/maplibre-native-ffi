@@ -252,24 +252,31 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
     return;
   }
   if (fixture->session != MLN_HANDLE_NULL) {
-    mln_test_completion detach = mln_test_completion_default(0);
-    const mln_status detach_status = mln_render_session_detach(
-      fixture->session, &detach.descriptor, MLN_TEST_DIAGNOSTIC
+    // A session the case already disposed or destroyed is stale and needs no
+    // teardown.
+    mln_render_session_snapshot snapshot = {
+      .size = sizeof(mln_render_session_snapshot)
+    };
+    const mln_status liveness = mln_render_session_get_snapshot(
+      fixture->session, &snapshot, MLN_TEST_DIAGNOSTIC
     );
-    if (detach_status == MLN_STATUS_OK) {
-      MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &detach));
-    } else {
-      detach.descriptor.release_user_data(detach.descriptor.user_data);
-      TEST_ASSERT_TRUE(
-        detach_status == MLN_STATUS_INVALID_STATE ||
-        detach_status == MLN_STATUS_INVALID_ARGUMENT
+    if (liveness == MLN_STATUS_OK) {
+      mln_test_completion detach = mln_test_completion_default(0);
+      const mln_status detach_status = mln_render_session_detach(
+        fixture->session, &detach.descriptor, MLN_TEST_DIAGNOSTIC
       );
-    }
-    mln_test_completion_destroy(&detach);
-    if (detach_status != MLN_STATUS_INVALID_ARGUMENT) {
+      if (detach_status == MLN_STATUS_OK) {
+        MLN_TEST_OK(mln_test_render_fixture_finish_operation(fixture, &detach));
+      } else {
+        detach.descriptor.release_user_data(detach.descriptor.user_data);
+        MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, detach_status);
+      }
+      mln_test_completion_destroy(&detach);
       MLN_TEST_OK(
         mln_render_session_destroy(fixture->session, MLN_TEST_DIAGNOSTIC)
       );
+    } else {
+      MLN_TEST_STATUS(MLN_STATUS_INVALID_STATE, liveness);
     }
   }
   untrack_session(fixture->session);

@@ -19,14 +19,23 @@ static void a_released_map_handle_never_names_a_later_map(void) {
   mln_map second = mln_test_create_map(runtime);
   TEST_ASSERT_NOT_EQUAL_UINT64(first, second);
 
-  MLN_TEST_INVALID(mln_test_map_request_repaint(first));
+  MLN_TEST_INVALID_STATE(mln_test_map_request_repaint(first));
   TEST_ASSERT_TRUE_MESSAGE(
     last_error_mentions("stale"),
     "A released handle should report that it is stale."
   );
-  MLN_TEST_INVALID(mln_test_map_close(first));
+  MLN_TEST_INVALID_STATE(mln_test_map_close(first));
 
   MLN_TEST_OK(mln_test_map_request_repaint(second));
+
+  // The generation after the live one is in a slot this process issued, but
+  // no handle carried it yet.
+  const mln_map ahead = second + 1;
+  MLN_TEST_INVALID(mln_test_map_request_repaint(ahead));
+  TEST_ASSERT_TRUE_MESSAGE(
+    last_error_mentions("never created"),
+    "A generation the slot has not issued should report as never created."
+  );
 
   mln_test_destroy_map(second);
   mln_test_destroy_runtime(runtime);

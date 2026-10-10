@@ -83,7 +83,7 @@ void close_waits_for_a_running_conversion() {
   TEST_ASSERT_EQUAL_DOUBLE(expected.x, conversion.point.x);
   TEST_ASSERT_EQUAL_DOUBLE(expected.y, conversion.point.y);
   auto point = mln_screen_point{};
-  MLN_TEST_INVALID(
+  MLN_TEST_INVALID_STATE(
     mln_map_projection_pixel_for_lat_lng(projection, origin, &point, nullptr)
   );
 
@@ -110,7 +110,7 @@ void a_conversion_that_leased_before_close_reports_a_stale_handle() {
   TEST_ASSERT_TRUE_MESSAGE(leased, "the conversion never leased the handle");
   MLN_TEST_OK(close_status);
   TEST_ASSERT_EQUAL_INT(0, close_waits);
-  MLN_TEST_INVALID(conversion.status.load());
+  MLN_TEST_INVALID_STATE(conversion.status.load());
   TEST_ASSERT_NOT_NULL_MESSAGE(
     std::strstr(conversion.diagnostic.message, "stale"),
     conversion.diagnostic.message

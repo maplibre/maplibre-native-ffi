@@ -297,8 +297,9 @@ static mln_status call_accessor(
 }
 
 // A broken frame or output fails before an accessor looks at the frame's
-// backend, so every accessor reports it the same way. Release takes a live
-// frame and a sync record it knows, and consumes the frame only when it
+// backend, so every accessor reports it the same way: a released frame as
+// invalid state, and anything else as an invalid argument. Release takes a
+// live frame and a sync record it knows, and consumes the frame only when it
 // succeeds, so a refused release leaves the frame with the host.
 static void accessors_and_release_reject_a_broken_frame_or_record(void) {
   mln_runtime runtime;
@@ -314,11 +315,12 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
   static const struct {
     const char* label;
     void (*mutate)(void* call);
+    mln_status expected;
   } breakages[] = {
-    {"null frame", null_frame},
-    {"released frame", a_released_frame},
-    {"null output", null_record},
-    {"undersized output", undersized_record},
+    {"null frame", null_frame, MLN_STATUS_INVALID_ARGUMENT},
+    {"released frame", a_released_frame, MLN_STATUS_INVALID_STATE},
+    {"null output", null_record, MLN_STATUS_INVALID_ARGUMENT},
+    {"undersized output", undersized_record, MLN_STATUS_INVALID_ARGUMENT},
   };
   enum { breakage_count = sizeof(breakages) / sizeof(breakages[0]) };
   for (size_t index = 0; index < accessor_count; index += 1) {
@@ -330,7 +332,7 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
         breakages[row].label
       );
       cases[row] = (mln_test_validation_case){
-        labels[row], breakages[row].mutate, MLN_STATUS_INVALID_ARGUMENT, NULL
+        labels[row], breakages[row].mutate, breakages[row].expected, NULL
       };
     }
     const accessor_call defaults = {
@@ -347,9 +349,7 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
   MLN_TEST_INVALID(mln_acquired_frame_release(&null_handle, &sync, NULL));
   MLN_TEST_INVALID(mln_acquired_frame_release(NULL, &sync, NULL));
   mln_acquired_frame stale_copy = stale;
-  TEST_ASSERT_NOT_EQUAL_INT(
-    MLN_STATUS_OK, mln_acquired_frame_release(&stale_copy, &sync, NULL)
-  );
+  MLN_TEST_INVALID_STATE(mln_acquired_frame_release(&stale_copy, &sync, NULL));
   mln_gpu_sync refused = sync;
   refused.size = sizeof(mln_gpu_sync) - 1;
   MLN_TEST_INVALID(mln_acquired_frame_release(&frame, &refused, NULL));
@@ -435,7 +435,7 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   const mln_acquired_frame released = frame;
   mln_test_render_release_frame(&frame);
   void* stale = NULL;
-  MLN_TEST_INVALID(
+  MLN_TEST_INVALID_STATE(
     mln_adapter_acquired_frame_view_begin(released, &stale, NULL)
   );
   TEST_ASSERT_NULL(stale);
@@ -468,7 +468,7 @@ static void disposing_a_frame_abandons_its_session_after_open_views(void) {
   MLN_TEST_OK(mln_adapter_acquired_frame_view_begin(kept, &scope, NULL));
 
   MLN_TEST_OK(mln_acquired_frame_dispose(disposed, MLN_TEST_DIAGNOSTIC));
-  MLN_TEST_INVALID(mln_acquired_frame_dispose(disposed, NULL));
+  MLN_TEST_INVALID_STATE(mln_acquired_frame_dispose(disposed, NULL));
   void* rejected = NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST,

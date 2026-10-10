@@ -338,7 +338,7 @@ void disposal_waits_for_pending_child_creation() {
   mln_test_pulse();
   TEST_ASSERT_TRUE(expired(weak));
   TEST_ASSERT_TRUE(released(result));
-  MLN_TEST_INVALID(result.status.load());
+  MLN_TEST_INVALID_STATE(result.status.load());
 }
 
 // An operation that stays pending after its run-loop task returns, the way an

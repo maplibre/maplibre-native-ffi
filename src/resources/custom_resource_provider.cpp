@@ -566,9 +566,7 @@ auto complete_resource_request(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   auto native_response = response_from_abi(*response);
   // A requester whose cached copy had to be revalidated has not seen that copy
   // yet, so NOT_MODIFIED delivers it, as MapLibre's online source does for a
@@ -580,8 +578,9 @@ auto complete_resource_request(
   {
     const std::scoped_lock lock(live->mutex);
     if (live->retired) {
-      set_thread_error("resource request handle is released");
-      return MLN_STATUS_INVALID_ARGUMENT;
+      return report_handle_fault(
+        HandleTraits<ResourceRequestObject>::kind, handle, HandleFault::Stale
+      );
     }
     if (live->completed) {
       set_thread_error("resource request is already completed");
@@ -612,13 +611,12 @@ auto resource_request_cancelled(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const std::scoped_lock lock(live->mutex);
   if (live->retired) {
-    set_thread_error("resource request handle is released");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return report_handle_fault(
+      HandleTraits<ResourceRequestObject>::kind, handle, HandleFault::Stale
+    );
   }
   *out_cancelled = live->cancelled && !live->completed;
   return MLN_STATUS_OK;
@@ -638,13 +636,12 @@ auto set_resource_request_cancel_callback(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<ResourceRequestObject>().lease(handle);
-  if (live == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  if (live == nullptr) return recorded_handle_fault_status();
   const std::scoped_lock lock(live->mutex);
   if (live->retired) {
-    set_thread_error("resource request handle is released");
-    return MLN_STATUS_INVALID_ARGUMENT;
+    return report_handle_fault(
+      HandleTraits<ResourceRequestObject>::kind, handle, HandleFault::Stale
+    );
   }
   if (live->cancel_callback_registered) {
     set_thread_error("resource request already has a cancel callback");
