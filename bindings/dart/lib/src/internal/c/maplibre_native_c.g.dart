@@ -86,6 +86,13 @@ typedef mln_log_callback_release =
     Pointer<NativeFunction<mln_log_callback_releaseFunction>>;
 typedef mln_log_callback_releaseFunction =
     Void Function(Pointer<Void> user_data);
+typedef mln_queue_lock_callback =
+    Pointer<NativeFunction<mln_queue_lock_callbackFunction>>;
+typedef mln_queue_lock_callbackFunction =
+    Void Function(Pointer<Void> user_data);
+typedef mln_queue_lock_release =
+    Pointer<NativeFunction<mln_queue_lock_releaseFunction>>;
+typedef mln_queue_lock_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_resource_provider_callback =
     Pointer<NativeFunction<mln_resource_provider_callbackFunction>>;
 typedef mln_resource_provider_callbackFunction =
@@ -882,6 +889,15 @@ final class mln_queried_feature extends Struct {
   external mln_buffer_view state;
 }
 
+final class mln_queue_lock extends Struct {
+  @Uint32()
+  external int size;
+  external mln_queue_lock_callback lock;
+  external mln_queue_lock_callback unlock;
+  external Pointer<Void> user_data;
+  external mln_queue_lock_release release_user_data;
+}
+
 final class mln_render_abandon_result extends Struct {
   @Uint32()
   external int size;
@@ -921,6 +937,7 @@ final class mln_render_session_attach_options extends Struct {
   external int reserved;
   external mln_wake frame_wake;
   external mln_wake driver_work_wake;
+  external mln_queue_lock queue_lock;
 }
 
 final class mln_render_session_capabilities extends Struct {

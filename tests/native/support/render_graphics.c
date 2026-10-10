@@ -127,8 +127,10 @@ static mln_metal_context_descriptor host_context(
 }
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
 // Set only while mln_test_render_fixture_create_vulkan_borrowed_texture()
-// attaches, to replace the context's PFN_vkGetDeviceProcAddr.
+// attaches, to replace the context's PFN_vkGetDeviceProcAddr and to give the
+// session a host queue lock.
 static mln_test_vulkan_device_proc_addr_wrap wrap_device_proc_addr = NULL;
+static const mln_queue_lock* attach_queue_lock = NULL;
 
 static mln_vulkan_context_descriptor host_context(
   const mln_test_graphics_context* context
@@ -319,8 +321,12 @@ static bool attach_borrowed_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_render_session_attach_options attach = *options;
+  if (attach_queue_lock != NULL) {
+    attach.queue_lock = *attach_queue_lock;
+  }
   *out_status = mln_vulkan_borrowed_texture_attach(
-    map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
+    map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
   *out_status = mln_opengl_borrowed_texture_attach(
@@ -380,14 +386,16 @@ bool mln_test_render_fixture_create_borrowed_texture(
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_vulkan_device_proc_addr_wrap wrap,
-  const mln_test_render_fixture* share
+  const mln_test_render_fixture* share, const mln_queue_lock* queue_lock
 ) {
   wrap_device_proc_addr = wrap;
+  attach_queue_lock = queue_lock;
   shared_graphics =
     share == NULL ? NULL : mln_test_render_fixture_graphics(share);
   const bool attached =
     mln_test_render_fixture_create_with(map, fixture, attach_borrowed_texture);
   wrap_device_proc_addr = NULL;
+  attach_queue_lock = NULL;
   shared_graphics = NULL;
   return attached;
 }

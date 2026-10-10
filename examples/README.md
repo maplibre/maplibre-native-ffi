@@ -76,12 +76,13 @@ These rules hold in every example, and the code alone does not show why:
 - A frame result of target-not-ready, or a rendered frame that the host could
   not present, demands again after about one display refresh without the
   render-if-needed flag, because the attempt consumed the map update.
-- A Vulkan core worker in a texture mode submits on a second queue from the
-  graphics family, because the host compositor submits on its own queue at the
-  same time. The session waits on its own queue and never on the device, so the
-  compositor's queue needs no lock against it. A device with one graphics queue,
-  such as MoltenVK, uses the caller driver for the texture modes. The host calls
-  `vkDeviceWaitIdle` only after detach completes.
+- A Vulkan core worker submits to the host's one graphics queue and takes the
+  host's queue lock around each call on it, because the host compositor submits
+  to that queue too and Vulkan requires the calls on one queue to be externally
+  synchronized. The host takes the same lock around its own queue calls and
+  releases it before calling the C API. A JVM or .NET example uses a lock
+  without an owner thread, because the session takes and releases it in separate
+  upcalls. The host calls `vkDeviceWaitIdle` only after detach completes.
 - OpenGL sessions use the caller driver. An OpenGL owned texture attaches on a
   context shared with the host, because one on a private EGL context offers CPU
   readback instead of frame acquisition.

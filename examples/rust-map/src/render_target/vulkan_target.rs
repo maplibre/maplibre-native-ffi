@@ -1,8 +1,8 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    MapHandle, RenderDriverKind, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
-    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    MapHandle, QueueLock, RenderDriverKind, VulkanBorrowedTextureDescriptor,
+    VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 
 use crate::graphics::GraphicsContext;
@@ -42,22 +42,18 @@ impl RenderTarget {
         wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<Self> {
         let vk = graphics.vulkan();
-        // A core worker drives every target, except a texture target whose
-        // device gave the session no queue of its own. That one shares the
-        // host's queue, so it renders on the event loop through a caller
-        // driver. A surface shares the host's queue too, since the host submits
-        // nothing there.
-        let driver = if mode == Mode::NativeSurface || vk.session_queue_pointer().is_some() {
-            RenderDriverKind::CoreWorker
-        } else {
-            RenderDriverKind::CallerGraphicsThread
-        };
-        let options = attach_options(wakes, mode, driver);
+        // The core worker submits to the host's queue, so it takes the host's
+        // queue lock around each call on it.
+        let mut options = attach_options(wakes, mode, RenderDriverKind::CoreWorker);
+        let (lock, unlock) = (vk.queue_mutex().clone(), vk.queue_mutex().clone());
+        options.queue_lock = QueueLock::default()
+            .with_lock(move || lock.lock())
+            .with_unlock(move || unlock.unlock());
         match mode {
             Mode::OwnedTexture => {
                 let descriptor = VulkanOwnedTextureDescriptor {
                     extent: extent(viewport),
-                    context: context_descriptor(vk, mode),
+                    context: context_descriptor(vk),
                 };
                 let session = Session::new(
                     unsafe { map.vulkan_owned_texture_attach(&descriptor, &options) }?,
@@ -91,7 +87,7 @@ impl RenderTarget {
             Mode::NativeSurface => {
                 let descriptor = VulkanSurfaceDescriptor {
                     extent: extent(viewport),
-                    context: context_descriptor(vk, mode),
+                    context: context_descriptor(vk),
                     surface: vk.surface_handle(),
                 };
                 Ok(Self::Surface {
@@ -269,7 +265,7 @@ fn borrowed_descriptor(
         extent: extent(viewport),
         physical_width: viewport.physical_width,
         physical_height: viewport.physical_height,
-        context: context_descriptor(vk, Mode::BorrowedTexture),
+        context: context_descriptor(vk),
         image: image.image_handle(),
         image_view: image.view_handle(),
         format: ash::vk::Format::R8G8B8A8_UNORM.as_raw() as u32,
@@ -278,18 +274,12 @@ fn borrowed_descriptor(
     }
 }
 
-/// Names the session's queue: its own in a texture mode when the device has
-/// one, and the host's otherwise.
-fn context_descriptor(vk: &VulkanContext, mode: Mode) -> VulkanContextDescriptor {
-    let session_queue = match mode {
-        Mode::NativeSurface => None,
-        Mode::OwnedTexture | Mode::BorrowedTexture => vk.session_queue_pointer(),
-    };
+fn context_descriptor(vk: &VulkanContext) -> VulkanContextDescriptor {
     let mut descriptor = VulkanContextDescriptor {
         instance: vk.instance_pointer(),
         physical_device: vk.physical_device_pointer(),
         device: vk.device_pointer(),
-        graphics_queue: session_queue.unwrap_or_else(|| vk.graphics_queue_pointer()),
+        graphics_queue: vk.graphics_queue_pointer(),
         graphics_queue_family_index: vk.graphics_queue_family_index(),
         ..Default::default()
     };

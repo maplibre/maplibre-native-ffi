@@ -107,6 +107,7 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "cancel_registration",
         "wait_retired",
         "deferred",
+        "synchronous",
         "prefix",
         "fields",
     }
@@ -480,6 +481,7 @@ def metadata_errors(
         "release_consumes": frozenset({"success", "always"}),
         "consumes": frozenset({"success", "always"}),
         "thread": frozenset({"native", "host"}),
+        "synchronous": frozenset({"true", "false"}),
         "reentry": frozenset({"allow", "forbid", "protocol"}),
         "handle_access": frozenset({"live", "issued"}),
         "dispose_invalidates": frozenset({"self", "parent"}),
@@ -1260,6 +1262,15 @@ def validate(api: Api) -> None:
             errors.append(f"{context}: failure requires a callback")
         if "deferred" in typedef.metadata:
             errors.extend(deferred_errors(typedef, enum_constants, context))
+        if "synchronous" in typedef.metadata and (
+            signature is None or signature.kind != "function"
+        ):
+            errors.append(f"{context}: synchronous requires a callback")
+        if (
+            typedef.metadata.get("synchronous") == "true"
+            and "deferred" in typedef.metadata
+        ):
+            errors.append(f"{context}: a synchronous callback cannot be deferred")
         decision_keys = {
             "decision_handle",
             "decision_accept",

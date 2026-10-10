@@ -111,4 +111,10 @@ internal actual object UpcallStubs {
   actual val wakeCallback: Long =
     staticCFunction { userData: COpaquePointer? -> Upcalls.wakeCallback(userData.toLong()) }
       .toLong()
+  actual val queueLockLock: Long =
+    staticCFunction { userData: COpaquePointer? -> Upcalls.queueLockLock(userData.toLong()) }
+      .toLong()
+  actual val queueLockUnlock: Long =
+    staticCFunction { userData: COpaquePointer? -> Upcalls.queueLockUnlock(userData.toLong()) }
+      .toLong()
 }

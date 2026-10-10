@@ -45,8 +45,12 @@ def flattened(value, expression):
 
 
 def payload(callback):
-    """Flatten a void context callback's inputs, or return None."""
-    if not callback.context or callback.result.native != "void":
+    """Flatten a void context callback's inputs, or return None.
+
+    A synchronous callback has none: native code relies on its work being done
+    when it returns, which a later port message cannot do.
+    """
+    if not callback.context or callback.result.native != "void" or callback.synchronous:
         return None
     result = []
     for parameter in callback.parameters:

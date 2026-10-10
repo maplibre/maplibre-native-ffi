@@ -557,6 +557,15 @@ internal unsafe struct mln_queried_feature
     public mln_buffer_view state;
 }
 
+internal unsafe struct mln_queue_lock
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<void*, void> @lock;
+    public delegate* unmanaged[Cdecl]<void*, void> unlock;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
 internal unsafe struct mln_render_abandon_result
 {
     public uint size;
@@ -584,6 +593,7 @@ internal unsafe struct mln_render_session_attach_options
     public uint reserved;
     public mln_wake frame_wake;
     public mln_wake driver_work_wake;
+    public mln_queue_lock queue_lock;
 }
 
 internal unsafe struct mln_render_session_capabilities

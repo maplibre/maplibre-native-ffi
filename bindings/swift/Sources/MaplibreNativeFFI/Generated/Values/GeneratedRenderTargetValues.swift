@@ -254,6 +254,57 @@ public struct OpenglContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
   public static let webgl: OpenglContextProviderFlag = .init(rawValue: 4)
 }
 
+public struct QueueLock: Sendable {
+  public var lock: (@Sendable () throws -> Void)?
+  public var unlock: (@Sendable () throws -> Void)?
+  public init(
+    lock: (@Sendable () throws -> Void)? = nil,
+    unlock: (@Sendable () throws -> Void)? = nil
+  ) {
+    self.lock = lock
+    self.unlock = unlock
+  }
+
+  public static var `default`: Self {
+    try! Self(raw: mln_queue_lock())
+  }
+
+  init(raw _: mln_queue_lock) throws {
+    lock = nil
+    unlock = nil
+  }
+
+  func nativeValue(arena: NativeInputArena) throws -> mln_queue_lock {
+    var raw = mln_queue_lock()
+    raw.size = UInt32(MemoryLayout<mln_queue_lock>.size)
+    raw.lock = lock == nil ? nil : invokeQueueLockLock
+    raw.unlock = unlock == nil ? nil : invokeQueueLockUnlock
+    if lock != nil || unlock != nil {
+      raw.user_data = arena.callback(self)
+      raw.release_user_data = releaseGeneratedCallback
+    }
+    return raw
+  }
+}
+
+private func invokeQueueLockLock(user_data: UnsafeMutableRawPointer?) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<QueueLock>>.fromOpaque(user_data)
+    .takeUnretainedValue()
+  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
+  defer { admission.end() }
+  do { try box.value.lock?() } catch {}
+}
+
+private func invokeQueueLockUnlock(user_data: UnsafeMutableRawPointer?) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<QueueLock>>.fromOpaque(user_data)
+    .takeUnretainedValue()
+  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
+  defer { admission.end() }
+  do { try box.value.unlock?() } catch {}
+}
+
 public struct RenderDriverKind: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -271,6 +322,7 @@ public struct RenderSessionAttachOptions: Sendable {
   public var requestedTextureRingDepth: UInt32
   public var frameWake: Wake
   public var driverWorkWake: Wake
+  public var queueLock: QueueLock
   public static var `default`: Self {
     try! Self(raw: mln_render_session_attach_options_default())
   }
@@ -280,12 +332,14 @@ public struct RenderSessionAttachOptions: Sendable {
     requestedTextureRingDepth: UInt32 = RenderSessionAttachOptions.default
       .requestedTextureRingDepth,
     frameWake: Wake = RenderSessionAttachOptions.default.frameWake,
-    driverWorkWake: Wake = RenderSessionAttachOptions.default.driverWorkWake
+    driverWorkWake: Wake = RenderSessionAttachOptions.default.driverWorkWake,
+    queueLock: QueueLock = RenderSessionAttachOptions.default.queueLock
   ) {
     self.driver = driver
     self.requestedTextureRingDepth = requestedTextureRingDepth
     self.frameWake = frameWake
     self.driverWorkWake = driverWorkWake
+    self.queueLock = queueLock
   }
 
   init(
@@ -296,6 +350,7 @@ public struct RenderSessionAttachOptions: Sendable {
     requestedTextureRingDepth = raw.requested_texture_ring_depth
     frameWake = try Wake(raw: raw.frame_wake)
     driverWorkWake = try Wake(raw: raw.driver_work_wake)
+    queueLock = try QueueLock(raw: raw.queue_lock)
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -307,6 +362,7 @@ public struct RenderSessionAttachOptions: Sendable {
     raw.requested_texture_ring_depth = requestedTextureRingDepth
     raw.frame_wake = try frameWake.nativeValue(arena: arena)
     raw.driver_work_wake = try driverWorkWake.nativeValue(arena: arena)
+    raw.queue_lock = try queueLock.nativeValue(arena: arena)
     return raw
   }
 }

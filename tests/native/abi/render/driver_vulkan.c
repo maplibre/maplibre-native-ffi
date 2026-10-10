@@ -2,7 +2,8 @@
 // one backend that checks a context the submission accepted once the driver
 // has it: the other backends reject a bad descriptor at submission or cannot
 // fail after it. And a session shares its device with the host, so it waits on
-// its own queue and never on the whole device.
+// its own queue and never on the whole device, and a host that shares the
+// queue with it gives it a lock that it takes around each call on the queue.
 
 #include <vulkan/vulkan_core.h>
 
@@ -90,6 +91,9 @@ typedef struct vulkan_observer {
   atomic_uint device_waits;
   // Submissions with at least one batch.
   atomic_uint submissions;
+  // Submissions of any kind from a thread that did not hold the host queue
+  // lock, for a case whose session has one.
+  atomic_uint unlocked_submissions;
   // Empty submissions with a fence, which drain the queue: the fence signals
   // once everything submitted to the queue before it has completed.
   atomic_uint drains;
@@ -110,10 +114,13 @@ typedef struct vulkan_observer_entry_points {
 static void observer_reset(vulkan_observer* observer) {
   atomic_store(&observer->device_waits, 0);
   atomic_store(&observer->submissions, 0);
+  atomic_store(&observer->unlocked_submissions, 0);
   atomic_store(&observer->drains, 0);
   atomic_store(&observer->unfinished_drains, 0);
   atomic_store(&observer->drain_fence, VK_NULL_HANDLE);
 }
+
+static MLN_TEST_THREAD_LOCAL bool holds_host_queue_lock;
 
 static VkResult observe_device_wait_idle(
   vulkan_observer* observer, VkDevice device
@@ -126,6 +133,9 @@ static VkResult observe_queue_submit(
   vulkan_observer* observer, VkQueue queue, uint32_t submit_count,
   const VkSubmitInfo* submits, VkFence fence
 ) {
+  if (!holds_host_queue_lock) {
+    atomic_fetch_add(&observer->unlocked_submissions, 1);
+  }
   if (submit_count == 0 && fence != VK_NULL_HANDLE) {
     atomic_fetch_add(&observer->drains, 1);
     atomic_store(&observer->drain_fence, fence);
@@ -262,7 +272,7 @@ static void a_session_drains_its_own_queue_and_never_waits_on_the_device(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      map, &fixture, first_observer_wrap, NULL
+      map, &fixture, first_observer_wrap, NULL, NULL
     ),
     mln_test_graphics_last_error()
   );
@@ -292,14 +302,14 @@ static void sessions_sharing_a_queue_call_their_own_device_functions(void) {
   mln_test_render_fixture first = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      first_map, &first, first_observer_wrap, NULL
+      first_map, &first, first_observer_wrap, NULL, NULL
     ),
     mln_test_graphics_last_error()
   );
   mln_test_render_fixture second = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      second_map, &second, second_observer_wrap, &first
+      second_map, &second, second_observer_wrap, &first, NULL
     ),
     mln_test_graphics_last_error()
   );
@@ -321,8 +331,156 @@ static void sessions_sharing_a_queue_call_their_own_device_functions(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// The host's lock on a queue that it shares with a session. C11 has no
+// portable mutex, and each hold covers one queue call, so this is a ticket
+// lock, which serves waiters in order and so starves neither thread.
+typedef struct host_queue_lock {
+  atomic_uint next_ticket;
+  atomic_uint serving;
+  // Calls the session made to its callbacks.
+  atomic_uint locks;
+  atomic_uint unlocks;
+  atomic_uint releases;
+} host_queue_lock;
+
+static void host_queue_lock_take(host_queue_lock* lock) {
+  const unsigned int ticket = atomic_fetch_add(&lock->next_ticket, 1);
+  while (atomic_load(&lock->serving) != ticket) {
+  }
+  holds_host_queue_lock = true;
+}
+
+static void host_queue_lock_give(host_queue_lock* lock) {
+  holds_host_queue_lock = false;
+  atomic_fetch_add(&lock->serving, 1);
+}
+
+static void session_takes_queue_lock(void* user_data) {
+  host_queue_lock* lock = user_data;
+  host_queue_lock_take(lock);
+  atomic_fetch_add(&lock->locks, 1);
+}
+
+static void session_gives_queue_lock(void* user_data) {
+  host_queue_lock* lock = user_data;
+  atomic_fetch_add(&lock->unlocks, 1);
+  host_queue_lock_give(lock);
+}
+
+static void queue_lock_released(void* user_data) {
+  host_queue_lock* lock = user_data;
+  atomic_fetch_add(&lock->releases, 1);
+}
+
+// A host thread that submits empty batches on the shared queue under the lock
+// until the case stops it.
+typedef struct host_submitter {
+  host_queue_lock* lock;
+  PFN_vkQueueSubmit queue_submit;
+  VkQueue queue;
+  atomic_bool stop;
+  atomic_int submissions;
+  atomic_uint failures;
+} host_submitter;
+
+// File scope, because the host thread and the session's callbacks can outlast
+// a case that fails partway.
+static host_queue_lock shared_lock;
+static host_submitter host_submits;
+
+static void submit_until_stopped(void* argument) {
+  host_submitter* submitter = argument;
+  while (!atomic_load(&submitter->stop)) {
+    host_queue_lock_take(submitter->lock);
+    const VkResult result =
+      submitter->queue_submit(submitter->queue, 0, NULL, VK_NULL_HANDLE);
+    host_queue_lock_give(submitter->lock);
+    if (result != VK_SUCCESS) {
+      atomic_fetch_add(&submitter->failures, 1);
+    }
+    if (atomic_fetch_add(&submitter->submissions, 1) == 0) {
+      mln_test_pulse();
+    }
+  }
+}
+
+// A host that submits on the session's queue passes a lock, and the session
+// holds it around every call on the queue, its teardown drain included, so
+// both can use one queue at once. The lock's release runs once the session is
+// destroyed.
+static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
+  observer_reset(&first_observer);
+  atomic_store(&shared_lock.next_ticket, 0);
+  atomic_store(&shared_lock.serving, 0);
+  atomic_store(&shared_lock.locks, 0);
+  atomic_store(&shared_lock.unlocks, 0);
+  atomic_store(&shared_lock.releases, 0);
+  const mln_queue_lock queue_lock = {
+    .size = sizeof(mln_queue_lock),
+    .lock = session_takes_queue_lock,
+    .unlock = session_gives_queue_lock,
+    .user_data = &shared_lock,
+    .release_user_data = queue_lock_released,
+  };
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_vulkan_borrowed_texture(
+      map, &fixture, first_observer_wrap, NULL, &queue_lock
+    ),
+    mln_test_graphics_last_error()
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, fixture.driver);
+
+  mln_test_graphics_context context = {0};
+  TEST_ASSERT_TRUE(mln_test_graphics_get_context(
+    mln_test_render_fixture_graphics(&fixture), &context
+  ));
+  const PFN_vkGetDeviceProcAddr get_device_proc_addr =
+    (PFN_vkGetDeviceProcAddr)(uintptr_t)context.vulkan_get_device_proc_addr;
+  host_submits.lock = &shared_lock;
+  host_submits.queue_submit = (PFN_vkQueueSubmit)get_device_proc_addr(
+    (VkDevice)context.vulkan_device, "vkQueueSubmit"
+  );
+  host_submits.queue = (VkQueue)context.vulkan_queue;
+  atomic_store(&host_submits.stop, false);
+  atomic_store(&host_submits.submissions, 0);
+  atomic_store(&host_submits.failures, 0);
+  TEST_ASSERT_NOT_NULL(host_submits.queue_submit);
+  mln_test_thread* host =
+    mln_test_thread_start(submit_until_stopped, &host_submits);
+  TEST_ASSERT_TRUE(mln_test_wait_for_count(&host_submits.submissions, 1));
+  render_one_frame(&fixture, 1);
+  render_one_frame(&fixture, 2);
+  detach(&fixture);
+  atomic_store(&host_submits.stop, true);
+  mln_test_thread_join(host);
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&host_submits.failures));
+
+  assert_drained_own_queue(&first_observer);
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&first_observer.submissions));
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&first_observer.unlocked_submissions));
+  TEST_ASSERT_EQUAL_UINT(
+    atomic_load(&first_observer.submissions) +
+      atomic_load(&first_observer.drains),
+    atomic_load(&shared_lock.locks)
+  );
+  TEST_ASSERT_EQUAL_UINT(
+    atomic_load(&shared_lock.locks), atomic_load(&shared_lock.unlocks)
+  );
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&shared_lock.releases));
+
+  mln_test_render_fixture_destroy(&fixture);
+  TEST_ASSERT_EQUAL_UINT(1, atomic_load(&shared_lock.releases));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_attach_still_owns_the_session_it_published);
   RUN_TEST(a_session_drains_its_own_queue_and_never_waits_on_the_device);
   RUN_TEST(sessions_sharing_a_queue_call_their_own_device_functions);
+  RUN_TEST(a_session_takes_the_host_queue_lock_around_its_queue_calls);
 }

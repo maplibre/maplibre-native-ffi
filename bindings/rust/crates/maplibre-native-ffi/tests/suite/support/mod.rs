@@ -375,6 +375,7 @@ impl Session {
             requested_texture_ring_depth: 2,
             frame_wake: wake(),
             driver_work_wake: wake(),
+            ..RenderSessionAttachOptions::default()
         };
         (options, SessionWakes { signal, released })
     }

@@ -2736,6 +2736,85 @@ pub struct QueriedFeatureField: u32 {
 }
 }
 
+#[derive(Clone, Default)]
+pub struct QueueLock {
+    pub lock: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
+    pub unlock: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
+}
+impl std::fmt::Debug for QueueLock {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("QueueLock").finish_non_exhaustive()
+    }
+}
+impl QueueLock {
+    pub fn with_lock<F>(mut self, callback: F) -> Self
+    where
+        F: Fn() -> () + Send + Sync + 'static,
+    {
+        self.lock = Some(std::sync::Arc::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: Fn() -> () + Send + Sync + 'static,
+    {
+        Self::default().with_lock(callback)
+    }
+    pub fn with_unlock<F>(mut self, callback: F) -> Self
+    where
+        F: Fn() -> () + Send + Sync + 'static,
+    {
+        self.unlock = Some(std::sync::Arc::new(callback));
+        self
+    }
+    unsafe extern "C" fn lock_trampoline(user_data: *mut std::ffi::c_void) {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
+        let state = unsafe { callback::state::<Self>(user_data) };
+        callback::invoke(Some((&[], 0)), (), || {
+            callback::require(&state.lock)?();
+            Ok(())
+        })
+    }
+    unsafe extern "C" fn unlock_trampoline(user_data: *mut std::ffi::c_void) {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
+        let state = unsafe { callback::state::<Self>(user_data) };
+        callback::invoke(Some((&[], 0)), (), || {
+            callback::require(&state.unlock)?();
+            Ok(())
+        })
+    }
+}
+impl ToNative<sys::mln_queue_lock> for QueueLock {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_queue_lock> {
+        let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_queue_lock>() as _;
+        raw.lock = self.lock.as_ref().map(|_| Self::lock_trampoline as _);
+        raw.unlock = self.unlock.as_ref().map(|_| Self::unlock_trampoline as _);
+        if !(raw.lock.is_none() && raw.unlock.is_none()) {
+            // SAFETY: the release reclaims exactly this state.
+            raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
+            raw.release_user_data = Some(callback::release::<Self>);
+        }
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_queue_lock> for QueueLock {
+    /// Copies a descriptor whose callbacks are unset, such as a native default.
+    unsafe fn from_native(raw: sys::mln_queue_lock) -> Result<Self> {
+        if !(raw.lock.is_none() && raw.unlock.is_none()) {
+            return Err(Error::invalid_argument(
+                "foreign callbacks cannot be adopted",
+            ));
+        }
+        Ok(Self {
+            lock: None,
+            unlock: None,
+        })
+    }
+}
+
 native_enum! {
 pub enum RenderAbandonDisposition: u32 {
     Clean = 0,
@@ -2849,6 +2928,7 @@ pub struct RenderSessionAttachOptions {
     pub requested_texture_ring_depth: u32,
     pub frame_wake: Wake,
     pub driver_work_wake: Wake,
+    pub queue_lock: QueueLock,
 }
 impl Default for RenderSessionAttachOptions {
     fn default() -> Self {
@@ -2864,6 +2944,7 @@ impl ToNative<sys::mln_render_session_attach_options> for RenderSessionAttachOpt
         raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
         raw.frame_wake = to_native(&self.frame_wake, arena)?;
         raw.driver_work_wake = to_native(&self.driver_work_wake, arena)?;
+        raw.queue_lock = to_native(&self.queue_lock, arena)?;
         Ok(raw)
     }
 }
@@ -2874,6 +2955,7 @@ impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachO
             requested_texture_ring_depth: raw.requested_texture_ring_depth,
             frame_wake: unsafe { from_native(raw.frame_wake) }?,
             driver_work_wake: unsafe { from_native(raw.driver_work_wake) }?,
+            queue_lock: unsafe { from_native(raw.queue_lock) }?,
         })
     }
 }

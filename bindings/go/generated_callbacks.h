@@ -22,6 +22,8 @@ void binding_mln_custom_mvt_vector_source_options_cancel_tile(
   void* user_data, mln_canonical_tile_id tile_id
 );
 void binding_mln_wake_callback(void* user_data);
+void binding_mln_queue_lock_lock(void* user_data);
+void binding_mln_queue_lock_unlock(void* user_data);
 void binding_mln_resource_request_set_cancel_callback_registration_callback(
   void* user_data
 );

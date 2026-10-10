@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const c = @import("../../c.zig").c;
+const maplibre = @import("maplibre_native_ffi");
 const types = @import("../../types.zig");
 const util = @import("util.zig");
 
@@ -10,21 +11,15 @@ pub const Context = struct {
     surface: c.VkSurfaceKHR,
     physical_device: c.VkPhysicalDevice,
     device: c.VkDevice,
-    /// The queue the host submits to.
+    /// The one queue that the host and the render session both submit to.
     queue: c.VkQueue,
-    /// The queue the render session submits to. A core worker submits from
-    /// its own thread, and Vulkan requires a queue's submissions to be
-    /// externally synchronized, so a host that also submits gives the session
-    /// a second queue from the same family when the family has one. Otherwise
-    /// this is `queue`.
-    session_queue: c.VkQueue,
+    /// Held around every call on `queue`. A core worker submits from its own
+    /// thread, and Vulkan requires the calls on one queue to be externally
+    /// synchronized, so the session takes it too, through its queue lock.
+    queue_mutex: *c.SDL_Mutex,
     queue_family_index: u32,
-    family_queue_count: u32,
 
-    /// Creates the context, with a separate session queue when
-    /// `separate_session_queue` is set and the graphics family exposes two
-    /// queues.
-    pub fn init(allocator: std.mem.Allocator, window: *c.SDL_Window, separate_session_queue: bool) !Context {
+    pub fn init(allocator: std.mem.Allocator, window: *c.SDL_Window) !Context {
         var self = Context{
             .allocator = allocator,
             .instance = null,
@@ -32,9 +27,8 @@ pub const Context = struct {
             .physical_device = null,
             .device = null,
             .queue = null,
-            .session_queue = null,
+            .queue_mutex = c.SDL_CreateMutex() orelse return types.AppError.BackendSetupFailed,
             .queue_family_index = 0,
-            .family_queue_count = 0,
         };
         errdefer self.deinit();
 
@@ -46,22 +40,50 @@ pub const Context = struct {
             &self.surface,
         ));
         try self.pickDevice();
-        try self.createDevice(if (separate_session_queue and self.family_queue_count >= 2) 2 else 1);
+        try self.createDevice();
         return self;
     }
 
+    /// Call only once the session that took the queue lock has been
+    /// destroyed.
     pub fn deinit(self: *Context) void {
         if (self.device != null) c.vkDestroyDevice(self.device, null);
         if (!util.isNullHandle(self.surface)) {
             c.SDL_Vulkan_DestroySurface(self.instance, self.surface, null);
         }
         if (self.instance != null) c.vkDestroyInstance(self.instance, null);
+        c.SDL_DestroyMutex(self.queue_mutex);
     }
 
-    /// Waits for every queue. Call only once the session submits nothing
+    /// Holds the queue for one call on it.
+    pub fn lockQueue(self: *const Context) void {
+        c.SDL_LockMutex(self.queue_mutex);
+    }
+
+    pub fn unlockQueue(self: *const Context) void {
+        c.SDL_UnlockMutex(self.queue_mutex);
+    }
+
+    /// The session's lock on `queue`, which takes `queue_mutex`.
+    pub fn queueLock(self: *const Context) maplibre.QueueLock {
+        return .{ .context = self.queue_mutex, .lock = lockMutex, .unlock = unlockMutex };
+    }
+
+    fn lockMutex(mutex: ?*anyopaque) maplibre.Error!void {
+        c.SDL_LockMutex(@ptrCast(mutex));
+    }
+
+    fn unlockMutex(mutex: ?*anyopaque) maplibre.Error!void {
+        c.SDL_UnlockMutex(@ptrCast(mutex));
+    }
+
+    /// Waits for the device. Call only once the session submits nothing
     /// more.
     pub fn waitIdle(self: *Context) void {
-        if (self.device != null) _ = c.vkDeviceWaitIdle(self.device);
+        if (self.device == null) return;
+        self.lockQueue();
+        defer self.unlockQueue();
+        _ = c.vkDeviceWaitIdle(self.device);
     }
 
     fn createInstance(self: *Context) !void {
@@ -153,7 +175,6 @@ pub const Context = struct {
                 )) continue;
                 self.physical_device = device;
                 self.queue_family_index = @intCast(index);
-                self.family_queue_count = family.queueCount;
                 return;
             }
         }
@@ -185,15 +206,15 @@ pub const Context = struct {
         return false;
     }
 
-    fn createDevice(self: *Context, queue_count: u32) !void {
-        const priorities = [_]f32{ 1.0, 1.0 };
+    fn createDevice(self: *Context) !void {
+        const priority: f32 = 1.0;
         const queue_info = c.VkDeviceQueueCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
             .pNext = null,
             .flags = 0,
             .queueFamilyIndex = self.queue_family_index,
-            .queueCount = queue_count,
-            .pQueuePriorities = &priorities,
+            .queueCount = 1,
+            .pQueuePriorities = &priority,
         };
         // A device that exposes the portability subset requires enabling it.
         // The name is spelled out because its constant lives behind
@@ -225,6 +246,5 @@ pub const Context = struct {
             &self.device,
         ));
         c.vkGetDeviceQueue(self.device, self.queue_family_index, 0, &self.queue);
-        c.vkGetDeviceQueue(self.device, self.queue_family_index, queue_count - 1, &self.session_queue);
     }
 };

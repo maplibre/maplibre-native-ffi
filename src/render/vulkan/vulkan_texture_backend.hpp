@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include <mln/gfx/headless_backend.hpp>
@@ -32,12 +33,14 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   class VulkanTextureRenderableResource;
 
  public:
+  // `queue_lock` is the host's lock on the graphics queue, or null.
   VulkanTextureBackend(
     const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth
+    std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
   );
   VulkanTextureBackend(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
+    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const QueueLock> queue_lock
   );
   VulkanTextureBackend(const VulkanTextureBackend&) = delete;
   auto operator=(const VulkanTextureBackend&) -> VulkanTextureBackend& = delete;

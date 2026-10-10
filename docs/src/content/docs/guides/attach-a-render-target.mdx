@@ -38,6 +38,17 @@ session in the attaching state, and accepts a one-shot completion. A caller
 driver must service ready driver work before attachment can complete. Await the
 completion before using the attached session for ordinary work.
 
+### Share a Vulkan queue
+
+A Vulkan session submits to the graphics queue in its context descriptor, from
+its driver's thread. Vulkan requires the host to synchronize every call on a
+queue, so a host that also submits to that queue passes a queue lock in the
+attach options. The session takes the lock around each of its calls on the
+queue, and the host takes the same lock around its own. The host releases the
+lock before it calls the C API, because the driver may need the lock to finish
+that call. With the lock, one queue serves both the host and a core-worker
+session, even on a device whose graphics family has a single queue.
+
 ## Attach to a target
 
 This snippet uses OpenGL through EGL and therefore selects the caller driver.

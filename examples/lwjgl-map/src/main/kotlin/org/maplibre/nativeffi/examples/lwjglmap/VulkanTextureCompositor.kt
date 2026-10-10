@@ -116,7 +116,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
    * MoltenVK presents succeed but reach no drawable the window shows.
    */
   private fun recreateSwapchain() {
-    context.waitHostQueueIdle()
+    context.waitQueueIdle()
     val retiredSwapchain = swapchain
     val retiredImageViews = imageViews
     val retiredFramebuffers = framebuffers
@@ -661,7 +661,10 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         .pWaitDstStageMask(waitStages)
         .pCommandBuffers(stack.pointers(commandBuffer()))
         .pSignalSemaphores(stack.longs(renderFinished[imageIndex]))
-    check(vkQueueSubmit(context.graphicsQueue(), submitInfo, inFlight), "vkQueueSubmit")
+    check(
+      context.withQueue { vkQueueSubmit(context.graphicsQueue(), submitInfo, inFlight) },
+      "vkQueueSubmit",
+    )
   }
 
   /** Presents the acquired image, reporting whether it reached the screen. */
@@ -674,7 +677,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         .swapchainCount(1)
         .pSwapchains(stack.longs(swapchain))
         .pImageIndices(indices)
-    val status = vkQueuePresentKHR(context.graphicsQueue(), presentInfo)
+    val status = context.withQueue { vkQueuePresentKHR(context.graphicsQueue(), presentInfo) }
     if (status == VK_SUBOPTIMAL_KHR || status == VK_ERROR_OUT_OF_DATE_KHR) {
       // A suboptimal frame reached the screen and an out-of-date one did not; either way the
       // surface has moved on.
@@ -683,7 +686,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     if (status != VK_SUCCESS && status != VK_SUBOPTIMAL_KHR && status != VK_ERROR_OUT_OF_DATE_KHR) {
       error("vkQueuePresentKHR failed with Vulkan status $status")
     }
-    check(vkQueueWaitIdle(context.graphicsQueue()), "vkQueueWaitIdle")
+    context.waitQueueIdle()
     return status != VK_ERROR_OUT_OF_DATE_KHR
   }
 
@@ -716,7 +719,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   }
 
   override fun close() {
-    context.waitHostQueueIdle()
+    context.waitQueueIdle()
     if (inFlight != NULL) {
       vkDestroyFence(context.device(), inFlight, null)
       inFlight = NULL

@@ -1,10 +1,14 @@
 #pragma once
 
 #include <cstddef>
+#include <memory>
+#include <utility>
 
 #include <mln/vulkan/renderer_backend.hpp>
 
 #include <vulkan/vulkan_core.h>
+
+#include "render/queue_lock.hpp"
 
 namespace mln::core {
 
@@ -26,7 +30,10 @@ namespace mln::core {
 // - vkQueueSubmit and vkQueuePresentKHR hold a per-queue lock for the call, so
 //   two sessions given the same queue never submit on it at once.
 //
-// No lock is held across a wait. Each session calls through the device
+// Each submission, the drain's included, and each present also holds the
+// host's queue lock when the session has one, taken inside the per-queue lock,
+// so the host can share the queue with the session. No lock is held across a
+// wait. Each session calls through the device
 // functions its own dispatcher resolved, so a host that interposes on those
 // functions sees only its own session's calls.
 //
@@ -40,7 +47,9 @@ namespace mln::core {
 // device through the dispatcher.
 class VulkanQueueAccess {
  public:
-  VulkanQueueAccess() = default;
+  // `host_lock` is the host's lock on the queue, or null when it has none.
+  explicit VulkanQueueAccess(std::shared_ptr<const QueueLock> host_lock)
+      : host_lock_(std::move(host_lock)) {}
   VulkanQueueAccess(const VulkanQueueAccess&) = delete;
   auto operator=(const VulkanQueueAccess&) -> VulkanQueueAccess& = delete;
   VulkanQueueAccess(VulkanQueueAccess&&) = delete;
@@ -51,7 +60,8 @@ class VulkanQueueAccess {
   // routes the dispatcher's device and queue waits, submissions, and presents
   // through the registration. Call it once, after the dispatcher has its
   // device functions. A dispatcher missing a function this needs is left as
-  // it is. Throws when every slot is taken.
+  // it is, unless the host passed a queue lock, which then throws. Also throws
+  // when every slot is taken.
   void install_queue_access(
     mln::vulkan::DispatchLoaderDynamic& dispatcher, VkDevice device,
     VkQueue queue
@@ -60,11 +70,14 @@ class VulkanQueueAccess {
   // Leaves the registry ahead of destruction, for a backend that abandon
   // quarantines: it is never destroyed and never calls Vulkan again, and the
   // host may destroy the device and reuse its handles for another session.
+  // This also lets go of the host's queue lock.
   void release_queue_access() noexcept;
 
  private:
   static constexpr auto no_slot = static_cast<std::size_t>(-1);
   std::size_t slot_ = no_slot;
+  // Moved into the registration, which holds it while a call can use it.
+  std::shared_ptr<const QueueLock> host_lock_;
 };
 
 }  // namespace mln::core

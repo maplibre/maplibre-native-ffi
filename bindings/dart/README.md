@@ -135,7 +135,9 @@ Native code never waits on a Dart callback. Resource providers and the log
 callback answer native code immediately and run on the registering isolate
 later, as do cancel callbacks. An exception a callback throws goes to the
 registering zone's error handler; a resource provider that throws also fails its
-request.
+request. For the same reason, the render session attach options have no queue
+lock: a lock must be held when its callback returns, so a Vulkan session's
+graphics queue belongs to the session alone.
 
 `ResourceRequestHandle.setCancelCallback()` registers one callback per request
 that runs when MapLibre discards a request the provider left open. The binding

@@ -5,7 +5,6 @@ import org.lwjgl.vulkan.VK10
 import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.GpuSyncKind
 import org.maplibre.nativeffi.generated.MapHandle
-import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
@@ -20,16 +19,7 @@ internal object VulkanRenderTarget {
     mode: RenderTargetMode,
     driver: SessionDriver,
   ): RenderTarget {
-    // A core worker in a texture mode submits to its own queue. A native surface shares the host's,
-    // because the host submits nothing in that mode, and a caller driver submits from the host's
-    // thread.
-    val queue =
-      if (mode != RenderTargetMode.NATIVE_SURFACE && driver.kind == RenderDriverKind.CORE_WORKER) {
-        context.sessionQueueAddress()
-      } else {
-        context.graphicsQueueAddress()
-      }
-    val session = descriptor(context, queue)
+    val session = descriptor(context, context.graphicsQueueAddress())
     return when (mode) {
       RenderTargetMode.NATIVE_SURFACE ->
         NativeSurfaceTarget(

@@ -323,9 +323,11 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
 
  public:
   VulkanSurfaceBackend(
-    const mln_vulkan_surface_descriptor& descriptor, mln::Size size
+    const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
   )
-      : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+      : mln::core::VulkanQueueAccess(std::move(queue_lock)),
+        mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::vulkan::Renderable(size, nullptr),
         descriptor_(descriptor) {
     initSharedDevice();
@@ -504,9 +506,10 @@ class VulkanSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   VulkanSurfaceSessionBackend(
-    const mln_vulkan_surface_descriptor& descriptor, mln::Size size
+    const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
   )
-      : backend_(descriptor, size) {}
+      : backend_(descriptor, size, std::move(queue_lock)) {}
 
   auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return backend_;
@@ -587,6 +590,7 @@ auto vulkan_surface_attach_start(
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
+  session->accepts_queue_lock = true;
   const auto copied = *descriptor;
   session->initialize_backend = [copied](mln_render_session_object& target) {
     const auto handles_status = validate_vulkan_handles(copied);
@@ -594,7 +598,8 @@ auto vulkan_surface_attach_start(
       return handles_status;
     }
     target.surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
-      copied, mln::Size{target.physical_width, target.physical_height}
+      copied, mln::Size{target.physical_width, target.physical_height},
+      target.queue_lock
     );
     return MLN_STATUS_OK;
   };

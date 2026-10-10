@@ -640,6 +640,38 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   mln_test_render_fixture_destroy(&fixture);
 }
 
+static void lock_nothing(void* context) { (void)context; }
+
+// A queue lock names both of its callbacks or neither, and only a Vulkan
+// target takes one, because only the Vulkan driver submits to a queue that the
+// host names.
+static void attach_checks_the_queue_lock(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.queue_lock.lock = lock_nothing;
+  mln_test_completion attach = mln_test_completion_default(0);
+  mln_test_render_fixture fixture = {0};
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
+                                   map, &options, &attach.descriptor, &fixture
+                                 )
+  );
+#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  options.queue_lock.unlock = lock_nothing;
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED, mln_test_render_fixture_start_attach(
+                              map, &options, &attach.descriptor, &fixture
+                            )
+  );
+#endif
+  mln_test_completion_reject(&attach);
+  mln_test_completion_destroy(&attach);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // A host whose wakes call back into the session instead of scheduling. It has
 // file scope because a wake fired on another thread can outlast the case.
 typedef struct reentrant_host {
@@ -779,4 +811,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
   RUN_TEST(wakes_may_call_back_into_the_session);
+  RUN_TEST(attach_checks_the_queue_lock);
 }

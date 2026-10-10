@@ -28,7 +28,7 @@ static mln_vulkan_context_descriptor vulkan_context_descriptor(
     .instance = context->instance,
     .physical_device = context->physical_device,
     .device = context->device,
-    .graphics_queue = context->session_queue,
+    .graphics_queue = context->queue,
     .graphics_queue_family_index = context->queue_family_index,
     .get_instance_proc_addr = (void*)vkGetInstanceProcAddr,
     .get_device_proc_addr = (void*)vkGetDeviceProcAddr,
@@ -58,7 +58,7 @@ static void vulkan_compositor_deinit(vulkan_compositor* compositor) {
 static app_error vulkan_compositor_create(
   vulkan_compositor* compositor, SDL_Window* window, viewport current_viewport
 ) {
-  MAP_TRY(vulkan_context_init(&compositor->context, window, true));
+  MAP_TRY(vulkan_context_init(&compositor->context, window));
   MAP_TRY(vulkan_swapchain_init(
     &compositor->swapchain, &compositor->context, current_viewport,
     VK_NULL_HANDLE
@@ -107,8 +107,10 @@ static void vulkan_compositor_resize(
 static app_error vulkan_compositor_recreate_swapchain(
   vulkan_compositor* compositor
 ) {
-  // Only the host's own queue reads the swapchain images.
-  MAP_TRY(expect_vk(vkQueueWaitIdle(compositor->context.queue)));
+  SDL_LockMutex(compositor->context.queue_mutex);
+  const VkResult idle = vkQueueWaitIdle(compositor->context.queue);
+  SDL_UnlockMutex(compositor->context.queue_mutex);
+  MAP_TRY(expect_vk(idle));
   // Create the replacement naming the retired swapchain as oldSwapchain before
   // destroying it: on MoltenVK, destroying first leaves presents that succeed
   // but reach no drawable the window shows.
@@ -192,9 +194,12 @@ static app_error vulkan_compositor_present_image_view(
     &compositor->commands, &compositor->swapchain, &compositor->pipeline,
     image_index
   ));
-  MAP_TRY(vulkan_commands_submit(
+  SDL_LockMutex(compositor->context.queue_mutex);
+  const app_error submitted = vulkan_commands_submit(
     &compositor->commands, compositor->context.queue, image_index
-  ));
+  );
+  SDL_UnlockMutex(compositor->context.queue_mutex);
+  MAP_TRY(submitted);
 
   const VkPresentInfoKHR present_info = {
     .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -204,8 +209,10 @@ static app_error vulkan_compositor_present_image_view(
     .pSwapchains = &compositor->swapchain.handle,
     .pImageIndices = &image_index,
   };
+  SDL_LockMutex(compositor->context.queue_mutex);
   const VkResult present =
     vkQueuePresentKHR(compositor->context.queue, &present_info);
+  SDL_UnlockMutex(compositor->context.queue_mutex);
   if (present == VK_ERROR_OUT_OF_DATE_KHR) {
     // Nothing reached the screen, but the sampling pass was submitted; wait it
     // out before the caller releases its frame.
@@ -400,8 +407,7 @@ app_error render_target_init(
       }
       break;
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      // The host submits nothing here, so the session shares its queue.
-      error = vulkan_context_init(&target->as.surface.context, window, false);
+      error = vulkan_context_init(&target->as.surface.context, window);
       break;
   }
   if (error != APP_OK) {
@@ -430,24 +436,16 @@ static mln_vulkan_borrowed_texture_descriptor borrowed_image_descriptor(
   return descriptor;
 }
 
-/// A core worker drives every target, except a texture target whose device
-/// gave the session no queue of its own. That one shares the host's queue, so
-/// it renders on the render loop through a caller driver.
-static mln_render_driver_kind select_driver(const render_target* target) {
-  const vulkan_context* context = nullptr;
+static const vulkan_context* target_context(const render_target* target) {
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      context = &target->as.owned.compositor.context;
-      break;
+      return &target->as.owned.compositor.context;
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      context = &target->as.borrowed.compositor.context;
-      break;
+      return &target->as.borrowed.compositor.context;
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      return MLN_RENDER_DRIVER_CORE_WORKER;
+      return &target->as.surface.context;
   }
-  return context->session_queue != context->queue
-           ? MLN_RENDER_DRIVER_CORE_WORKER
-           : MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  return nullptr;
 }
 
 app_error render_target_attach(
@@ -456,8 +454,11 @@ app_error render_target_attach(
   awaited_completion attached;
   mln_completion completion;
   MAP_TRY(awaited_completion_init(&attached, &completion));
-  const mln_render_session_attach_options options =
-    render_session_attach_options(target->mode, select_driver(target));
+  // The core worker submits to the host's queue, so it takes the host's queue
+  // lock around each call on it.
+  mln_render_session_attach_options options =
+    render_session_attach_options(target->mode, MLN_RENDER_DRIVER_CORE_WORKER);
+  options.queue_lock = vulkan_context_queue_lock(target_context(target));
   mln_render_session session = MLN_HANDLE_NULL;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status = MLN_STATUS_INVALID_STATE;

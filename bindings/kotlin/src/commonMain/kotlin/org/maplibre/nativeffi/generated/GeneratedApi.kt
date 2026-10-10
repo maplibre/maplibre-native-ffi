@@ -284,7 +284,7 @@ public object GeneratedApi {
 
   public fun renderSessionAttachOptionsDefault(): RenderSessionAttachOptions =
     nativeCall(null, null, "mln_render_session_attach_options_default") {
-      val out = sized(w(48, 80), w(4, 8))
+      val out = sized(w(68, 120), w(4, 8))
       C.mln_render_session_attach_options_default(out)
       readRenderSessionAttachOptions(out)
     }

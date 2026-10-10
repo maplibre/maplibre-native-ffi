@@ -238,6 +238,10 @@ class CallbackPlan:
     deferred: str | None = None
     # Whether the callback returns the status enum.
     status: bool = False
+    # Whether native code relies on the callback's work being done when it
+    # returns, so a binding must run it on the calling thread rather than
+    # deliver it later, even when it returns nothing.
+    synchronous: bool = False
 
 
 @dataclass(frozen=True)
@@ -1388,6 +1392,7 @@ class Binder:
             self.callback_reentry(typedef),
             typedef.metadata.get("deferred"),
             is_status(function.result),
+            typedef.metadata.get("synchronous") == "true",
         )
 
     def callback_reentry(self, typedef) -> CallbackReentryPlan | None:

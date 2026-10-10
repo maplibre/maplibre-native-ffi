@@ -63,6 +63,53 @@ typedef enum MLN_BINDING(
 } mln_render_session_capability_flag;
 
 /**
+ * Takes or returns the host's lock on the queue that a session shares with it.
+ * Native code relies on the lock being held or released when the call returns.
+ */
+MLN_BINDING("reentry=forbid;synchronous=true")
+typedef void (*mln_queue_lock_callback)(void* user_data);
+
+/** Releases queue-lock state after native code can no longer invoke it. */
+typedef void (*mln_queue_lock_release)(void* user_data);
+
+/**
+ * Host lock on the graphics queue that a session shares with its host, copied
+ * by a successful attach.
+ *
+ * Vulkan requires the host to synchronize every call that uses a queue. A
+ * Vulkan session's driver submits to the context's graphics_queue on its own
+ * thread, so a host that also uses that queue passes a lock here. Native code
+ * calls lock and then unlock on the driver thread around each submission and
+ * presentation on the queue, including the empty submission that waits for
+ * the queue to drain. It holds the lock only for that call, never across a
+ * wait. The host takes the same lock around its own calls on the queue.
+ *
+ * Both callbacks are null to disable the lock, or both are set. A disabled
+ * lock must not carry release_user_data, and size must still be
+ * sizeof(mln_queue_lock). A session without a lock assumes that the host
+ * leaves the queue alone while the session is attached.
+ *
+ * The callbacks must not call the C API. The host must not hold the lock while
+ * it calls the C API, because the driver may need the lock to finish the call:
+ * a caller-graphics-thread driver takes it inside driver service, and abandon
+ * and teardown wait for a core worker that may be waiting for it. Sessions
+ * that share a queue each take their own lock, so give them all a lock on the
+ * same host mutex.
+ *
+ * Native code calls release_user_data once, after the session can no longer
+ * invoke the callbacks.
+ */
+typedef struct mln_queue_lock {
+  uint32_t size;
+  mln_queue_lock_callback lock MLN_BINDING("nullable=true");
+  mln_queue_lock_callback unlock MLN_BINDING("nullable=true");
+  void* user_data MLN_BINDING("kind=context");
+  mln_queue_lock_release release_user_data;
+} mln_queue_lock MLN_BINDING(
+  "kind=callback_registration;release=release_user_data"
+);
+
+/**
  * Common attachment policy copied before an attach call returns.
  *
  * A successful backend attach-start call publishes a session in ATTACHING
@@ -84,6 +131,12 @@ typedef struct mln_render_session_attach_options {
   mln_wake frame_wake;
   /** Wakes the graphics receiver when caller-driver work is available. */
   mln_wake driver_work_wake;
+  /**
+   * Host lock on the graphics queue, disabled by default. Only Vulkan targets
+   * accept an enabled lock; other backends fail the attach with
+   * MLN_STATUS_UNSUPPORTED.
+   */
+  mln_queue_lock queue_lock;
 } mln_render_session_attach_options;
 
 /** Driver and target capabilities fixed for one attached render session. */
@@ -152,7 +205,11 @@ typedef struct mln_vulkan_context_descriptor {
   void* physical_device;
   /** Borrowed VkDevice. Required. */
   void* device;
-  /** Borrowed graphics VkQueue. Required. */
+  /**
+   * Borrowed graphics VkQueue. Required. The session's driver submits to it
+   * from its own thread, so a host that uses the same queue passes
+   * mln_render_session_attach_options.queue_lock at attach.
+   */
   void* graphics_queue;
   /** Queue family index for graphics_queue. Must support graphics commands. */
   uint32_t graphics_queue_family_index;

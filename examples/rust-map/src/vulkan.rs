@@ -1,5 +1,6 @@
 use std::error::Error;
 use std::ffi::{CStr, CString};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 
 use ash::vk;
 use ash::vk::Handle;
@@ -13,14 +14,53 @@ pub struct VulkanContext {
     surface: vk::SurfaceKHR,
     physical_device: vk::PhysicalDevice,
     device: ash::Device,
-    /// The queue the host submits to.
+    /// The one queue that the host and the session both submit to.
     graphics_queue: vk::Queue,
-    /// A second queue from the graphics family for a texture session's core
-    /// worker, when the family has one. The worker submits from its own
-    /// thread, and Vulkan requires a queue's submissions to be externally
-    /// synchronized, so it cannot share the host's queue.
-    session_queue: Option<vk::Queue>,
+    /// Held around every call on `graphics_queue`. A session's core worker
+    /// submits from its own thread, and Vulkan requires the calls on one queue
+    /// to be externally synchronized, so the session takes it too.
+    queue_mutex: Arc<QueueMutex>,
     graphics_queue_family_index: u32,
+}
+
+/// A lock that one thread takes and gives back in separate calls, as the
+/// session's queue-lock callbacks do.
+#[derive(Default)]
+pub struct QueueMutex {
+    held: Mutex<bool>,
+    given_back: Condvar,
+}
+
+impl QueueMutex {
+    pub fn lock(&self) {
+        let mut held = self.held.lock().unwrap_or_else(PoisonError::into_inner);
+        while *held {
+            held = self
+                .given_back
+                .wait(held)
+                .unwrap_or_else(PoisonError::into_inner);
+        }
+        *held = true;
+    }
+
+    pub fn unlock(&self) {
+        *self.held.lock().unwrap_or_else(PoisonError::into_inner) = false;
+        self.given_back.notify_one();
+    }
+
+    /// Holds the lock until the guard drops.
+    pub fn hold(&self) -> QueueGuard<'_> {
+        self.lock();
+        QueueGuard(self)
+    }
+}
+
+pub struct QueueGuard<'a>(&'a QueueMutex);
+
+impl Drop for QueueGuard<'_> {
+    fn drop(&mut self) {
+        self.0.unlock();
+    }
 }
 
 pub struct BorrowedImage {
@@ -71,7 +111,7 @@ impl VulkanContext {
         };
         let surface_loader = ash::khr::surface::Instance::new(&entry, &instance);
 
-        let (physical_device, graphics_queue_family_index, family_queue_count) =
+        let (physical_device, graphics_queue_family_index) =
             match pick_physical_device(&instance, &surface_loader, surface) {
                 Ok(device) => device,
                 Err(error) => {
@@ -84,11 +124,10 @@ impl VulkanContext {
                 }
             };
 
-        let priorities = [1.0_f32; 2];
-        let queue_count = family_queue_count.min(2) as usize;
+        let priorities = [1.0_f32];
         let queue_info = [vk::DeviceQueueCreateInfo::default()
             .queue_family_index(graphics_queue_family_index)
-            .queue_priorities(&priorities[..queue_count])];
+            .queue_priorities(&priorities)];
         let mut device_extensions = vec![ash::khr::swapchain::NAME.as_ptr()];
         if has_device_extension(
             &instance,
@@ -112,10 +151,8 @@ impl VulkanContext {
                 return Err(error.into());
             }
         };
-        // SAFETY: The device was created with queue_count queues in this family.
+        // SAFETY: The device was created with one queue in this family.
         let graphics_queue = unsafe { device.get_device_queue(graphics_queue_family_index, 0) };
-        let session_queue = (queue_count == 2)
-            .then(|| unsafe { device.get_device_queue(graphics_queue_family_index, 1) });
 
         Ok(Self {
             entry,
@@ -125,14 +162,20 @@ impl VulkanContext {
             physical_device,
             device,
             graphics_queue,
-            session_queue,
+            queue_mutex: Arc::default(),
             graphics_queue_family_index,
         })
     }
 
     pub fn wait_idle(&self) -> Result<(), vk::Result> {
-        // SAFETY: device is live while VulkanContext is live.
+        let _queue = self.queue_mutex.hold();
+        // SAFETY: device is live while VulkanContext is live, and its one queue
+        // is held.
         unsafe { self.device.device_wait_idle() }
+    }
+
+    pub fn queue_mutex(&self) -> &Arc<QueueMutex> {
+        &self.queue_mutex
     }
 
     pub fn instance(&self) -> &ash::Instance {
@@ -173,11 +216,6 @@ impl VulkanContext {
 
     pub fn graphics_queue_pointer(&self) -> *mut std::ffi::c_void {
         (self.graphics_queue.as_raw() as usize) as *mut std::ffi::c_void
-    }
-
-    pub fn session_queue_pointer(&self) -> Option<*mut std::ffi::c_void> {
-        self.session_queue
-            .map(|queue| (queue.as_raw() as usize) as *mut std::ffi::c_void)
     }
 
     pub fn get_instance_proc_addr_pointer(&self) -> *mut std::ffi::c_void {
@@ -360,7 +398,7 @@ fn pick_physical_device(
     instance: &ash::Instance,
     surface_loader: &ash::khr::surface::Instance,
     surface: vk::SurfaceKHR,
-) -> Result<(vk::PhysicalDevice, u32, u32), Box<dyn Error>> {
+) -> Result<(vk::PhysicalDevice, u32), Box<dyn Error>> {
     // SAFETY: instance is live and enumeration writes into ash-owned vectors.
     let devices = unsafe { instance.enumerate_physical_devices()? };
     for physical_device in devices {
@@ -378,7 +416,7 @@ fn pick_physical_device(
                 )?
             };
             if supports_graphics && supports_present {
-                return Ok((physical_device, index as u32, family.queue_count));
+                return Ok((physical_device, index as u32));
             }
         }
     }

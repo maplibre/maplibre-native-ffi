@@ -41,11 +41,11 @@ typedef void* (*mln_test_vulkan_device_proc_addr_wrap)(
 // context names `wrap`'s vkGetDeviceProcAddr, so that a case can observe the
 // device functions the session calls. With a non-null `share`, the session
 // attaches on the device and queue of that fixture, which must outlive this
-// one.
+// one. A non-null `queue_lock` is the session's host queue lock.
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_vulkan_device_proc_addr_wrap wrap,
-  const mln_test_render_fixture* share
+  const mln_test_render_fixture* share, const mln_queue_lock* queue_lock
 );
 #endif
 

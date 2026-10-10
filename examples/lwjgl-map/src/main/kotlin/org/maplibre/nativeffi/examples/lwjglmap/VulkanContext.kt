@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.examples.lwjglmap
 
 import java.util.LinkedHashSet
 import java.util.Locale
+import java.util.concurrent.Semaphore
 import org.lwjgl.PointerBuffer
 import org.lwjgl.glfw.GLFW.GLFW_CLIENT_API
 import org.lwjgl.glfw.GLFW.GLFW_FALSE
@@ -61,6 +62,7 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo
 import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 import org.lwjgl.vulkan.VkQueueFamilyProperties
+import org.maplibre.nativeffi.generated.QueueLock
 import org.maplibre.nativeffi.generated.RenderBackendFlag
 
 internal class VulkanContext private constructor(private val window: Long) : GraphicsContext {
@@ -68,10 +70,17 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   private var surface = NULL
   private var physicalDevice: VkPhysicalDevice? = null
   private var device: VkDevice? = null
+  /** The one queue that the host and a core-worker session both submit to. */
   private var graphicsQueue: VkQueue? = null
-  private var sessionQueue: VkQueue? = null
   private var graphicsQueueFamilyIndex = 0
-  private var graphicsQueueCount = 0
+
+  /**
+   * Held around every call on [graphicsQueue]. A core worker submits from its own thread, and
+   * Vulkan requires the calls on one queue to be externally synchronized, so the session takes it
+   * too. A semaphore has no owner thread, so the session's lock and unlock callbacks may run as
+   * separate upcalls.
+   */
+  private val queueMutex = Semaphore(1)
 
   override fun window(): Long = window
 
@@ -85,15 +94,19 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
 
   fun graphicsQueueAddress(): Long = graphicsQueue().address()
 
-  /**
-   * Whether the device has a second graphics queue for a core-worker session. The worker submits
-   * from its own thread, so in the texture modes, where the compositor also submits, it needs a
-   * queue that the host never touches.
-   */
-  fun hasSessionQueue(): Boolean = sessionQueue != null
+  /** Runs [block], which calls Vulkan on [graphicsQueue], while holding the queue. */
+  fun <T> withQueue(block: () -> T): T {
+    queueMutex.acquireUninterruptibly()
+    try {
+      return block()
+    } finally {
+      queueMutex.release()
+    }
+  }
 
-  fun sessionQueueAddress(): Long =
-    checkNotNull(sessionQueue) { "Vulkan device has no session queue" }.address()
+  /** The session's lock on [graphicsQueue]. */
+  fun queueLock(): QueueLock =
+    QueueLock(lock = { queueMutex.acquireUninterruptibly() }, unlock = { queueMutex.release() })
 
   fun getInstanceProcAddrAddress(): Long {
     ensureVulkanFunctionProvider()
@@ -121,12 +134,9 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   fun graphicsQueue(): VkQueue =
     checkNotNull(graphicsQueue) { "Vulkan graphics queue is not initialized" }
 
-  /**
-   * Waits for the host's own submissions. A core-worker session may be submitting to its queue
-   * meanwhile, so the host waits on its queue rather than the whole device.
-   */
-  fun waitHostQueueIdle() {
-    graphicsQueue?.let { check(vkQueueWaitIdle(it), "vkQueueWaitIdle") }
+  /** Waits for every submission to the queue, the session's included. */
+  fun waitQueueIdle() {
+    graphicsQueue?.let { withQueue { check(vkQueueWaitIdle(it), "vkQueueWaitIdle") } }
   }
 
   private fun createInstance() {
@@ -192,21 +202,10 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         if (queueFamily >= 0) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
-          graphicsQueueCount = queueCount(candidate, queueFamily)
           return
         }
       }
       error("No Vulkan device has a graphics queue that can present")
-    }
-  }
-
-  private fun queueCount(candidate: VkPhysicalDevice, family: Int): Int {
-    MemoryStack.stackPush().use { stack ->
-      val count = stack.mallocInt(1)
-      vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, null)
-      val families = VkQueueFamilyProperties.calloc(count[0], stack)
-      vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, families)
-      return families[family].queueCount()
     }
   }
 
@@ -245,9 +244,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       if (VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME in deviceExtensions) {
         extensions.add(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
       }
-      val queueCount = minOf(graphicsQueueCount, 2)
-      val priorities = stack.mallocFloat(queueCount)
-      repeat(queueCount) { priorities.put(it, 1.0f) }
+      val priorities = stack.floats(1.0f)
       val queueInfo =
         VkDeviceQueueCreateInfo.calloc(1, stack)
           .sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO)
@@ -264,17 +261,13 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       val queueOut = stack.mallocPointer(1)
       vkGetDeviceQueue(device(), graphicsQueueFamilyIndex, 0, queueOut)
       graphicsQueue = VkQueue(queueOut[0], device())
-      if (queueCount > 1) {
-        vkGetDeviceQueue(device(), graphicsQueueFamilyIndex, 1, queueOut)
-        sessionQueue = VkQueue(queueOut[0], device())
-      }
       println("Enabled Vulkan device extensions: $extensions")
     }
   }
 
   override fun close() {
     device?.let {
-      vkDeviceWaitIdle(it)
+      withQueue { vkDeviceWaitIdle(it) }
       vkDestroyDevice(it, null)
       device = null
     }
@@ -317,10 +310,9 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         context.pickPhysicalDeviceAndQueue()
         context.createDevice()
         System.out.printf(
-          "GLFW %s, Vulkan queue family %d with %d queues, platform %d%n",
+          "GLFW %s, Vulkan queue family %d, platform %d%n",
           glfwGetVersionString(),
           context.graphicsQueueFamilyIndex,
-          minOf(context.graphicsQueueCount, 2),
           glfwGetPlatform(),
         )
         return context

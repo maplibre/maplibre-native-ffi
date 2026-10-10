@@ -37,6 +37,7 @@
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
 #include "render/discard_present.hpp"
+#include "render/queue_lock.hpp"
 #include "wake/wake.hpp"
 
 struct mln_render_session_object;
@@ -658,6 +659,13 @@ struct mln_render_session_object
   std::function<mln_status(mln_render_session_object&)> initialize_backend;
   std::shared_ptr<mln::core::Wake> frame_wake;
   std::shared_ptr<mln::core::Wake> driver_wake;
+  // The host's lock on the queue the backend submits to. initialize_backend
+  // shares it with a backend that takes it around its queue calls. Null when
+  // the host passed no lock.
+  std::shared_ptr<mln::core::QueueLock> queue_lock;
+  // Set before attach by a backend whose driver takes queue_lock. Attach
+  // rejects an enabled lock on any other backend.
+  bool accepts_queue_lock = false;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
 

@@ -1,11 +1,12 @@
 use std::io::Cursor;
+use std::sync::Arc;
 
 use ash::vk;
 use ash::vk::Handle;
 use maplibre_native_ffi::{AcquiredFrameHandle, Error, ErrorKind};
 
 use crate::viewport::Viewport;
-use crate::vulkan::VulkanContext;
+use crate::vulkan::{QueueMutex, VulkanContext};
 
 const VERT_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/fullscreen.vert.spv"));
 const FRAG_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sample.frag.spv"));
@@ -16,6 +17,8 @@ pub struct VulkanTextureCompositor {
     physical_device: vk::PhysicalDevice,
     device: ash::Device,
     graphics_queue: vk::Queue,
+    /// Shared with the session, which submits to the same queue.
+    queue_mutex: Arc<QueueMutex>,
     graphics_queue_family_index: u32,
     swapchain_loader: ash::khr::swapchain::Device,
     swapchain: vk::SwapchainKHR,
@@ -56,6 +59,7 @@ impl VulkanTextureCompositor {
             physical_device: context.physical_device(),
             device,
             graphics_queue: context.graphics_queue(),
+            queue_mutex: context.queue_mutex().clone(),
             graphics_queue_family_index: context.graphics_queue_family_index(),
             swapchain_loader,
             swapchain: vk::SwapchainKHR::null(),
@@ -239,7 +243,10 @@ impl VulkanTextureCompositor {
                 .wait_dst_stage_mask(&wait_stages)
                 .command_buffers(&command_buffers)
                 .signal_semaphores(&signal_semaphores)];
-            device.queue_submit(self.graphics_queue, &submit_info, self.in_flight)?;
+            {
+                let _queue = self.queue_mutex.hold();
+                device.queue_submit(self.graphics_queue, &submit_info, self.in_flight)?;
+            }
             device.wait_for_fences(&[self.in_flight], true, u64::MAX)?;
 
             let swapchains = [self.swapchain];
@@ -248,10 +255,12 @@ impl VulkanTextureCompositor {
                 .wait_semaphores(&signal_semaphores)
                 .swapchains(&swapchains)
                 .image_indices(&image_indices);
-            match self
-                .swapchain_loader
-                .queue_present(self.graphics_queue, &present_info)
-            {
+            let presented = {
+                let _queue = self.queue_mutex.hold();
+                self.swapchain_loader
+                    .queue_present(self.graphics_queue, &present_info)
+            };
+            match presented {
                 Ok(present_suboptimal) => {
                     if present_suboptimal {
                         self.swapchain_stale = true;
@@ -601,9 +610,9 @@ impl VulkanTextureCompositor {
         }
     }
 
-    /// Waits for the host's queue, the only one that reads the swapchain and
-    /// the sampled map image.
+    /// Waits for the queue that reads the swapchain and the sampled map image.
     pub fn wait_idle(&self) -> Result<(), vk::Result> {
+        let _queue = self.queue_mutex.hold();
         unsafe { self.device.queue_wait_idle(self.graphics_queue) }
     }
 

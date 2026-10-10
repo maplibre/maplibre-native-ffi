@@ -3233,6 +3233,8 @@ mln_jni_upcall mln_jni_upcalls[] = {
   {"resourceProviderCallback", "(JJJ)I", NULL},
   {"resourceTransformCallback", "(JIJJ)I", NULL},
   {"wakeCallback", "(J)V", NULL},
+  {"queueLockLock", "(J)V", NULL},
+  {"queueLockUnlock", "(J)V", NULL},
 };
 
 static void mln_jni_completion(
@@ -3360,6 +3362,16 @@ static void mln_jni_wakeCallback(void* userData) {
   mln_jni_upcall_void(&mln_jni_upcalls[12], arguments);
 }
 
+static void mln_jni_queueLockLock(void* userData) {
+  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
+  mln_jni_upcall_void(&mln_jni_upcalls[13], arguments);
+}
+
+static void mln_jni_queueLockUnlock(void* userData) {
+  jvalue arguments[] = {{.j = MLN_JNI_ADDRESS(userData)}};
+  mln_jni_upcall_void(&mln_jni_upcalls[14], arguments);
+}
+
 void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_completion,
   (void*)mln_jni_completionRelease,
@@ -3374,6 +3386,8 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_resourceProviderCallback,
   (void*)mln_jni_resourceTransformCallback,
   (void*)mln_jni_wakeCallback,
+  (void*)mln_jni_queueLockLock,
+  (void*)mln_jni_queueLockUnlock,
 };
 const size_t mln_jni_upcall_count =
   sizeof mln_jni_upcall_stubs / sizeof mln_jni_upcall_stubs[0];

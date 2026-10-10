@@ -943,6 +943,15 @@ pub struct mln_queried_feature {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_queue_lock {
+    pub size: u32,
+    pub lock: mln_queue_lock_callback,
+    pub unlock: mln_queue_lock_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_queue_lock_release,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_render_abandon_result {
     pub size: u32,
     pub disposition: u32,
@@ -969,6 +978,7 @@ pub struct mln_render_session_attach_options {
     pub reserved: u32,
     pub frame_wake: mln_wake,
     pub driver_work_wake: mln_wake,
+    pub queue_lock: mln_queue_lock,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1586,6 +1596,8 @@ pub struct mln_map(pub u64);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_map_projection(pub u64);
 pub type mln_offline_region_id = i64;
+pub type mln_queue_lock_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
+pub type mln_queue_lock_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_render_frame_batch(pub u64);

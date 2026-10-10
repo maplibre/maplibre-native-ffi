@@ -36,6 +36,9 @@ struct Slot {
   // Held for each native submission or present on the queue, and never across
   // a wait. Every session registered on the queue shares it.
   std::shared_ptr<std::mutex> submit_mutex;
+  // The host's lock on the queue, taken inside submit_mutex. Null when the
+  // host has none.
+  std::shared_ptr<const mln::core::QueueLock> host_lock;
 };
 
 // More Vulkan sessions than any process keeps attached at once.
@@ -79,6 +82,7 @@ auto drain_queue(const Slot& slot) -> VkResult {
   }
   {
     const auto lock = std::scoped_lock{*slot.submit_mutex};
+    const auto host_lock = mln::core::QueueLockGuard{slot.host_lock.get()};
     // An empty batch still signals its fence, once all earlier work on the
     // queue has completed.
     result = functions.queue_submit(slot.queue, 0, nullptr, fence);
@@ -106,6 +110,7 @@ auto slot_queue_submit(
     return unregistered_result;
   }
   const auto lock = std::scoped_lock{*slot->submit_mutex};
+  const auto host_lock = mln::core::QueueLockGuard{slot->host_lock.get()};
   return slot->functions.queue_submit(queue, submit_count, submits, fence);
 }
 
@@ -119,6 +124,7 @@ auto slot_queue_present(
     return unregistered_result;
   }
   const auto lock = std::scoped_lock{*slot->submit_mutex};
+  const auto host_lock = mln::core::QueueLockGuard{slot->host_lock.get()};
   return slot->functions.queue_present(queue, present_info);
 }
 
@@ -203,6 +209,12 @@ void VulkanQueueAccess::install_queue_access(
     functions.queue_submit == nullptr || functions.create_fence == nullptr ||
     functions.wait_for_fences == nullptr || functions.destroy_fence == nullptr
   ) {
+    // Without the registration, native queue calls would skip the host's lock.
+    if (host_lock_ != nullptr && slot_ == no_slot) {
+      throw std::runtime_error(
+        "the Vulkan device functions that a queue lock needs did not resolve"
+      );
+    }
     return;
   }
 
@@ -229,6 +241,7 @@ void VulkanQueueAccess::install_queue_access(
       .queue = queue,
       .functions = functions,
       .submit_mutex = std::move(submit_mutex),
+      .host_lock = std::move(host_lock_),
     };
     slot_ = index;
   }

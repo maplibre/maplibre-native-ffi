@@ -374,9 +374,10 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 
 VulkanTextureBackend::VulkanTextureBackend(
   const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-  std::size_t ring_depth
+  std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
 )
-    : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+    : VulkanQueueAccess(std::move(queue_lock)),
+      mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       descriptor_(descriptor),
       ring_(ring_depth) {
@@ -384,9 +385,11 @@ VulkanTextureBackend::VulkanTextureBackend(
 }
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
+  const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size,
+  std::shared_ptr<const QueueLock> queue_lock
 )
-    : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+    : VulkanQueueAccess(std::move(queue_lock)),
+      mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       descriptor_(owned_descriptor_from_borrowed(descriptor)),
       borrowed_descriptor_(descriptor),

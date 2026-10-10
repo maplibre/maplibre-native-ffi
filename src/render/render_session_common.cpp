@@ -1346,8 +1346,17 @@ auto start_attach_render_session(
   if (frame_wake_status != MLN_STATUS_OK) return frame_wake_status;
   const auto driver_wake_status = validate_wake(&options->driver_work_wake);
   if (driver_wake_status != MLN_STATUS_OK) return driver_wake_status;
+  const auto queue_lock_status = validate_queue_lock(&options->queue_lock);
+  if (queue_lock_status != MLN_STATUS_OK) return queue_lock_status;
+  if (options->queue_lock.lock != nullptr && !session->accepts_queue_lock) {
+    set_thread_error("this render target does not take a queue lock");
+    return MLN_STATUS_UNSUPPORTED;
+  }
   auto frame_wake = std::make_shared<Wake>(options->frame_wake);
   auto driver_wake = std::make_shared<Wake>(options->driver_work_wake);
+  auto queue_lock = options->queue_lock.lock == nullptr
+                      ? std::shared_ptr<QueueLock>{}
+                      : std::make_shared<QueueLock>(options->queue_lock);
 
   auto async = CompletionOperation{};
   const auto operation_status =
@@ -1368,6 +1377,7 @@ auto start_attach_render_session(
   session->capabilities.driver = options->driver;
   session->frame_wake = frame_wake;
   session->driver_wake = driver_wake;
+  session->queue_lock = queue_lock;
   session->state = MLN_RENDER_SESSION_STATE_ATTACHING;
   const auto attach_status =
     map_attach_render_target_session(session->map, session.get());
@@ -1510,6 +1520,7 @@ auto start_attach_render_session(
     *out_session = session->self;
     frame_wake->accept();
     driver_wake->accept();
+    if (queue_lock != nullptr) queue_lock->accept();
     async.completion->accept();
     push_driver_work_locked(*session, std::move(attach_work), wakes);
   }
@@ -1996,6 +2007,7 @@ auto destroy_render_session(
 ) -> mln_status {
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
+  auto queue_lock = std::shared_ptr<QueueLock>{};
   {
     auto lock = std::unique_lock{live->control_mutex};
     if (
@@ -2045,6 +2057,7 @@ auto destroy_render_session(
     live->stop_worker = true;
     frame_wake = std::move(live->frame_wake);
     driver_wake = std::move(live->driver_wake);
+    queue_lock = std::move(live->queue_lock);
     live->worker_condition.notify_all();
   }
   close_wakes(frame_wake, driver_wake);
@@ -2064,6 +2077,7 @@ auto destroy_render_session(
   }
   frame_wake.reset();
   driver_wake.reset();
+  queue_lock.reset();
   return MLN_STATUS_OK;
 }
 }  // namespace
@@ -3482,6 +3496,7 @@ auto abandon_render_session(
   auto pending_barriers = std::deque<PendingBarrier>{};
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
+  auto queue_lock = std::shared_ptr<QueueLock>{};
   auto quarantined = uint32_t{0};
   SurfaceSessionBackend* quarantined_surface = nullptr;
   TextureSessionBackend* quarantined_texture = nullptr;
@@ -3582,6 +3597,7 @@ auto abandon_render_session(
                    static_cast<uint32_t>(quarantined_texture != nullptr);
     frame_wake = std::move(live->frame_wake);
     driver_wake = std::move(live->driver_wake);
+    queue_lock = std::move(live->queue_lock);
     ++live->generation;
     live->worker_condition.notify_all();
   }
@@ -3613,6 +3629,9 @@ auto abandon_render_session(
   }
   frame_wake.reset();
   driver_wake.reset();
+  // The quarantine above took the lock out of the backend's queue
+  // registration, so this drops the last reference and runs its release.
+  queue_lock.reset();
   *out_result = mln_render_abandon_result{
     sizeof(*out_result),
     quarantined == 0 ? MLN_RENDER_ABANDON_DISPOSITION_CLEAN

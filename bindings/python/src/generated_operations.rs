@@ -1333,6 +1333,56 @@ fn generated_copy_mln_queried_feature(
     Ok(dict.into_any().unbind())
 }
 
+unsafe extern "C" fn generated_callback_mln_queue_lock_lock(user_data: *mut std::ffi::c_void) {
+    let _reentry = GeneratedCallbackPolicy::enter(&[], 0);
+
+    generated_invoke(
+        || (),
+        |py| {
+            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
+                return Ok(());
+            };
+            let _result = callback.bind(py).call1(())?;
+            Ok(())
+        },
+    )
+}
+
+unsafe extern "C" fn generated_callback_mln_queue_lock_unlock(user_data: *mut std::ffi::c_void) {
+    let _reentry = GeneratedCallbackPolicy::enter(&[], 0);
+
+    generated_invoke(
+        || (),
+        |py| {
+            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 1) }) else {
+                return Ok(());
+            };
+            let _result = callback.bind(py).call1(())?;
+            Ok(())
+        },
+    )
+}
+
+fn generated_copy_mln_queue_lock(
+    py: Python<'_>,
+    value: &sys::mln_queue_lock,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("lock", py.None())?;
+    if value.lock.is_some() {
+        return Err(native_error(
+            "native callback cannot be copied into a Python closure",
+        ));
+    }
+    dict.set_item("unlock", py.None())?;
+    if value.unlock.is_some() {
+        return Err(native_error(
+            "native callback cannot be copied into a Python closure",
+        ));
+    }
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_render_abandon_result(
     py: Python<'_>,
     value: &sys::mln_render_abandon_result,
@@ -1386,6 +1436,10 @@ fn generated_copy_mln_render_session_attach_options(
     dict.set_item(
         "driver_work_wake",
         generated_copy_mln_wake(py, &value.driver_work_wake)?,
+    )?;
+    dict.set_item(
+        "queue_lock",
+        generated_copy_mln_queue_lock(py, &value.queue_lock)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -3631,6 +3685,34 @@ fn generated_input_mln_quaternion<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_queue_lock<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_queue_lock> {
+    let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_queue_lock>() as _;
+    let lock_enabled = !value.getattr("lock")?.is_none();
+    let unlock_enabled = !value.getattr("unlock")?.is_none();
+    if lock_enabled || unlock_enabled {
+        raw.user_data = storage.register_callbacks(vec![
+            value.getattr("_invoke_lock")?.unbind(),
+            value.getattr("_invoke_unlock")?.unbind(),
+        ]);
+        raw.release_user_data = Some(generated_release_callbacks);
+        raw.lock = if lock_enabled {
+            Some(generated_callback_mln_queue_lock_lock)
+        } else {
+            None
+        };
+        raw.unlock = if unlock_enabled {
+            Some(generated_callback_mln_queue_lock_unlock)
+        } else {
+            None
+        };
+    }
+    Ok(raw)
+}
+
 fn generated_input_mln_render_session_attach_options<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3650,6 +3732,7 @@ fn generated_input_mln_render_session_attach_options<'py>(
         .extract::<u32>()?;
     raw.frame_wake = generated_input_mln_wake(&value.getattr("frame_wake")?, storage)?;
     raw.driver_work_wake = generated_input_mln_wake(&value.getattr("driver_work_wake")?, storage)?;
+    raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;
     Ok(raw)
 }
 
