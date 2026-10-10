@@ -393,7 +393,10 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
     MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
   );
 
+  // Forced, since the map may have published nothing newer than the frame
+  // above.
   mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = 0;
   demand.token = 1000;
   MLN_TEST_OK(
     mln_render_session_request_frame(fixture->session, &demand, NULL)
