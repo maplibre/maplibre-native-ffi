@@ -40,6 +40,25 @@ static inline mln_buffer_view mln_test_buffer_view(
   return (mln_buffer_view){.data = data, .size = size};
 }
 
+// Whether the `size` bytes at `bytes` are all zero. Only for a value without
+// padding, since the C API promises nothing about padding bytes.
+static inline bool mln_test_all_zero(const void* bytes, size_t size) {
+  const unsigned char* byte = (const unsigned char*)bytes;
+  for (size_t index = 0; index < size; index += 1) {
+    if (byte[index] != 0) return false;
+  }
+  return true;
+}
+
+// Whether every member of `info` is zero, as an absent TILEJSON member reads.
+// The struct has trailing padding, so this compares members rather than bytes.
+static inline bool mln_test_tile_info_is_zero(
+  const mln_style_source_tile_info* info
+) {
+  return info->tile_urls == NULL && info->tile_url_count == 0 &&
+         info->min_zoom == 0.0 && info->max_zoom == 0.0 && info->scheme == 0;
+}
+
 // The calling thread's diagnostic, which these helpers pass to every C API
 // call. Tests pass MLN_TEST_DIAGNOSTIC to direct calls whose message they read.
 mln_diagnostic* mln_test_diagnostic(void);

@@ -139,14 +139,6 @@ static mln_adapter_completion_record* copy_one(
   return record;
 }
 
-static bool all_zero(const void* bytes, size_t size) {
-  const unsigned char* byte = bytes;
-  for (size_t index = 0; index < size; index += 1) {
-    if (byte[index] != 0) return false;
-  }
-  return true;
-}
-
 // A field its presence bit marks absent reaches the host cleared, whatever
 // the borrowed source left in it, so no stale value looks present.
 static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
@@ -173,7 +165,7 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
   );
   const mln_camera_options* copied_camera = record->result.value;
   TEST_ASSERT_EQUAL_UINT32(0, copied_camera->fields);
-  TEST_ASSERT_TRUE(all_zero(
+  TEST_ASSERT_TRUE(mln_test_all_zero(
     &copied_camera->latitude,
     sizeof(mln_camera_options) - offsetof(mln_camera_options, latitude)
   ));
@@ -227,7 +219,7 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
   );
   const mln_style_image_info* copied_image = record->result.value;
   TEST_ASSERT_TRUE(
-    all_zero(&copied_image->content, sizeof(copied_image->content))
+    mln_test_all_zero(&copied_image->content, sizeof(copied_image->content))
   );
   TEST_ASSERT_EQUAL_UINT32(0, copied_image->text_fit_width);
   TEST_ASSERT_EQUAL_UINT32(0, copied_image->text_fit_height);
@@ -258,15 +250,15 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
     &source_delivery
   );
   const mln_style_source_info* copied_source = record->result.value;
+  TEST_ASSERT_TRUE(mln_test_all_zero(
+    &copied_source->attribution, sizeof(copied_source->attribution)
+  ));
   TEST_ASSERT_TRUE(
-    all_zero(&copied_source->attribution, sizeof(copied_source->attribution))
+    mln_test_all_zero(&copied_source->url, sizeof(copied_source->url))
   );
-  TEST_ASSERT_TRUE(all_zero(&copied_source->url, sizeof(copied_source->url)));
+  TEST_ASSERT_TRUE(mln_test_tile_info_is_zero(&copied_source->tilejson));
   TEST_ASSERT_TRUE(
-    all_zero(&copied_source->tilejson, sizeof(copied_source->tilejson))
-  );
-  TEST_ASSERT_TRUE(
-    all_zero(&copied_source->bounds, sizeof(copied_source->bounds))
+    mln_test_all_zero(&copied_source->bounds, sizeof(copied_source->bounds))
   );
   TEST_ASSERT_EQUAL_UINT32(0, copied_source->tile_size);
   TEST_ASSERT_EQUAL_UINT32(0, copied_source->vector_encoding);

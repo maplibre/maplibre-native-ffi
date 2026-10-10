@@ -249,15 +249,9 @@ static const effective_options_case effective_cases[] = {
    MLN_STYLE_SOURCE_TYPE_RASTER_DEM, URL_INFO, MLN_STYLE_SOURCE_INFO_TILEJSON},
 };
 
-static bool all_zero(const void* bytes, size_t size) {
-  const unsigned char* byte = bytes;
-  for (size_t index = 0; index < size; index += 1) {
-    if (byte[index] != 0) return false;
-  }
-  return true;
-}
-
-// Each masked member whose bit is absent from fields reads as zero.
+// Each masked member whose bit is absent from fields reads as zero. The table
+// lists members without padding, whose bytes are all zero; tilejson has
+// trailing padding, so its members are compared instead.
 static void expect_absent_members_zero(
   const mln_style_source_info* info, const char* label
 ) {
@@ -271,7 +265,6 @@ static void expect_absent_members_zero(
    sizeof(((mln_style_source_info*)0)->name)}
     MEMBER(MLN_STYLE_SOURCE_INFO_ATTRIBUTION, attribution),
     MEMBER(MLN_STYLE_SOURCE_INFO_URL, url),
-    MEMBER(MLN_STYLE_SOURCE_INFO_TILEJSON, tilejson),
     MEMBER(MLN_STYLE_SOURCE_INFO_BOUNDS, bounds),
     MEMBER(MLN_STYLE_SOURCE_INFO_TILE_SIZE, tile_size),
     MEMBER(MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, vector_encoding),
@@ -282,10 +275,15 @@ static void expect_absent_members_zero(
        index += 1) {
     if ((info->fields & members[index].bit) != 0) continue;
     TEST_ASSERT_TRUE_MESSAGE(
-      all_zero(
+      mln_test_all_zero(
         (const unsigned char*)info + members[index].offset, members[index].size
       ),
       label
+    );
+  }
+  if ((info->fields & MLN_STYLE_SOURCE_INFO_TILEJSON) == 0) {
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_tile_info_is_zero(&info->tilejson), label
     );
   }
 }
