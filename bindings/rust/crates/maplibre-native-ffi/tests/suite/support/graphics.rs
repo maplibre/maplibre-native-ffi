@@ -112,7 +112,8 @@ fn last_error() -> String {
 }
 
 /// A device or context standing in for the host's, on the thread that created
-/// it. Destroy every session that uses it first.
+/// it. Destroy every session that uses it first, and wait for a disposed one
+/// to release its wakes.
 pub struct Graphics {
     raw: *mut c_void,
     context: ContextInfo,

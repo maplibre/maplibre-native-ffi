@@ -166,9 +166,13 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
     let (runtime, map) = fixture.into_parts();
     // No explicit close: each drop disposes its handle, children first.
-    drop(session);
+    let Session { handle, wakes } = session;
+    drop(handle);
     drop(map);
     drop(runtime);
+    // The graph retires off this thread, and the session can still reach the
+    // device until it does, so the device outlives the session's wakes.
+    await_release(&wakes.released);
 
     set_leak_reporter(None);
     let leaked: Vec<_> = leaks.try_iter().collect();
@@ -189,7 +193,7 @@ fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
 
     let graphics = Graphics::new();
     let fixture = styled_fixture();
-    let (options, _wakes) = Session::attach_options(RenderDriverKind::CoreWorker);
+    let (options, wakes) = Session::attach_options(RenderDriverKind::CoreWorker);
     let (session, attached) = graphics
         .attach_owned_texture(fixture.map(), EXTENT, &options)
         .unwrap();
@@ -201,6 +205,9 @@ fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     let (runtime, map) = fixture.into_parts();
     drop(map);
     drop(runtime);
+    // The options hold the wakes too, and the device outlives them.
+    drop(options);
+    await_release(&wakes.released);
 
     set_leak_reporter(None);
     let leaked: Vec<_> = leaks.try_iter().collect();

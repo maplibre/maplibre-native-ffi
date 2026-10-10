@@ -338,30 +338,51 @@ pub fn next_token() -> u64 {
     NEXT.fetch_add(1, Ordering::Relaxed)
 }
 
-/// A render session together with the wake that its frame results and
-/// driver work raise.
+/// The wake that a session's frame results and driver work raise, and the
+/// signal that native has released it.
+pub struct SessionWakes {
+    pub signal: Arc<Signal>,
+    /// Signals once native has released both of the session's wakes, which
+    /// it does when it retires the session. A disposed session retires off
+    /// the caller's thread and may still use the host's graphics objects until
+    /// then, so a test that disposes a session waits on this before it
+    /// destroys them.
+    pub released: mpsc::Receiver<()>,
+}
+
+/// A render session together with its wakes.
 pub struct Session {
     pub handle: RenderSessionHandle,
-    pub wakes: Arc<Signal>,
+    pub wakes: SessionWakes,
 }
 
 impl Session {
     /// Attach options that raise this session's wake, for `driver`.
-    pub fn attach_options(driver: RenderDriverKind) -> (RenderSessionAttachOptions, Arc<Signal>) {
-        let wakes = Arc::new(Signal::default());
+    pub fn attach_options(driver: RenderDriverKind) -> (RenderSessionAttachOptions, SessionWakes) {
+        let signal = Arc::new(Signal::default());
+        let (probe, released) = release_probe();
+        let probe = Arc::new(probe);
+        let wake = || {
+            let signal = Arc::clone(&signal);
+            let probe = Arc::clone(&probe);
+            maplibre_native_ffi::Wake::new(move || {
+                let _ = &probe;
+                signal.raise();
+            })
+        };
         let options = RenderSessionAttachOptions {
             driver,
             requested_texture_ring_depth: 2,
-            frame_wake: wakes.native_wake(),
-            driver_work_wake: wakes.native_wake(),
+            frame_wake: wake(),
+            driver_work_wake: wake(),
         };
-        (options, wakes)
+        (options, SessionWakes { signal, released })
     }
 
     /// Completes an attachment, servicing driver work while it is pending.
     pub fn finish_attach(
         (handle, attached): (RenderSessionHandle, NativeFuture<()>),
-        wakes: Arc<Signal>,
+        wakes: SessionWakes,
     ) -> Self {
         let session = Self { handle, wakes };
         session.drive(attached).expect("the attachment failed");
@@ -371,7 +392,7 @@ impl Session {
     /// Awaits one session operation, servicing driver work while it is
     /// pending, as the host's graphics thread would.
     pub fn drive<T>(&self, operation: NativeFuture<T>) -> Result<T> {
-        drive(&self.wakes, operation, || self.service())
+        drive(&self.wakes.signal, operation, || self.service())
     }
 
     fn service(&self) -> usize {
@@ -390,7 +411,7 @@ impl Session {
             .unwrap();
         let deadline = Instant::now() + timeout();
         loop {
-            let seen = self.wakes.seen();
+            let seen = self.wakes.signal.seen();
             self.service();
             match self.handle.drain_frame_results() {
                 Ok(batch) => {
@@ -404,7 +425,9 @@ impl Session {
                 Err(error) if error.kind() == ErrorKind::NotReady => {}
                 Err(error) => panic!("draining frame results failed: {error}"),
             }
-            self.wakes.wait_past(seen, deadline, "a frame result");
+            self.wakes
+                .signal
+                .wait_past(seen, deadline, "a frame result");
         }
     }
 
