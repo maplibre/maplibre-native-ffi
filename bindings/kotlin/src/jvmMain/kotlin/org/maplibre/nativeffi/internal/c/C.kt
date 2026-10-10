@@ -23,10 +23,10 @@ internal actual object C {
     Ffm.downcall("mln_acquired_frame_get_webgpu_texture", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_acquired_frame_release =
     Ffm.downcall("mln_acquired_frame_release", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_adapter_acquired_frame_view_begin =
-    Ffm.downcall("mln_adapter_acquired_frame_view_begin", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_adapter_acquired_frame_view_end =
-    Ffm.downcall("mln_adapter_acquired_frame_view_end", null, JAVA_LONG)
+  private val mln_acquired_frame_view_begin =
+    Ffm.downcall("mln_acquired_frame_view_begin", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_acquired_frame_view_end =
+    Ffm.downcall("mln_acquired_frame_view_end", null, JAVA_LONG)
   private val mln_android_init =
     Ffm.downcall("mln_android_init", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_animation_options_default =
@@ -1666,14 +1666,11 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_acquired_frame_release.invokeExact(frame, consumerCompletion, outDiagnostic) as Int
 
-  actual fun mln_adapter_acquired_frame_view_begin(
-    frame: Long,
-    outScope: Long,
-    outDiagnostic: Long,
-  ): Int = mln_adapter_acquired_frame_view_begin.invokeExact(frame, outScope, outDiagnostic) as Int
+  actual fun mln_acquired_frame_view_begin(frame: Long, outScope: Long, outDiagnostic: Long): Int =
+    mln_acquired_frame_view_begin.invokeExact(frame, outScope, outDiagnostic) as Int
 
-  actual fun mln_adapter_acquired_frame_view_end(scope: Long) {
-    mln_adapter_acquired_frame_view_end.invoke(scope)
+  actual fun mln_acquired_frame_view_end(scope: Long) {
+    mln_acquired_frame_view_end.invoke(scope)
   }
 
   actual fun mln_android_init(

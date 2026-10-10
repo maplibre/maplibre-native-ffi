@@ -2309,14 +2309,14 @@ external int mln_acquired_frame_release(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_adapter_acquired_frame_view_begin(
+external int mln_acquired_frame_view_begin(
   int frame,
   Pointer<Pointer<Void>> out_scope,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @Native<Void Function(Pointer<Void>)>()
-external void mln_adapter_acquired_frame_view_end(Pointer<Void> scope);
+external void mln_acquired_frame_view_end(Pointer<Void> scope);
 
 @Native<Int32 Function(Pointer<Void>, Uint64, Pointer<mln_diagnostic>)>()
 external int mln_adapter_arena_adopt_handle(

@@ -69,14 +69,10 @@ auto create_completion_operation(
       [completion = out.completion, deliver = std::move(deliver)](
         mln_status completion_status, std::string diagnostic, std::any result
       ) {
-        if (deliver) {
-          deliver(
-            completion, completion_status, std::move(diagnostic),
-            std::move(result)
-          );
-        } else {
-          complete(completion, completion_status, std::move(diagnostic));
-        }
+        deliver(
+          completion, completion_status, std::move(diagnostic),
+          std::move(result)
+        );
       }
     );
   } catch (...) {
@@ -85,6 +81,20 @@ auto create_completion_operation(
     return MLN_STATUS_NATIVE_ERROR;
   }
   return MLN_STATUS_OK;
+}
+
+auto create_completion_operation(
+  const mln_completion* descriptor, ValuelessCompletion valueless,
+  CompletionOperation& out
+) -> mln_status {
+  return create_completion_operation(
+    descriptor,
+    [valueless](
+      const std::shared_ptr<Completion>& completion, mln_status status,
+      std::string diagnostic, std::any
+    ) { valueless.complete(completion, status, std::move(diagnostic)); },
+    out
+  );
 }
 
 }  // namespace mln::core

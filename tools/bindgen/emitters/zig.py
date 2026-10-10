@@ -7,7 +7,7 @@ import re
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel, pascal
-from tools.bindgen.semantic import BoundApi
+from tools.bindgen.semantic import BoundApi, view_support
 
 SCALARS = {
     "int8_t": "i8",
@@ -173,5 +173,10 @@ pub const validateAbiVersion = status.validateAbiVersion;
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    _, generated, unsupported = lower(api)
-    return {"generated": generated, "unsupported": unsupported}
+    bound = compile_api(api)
+    _, generated, unsupported = lower(bound)
+    return {
+        "generated": generated,
+        "support": view_support(bound, generated),
+        "unsupported": unsupported,
+    }

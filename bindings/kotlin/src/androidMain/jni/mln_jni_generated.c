@@ -2,7 +2,6 @@
 // The JNI half of each C function and upcall the Kotlin binding uses. Every
 // argument is a primitive; mln_jni.h defines the casts and mln_jni.c the rest.
 #include <maplibre_native_c.h>
-#include <maplibre_native_c/callback_adapter.h>
 #include <maplibre_native_c/plugin.h>
 
 #include "mln_jni.h"
@@ -85,19 +84,19 @@ static jint mln_acquired_frame_release_jni(
   );
 }
 
-static jint mln_adapter_acquired_frame_view_begin_jni(
+static jint mln_acquired_frame_view_begin_jni(
   JNIEnv* env, jclass type, jlong frame, jlong out_scope, jlong out_diagnostic
 ) {
-  return (jint)mln_adapter_acquired_frame_view_begin(
+  return (jint)mln_acquired_frame_view_begin(
     (mln_acquired_frame)frame, MLN_JNI_POINTER(void**, out_scope),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
 
-static void mln_adapter_acquired_frame_view_end_jni(
+static void mln_acquired_frame_view_end_jni(
   JNIEnv* env, jclass type, jlong scope
 ) {
-  mln_adapter_acquired_frame_view_end(MLN_JNI_POINTER(void*, scope));
+  mln_acquired_frame_view_end(MLN_JNI_POINTER(void*, scope));
 }
 
 static jint mln_android_init_jni(
@@ -2748,10 +2747,10 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_acquired_frame_get_webgpu_texture_jni},
   {"mln_acquired_frame_release", "(JJJ)I",
    (void*)mln_acquired_frame_release_jni},
-  {"mln_adapter_acquired_frame_view_begin", "(JJJ)I",
-   (void*)mln_adapter_acquired_frame_view_begin_jni},
-  {"mln_adapter_acquired_frame_view_end", "(J)V",
-   (void*)mln_adapter_acquired_frame_view_end_jni},
+  {"mln_acquired_frame_view_begin", "(JJJ)I",
+   (void*)mln_acquired_frame_view_begin_jni},
+  {"mln_acquired_frame_view_end", "(J)V",
+   (void*)mln_acquired_frame_view_end_jni},
   {"mln_android_init", "(JJJJ)I", (void*)mln_android_init_jni},
   {"mln_animation_options_default", "(J)V",
    (void*)mln_animation_options_default_jni},

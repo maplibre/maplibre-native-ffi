@@ -21,12 +21,12 @@ public extension AcquiredFrameHandle {
     return try nativeView(
       "mln_acquired_frame_get_producer_sync",
       reading: raw,
-      begin: { raw, token, diagnostic in mln_adapter_acquired_frame_view_begin(
+      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
         token,
         diagnostic
       ) },
-      end: { mln_adapter_acquired_frame_view_end($0) },
+      end: { mln_acquired_frame_view_end($0) },
       get: { raw, value, diagnostic in mln_acquired_frame_get_producer_sync(
         raw,
         value,

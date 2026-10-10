@@ -39,19 +39,8 @@ class Declarations:
         self.used_enums: set[str] = set()
 
     def functions(self) -> list[Function]:
-        """Public functions, and the runtime adapters that generated code calls."""
-        adapters = {
-            name
-            for handle in self.bound.handles.values()
-            for name in (handle.view_begin, handle.view_end)
-            if name
-        }
-        return [
-            function
-            for function in self.api.functions
-            if function.name not in self.api.runtime_exports
-            or function.name in adapters
-        ]
+        """The public functions; the runtime header serves other bindings."""
+        return list(self.api.public_functions)
 
     def type(self, ctype: CType, pointee: bool = False, field: bool = False) -> str:
         """The C# spelling of one C type at a field, parameter, or result."""

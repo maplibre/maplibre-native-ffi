@@ -15,7 +15,6 @@
 #include <shared_mutex>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -39,8 +38,10 @@
 #include "runtime/runtime.hpp"
 
 #include "completion/completion.hpp"
+#include "completion/completion_result.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
+#include "execution/worker_thread.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
@@ -72,21 +73,6 @@ struct HandleTraits<EventBatchObject> {
 }  // namespace mln::core
 
 namespace {
-enum : std::uint32_t {
-  MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
-  MLN_OFFLINE_OPERATION_REGION_CREATE = 2,
-  MLN_OFFLINE_OPERATION_REGION_GET = 3,
-  MLN_OFFLINE_OPERATION_REGIONS_LIST = 4,
-  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE = 5,
-  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA = 6,
-  MLN_OFFLINE_OPERATION_REGION_GET_STATUS = 7,
-  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED = 8,
-  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
-  MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
-  MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
-  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
-};
-
 // Each mask constant must be the bit of the event type it selects, written
 // against the shift rather than a literal, so an event type added without its
 // mask constant fails the build here instead of silently queueing nothing.
@@ -879,7 +865,6 @@ auto erase_tracked_submission(
     runtime->pending_submissions.erase(sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
   }
-  runtime->terminal_condition.notify_all();
   if (dispose) runtime_disposal_lane().submit(runtime->disposal_task);
 }
 
@@ -893,7 +878,6 @@ auto erase_runtime_barrier(
     runtime->pending_submissions.erase(sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
   }
-  runtime->terminal_condition.notify_all();
   if (dispose) runtime_disposal_lane().submit(runtime->disposal_task);
 }
 
@@ -1080,6 +1064,15 @@ auto create_runtime(
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
+  // Creation blocks until the executor's worker starts, which on the browser
+  // main thread could wait forever.
+  if (on_browser_main_thread()) {
+    set_thread_error(
+      "runtimes cannot be created on the browser main thread, which cannot "
+      "block; create them on a Web Worker"
+    );
+    return MLN_STATUS_WRONG_THREAD;
+  }
   watch_process_exit();
   const auto event_wake = std::make_shared<Wake>(options->event_wake);
 
@@ -1153,27 +1146,24 @@ auto replace_registration(
 
 template <typename Mutation>
 auto execute_resource_configuration_command(
-  const std::shared_ptr<Completion>& completion, Mutation&& mutation
+  ValuelessCompletion valueless, const std::shared_ptr<Completion>& completion,
+  Mutation&& mutation
 ) noexcept -> void {
   try {
     std::invoke(std::forward<Mutation>(mutation));
-    complete_command(
-      completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK
-    );
+    valueless.complete(completion);
   } catch (const std::exception& exception) {
-    complete_command(
-      completion, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
-      exception.what()
-    );
+    valueless.complete(completion, MLN_STATUS_NATIVE_ERROR, exception.what());
   } catch (...) {
-    complete_command(
-      completion, MLN_COMMAND_DISPOSITION_FAILED, MLN_STATUS_NATIVE_ERROR, 0,
+    valueless.complete(
+      completion, MLN_STATUS_NATIVE_ERROR,
       "resource configuration command failed"
     );
   }
 }
 
-template <typename Mutation>
+// Submits the configuration change of Function, which delivers no value.
+template <auto Function, typename Mutation>
 auto submit_resource_configuration_command(
   const std::shared_ptr<RuntimeObject>& runtime,
   const mln_completion* descriptor, Mutation&& mutation
@@ -1185,7 +1175,9 @@ auto submit_resource_configuration_command(
     runtime,
     [completion,
      mutation = std::forward<Mutation>(mutation)](uint64_t) mutable {
-      execute_resource_configuration_command(completion, std::move(mutation));
+      execute_resource_configuration_command(
+        valueless_completion<Function>(), completion, std::move(mutation)
+      );
     },
     completion
   );
@@ -1225,13 +1217,14 @@ auto set_resource_transform(
   );
   context->transfer_to_runtime();
   const auto state = live->resource_transform_state;
-  const auto status = submit_resource_configuration_command(
-    live, completion, [state, registration]() -> void {
-      replace_registration(
-        *state, &ResourceTransformState::registration, registration
-      );
-    }
-  );
+  const auto status =
+    submit_resource_configuration_command<&mln_runtime_set_resource_transform>(
+      live, completion, [state, registration]() -> void {
+        replace_registration(
+          *state, &ResourceTransformState::registration, registration
+        );
+      }
+    );
   if (status != MLN_STATUS_OK) context->return_to_caller();
   return status;
 }
@@ -1283,13 +1276,12 @@ auto clear_resource_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
 
   const auto state = live->resource_transform_state;
-  return submit_resource_configuration_command(
-    live, completion, [state]() -> void {
-      replace_registration(
-        *state, &ResourceTransformState::registration, nullptr
-      );
-    }
-  );
+  return submit_resource_configuration_command<
+    &mln_runtime_clear_resource_transform>(live, completion, [state]() -> void {
+    replace_registration(
+      *state, &ResourceTransformState::registration, nullptr
+    );
+  });
 }
 
 auto set_http_header_transform(
@@ -1340,7 +1332,8 @@ auto set_http_header_transform(
   );
   context->transfer_to_runtime();
   const auto state = live->http_header_transform_state;
-  const auto status = submit_resource_configuration_command(
+  const auto status = submit_resource_configuration_command<
+    &mln_runtime_set_http_header_transform>(
     live, completion, [state, registration]() -> void {
       replace_registration(
         *state, &HttpHeaderTransformState::registration, registration
@@ -1568,7 +1561,8 @@ auto clear_http_header_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
 
   const auto state = live->http_header_transform_state;
-  return submit_resource_configuration_command(
+  return submit_resource_configuration_command<
+    &mln_runtime_clear_http_header_transform>(
     live, completion, [state]() -> void {
       replace_registration(
         *state, &HttpHeaderTransformState::registration, nullptr
@@ -1579,110 +1573,95 @@ auto clear_http_header_transform(
 
 namespace {
 
-// Adapts one offline operation's native result to its completion. Each arm
-// names the result type its operation kind stores in the operation object.
+// Presents one offline operation's successful native result to its completion.
+using OfflinePresent =
+  void (*)(const std::shared_ptr<Completion>& completion, std::any result);
+
+// Presents the success of Function, which delivers no value.
+template <auto Function>
+auto present_nothing(const std::shared_ptr<Completion>& completion, std::any)
+  -> void {
+  valueless_completion<Function>().complete(completion);
+}
+
+// Presents the regions that Function delivers: an OfflineRegionData, an
+// optional one when the result is nullable, or a vector of them for an array.
+template <auto Function>
+auto present_regions(
+  const std::shared_ptr<Completion>& completion, std::any result
+) -> void {
+  using Value = CompletionValue<Function>;
+  static_assert(std::is_same_v<typename Value::Type, mln_offline_region_info>);
+  if constexpr (Value::array) {
+    auto value =
+      std::any_cast<std::vector<OfflineRegionData>>(std::move(result));
+    completion->resolve([value =
+                           std::move(value)](const mln_completion& descriptor) {
+      auto info = std::vector<mln_offline_region_info>(value.size());
+      for (size_t index = 0; index < value.size(); ++index) {
+        info[index].size = sizeof(mln_offline_region_info);
+        if (fill_region_info(value[index], &info[index]) != MLN_STATUS_OK) {
+          deliver_failure(
+            descriptor, MLN_STATUS_NATIVE_ERROR, thread_last_error_message()
+          );
+          return;
+        }
+      }
+      Value::deliver(descriptor, info);
+    });
+  } else {
+    auto value = std::optional<OfflineRegionData>{};
+    if constexpr (Value::nullable) {
+      value =
+        std::any_cast<std::optional<OfflineRegionData>>(std::move(result));
+      if (!value) {
+        completion->resolve([](const mln_completion& descriptor) {
+          Value::deliver_absent(descriptor);
+        });
+        return;
+      }
+    } else {
+      value = std::any_cast<OfflineRegionData>(std::move(result));
+    }
+    completion->resolve(
+      [value = std::move(*value)](const mln_completion& descriptor) {
+        auto info = mln_offline_region_info{};
+        info.size = sizeof(mln_offline_region_info);
+        if (fill_region_info(value, &info) != MLN_STATUS_OK) {
+          deliver_failure(
+            descriptor, MLN_STATUS_NATIVE_ERROR, thread_last_error_message()
+          );
+          return;
+        }
+        Value::deliver(descriptor, info);
+      }
+    );
+  }
+}
+
+auto present_region_status(
+  const std::shared_ptr<Completion>& completion, std::any result
+) -> void {
+  CompletionValue<&mln_runtime_offline_region_get_status>::complete(
+    completion, std::any_cast<mln_offline_region_status>(std::move(result))
+  );
+}
+
+// Adapts one offline operation's native result to its completion.
 auto offline_operation_result_callback(
-  const std::shared_ptr<Completion>& completion, uint32_t kind
+  const std::shared_ptr<Completion>& completion, OfflinePresent present
 ) -> OperationObject::ResultCallback {
-  return [completion, kind](
+  return [completion, present](
            mln_status status, std::string diagnostic, std::any result
          ) mutable {
     if (status != MLN_STATUS_OK) {
-      complete(completion, status, std::move(diagnostic));
+      complete_failure(completion, status, std::move(diagnostic));
       return;
     }
     try {
-      switch (kind) {
-        case MLN_OFFLINE_OPERATION_REGION_CREATE:
-        case MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA: {
-          auto value = std::any_cast<OfflineRegionData>(std::move(result));
-          completion->resolve(
-            [value = std::move(value)](const mln_completion& descriptor) {
-              auto info = mln_offline_region_info{};
-              info.size = sizeof(mln_offline_region_info);
-              if (fill_region_info(value, &info) != MLN_STATUS_OK) {
-                invoke_completion(
-                  descriptor, MLN_STATUS_NATIVE_ERROR,
-                  MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                  thread_last_error_message(), nullptr, 0
-                );
-                return;
-              }
-              invoke_completion(
-                descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                {}, &info, 1
-              );
-            }
-          );
-          return;
-        }
-        case MLN_OFFLINE_OPERATION_REGION_GET: {
-          auto value =
-            std::any_cast<std::optional<OfflineRegionData>>(std::move(result));
-          if (!value) {
-            complete(completion, MLN_STATUS_OK);
-            return;
-          }
-          completion->resolve(
-            [value = std::move(*value)](const mln_completion& descriptor) {
-              auto info = mln_offline_region_info{};
-              info.size = sizeof(mln_offline_region_info);
-              if (fill_region_info(value, &info) != MLN_STATUS_OK) {
-                invoke_completion(
-                  descriptor, MLN_STATUS_NATIVE_ERROR,
-                  MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                  thread_last_error_message(), nullptr, 0
-                );
-                return;
-              }
-              invoke_completion(
-                descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                {}, &info, 1
-              );
-            }
-          );
-          return;
-        }
-        case MLN_OFFLINE_OPERATION_REGIONS_LIST:
-        case MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE: {
-          auto value =
-            std::any_cast<std::vector<OfflineRegionData>>(std::move(result));
-          completion->resolve(
-            [value = std::move(value)](const mln_completion& descriptor) {
-              auto info = std::vector<mln_offline_region_info>(value.size());
-              for (size_t index = 0; index < value.size(); ++index) {
-                info[index].size = sizeof(mln_offline_region_info);
-                if (
-                  fill_region_info(value[index], &info[index]) != MLN_STATUS_OK
-                ) {
-                  invoke_completion(
-                    descriptor, MLN_STATUS_NATIVE_ERROR,
-                    MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                    thread_last_error_message(), nullptr, 0
-                  );
-                  return;
-                }
-              }
-              invoke_completion(
-                descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                {}, info.data(), info.size()
-              );
-            }
-          );
-          return;
-        }
-        case MLN_OFFLINE_OPERATION_REGION_GET_STATUS:
-          complete_value(
-            completion, MLN_STATUS_OK, {},
-            std::any_cast<mln_offline_region_status>(std::move(result))
-          );
-          return;
-        default:
-          complete(completion, MLN_STATUS_OK);
-          return;
-      }
+      present(completion, std::move(result));
     } catch (...) {
-      complete(
+      complete_failure(
         completion, MLN_STATUS_NATIVE_ERROR,
         "offline operation produced an invalid result"
       );
@@ -1696,14 +1675,14 @@ auto offline_operation_result_callback(
 // runtime work.
 template <typename Schedule>
 auto submit_offline_operation(
-  const std::shared_ptr<RuntimeObject>& runtime, uint32_t kind,
+  const std::shared_ptr<RuntimeObject>& runtime, OfflinePresent present,
   const mln_completion* descriptor, Schedule schedule
 ) -> mln_status {
   const auto validation = validate_completion(descriptor);
   if (validation != MLN_STATUS_OK) return validation;
   auto completion = std::make_shared<Completion>(*descriptor);
   auto state = std::make_shared<OperationObject>(
-    offline_operation_result_callback(completion, kind)
+    offline_operation_result_callback(completion, present)
   );
   const auto status = submit_runtime_operation(
     runtime, state,
@@ -1759,7 +1738,7 @@ auto run_ambient_cache_operation_start(
   }
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_AMBIENT_CACHE, completion,
+    live, present_nothing<&mln_runtime_run_ambient_cache_operation>, completion,
     [operation](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1798,7 +1777,8 @@ auto set_maximum_ambient_cache_size_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE, completion,
+    live, present_nothing<&mln_runtime_set_maximum_ambient_cache_size>,
+    completion,
     [size](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1836,7 +1816,7 @@ auto offline_region_create_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_CREATE, completion,
+    live, present_regions<&mln_runtime_offline_region_create>, completion,
     [native_definition = std::move(native_definition),
      native_metadata = std::move(native_metadata)](
       const OfflineOperationState& state, const OfflineDatabase& database
@@ -1877,7 +1857,7 @@ auto offline_region_get_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_GET, completion,
+    live, present_regions<&mln_runtime_offline_region_get>, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1923,7 +1903,7 @@ auto offline_regions_list_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGIONS_LIST, completion,
+    live, present_regions<&mln_runtime_offline_regions_list>, completion,
     [](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2001,7 +1981,8 @@ auto offline_regions_merge_database_start(
   }
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE, completion,
+    live, present_regions<&mln_runtime_offline_regions_merge_database>,
+    completion,
     [path = std::string{side_database_path}](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2050,7 +2031,8 @@ auto offline_region_update_metadata_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA, completion,
+    live, present_regions<&mln_runtime_offline_region_update_metadata>,
+    completion,
     [region_id, native_metadata = std::move(native_metadata)](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2116,7 +2098,7 @@ auto offline_region_get_status_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_GET_STATUS, completion,
+    live, present_region_status, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2173,7 +2155,7 @@ auto offline_region_set_observed_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED, completion,
+    live, present_nothing<&mln_runtime_offline_region_set_observed>, completion,
     [region_id, observed, offline_event_state = live->offline_event_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2240,7 +2222,8 @@ auto offline_region_set_download_state_start(
   }
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE, completion,
+    live, present_nothing<&mln_runtime_offline_region_set_download_state>,
+    completion,
     [region_id = request.region_id, download_state = *native_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2282,7 +2265,7 @@ auto offline_region_invalidate_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_INVALIDATE, completion,
+    live, present_nothing<&mln_runtime_offline_region_invalidate>, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2327,7 +2310,7 @@ auto offline_region_delete_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_DELETE, completion,
+    live, present_nothing<&mln_runtime_offline_region_delete>, completion,
     [region_id, offline_event_state = live->offline_event_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2409,11 +2392,12 @@ auto set_resource_provider(
   };
   context->transfer_to_runtime();
   const auto state = live->resource_provider_state;
-  const auto status = submit_resource_configuration_command(
-    live, completion, [state, copied]() -> void {
-      replace_registration(*state, &ResourceProviderState::provider, copied);
-    }
-  );
+  const auto status =
+    submit_resource_configuration_command<&mln_runtime_set_resource_provider>(
+      live, completion, [state, copied]() -> void {
+        replace_registration(*state, &ResourceProviderState::provider, copied);
+      }
+    );
   if (status != MLN_STATUS_OK) context->return_to_caller();
   return status;
 }
@@ -2427,26 +2411,15 @@ auto clear_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
 
   const auto state = live->resource_provider_state;
-  return submit_resource_configuration_command(
-    live, completion, [state]() -> void {
-      replace_registration(
-        *state, &ResourceProviderState::provider, ResourceProvider{}
-      );
-    }
-  );
+  return submit_resource_configuration_command<
+    &mln_runtime_clear_resource_provider>(live, completion, [state]() -> void {
+    replace_registration(
+      *state, &ResourceProviderState::provider, ResourceProvider{}
+    );
+  });
 }
 
 namespace {
-
-auto wait_for_prior_runtime_submissions(
-  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
-) noexcept -> void {
-  auto lock = std::unique_lock{runtime->terminal_mutex};
-  runtime->terminal_condition.wait(lock, [&]() noexcept -> bool {
-    return runtime->pending_submissions.empty() ||
-           *runtime->pending_submissions.begin() >= sequence;
-  });
-}
 
 auto release_runtime_reachable_state(RuntimeObject* runtime) -> void {
   replace_registration(
@@ -2492,7 +2465,9 @@ auto runtime_barrier_start(
   auto completion_state = std::make_shared<Completion>(*completion);
   auto state = std::make_shared<OperationObject>(
     [completion_state](mln_status status, std::string diagnostic, std::any) {
-      complete(completion_state, status, std::move(diagnostic));
+      valueless_completion<&mln_runtime_barrier>().complete(
+        completion_state, status, std::move(diagnostic)
+      );
     }
   );
 
@@ -2534,48 +2509,59 @@ auto runtime_barrier_start(
   return MLN_STATUS_OK;
 }
 
-auto dispose_runtime(mln_runtime runtime) -> mln_status {
-  auto live = lease_runtime(runtime);
-  if (live == nullptr) return recorded_handle_fault_status();
-  {
-    const auto lock = std::scoped_lock{live->submission_mutex};
-    const auto status = live->control.begin_close(true);
-    if (status != MLN_STATUS_OK) return status;
-    live->disposal_owner = live;
-    live->disposal_task.context = live.get();
-    live->disposal_task.run = [](RetirementTask* task) noexcept {
-      auto* retiring = static_cast<RuntimeObject*>(task->context);
-      auto owned = std::move(retiring->disposal_owner);
-      static_cast<void>(handle_table<RuntimeObject>().remove(owned->self));
-      unregister_platform_context(owned->platform_context);
-      owned->disposal_worker_task.context = owned.get();
-      owned->disposal_worker_task.run = [](RetirementTask* node) noexcept {
-        auto* state = static_cast<RuntimeObject*>(node->context);
-        // The cleanup lane keeps this object alive until the worker reports.
-        release_runtime_reachable_state(state);
-        {
-          const auto lock = std::scoped_lock{state->terminal_mutex};
-          state->disposal_state_retired = true;
-        }
-        state->terminal_condition.notify_all();
-      };
-      owned->executor.invoke_retirement(owned->disposal_worker_task);
+namespace {
+
+// Retires a runtime whose close has begun: once its submission leases,
+// children, and pending submissions have drained, the disposal lane removes
+// its handle, releases the state its worker reaches, stops the worker, and
+// then reports `completion` when one is given. Nothing here blocks the caller
+// or the lane while the runtime drains.
+auto retire_runtime(
+  std::shared_ptr<RuntimeObject> live, std::shared_ptr<Completion> completion
+) noexcept -> void {
+  live->release_completion = std::move(completion);
+  live->disposal_owner = live;
+  live->disposal_task.context = live.get();
+  live->disposal_task.run = [](RetirementTask* task) noexcept {
+    auto* retiring = static_cast<RuntimeObject*>(task->context);
+    auto owned = std::move(retiring->disposal_owner);
+    static_cast<void>(handle_table<RuntimeObject>().remove(owned->self));
+    unregister_platform_context(owned->platform_context);
+    owned->disposal_worker_task.context = owned.get();
+    owned->disposal_worker_task.run = [](RetirementTask* node) noexcept {
+      auto* state = static_cast<RuntimeObject*>(node->context);
+      // The cleanup lane keeps this object alive until the worker reports.
+      release_runtime_reachable_state(state);
       {
-        auto lock = std::unique_lock{owned->terminal_mutex};
-        owned->terminal_condition.wait(lock, [&] {
-          return owned->disposal_state_retired;
-        });
+        const auto lock = std::scoped_lock{state->terminal_mutex};
+        state->disposal_state_retired = true;
       }
-      owned->executor.stop();
+      state->terminal_condition.notify_all();
     };
+    owned->executor.invoke_retirement(owned->disposal_worker_task);
     {
-      const auto terminal_lock = std::scoped_lock{live->terminal_mutex};
-      live->disposal_requested = true;
+      auto lock = std::unique_lock{owned->terminal_mutex};
+      owned->terminal_condition.wait(lock, [&] {
+        return owned->disposal_state_retired;
+      });
     }
+    owned->executor.stop();
+    // Drop the lane's reference before reporting, so a host that waits for
+    // the completion and then exits cannot race member destruction. Nothing
+    // after the completion touches library state.
+    auto release_completion = std::move(owned->release_completion);
+    owned.reset();
+    if (release_completion) {
+      valueless_completion<&mln_runtime_release>().complete(release_completion);
+    }
+  };
+  {
+    const auto terminal_lock = std::scoped_lock{live->terminal_mutex};
+    live->disposal_requested = true;
   }
   auto* retiring = live.get();
   live.reset();
-  retiring->control.notify_when_drained(
+  const auto drained = retiring->control.notify_when_drained(
     [](void* context) noexcept {
       auto& state = *static_cast<RuntimeObject*>(context);
       bool dispose;
@@ -2588,6 +2574,22 @@ auto dispose_runtime(mln_runtime runtime) -> mln_status {
     },
     retiring
   );
+  if (!drained) {
+    mln::testing::hit(mln::testing::SyncPoint::RuntimeRetirementDeferred);
+  }
+}
+
+}  // namespace
+
+auto dispose_runtime(mln_runtime runtime) -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) return recorded_handle_fault_status();
+  {
+    const auto lock = std::scoped_lock{live->submission_mutex};
+    const auto status = live->control.begin_close(true);
+    if (status != MLN_STATUS_OK) return status;
+  }
+  retire_runtime(std::move(live), nullptr);
   return MLN_STATUS_OK;
 }
 
@@ -2599,9 +2601,9 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   }
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  auto teardown_completion = std::shared_ptr<Completion>{};
+  auto release_completion = std::shared_ptr<Completion>{};
   try {
-    teardown_completion = std::make_shared<Completion>(*completion);
+    release_completion = std::make_shared<Completion>(*completion);
   } catch (...) {
     set_thread_error("runtime release could not allocate its completion");
     return MLN_STATUS_NATIVE_ERROR;
@@ -2610,80 +2612,17 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
     const std::scoped_lock commit_lock(live->submission_mutex);
     const auto release_status = live->control.begin_close();
     if (release_status != MLN_STATUS_OK) {
-      teardown_completion->reject();
+      release_completion->reject();
       return release_status;
     }
-  }
-  struct ReleaseGate {
-    std::mutex mutex;
-    std::condition_variable condition;
-    bool committed = false;
-    uint64_t sequence = 0;
-    std::shared_ptr<RuntimeObject> live;
-    std::shared_ptr<Completion> teardown_completion;
-  };
-  auto gate = std::shared_ptr<ReleaseGate>{};
-  try {
-    gate = std::make_shared<ReleaseGate>();
-  } catch (...) {
-    live->control.abort_close();
-    teardown_completion->reject();
-    set_thread_error("runtime release could not allocate its teardown gate");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  gate->live = live;
-  gate->teardown_completion = teardown_completion;
-  auto waiter = std::thread{};
-  try {
-    // Teardown stops and joins the executor, so it cannot run on that executor
-    // or on the caller that may also service host callbacks.
-    waiter = std::thread([gate]() mutable -> void {
-      {
-        auto lock = std::unique_lock{gate->mutex};
-        gate->condition.wait(lock, [&]() noexcept -> bool {
-          return gate->committed;
-        });
-      }
-      auto live = std::move(gate->live);
-      wait_for_prior_runtime_submissions(live, gate->sequence);
-      live->control.wait_for_submissions([]() noexcept -> void {
-        mln::testing::hit(mln::testing::SyncPoint::RuntimeReleaseWaits);
-      });
-      unregister_platform_context(live->platform_context);
-      try {
-        live->executor.invoke_sync([live]() -> void {
-          release_runtime_reachable_state(live.get());
-        });
-      } catch (...) {
-        // The public handle is already retired, so teardown failures are not
-        // actionable by its former owner.
-      }
-      live->executor.stop();
-      // Drop this thread's reference before reporting, so a host that waits
-      // for the completion and then exits cannot race member destruction.
-      // Nothing after complete() touches library state.
-      live.reset();
-      complete(gate->teardown_completion, MLN_STATUS_OK);
-    });
-  } catch (...) {
-    live->control.abort_close();
-    teardown_completion->reject();
-    set_thread_error("runtime release could not start its teardown waiter");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  waiter.detach();
-
-  {
-    const std::scoped_lock commit_lock(live->submission_mutex);
-    gate->sequence = live->next_submission_sequence++;
     static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
   }
-  {
-    const std::scoped_lock lock(gate->mutex);
-    gate->committed = true;
-  }
-  gate->condition.notify_one();
-  teardown_completion->accept();
+  // Nothing after close can fail. Accepting first keeps the completion on the
+  // disposal lane even when the runtime has already drained. Close rejects
+  // every later submission, so retirement, which waits for the pending ones,
+  // reports after every earlier accepted submission has finished.
+  release_completion->accept();
+  retire_runtime(std::move(live), std::move(release_completion));
   return MLN_STATUS_OK;
 }
 

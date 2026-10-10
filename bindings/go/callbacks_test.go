@@ -84,23 +84,28 @@ func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 		t.Fatalf("roots after the removal = %d, want 0", roots)
 	}
 
-	if completion := await(t, submitted(f.m.AddCustomGeometrySource("", options))); completion.Disposition != CommandDispositionFailed {
-		t.Fatalf("add with an empty ID = %+v, want failed", completion)
+	for _, rejected := range []struct {
+		id      string
+		options CustomGeometrySourceOptions
+	}{{"", options}, {"rejected", CustomGeometrySourceOptions{}}} {
+		if _, err := f.m.AddCustomGeometrySource(rejected.id, rejected.options); !errors.Is(err, ErrInvalidArgument) {
+			t.Fatalf("add %q = %v, want ErrInvalidArgument", rejected.id, err)
+		}
+		if roots := rootCount(f.m.bindingOwner); roots != 0 {
+			t.Fatalf("roots after a rejected add of %q = %d, want 0", rejected.id, roots)
+		}
+	}
+
+	awaitCommitted(t, submitted(f.m.AddCustomGeometrySource("kept", options)))
+	if completion := await(t, submitted(f.m.AddCustomGeometrySource("kept", options))); completion.Disposition != CommandDispositionFailed {
+		t.Fatalf("add with a taken ID = %+v, want failed", completion)
 	}
 	// Native releases a failed command's registration after its completion
 	// returns, and before the runtime's next barrier.
 	await(t, submitted(f.runtime.Barrier()))
-	if roots := rootCount(f.m.bindingOwner); roots != 0 {
-		t.Fatalf("roots after a failed add = %d, want 0", roots)
+	if roots := rootCount(f.m.bindingOwner); roots != 1 {
+		t.Fatalf("roots after a failed add = %d, want 1", roots)
 	}
-	if _, err := f.m.AddCustomGeometrySource("rejected", CustomGeometrySourceOptions{}); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("add without FetchTile = %v, want ErrInvalidArgument", err)
-	}
-	if roots := rootCount(f.m.bindingOwner); roots != 0 {
-		t.Fatalf("roots after a rejected add = %d, want 0", roots)
-	}
-
-	awaitCommitted(t, submitted(f.m.AddCustomGeometrySource("kept", options)))
 	await(t, submitted(f.m.Close()))
 	if roots := rootCount(f.m.bindingOwner); roots != 0 {
 		t.Fatalf("roots after the map closed = %d, want 0", roots)

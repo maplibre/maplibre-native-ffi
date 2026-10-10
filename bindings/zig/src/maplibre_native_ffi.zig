@@ -4172,8 +4172,8 @@ pub fn acquiredFrameGetMetalTexture(comptime Result: type, handle: AcquiredFrame
     const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_adapter_acquired_frame_view_end(token);
+    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
+    defer c.mln_acquired_frame_view_end(token);
     var raw: c.mln_metal_owned_texture_frame = std.mem.zeroes(c.mln_metal_owned_texture_frame);
     raw.size = @sizeOf(c.mln_metal_owned_texture_frame);
     try status.call(c.mln_acquired_frame_get_metal_texture, .{ lease.native, &raw }, diagnostic);
@@ -4187,8 +4187,8 @@ pub fn acquiredFrameGetOpenglTexture(comptime Result: type, handle: AcquiredFram
     const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_adapter_acquired_frame_view_end(token);
+    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
+    defer c.mln_acquired_frame_view_end(token);
     var raw: c.mln_opengl_owned_texture_frame = std.mem.zeroes(c.mln_opengl_owned_texture_frame);
     raw.size = @sizeOf(c.mln_opengl_owned_texture_frame);
     try status.call(c.mln_acquired_frame_get_opengl_texture, .{ lease.native, &raw }, diagnostic);
@@ -4202,8 +4202,8 @@ pub fn acquiredFrameGetProducerSync(comptime Result: type, handle: AcquiredFrame
     const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_adapter_acquired_frame_view_end(token);
+    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
+    defer c.mln_acquired_frame_view_end(token);
     var raw: c.mln_gpu_sync = std.mem.zeroes(c.mln_gpu_sync);
     raw.size = @sizeOf(c.mln_gpu_sync);
     try status.call(c.mln_acquired_frame_get_producer_sync, .{ lease.native, &raw }, diagnostic);
@@ -4221,8 +4221,8 @@ pub fn acquiredFrameGetVulkanTexture(comptime Result: type, handle: AcquiredFram
     const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_adapter_acquired_frame_view_end(token);
+    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
+    defer c.mln_acquired_frame_view_end(token);
     var raw: c.mln_vulkan_owned_texture_frame = std.mem.zeroes(c.mln_vulkan_owned_texture_frame);
     raw.size = @sizeOf(c.mln_vulkan_owned_texture_frame);
     try status.call(c.mln_acquired_frame_get_vulkan_texture, .{ lease.native, &raw }, diagnostic);
@@ -4236,8 +4236,8 @@ pub fn acquiredFrameGetWebgpuTexture(comptime Result: type, handle: AcquiredFram
     const lease = try handle.borrow(diagnostic);
     defer lease.release();
     var token: ?*anyopaque = null;
-    try status.call(c.mln_adapter_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
-    defer c.mln_adapter_acquired_frame_view_end(token);
+    try status.call(c.mln_acquired_frame_view_begin, .{ lease.native, &token }, diagnostic);
+    defer c.mln_acquired_frame_view_end(token);
     var raw: c.mln_webgpu_owned_texture_frame = std.mem.zeroes(c.mln_webgpu_owned_texture_frame);
     raw.size = @sizeOf(c.mln_webgpu_owned_texture_frame);
     try status.call(c.mln_acquired_frame_get_webgpu_texture, .{ lease.native, &raw }, diagnostic);

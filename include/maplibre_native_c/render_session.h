@@ -341,7 +341,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * - MLN_STATUS_INVALID_ARGUMENT when frame is null or points at an invalid
  *   handle, or consumer_completion is undersized.
  * - MLN_STATUS_INVALID_STATE when *frame has been released.
- * - MLN_STATUS_BUSY while a binding-owned borrowed view scope is active.
+ * - MLN_STATUS_BUSY while a scope from mln_acquired_frame_view_begin() is
+ *   active.
  * - MLN_STATUS_UNSUPPORTED when the backend does not support the named
  *   mln_gpu_sync_kind. The handle is not consumed.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -349,6 +350,37 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
 MLN_API mln_status mln_acquired_frame_release(
   mln_acquired_frame* frame MLN_BINDING("direction=inout;consumes=success"),
   const mln_gpu_sync* consumer_completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Begins an allocation-free scope that borrows an acquired frame.
+ *
+ * Native objects that the frame's getters lend, such as backend textures and
+ * devices, stay valid until the scope ends, even when another thread disposes
+ * the frame or its session. The scope retains the frame and its session.
+ * Disposal rejects later scopes immediately and waits for active scopes to end
+ * before it retires graphics resources. Explicit frame release and session
+ * abandonment report MLN_STATUS_BUSY while a scope is active. Each successful
+ * call requires exactly one mln_acquired_frame_view_end() call, on any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when *out_scope receives the scope.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or out_scope is
+ *   null.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
+ * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target, or
+ *   disposal of the frame or session has begun.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_acquired_frame_view_begin(
+  mln_acquired_frame frame,
+  void** out_scope MLN_BINDING("direction=out;kind=context"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/** Ends one scope from mln_acquired_frame_view_begin(). Null has no effect. */
+MLN_API void mln_acquired_frame_view_end(
+  void* scope MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /**
@@ -544,9 +576,9 @@ MLN_API mln_status mln_render_session_detach(
  * Returns:
  * - MLN_STATUS_OK when control is abandoned and *out_result describes what was
  *   quarantined.
- * - MLN_STATUS_BUSY when a borrowed view scope is active, a caller-driver call
- *   is in flight, or the caller is inside one of the session's driver calls.
- *   Nothing changes.
+ * - MLN_STATUS_BUSY when a scope from mln_acquired_frame_view_begin() is
+ *   active, a caller-driver call is in flight, or the caller is inside one of
+ *   the session's driver calls. Nothing changes.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   out_result is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released, or the session
@@ -570,8 +602,9 @@ MLN_API mln_status mln_render_session_abandon(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when session has been released or is neither
  *   detached nor abandoned, or a detached session still has an acquired frame.
- * - MLN_STATUS_BUSY when pending abandonment still has active borrowed views
- *   or driver work. The session owner remains live.
+ * - MLN_STATUS_BUSY when pending abandonment still waits on a scope from
+ *   mln_acquired_frame_view_begin() or on driver work. The session owner
+ *   remains live.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_destroy(

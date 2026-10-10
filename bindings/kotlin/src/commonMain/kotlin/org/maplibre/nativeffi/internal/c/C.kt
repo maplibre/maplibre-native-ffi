@@ -23,9 +23,9 @@ internal expect object C {
 
   fun mln_acquired_frame_release(frame: Long, consumerCompletion: Long, outDiagnostic: Long): Int
 
-  fun mln_adapter_acquired_frame_view_begin(frame: Long, outScope: Long, outDiagnostic: Long): Int
+  fun mln_acquired_frame_view_begin(frame: Long, outScope: Long, outDiagnostic: Long): Int
 
-  fun mln_adapter_acquired_frame_view_end(scope: Long): Unit
+  fun mln_acquired_frame_view_end(scope: Long): Unit
 
   fun mln_android_init(jniEnv: Long, jniClass: Long, context: Long, outDiagnostic: Long): Int
 

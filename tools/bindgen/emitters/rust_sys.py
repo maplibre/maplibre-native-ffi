@@ -270,23 +270,7 @@ class Declarations:
 
 
 def declarations(api: Api | BoundApi) -> Declarations:
-    bound = api if isinstance(api, BoundApi) else None
-    source = bound.source if bound else api
     # The runtime header serves bindings that cannot run code on MapLibre
-    # threads. Rust calls only the adapters that the handle plans name.
-    adapters = (
-        {
-            name
-            for handle in bound.handles.values()
-            for name in (handle.view_begin, handle.view_end)
-            if name
-        }
-        if bound
-        else set()
-    )
-    functions = [
-        function
-        for function in source.functions
-        if function.name not in source.runtime_exports or function.name in adapters
-    ]
-    return Declarations(source, functions)
+    # threads, which Rust does not need.
+    source = api.source if isinstance(api, BoundApi) else api
+    return Declarations(source, list(source.public_functions))

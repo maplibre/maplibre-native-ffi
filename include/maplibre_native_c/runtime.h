@@ -939,6 +939,7 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  *   small, options->flags or options->event_mask holds unknown bits, the wake
  *   descriptor is invalid, or out_runtime is null or does not point to the null
  *   handle.
+ * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
  */
 MLN_API mln_status mln_runtime_create(
@@ -1332,9 +1333,11 @@ MLN_API mln_status mln_runtime_barrier(
  *
  * The completion runs after every earlier accepted submission, including
  * released maps' teardown, has finished and the runtime's threads and
- * resources are gone. The invoking thread touches no library state after the
- * callback returns. A host that outlives its runtimes may pass a discarding
- * completion.
+ * resources are gone. It runs on the native thread that retires runtimes,
+ * which other runtimes' teardown shares, so it MUST NOT block. This runtime's
+ * retirement touches no library state after the callback returns; the thread
+ * then goes on to retire other runtimes. A host that outlives its runtimes may
+ * pass a discarding completion.
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their
@@ -1382,7 +1385,7 @@ MLN_API mln_status mln_runtime_barrier(
  *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when runtime has been released, or the runtime has
  *   a live or pending child or is already closing.
- * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
+ * - MLN_STATUS_NATIVE_ERROR when the completion could not be allocated.
  */
 MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_runtime_release(

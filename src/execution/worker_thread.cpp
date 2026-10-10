@@ -4,9 +4,21 @@
 #include <system_error>
 #include <utility>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/threading.h>
+#endif
+
 #include "execution/worker_thread.hpp"
 
 namespace mln::core {
+
+auto on_browser_main_thread() noexcept -> bool {
+#if defined(__EMSCRIPTEN__)
+  return emscripten_is_main_browser_thread() != 0;
+#else
+  return false;
+#endif
+}
 
 #if defined(_WIN32) || defined(__EMSCRIPTEN__)
 

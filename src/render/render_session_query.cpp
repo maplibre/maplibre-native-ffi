@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "bytes/buffer.hpp"
+#include "completion/completion_result.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
@@ -79,13 +80,14 @@ auto queried_feature_view(const QueriedFeatureRecord& record)
   return feature;
 }
 
+template <auto Function>
 auto complete_feature_list(
   const std::shared_ptr<Completion>& completion, mln_status status,
   std::string diagnostic, std::any result
 ) -> void {
   auto* list = std::any_cast<OwnedQueriedFeatureList>(&result);
   if (status != MLN_STATUS_OK || list == nullptr || *list == nullptr) {
-    complete(
+    complete_failure(
       completion, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
       status == MLN_STATUS_OK ? "render query produced an invalid result"
                               : std::move(diagnostic)
@@ -101,20 +103,18 @@ auto complete_feature_list(
                         const mln_completion& descriptor
                       ) {
     static_cast<void>(list);
-    invoke_completion(
-      descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
-      features.data(), features.size()
-    );
+    CompletionValue<Function>::deliver(descriptor, features);
   });
 }
 
+template <auto Function>
 auto complete_query_buffer(
   const std::shared_ptr<Completion>& completion, mln_status status,
   std::string diagnostic, std::any result
 ) -> void {
   auto* bytes = std::any_cast<std::string>(&result);
   if (status != MLN_STATUS_OK || bytes == nullptr) {
-    complete(
+    complete_failure(
       completion, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
       status == MLN_STATUS_OK ? "render query produced an invalid result"
                               : std::move(diagnostic)
@@ -123,11 +123,8 @@ auto complete_query_buffer(
   }
   completion->resolve([bytes =
                          std::move(*bytes)](const mln_completion& descriptor) {
-    const auto view =
-      mln_buffer_view{.data = bytes.data(), .size = bytes.size()};
-    invoke_completion(
-      descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
-      &view, 1
+    CompletionValue<Function>::deliver(
+      descriptor, {.data = bytes.data(), .size = bytes.size()}
     );
   });
 }
@@ -327,7 +324,8 @@ auto render_session_query_rendered_features_start(
       if (status == MLN_STATUS_OK) result = std::move(list);
       return status;
     },
-    completion, complete_feature_list
+    completion,
+    complete_feature_list<&mln_render_session_query_rendered_features>
   );
 }
 
@@ -373,7 +371,7 @@ auto render_session_query_source_features_start(
       if (status == MLN_STATUS_OK) result = std::move(list);
       return status;
     },
-    completion, complete_feature_list
+    completion, complete_feature_list<&mln_render_session_query_source_features>
   );
 }
 
@@ -413,7 +411,8 @@ auto render_session_query_feature_extensions_start(
       return status == MLN_STATUS_OK ? take_buffer_bytes(buffer, result)
                                      : status;
     },
-    completion, complete_query_buffer
+    completion,
+    complete_query_buffer<&mln_render_session_query_feature_extensions>
   );
 }
 

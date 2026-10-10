@@ -93,9 +93,11 @@ inline auto configure_transferred_webgl_worker(
       static_cast<void>(call.release());
       return MLN_STATUS_OK;
     };
-  // A session destroyed from its own completion would otherwise join itself.
+  // Detaches where reap_core_worker detaches a default worker.
   session.join_worker = [thread]() {
-    if (pthread_equal(pthread_self(), *thread) != 0) {
+    if (
+      pthread_equal(pthread_self(), *thread) != 0 || on_browser_main_thread()
+    ) {
       static_cast<void>(pthread_detach(*thread));
       return;
     }

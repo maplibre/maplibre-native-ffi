@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
-    from . import native_capture
+    from . import native_capture, native_results
     from .emitters import (
         dart,
         dart_native,
@@ -37,6 +37,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     if bound.diagnostics:
         raise ModelError(list(bound.diagnostics))
     outputs = native_capture.generate(bound)
+    outputs.update(native_results.generate(bound))
     outputs.update(copy_cases.generate(bound))
     for directory, emitter in (
         ("bindings/go", go),
@@ -100,7 +101,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
             "resolved_callbacks": len(bound.callbacks),
             "support_relations": {
                 plan.name: support_relation(plan)
-                for plan in bound.operations
+                for plan in (*bound.operations, *bound.view_scopes)
                 if plan.support
             },
         },
@@ -230,6 +231,7 @@ def generated_files(root: Path = ROOT) -> set[str]:
         root / "include/maplibre_native_c/callback_capture_generated.h",
         root / "src/c_api/callback_capture_generated.inc",
         root / "src/c_api/callback_port_generated.inc",
+        root / "src/completion/completion_result_generated.inc",
         root / copy_cases.PATH,
     ]
     candidates.extend((root / "bindings/dotnet/src").rglob("*.g.cs"))

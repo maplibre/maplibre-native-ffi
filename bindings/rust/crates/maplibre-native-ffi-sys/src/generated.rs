@@ -1673,12 +1673,12 @@ unsafe extern "C" {
         consumer_completion: *const mln_gpu_sync,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_adapter_acquired_frame_view_begin(
+    pub fn mln_acquired_frame_view_begin(
         frame: mln_acquired_frame,
         out_scope: *mut *mut std::ffi::c_void,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_adapter_acquired_frame_view_end(scope: *mut std::ffi::c_void);
+    pub fn mln_acquired_frame_view_end(scope: *mut std::ffi::c_void);
     pub fn mln_android_init(
         jni_env: *mut std::ffi::c_void,
         jni_class: *mut std::ffi::c_void,

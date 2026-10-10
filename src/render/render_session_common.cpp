@@ -898,6 +898,42 @@ auto session_teardown_lane() -> RetirementLane& {
   static auto* lane = new RetirementLane{};
   return *lane;
 }
+
+auto session_idle_locked(const mln_render_session_object& session) noexcept
+  -> bool {
+  return !session.driver_call_in_flight && session.active_views == 0;
+}
+
+// Runs on the lane. A retirement that finds its session busy parks there, in
+// order, and returns, so the lane moves on to other sessions.
+auto park_retirement_while_busy(
+  mln_render_session_object& session, RetirementTask& task
+) noexcept -> bool {
+  const auto lock = std::scoped_lock{session.control_mutex};
+  if (session_idle_locked(session)) return false;
+  auto** tail = &session.parked_retirements;
+  while (*tail != nullptr) tail = &(*tail)->next;
+  *tail = &task;
+  return true;
+}
+
+// Every transition that can make a session idle calls this under the control
+// lock and passes the result to resubmit_parked_retirements after releasing
+// it.
+auto take_parked_retirements_locked(mln_render_session_object& session) noexcept
+  -> RetirementTask* {
+  if (!session_idle_locked(session)) return nullptr;
+  return std::exchange(session.parked_retirements, nullptr);
+}
+
+auto resubmit_parked_retirements(RetirementTask* task) noexcept -> void {
+  while (task != nullptr) {
+    // The lane may run and destroy the task's owner once it is submitted.
+    auto* next = std::exchange(task->next, nullptr);
+    session_teardown_lane().submit(*task);
+    task = next;
+  }
+}
 auto abandon_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
   mln_render_abandon_result* out_result
@@ -1048,6 +1084,23 @@ auto splice_work(
   }
 }
 
+// Releases the core worker after stop_worker is set. A session destroyed from
+// one of its detach completions runs on the core worker and would join itself.
+// On the browser main thread, a worker whose Web Worker has not started yet
+// starts only after that thread yields, so a join there would never return.
+// Both cases detach the worker instead; it holds its own session reference and
+// finds nothing left to run.
+auto reap_core_worker(mln_render_session_object& session) -> void {
+  if (session.join_worker) {
+    session.join_worker();
+  } else if (session.worker.joinable()) {
+    if (session.worker.is_current() || on_browser_main_thread())
+      session.worker.detach();
+    else
+      session.worker.join();
+  }
+}
+
 auto run_core_worker(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
@@ -1082,12 +1135,15 @@ auto run_core_worker(
       if (work.abandon) work.abandon();
     }
     mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
+    auto* parked = static_cast<RetirementTask*>(nullptr);
     {
       const auto lock = std::scoped_lock{session->control_mutex};
       session->driver_call_in_flight = false;
       session->driver_call_thread.reset();
+      parked = take_parked_retirements_locked(*session);
       session->worker_condition.notify_all();
     }
+    resubmit_parked_retirements(parked);
   }
 }
 
@@ -1177,10 +1233,14 @@ auto lease_render_session(mln_render_session session)
 
 auto enqueue_driver_operation(
   mln_render_session session, RenderDriverCallable work,
-  const mln_completion* completion
+  const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status {
   return submit_driver_work(
-    session, completion, {},
+    session, completion,
+    [valueless](
+      const std::shared_ptr<Completion>& state, mln_status status,
+      std::string diagnostic, std::any
+    ) { valueless.complete(state, status, std::move(diagnostic)); },
     [work = std::move(work)](
       const std::shared_ptr<mln_render_session_object>& live,
       const std::shared_ptr<OperationObject>& operation
@@ -1269,7 +1329,7 @@ auto start_attach_render_session(
   std::shared_ptr<mln_render_session_object> session, RenderSessionKind kind,
   const mln_render_session_attach_options* options,
   mln_render_session_capabilities capabilities, mln_render_session* out_session,
-  const mln_completion* completion
+  const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status {
   if (session == nullptr) {
     set_thread_error("render session must not be null");
@@ -1302,7 +1362,7 @@ auto start_attach_render_session(
 
   auto async = CompletionOperation{};
   const auto operation_status =
-    create_completion_operation(completion, {}, async);
+    create_completion_operation(completion, valueless, async);
   if (operation_status != MLN_STATUS_OK) {
     return operation_status;
   }
@@ -1341,10 +1401,7 @@ auto start_attach_render_session(
         session->stop_worker = true;
         session->worker_condition.notify_all();
       }
-      if (session->join_worker)
-        session->join_worker();
-      else if (session->worker.joinable())
-        session->worker.join();
+      reap_core_worker(*session);
       static_cast<void>(
         map_set_render_session_publish_callback(session->map, {})
       );
@@ -2000,17 +2057,7 @@ auto destroy_render_session(
   static_cast<void>(
     handle_table<mln_render_session_object>().remove(live->self)
   );
-  // Detach completions run on the core worker, and the header allows destroy
-  // from any thread, so a host that destroys from one would otherwise join
-  // itself.
-  if (live->join_worker)
-    live->join_worker();
-  else if (live->worker.joinable()) {
-    if (live->worker.is_current())
-      live->worker.detach();
-    else
-      live->worker.join();
-  }
+  reap_core_worker(*live);
   frame_wake.reset();
   driver_wake.reset();
   return MLN_STATUS_OK;
@@ -2672,14 +2719,19 @@ auto render_session_service_driver_work(
     std::shared_ptr<mln_render_session_object> session;
     ~DriverCallGuard() {
       mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
-      const auto lock = std::scoped_lock{session->control_mutex};
-      session->driver_call_in_flight = false;
-      session->driver_call_thread.reset();
-      session->worker_condition.notify_all();
-      session->driver_wake_pending = !session->driver_work.empty();
-      if (session->driver_wake_pending && session->driver_wake) {
-        session->driver_wake->notify();
+      auto* parked = static_cast<RetirementTask*>(nullptr);
+      {
+        const auto lock = std::scoped_lock{session->control_mutex};
+        session->driver_call_in_flight = false;
+        session->driver_call_thread.reset();
+        parked = take_parked_retirements_locked(*session);
+        session->worker_condition.notify_all();
+        session->driver_wake_pending = !session->driver_work.empty();
+        if (session->driver_wake_pending && session->driver_wake) {
+          session->driver_wake->notify();
+        }
       }
+      resubmit_parked_retirements(parked);
     }
   } guard{live};
   mln::testing::hit(mln::testing::SyncPoint::RenderDriverEntered);
@@ -2889,12 +2941,15 @@ void acquired_frame_view_end(void* scope) noexcept {
   if (!scope) return;
   auto& frame = *static_cast<mln_acquired_frame_object*>(scope);
   auto owner = std::shared_ptr<mln_acquired_frame_object>{};
+  auto* parked = static_cast<RetirementTask*>(nullptr);
   {
     const auto lock = std::scoped_lock{frame.session->control_mutex};
     --frame.session->active_views;
     if (--frame.active_views == 0) owner = std::move(frame.view_owner);
+    parked = take_parked_retirements_locked(*frame.session);
     frame.session->worker_condition.notify_all();
   }
+  resubmit_parked_retirements(parked);
 }
 
 auto acquired_frame_get_result(
@@ -3264,7 +3319,9 @@ auto render_session_barrier_start(
     }
   }
   auto async = CompletionOperation{};
-  const auto status = create_completion_operation(completion, {}, async);
+  const auto status = create_completion_operation(
+    completion, valueless_completion<&mln_render_session_barrier>(), async
+  );
   if (status != MLN_STATUS_OK) return status;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -3289,6 +3346,25 @@ auto render_session_barrier_start(
   }
   return MLN_STATUS_OK;
 }
+
+namespace {
+
+// The completion of the C function that requests maintenance.
+auto maintenance_completion(RenderSessionMaintenance maintenance)
+  -> ValuelessCompletion {
+  switch (maintenance) {
+    case RenderSessionMaintenance::ReduceMemoryUse:
+      return valueless_completion<&mln_render_session_reduce_memory_use>();
+    case RenderSessionMaintenance::ClearData:
+      return valueless_completion<&mln_render_session_clear_data>();
+    case RenderSessionMaintenance::DumpDebugLogs:
+      return valueless_completion<&mln_render_session_dump_debug_logs>();
+  }
+  // An invalid kind fails in the driver work, so this never reports success.
+  return valueless_completion<&mln_render_session_reduce_memory_use>();
+}
+
+}  // namespace
 
 auto render_session_maintenance_start(
   mln_render_session session, RenderSessionMaintenance maintenance,
@@ -3315,7 +3391,7 @@ auto render_session_maintenance_start(
       set_thread_error("render session maintenance kind is invalid");
       return MLN_STATUS_INVALID_ARGUMENT;
     },
-    completion
+    completion, maintenance_completion(maintenance)
   );
 }
 
@@ -3336,7 +3412,9 @@ auto render_session_detach_start(
     }
   }
   auto async = CompletionOperation{};
-  const auto status = create_completion_operation(completion, {}, async);
+  const auto status = create_completion_operation(
+    completion, valueless_completion<&mln_render_session_detach>(), async
+  );
   if (status != MLN_STATUS_OK) return status;
   // Built before the lock below, because building it allocates and may throw.
   auto detach_work = RenderDriverWork{
@@ -3540,8 +3618,10 @@ auto abandon_render_session(
   return MLN_STATUS_OK;
 }
 
-// Admission owns an embedded node and a self-reference. The lane waits for an
-// existing driver call outside registry locks before abandoning the target.
+// Admission owns an embedded node and a self-reference. A driver call or a
+// borrowed view still running when the lane reaches the node parks it on the
+// session, and the call or view that leaves the session idle returns it to the
+// lane, which abandons the target outside registry locks.
 auto dispose_render_session(
   const std::shared_ptr<mln_render_session_object>& live
 ) -> void {
@@ -3554,13 +3634,8 @@ auto dispose_render_session(
     live->disposal_task.context = live.get();
     live->disposal_task.run = [](RetirementTask* task) noexcept {
       auto& session = *static_cast<mln_render_session_object*>(task->context);
+      if (park_retirement_while_busy(session, *task)) return;
       auto owned = session.disposal_owner;
-      {
-        auto lock = std::unique_lock{session.control_mutex};
-        session.worker_condition.wait(lock, [&] {
-          return !session.driver_call_in_flight && session.active_views == 0;
-        });
-      }
       auto result =
         mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
       try {
@@ -3600,14 +3675,8 @@ auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
   live->disposal_task.context = live.get();
   live->disposal_task.run = [](RetirementTask* task) noexcept {
     auto& frame = *static_cast<mln_acquired_frame_object*>(task->context);
+    if (park_retirement_while_busy(*frame.session, *task)) return;
     auto owned = frame.disposal_owner;
-    {
-      auto lock = std::unique_lock{owned->session->control_mutex};
-      owned->session->worker_condition.wait(lock, [&] {
-        return !owned->session->driver_call_in_flight &&
-               owned->session->active_views == 0;
-      });
-    }
     auto result =
       mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
     try {

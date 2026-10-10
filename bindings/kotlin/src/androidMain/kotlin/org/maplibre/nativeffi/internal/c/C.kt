@@ -59,13 +59,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_adapter_acquired_frame_view_begin(
+  actual external fun mln_acquired_frame_view_begin(
     frame: Long,
     outScope: Long,
     outDiagnostic: Long,
   ): Int
 
-  @JvmStatic actual external fun mln_adapter_acquired_frame_view_end(scope: Long): Unit
+  @JvmStatic actual external fun mln_acquired_frame_view_end(scope: Long): Unit
 
   @JvmStatic
   actual external fun mln_android_init(

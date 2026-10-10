@@ -2,9 +2,11 @@
 // and must retire the graph only once nothing still runs against it.
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "completion/completion.hpp"
 #include "internal/support/allocation_faults.hpp"
@@ -29,6 +31,14 @@ using mln::native_tests::await;
 using mln::native_tests::BackgroundChecks;
 using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
+
+// The completions that the fake surface attachments and the blocking driver
+// work below stand in for. Any surface attachment and any maintenance request
+// serves, because each one delivers no value.
+constexpr auto surface_attach_completion =
+  mln::core::valueless_completion<&mln_metal_surface_attach>();
+constexpr auto driver_work_completion =
+  mln::core::valueless_completion<&mln_render_session_reduce_memory_use>();
 
 struct Result {
   std::atomic_int status{MLN_STATUS_INVALID_STATE};
@@ -143,7 +153,9 @@ void runtime_barriers_observe_retired_command_captures() {
             },
         };
         probe.nested_status = mln_runtime_barrier(runtime, &barrier, nullptr);
-        mln::core::complete(completion, MLN_STATUS_OK);
+        mln::core::complete_command(
+          completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK
+        );
       },
       completion
     )
@@ -350,8 +362,10 @@ auto submit_pending_operation(
 ) -> mln_status {
   auto live = mln::core::lease_runtime(runtime);
   auto pending = mln::core::CompletionOperation{};
-  const auto created =
-    mln::core::create_completion_operation(&completion, {}, pending);
+  const auto created = mln::core::create_completion_operation(
+    &completion, mln::core::valueless_completion<&mln_runtime_barrier>(),
+    pending
+  );
   if (created != MLN_STATUS_OK) return created;
   const auto status =
     mln::core::submit_runtime_operation(live, pending.operation, [&entered] {
@@ -415,7 +429,7 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
   MLN_TEST_OK(
     mln::core::start_attach_render_session(
       session, mln::core::RenderSessionKind::Surface, &options, capabilities,
-      &handle, &completion
+      &handle, &completion, surface_attach_completion
     )
   );
   TEST_ASSERT_TRUE(released(attach));
@@ -435,7 +449,7 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
         );
         return MLN_STATUS_OK;
       },
-      &blocked_completion
+      &blocked_completion, driver_work_completion
     )
   );
   TEST_ASSERT_TRUE(await([&] { return driver.entered.load(); }, "the driver"));
@@ -548,7 +562,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   );
   void* scope = nullptr;
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
-    return mln_adapter_acquired_frame_view_begin(frame_id, &scope, nullptr);
+    return mln_acquired_frame_view_begin(frame_id, &scope, nullptr);
   });
   auto result =
     mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
@@ -571,7 +585,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   void* rejected = nullptr;
   MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST,
-    mln_adapter_acquired_frame_view_begin(frame_id, &rejected, nullptr)
+    mln_acquired_frame_view_begin(frame_id, &rejected, nullptr)
   );
   TEST_ASSERT_NULL(rejected);
   auto state = uint32_t{};
@@ -583,7 +597,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
     MLN_RENDER_SESSION_STATE_ATTACHED, state, "disposal retired an active view"
   );
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
-    mln_adapter_acquired_frame_view_end(scope);
+    mln_acquired_frame_view_end(scope);
     return MLN_STATUS_OK;
   });
   MLN_TEST_OK(mln_acquired_frame_release(&frame_id, &sync, nullptr));
@@ -596,11 +610,267 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   );
 }
 
+// An attached session with one acquired frame, standing in for a backend that
+// rendered into a texture ring.
+struct FakeTextureSession {
+  std::shared_ptr<mln_render_session_object> session;
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+};
+
+auto attach_fake_texture_session(mln_map map) -> FakeTextureSession {
+  auto session = std::make_shared<mln_render_session_object>();
+  session->map = map;
+  session->self = mln::core::register_render_session(session);
+  session->state = MLN_RENDER_SESSION_STATE_ATTACHED;
+  session->attached = true;
+  session->acquired_frame_count = 1;
+  MLN_TEST_OK(mln::core::map_attach_render_target_session(map, session.get()));
+  auto frame = std::make_shared<mln_acquired_frame_object>();
+  frame->session = session;
+  const auto frame_id =
+    mln::core::handle_table<mln_acquired_frame_object>().insert(frame);
+  return {.session = std::move(session), .frame = frame_id};
+}
+
+auto session_state(const mln_render_session_object& session) -> uint32_t {
+  const auto lock = std::scoped_lock{session.control_mutex};
+  return session.state;
+}
+
+// Every session retires on one lane, so a held view must park its session's
+// retirements rather than block the lane.
+void a_held_view_parks_its_retirements_without_stalling_others() {
+  const auto runtime = create_runtime();
+  const auto held_map = create_map(runtime);
+  const auto other_map = create_map(runtime);
+  auto held = attach_fake_texture_session(held_map);
+  auto other = attach_fake_texture_session(other_map);
+  auto held_weak = std::weak_ptr{held.session};
+  auto other_weak = std::weak_ptr{other.session};
+  void* scope = nullptr;
+  MLN_TEST_OK(mln_acquired_frame_view_begin(held.frame, &scope, nullptr));
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_acquired_frame_dispose(held.frame, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_render_session_dispose(held.session->self, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_acquired_frame_dispose(other.frame, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_render_session_dispose(other.session->self, nullptr);
+  });
+  other.session.reset();
+  // The lane runs in submission order, so the other session retiring means
+  // both of the held session's retirements already ran.
+  TEST_ASSERT_TRUE(expired(other_weak));
+  TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+    MLN_RENDER_SESSION_STATE_ATTACHED, session_state(*held.session),
+    "disposal abandoned a target under a borrowed view"
+  );
+  held.session.reset();
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    mln_acquired_frame_view_end(scope);
+    return MLN_STATUS_OK;
+  });
+  TEST_ASSERT_TRUE(expired(held_weak));
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(held_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(other_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_runtime_dispose(runtime, nullptr);
+  });
+}
+
+// A core worker's driver call parks its session's retirement the same way.
+void a_running_driver_call_parks_its_retirement_without_stalling_others() {
+  const auto runtime = create_runtime();
+  const auto busy_map = create_map(runtime);
+  const auto other_map = create_map(runtime);
+  auto busy = std::make_shared<mln_render_session_object>();
+  busy->map = busy_map;
+  auto options = mln_render_session_attach_options_default();
+  options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
+  auto capabilities = mln_render_session_capabilities{};
+  capabilities.size = sizeof(capabilities);
+  auto attach = Result{};
+  const auto attach_completion = descriptor(attach);
+  auto busy_id = mln_render_session{MLN_HANDLE_NULL};
+  MLN_TEST_OK(
+    mln::core::start_attach_render_session(
+      busy, mln::core::RenderSessionKind::Surface, &options, capabilities,
+      &busy_id, &attach_completion, surface_attach_completion
+    )
+  );
+  TEST_ASSERT_TRUE(released(attach));
+  MLN_TEST_OK(attach.status.load());
+  auto busy_weak = std::weak_ptr{busy};
+  busy.reset();
+  auto driver = WorkerGate{};
+  auto blocked = Result{};
+  const auto blocked_completion = descriptor(blocked);
+  MLN_TEST_OK(
+    mln::core::enqueue_driver_operation(
+      busy_id,
+      [&driver](mln_render_session_object&) {
+        driver.entered = true;
+        mln_test_pulse();
+        static_cast<void>(
+          await([&] { return driver.release.load(); }, "release")
+        );
+        return MLN_STATUS_OK;
+      },
+      &blocked_completion, driver_work_completion
+    )
+  );
+  TEST_ASSERT_TRUE(await([&] { return driver.entered.load(); }, "the driver"));
+  auto other = attach_fake_texture_session(other_map);
+  auto other_weak = std::weak_ptr{other.session};
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_render_session_dispose(busy_id, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_acquired_frame_dispose(other.frame, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_render_session_dispose(other.session->self, nullptr);
+  });
+  other.session.reset();
+  TEST_ASSERT_TRUE(expired(other_weak));
+  TEST_ASSERT_FALSE_MESSAGE(
+    busy_weak.expired(), "a session retired under its driver call"
+  );
+  driver.release = true;
+  mln_test_pulse();
+  TEST_ASSERT_TRUE(expired(busy_weak));
+  TEST_ASSERT_TRUE(released(blocked));
+  MLN_TEST_OK(blocked.status.load());
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(busy_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(other_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_runtime_dispose(runtime, nullptr);
+  });
+}
+
+// So does a call that services a caller-driven session's driver work.
+void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
+  const auto runtime = create_runtime();
+  const auto busy_map = create_map(runtime);
+  const auto other_map = create_map(runtime);
+  auto busy = std::make_shared<mln_render_session_object>();
+  busy->map = busy_map;
+  auto options = mln_render_session_attach_options_default();
+  options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  auto capabilities = mln_render_session_capabilities{};
+  capabilities.size = sizeof(capabilities);
+  auto attach = Result{};
+  const auto attach_completion = descriptor(attach);
+  auto busy_id = mln_render_session{MLN_HANDLE_NULL};
+  MLN_TEST_OK(
+    mln::core::start_attach_render_session(
+      busy, mln::core::RenderSessionKind::Surface, &options, capabilities,
+      &busy_id, &attach_completion, surface_attach_completion
+    )
+  );
+  auto busy_weak = std::weak_ptr{busy};
+  busy.reset();
+  // Driver work belongs to the thread that first services it, so one helper
+  // thread services both the attachment and the blocking operation.
+  auto checks = BackgroundChecks{};
+  auto serve = std::atomic_bool{false};
+  auto graphics = std::thread{[&] {
+    auto serviced = std::size_t{0};
+    checks.check(
+      mln_render_session_service_driver_work(busy_id, 0, &serviced, nullptr) ==
+        MLN_STATUS_OK,
+      "servicing the attachment failed"
+    );
+    checks.check(
+      await([&] { return serve.load(); }, "the operation to service"),
+      "the operation was never enqueued"
+    );
+    checks.check(
+      mln_render_session_service_driver_work(busy_id, 0, &serviced, nullptr) ==
+        MLN_STATUS_OK,
+      "servicing the operation failed"
+    );
+  }};
+  const auto attached = released(attach);
+  auto driver = WorkerGate{};
+  auto blocked = Result{};
+  const auto blocked_completion = descriptor(blocked);
+  const auto enqueued = mln::core::enqueue_driver_operation(
+    busy_id,
+    [&driver](mln_render_session_object&) {
+      driver.entered = true;
+      mln_test_pulse();
+      static_cast<void>(
+        await([&] { return driver.release.load(); }, "release")
+      );
+      return MLN_STATUS_OK;
+    },
+    &blocked_completion, driver_work_completion
+  );
+  serve = true;
+  mln_test_pulse();
+  const auto entered =
+    await([&] { return driver.entered.load(); }, "the driver call");
+  auto other = attach_fake_texture_session(other_map);
+  auto other_weak = std::weak_ptr{other.session};
+  const auto busy_disposed = mln_render_session_dispose(busy_id, nullptr);
+  const auto frame_disposed = mln_acquired_frame_dispose(other.frame, nullptr);
+  const auto other_disposed =
+    mln_render_session_dispose(other.session->self, nullptr);
+  other.session.reset();
+  const auto other_retired = expired(other_weak);
+  const auto busy_retired_early = busy_weak.expired();
+  // Assertions wait until the helper thread joins, so a failure never leaves
+  // it parked on this frame's state.
+  driver.release = true;
+  mln_test_pulse();
+  graphics.join();
+  TEST_ASSERT_TRUE(attached);
+  MLN_TEST_OK(attach.status.load());
+  MLN_TEST_OK(enqueued);
+  TEST_ASSERT_TRUE(entered);
+  MLN_TEST_OK(busy_disposed);
+  MLN_TEST_OK(frame_disposed);
+  MLN_TEST_OK(other_disposed);
+  TEST_ASSERT_NULL_MESSAGE(checks.failure(), checks.failure());
+  TEST_ASSERT_TRUE(other_retired);
+  TEST_ASSERT_FALSE_MESSAGE(
+    busy_retired_early, "a session retired under its driver call"
+  );
+  TEST_ASSERT_TRUE(expired(busy_weak));
+  TEST_ASSERT_TRUE(released(blocked));
+  MLN_TEST_OK(blocked.status.load());
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(busy_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(other_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_runtime_dispose(runtime, nullptr);
+  });
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
   RUN_TEST(runtime_barriers_observe_retired_command_captures);
   RUN_TEST(borrowed_views_hold_the_session_through_sibling_disposal);
+  RUN_TEST(a_held_view_parks_its_retirements_without_stalling_others);
+  RUN_TEST(a_running_driver_call_parks_its_retirement_without_stalling_others);
+  RUN_TEST(a_serviced_driver_call_parks_its_retirement_without_stalling_others);
   RUN_TEST(failed_finalizer_token_creation_disposes_the_owner);
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
   RUN_TEST(

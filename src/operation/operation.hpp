@@ -7,6 +7,7 @@
 #include <string>
 
 #include "completion/completion.hpp"
+#include "completion/completion_result.hpp"
 
 namespace mln::core {
 
@@ -44,8 +45,17 @@ struct CompletionOperation {
   std::shared_ptr<Completion> completion;
 };
 
+// Pairs an operation with a completion that deliver resolves from the
+// operation's result. deliver must not be empty.
 auto create_completion_operation(
   const mln_completion* descriptor, CompletionOperation::Delivery deliver,
+  CompletionOperation& out
+) -> mln_status;
+
+// Pairs an operation with the completion of a function that delivers no value,
+// so the completion reports the operation's status alone.
+auto create_completion_operation(
+  const mln_completion* descriptor, ValuelessCompletion valueless,
   CompletionOperation& out
 ) -> mln_status;
 

@@ -17,8 +17,8 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
   public fun <T> withMetalTexture(block: (MetalOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_metal_texture", Access.READ) {
       borrowView(
-        { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_adapter_acquired_frame_view_end(it) },
+        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+        { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
         val out = sized(w(56, 64), 8)
         check(C.mln_acquired_frame_get_metal_texture(handle, out, diagnostic))
@@ -29,8 +29,8 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
   public fun <T> withOpenglTexture(block: (OpenglOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_opengl_texture", Access.READ) {
       borrowView(
-        { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_adapter_acquired_frame_view_end(it) },
+        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+        { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
         val out = sized(64, 8)
         check(C.mln_acquired_frame_get_opengl_texture(handle, out, diagnostic))
@@ -41,8 +41,8 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
   public fun <T> withProducerSync(block: (GpuSync) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_producer_sync", Access.READ) {
       borrowView(
-        { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_adapter_acquired_frame_view_end(it) },
+        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+        { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
         val out = sized(24, 8)
         check(C.mln_acquired_frame_get_producer_sync(handle, out, diagnostic))
@@ -60,8 +60,8 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
   public fun <T> withVulkanTexture(block: (VulkanOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_vulkan_texture", Access.READ) {
       borrowView(
-        { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_adapter_acquired_frame_view_end(it) },
+        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+        { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
         val out = sized(72, 8)
         check(C.mln_acquired_frame_get_vulkan_texture(handle, out, diagnostic))
@@ -72,8 +72,8 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
   public fun <T> withWebgpuTexture(block: (WebgpuOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_webgpu_texture", Access.READ) {
       borrowView(
-        { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
-        { C.mln_adapter_acquired_frame_view_end(it) },
+        { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
+        { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
         val out = sized(w(56, 72), 8)
         check(C.mln_acquired_frame_get_webgpu_texture(handle, out, diagnostic))

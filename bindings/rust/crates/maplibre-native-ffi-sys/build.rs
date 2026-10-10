@@ -706,9 +706,18 @@ mod download {
         );
     }
 
+    /// Headers in the checkout's domain directory that the install leaves out.
+    /// Keep in sync with the `EXCLUDE` patterns in `cmake/mln_ffi_install.cmake`
+    /// and `_uninstalledHeaders` in the Dart binding's `hook/build.dart`.
+    const UNINSTALLED_HEADERS: [&str; 2] = [
+        "maplibre_native_c/callback_adapter.h",
+        "maplibre_native_c/callback_capture_generated.h",
+    ];
+
     /// Digests the public C headers, keyed by their path under `include/`.
     /// Render backend dependencies install their own headers alongside ours, so
-    /// this covers only the umbrella header and its domain directory.
+    /// this covers only the umbrella header and its domain directory, less the
+    /// binding-internal headers that the install leaves out.
     fn public_headers(include_dir: &Path) -> Option<BTreeMap<String, String>> {
         let umbrella = include_dir.join("maplibre_native_c.h");
         if !umbrella.is_file() {
@@ -740,6 +749,7 @@ mod download {
             if path.is_dir() {
                 collect_headers(&path, &key, headers);
             } else if path.extension().is_some_and(|extension| extension == "h")
+                && !UNINSTALLED_HEADERS.contains(&key.as_str())
                 && let Ok(contents) = fs::read(&path)
             {
                 headers.insert(key, hex(&Sha256::digest(contents)));

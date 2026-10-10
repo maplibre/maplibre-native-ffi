@@ -23,6 +23,7 @@ from tools.bindgen.semantic import (
     OperationPlan,
     output_member,
     public_stem,
+    view_support,
 )
 
 from . import dotnet_native
@@ -1193,5 +1194,10 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    result = emit(api)
-    return {"generated": list(result.functions), "unsupported": result.unsupported}
+    bound = compile_api(api)
+    result = emit(bound)
+    return {
+        "generated": list(result.functions),
+        "support": view_support(bound, result.functions),
+        "unsupported": result.unsupported,
+    }

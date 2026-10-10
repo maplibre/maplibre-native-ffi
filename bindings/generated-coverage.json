@@ -315,6 +315,7 @@
     "include/maplibre_native_c/callback_capture_generated.h",
     "src/c_api/callback_capture_generated.inc",
     "src/c_api/callback_port_generated.inc",
+    "src/completion/completion_result_generated.inc",
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc"
   ],
   "function_count": 297,
@@ -587,6 +588,10 @@
         "mln_webgpu_surface_descriptor_default",
         "mln_webgpu_surface_set_target"
       ],
+      "support": {
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+      },
       "unsupported": {}
     },
     "dotnet": {
@@ -855,6 +860,10 @@
         "mln_webgpu_surface_descriptor_default",
         "mln_webgpu_surface_set_target"
       ],
+      "support": {
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+      },
       "unsupported": {}
     },
     "go": {
@@ -1123,6 +1132,10 @@
         "mln_webgpu_surface_descriptor_default",
         "mln_webgpu_surface_set_target"
       ],
+      "support": {
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+      },
       "unsupported": {}
     },
     "kotlin": {
@@ -1391,6 +1404,10 @@
         "mln_webgpu_surface_descriptor_default",
         "mln_webgpu_surface_set_target"
       ],
+      "support": {
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+      },
       "unsupported": {}
     },
     "python": {
@@ -1619,6 +1636,8 @@
       ],
       "support": {
         "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" },
         "mln_animation_options_default": { "default": "mln_animation_options" },
         "mln_bound_options_default": { "default": "mln_bound_options" },
         "mln_camera_delta_default": { "default": "mln_camera_delta" },
@@ -1981,6 +2000,10 @@
         "mln_webgpu_surface_descriptor_default",
         "mln_webgpu_surface_set_target"
       ],
+      "support": {
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+      },
       "unsupported": {}
     },
     "swift": {
@@ -2249,6 +2272,10 @@
         "mln_webgpu_surface_descriptor_default",
         "mln_webgpu_surface_set_target"
       ],
+      "support": {
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+      },
       "unsupported": {}
     },
     "zig": {
@@ -2517,13 +2544,15 @@
         "mln_webgpu_surface_descriptor_default",
         "mln_webgpu_surface_set_target"
       ],
+      "support": {
+        "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+        "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" }
+      },
       "unsupported": {}
     }
   },
-  "public_function_count": 263,
+  "public_function_count": 265,
   "runtime_exports": [
-    "mln_adapter_acquired_frame_view_begin",
-    "mln_adapter_acquired_frame_view_end",
     "mln_adapter_arena_adopt_handle",
     "mln_adapter_arena_adopt_release",
     "mln_adapter_arena_allocate",
@@ -2563,6 +2592,8 @@
     "resolved_operations": 263,
     "support_relations": {
       "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },
+      "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
+      "mln_acquired_frame_view_end": { "view": "mln_acquired_frame" },
       "mln_animation_options_default": { "default": "mln_animation_options" },
       "mln_bound_options_default": { "default": "mln_bound_options" },
       "mln_camera_delta_default": { "default": "mln_camera_delta" },

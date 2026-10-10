@@ -9528,8 +9528,8 @@ generated_owner!(
     |py, owner| GeneratedReadScope::with_native::<sys::mln_acquired_frame, _>(
         py,
         Arc::clone(&owner.state),
-        sys::mln_adapter_acquired_frame_view_begin,
-        sys::mln_adapter_acquired_frame_view_end
+        sys::mln_acquired_frame_view_begin,
+        sys::mln_acquired_frame_view_end
     )
 );
 generated_owner!(

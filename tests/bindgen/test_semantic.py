@@ -5,7 +5,7 @@ import unittest
 from support import parse
 
 from tools.bindgen.model import ModelError
-from tools.bindgen.semantic import DefaultSupport, DisposeSupport, bind
+from tools.bindgen.semantic import DefaultSupport, DisposeSupport, ViewSupport, bind
 
 
 class SemanticTests(unittest.TestCase):
@@ -374,6 +374,15 @@ BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("
 """
         api = bind(self.parse(source), require_complete=True)
         view = api.operations_by_name["child_get_view"].view
+        # The scope operations back the view and never become public members.
+        self.assertEqual(
+            {plan.name: plan.support for plan in api.view_scopes},
+            {
+                "child_begin": ViewSupport(api.handles["child"]),
+                "child_end": ViewSupport(api.handles["child"]),
+            },
+        )
+        self.assertTrue({"child_begin", "child_end"}.isdisjoint(api.operations_by_name))
         self.assertEqual(view.owner_parameter, "owner")
         self.assertEqual(view.owner.native, "child")
         self.assertEqual(

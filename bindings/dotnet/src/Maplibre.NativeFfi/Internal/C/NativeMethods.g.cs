@@ -61,14 +61,14 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_adapter_acquired_frame_view_begin(
+    internal static partial mln_status mln_acquired_frame_view_begin(
         MlnAcquiredFrame frame,
         void** out_scope,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial void mln_adapter_acquired_frame_view_end(void* scope);
+    internal static partial void mln_acquired_frame_view_end(void* scope);
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_android_init(

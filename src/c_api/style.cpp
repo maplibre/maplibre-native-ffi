@@ -150,16 +150,19 @@ struct OwnedCallbackSourceOptions {
   }
 };
 
+// Checks that a view's bytes are readable: a null pointer is valid only with
+// size 0. The diagnostic names the view.
 auto valid_view(mln_buffer_view view, const char* name) -> bool {
   if (view.data == nullptr && view.size != 0) {
-    mln::core::set_thread_error(name);
+    mln::core::set_thread_error((std::string{name} + " is invalid").c_str());
     return false;
   }
   return true;
 }
 
 // Checks a view that must name at least one byte, and records which way it
-// failed.
+// failed. Every ID, URL, and JSON input takes this check before submission, so
+// the map worker never sees an empty one.
 auto valid_non_empty_view(mln_buffer_view view, const char* name) -> bool {
   if (view.size == 0) {
     mln::core::set_thread_error(
@@ -167,16 +170,23 @@ auto valid_non_empty_view(mln_buffer_view view, const char* name) -> bool {
     );
     return false;
   }
-  return valid_view(view, (std::string{name} + " is invalid").c_str());
+  return valid_view(view, name);
 }
 
-// Checks that a tile URL list is present when it has entries.
+// Checks a tile URL list: at least one entry, each naming at least one byte.
 auto valid_tile_urls(const mln_buffer_view* tiles, size_t tile_count) -> bool {
-  if (tile_count != 0 && tiles == nullptr) {
-    mln::core::set_thread_error(
-      "tiles must not be null when tile_count is nonzero"
-    );
+  if (tile_count == 0) {
+    mln::core::set_thread_error("tile_count must be greater than 0");
     return false;
+  }
+  if (tiles == nullptr) {
+    mln::core::set_thread_error("tiles must not be null");
+    return false;
+  }
+  for (size_t index = 0; index < tile_count; ++index) {
+    if (!valid_non_empty_view(tiles[index], "tile URL")) {
+      return false;
+    }
   }
   return true;
 }
@@ -205,7 +215,7 @@ auto add_callback_source(
 ) -> mln_status {
   using Owned = OwnedCallbackSourceOptions<Options>;
   if (
-    !valid_view(source_id, "source_id is invalid") ||
+    !valid_non_empty_view(source_id, "source_id") ||
     validate(options) != MLN_STATUS_OK
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -238,16 +248,17 @@ auto add_callback_source(
 using TextCopy = std::function<
   mln_status(mln::core::MapObject&, mln_buffer_view, std::string&)>;
 
+template <auto Function>
 auto start_text_copy(
-  mln_map map, mln_buffer_view id, mln::core::StyleOperationKind kind,
-  TextCopy copy, const mln_completion* completion
+  mln_map map, mln_buffer_view layer_id, TextCopy copy,
+  const mln_completion* completion
 ) -> mln_status {
-  if (!valid_view(id, "style ID is invalid")) {
+  if (!valid_non_empty_view(layer_id, "layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto owned = OwnedView{id};
-  return mln::core::start_style_operation(
-    map, kind,
+  auto owned = OwnedView{layer_id};
+  return mln::core::start_style_operation<Function>(
+    map,
     [owned = std::move(owned), copy = std::move(copy)](
       mln::core::MapObject& live, mln::core::StyleOperationResult& result
     ) -> mln_status { return copy(live, owned.view(), result.bytes); },
@@ -355,8 +366,8 @@ auto mln_map_add_style_source_json(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(source_id, "source_id is invalid") ||
-      !valid_view(source_json, "source_json is invalid")
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(source_json, "source_json")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -380,7 +391,7 @@ auto mln_map_remove_style_source(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
@@ -399,12 +410,12 @@ auto mln_map_get_style_source_info(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::SourceInfo,
+    return mln::core::start_style_operation<&mln_map_get_style_source_info>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -436,12 +447,13 @@ auto mln_map_copy_style_source_attribution(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::SourceAttribution,
+    return mln::core::start_style_operation<
+      &mln_map_copy_style_source_attribution>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -459,12 +471,12 @@ auto mln_map_copy_style_source_url(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::SourceUrl,
+    return mln::core::start_style_operation<&mln_map_copy_style_source_url>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -482,12 +494,13 @@ auto mln_map_get_style_source_tile_urls(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::SourceTileUrls,
+    return mln::core::start_style_operation<
+      &mln_map_get_style_source_tile_urls>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -504,8 +517,8 @@ auto mln_map_list_style_source_ids(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::SourceIds,
+    return mln::core::start_style_operation<&mln_map_list_style_source_ids>(
+      map,
       [](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -516,38 +529,6 @@ auto mln_map_list_style_source_ids(
   });
 }
 
-#define MLN_GEOJSON_COMMAND(NAME, CORE)                                       \
-  auto NAME(                                                                  \
-    mln_map map, mln_buffer_view source_id, mln_buffer_view input,            \
-    const mln_geojson_source_options* options,                                \
-    const mln_completion* completion, mln_diagnostic* out_diagnostic          \
-  ) noexcept -> mln_status {                                                  \
-    return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {  \
-      if (                                                                    \
-        !valid_view(source_id, "source_id is invalid") ||                     \
-        !valid_view(input, "source input is invalid") ||                      \
-        mln::core::validate_geojson_command_options(options) != MLN_STATUS_OK \
-      ) {                                                                     \
-        return MLN_STATUS_INVALID_ARGUMENT;                                   \
-      }                                                                       \
-      auto id = OwnedView{source_id};                                         \
-      auto owned_input = OwnedView{input};                                    \
-      auto owned_options = OwnedGeoJSONOptions{options};                      \
-      return mln::core::submit_map_command(                                   \
-        map,                                                                  \
-        [id = std::move(id), input = std::move(owned_input),                  \
-         options = std::move(owned_options)](mln::core::MapObject& live)      \
-          -> mln_status {                                                     \
-          const auto source_options = options.options();                      \
-          return mln::core::CORE(                                             \
-            live, id.view(), input.view(), &source_options                    \
-          );                                                                  \
-        },                                                                    \
-        completion                                                            \
-      );                                                                      \
-    });                                                                       \
-  }
-
 #define MLN_TILE_URL_COMMAND(NAME, CORE, KIND)                               \
   auto NAME(                                                                 \
     mln_map map, mln_buffer_view source_id, mln_buffer_view url,             \
@@ -556,8 +537,8 @@ auto mln_map_list_style_source_ids(
   ) noexcept -> mln_status {                                                 \
     return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status { \
       if (                                                                   \
-        !valid_view(source_id, "source_id is invalid") ||                    \
-        !valid_view(url, "url is invalid") ||                                \
+        !valid_non_empty_view(source_id, "source_id") ||                     \
+        !valid_non_empty_view(url, "url") ||                                 \
         mln::core::validate_tile_command_options(options, KIND) !=           \
           MLN_STATUS_OK                                                      \
       ) {                                                                    \
@@ -589,7 +570,7 @@ auto mln_map_list_style_source_ids(
   ) noexcept -> mln_status {                                                 \
     return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status { \
       if (                                                                   \
-        !valid_view(source_id, "source_id is invalid") ||                    \
+        !valid_non_empty_view(source_id, "source_id") ||                     \
         !valid_tile_urls(tiles, tile_count) ||                               \
         mln::core::validate_tile_command_options(options, KIND) !=           \
           MLN_STATUS_OK                                                      \
@@ -600,9 +581,6 @@ auto mln_map_list_style_source_ids(
       auto owned_tiles = std::vector<OwnedView>{};                           \
       owned_tiles.reserve(tile_count);                                       \
       for (size_t index = 0; index < tile_count; ++index) {                  \
-        if (!valid_view(tiles[index], "tile URL is invalid")) {              \
-          return MLN_STATUS_INVALID_ARGUMENT;                                \
-        }                                                                    \
         owned_tiles.emplace_back(tiles[index]);                              \
       }                                                                      \
       auto owned_options = OwnedTileOptions{options};                        \
@@ -626,7 +604,36 @@ auto mln_map_list_style_source_ids(
     });                                                                      \
   }
 
-MLN_GEOJSON_COMMAND(mln_map_add_geojson_source_url, map_add_geojson_source_url)
+auto mln_map_add_geojson_source_url(
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  const mln_geojson_source_options* options, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(url, "url") ||
+      mln::core::validate_geojson_command_options(options) != MLN_STATUS_OK
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto id = OwnedView{source_id};
+    auto owned_url = OwnedView{url};
+    auto owned_options = OwnedGeoJSONOptions{options};
+    return mln::core::submit_map_command(
+      map,
+      [id = std::move(id), url = std::move(owned_url),
+       options =
+         std::move(owned_options)](mln::core::MapObject& live) -> mln_status {
+        const auto source_options = options.options();
+        return mln::core::map_add_geojson_source_url(
+          live, id.view(), url.view(), &source_options
+        );
+      },
+      completion
+    );
+  });
+}
 
 auto mln_geojson_source_data_create(
   mln_buffer_view data, const mln_geojson_source_options* options,
@@ -647,7 +654,7 @@ auto mln_map_add_geojson_source_data(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     // The lease taken at submit keeps the prepared index alive until the
@@ -677,8 +684,8 @@ auto mln_map_set_geojson_source_url(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(source_id, "source_id is invalid") ||
-      !valid_view(url, "url is invalid")
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(url, "url")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -702,7 +709,7 @@ auto mln_map_set_geojson_source_data(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     // The lease taken at submit keeps the prepared index alive until the
@@ -731,7 +738,7 @@ auto mln_map_set_geojson_source_synchronous_tiling(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
@@ -752,7 +759,7 @@ auto mln_map_set_style_source_volatile(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(source_id, "source_id is invalid")) {
+    if (!valid_non_empty_view(source_id, "source_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{source_id};
@@ -814,6 +821,12 @@ auto mln_map_set_custom_geometry_source_tile_data(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_non_empty_view(data, "data")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{source_id};
     auto owned = OwnedView{data};
     return mln::core::submit_map_command(
@@ -834,6 +847,9 @@ auto mln_map_invalidate_custom_geometry_source_tile(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(source_id, "source_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{source_id};
     return mln::core::submit_map_command(
       map,
@@ -852,6 +868,9 @@ auto mln_map_invalidate_custom_geometry_source_region(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(source_id, "source_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{source_id};
     return mln::core::submit_map_command(
       map,
@@ -884,6 +903,11 @@ auto mln_map_set_custom_mvt_vector_source_tile_data(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(source_id, "source_id") || !valid_view(data, "data")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{source_id};
     auto owned = OwnedView{data};
     return mln::core::submit_map_command(
@@ -905,6 +929,12 @@ auto mln_map_set_custom_mvt_vector_source_tile_error(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(source_id, "source_id") ||
+      !valid_view(message, "message")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{source_id};
     auto owned = OwnedView{message};
     return mln::core::submit_map_command(
@@ -925,6 +955,9 @@ auto mln_map_invalidate_custom_mvt_vector_source_tile(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(source_id, "source_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{source_id};
     return mln::core::submit_map_command(
       map,
@@ -940,7 +973,6 @@ auto mln_map_invalidate_custom_mvt_vector_source_tile(
 
 #undef MLN_TILE_LIST_COMMAND
 #undef MLN_TILE_URL_COMMAND
-#undef MLN_GEOJSON_COMMAND
 
 auto mln_map_set_style_image(
   mln_map map, mln_buffer_view image_id,
@@ -981,7 +1013,7 @@ auto mln_map_remove_style_image(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(image_id, "image_id is invalid")) {
+    if (!valid_non_empty_view(image_id, "image_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{image_id};
@@ -1000,9 +1032,12 @@ auto mln_map_get_style_image_info(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(image_id, "image_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{image_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::ImageInfo,
+    return mln::core::start_style_operation<&mln_map_get_style_image_info>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1030,9 +1065,13 @@ auto mln_map_copy_style_image_stretches(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(image_id, "image_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{image_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::ImageStretches,
+    return mln::core::start_style_operation<
+      &mln_map_copy_style_image_stretches>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1050,9 +1089,13 @@ auto mln_map_copy_style_image_premultiplied_rgba8(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(image_id, "image_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{image_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::ImagePixels,
+    return mln::core::start_style_operation<
+      &mln_map_copy_style_image_premultiplied_rgba8>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1223,9 +1266,13 @@ auto mln_map_get_image_source_coordinates(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(source_id, "source_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{source_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::ImageCoordinates,
+    return mln::core::start_style_operation<
+      &mln_map_get_image_source_coordinates>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1245,6 +1292,13 @@ auto mln_map_get_image_source_coordinates(
     mln_diagnostic* out_diagnostic                                           \
   ) noexcept -> mln_status {                                                 \
     return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status { \
+      if (                                                                   \
+        !valid_non_empty_view(layer_id, "layer_id") ||                       \
+        !valid_non_empty_view(source_id, "source_id") ||                     \
+        !valid_view(before_layer_id, "before_layer_id")                      \
+      ) {                                                                    \
+        return MLN_STATUS_INVALID_ARGUMENT;                                  \
+      }                                                                      \
       auto layer = OwnedView{layer_id};                                      \
       auto source = OwnedView{source_id};                                    \
       auto before = OwnedView{before_layer_id};                              \
@@ -1274,6 +1328,12 @@ auto mln_map_add_location_indicator_layer(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      !valid_view(before_layer_id, "before_layer_id")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{layer_id};
     auto before = OwnedView{before_layer_id};
     return mln::core::submit_map_command(
@@ -1296,8 +1356,9 @@ auto mln_map_set_location_indicator_location(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
+      !valid_non_empty_view(layer_id, "layer_id") ||
       mln::core::validate_location_indicator_location_command(
-        layer_id, coordinate, altitude
+        coordinate, altitude
       ) != MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -1322,9 +1383,9 @@ auto mln_map_set_location_indicator_bearing(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      mln::core::validate_location_indicator_bearing_command(
-        layer_id, bearing
-      ) != MLN_STATUS_OK
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      mln::core::validate_location_indicator_bearing_command(bearing) !=
+        MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1347,9 +1408,9 @@ auto mln_map_set_location_indicator_accuracy_radius(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      mln::core::validate_location_indicator_accuracy_radius_command(
-        layer_id, radius
-      ) != MLN_STATUS_OK
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      mln::core::validate_location_indicator_accuracy_radius_command(radius) !=
+        MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1373,9 +1434,10 @@ auto mln_map_set_location_indicator_image_name(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      mln::core::validate_location_indicator_image_name_command(
-        layer_id, image_kind, image_id
-      ) != MLN_STATUS_OK
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      !valid_non_empty_view(image_id, "image_id") ||
+      mln::core::validate_location_indicator_image_kind(image_kind) !=
+        MLN_STATUS_OK
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1399,8 +1461,8 @@ auto mln_map_add_style_layer_json(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(layer_json, "layer_json is invalid") ||
-      !valid_view(before_layer_id, "before_layer_id is invalid")
+      !valid_non_empty_view(layer_json, "layer_json") ||
+      !valid_view(before_layer_id, "before_layer_id")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1424,7 +1486,7 @@ auto mln_map_remove_style_layer(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(layer_id, "layer_id is invalid")) {
+    if (!valid_non_empty_view(layer_id, "layer_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{layer_id};
@@ -1443,12 +1505,12 @@ auto mln_map_get_style_layer_info(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(layer_id, "layer_id is invalid")) {
+    if (!valid_non_empty_view(layer_id, "layer_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{layer_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::LayerInfo,
+    return mln::core::start_style_operation<&mln_map_get_style_layer_info>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1475,8 +1537,8 @@ auto mln_map_list_style_layers(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::Layers,
+    return mln::core::start_style_operation<&mln_map_list_style_layers>(
+      map,
       [](mln::core::MapObject& live, mln::core::StyleOperationResult& result) {
         return mln::core::map_list_style_layers(live, result.layers);
       },
@@ -1489,8 +1551,8 @@ auto mln_map_list_style_layer_ids(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::LayerIds,
+    return mln::core::start_style_operation<&mln_map_list_style_layer_ids>(
+      map,
       [](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1507,8 +1569,8 @@ auto mln_map_move_style_layer(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(layer_id, "layer_id is invalid") ||
-      !valid_view(before_layer_id, "before_layer_id is invalid")
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      !valid_view(before_layer_id, "before_layer_id")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1530,12 +1592,12 @@ auto mln_map_get_style_layer_json(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(layer_id, "layer_id is invalid")) {
+    if (!valid_non_empty_view(layer_id, "layer_id")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{layer_id};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::LayerJson,
+    return mln::core::start_style_operation<&mln_map_get_style_layer_json>(
+      map,
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1557,7 +1619,7 @@ auto mln_map_set_style_light_json(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(light_json, "light_json is invalid")) {
+    if (!valid_non_empty_view(light_json, "light_json")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto json = OwnedView{light_json};
@@ -1577,8 +1639,8 @@ auto mln_map_set_global_state_property(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(property_name, "property_name is invalid") ||
-      !valid_view(value, "value is invalid")
+      !valid_view(property_name, "property_name") ||
+      !valid_non_empty_view(value, "value")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1601,8 +1663,8 @@ auto mln_map_get_global_state(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::GlobalState,
+    return mln::core::start_style_operation<&mln_map_get_global_state>(
+      map,
       [](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1622,8 +1684,8 @@ auto mln_map_set_style_light_property(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(property_name, "property_name is invalid") ||
-      !valid_view(value, "value is invalid")
+      !valid_non_empty_view(property_name, "property_name") ||
+      !valid_non_empty_view(value, "value")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1647,12 +1709,12 @@ auto mln_map_get_style_light_property(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    if (!valid_view(property_name, "property_name is invalid")) {
+    if (!valid_non_empty_view(property_name, "property_name")) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto name = OwnedView{property_name};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::LightProperty,
+    return mln::core::start_style_operation<&mln_map_get_style_light_property>(
+      map,
       [name = std::move(name)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1698,8 +1760,9 @@ auto mln_map_get_style_transition_options(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::TransitionOptions,
+    return mln::core::start_style_operation<
+      &mln_map_get_style_transition_options>(
+      map,
       [](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1714,43 +1777,16 @@ auto mln_map_get_style_transition_options(
   });
 }
 
-#define MLN_STYLE_BUFFER_OPERATION(NAME, CORE, KIND)                          \
-  auto NAME(                                                                  \
-    mln_map map, mln_buffer_view id, const mln_completion* completion,        \
-    mln_diagnostic* out_diagnostic                                            \
-  ) noexcept -> mln_status {                                                  \
-    return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {  \
-      if (!valid_view(id, "style ID is invalid")) {                           \
-        return MLN_STATUS_INVALID_ARGUMENT;                                   \
-      }                                                                       \
-      auto owned = OwnedView{id};                                             \
-      return mln::core::start_style_operation(                                \
-        map, mln::core::StyleOperationKind::KIND,                             \
-        [owned = std::move(owned)](                                           \
-          mln::core::MapObject& live, mln::core::StyleOperationResult& result \
-        ) -> mln_status {                                                     \
-          auto buffer = mln_buffer{MLN_HANDLE_NULL};                          \
-          const auto status = mln::core::CORE(live, owned.view(), &buffer);   \
-          if (status != MLN_STATUS_OK) return status;                         \
-          if (buffer == MLN_HANDLE_NULL) return MLN_STATUS_OK;                \
-          result.found = true;                                                \
-          return take_buffer(buffer, result.bytes);                           \
-        },                                                                    \
-        completion                                                            \
-      );                                                                      \
-    });                                                                       \
-  }
-
 #define MLN_STYLE_SCALAR_COMMAND(NAME, CORE, TYPE)                           \
   auto NAME(                                                                 \
-    mln_map map, mln_buffer_view id, TYPE value,                             \
+    mln_map map, mln_buffer_view layer_id, TYPE value,                       \
     const mln_completion* completion, mln_diagnostic* out_diagnostic         \
   ) noexcept -> mln_status {                                                 \
     return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status { \
-      if (!valid_view(id, "style ID is invalid")) {                          \
+      if (!valid_non_empty_view(layer_id, "layer_id")) {                     \
         return MLN_STATUS_INVALID_ARGUMENT;                                  \
       }                                                                      \
-      auto owned = OwnedView{id};                                            \
+      auto owned = OwnedView{layer_id};                                      \
       return mln::core::submit_map_command(                                  \
         map,                                                                 \
         [owned = std::move(owned),                                           \
@@ -1769,9 +1805,9 @@ auto mln_map_set_layer_property(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(layer_id, "layer_id is invalid") ||
-      !valid_view(property_name, "property_name is invalid") ||
-      !valid_view(value, "value is invalid")
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      !valid_non_empty_view(property_name, "property_name") ||
+      !valid_non_empty_view(value, "value")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1797,15 +1833,15 @@ auto mln_map_get_layer_property(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(layer_id, "layer_id is invalid") ||
-      !valid_view(property_name, "property_name is invalid")
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      !valid_non_empty_view(property_name, "property_name")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     auto id = OwnedView{layer_id};
     auto name = OwnedView{property_name};
-    return mln::core::start_style_operation(
-      map, mln::core::StyleOperationKind::LayerProperty,
+    return mln::core::start_style_operation<&mln_map_get_layer_property>(
+      map,
       [id = std::move(id), name = std::move(name)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
@@ -1828,8 +1864,8 @@ auto mln_map_set_layer_filter(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      !valid_view(layer_id, "layer_id is invalid") ||
-      (filter != nullptr && !valid_view(*filter, "filter is invalid"))
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      (filter != nullptr && !valid_non_empty_view(*filter, "filter"))
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1854,15 +1890,44 @@ auto mln_map_set_layer_filter(
   });
 }
 
-MLN_STYLE_BUFFER_OPERATION(
-  mln_map_get_layer_filter, map_get_layer_filter, LayerFilter
-)
+auto mln_map_get_layer_filter(
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (!valid_non_empty_view(layer_id, "layer_id")) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    auto owned = OwnedView{layer_id};
+    return mln::core::start_style_operation<&mln_map_get_layer_filter>(
+      map,
+      [owned = std::move(owned)](
+        mln::core::MapObject& live, mln::core::StyleOperationResult& result
+      ) -> mln_status {
+        auto buffer = mln_buffer{MLN_HANDLE_NULL};
+        const auto status =
+          mln::core::map_get_layer_filter(live, owned.view(), &buffer);
+        if (status != MLN_STATUS_OK) return status;
+        if (buffer == MLN_HANDLE_NULL) return MLN_STATUS_OK;
+        result.found = true;
+        return take_buffer(buffer, result.bytes);
+      },
+      completion
+    );
+  });
+}
 
 auto mln_map_set_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_layer,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    if (
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      !valid_view(source_layer, "source_layer")
+    ) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
     auto id = OwnedView{layer_id};
     auto source = OwnedView{source_layer};
     return mln::core::submit_map_command(
@@ -1884,8 +1949,8 @@ auto mln_map_set_layer_source_id(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
-      mln::core::validate_layer_source_id_command(layer_id, source_id) !=
-      MLN_STATUS_OK
+      !valid_non_empty_view(layer_id, "layer_id") ||
+      !valid_non_empty_view(source_id, "source_id")
     ) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -1915,16 +1980,14 @@ MLN_STYLE_SCALAR_COMMAND(
 )
 
 #undef MLN_STYLE_SCALAR_COMMAND
-#undef MLN_STYLE_BUFFER_OPERATION
 
 auto mln_map_copy_layer_source_layer(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return start_text_copy(
-      map, layer_id, mln::core::StyleOperationKind::LayerSourceLayer,
-      mln::core::map_copy_layer_source_layer, completion
+    return start_text_copy<&mln_map_copy_layer_source_layer>(
+      map, layer_id, mln::core::map_copy_layer_source_layer, completion
     );
   });
 }
@@ -1934,9 +1997,8 @@ auto mln_map_copy_layer_source_id(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return start_text_copy(
-      map, layer_id, mln::core::StyleOperationKind::LayerSourceId,
-      mln::core::map_copy_layer_source_id, completion
+    return start_text_copy<&mln_map_copy_layer_source_id>(
+      map, layer_id, mln::core::map_copy_layer_source_id, completion
     );
   });
 }

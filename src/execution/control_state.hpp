@@ -1,6 +1,5 @@
 #pragma once
 
-#include <condition_variable>
 #include <cstddef>
 #include <functional>
 #include <mutex>
@@ -82,9 +81,12 @@ class ControlState {
     }
   }
 
+  // Returns whether the handle had already drained, in which case `callback`
+  // has run before the return. Otherwise it runs later, on the thread that
+  // retires the last lease or child.
   auto notify_when_drained(
     void (*callback)(void*) noexcept, void* context
-  ) noexcept -> void {
+  ) noexcept -> bool {
     bool ready;
     {
       const auto lock = std::scoped_lock{mutex_};
@@ -95,21 +97,7 @@ class ControlState {
       }
     }
     if (ready) callback(context);
-  }
-
-  // Blocks until no submission lease is outstanding. When one is, it first
-  // calls `before_wait` once, outside the control lock.
-  auto wait_for_submissions(void (*before_wait)() noexcept = nullptr) noexcept
-    -> void {
-    auto lock = std::unique_lock{mutex_};
-    if (before_wait != nullptr && submissions_ != 0) {
-      lock.unlock();
-      before_wait();
-      lock.lock();
-    }
-    condition_.wait(lock, [this]() noexcept -> bool {
-      return submissions_ == 0;
-    });
+    return ready;
   }
 
   [[nodiscard]] auto is_closing() const noexcept -> bool {
@@ -132,7 +120,6 @@ class ControlState {
         context = drained_context_;
       }
     }
-    condition_.notify_all();
     if (callback != nullptr) callback(context);
     if (drained) {
       try {
@@ -144,7 +131,6 @@ class ControlState {
   }
 
   mutable std::mutex mutex_;
-  std::condition_variable condition_;
   std::size_t submissions_ = 0;
   std::size_t children_ = 0;
   bool closing_ = false;

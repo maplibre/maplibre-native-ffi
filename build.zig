@@ -245,7 +245,6 @@ fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
     return header.add("maplibre_native_c_import.h",
         \\#include <maplibre_native_c.h>
         \\#include <maplibre_native_c/plugin.h>
-        \\#include <maplibre_native_c/callback_adapter.h>
         \\
     );
 }

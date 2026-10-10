@@ -233,6 +233,8 @@ struct RuntimeObject {
   RetirementTask disposal_task;
   RetirementTask disposal_worker_task;
   std::shared_ptr<RuntimeObject> disposal_owner;
+  // Reported by the disposal lane once retirement finishes; null for dispose.
+  std::shared_ptr<Completion> release_completion;
   bool disposal_state_retired = false;
   std::atomic_bool disposal_requested = false;
   bool disposal_drained = false;
@@ -241,6 +243,8 @@ struct RuntimeObject {
   // The single commit point for commands, operations, barriers, and close.
   std::mutex submission_mutex;
   std::mutex terminal_mutex;
+  // Signals only disposal_state_retired, to the disposal lane task that waits
+  // for the worker to release its reachable state.
   std::condition_variable terminal_condition;
   uint64_t next_submission_sequence = 1;
   std::set<uint64_t> pending_submissions;

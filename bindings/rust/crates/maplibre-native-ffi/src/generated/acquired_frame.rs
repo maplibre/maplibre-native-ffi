@@ -26,8 +26,8 @@ impl AcquiredFrameHandle {
         let mut call = self.inner.read("mln_acquired_frame_get_metal_texture")?;
         unsafe {
             call.view(
-                sys::mln_adapter_acquired_frame_view_begin,
-                sys::mln_adapter_acquired_frame_view_end,
+                sys::mln_acquired_frame_view_begin,
+                sys::mln_acquired_frame_view_end,
             )
         }?;
         let mut out_frame: sys::mln_metal_owned_texture_frame = unsafe { std::mem::zeroed() };
@@ -47,8 +47,8 @@ impl AcquiredFrameHandle {
         let mut call = self.inner.read("mln_acquired_frame_get_opengl_texture")?;
         unsafe {
             call.view(
-                sys::mln_adapter_acquired_frame_view_begin,
-                sys::mln_adapter_acquired_frame_view_end,
+                sys::mln_acquired_frame_view_begin,
+                sys::mln_acquired_frame_view_end,
             )
         }?;
         let mut out_frame: sys::mln_opengl_owned_texture_frame = unsafe { std::mem::zeroed() };
@@ -65,8 +65,8 @@ impl AcquiredFrameHandle {
         let mut call = self.inner.read("mln_acquired_frame_get_producer_sync")?;
         unsafe {
             call.view(
-                sys::mln_adapter_acquired_frame_view_begin,
-                sys::mln_adapter_acquired_frame_view_end,
+                sys::mln_acquired_frame_view_begin,
+                sys::mln_acquired_frame_view_end,
             )
         }?;
         let mut out_sync: sys::mln_gpu_sync = unsafe { sys::mln_gpu_sync_default() };
@@ -97,8 +97,8 @@ impl AcquiredFrameHandle {
         let mut call = self.inner.read("mln_acquired_frame_get_vulkan_texture")?;
         unsafe {
             call.view(
-                sys::mln_adapter_acquired_frame_view_begin,
-                sys::mln_adapter_acquired_frame_view_end,
+                sys::mln_acquired_frame_view_begin,
+                sys::mln_acquired_frame_view_end,
             )
         }?;
         let mut out_frame: sys::mln_vulkan_owned_texture_frame = unsafe { std::mem::zeroed() };
@@ -118,8 +118,8 @@ impl AcquiredFrameHandle {
         let mut call = self.inner.read("mln_acquired_frame_get_webgpu_texture")?;
         unsafe {
             call.view(
-                sys::mln_adapter_acquired_frame_view_begin,
-                sys::mln_adapter_acquired_frame_view_end,
+                sys::mln_acquired_frame_view_begin,
+                sys::mln_acquired_frame_view_end,
             )
         }?;
         let mut out_frame: sys::mln_webgpu_owned_texture_frame = unsafe { std::mem::zeroed() };

@@ -51,7 +51,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
         try
         {
             Check(
@@ -68,7 +68,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         finally
         {
             viewScope.Expire();
-            NativeMethods.mln_adapter_acquired_frame_view_end(token);
+            NativeMethods.mln_acquired_frame_view_end(token);
         }
     }
 
@@ -82,7 +82,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
         try
         {
             Check(
@@ -99,7 +99,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         finally
         {
             viewScope.Expire();
-            NativeMethods.mln_adapter_acquired_frame_view_end(token);
+            NativeMethods.mln_acquired_frame_view_end(token);
         }
     }
 
@@ -110,7 +110,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
         try
         {
             Check(
@@ -125,7 +125,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         finally
         {
             viewScope.Expire();
-            NativeMethods.mln_adapter_acquired_frame_view_end(token);
+            NativeMethods.mln_acquired_frame_view_end(token);
         }
     }
 
@@ -150,7 +150,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
         try
         {
             Check(
@@ -167,7 +167,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         finally
         {
             viewScope.Expire();
-            NativeMethods.mln_adapter_acquired_frame_view_end(token);
+            NativeMethods.mln_acquired_frame_view_end(token);
         }
     }
 
@@ -181,7 +181,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
-        Check(NativeMethods.mln_adapter_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
+        Check(NativeMethods.mln_acquired_frame_view_begin(read.Handle, &token, Diagnostic));
         try
         {
             Check(
@@ -198,7 +198,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         finally
         {
             viewScope.Expire();
-            NativeMethods.mln_adapter_acquired_frame_view_end(token);
+            NativeMethods.mln_acquired_frame_view_end(token);
         }
     }
 
