@@ -939,6 +939,7 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  *   small, options->flags or options->event_mask holds unknown bits, the wake
  *   descriptor is invalid, or out_runtime is null or does not point to the null
  *   handle.
+ * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
  */
 MLN_API mln_status mln_runtime_create(

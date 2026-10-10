@@ -9,9 +9,38 @@ if(NOT EMSCRIPTEN)
   return()
 endif()
 
-# The pool holds one thread beyond MapLibre's workers for the process-wide map
-# teardown lane, which starts before any map's worker pool.
-set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "17"
+# Emscripten pre-spawns this many Web Workers while the page loads. The pool is
+# not a cap. Once it is empty, pthread_create() asks the browser main thread for
+# a new Worker, and the thread starts when the main thread next yields. The one
+# call that waits for a new thread to start, mln_runtime_create(), returns
+# MLN_STATUS_WRONG_THREAD on the browser main thread, so the size sets only how
+# soon threads start. The default covers one host thread that drives one runtime
+# with one map, one GeoJSON source, and one render session, so such a page
+# starts every thread without waiting for a Worker. A host that runs more
+# raises the size.
+#
+# The thread that calls into the library, such as main() under
+# -sPROXY_TO_PTHREAD.
+set(_mln_pool_host 1)
+# MapLibre's background ThreadPool, a ParallelScheduler(3) of four threads that
+# every map shares.
+set(_mln_pool_maplibre_workers 4)
+# MapLibre's sequenced schedulers: one for logging and one for the first
+# GeoJSON source. Further GeoJSON sources take up to eight more.
+set(_mln_pool_maplibre_sequenced 2)
+# The process-wide map teardown, session teardown, and runtime disposal lanes.
+set(_mln_pool_lanes 3)
+# The browser HTTP transport thread, which issues every fetch.
+set(_mln_pool_transport 1)
+# Each runtime's executor, plus the util::Thread of each file source its first
+# map creates: the resource loader, asset, database, local file, network,
+# MBTiles, and PMTiles sources.
+set(_mln_pool_per_runtime 8)
+# Each render session's core worker.
+set(_mln_pool_per_session 1)
+math(EXPR _mln_pool_default
+     "${_mln_pool_host} + ${_mln_pool_maplibre_workers} + ${_mln_pool_maplibre_sequenced} + ${_mln_pool_lanes} + ${_mln_pool_transport} + ${_mln_pool_per_runtime} + ${_mln_pool_per_session}")
+set(MLN_FFI_EMSCRIPTEN_PTHREAD_POOL_SIZE "${_mln_pool_default}"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
 set(MLN_FFI_EMSCRIPTEN_INITIAL_MEMORY "512MB"
     CACHE STRING "Initial WASM linear memory")

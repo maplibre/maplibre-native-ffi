@@ -35,7 +35,9 @@
 #include <mln/util/geo.hpp>
 #include <mln/util/run_loop.hpp>
 
-#include "runtime/runtime.hpp"
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/threading.h>
+#endif
 
 #include "completion/completion.hpp"
 #include "diagnostics/diagnostics.hpp"
@@ -44,6 +46,7 @@
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
+#include "runtime/runtime.hpp"
 #include "testing/sync_point.hpp"
 #include "wake/wake.hpp"
 
@@ -1077,6 +1080,17 @@ auto create_runtime(
   if (options_status != MLN_STATUS_OK) {
     return options_status;
   }
+#if defined(__EMSCRIPTEN__)
+  // Creation blocks until the executor's worker starts, and the browser starts
+  // a worker only once its main thread yields, so the wait could hang there.
+  if (emscripten_is_main_browser_thread() != 0) {
+    set_thread_error(
+      "runtimes cannot be created on the browser main thread, which cannot "
+      "block; create them on a Web Worker"
+    );
+    return MLN_STATUS_WRONG_THREAD;
+  }
+#endif
   watch_process_exit();
   const auto event_wake = std::make_shared<Wake>(options->event_wake);
 
