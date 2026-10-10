@@ -96,6 +96,14 @@ static void projection_follows_committed_extent_viewport_and_mode(void) {
   MLN_TEST_AWAIT_OK(mln_map_resize(
     map, (mln_logical_extent){512, 256, 1.0}, &completion.descriptor, NULL
   ));
+  mln_camera_update padded = mln_camera_update_default();
+  padded.mode = MLN_CAMERA_UPDATE_MODE_JUMP;
+  padded.camera = mln_camera_options_default();
+  padded.camera.fields = MLN_CAMERA_OPTION_PADDING;
+  padded.camera.padding = (mln_edge_insets){.top = 40.0, .left = 100.0};
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &padded, &completion.descriptor, NULL)
+  );
   mln_projection_mode mode = mln_projection_mode_default();
   mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC;
   mode.axonometric = true;
@@ -127,6 +135,9 @@ static void projection_follows_committed_extent_viewport_and_mode(void) {
   const mln_lat_lng center = {
     .latitude = snapshot.camera.latitude, .longitude = snapshot.camera.longitude
   };
+  // Perspective mode draws the center at the middle of the padded area, at
+  // (306, 148). Axonometric mode ignores padding, so the center stays at the
+  // middle of the extent only when the projection copied that mode.
   const mln_screen_point centered = projected_pixel(projection, center);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 256.0, centered.x);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, 128.0, centered.y);

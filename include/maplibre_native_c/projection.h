@@ -27,7 +27,7 @@ extern "C" {
  * the null handle. This function never reads mutable MapLibre state and may be
  * called from any thread.
  *
- * This projection follows the map's latest committed state, while
+ * This projection copies the map's latest published snapshot, while
  * mln_render_session_projection_create() copies the transform of the last
  * frame the session drew. Hit-testing against what is on screen uses the
  * session's projection.
