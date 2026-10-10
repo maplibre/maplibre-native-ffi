@@ -5,6 +5,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import org.lwjgl.glfw.GLFW.glfwPostEmptyEvent
 import org.lwjgl.glfw.GLFW.glfwWaitEvents
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.FrameDemand
@@ -175,7 +176,7 @@ internal open class RenderTarget(
 
   /** Follows a resized host. The session resize carries the new extent to the map. */
   open fun resize(viewport: Viewport) {
-    session.resize(extent(viewport)).reportFailure("render session resize")
+    submit("render session resize") { session.resize(extent(viewport)) }
   }
 
   /** Releases the acquired frames that the target holds. */
@@ -377,11 +378,11 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
         throw error
       }
     // A target replacement leaves the map's extent unchanged.
-    map
-      .resize(
+    submit("map resize") {
+      map.resize(
         LogicalExtent(viewport.width().toUInt(), viewport.height().toUInt(), viewport.scaleFactor())
       )
-      .reportFailure("map resize")
+    }
     try {
       await(handover)
     } catch (error: RuntimeException) {
@@ -396,7 +397,22 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
   }
 }
 
-/** Prints the command's failure once it completes: an error, or a FAILED terminal disposition. */
+/**
+ * Submits a command without waiting on it. A rejection or a terminal failure is printed, so that
+ * one bad input or resize does not escape a GLFW callback or the event loop.
+ */
+internal inline fun submit(operation: String, command: () -> Deferred<CommandCompletion>) {
+  try {
+    command().reportFailure(operation)
+  } catch (error: MaplibreException) {
+    System.err.println("$operation rejected: $error")
+  }
+}
+
+/**
+ * Prints the command's failure once it completes: an error, or a FAILED terminal disposition. A
+ * superseded or cancelled command ended without failing, so it prints nothing.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun Deferred<CommandCompletion>.reportFailure(operation: String) {
   invokeOnCompletion { error ->

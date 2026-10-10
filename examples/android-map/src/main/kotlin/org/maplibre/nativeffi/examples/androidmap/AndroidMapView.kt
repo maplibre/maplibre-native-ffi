@@ -239,7 +239,7 @@ internal class AndroidMapView(
     val target = renderTarget?.takeIf { it.attached } ?: return null
     val state = mapState ?: return null
     val handover =
-      target.follow(state.map, currentGraphics, currentViewport) { error ->
+      target.follow(state, currentGraphics, currentViewport) { error ->
         // A failed handover may leave the session naming a destroyed surface, so close it; the next
         // surface attaches a new one.
         handler.post {

@@ -1,13 +1,18 @@
 package org.maplibre.nativeffi.examples.androidmap
 
+import android.util.Log
 import kotlin.math.pow
 import kotlin.math.round
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
 import org.maplibre.nativeffi.generated.CameraDeltaKind
 import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraUpdate
+import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GesturePhase
 import org.maplibre.nativeffi.generated.LatLng
@@ -18,6 +23,7 @@ import org.maplibre.nativeffi.generated.RuntimeEventMask
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.ScreenPoint
 import org.maplibre.nativeffi.generated.Wake
+import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * The runtime and its map. Commands go straight to the runtime's own thread, and the runtime raises
@@ -56,9 +62,12 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
           )
           .await()
       }
-      if (styleJson != null) map.setStyleJson(styleJson.encodeToByteArray())
-      else map.setStyleUrl(STYLE_URL)
-      map.updateCamera(CameraUpdate(camera = initialCamera))
+      // A rejection here fails construction; a terminal failure is only logged.
+      val style =
+        if (styleJson != null) map.setStyleJson(styleJson.encodeToByteArray())
+        else map.setStyleUrl(STYLE_URL)
+      style.logFailure("style load")
+      map.updateCamera(CameraUpdate(camera = initialCamera)).logFailure("initial camera")
     } catch (error: Throwable) {
       runBlocking {
         if (::ownedMap.isInitialized) ownedMap.release().await()
@@ -69,37 +78,37 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
   }
 
   fun cancelTransitions() {
-    map.cancelTransitions()
+    submit("camera transition cancel") { map.cancelTransitions() }
   }
 
   fun setGestureInProgress(inProgress: Boolean) {
-    map.updateCamera(
-      CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
-    )
+    submit("gesture update") {
+      map.updateCamera(
+        CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
+      )
+    }
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    map.applyCameraDelta(CameraDelta(offset = ScreenPoint(deltaX, deltaY)))
+    delta(CameraDelta(offset = ScreenPoint(deltaX, deltaY)))
   }
 
   fun scaleBy(scale: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
+    delta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
   }
 
   fun adjustBearing(degrees: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(
-      CameraDelta(kind = CameraDeltaKind.BEARING, amount = degrees, anchor = anchor)
-    )
+    delta(CameraDelta(kind = CameraDeltaKind.BEARING, amount = degrees, anchor = anchor))
   }
 
   fun adjustPitch(degrees: Double) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.PITCH, amount = degrees))
+    delta(CameraDelta(kind = CameraDeltaKind.PITCH, amount = degrees))
   }
 
   /** Eases to the next whole zoom level, as `round(zoom) + 1`, about [anchor]. */
   fun zoomToNextWholeLevel(anchor: ScreenPoint) {
     val zoom = map.cameraSnapshotGet().camera.zoom ?: 0.0
-    map.applyCameraDelta(
+    delta(
       CameraDelta(
         kind = CameraDeltaKind.SCALE,
         amount = 2.0.pow(round(zoom) + 1.0 - zoom),
@@ -110,13 +119,31 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
   }
 
   fun resize(viewport: Viewport) {
-    map.resize(
-      LogicalExtent(
-        viewport.logicalWidth.toUInt(),
-        viewport.logicalHeight.toUInt(),
-        viewport.scaleFactor,
+    submit("map resize") {
+      map.resize(
+        LogicalExtent(
+          viewport.logicalWidth.toUInt(),
+          viewport.logicalHeight.toUInt(),
+          viewport.scaleFactor,
+        )
       )
-    )
+    }
+  }
+
+  private fun delta(delta: CameraDelta) {
+    submit("camera delta") { map.applyCameraDelta(delta) }
+  }
+
+  /**
+   * Submits a command without waiting on it. A rejection or a terminal failure is logged, so that
+   * one bad input does not escape a touch or surface callback.
+   */
+  private inline fun submit(operation: String, command: () -> Deferred<CommandCompletion>) {
+    try {
+      command().logFailure(operation)
+    } catch (error: MaplibreException) {
+      Log.w(TAG, "$operation rejected", error)
+    }
   }
 
   private fun animation(durationMs: Double) = AnimationOptions(durationMs = durationMs)
@@ -144,3 +171,22 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
     private const val DOUBLE_TAP_DURATION_MS = 160.0
   }
 }
+
+private const val TAG = "MapLibreAndroidMap"
+
+/**
+ * Logs the command's failure once it completes: an error, or a FAILED terminal disposition. A
+ * superseded or cancelled command ended without failing, so it logs nothing.
+ */
+private fun Deferred<CommandCompletion>.logFailure(operation: String) {
+  invokeOnCompletion { error ->
+    (error ?: terminalFailure(operation))?.let { Log.w(TAG, "$operation failed", it) }
+  }
+}
+
+/** The failure that a completed command reports as its terminal disposition, or null. */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun Deferred<CommandCompletion>.terminalFailure(operation: String): Throwable? =
+  getCompleted()
+    .takeIf { it.disposition == CommandDisposition.FAILED }
+    ?.let { IllegalStateException("$operation failed: ${it.status}: ${it.diagnostic}") }

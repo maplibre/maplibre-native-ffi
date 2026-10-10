@@ -4,12 +4,9 @@ import android.util.Log
 import java.util.concurrent.Semaphore
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
-import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
@@ -18,7 +15,6 @@ import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.generated.Wake
-import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * A native-surface render session. A Vulkan session renders and presents on its core worker. An EGL
@@ -90,14 +86,15 @@ private constructor(
   /**
    * Points the session at the surface the graphics context presents through now, and at the
    * viewport. A session resize carries the map's extent itself. An EGL surface replacement changes
-   * only the graphics resource, so that path submits the map resize alongside it.
+   * only the graphics resource, so that path submits the map resize alongside it, and the map logs
+   * that resize's own rejection or failure.
    *
-   * The returned handover fails when native rejects a submission or the session's command fails. A
+   * The returned handover fails when native rejects the session's command or the command fails. A
    * caller whose outgoing surface is about to go passes the handover to [await], and a failure
    * otherwise reaches [onFailure].
    */
   fun follow(
-    map: MapHandle,
+    state: MapState,
     graphics: GraphicsContext,
     viewport: Viewport,
     onFailure: (Throwable) -> Unit,
@@ -113,19 +110,7 @@ private constructor(
               OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
             )
             .invokeOnCompletion(handover::settle)
-          val resize =
-            map.resize(
-              LogicalExtent(
-                viewport.logicalWidth.toUInt(),
-                viewport.logicalHeight.toUInt(),
-                viewport.scaleFactor,
-              )
-            )
-          resize.invokeOnCompletion { error ->
-            (error ?: resize.terminalFailure("map resize"))?.let { failure ->
-              Log.w(TAG, "resizing the map failed", failure)
-            }
-          }
+          state.resize(viewport)
         }
         is VulkanGraphicsContext -> {
           val resize = session.resize(viewport.extent)
@@ -257,10 +242,3 @@ private constructor(
 private fun CompletableDeferred<Unit>.settle(error: Throwable?) {
   if (error == null) complete(Unit) else completeExceptionally(error)
 }
-
-/** The failure that a completed command reports as its terminal disposition, or null. */
-@OptIn(ExperimentalCoroutinesApi::class)
-private fun Deferred<CommandCompletion>.terminalFailure(operation: String): Throwable? =
-  getCompleted()
-    .takeIf { it.disposition == CommandDisposition.FAILED }
-    ?.let { IllegalStateException("$operation failed: ${it.status}: ${it.diagnostic}") }
