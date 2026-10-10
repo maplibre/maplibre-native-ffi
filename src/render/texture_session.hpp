@@ -123,7 +123,7 @@ auto opengl_borrowed_texture_set_target_start(
   const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion
 ) -> mln_status;
-auto read_texture_start(
+auto texture_read_premultiplied_rgba8_start(
   mln_render_session texture, const mln_completion* completion
 ) -> mln_status;
 auto acquired_frame_get_metal_texture(

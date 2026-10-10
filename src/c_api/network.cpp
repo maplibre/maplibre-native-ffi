@@ -10,7 +10,7 @@ auto mln_network_get_status(
   std::uint32_t* out_status, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::network_get_status(out_status);
+    return mln::core::network_status_get(out_status);
   });
 }
 
@@ -18,6 +18,6 @@ auto mln_network_set_status(
   std::uint32_t status, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::network_set_status(status);
+    return mln::core::network_status_set(status);
   });
 }

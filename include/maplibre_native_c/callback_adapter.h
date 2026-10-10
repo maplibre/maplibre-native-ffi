@@ -570,7 +570,7 @@ MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
  * - MLN_STATUS_INVALID_ARGUMENT when a rule table or header array is null with
  *   a non-zero count.
  * - the first non-OK status from
- * mln_http_header_transform_response_set_header().
+ *   mln_http_header_transform_response_set_header().
  */
 MLN_BINDING(
   "callback_adapter=mln_http_header_transform_callback;"

@@ -228,7 +228,9 @@ auto mln_render_session_read_texture(
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::read_texture_start(session, completion);
+    return mln::core::texture_read_premultiplied_rgba8_start(
+      session, completion
+    );
   });
 }
 
