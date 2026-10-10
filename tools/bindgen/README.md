@@ -119,13 +119,21 @@ case and escapes keywords:
 | `OperationPlan.support` | The record default or handle disposal that the operation backs                              |
 
 `native_results.py` writes `src/completion/completion_result_generated.inc`,
-which specializes `CompletionResult` for each function with a value result. The
-specialization records the C type that `result=` names and whether the value is
-an array or nullable. The native core delivers every completion value through
-`CompletionValue<&function>` in `src/completion/completion_result.hpp`, which
-takes its value type and shape from that table. A call site whose value
-disagrees with the header fails to compile, so the native library delivers the
-type that every binding reads.
+which specializes `CompletionResult` for each completion function other than a
+command. The specialization records whether the header names a `result=` value,
+and for a value it records the C type and whether the value is an array or
+nullable. The native core delivers a success through one of two entry points in
+`src/completion/completion_result.hpp`, each named by its function:
+
+- `CompletionValue<&function>` delivers a value and takes its type and shape
+  from the table.
+- `valueless_completion<&function>()` completes a function with no value. Code
+  that several functions share takes this from each entry point.
+
+A success that disagrees with the header fails to compile, so the native library
+delivers the type that every binding reads. A failure carries no value and
+passes through `complete_failure`. Commands carry no value by schema and report
+their disposition through `complete_command`.
 
 ## Test a change
 

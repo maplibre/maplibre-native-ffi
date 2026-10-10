@@ -3,16 +3,20 @@
 #include <cstddef>
 #include <memory>
 #include <span>
+#include <string>
 
 #include "completion/completion.hpp"
 #include "maplibre_native_c.h"
 
 namespace mln::core {
 
-// The value that a completion function delivers, as its header declares it:
-// `type` is the C type that `result=` names, `array` reports `shape=array`, and
-// `nullable` reports `nullable=true`. tools/bindgen specializes it for each
-// function with a value result, so a function without one has no table entry.
+// The result that a completion function delivers, as its header declares it.
+// tools/bindgen specializes it for each completion function that is not a
+// command, and a function with no entry has no completion result to deliver.
+// `has_value` reports whether the header names a `result=`; when it does,
+// `type` is that C type, `array` reports `shape=array`, and `nullable` reports
+// `nullable=true`. Commands deliver no value by schema and complete through
+// complete_command instead.
 template <auto Function>
 struct CompletionResult;
 
@@ -21,10 +25,12 @@ struct CompletionResult;
 template <auto Function>
 class CompletionValue;
 
-// The type-erased delivery behind CompletionValue, which alone may call it.
+// The type-erased success behind CompletionValue and ValuelessCompletion,
+// which alone may call it.
 class ErasedCompletionValue final {
   template <auto Function>
   friend class CompletionValue;
+  friend class ValuelessCompletion;
 
   static auto deliver(
     const mln_completion& descriptor, const void* value, std::size_t count
@@ -37,6 +43,11 @@ class ErasedCompletionValue final {
 // nullable fails to compile.
 template <auto Function>
 class CompletionValue final {
+  static_assert(
+    CompletionResult<Function>::has_value,
+    "this function delivers no value; complete it through ValuelessCompletion"
+  );
+
  public:
   using Type = typename CompletionResult<Function>::type;
   static constexpr bool array = CompletionResult<Function>::array;
@@ -82,5 +93,42 @@ class CompletionValue final {
     });
   }
 };
+
+class ValuelessCompletion;
+
+template <auto Function>
+constexpr auto valueless_completion() noexcept -> ValuelessCompletion;
+
+// Completes a function whose header declares no value, delivering any status
+// with a null value. Only valueless_completion<&function>() makes one, and only
+// for such a function, so code shared by several functions takes one from each
+// entry point rather than completing without a value on its own.
+class ValuelessCompletion final {
+ public:
+  auto deliver(
+    const mln_completion& descriptor, mln_status status = MLN_STATUS_OK,
+    const std::string& diagnostic = {}
+  ) const noexcept -> void;
+
+  auto complete(
+    const std::shared_ptr<Completion>& completion,
+    mln_status status = MLN_STATUS_OK, std::string diagnostic = {}
+  ) const noexcept -> void;
+
+ private:
+  constexpr ValuelessCompletion() noexcept = default;
+
+  template <auto Function>
+  friend constexpr auto valueless_completion() noexcept -> ValuelessCompletion;
+};
+
+template <auto Function>
+constexpr auto valueless_completion() noexcept -> ValuelessCompletion {
+  static_assert(
+    !CompletionResult<Function>::has_value,
+    "this function delivers a value; complete it through CompletionValue"
+  );
+  return ValuelessCompletion{};
+}
 
 }  // namespace mln::core

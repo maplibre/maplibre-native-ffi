@@ -1233,10 +1233,14 @@ auto lease_render_session(mln_render_session session)
 
 auto enqueue_driver_operation(
   mln_render_session session, RenderDriverCallable work,
-  const mln_completion* completion
+  const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status {
   return submit_driver_work(
-    session, completion, {},
+    session, completion,
+    [valueless](
+      const std::shared_ptr<Completion>& state, mln_status status,
+      std::string diagnostic, std::any
+    ) { valueless.complete(state, status, std::move(diagnostic)); },
     [work = std::move(work)](
       const std::shared_ptr<mln_render_session_object>& live,
       const std::shared_ptr<OperationObject>& operation
@@ -1325,7 +1329,7 @@ auto start_attach_render_session(
   std::shared_ptr<mln_render_session_object> session, RenderSessionKind kind,
   const mln_render_session_attach_options* options,
   mln_render_session_capabilities capabilities, mln_render_session* out_session,
-  const mln_completion* completion
+  const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status {
   if (session == nullptr) {
     set_thread_error("render session must not be null");
@@ -1358,7 +1362,7 @@ auto start_attach_render_session(
 
   auto async = CompletionOperation{};
   const auto operation_status =
-    create_completion_operation(completion, {}, async);
+    create_completion_operation(completion, valueless, async);
   if (operation_status != MLN_STATUS_OK) {
     return operation_status;
   }
@@ -3315,7 +3319,9 @@ auto render_session_barrier_start(
     }
   }
   auto async = CompletionOperation{};
-  const auto status = create_completion_operation(completion, {}, async);
+  const auto status = create_completion_operation(
+    completion, valueless_completion<&mln_render_session_barrier>(), async
+  );
   if (status != MLN_STATUS_OK) return status;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -3340,6 +3346,25 @@ auto render_session_barrier_start(
   }
   return MLN_STATUS_OK;
 }
+
+namespace {
+
+// The completion of the C function that requests maintenance.
+auto maintenance_completion(RenderSessionMaintenance maintenance)
+  -> ValuelessCompletion {
+  switch (maintenance) {
+    case RenderSessionMaintenance::ReduceMemoryUse:
+      return valueless_completion<&mln_render_session_reduce_memory_use>();
+    case RenderSessionMaintenance::ClearData:
+      return valueless_completion<&mln_render_session_clear_data>();
+    case RenderSessionMaintenance::DumpDebugLogs:
+      return valueless_completion<&mln_render_session_dump_debug_logs>();
+  }
+  // An invalid kind fails in the driver work, so this never reports success.
+  return valueless_completion<&mln_render_session_reduce_memory_use>();
+}
+
+}  // namespace
 
 auto render_session_maintenance_start(
   mln_render_session session, RenderSessionMaintenance maintenance,
@@ -3366,7 +3391,7 @@ auto render_session_maintenance_start(
       set_thread_error("render session maintenance kind is invalid");
       return MLN_STATUS_INVALID_ARGUMENT;
     },
-    completion
+    completion, maintenance_completion(maintenance)
   );
 }
 
@@ -3387,7 +3412,9 @@ auto render_session_detach_start(
     }
   }
   auto async = CompletionOperation{};
-  const auto status = create_completion_operation(completion, {}, async);
+  const auto status = create_completion_operation(
+    completion, valueless_completion<&mln_render_session_detach>(), async
+  );
   if (status != MLN_STATUS_OK) return status;
   // Built before the lock below, because building it allocates and may throw.
   auto detach_work = RenderDriverWork{

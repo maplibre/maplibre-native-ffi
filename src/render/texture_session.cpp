@@ -594,7 +594,7 @@ auto texture_read_premultiplied_rgba8_start(
           );
         });
       } else {
-        complete(
+        complete_failure(
           state, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
           status == MLN_STATUS_OK
             ? "texture readback produced an invalid result"

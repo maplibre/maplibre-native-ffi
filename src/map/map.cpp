@@ -2519,7 +2519,7 @@ auto start_style_operation(
                          ) mutable {
     auto shared = std::any_cast<std::shared_ptr<StyleOperationResult>>(&result);
     if (status != MLN_STATUS_OK || shared == nullptr || *shared == nullptr) {
-      complete(
+      complete_failure(
         completion_state,
         status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
         status == MLN_STATUS_OK ? "style operation produced an invalid result"
@@ -2595,7 +2595,7 @@ auto start_geometry_operation(
                                       ) mutable {
       auto* value = std::any_cast<GeometryValue<Function>>(&result);
       if (status != MLN_STATUS_OK || value == nullptr) {
-        complete(
+        complete_failure(
           completion_state,
           status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
           status == MLN_STATUS_OK
@@ -2781,12 +2781,12 @@ auto create_map_start(
                                         std::string diagnostic, std::any result
                                       ) mutable {
       if (status != MLN_STATUS_OK) {
-        complete(completion_state, status, std::move(diagnostic));
+        complete_failure(completion_state, status, std::move(diagnostic));
         return;
       }
       auto* pending = std::any_cast<std::shared_ptr<PendingMapResult>>(&result);
       if (pending == nullptr || *pending == nullptr) {
-        complete(
+        complete_failure(
           completion_state, MLN_STATUS_NATIVE_ERROR,
           "map creation produced an invalid result"
         );
@@ -3014,8 +3014,9 @@ auto dispose_map(mln_map map) -> mln_status {
 
 auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
   CompletionOperation teardown;
-  const auto completion_status =
-    create_completion_operation(completion, {}, teardown);
+  const auto completion_status = create_completion_operation(
+    completion, valueless_completion<&mln_map_release>(), teardown
+  );
   if (completion_status != MLN_STATUS_OK) {
     return completion_status;
   }
@@ -3243,7 +3244,9 @@ auto map_request_still_image_start(
   auto completion_state = std::make_shared<Completion>(*completion);
   auto state = std::make_shared<OperationObject>(
     [completion_state](mln_status status, std::string diagnostic, std::any) {
-      complete(completion_state, status, std::move(diagnostic));
+      valueless_completion<&mln_map_request_still_image>().complete(
+        completion_state, status, std::move(diagnostic)
+      );
     }
   );
   const auto submit_status = submit_runtime_operation(
@@ -3516,12 +3519,12 @@ auto start_map_string_operation(
                                         std::string diagnostic, std::any result
                                       ) {
       if (status != MLN_STATUS_OK) {
-        complete(completion_state, status, std::move(diagnostic));
+        complete_failure(completion_state, status, std::move(diagnostic));
         return;
       }
       auto* text = std::any_cast<std::string>(&result);
       if (text == nullptr) {
-        complete(
+        complete_failure(
           completion_state, MLN_STATUS_NATIVE_ERROR,
           "map string operation produced an invalid result"
         );
@@ -3936,7 +3939,7 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
                                                  ) {
     auto* value = std::any_cast<mln_camera_query_result>(&result);
     if (status != MLN_STATUS_OK || value == nullptr) {
-      complete(
+      complete_failure(
         completion_state,
         status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
         status == MLN_STATUS_OK ? "camera query produced an invalid result"
@@ -4313,7 +4316,7 @@ auto map_projection_create_start(mln_map map, const mln_completion* completion)
     if (
       status != MLN_STATUS_OK || projection == nullptr || *projection == nullptr
     ) {
-      complete(
+      complete_failure(
         completion_state,
         status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
         status == MLN_STATUS_OK

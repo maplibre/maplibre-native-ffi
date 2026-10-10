@@ -32,6 +32,14 @@ using mln::native_tests::BackgroundChecks;
 using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
+// The completions that the fake surface attachments and the blocking driver
+// work below stand in for. Any surface attachment and any maintenance request
+// serves, because each one delivers no value.
+constexpr auto surface_attach_completion =
+  mln::core::valueless_completion<&mln_metal_surface_attach>();
+constexpr auto driver_work_completion =
+  mln::core::valueless_completion<&mln_render_session_reduce_memory_use>();
+
 struct Result {
   std::atomic_int status{MLN_STATUS_INVALID_STATE};
   std::atomic_uint releases{0};
@@ -145,7 +153,9 @@ void runtime_barriers_observe_retired_command_captures() {
             },
         };
         probe.nested_status = mln_runtime_barrier(runtime, &barrier, nullptr);
-        mln::core::complete(completion, MLN_STATUS_OK);
+        mln::core::complete_command(
+          completion, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK
+        );
       },
       completion
     )
@@ -352,8 +362,10 @@ auto submit_pending_operation(
 ) -> mln_status {
   auto live = mln::core::lease_runtime(runtime);
   auto pending = mln::core::CompletionOperation{};
-  const auto created =
-    mln::core::create_completion_operation(&completion, {}, pending);
+  const auto created = mln::core::create_completion_operation(
+    &completion, mln::core::valueless_completion<&mln_runtime_barrier>(),
+    pending
+  );
   if (created != MLN_STATUS_OK) return created;
   const auto status =
     mln::core::submit_runtime_operation(live, pending.operation, [&entered] {
@@ -417,7 +429,7 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
   MLN_TEST_OK(
     mln::core::start_attach_render_session(
       session, mln::core::RenderSessionKind::Surface, &options, capabilities,
-      &handle, &completion
+      &handle, &completion, surface_attach_completion
     )
   );
   TEST_ASSERT_TRUE(released(attach));
@@ -437,7 +449,7 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
         );
         return MLN_STATUS_OK;
       },
-      &blocked_completion
+      &blocked_completion, driver_work_completion
     )
   );
   TEST_ASSERT_TRUE(await([&] { return driver.entered.load(); }, "the driver"));
@@ -693,7 +705,7 @@ void a_running_driver_call_parks_its_retirement_without_stalling_others() {
   MLN_TEST_OK(
     mln::core::start_attach_render_session(
       busy, mln::core::RenderSessionKind::Surface, &options, capabilities,
-      &busy_id, &attach_completion
+      &busy_id, &attach_completion, surface_attach_completion
     )
   );
   TEST_ASSERT_TRUE(released(attach));
@@ -714,7 +726,7 @@ void a_running_driver_call_parks_its_retirement_without_stalling_others() {
         );
         return MLN_STATUS_OK;
       },
-      &blocked_completion
+      &blocked_completion, driver_work_completion
     )
   );
   TEST_ASSERT_TRUE(await([&] { return driver.entered.load(); }, "the driver"));
@@ -767,7 +779,7 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   MLN_TEST_OK(
     mln::core::start_attach_render_session(
       busy, mln::core::RenderSessionKind::Surface, &options, capabilities,
-      &busy_id, &attach_completion
+      &busy_id, &attach_completion, surface_attach_completion
     )
   );
   auto busy_weak = std::weak_ptr{busy};
@@ -807,7 +819,7 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
       );
       return MLN_STATUS_OK;
     },
-    &blocked_completion
+    &blocked_completion, driver_work_completion
   );
   serve = true;
   mln_test_pulse();

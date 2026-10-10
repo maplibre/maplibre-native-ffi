@@ -7,6 +7,7 @@
 
 #include "completion/completion.hpp"
 
+#include "completion/completion_result.hpp"
 #include "maplibre_native_c.h"
 #include "support/harness.h"
 #include "support/status.h"
@@ -54,13 +55,19 @@ auto descriptor_for(CompletionProbe& probe) -> mln_completion {
   };
 }
 
+// Resolves completion with a success that carries no value, as the runtime
+// barrier's does.
+void succeed(const std::shared_ptr<mln::core::Completion>& completion) {
+  mln::core::valueless_completion<&mln_runtime_barrier>().complete(completion);
+}
+
 // A completion resolved before its acceptance holds the result until accept
 // runs, then delivers it exactly once and releases the user data after.
 void inline_resolution_waits_for_acceptance() {
   auto probe = CompletionProbe{};
   auto completion =
     std::make_shared<mln::core::Completion>(descriptor_for(probe));
-  mln::core::complete(completion, MLN_STATUS_OK);
+  succeed(completion);
   TEST_ASSERT_EQUAL_UINT(0, probe.calls.load());
 
   completion->accept();
@@ -106,9 +113,7 @@ void acceptance_and_resolution_race_once() {
     auto completion =
       std::make_shared<mln::core::Completion>(descriptor_for(probe));
     auto accept = std::thread{[completion]() { completion->accept(); }};
-    auto resolve = std::thread{[completion]() {
-      mln::core::complete(completion, MLN_STATUS_OK);
-    }};
+    auto resolve = std::thread{[completion]() { succeed(completion); }};
     accept.join();
     resolve.join();
     TEST_ASSERT_EQUAL_UINT(1, probe.calls.load());

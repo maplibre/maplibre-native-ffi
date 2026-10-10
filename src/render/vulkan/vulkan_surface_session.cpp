@@ -596,7 +596,7 @@ auto vulkan_surface_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
-    out_session, completion
+    out_session, completion, valueless_completion<&mln_vulkan_surface_attach>()
   );
 }
 
@@ -625,7 +625,7 @@ auto vulkan_surface_set_target_start(
         }
       );
     },
-    completion
+    completion, valueless_completion<&mln_vulkan_surface_set_target>()
   );
 }
 

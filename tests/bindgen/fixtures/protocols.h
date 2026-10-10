@@ -202,7 +202,8 @@ mln_status mln_map_snapshot(
 
 #ifdef MLN_PROTOCOL_COMPLETION_RESULTS
 // Completions in each shape of the native result table: one value, a nullable
-// value, an array, a nullable array, and a command that completes without one.
+// value, an array, a nullable array, an operation that delivers only a status,
+// and a command, which the table leaves out.
 typedef struct mln_tile_id {
   double x;
   double y;
@@ -221,6 +222,10 @@ mln_status mln_map_list_names(
 );
 BIND("execution=query;result=mln_tile_id;shape=array;nullable=true")
 mln_status mln_map_visible_tiles(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+BIND("execution=operation")
+mln_status mln_map_reload(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 BIND("execution=command")

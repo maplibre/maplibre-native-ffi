@@ -87,7 +87,7 @@ auto complete_feature_list(
 ) -> void {
   auto* list = std::any_cast<OwnedQueriedFeatureList>(&result);
   if (status != MLN_STATUS_OK || list == nullptr || *list == nullptr) {
-    complete(
+    complete_failure(
       completion, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
       status == MLN_STATUS_OK ? "render query produced an invalid result"
                               : std::move(diagnostic)
@@ -114,7 +114,7 @@ auto complete_query_buffer(
 ) -> void {
   auto* bytes = std::any_cast<std::string>(&result);
   if (status != MLN_STATUS_OK || bytes == nullptr) {
-    complete(
+    complete_failure(
       completion, status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
       status == MLN_STATUS_OK ? "render query produced an invalid result"
                               : std::move(diagnostic)

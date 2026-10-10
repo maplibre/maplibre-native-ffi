@@ -1,3 +1,4 @@
+#include <cassert>
 #include <utility>
 
 #include "completion/completion.hpp"
@@ -44,14 +45,43 @@ auto ErasedCompletionValue::deliver(
   );
 }
 
-auto deliver_status(
+auto deliver_failure(
   const mln_completion& descriptor, mln_status status,
   const std::string& diagnostic
 ) noexcept -> void {
+  if (status == MLN_STATUS_OK) {
+    assert(false && "a failure delivery reported success");
+    invoke_completion(
+      descriptor, MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
+      "native completion reported success without its result", nullptr, 0
+    );
+    return;
+  }
   invoke_completion(
     descriptor, status, MLN_COMMAND_DISPOSITION_COMMITTED, 0, diagnostic,
     nullptr, 0
   );
+}
+
+auto ValuelessCompletion::deliver(
+  const mln_completion& descriptor, mln_status status,
+  const std::string& diagnostic
+) const noexcept -> void {
+  if (status == MLN_STATUS_OK) {
+    ErasedCompletionValue::deliver(descriptor, nullptr, 0);
+  } else {
+    deliver_failure(descriptor, status, diagnostic);
+  }
+}
+
+auto ValuelessCompletion::complete(
+  const std::shared_ptr<Completion>& completion, mln_status status,
+  std::string diagnostic
+) const noexcept -> void {
+  completion->resolve([self = *this, status,
+                       diagnostic = std::move(diagnostic)](
+                        const mln_completion& descriptor
+                      ) { self.deliver(descriptor, status, diagnostic); });
 }
 
 Completion::Completion(const mln_completion& descriptor)
@@ -165,13 +195,13 @@ auto validate_completion(const mln_completion* completion) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto complete(
+auto complete_failure(
   const std::shared_ptr<Completion>& completion, mln_status status,
   std::string diagnostic
 ) noexcept -> void {
   completion->resolve([status, diagnostic = std::move(diagnostic)](
                         const mln_completion& descriptor
-                      ) { deliver_status(descriptor, status, diagnostic); });
+                      ) { deliver_failure(descriptor, status, diagnostic); });
 }
 
 auto complete_command(

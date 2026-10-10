@@ -30,7 +30,8 @@ struct DriverBlocker {
         mln_test_gate_park(gate.get());
         return MLN_STATUS_OK;
       },
-      &completion.descriptor
+      &completion.descriptor,
+      mln::core::valueless_completion<&mln_render_session_reduce_memory_use>()
     );
     submitted = status == MLN_STATUS_OK;
     if (!submitted) {

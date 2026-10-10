@@ -712,7 +712,7 @@ using RenderDriverResultCallable =
   -> std::shared_ptr<mln_render_session_object>;
 auto enqueue_driver_operation(
   mln_render_session session, RenderDriverCallable work,
-  const mln_completion* completion
+  const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status;
 auto enqueue_driver_result_operation(
   mln_render_session session, RenderDriverResultCallable work,
@@ -727,7 +727,7 @@ auto start_attach_render_session(
   std::shared_ptr<mln_render_session_object> session, RenderSessionKind kind,
   const mln_render_session_attach_options* options,
   mln_render_session_capabilities capabilities, mln_render_session* out_session,
-  const mln_completion* completion
+  const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status;
 auto notify_render_session_map_update(
   mln_render_session_object* session
