@@ -61,6 +61,7 @@ enum add_variant {
   // Rejected before the call returns, so nothing references the probe.
   ADD_NEGATIVE_MIN_ZOOM,
   ADD_WITHOUT_FETCH,
+  ADD_WITHOUT_ID,
 };
 
 static const mln_canonical_tile_id root_tile = {.z = 0, .x = 0, .y = 0};
@@ -80,7 +81,10 @@ static mln_status add_geometry_source(
     options.min_zoom = -1;
   }
   return mln_map_add_custom_geometry_source(
-    map, MLN_BUFFER_LITERAL("custom-geometry"), &options, completion, NULL
+    map,
+    variant == ADD_WITHOUT_ID ? MLN_BUFFER_LITERAL("")
+                              : MLN_BUFFER_LITERAL("custom-geometry"),
+    &options, completion, NULL
   );
 }
 
@@ -99,7 +103,10 @@ static mln_status add_mvt_source(
     options.min_zoom = -1;
   }
   return mln_map_add_custom_mvt_vector_source(
-    map, MLN_BUFFER_LITERAL("custom-mvt-vector"), &options, completion, NULL
+    map,
+    variant == ADD_WITHOUT_ID ? MLN_BUFFER_LITERAL("")
+                              : MLN_BUFFER_LITERAL("custom-mvt-vector"),
+    &options, completion, NULL
   );
 }
 
@@ -321,8 +328,11 @@ static void accepted_adds_release_their_callback_state(void) {
     static const enum add_variant rejected_variants[] = {
       ADD_NEGATIVE_MIN_ZOOM,
       ADD_WITHOUT_FETCH,
+      ADD_WITHOUT_ID,
     };
-    for (size_t index = 0; index < 2; index += 1) {
+    for (size_t index = 0;
+         index < sizeof(rejected_variants) / sizeof(rejected_variants[0]);
+         index += 1) {
       mln_test_completion rejected = mln_test_completion_default(0);
       TEST_ASSERT_EQUAL_INT_MESSAGE(
         MLN_STATUS_INVALID_ARGUMENT,

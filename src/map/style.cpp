@@ -509,28 +509,6 @@ auto to_native_raster_encoding(uint32_t encoding)
            : mln::Tileset::RasterEncoding::Mapbox;
 }
 
-auto validate_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
-  -> mln_status {
-  if (tile_count == 0) {
-    mln::core::set_thread_error("tile_count must be greater than 0");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (tiles == nullptr) {
-    mln::core::set_thread_error("tiles must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  for (const auto tile : std::span<const mln_buffer_view>{tiles, tile_count}) {
-    if (!validate_string_view(tile, "tile URL")) {
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-    if (tile.size == 0) {
-      mln::core::set_thread_error("tile URLs must not be empty");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
-  }
-  return MLN_STATUS_OK;
-}
-
 auto to_native_tile_urls(const mln_buffer_view* tiles, size_t tile_count)
   -> std::vector<std::string> {
   auto result = std::vector<std::string>{};
@@ -910,17 +888,6 @@ auto to_native_canonical_tile_id(mln_canonical_tile_id tile_id)
   };
 }
 
-auto validate_source_id(mln_buffer_view source_id) -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    mln::core::set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
 auto validate_source_can_be_added(
   mln::style::Style& style, const std::string& source_id
 ) -> mln_status {
@@ -1196,17 +1163,6 @@ auto to_native_premultiplied_rgba8_image(
     );
   }
   return result;
-}
-
-auto validate_image_id(mln_buffer_view image_id) -> mln_status {
-  if (!validate_string_view(image_id, "image_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (image_id.size == 0) {
-    mln::core::set_thread_error("image_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
 }
 
 auto style_image_info_from_native(const mln::style::Image& image)
@@ -1584,13 +1540,6 @@ auto validate_image_source_command_coordinates(
 auto map_add_style_source_json(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view source_json
 ) -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (!validate_bytes(source_json, "style source")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1618,14 +1567,6 @@ auto map_add_style_source_json(
 
 auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(source_id);
   if (style.getSource(id) == nullptr) {
@@ -1649,13 +1590,6 @@ auto map_get_style_source_info(
   MapObject& live, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_info == nullptr || out_info->size < sizeof(mln_style_source_info)) {
     set_thread_error("out_info must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1730,13 +1664,6 @@ auto map_copy_style_source_attribution(
   MapObject& live, mln_buffer_view source_id, std::string& out_attribution,
   bool* out_found
 ) -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_found == nullptr) {
     set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1763,13 +1690,6 @@ auto map_copy_style_source_url(
   MapObject& live, mln_buffer_view source_id, std::string& out_url,
   bool* out_found
 ) -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_found == nullptr) {
     set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1787,13 +1707,6 @@ auto map_get_style_source_tile_urls(
   MapObject& live, mln_buffer_view source_id,
   std::vector<std::string>& out_tile_urls, bool* out_found
 ) -> mln_status {
-  if (!validate_string_view(source_id, "source_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (source_id.size == 0) {
-    set_thread_error("source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_found == nullptr) {
     set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1829,17 +1742,6 @@ auto map_add_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_geojson_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto options_status = validate_geojson_source_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
@@ -1869,11 +1771,6 @@ auto map_add_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-
   if (data == nullptr) {
     set_thread_error("prepared GeoJSON data is not live");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1895,18 +1792,6 @@ auto map_add_geojson_source_data(
 auto map_set_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* source =
     map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
@@ -1927,11 +1812,6 @@ auto map_set_geojson_source_data(
   MapObject& live, mln_buffer_view source_id,
   const std::shared_ptr<const GeoJsonSourceDataObject>& data
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-
   if (data == nullptr) {
     set_thread_error("prepared GeoJSON data is not live");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1966,11 +1846,6 @@ auto map_set_geojson_source_data(
 auto map_set_geojson_source_synchronous_tiling(
   MapObject& live, mln_buffer_view source_id, bool enabled
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-
   auto* source =
     map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
@@ -1990,11 +1865,6 @@ auto map_set_geojson_source_synchronous_tiling(
 auto map_set_style_source_volatile(
   MapObject& live, mln_buffer_view source_id, bool is_volatile
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-
   const auto id = string_from_view(source_id);
   auto* source = map_native(live).getStyle().getSource(id);
   if (source == nullptr) {
@@ -2010,17 +1880,6 @@ auto map_add_vector_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto options_status =
     validate_tile_source_options(options, TileSourceOptionKind::Vector);
   if (options_status != MLN_STATUS_OK) {
@@ -2073,14 +1932,6 @@ auto map_add_vector_source_tiles(
   MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tiles_status = validate_tile_urls(tiles, tile_count);
-  if (tiles_status != MLN_STATUS_OK) {
-    return tiles_status;
-  }
   const auto options_status =
     validate_tile_source_options(options, TileSourceOptionKind::Vector);
   if (options_status != MLN_STATUS_OK) {
@@ -2112,17 +1963,6 @@ auto map_add_raster_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto options_status =
     validate_tile_source_options(options, TileSourceOptionKind::Raster);
   if (options_status != MLN_STATUS_OK) {
@@ -2149,14 +1989,6 @@ auto map_add_raster_source_tiles(
   MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tiles_status = validate_tile_urls(tiles, tile_count);
-  if (tiles_status != MLN_STATUS_OK) {
-    return tiles_status;
-  }
   const auto options_status =
     validate_tile_source_options(options, TileSourceOptionKind::Raster);
   if (options_status != MLN_STATUS_OK) {
@@ -2187,17 +2019,6 @@ auto map_add_raster_dem_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url,
   const mln_style_tile_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   const auto options_status =
     validate_tile_source_options(options, TileSourceOptionKind::RasterDEM);
   if (options_status != MLN_STATUS_OK) {
@@ -2235,14 +2056,6 @@ auto map_add_raster_dem_source_tiles(
   MapObject& live, mln_buffer_view source_id, const mln_buffer_view* tiles,
   size_t tile_count, const mln_style_tile_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  const auto tiles_status = validate_tile_urls(tiles, tile_count);
-  if (tiles_status != MLN_STATUS_OK) {
-    return tiles_status;
-  }
   const auto options_status =
     validate_tile_source_options(options, TileSourceOptionKind::RasterDEM);
   if (options_status != MLN_STATUS_OK) {
@@ -2281,10 +2094,6 @@ auto map_add_custom_geometry_source(
   MapObject& live, mln_buffer_view source_id,
   const mln_custom_geometry_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto options_status = validate_custom_geometry_source_options(options);
   if (options_status != MLN_STATUS_OK) {
     return options_status;
@@ -2329,10 +2138,6 @@ auto map_set_custom_geometry_source_tile_data(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view data
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto tile_status = validate_canonical_tile_id(tile_id);
   if (tile_status != MLN_STATUS_OK) {
     return tile_status;
@@ -2360,10 +2165,6 @@ auto map_set_custom_geometry_source_tile_data(
 auto map_invalidate_custom_geometry_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto tile_status = validate_canonical_tile_id(tile_id);
   if (tile_status != MLN_STATUS_OK) {
     return tile_status;
@@ -2387,10 +2188,6 @@ auto map_invalidate_custom_geometry_source_tile(
 auto map_invalidate_custom_geometry_source_region(
   MapObject& live, mln_buffer_view source_id, mln_lat_lng_bounds bounds
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto bounds_status = validate_lat_lng_bounds(bounds);
   if (bounds_status != MLN_STATUS_OK) {
     return bounds_status;
@@ -2433,10 +2230,6 @@ auto map_add_custom_mvt_vector_source(
   MapObject& live, mln_buffer_view source_id,
   const mln_custom_mvt_vector_source_options* options
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto options_status =
     validate_custom_mvt_vector_source_options(options);
   if (options_status != MLN_STATUS_OK) {
@@ -2482,16 +2275,9 @@ auto map_set_custom_mvt_vector_source_tile_data(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view data
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto tile_status = validate_canonical_tile_id(tile_id);
   if (tile_status != MLN_STATUS_OK) {
     return tile_status;
-  }
-  if (!validate_string_view(data, "data")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   mln::style::CustomVectorSource* custom_source = nullptr;
@@ -2518,16 +2304,9 @@ auto map_set_custom_mvt_vector_source_tile_error(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
   mln_buffer_view message
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto tile_status = validate_canonical_tile_id(tile_id);
   if (tile_status != MLN_STATUS_OK) {
     return tile_status;
-  }
-  if (!validate_string_view(message, "message")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   mln::style::CustomVectorSource* custom_source = nullptr;
@@ -2547,10 +2326,6 @@ auto map_set_custom_mvt_vector_source_tile_error(
 auto map_invalidate_custom_mvt_vector_source_tile(
   MapObject& live, mln_buffer_view source_id, mln_canonical_tile_id tile_id
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto tile_status = validate_canonical_tile_id(tile_id);
   if (tile_status != MLN_STATUS_OK) {
     return tile_status;
@@ -2571,10 +2346,6 @@ auto map_set_style_image(
   const mln_premultiplied_rgba8_image* image,
   const mln_style_image_options* options
 ) -> mln_status {
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
   const auto image_status = validate_premultiplied_rgba8_image(image);
   if (image_status != MLN_STATUS_OK) {
     return image_status;
@@ -2625,11 +2396,6 @@ auto map_set_style_image(
 
 auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   -> mln_status {
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
-
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(image_id);
   if (!style.getImage(id).has_value()) {
@@ -2644,10 +2410,6 @@ auto map_get_style_image_info(
   MapObject& live, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) -> mln_status {
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
   if (out_info == nullptr || out_info->size < sizeof(mln_style_image_info)) {
     set_thread_error("out_info must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2670,10 +2432,6 @@ auto map_copy_style_image_stretches(
   std::vector<mln_image_stretch>& out_stretch_x,
   std::vector<mln_image_stretch>& out_stretch_y, bool* out_found
 ) -> mln_status {
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
   if (out_found == nullptr) {
     set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2704,10 +2462,6 @@ auto map_copy_style_image_premultiplied_rgba8(
   MapObject& live, mln_buffer_view image_id, std::string& out_pixels,
   bool* out_found
 ) -> mln_status {
-  const auto image_id_status = validate_image_id(image_id);
-  if (image_id_status != MLN_STATUS_OK) {
-    return image_id_status;
-  }
   if (out_found == nullptr) {
     set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2732,21 +2486,10 @@ auto map_add_image_source_url(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, mln_buffer_view url
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto coordinate_status =
     validate_image_source_coordinates(coordinates, coordinate_count);
   if (coordinate_status != MLN_STATUS_OK) {
     return coordinate_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   auto& style = map_native(live).getStyle();
@@ -2768,10 +2511,6 @@ auto map_add_image_source_image(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, const mln_premultiplied_rgba8_image* image
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto coordinate_status =
     validate_image_source_coordinates(coordinates, coordinate_count);
   if (coordinate_status != MLN_STATUS_OK) {
@@ -2810,18 +2549,6 @@ auto map_add_image_source_image(
 auto map_set_image_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
-  if (!validate_string_view(url, "url")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (url.size == 0) {
-    set_thread_error("url must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* source =
     map_native(live).getStyle().getSource(string_from_view(source_id));
   if (source == nullptr) {
@@ -2841,10 +2568,6 @@ auto map_set_image_source_image(
   MapObject& live, mln_buffer_view source_id,
   const mln_premultiplied_rgba8_image* image
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto image_status = validate_premultiplied_rgba8_image(image);
   if (image_status != MLN_STATUS_OK) {
     return image_status;
@@ -2869,10 +2592,6 @@ auto map_set_image_source_coordinates(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   const auto coordinate_status =
     validate_image_source_coordinates(coordinates, coordinate_count);
   if (coordinate_status != MLN_STATUS_OK) {
@@ -2898,10 +2617,6 @@ auto map_get_image_source_coordinates(
   MapObject& live, mln_buffer_view source_id,
   std::vector<mln_lat_lng>& out_coordinates, bool* out_found
 ) -> mln_status {
-  const auto source_id_status = validate_source_id(source_id);
-  if (source_id_status != MLN_STATUS_OK) {
-    return source_id_status;
-  }
   if (out_found == nullptr) {
     set_thread_error("out_found must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -2930,18 +2645,6 @@ auto map_add_hillshade_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
   mln_buffer_view before_layer_id
 ) -> mln_status {
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(source_id, "source_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || source_id.size == 0) {
-    set_thread_error("layer_id and source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto& style = map_native(live).getStyle();
   const auto layer = string_from_view(layer_id);
   const auto source = string_from_view(source_id);
@@ -2977,18 +2680,6 @@ auto map_add_color_relief_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,
   mln_buffer_view before_layer_id
 ) -> mln_status {
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(source_id, "source_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || source_id.size == 0) {
-    set_thread_error("layer_id and source_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto& style = map_native(live).getStyle();
   const auto layer = string_from_view(layer_id);
   const auto source = string_from_view(source_id);
@@ -3023,17 +2714,6 @@ auto map_add_color_relief_layer(
 auto map_add_location_indicator_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto& style = map_native(live).getStyle();
   const auto layer = string_from_view(layer_id);
   if (style.getLayer(layer) != nullptr) {
@@ -3051,18 +2731,6 @@ auto map_add_location_indicator_layer(
   style.addLayer(
     std::make_unique<mln::style::LocationIndicatorLayer>(layer), before
   );
-  return MLN_STATUS_OK;
-}
-
-auto validate_required_id(mln_buffer_view id, const char* name) -> mln_status {
-  if (!validate_string_view(id, name)) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (id.size == 0) {
-    const auto message = std::string{name} + " must not be empty";
-    set_thread_error(message.c_str());
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   return MLN_STATUS_OK;
 }
 
@@ -3108,12 +2776,8 @@ auto location_indicator_image_property(uint32_t image_kind)
 }
 
 auto validate_location_indicator_location_command(
-  mln_buffer_view layer_id, mln_lat_lng coordinate, double altitude
+  mln_lat_lng coordinate, double altitude
 ) -> mln_status {
-  const auto layer_status = validate_required_id(layer_id, "layer_id");
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
   const auto coordinate_status = validate_lat_lng(coordinate);
   if (coordinate_status != MLN_STATUS_OK) {
     return coordinate_status;
@@ -3125,22 +2789,12 @@ auto validate_location_indicator_location_command(
   return MLN_STATUS_OK;
 }
 
-auto validate_location_indicator_bearing_command(
-  mln_buffer_view layer_id, double bearing
-) -> mln_status {
-  const auto layer_status = validate_required_id(layer_id, "layer_id");
-  return layer_status == MLN_STATUS_OK
-           ? validate_float64_to_float32(bearing, "bearing")
-           : layer_status;
+auto validate_location_indicator_bearing_command(double bearing) -> mln_status {
+  return validate_float64_to_float32(bearing, "bearing");
 }
 
-auto validate_location_indicator_accuracy_radius_command(
-  mln_buffer_view layer_id, double radius
-) -> mln_status {
-  const auto layer_status = validate_required_id(layer_id, "layer_id");
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
+auto validate_location_indicator_accuracy_radius_command(double radius)
+  -> mln_status {
   const auto radius_status = validate_float64_to_float32(radius, "radius");
   if (radius_status != MLN_STATUS_OK) {
     return radius_status;
@@ -3152,17 +2806,7 @@ auto validate_location_indicator_accuracy_radius_command(
   return MLN_STATUS_OK;
 }
 
-auto validate_location_indicator_image_name_command(
-  mln_buffer_view layer_id, uint32_t image_kind, mln_buffer_view image_id
-) -> mln_status {
-  const auto layer_status = validate_required_id(layer_id, "layer_id");
-  if (layer_status != MLN_STATUS_OK) {
-    return layer_status;
-  }
-  const auto image_status = validate_required_id(image_id, "image_id");
-  if (image_status != MLN_STATUS_OK) {
-    return image_status;
-  }
+auto validate_location_indicator_image_kind(uint32_t image_kind) -> mln_status {
   if (!location_indicator_image_property(image_kind)) {
     set_thread_error("image_kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3174,12 +2818,6 @@ auto map_set_location_indicator_location(
   MapObject& live, mln_buffer_view layer_id, mln_lat_lng coordinate,
   double altitude
 ) -> mln_status {
-  const auto argument_status = validate_location_indicator_location_command(
-    layer_id, coordinate, altitude
-  );
-  if (argument_status != MLN_STATUS_OK) {
-    return argument_status;
-  }
   const auto layer_status = find_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3202,11 +2840,6 @@ auto map_set_location_indicator_location(
 auto map_set_location_indicator_bearing(
   MapObject& live, mln_buffer_view layer_id, double bearing
 ) -> mln_status {
-  const auto argument_status =
-    validate_location_indicator_bearing_command(layer_id, bearing);
-  if (argument_status != MLN_STATUS_OK) {
-    return argument_status;
-  }
   const auto layer_status = find_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3221,11 +2854,6 @@ auto map_set_location_indicator_bearing(
 auto map_set_location_indicator_accuracy_radius(
   MapObject& live, mln_buffer_view layer_id, double radius
 ) -> mln_status {
-  const auto argument_status =
-    validate_location_indicator_accuracy_radius_command(layer_id, radius);
-  if (argument_status != MLN_STATUS_OK) {
-    return argument_status;
-  }
   const auto layer_status = find_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3241,12 +2869,6 @@ auto map_set_location_indicator_image_name(
   MapObject& live, mln_buffer_view layer_id, uint32_t image_kind,
   mln_buffer_view image_id
 ) -> mln_status {
-  const auto argument_status = validate_location_indicator_image_name_command(
-    layer_id, image_kind, image_id
-  );
-  if (argument_status != MLN_STATUS_OK) {
-    return argument_status;
-  }
   const auto layer_status = find_location_indicator_layer(live, layer_id);
   if (layer_status != MLN_STATUS_OK) {
     return layer_status;
@@ -3262,9 +2884,6 @@ auto map_set_location_indicator_image_name(
 auto map_add_style_layer_json(
   MapObject& live, mln_buffer_view layer_json, mln_buffer_view before_layer_id
 ) -> mln_status {
-  if (!validate_string_view(before_layer_id, "before_layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (!validate_bytes(layer_json, "style layer")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3309,14 +2928,6 @@ auto map_add_style_layer_json(
 
 auto map_remove_style_layer(MapObject& live, mln_buffer_view layer_id)
   -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   const auto id = string_from_view(layer_id);
   auto removed = map_native(live).getStyle().removeLayer(id);
   if (removed == nullptr) {
@@ -3330,13 +2941,6 @@ auto map_get_style_layer_info(
   MapObject& live, mln_buffer_view layer_id, mln_style_layer_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_info == nullptr || out_info->size < sizeof(mln_style_layer_info)) {
     set_thread_error("out_info must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3392,17 +2996,6 @@ auto map_list_style_layer_ids(
 auto map_move_style_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status {
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto& style = map_native(live).getStyle();
   const auto id = string_from_view(layer_id);
   if (style.getLayer(id) == nullptr) {
@@ -3431,13 +3024,6 @@ auto map_get_style_layer_json(
   MapObject& live, mln_buffer_view layer_id, mln_buffer* out_layer,
   bool* out_found
 ) -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (
     out_layer == nullptr || *out_layer != MLN_HANDLE_NULL ||
     out_found == nullptr
@@ -3461,9 +3047,6 @@ auto map_get_style_layer_json(
 auto map_set_global_state_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {
-  if (!validate_string_view(property_name, "property_name")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   auto native_value = to_native_json_value(value);
   if (!native_value) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3511,13 +3094,6 @@ auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status {
-  if (!validate_string_view(property_name, "property_name")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (property_name.size == 0) {
-    set_thread_error("property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   auto document = mln::JSDocument{};
   if (!parse_json_document(value, "style light property", document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3545,13 +3121,6 @@ auto map_set_style_light_property(
 auto map_get_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer* out_value
 ) -> mln_status {
-  if (!validate_string_view(property_name, "property_name")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (property_name.size == 0) {
-    set_thread_error("property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
     set_thread_error(
       "out_value must not be null and *out_value must be the null handle"
@@ -3656,17 +3225,6 @@ auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
 ) -> mln_status {
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(property_name, "property_name")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || property_name.size == 0) {
-    set_thread_error("layer_id and property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto document = mln::JSDocument{};
   if (!parse_json_document(value, "layer property", document)) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3697,16 +3255,6 @@ auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer* out_value
 ) -> mln_status {
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(property_name, "property_name")
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0 || property_name.size == 0) {
-    set_thread_error("layer_id and property_name must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
     set_thread_error(
       "out_value must not be null and *out_value must be the null handle"
@@ -3731,14 +3279,6 @@ auto map_get_layer_property(
 auto map_set_layer_filter(
   MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3763,13 +3303,6 @@ auto map_set_layer_filter(
 auto map_get_layer_filter(
   MapObject& live, mln_buffer_view layer_id, mln_buffer* out_filter
 ) -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_filter == nullptr || *out_filter != MLN_HANDLE_NULL) {
     set_thread_error(
       "out_filter must not be null and *out_filter must be the null handle"
@@ -3796,14 +3329,6 @@ namespace {
 auto resolve_layer_for_access(
   MapObject& live, mln_buffer_view layer_id, mln::style::Layer*& out_layer
 ) -> mln_status {
-  if (!validate_string_view(layer_id, "layer_id")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (layer_id.size == 0) {
-    set_thread_error("layer_id must not be empty");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3851,9 +3376,6 @@ auto map_set_layer_source_layer(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (!validate_string_view(source_layer, "source_layer")) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (!require_layer_takes_source(*layer, "source-layer")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3874,23 +3396,9 @@ auto map_copy_layer_source_layer(
   return MLN_STATUS_OK;
 }
 
-auto validate_layer_source_id_command(
-  mln_buffer_view layer_id, mln_buffer_view source_id
-) -> mln_status {
-  const auto layer_status = validate_required_id(layer_id, "layer_id");
-  return layer_status == MLN_STATUS_OK
-           ? validate_required_id(source_id, "source_id")
-           : layer_status;
-}
-
 auto map_set_layer_source_id(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id
 ) -> mln_status {
-  const auto argument_status =
-    validate_layer_source_id_command(layer_id, source_id);
-  if (argument_status != MLN_STATUS_OK) {
-    return argument_status;
-  }
   mln::style::Layer* layer = nullptr;
   const auto status = resolve_layer_for_access(live, layer_id, layer);
   if (status != MLN_STATUS_OK) {

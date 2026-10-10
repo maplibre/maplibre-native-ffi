@@ -3745,11 +3745,6 @@ auto map_set_feature_state(
   MapObject& live, const mln_feature_state_selector* selector,
   mln_buffer_view state
 ) -> mln_status {
-  const auto selector_status = validate_feature_state_selector(selector, true);
-  if (selector_status != MLN_STATUS_OK) {
-    return selector_status;
-  }
-
   auto native_state = to_native_json_value(state);
   if (!native_state) {
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -3796,11 +3791,6 @@ auto map_get_feature_state_start(
 auto map_remove_feature_state(
   MapObject& live, const mln_feature_state_selector* selector
 ) -> mln_status {
-  const auto selector_status = validate_feature_state_selector(selector, false);
-  if (selector_status != MLN_STATUS_OK) {
-    return selector_status;
-  }
-
   if (
     live.feature_state.remove(
       feature_state_string_from_view(selector->source_id),

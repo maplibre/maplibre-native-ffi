@@ -38,15 +38,18 @@ extern "C" {
 
 /**
  * Submits a global-state JSON value. JSON null restores the style default.
- * Input is copied before return. Completion reports invalid state if the style
- * is not loaded, or invalid argument if the JSON cannot be parsed.
+ * Input is copied before return.
  *
  * Returns:
  * - MLN_STATUS_OK when accepted.
- * - MLN_STATUS_INVALID_ARGUMENT for an invalid map handle, view, or
- *   completion.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, property_name is
+ *   invalid, value is invalid or empty, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_ARGUMENT when value is not valid JSON.
+ * - MLN_STATUS_INVALID_STATE when the style has not loaded.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_global_state_property(
@@ -958,13 +961,13 @@ MLN_API mln_status mln_map_list_style_source_ids(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid, or options is invalid.
+ *   is invalid or empty, or options is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, a source
- *   already has that ID, or the options cannot be converted.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
+ *   options cannot be converted.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geojson_source_url(
@@ -1033,14 +1036,13 @@ MLN_API void mln_geojson_source_data_destroy(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid, or data is an invalid handle.
+ *   invalid or empty, or data is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when map or data has been released, or the map is
  *   closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty or a source already
- *   has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geojson_source_data(
@@ -1143,13 +1145,12 @@ MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid, or options is invalid.
+ *   is invalid or empty, or options is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
- *   already has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_vector_source_url(
@@ -1167,14 +1168,14 @@ MLN_API mln_status mln_map_add_vector_source_url(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid, tile URLs are null or invalid, or options is invalid.
+ *   invalid or empty, tile_count is 0, tiles is null, any tile URL is invalid
+ *   or empty, or options is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty, the tile URL list or
- *   any tile URL is empty, a source already has that ID, or the tileset cannot
- *   be built.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
+ *   tileset cannot be built.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_vector_source_tiles(
@@ -1194,13 +1195,12 @@ MLN_API mln_status mln_map_add_vector_source_tiles(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid, or options is invalid.
+ *   is invalid or empty, or options is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
- *   already has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_source_url(
@@ -1218,14 +1218,14 @@ MLN_API mln_status mln_map_add_raster_source_url(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid, tile URLs are null or invalid, or options is invalid.
+ *   invalid or empty, tile_count is 0, tiles is null, any tile URL is invalid
+ *   or empty, or options is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty, the tile URL list or
- *   any tile URL is empty, a source already has that ID, or the tileset cannot
- *   be built.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
+ *   tileset cannot be built.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_source_tiles(
@@ -1246,13 +1246,12 @@ MLN_API mln_status mln_map_add_raster_source_tiles(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
- *   is invalid, or options is invalid.
+ *   is invalid or empty, or options is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
- *   already has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_dem_source_url(
@@ -1270,14 +1269,14 @@ MLN_API mln_status mln_map_add_raster_dem_source_url(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid, tile URLs are null or invalid, or options is invalid.
+ *   invalid or empty, tile_count is 0, tiles is null, any tile URL is invalid
+ *   or empty, or options is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty, the tile URL list or
- *   any tile URL is empty, a source already has that ID, or the tileset cannot
- *   be built.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
+ *   tileset cannot be built.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_dem_source_tiles(
@@ -1317,14 +1316,14 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid, options is null or invalid, or fetch_tile is null.
+ *   invalid or empty, options is null or invalid, or fetch_tile is null.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty or a source already
- *   has that ID. This API runs release_user_data once, because the accepted
- *   command already referenced user_data.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID. This API
+ *   runs release_user_data once, because the accepted command already
+ *   referenced user_data.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_geometry_source(
@@ -1342,8 +1341,8 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, tile_id is invalid, data is empty, or completion is
- *   invalid.
+ *   invalid or empty, tile_id is invalid, data is invalid or empty, or
+ *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -1433,14 +1432,14 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid, options is null or invalid, or fetch_tile is null.
+ *   invalid or empty, options is null or invalid, or fetch_tile is null.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty or a source already
- *   has that ID. This API runs release_user_data once, because the accepted
- *   command already referenced user_data.
+ * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID. This API
+ *   runs release_user_data once, because the accepted command already
+ *   referenced user_data.
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_mvt_vector_source(
@@ -2330,7 +2329,8 @@ MLN_API mln_status mln_map_get_layer_property(
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, filter is invalid, or completion is invalid.
+ *   invalid or empty, filter points to an invalid or empty view, or completion
+ *   is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *

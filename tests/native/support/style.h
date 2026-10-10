@@ -55,13 +55,17 @@ static inline mln_buffer_view mln_test_view_of(const char* text) {
 
 // Expects `expression`, which submits a command with `completion.descriptor`
 // and MLN_TEST_DIAGNOSTIC, to reject it as INVALID_ARGUMENT with a diagnostic
-// that contains `fragment`.
+// that contains `fragment`. A rejection leaves the completion with the caller
+// and never runs its callback.
 #define MLN_TEST_EXPECT_COMMAND_REJECTED(fragment, expression)         \
   do {                                                                 \
     mln_test_completion completion = mln_test_completion_default(0);   \
     MLN_TEST_INVALID(expression);                                      \
     TEST_ASSERT_NOT_NULL_MESSAGE(                                      \
       strstr(mln_test_last_error(), (fragment)), mln_test_last_error() \
+    );                                                                 \
+    TEST_ASSERT_FALSE_MESSAGE(                                         \
+      mln_test_completion_poll(&completion), #expression               \
     );                                                                 \
     mln_test_completion_reject(&completion);                           \
     mln_test_completion_destroy(&completion);                          \
