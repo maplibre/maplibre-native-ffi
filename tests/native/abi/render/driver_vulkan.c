@@ -404,24 +404,29 @@ static void submit_until_stopped(void* argument) {
   }
 }
 
-// A host that submits on the session's queue passes a lock, and the session
-// holds it around every call on the queue, its teardown drain included, so
-// both can use one queue at once. The lock's release runs once the session is
-// destroyed.
-static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
-  observer_reset(&first_observer);
+// Resets the shared lock and returns a queue lock on it for a session.
+static mln_queue_lock reset_shared_lock(void) {
   atomic_store(&shared_lock.next_ticket, 0);
   atomic_store(&shared_lock.serving, 0);
   atomic_store(&shared_lock.locks, 0);
   atomic_store(&shared_lock.unlocks, 0);
   atomic_store(&shared_lock.releases, 0);
-  const mln_queue_lock queue_lock = {
+  return (mln_queue_lock){
     .size = sizeof(mln_queue_lock),
     .lock = session_takes_queue_lock,
     .unlock = session_gives_queue_lock,
     .user_data = &shared_lock,
     .release_user_data = queue_lock_released,
   };
+}
+
+// A host that submits on the session's queue passes a lock, and the session
+// holds it around every call on the queue, its teardown drain included, so
+// both can use one queue at once. The lock's release runs once the session is
+// destroyed.
+static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
+  observer_reset(&first_observer);
+  const mln_queue_lock queue_lock = reset_shared_lock();
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(runtime, map);
@@ -478,9 +483,43 @@ static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Abandon ends the session's graphics calls at once, so it lets go of the
+// host's queue lock before it returns: the lock is given back as often as it
+// was taken, and its release has run.
+static void abandon_releases_the_host_queue_lock(void) {
+  const mln_queue_lock queue_lock = reset_shared_lock();
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_vulkan_borrowed_texture(
+      map, &fixture, NULL, NULL, &queue_lock
+    ),
+    mln_test_graphics_last_error()
+  );
+  render_one_frame(&fixture, 1);
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&shared_lock.locks));
+
+  mln_render_abandon_result abandoned = {
+    .size = sizeof(mln_render_abandon_result)
+  };
+  MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
+  TEST_ASSERT_EQUAL_UINT(1, atomic_load(&shared_lock.releases));
+  TEST_ASSERT_EQUAL_UINT(
+    atomic_load(&shared_lock.locks), atomic_load(&shared_lock.unlocks)
+  );
+
+  mln_test_render_fixture_destroy(&fixture);
+  TEST_ASSERT_EQUAL_UINT(1, atomic_load(&shared_lock.releases));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_attach_still_owns_the_session_it_published);
   RUN_TEST(a_session_drains_its_own_queue_and_never_waits_on_the_device);
   RUN_TEST(sessions_sharing_a_queue_call_their_own_device_functions);
   RUN_TEST(a_session_takes_the_host_queue_lock_around_its_queue_calls);
+  RUN_TEST(abandon_releases_the_host_queue_lock);
 }

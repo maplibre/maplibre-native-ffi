@@ -686,7 +686,6 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     if (status != VK_SUCCESS && status != VK_SUBOPTIMAL_KHR && status != VK_ERROR_OUT_OF_DATE_KHR) {
       error("vkQueuePresentKHR failed with Vulkan status $status")
     }
-    context.waitQueueIdle()
     return status != VK_ERROR_OUT_OF_DATE_KHR
   }
 

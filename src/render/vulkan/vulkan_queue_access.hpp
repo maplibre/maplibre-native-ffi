@@ -32,10 +32,13 @@ namespace mln::core {
 //
 // Each submission, the drain's included, and each present also holds the
 // host's queue lock when the session has one, taken inside the per-queue lock,
-// so the host can share the queue with the session. No lock is held across a
-// wait. Each session calls through the device
-// functions its own dispatcher resolved, so a host that interposes on those
-// functions sees only its own session's calls.
+// so the host can share the queue with the session. Once the process has begun
+// to exit, such a call returns VK_ERROR_DEVICE_LOST without calling the host's
+// lock or reaching the queue. No lock is held across a wait.
+//
+// Each session calls through the device functions its own dispatcher resolved,
+// so a host that interposes on those functions sees only its own session's
+// calls.
 //
 // Vulkan entry points carry no user data, so each registration takes one of a
 // fixed set of slots, each with its own entry points. A registration past the

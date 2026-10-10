@@ -20,12 +20,14 @@ QueueLock::~QueueLock() {
   }
 }
 
-auto QueueLock::lock() const noexcept -> void {
+auto QueueLock::lock() const noexcept -> bool {
+  if (process_exiting()) return false;
   try {
     descriptor_.lock(descriptor_.user_data);
   } catch (...) {
     // Host lock callbacks must not unwind through the C boundary.
   }
+  return true;
 }
 
 auto QueueLock::unlock() const noexcept -> void {

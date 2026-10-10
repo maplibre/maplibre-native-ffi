@@ -65,6 +65,11 @@ auto find_slot(std::size_t index) -> std::optional<Slot> {
   return state.slots.at(index);
 }
 
+// What a queue call returns, without reaching the queue, when the host shares
+// the queue under a lock and the process has begun to exit. The host's lock
+// can no longer be called, and the queue must not be used without it.
+constexpr auto exiting_result = VK_ERROR_DEVICE_LOST;
+
 // Waits for everything submitted to the slot's queue so far, without holding
 // its lock during the wait.
 auto drain_queue(const Slot& slot) -> VkResult {
@@ -85,7 +90,9 @@ auto drain_queue(const Slot& slot) -> VkResult {
     const auto host_lock = mln::core::QueueLockGuard{slot.host_lock.get()};
     // An empty batch still signals its fence, once all earlier work on the
     // queue has completed.
-    result = functions.queue_submit(slot.queue, 0, nullptr, fence);
+    result = host_lock.refused()
+               ? exiting_result
+               : functions.queue_submit(slot.queue, 0, nullptr, fence);
   }
   if (result == VK_SUCCESS) {
     result = functions.wait_for_fences(
@@ -111,6 +118,7 @@ auto slot_queue_submit(
   }
   const auto lock = std::scoped_lock{*slot->submit_mutex};
   const auto host_lock = mln::core::QueueLockGuard{slot->host_lock.get()};
+  if (host_lock.refused()) return exiting_result;
   return slot->functions.queue_submit(queue, submit_count, submits, fence);
 }
 
@@ -125,6 +133,7 @@ auto slot_queue_present(
   }
   const auto lock = std::scoped_lock{*slot->submit_mutex};
   const auto host_lock = mln::core::QueueLockGuard{slot->host_lock.get()};
+  if (host_lock.refused()) return exiting_result;
   return slot->functions.queue_present(queue, present_info);
 }
 

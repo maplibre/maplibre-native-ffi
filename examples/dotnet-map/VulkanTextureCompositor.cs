@@ -167,7 +167,6 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             "vkWaitForFences"
         );
         var present = Present(imageIndex);
-        context.WaitQueueIdle();
         if (present == Result.ErrorOutOfDateKhr)
         {
             RecreateSwapchain();

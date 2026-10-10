@@ -642,17 +642,24 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
 
 static void lock_nothing(void* context) { (void)context; }
 
-// A queue lock names both of its callbacks or neither, and only a Vulkan
-// target takes one, because only the Vulkan driver submits to a queue that the
-// host names.
+// A queue lock names both of its callbacks or neither, a disabled one retains
+// no user data, and only a Vulkan target takes one, because only the Vulkan
+// driver submits to a queue that the host names.
 static void attach_checks_the_queue_lock(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
-  options.queue_lock.lock = lock_nothing;
+  options.queue_lock.release_user_data = lock_nothing;
   mln_test_completion attach = mln_test_completion_default(0);
   mln_test_render_fixture fixture = {0};
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
+                                   map, &options, &attach.descriptor, &fixture
+                                 )
+  );
+  options.queue_lock.release_user_data = NULL;
+  options.queue_lock.lock = lock_nothing;
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
                                    map, &options, &attach.descriptor, &fixture
