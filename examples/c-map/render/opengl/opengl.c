@@ -455,13 +455,13 @@ static void borrowed_texture_destroy(
 
 /// The textures of a borrowed ring, one per slot.
 typedef struct opengl_ring {
-  GLuint textures[BORROWED_RING_DEPTH];
+  GLuint textures[RING_DEPTH];
 } opengl_ring;
 
 static void opengl_ring_destroy(
   const opengl_context* context, const gl_procs* procs, opengl_ring* ring
 ) {
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     borrowed_texture_destroy(context, procs, &ring->textures[index]);
   }
 }
@@ -471,7 +471,7 @@ static app_error opengl_ring_create(
   viewport current_viewport, opengl_ring* out_ring
 ) {
   *out_ring = (opengl_ring){};
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     const app_error error = borrowed_texture_create(
       context, procs, current_viewport, &out_ring->textures[index]
     );
@@ -583,9 +583,9 @@ app_error render_target_init(
 /// Describes ring, whose entries the caller provides storage for.
 static mln_opengl_borrowed_texture_descriptor borrowed_ring_descriptor(
   render_target* target, const opengl_ring* ring, viewport current_viewport,
-  mln_opengl_borrowed_texture entries[BORROWED_RING_DEPTH]
+  mln_opengl_borrowed_texture entries[RING_DEPTH]
 ) {
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     entries[index] =
       (mln_opengl_borrowed_texture){.texture = ring->textures[index]};
   }
@@ -597,7 +597,7 @@ static mln_opengl_borrowed_texture_descriptor borrowed_ring_descriptor(
   descriptor.context =
     opengl_context_descriptor(&target->as.borrowed.compositor.context);
   descriptor.textures = entries;
-  descriptor.texture_count = BORROWED_RING_DEPTH;
+  descriptor.texture_count = RING_DEPTH;
   descriptor.target = gl_texture_target;
   return descriptor;
 }
@@ -641,7 +641,7 @@ app_error render_target_attach(
       break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      mln_opengl_borrowed_texture entries[BORROWED_RING_DEPTH];
+      mln_opengl_borrowed_texture entries[RING_DEPTH];
       const mln_opengl_borrowed_texture_descriptor descriptor =
         borrowed_ring_descriptor(
           target, &target->as.borrowed.ring, current_viewport, entries
@@ -705,8 +705,8 @@ void render_target_deinit(render_target* target) {
 }
 
 /// Follows a resized window in borrowed-texture mode: allocates a ring at the
-/// new size and hands it to the live session, which stays attached. The
-/// replacement waits until the host holds no frame, so the held one goes
+/// new size and hands it to the live session, which stays attached. A
+/// replacement is refused while the host holds a frame, so the held one goes
 /// first; the window keeps showing what it last presented.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
@@ -729,7 +729,7 @@ static app_error resize_borrowed(
   mln_status status = MLN_STATUS_INVALID_STATE;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   if (entry != nullptr) {
-    mln_opengl_borrowed_texture entries[BORROWED_RING_DEPTH];
+    mln_opengl_borrowed_texture entries[RING_DEPTH];
     const mln_opengl_borrowed_texture_descriptor descriptor =
       borrowed_ring_descriptor(target, &replacement, current_viewport, entries);
     status = mln_opengl_borrowed_texture_set_target(

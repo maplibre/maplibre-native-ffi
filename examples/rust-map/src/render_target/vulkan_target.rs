@@ -8,7 +8,7 @@ use maplibre_native_ffi::{
 use crate::graphics::GraphicsContext;
 use crate::map_state::MapState;
 use crate::render_target::{
-    BORROWED_RING_DEPTH, Mode, Replacements, Session, attach_options, compositor_error, extent,
+    Mode, RING_DEPTH, Replacements, Session, attach_options, compositor_error, extent,
     require_cpu_complete_producer,
 };
 use crate::shell::Wakes;
@@ -17,7 +17,7 @@ use crate::vulkan::{BorrowedImage, VulkanContext};
 use crate::vulkan_texture_compositor::VulkanTextureCompositor;
 
 /// The images of a borrowed ring, one per slot.
-type VulkanRing = [BorrowedImage; BORROWED_RING_DEPTH];
+type VulkanRing = [BorrowedImage; RING_DEPTH];
 
 pub enum RenderTarget {
     OwnedTexture {
@@ -136,7 +136,7 @@ impl RenderTarget {
                 ring: current,
                 replacements,
             } => {
-                // The replacement waits until the host holds no frame, and
+                // A replacement is refused while the host holds a frame, and
                 // the window keeps showing what it last presented.
                 session.release_held()?;
                 let replacement = ring(graphics.vulkan(), viewport)?;

@@ -25,8 +25,9 @@ mln_render_session_attach_options render_session_attach_options(
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
   options.driver = driver;
-  options.requested_texture_ring_depth =
-    mode == RENDER_TARGET_MODE_OWNED_TEXTURE ? BORROWED_RING_DEPTH : 0;
+  if (mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
+    options.requested_texture_ring_depth = RING_DEPTH;
+  }
   options.frame_wake = app_event_wake(APP_EVENT_FRAME_RESULTS);
   if (driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     options.driver_work_wake = app_event_wake(APP_EVENT_DRIVER_WORK);

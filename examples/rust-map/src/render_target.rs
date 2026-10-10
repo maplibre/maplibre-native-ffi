@@ -94,10 +94,10 @@ pub fn extent(viewport: Viewport) -> RenderTargetExtent {
     )
 }
 
-/// The textures of a borrowed ring. The host holds the newest frame until a
-/// newer one arrives, and the session never renders into a held frame's
-/// texture, so it renders into the other one meanwhile.
-pub const BORROWED_RING_DEPTH: usize = 2;
+/// The slot count of a texture ring, owned or borrowed. The host holds the
+/// newest frame until a newer one arrives, and the session never renders into
+/// a held frame's texture, so it renders into the other one meanwhile.
+pub const RING_DEPTH: usize = 2;
 
 pub fn driver_label(driver: RenderDriverKind) -> &'static str {
     match driver {
@@ -108,7 +108,7 @@ pub fn driver_label(driver: RenderDriverKind) -> &'static str {
 
 /// Attach options for `driver` whose wakes post frame-result events and, for a
 /// caller driver, driver-work events to the winit loop. An owned texture asks
-/// for a ring of [`BORROWED_RING_DEPTH`] slots; a borrowed ring's depth is its
+/// for a ring of [`RING_DEPTH`] slots; a borrowed ring's depth is its
 /// texture count.
 pub fn attach_options(
     wakes: &Wakes,
@@ -117,14 +117,12 @@ pub fn attach_options(
 ) -> RenderSessionAttachOptions {
     let mut options = RenderSessionAttachOptions {
         driver,
-        requested_texture_ring_depth: if mode == Mode::OwnedTexture {
-            BORROWED_RING_DEPTH as u32
-        } else {
-            0
-        },
         frame_wake: wakes.wake(AppEvent::FrameResults),
         ..RenderSessionAttachOptions::default()
     };
+    if mode == Mode::OwnedTexture {
+        options.requested_texture_ring_depth = RING_DEPTH as u32;
+    }
     if driver == RenderDriverKind::CallerGraphicsThread {
         options.driver_work_wake = wakes.wake(AppEvent::DriverWork);
     }

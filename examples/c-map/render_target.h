@@ -32,16 +32,16 @@ typedef struct frame_results {
   bool target_not_ready;
 } frame_results;
 
-/// The textures of a borrowed ring. The host holds the newest frame until a
-/// newer one arrives, and the session never renders into a held frame's
-/// texture, so it renders into the other one meanwhile.
-enum { BORROWED_RING_DEPTH = 2 };
+/// The slot count of a texture ring, owned or borrowed. The host holds the
+/// newest frame until a newer one arrives, and the session never renders into
+/// a held frame's texture, so it renders into the other one meanwhile.
+enum { RING_DEPTH = 2 };
 
 const char* render_driver_label(mln_render_driver_kind driver);
 
 /// Attach options for driver whose wakes post APP_EVENT_FRAME_RESULTS and, for
 /// a caller driver, APP_EVENT_DRIVER_WORK. An owned texture asks for a ring of
-/// BORROWED_RING_DEPTH slots; a borrowed ring's depth is its texture count.
+/// RING_DEPTH slots; a borrowed ring's depth is its texture count.
 mln_render_session_attach_options render_session_attach_options(
   render_target_mode mode, mln_render_driver_kind driver
 );

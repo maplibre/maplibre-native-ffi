@@ -348,9 +348,9 @@ const MetalBorrowedTextureBackend = struct {
     }
 
     /// Follows a resized window: allocates a ring at the new size and hands it
-    /// to the live session, which stays attached. The replacement waits until
-    /// the host holds no frame, so the held one goes first; the window keeps
-    /// showing what it last presented.
+    /// to the live session, which stays attached. A replacement is refused
+    /// while the host holds a frame, so the held one goes first; the window
+    /// keeps showing what it last presented.
     fn resize(self: *MetalBorrowedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
         render_target.releaseFrame(&self.held);

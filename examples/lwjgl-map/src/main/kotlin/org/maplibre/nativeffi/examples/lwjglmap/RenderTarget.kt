@@ -348,11 +348,11 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
   protected abstract fun setTarget(viewport: Viewport, replacement: List<T>): Deferred<Unit>
 
   /**
-   * Replaces the ring, because its owner sets its size. The replacement waits until the host holds
-   * no frame, so the held one goes first, and the window keeps what it last presented. The outgoing
-   * ring stays alive until the replacement completes. A replacement that fails once started leaves
-   * it unknown which ring the session holds, so the session detaches before either ring is
-   * released.
+   * Replaces the ring, because its owner sets its size. A replacement is refused while the host
+   * holds a frame, so the held one goes first, and the window keeps what it last presented. The
+   * outgoing ring stays alive until the replacement completes. A replacement that fails once
+   * started leaves it unknown which ring the session holds, so the session detaches before either
+   * ring is released.
    */
   override fun resize(viewport: Viewport) {
     releaseFrames()

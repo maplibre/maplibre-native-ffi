@@ -353,11 +353,11 @@ static app_error borrowed_texture_create(
 
 /// The textures of a borrowed ring, one per slot.
 typedef struct metal_ring {
-  id textures[BORROWED_RING_DEPTH];
+  id textures[RING_DEPTH];
 } metal_ring;
 
 static void metal_ring_release(metal_ring* ring) {
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     release_object(&ring->textures[index]);
   }
 }
@@ -366,7 +366,7 @@ static app_error metal_ring_create(
   id device, viewport current_viewport, metal_ring* out_ring
 ) {
   *out_ring = (metal_ring){};
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     const app_error error = borrowed_texture_create(
       device, current_viewport, &out_ring->textures[index]
     );
@@ -476,9 +476,9 @@ static mln_metal_context_descriptor metal_context_descriptor(id device) {
 /// Describes ring, whose entries the caller provides storage for.
 static mln_metal_borrowed_texture_descriptor borrowed_ring_descriptor(
   const metal_ring* ring, viewport current_viewport,
-  mln_metal_borrowed_texture entries[BORROWED_RING_DEPTH]
+  mln_metal_borrowed_texture entries[RING_DEPTH]
 ) {
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     entries[index] =
       (mln_metal_borrowed_texture){.texture = ring->textures[index]};
   }
@@ -488,7 +488,7 @@ static mln_metal_borrowed_texture_descriptor borrowed_ring_descriptor(
   descriptor.physical_width = current_viewport.physical_width;
   descriptor.physical_height = current_viewport.physical_height;
   descriptor.textures = entries;
-  descriptor.texture_count = BORROWED_RING_DEPTH;
+  descriptor.texture_count = RING_DEPTH;
   return descriptor;
 }
 
@@ -517,7 +517,7 @@ app_error render_target_attach(
       break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      mln_metal_borrowed_texture entries[BORROWED_RING_DEPTH];
+      mln_metal_borrowed_texture entries[RING_DEPTH];
       const mln_metal_borrowed_texture_descriptor descriptor =
         borrowed_ring_descriptor(
           &target->as.borrowed.ring, current_viewport, entries
@@ -582,8 +582,8 @@ void render_target_deinit(render_target* target) {
 }
 
 /// Follows a resized window in borrowed-texture mode: allocates a ring at the
-/// new size and hands it to the live session, which stays attached. The
-/// replacement waits until the host holds no frame, so the held one goes
+/// new size and hands it to the live session, which stays attached. A
+/// replacement is refused while the host holds a frame, so the held one goes
 /// first; the window keeps showing what it last presented.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
@@ -608,7 +608,7 @@ static app_error resize_borrowed(
     free(retired);
     return APP_ERROR_RESIZE_FAILED;
   }
-  mln_metal_borrowed_texture entries[BORROWED_RING_DEPTH];
+  mln_metal_borrowed_texture entries[RING_DEPTH];
   const mln_metal_borrowed_texture_descriptor descriptor =
     borrowed_ring_descriptor(&replacement, current_viewport, entries);
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};

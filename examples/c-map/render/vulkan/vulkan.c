@@ -338,11 +338,11 @@ static app_error borrowed_image_init(
 
 /// The images of a borrowed ring, one per slot.
 typedef struct vulkan_ring {
-  borrowed_image images[BORROWED_RING_DEPTH];
+  borrowed_image images[RING_DEPTH];
 } vulkan_ring;
 
 static void vulkan_ring_deinit(vulkan_ring* ring, VkDevice device) {
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     borrowed_image_deinit(&ring->images[index], device);
   }
 }
@@ -351,7 +351,7 @@ static app_error vulkan_ring_init(
   vulkan_ring* ring, const vulkan_context* context, viewport current_viewport
 ) {
   *ring = (vulkan_ring){};
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     const app_error error =
       borrowed_image_init(&ring->images[index], context, current_viewport);
     if (error != APP_OK) {
@@ -449,9 +449,9 @@ app_error render_target_init(
 /// Describes ring, whose entries the caller provides storage for.
 static mln_vulkan_borrowed_texture_descriptor borrowed_ring_descriptor(
   render_target* target, const vulkan_ring* ring, viewport current_viewport,
-  mln_vulkan_borrowed_texture entries[BORROWED_RING_DEPTH]
+  mln_vulkan_borrowed_texture entries[RING_DEPTH]
 ) {
-  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
     entries[index] = (mln_vulkan_borrowed_texture){
       .image = vulkan_image_to_abi(ring->images[index].image),
       .image_view = vulkan_image_view_to_abi(ring->images[index].view),
@@ -465,7 +465,7 @@ static mln_vulkan_borrowed_texture_descriptor borrowed_ring_descriptor(
   descriptor.context =
     vulkan_context_descriptor(&target->as.borrowed.compositor.context);
   descriptor.textures = entries;
-  descriptor.texture_count = BORROWED_RING_DEPTH;
+  descriptor.texture_count = RING_DEPTH;
   descriptor.format = borrowed_image_format;
   descriptor.initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
   descriptor.final_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -511,7 +511,7 @@ app_error render_target_attach(
       break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      mln_vulkan_borrowed_texture entries[BORROWED_RING_DEPTH];
+      mln_vulkan_borrowed_texture entries[RING_DEPTH];
       const mln_vulkan_borrowed_texture_descriptor descriptor =
         borrowed_ring_descriptor(
           target, &target->as.borrowed.ring, current_viewport, entries
@@ -584,8 +584,8 @@ void render_target_deinit(render_target* target) {
 }
 
 /// Follows a resized window in borrowed-texture mode: allocates a ring at the
-/// new size and hands it to the live session, which stays attached. The
-/// replacement waits until the host holds no frame, so the held one goes
+/// new size and hands it to the live session, which stays attached. A
+/// replacement is refused while the host holds a frame, so the held one goes
 /// first; the window keeps showing what it last presented.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
@@ -608,7 +608,7 @@ static app_error resize_borrowed(
   mln_status status = MLN_STATUS_INVALID_STATE;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   if (entry != nullptr) {
-    mln_vulkan_borrowed_texture entries[BORROWED_RING_DEPTH];
+    mln_vulkan_borrowed_texture entries[RING_DEPTH];
     const mln_vulkan_borrowed_texture_descriptor descriptor =
       borrowed_ring_descriptor(target, &replacement, current_viewport, entries);
     status = mln_vulkan_borrowed_texture_set_target(

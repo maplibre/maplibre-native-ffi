@@ -213,7 +213,7 @@ final class MetalRenderTarget {
       try await session.resize(extent: viewport.extent)
       return
     }
-    // The replacement waits until the host holds no frame, so the held one
+    // A replacement is refused while the host holds a frame, so the held one
     // goes first, and the layer keeps what it last presented. The session
     // renders into the outgoing ring until the replacement completes, and
     // this call keeps that ring alive until then.
