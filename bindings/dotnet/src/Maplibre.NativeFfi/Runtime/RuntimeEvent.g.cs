@@ -20,8 +20,8 @@ namespace Maplibre.NativeFfi;
 /// <c>mln_map</c>. Every handle type is uint64_t, so this needs no cast.
 /// </param>
 /// <param name="Generation">
-/// Map snapshot generation that the event reports, or zero for an event whose
-/// source is a runtime.
+/// Map snapshot generation that the event reports, or zero when source_type is
+/// <c>MLN_RUNTIME_EVENT_SOURCE_RUNTIME</c>.
 /// </param>
 /// <param name="Code">
 /// Secondary event detail whose meaning type selects. Depending on type it

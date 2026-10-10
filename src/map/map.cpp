@@ -387,36 +387,41 @@ namespace {
 // Queues one event that the map raised on the runtime worker. Inside a map
 // transaction the event waits for the generation that the transaction
 // publishes, and `generation` is unused. Outside one, `generation` stamps the
-// event, and zero drops it, because zero means the map is gone. Every map
-// producer queues through here.
+// event, and zero drops it, because zero means the map is gone or its publish
+// failed. Every map producer queues through here. Most run inside MapLibre
+// callbacks, so an event that cannot be queued is dropped rather than thrown.
 auto queue_map_event(
   MapEventState& events, uint64_t generation, uint32_t type,
   uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
   const mln_runtime_event_payload& payload = zeroed_event_payload(),
   int32_t code = 0, std::string message = {}
-) -> void {
-  if (events.in_transaction()) {
-    events.held.push_back(
-      HeldMapEvent{
-        .type = type,
-        .payload_type = payload_type,
-        .payload = payload,
-        .code = code,
-        .message = std::move(message),
-      }
+) noexcept -> void {
+  try {
+    if (events.in_transaction()) {
+      events.held.push_back(
+        HeldMapEvent{
+          .type = type,
+          .payload_type = payload_type,
+          .payload = payload,
+          .code = code,
+          .message = std::move(message),
+        }
+      );
+      return;
+    }
+    if (generation == 0) return;
+    push_runtime_map_event_payload(
+      events.runtime, events.map, generation, type, payload_type, payload, code,
+      std::move(message)
     );
-    return;
+  } catch (...) {
+    // Dropped, as the queue drops an event whose runtime is gone.
   }
-  if (generation == 0) return;
-  push_runtime_map_event_payload(
-    events.runtime, events.map, generation, type, payload_type, payload, code,
-    std::move(message)
-  );
 }
 
 auto queue_transition_finished(
   MapEventState& events, uint64_t generation, uint64_t transition_id
-) -> void {
+) noexcept -> void {
   auto payload = zeroed_event_payload();
   payload.camera_transition_finished =
     mln_runtime_event_camera_transition_finished{
@@ -463,7 +468,8 @@ class HeadlessObserver final : public mln::MapObserver {
     if (!selected(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)) {
       return;
     }
-    queue_fresh(
+    // The camera has not moved yet, so the latest snapshot is current.
+    queue_current(
       MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, to_c_camera_change_mode(mode)
     );
   }
@@ -506,7 +512,8 @@ class HeadlessObserver final : public mln::MapObserver {
     if (!selected(MLN_RUNTIME_EVENT_MAP_LOADING_STARTED)) {
       return;
     }
-    queue_fresh(MLN_RUNTIME_EVENT_MAP_LOADING_STARTED);
+    // Loading has changed no published state yet.
+    queue_current(MLN_RUNTIME_EVENT_MAP_LOADING_STARTED);
   }
 
   void onDidFinishLoadingMap() override {
@@ -2268,6 +2275,32 @@ class RuntimeMapRetainGuard final {
   mln_runtime runtime_ = MLN_HANDLE_NULL;
 };
 
+// Completes an operation that the map finished on the runtime worker. Inside a
+// map transaction the completion waits until the transaction queues the events
+// it held, so the operation's own event comes first. If the completion cannot
+// be deferred it runs now, because a completion must still run exactly once.
+auto complete_after_held_events(
+  MapEventState& events, std::shared_ptr<OperationObject> operation,
+  mln_status status, std::string message, std::any result
+) noexcept -> void {
+  if (events.in_transaction()) {
+    try {
+      events.deferred_completions.push_back(
+        DeferredOperationCompletion{
+          .operation = operation,
+          .status = status,
+          .message = message,
+          .result = result,
+        }
+      );
+      return;
+    } catch (...) {
+      // Completes below, ahead of the held events.
+    }
+  }
+  operation->complete(status, std::move(message), std::move(result));
+}
+
 // Runs on the runtime worker from MapLibre's still-image continuation and
 // resolves the handle that identifies the pending request.
 auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
@@ -2300,15 +2333,10 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
     );
   }
   if (!operation) return;
-  if (events.in_transaction()) {
-    events.held_still_image = HeldStillImageCompletion{
-      .operation = std::move(operation),
-      .status = status,
-      .message = std::move(message),
-    };
-    return;
-  }
-  operation->complete(status, std::move(message), std::any{std::monostate{}});
+  complete_after_held_events(
+    events, std::move(operation), status, std::move(message),
+    std::any{std::monostate{}}
+  );
 }
 
 // The caller holds the map handle table's mutex, so it can act on the result
@@ -2403,30 +2431,25 @@ auto open_map_transaction(MapEventState& events) -> void {
 // followed. MapLibre finishes a transition that way only from easeTo() or
 // flyTo(), which only map commands call, so the finish belongs to the
 // command that closes the transaction.
-auto hold_finished_transitions(MapEventState& events) -> void {
+auto hold_finished_transitions(MapEventState& events) noexcept -> void {
   auto& finished = events.finished_transitions;
   if (finished.empty()) return;
-  try {
-    if (
-      event_selected(
-        events.mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
-      )
-    ) {
-      for (const auto transition_id : finished) {
-        queue_transition_finished(events, 0, transition_id);
-      }
+  if (
+    event_selected(
+      events.mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
+    )
+  ) {
+    for (const auto transition_id : finished) {
+      queue_transition_finished(events, 0, transition_id);
     }
-  } catch (...) {
-    finished.clear();
-    throw;
   }
   finished.clear();
 }
 
 // Queues the held events with `generation`, then announces the render update
-// that the transaction held, so a command raises at most one. A still-image
-// request that the transaction finished completes last, after its event. The
-// update and the completion go out even when queueing fails, and the first
+// that the transaction held, so a command raises at most one. Operations that
+// finished inside the transaction complete last, after their events. The
+// update and the completions go out even when queueing fails, and the first
 // failure is rethrown afterwards.
 auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
   auto& events = *live.event_state;
@@ -2434,11 +2457,7 @@ auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
   const auto record = [&error] {
     if (!error) error = std::current_exception();
   };
-  try {
-    hold_finished_transitions(events);
-  } catch (...) {
-    record();
-  }
+  hold_finished_transitions(events);
   events.transaction_depth -= 1;
   try {
     queue_held_map_events(
@@ -2452,9 +2471,12 @@ auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
   } catch (...) {
     record();
   }
-  if (auto held = std::exchange(events.held_still_image, std::nullopt)) {
-    held->operation->complete(
-      held->status, std::move(held->message), std::any{std::monostate{}}
+  // A completion runs host code, which may submit work but never runs a task
+  // inline, so nothing appends to the slot while it drains.
+  auto deferred = std::exchange(events.deferred_completions, {});
+  for (auto& held : deferred) {
+    held.operation->complete(
+      held.status, std::move(held.message), std::move(held.result)
     );
   }
   if (error) std::rethrow_exception(error);
@@ -2470,11 +2492,16 @@ struct MapCommandOutcome {
 // publishes a snapshot after the work, whether it committed or failed, and its
 // events are queued with that generation before the caller completes the
 // command. Work returns a status and sets the thread error for a failure, and
-// an exception fails the command with its text.
+// an exception fails the command with its text. Work can run host callbacks,
+// such as the release callbacks of a style load, so the transaction keeps its
+// own shares of the map and its event state.
 template <typename Work>
-auto run_map_transaction(MapObject& live, Work&& work) -> MapCommandOutcome {
+auto run_map_transaction(std::shared_ptr<MapObject> map, Work&& work)
+  -> MapCommandOutcome {
+  auto& live = *map;
+  const auto event_state = live.event_state;
   auto outcome = MapCommandOutcome{};
-  open_map_transaction(*live.event_state);
+  open_map_transaction(*event_state);
   clear_thread_error();
   try {
     outcome.status = std::invoke(std::forward<Work>(work), live);
@@ -2712,7 +2739,7 @@ auto submit_map_command(
     [live = std::move(context.map), map_lease = std::move(context.control),
      completion_state, work = std::move(work)](uint64_t) mutable -> void {
       complete_map_command(
-        completion_state, run_map_transaction(*live, std::move(work))
+        completion_state, run_map_transaction(live, std::move(work))
       );
     },
     completion_state
@@ -3103,7 +3130,7 @@ auto map_resize(
       }
       complete_map_command(
         completion_state,
-        run_map_transaction(*live, [extent](MapObject& map) -> mln_status {
+        run_map_transaction(live, [extent](MapObject& map) -> mln_status {
           map.logical_extent.width = extent.width;
           map.logical_extent.height = extent.height;
           map.map->setSize(mln::Size{extent.width, extent.height});
@@ -3405,7 +3432,7 @@ auto map_request_repaint(mln_map map, const mln_completion* completion)
      completion_state](uint64_t) mutable -> void {
       complete_map_command(
         completion_state,
-        run_map_transaction(*live, [](MapObject& map) -> mln_status {
+        run_map_transaction(live, [](MapObject& map) -> mln_status {
           map.map->triggerRepaint();
           return MLN_STATUS_OK;
         })
@@ -3872,7 +3899,7 @@ auto map_set_event_mask(
      completion_state](uint64_t) mutable -> void {
       complete_map_command(
         completion_state,
-        run_map_transaction(*live, [mask](MapObject& map) -> mln_status {
+        run_map_transaction(live, [mask](MapObject& map) -> mln_status {
           map.event_state->mask.store(mask, std::memory_order_relaxed);
           return MLN_STATUS_OK;
         })
@@ -3922,7 +3949,7 @@ auto submit_camera_command(
      completion_state](uint64_t) mutable -> void {
       complete_map_command(
         completion_state,
-        run_map_transaction(*live, [&mutation](MapObject& map) -> mln_status {
+        run_map_transaction(live, [&mutation](MapObject& map) -> mln_status {
           mutation(map);
           return MLN_STATUS_OK;
         })

@@ -4408,8 +4408,8 @@ pub struct RuntimeEvent {
     /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
     /// Every handle type is uint64_t, so this needs no cast.
     pub source: u64,
-    /// Map snapshot generation that the event reports, or zero for an event
-    /// whose source is a runtime.
+    /// Map snapshot generation that the event reports, or zero when source_type
+    /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
     pub generation: u64,
     /// Secondary event detail whose meaning type selects. Depending on type it
     /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native

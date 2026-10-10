@@ -760,8 +760,8 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
   /// Every handle type is uint64_t, so this needs no cast.
   public var source: UInt64
-  /// Map snapshot generation that the event reports, or zero for an event whose
-  /// source is a runtime.
+  /// Map snapshot generation that the event reports, or zero when source_type
+  /// is `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
   public var generation: UInt64
   /// Secondary event detail whose meaning type selects. Depending on type it
   /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native

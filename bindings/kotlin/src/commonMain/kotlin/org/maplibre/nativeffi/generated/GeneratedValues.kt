@@ -3109,7 +3109,8 @@ public data class RuntimeEvent(
    */
   public val source: ULong = 0uL,
   /**
-   * Map snapshot generation that the event reports, or zero for an event whose source is a runtime.
+   * Map snapshot generation that the event reports, or zero when source_type is
+   * `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
    */
   public val generation: ULong = 0uL,
   /**

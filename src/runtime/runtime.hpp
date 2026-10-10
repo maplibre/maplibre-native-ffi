@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <atomic>
 #include <condition_variable>
 #include <cstddef>
@@ -50,12 +51,14 @@ struct HeldMapEvent {
   std::string message;
 };
 
-// A still-image request that finished inside a map transaction. Its
-// completion waits until the transaction queues the request's event.
-struct HeldStillImageCompletion {
+// An operation completion raised inside a map transaction. It waits until
+// the transaction queues the events it held, so an operation's event precedes
+// its completion.
+struct DeferredOperationCompletion {
   std::shared_ptr<OperationObject> operation;
   mln_status status = MLN_STATUS_OK;
   std::string message;
+  std::any result;
 };
 
 // One map's event state. The runtime keeps a share of it while the map is
@@ -80,9 +83,9 @@ struct MapEventState {
   // until it publishes, and transactions never nest.
   uint32_t transaction_depth = 0;
   std::vector<HeldMapEvent> held;
-  // A style error inside a command can finish a pending still-image request,
-  // and at most one is pending.
-  std::optional<HeldStillImageCompletion> held_still_image;
+  // Operations that finished inside the open transaction, such as a pending
+  // still image that a style error inside a command fails.
+  std::vector<DeferredOperationCompletion> deferred_completions;
   // Transition IDs whose finish callbacks ran, waiting for the
   // MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE that MapLibre usually raises right
   // after. A transaction flushes any finish that no camera change followed.
@@ -97,9 +100,15 @@ struct MapEventState {
   // The generation for an event that reports a change in map state. Outside a
   // transaction this publishes first, so the snapshot includes the change.
   // Inside one it publishes nothing, because the transaction stamps its held
-  // events when it publishes.
-  auto fresh_generation() -> uint64_t {
-    return in_transaction() ? published_generation : publish();
+  // events when it publishes. A failed publish returns zero, which drops the
+  // event, so no exception reaches the MapLibre callback that raised it.
+  auto fresh_generation() noexcept -> uint64_t {
+    if (in_transaction()) return published_generation;
+    try {
+      return publish();
+    } catch (...) {
+      return 0;
+    }
   }
 };
 

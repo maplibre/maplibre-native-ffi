@@ -559,20 +559,20 @@ typedef struct mln_runtime_event {
    */
   uint64_t source;
   /**
-   * Map snapshot generation that the event reports, or zero for an event whose
-   * source is a runtime.
+   * Map snapshot generation that the event reports, or zero when source_type
+   * is MLN_RUNTIME_EVENT_SOURCE_RUNTIME.
    *
-   * A camera, style, loading, or idle event follows the publication of a
-   * snapshot that includes the change it reports and carries that snapshot's
-   * generation. A published snapshot read at or past this generation therefore
+   * A camera, style, loading-finished, loading-failed, or idle event follows
+   * the publication of a snapshot that includes the change it reports and
+   * carries that snapshot's generation, so a snapshot read after draining it
    * shows state at least as new as the event. Every other map event carries the
-   * generation that was current when the map raised it.
+   * generation the map had published last.
    *
    * An event that a map command raises carries the generation that the
-   * command's completion reports. An event whose generation is at or past a
-   * command's completion generation was raised by that command or after it;
-   * one below it was raised before the command ran. Events from one map are
-   * queued in non-decreasing generation order.
+   * command's completion reports. An event at or past a command's completion
+   * generation was raised by that command or after it; one below it was raised
+   * before the command ran. Events from one map are queued in non-decreasing
+   * generation order.
    */
   uint64_t generation;
   /**
