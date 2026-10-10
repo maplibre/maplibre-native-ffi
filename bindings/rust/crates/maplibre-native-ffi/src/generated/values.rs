@@ -5008,7 +5008,9 @@ pub enum Status: i32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleImageInfo {
+    /// Image width in pixels.
     pub width: u32,
+    /// Image height in pixels.
     pub height: u32,
     /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes,
     /// top row first.
@@ -5384,7 +5386,9 @@ pub struct StyleSourceInfoField: u32 {
 pub struct StyleSourceTileInfo {
     /// Tile URL templates in TileJSON order.
     pub tile_urls: Vec<String>,
+    /// Lowest zoom level the TileJSON provides tiles for.
     pub min_zoom: f64,
+    /// Highest zoom level the TileJSON provides tiles for.
     pub max_zoom: f64,
     /// One of `mln_style_tile_scheme`.
     pub scheme: StyleTileScheme,

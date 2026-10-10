@@ -413,9 +413,9 @@ static void tile_source_options_are_validated_at_submission(void) {
 }
 
 // A URL source reports the URL it was added with, or last set to. An inline
-// tile source reports the attribution its options carried and its tile URLs,
-// and a source reports only the members it has. A missing source completes
-// with no value.
+// tile source reports the attribution its options carried, or an empty one when
+// they carried none, and its tile URLs. A source reports only the members it
+// has. A missing source completes with no value.
 static void a_source_reports_its_url_attribution_and_tilejson(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -441,6 +441,10 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   // The command copied the attribution before it returned.
   memset(attribution, 'x', strlen(attribution));
   MLN_TEST_OK(mln_test_completion_settle(&add));
+  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
+    map, MLN_BUFFER_LITERAL("unattributed"), tiles, 1, NULL,
+    &completion.descriptor, NULL
+  ));
   MLN_TEST_AWAIT_OK(mln_map_add_geojson_source_url(
     map, MLN_BUFFER_LITERAL("geojson"),
     MLN_BUFFER_LITERAL("fixture://first.geojson"), NULL, &completion.descriptor,
@@ -477,6 +481,11 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   TEST_ASSERT_EQUAL_size_t(2, probe.info.tilejson.tile_url_count);
   TEST_ASSERT_EQUAL_STRING("fixture://a/{z}/{x}/{y}.mvt", probe.tile_urls[0]);
   TEST_ASSERT_EQUAL_STRING("fixture://b/{z}/{x}/{y}.mvt", probe.tile_urls[1]);
+
+  probe = read_source(map, "unattributed");
+  TEST_ASSERT_TRUE(probe.found);
+  TEST_ASSERT_TRUE(probe.info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION);
+  TEST_ASSERT_EQUAL_STRING("", probe.attribution);
 
   TEST_ASSERT_FALSE(read_source(map, "missing").found);
 

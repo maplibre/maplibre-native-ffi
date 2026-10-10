@@ -3147,7 +3147,9 @@ public data class FeatureStateSelector(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleImageInfo(
+  /** Image width in pixels. */
   public val width: UInt = 0u,
+  /** Image height in pixels. */
   public val height: UInt = 0u,
   /** Premultiplied RGBA8 pixels in tightly packed rows of width &#42; 4 bytes, top row first. */
   public val pixels: ByteArray = byteArrayOf(),
@@ -3197,7 +3199,9 @@ public data class StyleLayerInfo(
 public data class StyleSourceTileInfo(
   /** Tile URL templates in TileJSON order. */
   public val tileUrls: List<String> = emptyList(),
+  /** Lowest zoom level the TileJSON provides tiles for. */
   public val minZoom: Double = 0.0,
+  /** Highest zoom level the TileJSON provides tiles for. */
   public val maxZoom: Double = 0.0,
   /** One of `mln_style_tile_scheme`. */
   public val scheme: StyleTileScheme = StyleTileScheme(0u),

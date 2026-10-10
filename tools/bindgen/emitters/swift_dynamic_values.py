@@ -295,7 +295,7 @@ def declaration(values, value):
         fields.append(f"  public var {local}: {group_type}?")
         args.append(f"{local}: {group_type}? = nil")
         init.append(f"    self.{local} = {local}")
-        path = ".".join(identifier(part) for part in group.mask.split("."))
+        path = identifier(group.mask)
         present = (
             f"raw.{path} & {group.bit}.rawValue != 0" if group.bit else f"raw.{path}"
         )
@@ -388,7 +388,7 @@ def declaration(values, value):
         init.append(f"    self.{local} = {local}")
         capture = decode(values, f.value, raw)
         if optional:
-            path = ".".join(identifier(part) for part in f.presence.mask.split("."))
+            path = identifier(f.presence.mask)
             bit = f.presence.bit
             present = f"raw.{path} & {bit}.rawValue != 0" if bit else f"raw.{path}"
             mark = f"raw.{path} |= {bit}.rawValue" if bit else f"raw.{path} = true"

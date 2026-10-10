@@ -165,7 +165,7 @@ def declaration(values, value):
             + " };\n"
         )
         fields.append(f"    {local}: ?{name} = null,")
-        mask = ".".join(identifier(part) for part in group.mask.split("."))
+        mask = identifier(group.mask)
         present = f"raw.{mask} & c.{group.bit} != 0" if group.bit else f"raw.{mask}"
         mark = f"raw.{mask} |= c.{group.bit}" if group.bit else f"raw.{mask} = true"
         assigned = " ".join(
@@ -247,7 +247,7 @@ def declaration(values, value):
         )
         copied = decode(values, field.value, raw)
         if optional:
-            path = ".".join(identifier(part) for part in field.presence.mask.split("."))
+            path = identifier(field.presence.mask)
             bit = field.presence.bit
             present = f"raw.{path} & c.{bit} != 0" if bit else f"raw.{path}"
             mark = f"raw.{path} |= c.{bit}" if bit else f"raw.{path} = true"

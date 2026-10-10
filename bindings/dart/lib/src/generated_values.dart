@@ -2507,7 +2507,11 @@ final class StyleImageInfo extends _Value {
        ).asUnmodifiableView(),
        stretchX = List.unmodifiable(stretchX),
        stretchY = List.unmodifiable(stretchY);
+
+  /// Image width in pixels.
   final int width;
+
+  /// Image height in pixels.
   final int height;
 
   /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
@@ -2608,7 +2612,11 @@ final class StyleSourceTileInfo extends _Value {
 
   /// Tile URL templates in TileJSON order.
   final List<String> tileUrls;
+
+  /// Lowest zoom level the TileJSON provides tiles for.
   final double minZoom;
+
+  /// Highest zoom level the TileJSON provides tiles for.
   final double maxZoom;
 
   /// One of `mln_style_tile_scheme`.

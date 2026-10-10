@@ -298,6 +298,13 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
                 self.parse(source.replace("mask=fields;bit=ZOOM", "mask=fields")),
                 require_complete=True,
             )
+        with self.assertRaisesRegex(ModelError, "mask must name a sibling field"):
+            bind(
+                self.parse(
+                    source.replace("mask=fields;bit=ZOOM", "mask=a.fields;bit=ZOOM")
+                ),
+                require_complete=True,
+            )
 
     def test_boolean_presence_preserves_optional_groups(self):
         source = """

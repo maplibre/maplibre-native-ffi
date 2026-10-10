@@ -653,7 +653,9 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageInfo: Equatable, Hashable, Sendable {
+  /// Image width in pixels.
   public var width: UInt32
+  /// Image height in pixels.
   public var height: UInt32
   /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
   /// row first.
@@ -1226,7 +1228,9 @@ public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
 public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
   /// Tile URL templates in TileJSON order.
   public var tileUrls: [String]
+  /// Lowest zoom level the TileJSON provides tiles for.
   public var minZoom: Double
+  /// Highest zoom level the TileJSON provides tiles for.
   public var maxZoom: Double
   /// One of `mln_style_tile_scheme`.
   public var scheme: StyleTileScheme

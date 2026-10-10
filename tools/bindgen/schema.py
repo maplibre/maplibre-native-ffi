@@ -918,6 +918,8 @@ def validate(api: Api) -> None:
                 enum.name for enum in api.enums
             }:
                 errors.append(f"{fcontext}: enum names an absent enum")
+            if "." in field.metadata.get("mask", ""):
+                errors.append(f"{fcontext}: mask must name a sibling field")
             if ("mask" in field.metadata) != ("bit" in field.metadata):
                 presence = field_path(record.name, field.metadata.get("mask", ""))
                 if presence is None or presence.type.kind != "bool":

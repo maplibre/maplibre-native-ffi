@@ -3998,7 +3998,9 @@ func DefaultSourceFeatureQueryOptions() SourceFeatureQueryOptions {
 // See mln_style_image_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleImageInfo struct {
-	Width  uint32
+	// Image width in pixels.
+	Width uint32
+	// Image height in pixels.
 	Height uint32
 	// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes, top row
 	// first.
@@ -4269,8 +4271,10 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 type StyleSourceTileInfo struct {
 	// Tile URL templates in TileJSON order.
 	TileUrls []string
-	MinZoom  float64
-	MaxZoom  float64
+	// Lowest zoom level the TileJSON provides tiles for.
+	MinZoom float64
+	// Highest zoom level the TileJSON provides tiles for.
+	MaxZoom float64
 	// One of mln_style_tile_scheme.
 	Scheme StyleTileScheme
 }

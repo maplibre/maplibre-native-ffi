@@ -269,7 +269,9 @@ typedef struct mln_style_source_tile_info {
   /** Tile URL templates in TileJSON order. */
   const mln_buffer_view* tile_urls MLN_BINDING("length=tile_url_count");
   size_t tile_url_count;
+  /** Lowest zoom level the TileJSON provides tiles for. */
   double min_zoom;
+  /** Highest zoom level the TileJSON provides tiles for. */
   double max_zoom;
   /** One of mln_style_tile_scheme. */
   uint32_t scheme MLN_BINDING("enum=mln_style_tile_scheme");
@@ -630,7 +632,9 @@ typedef struct mln_style_image_options {
  */
 typedef struct mln_style_image_info {
   uint32_t size;
+  /** Image width in pixels. */
   uint32_t width;
+  /** Image height in pixels. */
   uint32_t height;
   /** Bitwise combination of mln_style_image_info_field values. */
   uint32_t fields MLN_BINDING("enum=mln_style_image_info_field");
