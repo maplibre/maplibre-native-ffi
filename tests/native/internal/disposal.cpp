@@ -519,7 +519,7 @@ void abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync()
   ));
 }
 
-void borrowed_views_hold_the_session_through_sibling_disposal() {
+void borrowed_views_survive_sibling_frame_disposal() {
   const auto runtime = create_runtime();
   const auto map = create_map(runtime);
   auto session = std::make_shared<mln_render_session_object>();
@@ -568,25 +568,28 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_acquired_frame_dispose(sibling_id, nullptr);
   });
-  void* rejected = nullptr;
-  MLN_TEST_STATUS(
-    MLN_STATUS_TARGET_LOST,
-    mln_adapter_acquired_frame_view_begin(frame_id, &rejected, nullptr)
+  // Disposing the sibling quarantines only the sibling's slot, so the session
+  // keeps its target and the frame's views keep working.
+  void* second = nullptr;
+  MLN_TEST_OK(
+    mln_adapter_acquired_frame_view_begin(frame_id, &second, nullptr)
   );
-  TEST_ASSERT_NULL(rejected);
+  mln_adapter_acquired_frame_view_end(second);
   auto state = uint32_t{};
   {
     const auto lock = std::scoped_lock{session->control_mutex};
     state = session->state;
   }
   TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-    MLN_RENDER_SESSION_STATE_ATTACHED, state, "disposal retired an active view"
+    MLN_RENDER_SESSION_STATE_ATTACHED, state,
+    "frame disposal released the session's target"
   );
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     mln_adapter_acquired_frame_view_end(scope);
     return MLN_STATUS_OK;
   });
   MLN_TEST_OK(mln_acquired_frame_release(&frame_id, &sync, nullptr));
+  MLN_TEST_OK(mln_render_session_abandon(session->self, &result, nullptr));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_render_session_destroy(session->self, nullptr);
   });
@@ -600,7 +603,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
 
 MLN_TEST_GROUP {
   RUN_TEST(runtime_barriers_observe_retired_command_captures);
-  RUN_TEST(borrowed_views_hold_the_session_through_sibling_disposal);
+  RUN_TEST(borrowed_views_survive_sibling_frame_disposal);
   RUN_TEST(failed_finalizer_token_creation_disposes_the_owner);
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
   RUN_TEST(

@@ -1016,6 +1016,25 @@ auto finish_driver_work(
   }
 }
 
+// Whether a session-owned ring has no slot left to render into. A session
+// without a ring renders into its target directly.
+auto every_slot_quarantined_locked(const mln_render_session_object& session)
+  -> bool {
+  const auto& slots = session.texture.slots;
+  return !slots.empty() &&
+         std::all_of(slots.begin(), slots.end(), [](const auto& slot) {
+           return slot.quarantined;
+         });
+}
+
+auto any_slot_quarantined_locked(const mln_render_session_object& session)
+  -> bool {
+  const auto& slots = session.texture.slots;
+  return std::any_of(slots.begin(), slots.end(), [](const auto& slot) {
+    return slot.quarantined;
+  });
+}
+
 // The host wakes that a section holding control_mutex owes. A wake callback may
 // call back into the session, which would relock control_mutex, so the section
 // records its wakes here and they run when this object is destroyed. Declare it
@@ -1072,11 +1091,12 @@ auto publish_driver_work_locked(
 
 // Queues one work item behind whatever the driver is already waiting on. While
 // an ordered resize waits for the map, everything after it parks with it so the
-// driver keeps its accepted order.
+// driver keeps its accepted order. Queueing allocates, and a throw queues
+// nothing.
 auto push_driver_work_locked(
   mln_render_session_object& session, RenderDriverWork work,
   DeferredWakes& wakes
-) noexcept -> void {
+) -> void {
   auto& queue = session.waiting_update_work.empty()
                   ? session.driver_work
                   : session.waiting_update_work;
@@ -1911,6 +1931,15 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
   }
 
   live->scheduler.set_work_available_callback({});
+  // A quarantined slot's texture may still be in use by the host's GPU, and
+  // nothing tells native when that use ends. The backend that owns the ring
+  // is released and never destroyed, as abandon does.
+  auto quarantine = false;
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    quarantine = any_slot_quarantined_locked(*live);
+  }
+  TextureSessionBackend* quarantined_texture = nullptr;
 
   // Tear the renderer down before releasing the map's slot. The renderer holds
   // the map's forwarding observer, which the map's frontend owns; releasing the
@@ -1922,9 +1951,18 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
     live->renderer.reset();
     reset_pushed_feature_state(*live);
     live->surface.backend.reset();
-    live->texture.backend.reset();
+    if (quarantine)
+      quarantined_texture = live->texture.backend.release();
+    else
+      live->texture.backend.reset();
     // Anything enqueued during teardown targets something already gone.
     live->scheduler.discard();
+  }
+  if (quarantined_texture != nullptr) {
+    // Tile workers can still hold graphics objects of the released backend,
+    // and the host may destroy its device once detach completes.
+    map_quiesce_render_workers(live->map);
+    quarantined_texture->quarantine();
   }
 
   const auto detach_status = map_detach_render_target_session(live->map, live);
@@ -2459,38 +2497,44 @@ auto run_frame_demand(
   }
   auto selected_slot = std::optional<std::size_t>{};
   auto ring_full = false;
+  auto ring_quarantined = false;
   {
     const auto lock = std::scoped_lock{session->control_mutex};
-    if (!session->texture.slots.empty()) {
-      const auto reusable = std::find_if(
-        session->texture.slots.begin(), session->texture.slots.end(),
-        [](const RenderTextureSlot& value) {
-          return !value.acquired && !value.available && !value.rendering;
-        }
-      );
-      const auto slot =
-        reusable != session->texture.slots.end()
-          ? reusable
-          : std::min_element(
-              session->texture.slots.begin(), session->texture.slots.end(),
-              [](
-                const RenderTextureSlot& left, const RenderTextureSlot& right
-              ) {
-                if (left.acquired || left.rendering) return false;
-                if (right.acquired || right.rendering) return true;
-                return left.result.frame_generation <
-                       right.result.frame_generation;
-              }
-            );
-      ring_full = slot == session->texture.slots.end() || slot->acquired ||
-                  slot->rendering;
+    auto& slots = session->texture.slots;
+    ring_quarantined = every_slot_quarantined_locked(*session);
+    if (!slots.empty() && !ring_quarantined) {
+      const auto busy = [](const RenderTextureSlot& value) {
+        return value.acquired || value.rendering || value.quarantined;
+      };
+      const auto reusable =
+        std::find_if(slots.begin(), slots.end(), [&](const auto& value) {
+          return !busy(value) && !value.available;
+        });
+      const auto slot = reusable != slots.end()
+                          ? reusable
+                          : std::min_element(
+                              slots.begin(), slots.end(),
+                              [&](const auto& left, const auto& right) {
+                                if (busy(left)) return false;
+                                if (busy(right)) return true;
+                                return left.result.frame_generation <
+                                       right.result.frame_generation;
+                              }
+                            );
+      ring_full = slot == slots.end() || busy(*slot);
       if (!ring_full) {
-        selected_slot =
-          static_cast<std::size_t>(slot - session->texture.slots.begin());
+        selected_slot = static_cast<std::size_t>(slot - slots.begin());
         slot->available = false;
         slot->rendering = true;
       }
     }
+  }
+  if (ring_quarantined) {
+    // No slot can ever take a frame again, so waiting for a release would
+    // park the demand until detach.
+    result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
+    publish_frame_result(session, result);
+    return;
   }
   if (ring_full) {
     const auto lock = std::scoped_lock{session->control_mutex};
@@ -2656,6 +2700,10 @@ auto render_session_request_frame(
   const auto lock = std::scoped_lock{live->control_mutex};
   if (live->state != MLN_RENDER_SESSION_STATE_ATTACHED) {
     set_thread_error("render session is not attached");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (every_slot_quarantined_locked(*live)) {
+    set_thread_error("every texture slot of the render session is quarantined");
     return MLN_STATUS_INVALID_STATE;
   }
   if (
@@ -3067,20 +3115,22 @@ auto acquired_frame_release(
     auto resume_demand = false;
     {
       const auto lock = std::scoped_lock{consumed->session->control_mutex};
-      // A failed sync wait must not make the slot reusable: the host GPU may
-      // still be reading the texture. TARGET_LOST is safe because an
-      // abandoned session renders nothing further.
-      if (status == MLN_STATUS_OK || status == MLN_STATUS_TARGET_LOST) {
-        if (consumed->slot < consumed->session->texture.slots.size())
-          consumed->session->texture.slots[consumed->slot].acquired = false;
-        resume_demand = !consumed->session->demands.empty();
+      auto& slots = consumed->session->texture.slots;
+      if (consumed->slot < slots.size()) {
+        auto& slot = slots[consumed->slot];
+        slot.acquired = false;
+        // A failed sync wait must not make the slot reusable: the host GPU
+        // may still be reading the texture. TARGET_LOST is safe because an
+        // abandoned session renders nothing further.
+        if (status != MLN_STATUS_OK && status != MLN_STATUS_TARGET_LOST)
+          slot.quarantined = true;
       }
+      resume_demand = !consumed->session->demands.empty();
     }
     if (status != MLN_STATUS_OK && status != MLN_STATUS_TARGET_LOST) {
       mln::Log::Error(
         mln::Event::Render,
-        "failed to retire an acquired frame; its texture slot will not be "
-        "reused"
+        "failed to retire an acquired frame; its texture slot is quarantined"
       );
     }
     if (resume_demand) {
@@ -3697,36 +3747,34 @@ auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
     );
   }
   static_cast<void>(handle_table<mln_acquired_frame_object>().remove(frame));
-  live->disposal_owner = live;
-  live->disposal_task.context = live.get();
-  live->disposal_task.run = [](RetirementTask* task) noexcept {
-    auto& frame = *static_cast<mln_acquired_frame_object*>(task->context);
-    auto owned = frame.disposal_owner;
-    {
-      auto lock = std::unique_lock{owned->session->control_mutex};
-      owned->session->worker_condition.wait(lock, [&] {
-        return !owned->session->driver_call_in_flight &&
-               owned->session->active_views == 0;
-      });
-    }
-    auto result =
-      mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
+  auto& session = *live->session;
+  auto wakes = DeferredWakes{};
+  const auto lock = std::scoped_lock{session.control_mutex};
+  if (session.acquired_frame_count) --session.acquired_frame_count;
+  // Without consumer synchronization the host's GPU may still be reading the
+  // slot's texture, so the slot never takes another frame. A view already open
+  // on the frame keeps reading it, since the ring keeps the texture.
+  if (live->slot >= session.texture.slots.size()) return MLN_STATUS_OK;
+  session.texture.slots[live->slot] = RenderTextureSlot{.quarantined = true};
+  // A demand parked behind a full ring waits for a release. Once no slot can
+  // take a frame, no release can come, so the driver gives the demand its
+  // terminal result now. Queueing allocates; if it fails, detach resolves the
+  // demand instead.
+  if (
+    session.state == MLN_RENDER_SESSION_STATE_ATTACHED &&
+    !session.demands.empty() && every_slot_quarantined_locked(session)
+  ) {
     try {
-      static_cast<void>(abandon_render_session(owned->session, &result));
-      frame.disposal_owner.reset();
+      push_driver_work_locked(
+        session,
+        RenderDriverWork{
+          [owner = live->session]() { run_frame_demand(owner); }, {}
+        },
+        wakes
+      );
     } catch (...) {
-      session_teardown_lane().submit(frame.disposal_task);
     }
-  };
-  {
-    const auto lock = std::scoped_lock{live->session->control_mutex};
-    live->session->views_invalidated = true;
-    live->session->stop_worker = true;
-    live->session->worker_condition.notify_all();
-    if (live->session->acquired_frame_count)
-      --live->session->acquired_frame_count;
   }
-  session_teardown_lane().submit(live->disposal_task);
   return MLN_STATUS_OK;
 }
 

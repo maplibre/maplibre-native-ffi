@@ -35,7 +35,6 @@ class HandlePlan:
     release_inputs: tuple[str, ...] = ()
     finalize: tuple[str, ...] = ()
     parent_retention: str = "strong"
-    dispose_invalidates: str = "self"
     view_begin: str | None = None
     view_end: str | None = None
     # The name that the handle's operations begin with: its `prefix=` metadata,
@@ -531,7 +530,6 @@ class Binder:
                         (typedef.metadata.get("abandon"), typedef.metadata["release"]),
                     )
                 ),
-                dispose_invalidates=typedef.metadata.get("dispose_invalidates", "self"),
                 view_begin=typedef.metadata.get("view_begin"),
                 view_end=typedef.metadata.get("view_end"),
                 prefix=typedef.metadata.get("prefix", name),

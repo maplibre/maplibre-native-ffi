@@ -85,7 +85,6 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "release",
         "parent",
         "dispose",
-        "dispose_invalidates",
         "view_begin",
         "view_end",
         "release_consumes",
@@ -484,7 +483,6 @@ def metadata_errors(
         "synchronous": frozenset({"true", "false"}),
         "reentry": frozenset({"allow", "forbid", "protocol"}),
         "handle_access": frozenset({"live", "issued"}),
-        "dispose_invalidates": frozenset({"self", "parent"}),
     }
     for key, accepted in values.items():
         if key in metadata and metadata[key] not in accepted:
@@ -1117,7 +1115,6 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: registration user_data requires a void context pointer"
                 )
-        dispose = typedef.metadata.get("dispose")
         default = typedef.metadata.get("default")
         if default:
             constructor = api.functions_by_name.get(default)
@@ -1158,16 +1155,6 @@ def validate(api: Api) -> None:
                 ):
                     errors.append(
                         f"{context}: view scope requires handle/token begin and token end operations"
-                    )
-            if typedef.metadata.get("dispose_invalidates") == "parent":
-                parent_type = api.typedefs_by_name.get(parent)
-                if (
-                    not dispose
-                    or parent_type is None
-                    or not parent_type.metadata.get("abandon")
-                ):
-                    errors.append(
-                        f"{context}: parent disposal invalidation requires a disposer and abandonable parent"
                     )
             for key in ("release", "dispose", "abandon"):
                 operation = api.functions_by_name.get(typedef.metadata.get(key, ""))

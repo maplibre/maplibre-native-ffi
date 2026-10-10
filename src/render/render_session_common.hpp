@@ -350,6 +350,10 @@ struct RenderTextureSlot {
   bool available = false;
   bool acquired = false;
   bool rendering = false;
+  // Set by a frame disposed without consumer synchronization, or by a release
+  // whose wait failed. The host's GPU may still read the slot's texture, so the
+  // ring never renders into it again and detach never destroys it.
+  bool quarantined = false;
 };
 
 // The renderable resources a session-owned texture backend cycles through. The
@@ -689,8 +693,6 @@ struct mln_render_frame_batch_object {
 struct mln_acquired_frame_object {
   std::size_t active_views = 0;
   std::shared_ptr<mln_acquired_frame_object> view_owner;
-  mln::core::RetirementTask disposal_task;
-  std::shared_ptr<mln_acquired_frame_object> disposal_owner;
   std::shared_ptr<mln_render_session_object> session;
   std::any backend_metadata;
   std::size_t slot = 0;

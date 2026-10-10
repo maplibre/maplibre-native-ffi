@@ -298,30 +298,19 @@ class OwnedTexture:
         if release and self.graphics is not None:
             self.graphics.close()
 
-    def close(self, detach: bool = True) -> None:
-        """Detach the session, then tear everything down.
-
-        A session that a frame's disposal is abandoning has nothing to
-        detach, so ``detach=False`` skips straight to destroying it.
-        """
+    def close(self) -> None:
+        """Detach the session, then tear everything down."""
         if self._closed:
             return
         try:
-            if detach and self.session is not None and not self.session.closed:
+            if self.session is not None and not self.session.closed:
                 result(self.session.detach())
         except BaseException:
             with contextlib.suppress(Exception):
                 self._teardown(release=False)
             raise
         self._teardown(release=True)
-        # An abandoned session reports TargetLostError to any service of its
-        # driver work that runs after the abandonment.
-        errors = [
-            error
-            for error in self.service_errors
-            if detach or not isinstance(error, mln.TargetLostError)
-        ]
-        assert not errors
+        assert not self.service_errors
 
     def __enter__(self) -> Self:
         return self
@@ -458,12 +447,8 @@ def test_finalizing_a_sibling_frame_leaves_an_active_view_intact(
                     gc.collect()
                 assert retired() is None
                 assert reports == ["AcquiredFrameHandle was not explicitly closed"]
-                with pytest.raises(mln.TargetLostError):
-                    target.with_texture(frame, lambda _: None)
                 return _texture_name(backend, view)
 
             assert target.with_texture(frame, inspect) != 0
             assert not frame.closed
         assert frame.closed
-        # Disposing the sibling abandons the session once the view ends.
-        target.close(detach=False)
