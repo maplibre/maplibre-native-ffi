@@ -390,11 +390,12 @@ namespace {
 // event, and zero drops it, because zero means the map is gone or its publish
 // failed. Every map producer queues through here. Most run inside MapLibre
 // callbacks, so an event that cannot be queued is dropped rather than thrown.
+// The message is copied inside the guard for the same reason.
 auto queue_map_event(
   MapEventState& events, uint64_t generation, uint32_t type,
   uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
   const mln_runtime_event_payload& payload = zeroed_event_payload(),
-  int32_t code = 0, std::string message = {}
+  int32_t code = 0, std::string_view message = {}
 ) noexcept -> void {
   try {
     if (events.in_transaction()) {
@@ -404,7 +405,7 @@ auto queue_map_event(
           .payload_type = payload_type,
           .payload = payload,
           .code = code,
-          .message = std::move(message),
+          .message = std::string{message},
         }
       );
       return;
@@ -412,7 +413,7 @@ auto queue_map_event(
     if (generation == 0) return;
     push_runtime_map_event_payload(
       events.runtime, events.map, generation, type, payload_type, payload, code,
-      std::move(message)
+      std::string{message}
     );
   } catch (...) {
     // Dropped, as the queue drops an event whose runtime is gone.
@@ -524,12 +525,17 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
   // The failure text is map state that both style setters read, so it is
-  // recorded whatever the mask selects.
+  // recorded whatever the mask selects. A copy that fails leaves the text
+  // empty, but the flag still tells the setters that the load failed.
   void onDidFailLoadingMap(
     mln::MapLoadError error, const std::string& message
   ) override {
-    event_state_->style_load_failure = message;
     event_state_->style_load_failed = true;
+    try {
+      event_state_->style_load_failure = message;
+    } catch (...) {
+      event_state_->style_load_failure.clear();
+    }
     if (!selected(MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)) {
       return;
     }
@@ -641,26 +647,27 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
   // Queues an event that reports a change in map state.
-  auto queue_fresh(uint32_t type, int32_t code = 0, std::string message = {})
-    -> void {
+  auto queue_fresh(
+    uint32_t type, int32_t code = 0, std::string_view message = {}
+  ) noexcept -> void {
     auto& events = *event_state_;
     queue_map_event(
       events, events.fresh_generation(), type, MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-      zeroed_event_payload(), code, std::move(message)
+      zeroed_event_payload(), code, message
     );
   }
 
   // Queues an event that changes no published state, with the generation
   // that the map published last.
   auto queue_current(
-    uint32_t type, int32_t code = 0, std::string message = {},
+    uint32_t type, int32_t code = 0, std::string_view message = {},
     uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
     const mln_runtime_event_payload& payload = zeroed_event_payload()
-  ) -> void {
+  ) noexcept -> void {
     auto& events = *event_state_;
     queue_map_event(
       events, events.published_generation, type, payload_type, payload, code,
-      std::move(message)
+      message
     );
   }
 
@@ -913,7 +920,9 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       update_held_ = true;
       return;
     }
-    announce_update(event_state_->publish());
+    // A failed publish yields zero, which drops only the update event; the
+    // session still learns of the update.
+    announce_update(event_state_->fresh_generation());
   }
 
   // Announces the update that the closing transaction held, if any. The
