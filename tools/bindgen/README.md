@@ -94,7 +94,11 @@ Four keys state what a C shape cannot:
   for a drain with nothing queued. A binding returns its language's empty form
   for that status, such as `None`, `nil`, or `null`, and reads or adopts the
   output only on success. The schema accepts the key only on a function that
-  returns a status, takes no completion, and has exactly one output.
+  returns a status, takes no completion, and has exactly one output. The
+  semantic plan also rejects it on a borrowed view, a consuming operation, and a
+  call that passes a callback registration, because an absent call publishes
+  nothing. Dart, Go, Rust, Swift, and Zig return any output as absent; .NET,
+  Kotlin, and Python return only an owned handle as absent.
 - `default=` on a field states the nonzero value that the field holds in its
   record's native default: a decimal integer, a decimal with a point, `true`, or
   a constant of the field's enum. Dart, Kotlin, and Zig build a record from

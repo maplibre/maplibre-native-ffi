@@ -396,8 +396,8 @@ def immediate(plan, values, native):
         setup.append("val raw = " + native.call(plan.function, arguments))
         decoded = result_value(result, values).replace("{raw}", "raw")
     elif plan.absence:
-        decoded = f"if ({native.present(plan, arguments)}) {decoded} else null"
-        result_type += "?"
+        # Only an owned handle has an executed absence probe.
+        raise Unsupported("absence requires an owned handle output")
     else:
         setup.append(native.checked(plan.function, arguments))
     if decoded:
@@ -500,8 +500,6 @@ def owned(plan, values, native):
             if p.name == plan.owned_outputs[0].parameter
         )
         if plan.absence:
-            if registered:
-                raise Unsupported("absence requires an output without registrations")
             body = f"val out = {values.storage(slot)}; if ({native.present(plan, arguments)}) {adopted} else null"
             head = head.removesuffix(" =") + "? ="
         else:

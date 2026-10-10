@@ -587,8 +587,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
                 raise Unsupported(f"{function.name}: status return has no diagnostic")
             ending = [f"call.status({closure} {native})?;", f"Ok({output})"]
             if plan.absence:
-                if plan.view or consuming:
-                    raise Unsupported("absence requires an output that the caller owns")
                 # The parent joins only an output that native published.
                 if parent_line:
                     prelude.remove(parent_line)

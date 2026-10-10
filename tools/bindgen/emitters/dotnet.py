@@ -734,8 +734,9 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 ");",
             ]
         elif plan.absence:
-            if plan.registrations or scoped:
-                raise Unsupported("absence requires an output without registrations")
+            # The scope accepts its inputs only after a call that publishes.
+            if scoped:
+                raise Unsupported("absence requires a call without a native scope")
             body = prologue + [
                 present_call(plan, arguments),
                 f"return {result_type}.Adopt({parent}{local});",
@@ -822,14 +823,9 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         else:
             result_type, result = "void", None
         if plan.absence:
-            if scoped or decision_completion or len(outputs) != 1:
-                raise Unsupported("absence requires one output without registrations")
-            result_type += "?"
-        body = prologue + [
-            present_call(plan, arguments)
-            if plan.absence
-            else checked_call(function, arguments)
-        ]
+            # Only an owned handle has an executed absence probe.
+            raise Unsupported("absence requires an owned handle output")
+        body = prologue + [checked_call(function, arguments)]
         if scoped:
             accept = (
                 "scope.Accept(CallbackOwner);"

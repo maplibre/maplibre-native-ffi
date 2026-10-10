@@ -31,6 +31,9 @@ PROTOCOL_GAPS = {
     ("direct_registration", "python"): {"mln_ticket_on_cancel"},
     ("direct_registration", "rust"): {"mln_ticket_on_cancel"},
     ("decision", "dart"): {"mln_host_set_provider"},
+    ("absent_value", "dotnet"): {"mln_probe_read_level"},
+    ("absent_value", "kotlin"): {"mln_probe_read_level"},
+    ("absent_value", "python"): {"mln_probe_read_level"},
 }
 
 

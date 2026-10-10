@@ -61,7 +61,12 @@ class RustEmitterTests(unittest.TestCase):
         )
         api = parse(
             COLLISIONS,
-            groups=("keywords", "default_registration", "absence"),
+            groups=(
+                "keywords",
+                "default_registration",
+                "absent_handle",
+                "absent_value",
+            ),
             defines=defines,
         )
         validate(api)

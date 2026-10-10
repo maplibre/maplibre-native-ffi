@@ -1232,9 +1232,15 @@ class Binder:
             )
         absence = None
         if "absent_on" in metadata:
+            # An absent call publishes nothing, so it neither consumes its
+            # receiver nor roots a registration.
             if view or consumes:
                 raise ModelError(
                     [f"{context}: absent_on requires an output that the caller owns"]
+                )
+            if registrations or "registration" in metadata:
+                raise ModelError(
+                    [f"{context}: absent_on requires a call without registrations"]
                 )
             absence = AbsencePlan(
                 metadata["absent_on"],

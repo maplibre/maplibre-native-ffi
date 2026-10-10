@@ -5,8 +5,8 @@
 import 'dart:ffi';
 import 'dart:io';
 
-import 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_roundtrip;
-export 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_roundtrip;
+import 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_read_level, mln_probe_roundtrip;
+export 'maplibre_native_c.g.dart' hide mln_keyword_combine, mln_probe_read_level, mln_probe_roundtrip;
 
 final _library = DynamicLibrary.open(Platform.environment['MLN_PROBE_LIBRARY']!);
 
@@ -21,3 +21,8 @@ final mln_keyword_combine = _library.lookupFunction<
         Pointer<mln_diagnostic>),
     int Function(double, double, double, double, Pointer<mln_keyword_entry>,
         Pointer<mln_diagnostic>)>('mln_keyword_combine');
+
+final mln_probe_read_level = _library.lookupFunction<
+    Int32 Function(Pointer<Double>, Pointer<mln_diagnostic>),
+    int Function(
+        Pointer<Double>, Pointer<mln_diagnostic>)>('mln_probe_read_level');

@@ -73,6 +73,12 @@ void _check(int status) {
   throw NativeFailure(status, utf8.decode(message));
 }
 
+bool _present(int status, int absent) {
+  if (status == absent) return false;
+  _check(status);
+  return true;
+}
+
 final class NativeStringView {
   NativeStringView(this.value);
   final raw.mln_buffer_view value;

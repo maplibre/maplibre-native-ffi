@@ -26,7 +26,7 @@ class GoEmitterTests(unittest.TestCase):
                 include = root / "include"
                 include.mkdir()
                 header = protocol_header(
-                    groups=("values", "keywords"),
+                    groups=("values", "keywords", "absent_value"),
                     defines=(f"MLN_PROTOCOL_GAIN_TYPE {scalar}",),
                 )
                 (include / "api.h").write_text(header)
@@ -39,6 +39,7 @@ class GoEmitterTests(unittest.TestCase):
                         "generated": [
                             "mln_keyword_combine",
                             "mln_probe_nullable_text",
+                            "mln_probe_read_level",
                             "mln_probe_roundtrip",
                         ],
                         "unsupported": {},
@@ -58,7 +59,7 @@ class GoEmitterTests(unittest.TestCase):
                 )
                 (root / "generated.go").write_text(source)
                 (root / "generated_callbacks.h").write_text(
-                    "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2, binding_operation_mln_keyword_combine = 3 };\n"
+                    "enum { binding_operation_mln_probe_roundtrip = 1, binding_operation_mln_probe_nullable_text = 2, binding_operation_mln_keyword_combine = 3, binding_operation_mln_probe_read_level = 4 };\n"
                 )
                 (root / "go.mod").write_text("module fixture\n\ngo 1.24\n")
                 (root / "runtime.go").write_text(
@@ -88,6 +89,7 @@ func bindingElement(p unsafe.Pointer,i int,stride uint64,size,align uintptr) uns
 type bindingTarget struct { operation uint32 }
 func bindingGlobal(operation uint32) bindingTarget { return bindingTarget{operation} }
 func bindingGet[T any](target bindingTarget, call func(*bindingArena, uint64, *C.mln_diagnostic) int32, result func(*bindingArena) T) (T, error) { a := &bindingArena{}; defer a.close(); bindingAdmission(target.operation, 0); bindingCheck(func(d *C.mln_diagnostic) int32 { return call(a, 0, d) }); return result(a), nil }
+func bindingGetUnless[T any](target bindingTarget, absent int32, call func(*bindingArena, uint64, *C.mln_diagnostic) int32, result func(*bindingArena) T) (T, error) { a := &bindingArena{}; defer a.close(); var none T; status := call(a, 0, nil); if status == absent { return none, nil }; if status != 0 { return none, fmt.Errorf("status %d", status) }; return result(a), nil }
 """.replace("FIXTURES", str(FIXTURES)).replace("SCALAR", scalar)
                 )
                 # The value conversions need no C declarations, so the probe
@@ -115,6 +117,9 @@ func TestRoundtrip(t *testing.T) {
     if err != nil || absent.Title != nil || absent.Point != nil || len(absent.Left)!=0 || len(absent.Right)!=0 { t.Fatalf("absence: %+v, %v",absent,err) }
     keywords, err := KeywordCombine(5, 2, 7, 11)
     if err != nil || keywords != (KeywordEntry{Type: 3, Defer: 7, Raw: 11}) { t.Fatalf("keyword names: %+v, %v",keywords,err) }
+    if level, err := ProbeReadLevel(); level != nil || err != nil { t.Fatalf("absent level: %v, %v",level,err) }
+    if level, err := ProbeReadLevel(); err != nil || level == nil || *level != 0.5 { t.Fatalf("published level: %v, %v",level,err) }
+    if level, err := ProbeReadLevel(); level != nil || err == nil { t.Fatalf("exhausted level: %v, %v",level,err) }
 }
 """.replace("LITERAL", literal)
                 )

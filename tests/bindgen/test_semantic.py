@@ -823,7 +823,9 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
                 bind(self.parse(source.replace(before, after)), require_complete=True)
 
     def test_an_absence_status_names_the_one_output_it_reports_absent(self):
-        model = bind(parse(groups=("absence",)), require_complete=True)
+        model = bind(
+            parse(groups=("absent_handle", "absent_value")), require_complete=True
+        )
         self.assertEqual(
             {
                 name: (
@@ -854,6 +856,27 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
         ):
             source = f'BIND("{annotation}") mln_status read({parameters});'
             with self.subTest(source=source), self.assertRaisesRegex(ModelError, error):
+                bind(self.parse(source), require_complete=True)
+        # An absent call publishes nothing, so no binding may root a
+        # registration that it passed.
+        callbacks = """
+typedef void (*notify)(void *state);
+typedef void (*release)(void *state);
+typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+"""
+        for annotation, parameters in (
+            ("absent_on=MLN_STATUS_NOT_READY", "const signals *events, " + one),
+            (
+                "registration=signal;release_callback=retire;absent_on=MLN_STATUS_NOT_READY",
+                'notify signal, void *state BIND("kind=context"), release retire, '
+                + one,
+            ),
+        ):
+            source = callbacks + f'BIND("{annotation}") mln_status read({parameters});'
+            with (
+                self.subTest(source=source),
+                self.assertRaisesRegex(ModelError, "without registrations"),
+            ):
                 bind(self.parse(source), require_complete=True)
 
     def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):

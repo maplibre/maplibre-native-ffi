@@ -450,10 +450,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         )
         copied = capture[0] if len(capture) == 1 else "(" + ", ".join(capture) + ")"
         if plan.absence:
-            if plan.registrations or plan.direct_registrations or len(types) != 1:
-                raise unsupported(
-                    function, "absence requires one output without registrations"
-                )
             result += "?"
         return (
             f"""{doc}{signature} throws -> {result} {{

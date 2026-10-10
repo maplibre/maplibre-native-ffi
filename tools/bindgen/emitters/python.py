@@ -534,10 +534,6 @@ def operation(
             )
         status = plan.status
         absence = plan.absence
-        if absence and (plan.view or plan.consumes or plan.registrations):
-            raise unsupported(
-                function, "absence requires an output that the caller owns"
-            )
         body = setup + [
             f"        let result = unsafe {{ call.status_unless(sys::{absence.status}, |diagnostic| {call}) }};"
             if absence
@@ -597,11 +593,14 @@ def operation(
                         f"_adopt_value({expression}, {result_owner!r}, {parent})"
                     )
             else:
+                # Only an owned handle has an executed absence probe.
+                if absence:
+                    raise unsupported(
+                        function, "absence requires an owned handle output"
+                    )
                 body.append(f"        {ok(values.copy(value, output))}")
-                # An absent output reads as None, as a nullable one does.
-                facade_value = replace(value, nullable=True) if absence else value
-                public_result = values.type(facade_value)
-                expression = values.facade_copy(facade_value, expression)
+                public_result = values.type(value)
+                expression = values.facade_copy(value, expression)
         else:
             body.append("        let dict = PyDict::new(py);")
             for output, value in outputs:

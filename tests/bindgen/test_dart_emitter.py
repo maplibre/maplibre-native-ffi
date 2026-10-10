@@ -27,7 +27,13 @@ class DartEmitterTests(unittest.TestCase):
         dart_tool = require_tool(self, "dart", BINDING)
         clang = require_tool(self, "clang")
         header = protocol_header(
-            groups=("values", "keywords", "defaults", "default_registration")
+            groups=(
+                "values",
+                "keywords",
+                "defaults",
+                "default_registration",
+                "absent_value",
+            )
         )
         api = parse_sources({"api.h": header})
         validate(api)
@@ -36,6 +42,7 @@ class DartEmitterTests(unittest.TestCase):
             {
                 "mln_keyword_combine",
                 "mln_probe_hooks_default",
+                "mln_probe_read_level",
                 "mln_probe_roundtrip",
                 "mln_probe_settings_check",
                 "mln_probe_settings_default",

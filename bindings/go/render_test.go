@@ -195,7 +195,6 @@ func TestCallerDriverIsServicedFromAGoroutine(t *testing.T) {
 	r.renderFrame(t)
 }
 
-// The binding reads a rendered frame back as premultiplied RGBA8 pixels.
 // Before any demand, no frame result is queued and no frame has rendered,
 // which native reports as not ready and the binding returns as nil.
 func TestDrainBeforeAnyDemandReturnsNoBatch(t *testing.T) {
@@ -209,6 +208,7 @@ func TestDrainBeforeAnyDemandReturnsNoBatch(t *testing.T) {
 	}
 }
 
+// The binding reads a rendered frame back as premultiplied RGBA8 pixels.
 func TestOwnedTextureFrameReadsBackAsPixels(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)
