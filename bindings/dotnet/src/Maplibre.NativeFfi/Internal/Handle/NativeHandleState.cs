@@ -134,7 +134,7 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
                 // A finalizer reports failed retirement without unwinding.
             }
             NativeLeakReporter.Report(
-                $"Leaked {typeName} native handle 0x{handle.Value:x}; call Close() before releasing the wrapper."
+                $"Leaked {typeName} native handle 0x{handle.Value:x}; close or dispose it before releasing the wrapper."
             );
         }
     }

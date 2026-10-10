@@ -167,13 +167,15 @@ internal sealed class MapState : IDisposable
             return;
         }
         closed = true;
+        // The shell must terminate GLFW on this thread after the runtime stops posting wakes, so
+        // shutdown blocks here until both teardowns finish.
         try
         {
-            Map.Close();
+            Map.CloseAsync().GetAwaiter().GetResult();
         }
         finally
         {
-            runtime.Close();
+            runtime.CloseAsync().GetAwaiter().GetResult();
         }
     }
 

@@ -1208,8 +1208,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
-    public void Close() => CloseAsync().GetAwaiter().GetResult();
-
     public Task CloseAsync()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_map_release");

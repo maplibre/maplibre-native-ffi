@@ -319,8 +319,6 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
-    public void Close() => CloseAsync().GetAwaiter().GetResult();
-
     public Task CloseAsync()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_runtime_release");

@@ -176,7 +176,7 @@ internal sealed class RenderFixture : IDisposable
             try
             {
                 if (Map is { IsClosed: false })
-                    Map.Close();
+                    Complete(Map.CloseAsync());
             }
             finally
             {

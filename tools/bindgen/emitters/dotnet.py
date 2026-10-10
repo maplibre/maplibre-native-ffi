@@ -346,8 +346,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         return (
             owners[receiver],
             (
-                "    public void Close() => CloseAsync().GetAwaiter().GetResult();\n\n"
-                + method(
+                method(
                     "public Task CloseAsync()",
                     [guard, "state.Close();", "return teardown;"],
                 )
