@@ -6,7 +6,7 @@ from collections import defaultdict
 from dataclasses import replace
 
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.semantic import BoundApi, OperationPlan
+from tools.bindgen.semantic import BoundApi, OperationPlan, view_support
 
 from ..model import Api, CType
 
@@ -772,5 +772,10 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    _, generated, unsupported = lower(api)
-    return {"generated": generated, "unsupported": unsupported}
+    bound = compile_api(api)
+    _, generated, unsupported = lower(bound)
+    return {
+        "generated": generated,
+        "support": view_support(bound, generated),
+        "unsupported": unsupported,
+    }

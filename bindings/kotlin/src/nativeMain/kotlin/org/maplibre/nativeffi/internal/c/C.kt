@@ -87,19 +87,15 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_adapter_acquired_frame_view_begin(
-    frame: Long,
-    outScope: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_adapter_acquired_frame_view_begin(
+  actual fun mln_acquired_frame_view_begin(frame: Long, outScope: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_view_begin(
       frame.toULong(),
       outScope.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_adapter_acquired_frame_view_end(scope: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_adapter_acquired_frame_view_end(
+  actual fun mln_acquired_frame_view_end(scope: Long) {
+    org.maplibre.nativeffi.internal.cinterop.mln_acquired_frame_view_end(
       scope.toCPointer<CPointed>()
     )
   }

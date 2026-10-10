@@ -608,7 +608,6 @@ class NativeShims:
             + "// argument is a primitive; mln_jni.h defines the casts and mln_jni.c the rest.\n"
             + '#include "mln_jni.h"\n\n'
             + "#include <maplibre_native_c.h>\n"
-            + "#include <maplibre_native_c/callback_adapter.h>\n"
             + "#include <maplibre_native_c/plugin.h>\n\n"
             + "\n\n".join(functions)
             + "\n\nconst JNINativeMethod mln_jni_methods[] = {\n"

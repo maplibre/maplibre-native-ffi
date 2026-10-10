@@ -12,8 +12,11 @@
  * so host user code runs on its own execution context rather than on MapLibre
  * worker, network, logging, or render threads.
  *
- * This header is not part of the maplibre_native_c.h umbrella. Include it
- * directly when a binding needs it.
+ * Binding-internal support for host runtimes that cannot run user code on
+ * native threads. It is not installed and carries no compatibility promise;
+ * bindings in this repository generate against it from the source tree. Its
+ * symbols stay exported because those bindings resolve them from the shipped
+ * library.
  *
  * This header targets C23.
  */
@@ -644,25 +647,6 @@ MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
   mln_custom_mvt_vector_source_tile_callback fetch_tile,
   mln_custom_mvt_vector_source_tile_callback cancel_tile,
   void* user_data MLN_BINDING("kind=context")
-) MLN_NOEXCEPT;
-
-/**
- * Begins an allocation-free borrowed-frame use scope.
- *
- * The scope retains its frame and session until view_end. Disposal invalidates
- * later scopes immediately and waits for existing scopes before retiring the
- * graphics resources. Explicit frame release and session abandon report BUSY
- * while a scope is active. Every successful begin requires exactly one end.
- */
-MLN_API mln_status mln_adapter_acquired_frame_view_begin(
-  mln_acquired_frame frame,
-  void** out_scope MLN_BINDING("direction=out;kind=context"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/** Ends one borrowed-frame scope. Null is a no-op. */
-MLN_API void mln_adapter_acquired_frame_view_end(
-  void* scope MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)

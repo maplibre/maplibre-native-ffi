@@ -209,7 +209,6 @@ class RustSysTests(unittest.TestCase):
             (root / "main.c").write_text(
                 "#include <stddef.h>\n#include <stdio.h>\n"
                 "#include <maplibre_native_c.h>\n"
-                "#include <maplibre_native_c/callback_adapter.h>\n"
                 "#include <maplibre_native_c/plugin.h>\n"
                 "int main(int argc, char** argv) {\n  (void)argc;\n"
                 '  FILE* out = fopen(argv[1], "w");\n  '

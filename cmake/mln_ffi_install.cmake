@@ -252,12 +252,16 @@ function(mln_ffi_install_c_api_library target)
     FILES "${PROJECT_SOURCE_DIR}/include/maplibre_native_c.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+  # The callback adapter headers are binding-internal support that bindings in
+  # this repository read from the source tree.
   install(
     DIRECTORY "${PROJECT_SOURCE_DIR}/include/maplibre_native_c"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
     FILES_MATCHING
-    PATTERN "*.h")
+    PATTERN "*.h"
+    PATTERN "callback_adapter.h" EXCLUDE
+    PATTERN "callback_capture_generated.h" EXCLUDE)
   # The contract behind include/maplibre_native_c/plugin.h and the exported
   # mln_plugin_register_v1, kept at upstream's path so the header stays
   # verbatim.

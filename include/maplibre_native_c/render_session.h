@@ -352,6 +352,37 @@ MLN_API mln_status mln_acquired_frame_release(
 ) MLN_NOEXCEPT;
 
 /**
+ * Begins an allocation-free scope that borrows an acquired frame.
+ *
+ * Native objects that the frame's getters lend, such as backend textures and
+ * devices, stay valid until the scope ends, even when another thread disposes
+ * the frame or its session. The scope retains the frame and its session.
+ * Disposal rejects later scopes immediately and waits for active scopes to end
+ * before it retires graphics resources. Explicit frame release and session
+ * abandonment report MLN_STATUS_BUSY while a scope is active. Each successful
+ * call requires exactly one mln_acquired_frame_view_end() call, on any thread.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when *out_scope receives the scope.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or out_scope is
+ *   null.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
+ * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target, or
+ *   disposal of the frame or session has begun.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_acquired_frame_view_begin(
+  mln_acquired_frame frame,
+  void** out_scope MLN_BINDING("direction=out;kind=context"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/** Ends one scope from mln_acquired_frame_view_begin(). Null has no effect. */
+MLN_API void mln_acquired_frame_view_end(
+  void* scope MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/**
  * Starts an ordered logical resize. The completion runs after the selected
  * driver applies the extent and updates the map viewport.
  *

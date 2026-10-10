@@ -101,7 +101,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
             "resolved_callbacks": len(bound.callbacks),
             "support_relations": {
                 plan.name: support_relation(plan)
-                for plan in bound.operations
+                for plan in (*bound.operations, *bound.view_scopes)
                 if plan.support
             },
         },

@@ -21,6 +21,7 @@ from tools.bindgen.semantic import (
     OperationPlan,
     output_member,
     support_relation,
+    view_support,
 )
 
 from .python_values import Values, ok, public_name, scalar_type
@@ -1059,11 +1060,11 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    _, generated, errors = lower(api)
     bound = compile_api(api)
+    _, generated, errors = lower(bound)
     support = {
         plan.name: support_relation(plan)
         for plan in bound.operations
         if plan.support and plan.name not in errors
-    }
+    } | view_support(bound, generated)
     return {"generated": generated, "support": support, "unsupported": errors}

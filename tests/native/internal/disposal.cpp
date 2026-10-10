@@ -562,7 +562,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   );
   void* scope = nullptr;
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
-    return mln_adapter_acquired_frame_view_begin(frame_id, &scope, nullptr);
+    return mln_acquired_frame_view_begin(frame_id, &scope, nullptr);
   });
   auto result =
     mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
@@ -585,7 +585,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
   void* rejected = nullptr;
   MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST,
-    mln_adapter_acquired_frame_view_begin(frame_id, &rejected, nullptr)
+    mln_acquired_frame_view_begin(frame_id, &rejected, nullptr)
   );
   TEST_ASSERT_NULL(rejected);
   auto state = uint32_t{};
@@ -597,7 +597,7 @@ void borrowed_views_hold_the_session_through_sibling_disposal() {
     MLN_RENDER_SESSION_STATE_ATTACHED, state, "disposal retired an active view"
   );
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
-    mln_adapter_acquired_frame_view_end(scope);
+    mln_acquired_frame_view_end(scope);
     return MLN_STATUS_OK;
   });
   MLN_TEST_OK(mln_acquired_frame_release(&frame_id, &sync, nullptr));
@@ -648,9 +648,7 @@ void a_held_view_parks_its_retirements_without_stalling_others() {
   auto held_weak = std::weak_ptr{held.session};
   auto other_weak = std::weak_ptr{other.session};
   void* scope = nullptr;
-  MLN_TEST_OK(
-    mln_adapter_acquired_frame_view_begin(held.frame, &scope, nullptr)
-  );
+  MLN_TEST_OK(mln_acquired_frame_view_begin(held.frame, &scope, nullptr));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_acquired_frame_dispose(held.frame, nullptr);
   });
@@ -673,7 +671,7 @@ void a_held_view_parks_its_retirements_without_stalling_others() {
   );
   held.session.reset();
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
-    mln_adapter_acquired_frame_view_end(scope);
+    mln_acquired_frame_view_end(scope);
     return MLN_STATUS_OK;
   });
   TEST_ASSERT_TRUE(expired(held_weak));

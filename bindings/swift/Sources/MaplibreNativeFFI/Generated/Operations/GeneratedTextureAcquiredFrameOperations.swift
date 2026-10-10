@@ -12,12 +12,12 @@ public extension AcquiredFrameHandle {
     return try nativeView(
       "mln_acquired_frame_get_metal_texture",
       reading: raw,
-      begin: { raw, token, diagnostic in mln_adapter_acquired_frame_view_begin(
+      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
         token,
         diagnostic
       ) },
-      end: { mln_adapter_acquired_frame_view_end($0) },
+      end: { mln_acquired_frame_view_end($0) },
       get: { raw, value, diagnostic in mln_acquired_frame_get_metal_texture(
         raw,
         value,
@@ -37,12 +37,12 @@ public extension AcquiredFrameHandle {
     return try nativeView(
       "mln_acquired_frame_get_opengl_texture",
       reading: raw,
-      begin: { raw, token, diagnostic in mln_adapter_acquired_frame_view_begin(
+      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
         token,
         diagnostic
       ) },
-      end: { mln_adapter_acquired_frame_view_end($0) },
+      end: { mln_acquired_frame_view_end($0) },
       get: { raw, value, diagnostic in mln_acquired_frame_get_opengl_texture(
         raw,
         value,
@@ -62,12 +62,12 @@ public extension AcquiredFrameHandle {
     return try nativeView(
       "mln_acquired_frame_get_vulkan_texture",
       reading: raw,
-      begin: { raw, token, diagnostic in mln_adapter_acquired_frame_view_begin(
+      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
         token,
         diagnostic
       ) },
-      end: { mln_adapter_acquired_frame_view_end($0) },
+      end: { mln_acquired_frame_view_end($0) },
       get: { raw, value, diagnostic in mln_acquired_frame_get_vulkan_texture(
         raw,
         value,
@@ -87,12 +87,12 @@ public extension AcquiredFrameHandle {
     return try nativeView(
       "mln_acquired_frame_get_webgpu_texture",
       reading: raw,
-      begin: { raw, token, diagnostic in mln_adapter_acquired_frame_view_begin(
+      begin: { raw, token, diagnostic in mln_acquired_frame_view_begin(
         raw,
         token,
         diagnostic
       ) },
-      end: { mln_adapter_acquired_frame_view_end($0) },
+      end: { mln_acquired_frame_view_end($0) },
       get: { raw, value, diagnostic in mln_acquired_frame_get_webgpu_texture(
         raw,
         value,

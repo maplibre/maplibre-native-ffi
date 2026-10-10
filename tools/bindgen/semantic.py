@@ -7,6 +7,7 @@ these plans and keep allocation, callback roots, and scheduling in their runtime
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import TypedDict
 
@@ -291,6 +292,17 @@ class DisposeSupport:
 
 
 @dataclass(frozen=True)
+class ViewSupport:
+    """The operation begins or ends a borrowed view scope of this handle.
+
+    Bindings call it only from the borrowed views that the handle owns, so it
+    never becomes a public member.
+    """
+
+    handle: HandlePlan
+
+
+@dataclass(frozen=True)
 class OperationPlan:
     function: Function
     execution: str
@@ -300,7 +312,7 @@ class OperationPlan:
     result: ValuePlan | None
     registrations: tuple[RegistrationPlan, ...] = ()
     consumes: str | None = None
-    support: DefaultSupport | DisposeSupport | None = None
+    support: DefaultSupport | DisposeSupport | ViewSupport | None = None
     completion: CompletionPlan | None = None
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
     direct_registrations: tuple[DirectRegistrationPlan, ...] = ()
@@ -341,6 +353,9 @@ class BoundApi:
     unsupported: dict[str, tuple[str, ...]] = field(default_factory=dict)
     runtime_operations: tuple[OperationPlan, ...] = ()
     callback_adapters: tuple[CallbackAdapterPlan, ...] = ()
+    # The scope operations of borrowed views, which bindings call from the
+    # views they generate instead of exposing.
+    view_scopes: tuple[OperationPlan, ...] = ()
 
     @property
     def public_values(self) -> dict[str, ValuePlan]:
@@ -415,7 +430,29 @@ def support_relation(plan: OperationPlan) -> dict[str, str] | None:
         return {"default": plan.support.value}
     if isinstance(plan.support, DisposeSupport):
         return {"dispose": plan.support.handle.native}
+    if isinstance(plan.support, ViewSupport):
+        return {"view": plan.support.handle.native}
     return None
+
+
+def view_support(bound: BoundApi, generated: Iterable[str]) -> dict[str, dict]:
+    """The support relations of the view scopes that generated views call.
+
+    A binding reports these with its coverage, since it calls each scope only
+    from the borrowed views that it generates.
+    """
+    generated = set(generated)
+    used = {
+        name
+        for plan in bound.operations
+        if plan.view and plan.name in generated
+        for name in (plan.view.begin, plan.view.end)
+    }
+    return {
+        plan.name: support_relation(plan)
+        for plan in bound.view_scopes
+        if plan.name in used
+    }
 
 
 def output_member(name: str) -> str:
@@ -1062,7 +1099,7 @@ class Binder:
                 function.return_type
             ):
                 result = self.value(function.return_type, metadata, context + " return")
-        support: DefaultSupport | DisposeSupport | None = None
+        support: DefaultSupport | DisposeSupport | ViewSupport | None = None
         for name, typedef in self.typedefs.items():
             if typedef.metadata.get("default") == function.name:
                 support = DefaultSupport(name)
@@ -1185,6 +1222,9 @@ class Binder:
                 consumes = handle.release_consumes
                 if function.name == handle.dispose and function.name != handle.release:
                     support = DisposeSupport(handle)
+                break
+            if function.name in {handle.view_begin, handle.view_end}:
+                support = ViewSupport(handle)
                 break
         for parameter in inputs:
             if parameter.consumes:
@@ -1492,6 +1532,7 @@ class Binder:
                 operation
                 for operation in operations
                 if operation.name not in self.api.runtime_exports
+                and not isinstance(operation.support, ViewSupport)
             ),
             self.values,
             self.callbacks,
@@ -1511,6 +1552,12 @@ class Binder:
                 )
                 for f in self.api.functions
                 if "callback_adapter" in f.metadata
+            ),
+            tuple(
+                operation
+                for operation in operations
+                if operation.name not in self.api.runtime_exports
+                and isinstance(operation.support, ViewSupport)
             ),
         )
 

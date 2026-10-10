@@ -6,7 +6,6 @@ package maplibre
 #include <stdlib.h>
 #include <stdbool.h>
 #include "maplibre_native_c/plugin.h"
-#include "maplibre_native_c/callback_adapter.h"
 #include "generated_callbacks.h"
 */
 import "C"
@@ -4428,8 +4427,8 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalOwnedTe
 	var outFrame C.mln_metal_owned_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_metal_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
-	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_metal_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
 	}, func(scope *bindingScope) MetalOwnedTextureFrameView {
 		return MetalOwnedTextureFrameView{value: copyMetalOwnedTextureFrame(outFrame), scope: scope}
@@ -4440,8 +4439,8 @@ func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglOwned
 	var outFrame C.mln_opengl_owned_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_opengl_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
-	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_opengl_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
 	}, func(scope *bindingScope) OpenglOwnedTextureFrameView {
 		return OpenglOwnedTextureFrameView{value: copyOpenglOwnedTextureFrame(outFrame), scope: scope}
@@ -4452,8 +4451,8 @@ func (receiver *AcquiredFrameHandle) WithProducerSync(callback func(GpuSyncView)
 	outSync := C.mln_gpu_sync_default()
 	outSync.size = C.uint32_t(unsafe.Sizeof(outSync))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_producer_sync), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
-	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_producer_sync(C.mln_acquired_frame(raw), &outSync, diagnostic))
 	}, func(scope *bindingScope) GpuSyncView { return GpuSyncView{value: copyGpuSync(outSync), scope: scope} })
 }
@@ -4472,8 +4471,8 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanOwned
 	var outFrame C.mln_vulkan_owned_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_vulkan_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
-	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_vulkan_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
 	}, func(scope *bindingScope) VulkanOwnedTextureFrameView {
 		return VulkanOwnedTextureFrameView{value: copyVulkanOwnedTextureFrame(outFrame), scope: scope}
@@ -4484,8 +4483,8 @@ func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuOwned
 	var outFrame C.mln_webgpu_owned_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_webgpu_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_adapter_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
-	}, func(token unsafe.Pointer) { C.mln_adapter_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
+	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_webgpu_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
 	}, func(scope *bindingScope) WebgpuOwnedTextureFrameView {
 		return WebgpuOwnedTextureFrameView{value: copyWebgpuOwnedTextureFrame(outFrame), scope: scope}

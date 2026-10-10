@@ -69,8 +69,8 @@ typedef enum mln_status : int32_t {
 /**
  * The diagnostic message of one status-returning call.
  *
- * Every status-returning function, except the callback implementations in
- * callback_adapter.h, takes a nullable mln_diagnostic* as its last parameter,
+ * Every status-returning function, except the binding-internal callback
+ * adapters, takes a nullable mln_diagnostic* as its last parameter,
  * out_diagnostic. The caller sets size to sizeof(mln_diagnostic). The function
  * writes message as null-terminated UTF-8, empty when it returns MLN_STATUS_OK
  * and describing the failure otherwise, truncated to fit. It writes no more
@@ -148,8 +148,8 @@ typedef uint64_t mln_event_batch MLN_BINDING(
 typedef uint64_t mln_acquired_frame MLN_BINDING(
   "kind=handle;release=mln_acquired_frame_release;parent=mln_render_session;"
   "dispose=mln_acquired_frame_dispose;dispose_invalidates=parent;"
-  "view_begin=mln_adapter_acquired_frame_view_begin;"
-  "view_end=mln_adapter_acquired_frame_view_end"
+  "view_begin=mln_acquired_frame_view_begin;"
+  "view_end=mln_acquired_frame_view_end"
 );
 typedef uint64_t mln_render_frame_batch MLN_BINDING(
   "kind=handle;release=mln_render_frame_batch_release;"

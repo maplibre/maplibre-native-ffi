@@ -2,7 +2,6 @@
 
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
-#include "maplibre_native_c/callback_adapter.h"
 #include "render/render_session_common.hpp"
 
 auto mln_render_session_projection_create(
@@ -244,13 +243,13 @@ auto mln_acquired_frame_dispose(
   });
 }
 
-auto mln_adapter_acquired_frame_view_begin(
+auto mln_acquired_frame_view_begin(
   mln_acquired_frame frame, void** out_scope, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {
     return mln::core::acquired_frame_view_begin(frame, out_scope);
   });
 }
-void mln_adapter_acquired_frame_view_end(void* scope) noexcept {
+void mln_acquired_frame_view_end(void* scope) noexcept {
   mln::core::acquired_frame_view_end(scope);
 }

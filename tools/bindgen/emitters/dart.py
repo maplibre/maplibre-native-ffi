@@ -12,7 +12,7 @@ from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functi
 from tools.bindgen.model import Api
 from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.native_capture import copy_kind
-from tools.bindgen.semantic import BoundApi, OperationPlan, output_member
+from tools.bindgen.semantic import BoundApi, OperationPlan, output_member, view_support
 
 from .dart_values import (
     Unsupported,
@@ -817,6 +817,7 @@ def coverage(api: Api | BoundApi):
     return {
         "generated": generated,
         "callback_adapters": adapters,
+        "support": view_support(bound, generated),
         "unsupported": unsupported,
     }
 

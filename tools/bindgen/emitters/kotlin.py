@@ -8,7 +8,7 @@ the C functions and upcall stubs that common code uses (see kotlin_native).
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import conflicting_functions
 from tools.bindgen.model import Api
-from tools.bindgen.semantic import BoundApi
+from tools.bindgen.semantic import BoundApi, view_support
 
 from . import kotlin_callbacks, kotlin_owners
 from .kotlin_native import NativeShims
@@ -163,8 +163,11 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    functions, unsupported = lower(api)
+    bound = compile_api(api)
+    functions, unsupported = lower(bound)
+    generated = [function.name for function in functions]
     return {
-        "generated": [function.name for function in functions],
+        "generated": generated,
+        "support": view_support(bound, generated),
         "unsupported": unsupported,
     }

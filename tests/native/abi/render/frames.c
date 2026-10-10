@@ -7,7 +7,6 @@
 
 #include "support/frames.h"
 
-#include "maplibre_native_c/callback_adapter.h"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -408,7 +407,7 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
 
   MLN_TEST_INVALID(
-    mln_adapter_acquired_frame_view_begin(frame, NULL, MLN_TEST_DIAGNOSTIC)
+    mln_acquired_frame_view_begin(frame, NULL, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "out_scope must not be null"),
@@ -416,9 +415,7 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   );
   void* scopes[2] = {NULL, NULL};
   for (size_t index = 0; index < 2; index += 1) {
-    MLN_TEST_OK(
-      mln_adapter_acquired_frame_view_begin(frame, &scopes[index], NULL)
-    );
+    MLN_TEST_OK(mln_acquired_frame_view_begin(frame, &scopes[index], NULL));
     TEST_ASSERT_NOT_NULL(scopes[index]);
   }
   mln_gpu_sync sync = mln_gpu_sync_default();
@@ -428,16 +425,14 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
       MLN_STATUS_BUSY, mln_acquired_frame_release(&frame, &sync, NULL)
     );
     TEST_ASSERT_EQUAL_UINT64(held, frame);
-    mln_adapter_acquired_frame_view_end(scopes[index]);
+    mln_acquired_frame_view_end(scopes[index]);
   }
-  mln_adapter_acquired_frame_view_end(NULL);
+  mln_acquired_frame_view_end(NULL);
 
   const mln_acquired_frame released = frame;
   mln_test_render_release_frame(&frame);
   void* stale = NULL;
-  MLN_TEST_INVALID_STATE(
-    mln_adapter_acquired_frame_view_begin(released, &stale, NULL)
-  );
+  MLN_TEST_INVALID_STATE(mln_acquired_frame_view_begin(released, &stale, NULL));
   TEST_ASSERT_NULL(stale);
   detach(runtime, map, &fixture);
 }
@@ -465,14 +460,14 @@ static void disposing_a_frame_abandons_its_session_after_open_views(void) {
   mln_acquired_frame kept = mln_test_render_and_acquire(&fixture, 1);
   const mln_acquired_frame disposed = mln_test_render_and_acquire(&fixture, 2);
   void* scope = NULL;
-  MLN_TEST_OK(mln_adapter_acquired_frame_view_begin(kept, &scope, NULL));
+  MLN_TEST_OK(mln_acquired_frame_view_begin(kept, &scope, NULL));
 
   MLN_TEST_OK(mln_acquired_frame_dispose(disposed, MLN_TEST_DIAGNOSTIC));
   MLN_TEST_INVALID_STATE(mln_acquired_frame_dispose(disposed, NULL));
   void* rejected = NULL;
   MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST,
-    mln_adapter_acquired_frame_view_begin(kept, &rejected, MLN_TEST_DIAGNOSTIC)
+    mln_acquired_frame_view_begin(kept, &rejected, MLN_TEST_DIAGNOSTIC)
   );
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "no longer owns"), mln_test_last_error()
@@ -483,7 +478,7 @@ static void disposing_a_frame_abandons_its_session_after_open_views(void) {
     MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(kept, &result, NULL)
   );
 
-  mln_adapter_acquired_frame_view_end(scope);
+  mln_acquired_frame_view_end(scope);
   TEST_ASSERT_TRUE(mln_test_await(
     session_abandoned, &fixture, mln_test_deadline_default(),
     "the disposed frame's session to be abandoned"

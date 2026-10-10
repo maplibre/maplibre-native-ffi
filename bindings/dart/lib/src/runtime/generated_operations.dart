@@ -6281,8 +6281,8 @@ final class ScopedMetalOwnedTextureFrame {
   ScopedMetalOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
-        raw.mln_adapter_acquired_frame_view_begin,
-        raw.mln_adapter_acquired_frame_view_end,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
       );
   final MetalOwnedTextureFrame _value;
   final _NativeViewScope _scope;
@@ -6310,8 +6310,8 @@ final class ScopedOpenglOwnedTextureFrame {
   ScopedOpenglOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
-        raw.mln_adapter_acquired_frame_view_begin,
-        raw.mln_adapter_acquired_frame_view_end,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
       );
   final OpenglOwnedTextureFrame _value;
   final _NativeViewScope _scope;
@@ -6333,8 +6333,8 @@ final class ScopedGpuSync {
   ScopedGpuSync._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
-        raw.mln_adapter_acquired_frame_view_begin,
-        raw.mln_adapter_acquired_frame_view_end,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
       );
   final GpuSync _value;
   final _NativeViewScope _scope;
@@ -6348,8 +6348,8 @@ final class ScopedVulkanOwnedTextureFrame {
   ScopedVulkanOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
-        raw.mln_adapter_acquired_frame_view_begin,
-        raw.mln_adapter_acquired_frame_view_end,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
       );
   final VulkanOwnedTextureFrame _value;
   final _NativeViewScope _scope;
@@ -6375,8 +6375,8 @@ final class ScopedWebgpuOwnedTextureFrame {
   ScopedWebgpuOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
-        raw.mln_adapter_acquired_frame_view_begin,
-        raw.mln_adapter_acquired_frame_view_end,
+        raw.mln_acquired_frame_view_begin,
+        raw.mln_acquired_frame_view_end,
       );
   final WebgpuOwnedTextureFrame _value;
   final _NativeViewScope _scope;

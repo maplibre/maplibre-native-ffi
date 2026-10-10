@@ -41,6 +41,7 @@ class GoEmitterTests(unittest.TestCase):
                             "mln_probe_nullable_text",
                             "mln_probe_roundtrip",
                         ],
+                        "support": {},
                         "unsupported": {},
                     },
                 )
@@ -52,9 +53,6 @@ class GoEmitterTests(unittest.TestCase):
                 )
                 source = source.replace(
                     '#include "maplibre_native_c/plugin.h"', '#include "api.h"'
-                )
-                source = source.replace(
-                    '#include "maplibre_native_c/callback_adapter.h"', ""
                 )
                 (root / "generated.go").write_text(source)
                 (root / "generated_callbacks.h").write_text(

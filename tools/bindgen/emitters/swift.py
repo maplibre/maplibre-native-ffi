@@ -8,7 +8,7 @@ from pathlib import Path
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
-from tools.bindgen.semantic import BoundApi, OperationPlan, output_member
+from tools.bindgen.semantic import BoundApi, OperationPlan, output_member, view_support
 
 SCALARS = {
     "double": "Double",
@@ -546,5 +546,10 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
 
 
 def coverage(api: Api | BoundApi) -> dict:
-    _, generated, failures = lower(api)
-    return {"generated": generated, "unsupported": failures}
+    bound = compile_api(api)
+    _, generated, failures = lower(bound)
+    return {
+        "generated": generated,
+        "support": view_support(bound, generated),
+        "unsupported": failures,
+    }

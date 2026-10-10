@@ -116,7 +116,7 @@ case and escapes keywords:
 | `MaskFlag.member`       | The flag constant without its enum's shared prefix                                          |
 | `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
 | `OperationPlan.status`  | Whether the function returns the status enum                                                |
-| `OperationPlan.support` | The record default or handle disposal that the operation backs                              |
+| `OperationPlan.support` | The record default, handle disposal, or borrowed view scope that the operation backs        |
 
 `native_results.py` writes `src/completion/completion_result_generated.inc`,
 which specializes `CompletionResult` for each completion function other than a

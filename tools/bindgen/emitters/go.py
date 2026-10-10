@@ -2,6 +2,7 @@
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
+from tools.bindgen.semantic import view_support
 
 GO_KEYWORDS = {
     "break",
@@ -107,8 +108,13 @@ def lower(api):
 
 
 def coverage(api):
-    _, _, _, generated, unsupported = lower(api)
-    return {"generated": sorted(generated), "unsupported": unsupported}
+    bound = compile_api(api)
+    _, _, _, generated, unsupported = lower(bound)
+    return {
+        "generated": sorted(generated),
+        "support": view_support(bound, generated),
+        "unsupported": unsupported,
+    }
 
 
 def generate(api):
@@ -126,7 +132,6 @@ package maplibre
 #include <stdlib.h>
 #include <stdbool.h>
 #include "maplibre_native_c/plugin.h"
-#include "maplibre_native_c/callback_adapter.h"
 #include "generated_callbacks.h"
 */
 import "C"
