@@ -24,8 +24,8 @@ public sealed class GeneratedValueTests
             TestWaits.Token
         );
         Assert.Equal(CommandDisposition.Committed, added.Disposition);
-        Assert.NotNull(await fixture.Map.GetStyleSourceInfoAsync("before\0after", TestWaits.Token));
-        Assert.Null(await fixture.Map.GetStyleSourceInfoAsync("before", TestWaits.Token));
+        Assert.NotNull(await fixture.Map.GetStyleSourceAsync("before\0after", TestWaits.Token));
+        Assert.Null(await fixture.Map.GetStyleSourceAsync("before", TestWaits.Token));
 
         // A style URL crosses NUL-terminated, where an embedded NUL would cut it short.
         var error = Assert.Throws<InvalidArgumentException>(() =>
@@ -76,9 +76,9 @@ public sealed class GeneratedValueTests
         tiles[0] = "provider-test://changed/{z}/{x}/{y}.pbf";
         Assert.Equal(CommandDisposition.Committed, (await added).Disposition);
 
-        var urls = await fixture.Map.GetStyleSourceTileUrlsAsync("tiles", TestWaits.Token);
-        Assert.NotNull(urls);
-        Assert.Equal(["provider-test://tiles/{z}/{x}/{y}.pbf"], urls.Value.TileUrls);
+        var source = await fixture.Map.GetStyleSourceAsync("tiles", TestWaits.Token);
+        Assert.NotNull(source?.Tilejson);
+        Assert.Equal(["provider-test://tiles/{z}/{x}/{y}.pbf"], source.Tilejson.Value.TileUrls);
     }
 
     // A parameterless constructor starts each member at the header's annotated default, so the
@@ -87,7 +87,6 @@ public sealed class GeneratedValueTests
     public void ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault()
     {
         Assert.Equal(MapOptions.Default, new MapOptions());
-        Assert.Equal(StyleImageInfo.Default, new StyleImageInfo());
     }
 
     [Fact]

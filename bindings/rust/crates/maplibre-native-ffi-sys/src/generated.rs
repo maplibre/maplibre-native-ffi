@@ -353,6 +353,10 @@ pub const MLN_STATUS_BUSY: mln_status = -7;
 pub const MLN_STATUS_TARGET_LOST: mln_status = -8;
 pub const MLN_STATUS_NOT_READY: mln_status = -9;
 pub const MLN_STATUS_NOT_FOUND: mln_status = -10;
+pub type mln_style_image_info_field = u32;
+pub const MLN_STYLE_IMAGE_INFO_CONTENT: mln_style_image_info_field = 1;
+pub const MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH: mln_style_image_info_field = 2;
+pub const MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT: mln_style_image_info_field = 4;
 pub type mln_style_image_option_field = u32;
 pub const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO: mln_style_image_option_field = 1;
 pub const MLN_STYLE_IMAGE_OPTION_SDF: mln_style_image_option_field = 2;
@@ -378,6 +382,7 @@ pub const MLN_STYLE_SOURCE_INFO_BOUNDS: mln_style_source_info_field = 4;
 pub const MLN_STYLE_SOURCE_INFO_TILE_SIZE: mln_style_source_info_field = 8;
 pub const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: mln_style_source_info_field = 16;
 pub const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING: mln_style_source_info_field = 32;
+pub const MLN_STYLE_SOURCE_INFO_ATTRIBUTION: mln_style_source_info_field = 64;
 pub type mln_style_source_type = u32;
 pub const MLN_STYLE_SOURCE_TYPE_UNKNOWN: mln_style_source_type = 0;
 pub const MLN_STYLE_SOURCE_TYPE_VECTOR: mln_style_source_type = 1;
@@ -1228,18 +1233,17 @@ pub struct mln_style_image_info {
     pub size: u32,
     pub width: u32,
     pub height: u32,
-    pub stride: u32,
-    pub byte_length: usize,
+    pub fields: u32,
+    pub pixels: mln_buffer_view,
+    pub stretch_x: *const mln_image_stretch,
     pub stretch_x_count: usize,
+    pub stretch_y: *const mln_image_stretch,
     pub stretch_y_count: usize,
     pub content: mln_image_content,
     pub text_fit_width: u32,
     pub text_fit_height: u32,
     pub pixel_ratio: f32,
     pub sdf: bool,
-    pub has_content: bool,
-    pub has_text_fit_width: bool,
-    pub has_text_fit_height: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1258,28 +1262,6 @@ pub struct mln_style_image_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_style_image_result {
-    pub size: u32,
-    pub reserved: u32,
-    pub info: mln_style_image_info,
-    pub pixels: mln_buffer_view,
-    pub stretch_x: *const mln_image_stretch,
-    pub stretch_x_count: usize,
-    pub stretch_y: *const mln_image_stretch,
-    pub stretch_y_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_image_stretches_result {
-    pub size: u32,
-    pub reserved: u32,
-    pub stretch_x: *const mln_image_stretch,
-    pub stretch_x_count: usize,
-    pub stretch_y: *const mln_image_stretch,
-    pub stretch_y_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_entry {
     pub size: u32,
     pub id: mln_buffer_view,
@@ -1291,18 +1273,10 @@ pub struct mln_style_layer_entry {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_info {
     pub size: u32,
-    pub reserved: u32,
+    pub visibility: u32,
     pub type_: mln_buffer_view,
     pub min_zoom: f64,
     pub max_zoom: f64,
-    pub visibility: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_layer_result {
-    pub size: u32,
-    pub reserved: u32,
-    pub info: mln_style_layer_info,
     pub source_id: mln_buffer_view,
     pub source_layer: mln_buffer_view,
 }
@@ -1312,15 +1286,10 @@ pub struct mln_style_source_info {
     pub size: u32,
     pub type_: u32,
     pub fields: u32,
-    pub id_size: usize,
     pub is_volatile: bool,
-    pub has_attribution: bool,
-    pub attribution_size: usize,
-    pub url_size: usize,
-    pub tile_count: usize,
-    pub min_zoom: f64,
-    pub max_zoom: f64,
-    pub scheme: u32,
+    pub attribution: mln_buffer_view,
+    pub url: mln_buffer_view,
+    pub tilejson: mln_style_source_tile_info,
     pub bounds: mln_lat_lng_bounds,
     pub tile_size: u32,
     pub vector_encoding: u32,
@@ -1328,30 +1297,12 @@ pub struct mln_style_source_info {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_style_source_result {
-    pub size: u32,
-    pub reserved: u32,
-    pub info: mln_style_source_info,
-    pub attribution: mln_buffer_view,
-    pub url: mln_buffer_view,
+pub struct mln_style_source_tile_info {
     pub tile_urls: *const mln_buffer_view,
     pub tile_url_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_source_tile_info {
-    pub tile_count: usize,
     pub min_zoom: f64,
     pub max_zoom: f64,
     pub scheme: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_source_tile_urls_result {
-    pub size: u32,
-    pub reserved: u32,
-    pub tile_urls: *const mln_buffer_view,
-    pub tile_url_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1932,42 +1883,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_copy_layer_source_id(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_layer_source_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_image_premultiplied_rgba8(
-        map: mln_map,
-        image_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_image_stretches(
-        map: mln_map,
-        image_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_source_attribution(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_source_url(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_create(
         runtime: mln_runtime,
         options: *const mln_map_options,
@@ -2010,13 +1925,13 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_style_image_info(
+    pub fn mln_map_get_style_image(
         map: mln_map,
         image_id: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_style_layer_info(
+    pub fn mln_map_get_style_layer(
         map: mln_map,
         layer_id: mln_buffer_view,
         completion: *const mln_completion,
@@ -2034,13 +1949,7 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_style_source_info(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_get_style_source_tile_urls(
+    pub fn mln_map_get_style_source(
         map: mln_map,
         source_id: mln_buffer_view,
         completion: *const mln_completion,
@@ -2107,11 +2016,6 @@ unsafe extern "C" {
         map: mln_map,
         points: *const mln_screen_point,
         point_count: usize,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_list_style_layer_ids(
-        map: mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2930,7 +2834,6 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_source_feature_query_options_default() -> mln_source_feature_query_options;
-    pub fn mln_style_image_info_default() -> mln_style_image_info;
     pub fn mln_style_image_options_default() -> mln_style_image_options;
     pub fn mln_style_tile_source_options_default() -> mln_style_tile_source_options;
     pub fn mln_style_transition_options_default() -> mln_style_transition_options;

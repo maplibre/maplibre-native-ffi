@@ -2384,47 +2384,73 @@ internal static unsafe class GeneratedValues
         {
             Width = value.width,
             Height = value.height,
-            Stride = value.stride,
-            ByteLength = (ulong)value.byte_length,
-            StretchXCount = (ulong)value.stretch_x_count,
-            StretchYCount = (ulong)value.stretch_y_count,
-            Content = value.has_content != 0 ? CopyImageContent(value.content) : null,
-            TextFitWidth =
-                value.has_text_fit_width != 0 ? (StyleImageTextFit)value.text_fit_width : null,
-            TextFitHeight =
-                value.has_text_fit_height != 0 ? (StyleImageTextFit)value.text_fit_height : null,
+            PixelsStorage = new(ValueStructs.CopyBufferView(value.pixels)),
+            StretchXStorage = new(
+                NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
+                    value.stretch_x,
+                    (nuint)(value.stretch_x_count),
+                    static item => CopyImageStretch(item)
+                )
+            ),
+            StretchYStorage = new(
+                NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
+                    value.stretch_y,
+                    (nuint)(value.stretch_y_count),
+                    static item => CopyImageStretch(item)
+                )
+            ),
+            Content = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_CONTENT)
+                ? CopyImageContent(value.content)
+                : null,
+            TextFitWidth = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH)
+                ? (StyleImageTextFit)value.text_fit_width
+                : null,
+            TextFitHeight = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT)
+                ? (StyleImageTextFit)value.text_fit_height
+                : null,
             PixelRatio = value.pixel_ratio,
             Sdf = value.sdf != 0,
         };
 
-    internal static mln_style_image_info NativeStyleImageInfo(StyleImageInfo value)
+    internal static mln_style_image_info NativeStyleImageInfo(
+        StyleImageInfo value,
+        NativeCallScope scope
+    )
     {
-        var native = NativeMethods.mln_style_image_info_default();
-        native.has_content = 0;
-        native.has_text_fit_width = 0;
-        native.has_text_fit_height = 0;
+        var native = new mln_style_image_info();
+        native.fields = 0;
         native.size = (uint)sizeof(mln_style_image_info);
         native.width = value.Width;
         native.height = value.Height;
-        native.stride = value.Stride;
-        native.byte_length = checked((nuint)value.ByteLength);
-        native.stretch_x_count = checked((nuint)value.StretchXCount);
-        native.stretch_y_count = checked((nuint)value.StretchYCount);
-        if (value.Content is { } fieldContent)
-        {
-            native.has_content = 1;
-            native.content = NativeImageContent(fieldContent);
-        }
-        if (value.TextFitWidth is { } fieldTextFitWidth)
-        {
-            native.has_text_fit_width = 1;
-            native.text_fit_width = (uint)fieldTextFitWidth;
-        }
-        if (value.TextFitHeight is { } fieldTextFitHeight)
-        {
-            native.has_text_fit_height = 1;
-            native.text_fit_height = (uint)fieldTextFitHeight;
-        }
+        native.pixels = scope.Buffer(value.PixelsStorage.Items);
+        native.stretch_x = scope.Array<mln_image_stretch, ImageStretch>(
+            value.StretchXStorage.Items,
+            item => NativeImageStretch(item)
+        );
+        native.stretch_x_count = checked((nuint)value.StretchXStorage.Items.Length);
+        native.stretch_y = scope.Array<mln_image_stretch, ImageStretch>(
+            value.StretchYStorage.Items,
+            item => NativeImageStretch(item)
+        );
+        native.stretch_y_count = checked((nuint)value.StretchYStorage.Items.Length);
+        native.fields |= Put(
+            value.Content,
+            ref native.content,
+            MLN_STYLE_IMAGE_INFO_CONTENT,
+            NativeImageContent
+        );
+        native.fields |= Put(
+            value.TextFitWidth,
+            ref native.text_fit_width,
+            MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH,
+            static present => (uint)present
+        );
+        native.fields |= Put(
+            value.TextFitHeight,
+            ref native.text_fit_height,
+            MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
+            static present => (uint)present
+        );
         native.pixel_ratio = value.PixelRatio;
         native.sdf = (byte)(value.Sdf ? 1 : 0);
         return native;
@@ -2524,91 +2550,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static StyleImageResult CopyStyleImageResult(mln_style_image_result value) =>
-        new()
-        {
-            Info = CopyStyleImageInfo(value.info),
-            PixelsStorage = new(ValueStructs.CopyBufferView(value.pixels)),
-            StretchXStorage = new(
-                NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
-                    value.stretch_x,
-                    (nuint)(value.stretch_x_count),
-                    static item => CopyImageStretch(item)
-                )
-            ),
-            StretchYStorage = new(
-                NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
-                    value.stretch_y,
-                    (nuint)(value.stretch_y_count),
-                    static item => CopyImageStretch(item)
-                )
-            ),
-        };
-
-    internal static mln_style_image_result NativeStyleImageResult(
-        StyleImageResult value,
-        NativeCallScope scope
-    )
-    {
-        Required(value.Info, "StyleImageResult.Info must not be null.");
-        var native = new mln_style_image_result();
-        native.size = (uint)sizeof(mln_style_image_result);
-        native.info = NativeStyleImageInfo(value.Info);
-        native.pixels = scope.Buffer(value.PixelsStorage.Items);
-        native.stretch_x = scope.Array<mln_image_stretch, ImageStretch>(
-            value.StretchXStorage.Items,
-            item => NativeImageStretch(item)
-        );
-        native.stretch_x_count = checked((nuint)value.StretchXStorage.Items.Length);
-        native.stretch_y = scope.Array<mln_image_stretch, ImageStretch>(
-            value.StretchYStorage.Items,
-            item => NativeImageStretch(item)
-        );
-        native.stretch_y_count = checked((nuint)value.StretchYStorage.Items.Length);
-        return native;
-    }
-
-    internal static StyleImageStretchesResult CopyStyleImageStretchesResult(
-        mln_style_image_stretches_result value
-    ) =>
-        new()
-        {
-            StretchXStorage = new(
-                NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
-                    value.stretch_x,
-                    (nuint)(value.stretch_x_count),
-                    static item => CopyImageStretch(item)
-                )
-            ),
-            StretchYStorage = new(
-                NativeCallScope.CopyArray<mln_image_stretch, ImageStretch>(
-                    value.stretch_y,
-                    (nuint)(value.stretch_y_count),
-                    static item => CopyImageStretch(item)
-                )
-            ),
-        };
-
-    internal static mln_style_image_stretches_result NativeStyleImageStretchesResult(
-        StyleImageStretchesResult value,
-        NativeCallScope scope
-    )
-    {
-        var native = new mln_style_image_stretches_result();
-        native.size = (uint)sizeof(mln_style_image_stretches_result);
-        native.stretch_x = scope.Array<mln_image_stretch, ImageStretch>(
-            value.StretchXStorage.Items,
-            item => NativeImageStretch(item)
-        );
-        native.stretch_x_count = checked((nuint)value.StretchXStorage.Items.Length);
-        native.stretch_y = scope.Array<mln_image_stretch, ImageStretch>(
-            value.StretchYStorage.Items,
-            item => NativeImageStretch(item)
-        );
-        native.stretch_y_count = checked((nuint)value.StretchYStorage.Items.Length);
-        return native;
-    }
-
     internal static StyleLayerEntry CopyStyleLayerEntry(mln_style_layer_entry value) =>
         new(
             RuntimeStructs.CopyUtf8((sbyte*)value.id.data, value.id.size),
@@ -2639,10 +2580,16 @@ internal static unsafe class GeneratedValues
 
     internal static StyleLayerInfo CopyStyleLayerInfo(mln_style_layer_info value) =>
         new(
+            (StyleLayerVisibility)value.visibility,
             RuntimeStructs.CopyUtf8((sbyte*)value.type.data, value.type.size),
             value.min_zoom,
             value.max_zoom,
-            (StyleLayerVisibility)value.visibility
+            value.source_id.size == 0
+                ? null
+                : RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
+            value.source_layer.size == 0
+                ? null
+                : RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size)
         );
 
     internal static mln_style_layer_info NativeStyleLayerInfo(
@@ -2653,32 +2600,10 @@ internal static unsafe class GeneratedValues
         Required(value.Type, "StyleLayerInfo.Type must not be null.");
         var native = new mln_style_layer_info();
         native.size = (uint)sizeof(mln_style_layer_info);
+        native.visibility = (uint)value.Visibility;
         native.type = scope.Utf8(value.Type);
         native.min_zoom = value.MinZoom;
         native.max_zoom = value.MaxZoom;
-        native.visibility = (uint)value.Visibility;
-        return native;
-    }
-
-    internal static StyleLayerResult CopyStyleLayerResult(mln_style_layer_result value) =>
-        new(
-            CopyStyleLayerInfo(value.info),
-            value.source_id.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
-            value.source_layer.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size)
-        );
-
-    internal static mln_style_layer_result NativeStyleLayerResult(
-        StyleLayerResult value,
-        NativeCallScope scope
-    )
-    {
-        var native = new mln_style_layer_result();
-        native.size = (uint)sizeof(mln_style_layer_result);
-        native.info = NativeStyleLayerInfo(value.Info, scope);
         native.source_id = scope.Utf8(value.SourceId ?? "");
         native.source_layer = scope.Utf8(value.SourceLayer ?? "");
         return native;
@@ -2688,19 +2613,15 @@ internal static unsafe class GeneratedValues
         new()
         {
             Type = (StyleSourceType)value.type,
-            IdSize = (ulong)value.id_size,
             IsVolatile = value.is_volatile != 0,
-            AttributionSize = value.has_attribution != 0 ? (ulong)value.attribution_size : null,
-            UrlSize = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_URL)
-                ? (ulong)value.url_size
+            Attribution = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
+                ? RuntimeStructs.CopyUtf8((sbyte*)value.attribution.data, value.attribution.size)
+                : null,
+            Url = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_URL)
+                ? RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
                 : null,
             Tilejson = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_TILEJSON)
-                ? new StyleSourceTileInfo(
-                    (ulong)value.tile_count,
-                    value.min_zoom,
-                    value.max_zoom,
-                    (StyleTileScheme)value.scheme
-                )
+                ? CopyStyleSourceTileInfo(value.tilejson)
                 : null,
             Bounds = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_BOUNDS)
                 ? CopyLatLngBounds(value.bounds)
@@ -2716,34 +2637,34 @@ internal static unsafe class GeneratedValues
                 : null,
         };
 
-    internal static mln_style_source_info NativeStyleSourceInfo(StyleSourceInfo value)
+    internal static mln_style_source_info NativeStyleSourceInfo(
+        StyleSourceInfo value,
+        NativeCallScope scope
+    )
     {
         var native = new mln_style_source_info();
         native.fields = 0;
-        native.has_attribution = 0;
         native.size = (uint)sizeof(mln_style_source_info);
         native.type = (uint)value.Type;
-        native.id_size = checked((nuint)value.IdSize);
         native.is_volatile = (byte)(value.IsVolatile ? 1 : 0);
-        if (value.AttributionSize is { } fieldAttributionSize)
-        {
-            native.has_attribution = 1;
-            native.attribution_size = checked((nuint)fieldAttributionSize);
-        }
         native.fields |= Put(
-            value.UrlSize,
-            ref native.url_size,
-            MLN_STYLE_SOURCE_INFO_URL,
-            static present => checked((nuint)present)
+            value.Attribution,
+            ref native.attribution,
+            MLN_STYLE_SOURCE_INFO_ATTRIBUTION,
+            present => scope.Utf8(present)
         );
-        if (value.Tilejson is { } fieldTilejson)
-        {
-            native.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-            native.tile_count = checked((nuint)fieldTilejson.TileCount);
-            native.min_zoom = fieldTilejson.MinZoom;
-            native.max_zoom = fieldTilejson.MaxZoom;
-            native.scheme = (uint)fieldTilejson.Scheme;
-        }
+        native.fields |= Put(
+            value.Url,
+            ref native.url,
+            MLN_STYLE_SOURCE_INFO_URL,
+            present => scope.Utf8(present)
+        );
+        native.fields |= Put(
+            value.Tilejson,
+            ref native.tilejson,
+            MLN_STYLE_SOURCE_INFO_TILEJSON,
+            present => NativeStyleSourceTileInfo(present, scope)
+        );
         native.fields |= Put(
             value.Bounds,
             ref native.bounds,
@@ -2766,82 +2687,7 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static StyleSourceResult CopyStyleSourceResult(mln_style_source_result value) =>
-        new()
-        {
-            Info = CopyStyleSourceInfo(value.info),
-            Attribution =
-                value.info.has_attribution != 0
-                    ? RuntimeStructs.CopyUtf8(
-                        (sbyte*)value.attribution.data,
-                        value.attribution.size
-                    )
-                    : null,
-            Url = value.info.fields.HasFlag(MLN_STYLE_SOURCE_INFO_URL)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
-                : null,
-            TileUrlsStorage = ValueArray.Optional(
-                value.info.fields.HasFlag(MLN_STYLE_SOURCE_INFO_TILEJSON)
-                    ? NativeCallScope.CopyArray<mln_buffer_view, string>(
-                        value.tile_urls,
-                        (nuint)(value.tile_url_count),
-                        static item => RuntimeStructs.CopyUtf8((sbyte*)item.data, item.size)
-                    )
-                    : null
-            ),
-        };
-
-    internal static mln_style_source_result NativeStyleSourceResult(
-        StyleSourceResult value,
-        NativeCallScope scope
-    )
-    {
-        Required(value.Info, "StyleSourceResult.Info must not be null.");
-        var native = new mln_style_source_result();
-        native.size = (uint)sizeof(mln_style_source_result);
-        native.info = NativeStyleSourceInfo(value.Info);
-        native.info.has_attribution = 0;
-        if (value.Attribution is { } fieldAttribution)
-        {
-            native.info.has_attribution = 1;
-            native.attribution = scope.Utf8(fieldAttribution);
-        }
-        native.info.fields &= ~MLN_STYLE_SOURCE_INFO_URL;
-        native.info.fields |= Put(
-            value.Url,
-            ref native.url,
-            MLN_STYLE_SOURCE_INFO_URL,
-            present => scope.Utf8(present)
-        );
-        native.info.fields &= ~MLN_STYLE_SOURCE_INFO_TILEJSON;
-        if (value.TileUrlsStorage?.Items is { } fieldTileUrls)
-        {
-            native.info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-            native.tile_urls = scope.Array<mln_buffer_view, string>(
-                fieldTileUrls,
-                item => scope.Utf8(item)
-            );
-            native.tile_url_count = checked((nuint)fieldTileUrls.Length);
-        }
-        return native;
-    }
-
     internal static StyleSourceTileInfo CopyStyleSourceTileInfo(mln_style_source_tile_info value) =>
-        new((ulong)value.tile_count, value.min_zoom, value.max_zoom, (StyleTileScheme)value.scheme);
-
-    internal static mln_style_source_tile_info NativeStyleSourceTileInfo(StyleSourceTileInfo value)
-    {
-        var native = new mln_style_source_tile_info();
-        native.tile_count = checked((nuint)value.TileCount);
-        native.min_zoom = value.MinZoom;
-        native.max_zoom = value.MaxZoom;
-        native.scheme = (uint)value.Scheme;
-        return native;
-    }
-
-    internal static StyleSourceTileUrlsResult CopyStyleSourceTileUrlsResult(
-        mln_style_source_tile_urls_result value
-    ) =>
         new()
         {
             TileUrlsStorage = new(
@@ -2851,20 +2697,25 @@ internal static unsafe class GeneratedValues
                     static item => RuntimeStructs.CopyUtf8((sbyte*)item.data, item.size)
                 )
             ),
+            MinZoom = value.min_zoom,
+            MaxZoom = value.max_zoom,
+            Scheme = (StyleTileScheme)value.scheme,
         };
 
-    internal static mln_style_source_tile_urls_result NativeStyleSourceTileUrlsResult(
-        StyleSourceTileUrlsResult value,
+    internal static mln_style_source_tile_info NativeStyleSourceTileInfo(
+        StyleSourceTileInfo value,
         NativeCallScope scope
     )
     {
-        var native = new mln_style_source_tile_urls_result();
-        native.size = (uint)sizeof(mln_style_source_tile_urls_result);
+        var native = new mln_style_source_tile_info();
         native.tile_urls = scope.Array<mln_buffer_view, string>(
             value.TileUrlsStorage.Items,
             item => scope.Utf8(item)
         );
         native.tile_url_count = checked((nuint)value.TileUrlsStorage.Items.Length);
+        native.min_zoom = value.MinZoom;
+        native.max_zoom = value.MaxZoom;
+        native.scheme = (uint)value.Scheme;
         return native;
     }
 

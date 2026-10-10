@@ -546,94 +546,53 @@ static bool mln_adapter_copy_case_screen_point_matches(
   return true;
 }
 
-static const void* mln_adapter_copy_case_style_image_result_value(
-  size_t* count
-) {
-  static mln_style_image_result values[1];
-  static const char text_12[] = "mln_style_image_result[0].pixels";
-  static struct mln_image_stretch items_13[2];
-  static struct mln_image_stretch items_18[2];
+static const void* mln_adapter_copy_case_style_image_info_value(size_t* count) {
+  static mln_style_image_info values[1];
+  static const char text_3[] = "mln_style_image_info[0].pixels";
+  static struct mln_image_stretch items_4[2];
+  static struct mln_image_stretch items_9[2];
   values[0].size = sizeof(values[0]);
-  values[0].info.size = sizeof(values[0].info);
-  values[0].info.width = 1;
-  values[0].info.height = 2;
-  values[0].info.stride = 3;
-  values[0].info.byte_length = 4;
-  values[0].info.stretch_x_count = 5;
-  values[0].info.stretch_y_count = 6;
-  values[0].info.has_content = true;
-  values[0].info.content.left = 7.5;
-  values[0].info.content.top = 8.5;
-  values[0].info.content.right = 9.5;
-  values[0].info.content.bottom = 10.5;
-  values[0].info.has_text_fit_width = true;
-  values[0].info.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
-  values[0].info.has_text_fit_height = true;
-  values[0].info.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
-  values[0].info.pixel_ratio = 11.5;
-  values[0].info.sdf = true;
-  values[0].pixels.data = text_12;
-  values[0].pixels.size = sizeof(text_12) - 1;
-  items_13[0].from = 14.5;
-  items_13[0].to = 15.5;
-  items_13[1].from = 16.5;
-  items_13[1].to = 17.5;
-  values[0].stretch_x = items_13;
+  values[0].width = 1;
+  values[0].height = 2;
+  values[0].pixels.data = text_3;
+  values[0].pixels.size = sizeof(text_3) - 1;
+  items_4[0].from = 5.5;
+  items_4[0].to = 6.5;
+  items_4[1].from = 7.5;
+  items_4[1].to = 8.5;
+  values[0].stretch_x = items_4;
   values[0].stretch_x_count = 2;
-  items_18[0].from = 19.5;
-  items_18[0].to = 20.5;
-  items_18[1].from = 21.5;
-  items_18[1].to = 22.5;
-  values[0].stretch_y = items_18;
+  items_9[0].from = 10.5;
+  items_9[0].to = 11.5;
+  items_9[1].from = 12.5;
+  items_9[1].to = 13.5;
+  values[0].stretch_y = items_9;
   values[0].stretch_y_count = 2;
+  values[0].fields |= MLN_STYLE_IMAGE_INFO_CONTENT;
+  values[0].content.left = 14.5;
+  values[0].content.top = 15.5;
+  values[0].content.right = 16.5;
+  values[0].content.bottom = 17.5;
+  values[0].fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;
+  values[0].text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
+  values[0].fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;
+  values[0].text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
+  values[0].pixel_ratio = 18.5;
+  values[0].sdf = true;
   *count = 1;
   return values;
 }
 
-static bool mln_adapter_copy_case_style_image_result_matches(
+static bool mln_adapter_copy_case_style_image_info_matches(
   const void* copy_value, const void* source_value, size_t count
 ) {
-  const mln_style_image_result* copy =
-    (const mln_style_image_result*)copy_value;
-  const mln_style_image_result* source =
-    (const mln_style_image_result*)source_value;
+  const mln_style_image_info* copy = (const mln_style_image_info*)copy_value;
+  const mln_style_image_info* source =
+    (const mln_style_image_info*)source_value;
   for (size_t index = 0; index < count; ++index) {
-    if (copy[index].info.width != source[index].info.width) return false;
-    if (copy[index].info.height != source[index].info.height) return false;
-    if (copy[index].info.stride != source[index].info.stride) return false;
-    if (copy[index].info.byte_length != source[index].info.byte_length)
-      return false;
-    if (copy[index].info.stretch_x_count != source[index].info.stretch_x_count)
-      return false;
-    if (copy[index].info.stretch_y_count != source[index].info.stretch_y_count)
-      return false;
-    if (copy[index].info.content.left != source[index].info.content.left)
-      return false;
-    if (copy[index].info.content.top != source[index].info.content.top)
-      return false;
-    if (copy[index].info.content.right != source[index].info.content.right)
-      return false;
-    if (copy[index].info.content.bottom != source[index].info.content.bottom)
-      return false;
-    if (copy[index].info.text_fit_width != source[index].info.text_fit_width)
-      return false;
-    if (copy[index].info.text_fit_height != source[index].info.text_fit_height)
-      return false;
-    if (copy[index].info.pixel_ratio != source[index].info.pixel_ratio)
-      return false;
-    if (copy[index].info.sdf != source[index].info.sdf) return false;
-    if (copy[index].info.has_content != source[index].info.has_content)
-      return false;
-    if (
-      copy[index].info.has_text_fit_width !=
-      source[index].info.has_text_fit_width
-    )
-      return false;
-    if (
-      copy[index].info.has_text_fit_height !=
-      source[index].info.has_text_fit_height
-    )
-      return false;
+    if (copy[index].width != source[index].width) return false;
+    if (copy[index].height != source[index].height) return false;
+    if (copy[index].fields != source[index].fields) return false;
     if (!mln_adapter_copy_case_view(copy[index].pixels, source[index].pixels))
       return false;
     if (
@@ -642,93 +601,16 @@ static bool mln_adapter_copy_case_style_image_result_matches(
        copy[index].stretch_x == source[index].stretch_x)
     )
       return false;
-    for (size_t index_23 = 0; index_23 < source[index].stretch_x_count;
-         ++index_23) {
+    for (size_t index_19 = 0; index_19 < source[index].stretch_x_count;
+         ++index_19) {
       if (
-        copy[index].stretch_x[index_23].from !=
-        source[index].stretch_x[index_23].from
+        copy[index].stretch_x[index_19].from !=
+        source[index].stretch_x[index_19].from
       )
         return false;
       if (
-        copy[index].stretch_x[index_23].to !=
-        source[index].stretch_x[index_23].to
-      )
-        return false;
-    }
-    if (copy[index].stretch_x_count != source[index].stretch_x_count)
-      return false;
-    if (
-      source[index].stretch_y_count != 0 &&
-      (copy[index].stretch_y == NULL ||
-       copy[index].stretch_y == source[index].stretch_y)
-    )
-      return false;
-    for (size_t index_24 = 0; index_24 < source[index].stretch_y_count;
-         ++index_24) {
-      if (
-        copy[index].stretch_y[index_24].from !=
-        source[index].stretch_y[index_24].from
-      )
-        return false;
-      if (
-        copy[index].stretch_y[index_24].to !=
-        source[index].stretch_y[index_24].to
-      )
-        return false;
-    }
-    if (copy[index].stretch_y_count != source[index].stretch_y_count)
-      return false;
-  }
-  return true;
-}
-
-static const void* mln_adapter_copy_case_style_image_stretches_result_value(
-  size_t* count
-) {
-  static mln_style_image_stretches_result values[1];
-  static struct mln_image_stretch items_1[2];
-  static struct mln_image_stretch items_6[2];
-  values[0].size = sizeof(values[0]);
-  items_1[0].from = 2.5;
-  items_1[0].to = 3.5;
-  items_1[1].from = 4.5;
-  items_1[1].to = 5.5;
-  values[0].stretch_x = items_1;
-  values[0].stretch_x_count = 2;
-  items_6[0].from = 7.5;
-  items_6[0].to = 8.5;
-  items_6[1].from = 9.5;
-  items_6[1].to = 10.5;
-  values[0].stretch_y = items_6;
-  values[0].stretch_y_count = 2;
-  *count = 1;
-  return values;
-}
-
-static bool mln_adapter_copy_case_style_image_stretches_result_matches(
-  const void* copy_value, const void* source_value, size_t count
-) {
-  const mln_style_image_stretches_result* copy =
-    (const mln_style_image_stretches_result*)copy_value;
-  const mln_style_image_stretches_result* source =
-    (const mln_style_image_stretches_result*)source_value;
-  for (size_t index = 0; index < count; ++index) {
-    if (
-      source[index].stretch_x_count != 0 &&
-      (copy[index].stretch_x == NULL ||
-       copy[index].stretch_x == source[index].stretch_x)
-    )
-      return false;
-    for (size_t index_11 = 0; index_11 < source[index].stretch_x_count;
-         ++index_11) {
-      if (
-        copy[index].stretch_x[index_11].from !=
-        source[index].stretch_x[index_11].from
-      )
-        return false;
-      if (
-        copy[index].stretch_x[index_11].to !=
-        source[index].stretch_x[index_11].to
+        copy[index].stretch_x[index_19].to !=
+        source[index].stretch_x[index_19].to
       )
         return false;
     }
@@ -740,21 +622,32 @@ static bool mln_adapter_copy_case_style_image_stretches_result_matches(
        copy[index].stretch_y == source[index].stretch_y)
     )
       return false;
-    for (size_t index_12 = 0; index_12 < source[index].stretch_y_count;
-         ++index_12) {
+    for (size_t index_20 = 0; index_20 < source[index].stretch_y_count;
+         ++index_20) {
       if (
-        copy[index].stretch_y[index_12].from !=
-        source[index].stretch_y[index_12].from
+        copy[index].stretch_y[index_20].from !=
+        source[index].stretch_y[index_20].from
       )
         return false;
       if (
-        copy[index].stretch_y[index_12].to !=
-        source[index].stretch_y[index_12].to
+        copy[index].stretch_y[index_20].to !=
+        source[index].stretch_y[index_20].to
       )
         return false;
     }
     if (copy[index].stretch_y_count != source[index].stretch_y_count)
       return false;
+    if (copy[index].content.left != source[index].content.left) return false;
+    if (copy[index].content.top != source[index].content.top) return false;
+    if (copy[index].content.right != source[index].content.right) return false;
+    if (copy[index].content.bottom != source[index].content.bottom)
+      return false;
+    if (copy[index].text_fit_width != source[index].text_fit_width)
+      return false;
+    if (copy[index].text_fit_height != source[index].text_fit_height)
+      return false;
+    if (copy[index].pixel_ratio != source[index].pixel_ratio) return false;
+    if (copy[index].sdf != source[index].sdf) return false;
   }
   return true;
 }
@@ -816,20 +709,17 @@ static bool mln_adapter_copy_case_style_layer_entry_matches(
   return true;
 }
 
-static const void* mln_adapter_copy_case_style_layer_result_value(
-  size_t* count
-) {
-  static mln_style_layer_result values[1];
-  static const char text_1[] = "mln_style_layer_result[0].info.type";
-  static const char text_4[] = "mln_style_layer_result[0].source_id";
-  static const char text_5[] = "mln_style_layer_result[0].source_layer";
+static const void* mln_adapter_copy_case_style_layer_info_value(size_t* count) {
+  static mln_style_layer_info values[1];
+  static const char text_1[] = "mln_style_layer_info[0].type";
+  static const char text_4[] = "mln_style_layer_info[0].source_id";
+  static const char text_5[] = "mln_style_layer_info[0].source_layer";
   values[0].size = sizeof(values[0]);
-  values[0].info.size = sizeof(values[0].info);
-  values[0].info.type.data = text_1;
-  values[0].info.type.size = sizeof(text_1) - 1;
-  values[0].info.min_zoom = 2.5;
-  values[0].info.max_zoom = 3.5;
-  values[0].info.visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
+  values[0].visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
+  values[0].type.data = text_1;
+  values[0].type.size = sizeof(text_1) - 1;
+  values[0].min_zoom = 2.5;
+  values[0].max_zoom = 3.5;
   values[0].source_id.data = text_4;
   values[0].source_id.size = sizeof(text_4) - 1;
   values[0].source_layer.data = text_5;
@@ -838,22 +728,18 @@ static const void* mln_adapter_copy_case_style_layer_result_value(
   return values;
 }
 
-static bool mln_adapter_copy_case_style_layer_result_matches(
+static bool mln_adapter_copy_case_style_layer_info_matches(
   const void* copy_value, const void* source_value, size_t count
 ) {
-  const mln_style_layer_result* copy =
-    (const mln_style_layer_result*)copy_value;
-  const mln_style_layer_result* source =
-    (const mln_style_layer_result*)source_value;
+  const mln_style_layer_info* copy = (const mln_style_layer_info*)copy_value;
+  const mln_style_layer_info* source =
+    (const mln_style_layer_info*)source_value;
   for (size_t index = 0; index < count; ++index) {
-    if (!mln_adapter_copy_case_view(
-          copy[index].info.type, source[index].info.type
-        ))
+    if (copy[index].visibility != source[index].visibility) return false;
+    if (!mln_adapter_copy_case_view(copy[index].type, source[index].type))
       return false;
-    if (copy[index].info.min_zoom != source[index].info.min_zoom) return false;
-    if (copy[index].info.max_zoom != source[index].info.max_zoom) return false;
-    if (copy[index].info.visibility != source[index].info.visibility)
-      return false;
+    if (copy[index].min_zoom != source[index].min_zoom) return false;
+    if (copy[index].max_zoom != source[index].max_zoom) return false;
     if (!mln_adapter_copy_case_view(
           copy[index].source_id, source[index].source_id
         ))
@@ -866,111 +752,59 @@ static bool mln_adapter_copy_case_style_layer_result_matches(
   return true;
 }
 
-static const void* mln_adapter_copy_case_style_source_result_value(
+static const void* mln_adapter_copy_case_style_source_info_value(
   size_t* count
 ) {
-  static mln_style_source_result values[1];
-  static const char text_12[] = "mln_style_source_result[0].attribution";
-  static const char text_13[] = "mln_style_source_result[0].url";
-  static struct mln_buffer_view items_14[2];
-  static const char text_15[] = "mln_style_source_result[0].tile_urls[0]";
-  static const char text_16[] = "mln_style_source_result[0].tile_urls[1]";
+  static mln_style_source_info values[1];
+  static const char text_1[] = "mln_style_source_info[0].attribution";
+  static const char text_2[] = "mln_style_source_info[0].url";
+  static struct mln_buffer_view items_3[2];
+  static const char text_4[] = "mln_style_source_info[0].tilejson.tile_urls[0]";
+  static const char text_5[] = "mln_style_source_info[0].tilejson.tile_urls[1]";
   values[0].size = sizeof(values[0]);
-  values[0].info.size = sizeof(values[0].info);
-  values[0].info.type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
-  values[0].info.id_size = 1;
-  values[0].info.is_volatile = true;
-  values[0].info.has_attribution = true;
-  values[0].info.attribution_size = 2;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_URL;
-  values[0].info.url_size = 3;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.tile_count = 4;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.min_zoom = 5.5;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.max_zoom = 6.5;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.scheme = MLN_STYLE_TILE_SCHEME_XYZ;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
-  values[0].info.bounds.southwest.latitude = 7.5;
-  values[0].info.bounds.southwest.longitude = 8.5;
-  values[0].info.bounds.northeast.latitude = 9.5;
-  values[0].info.bounds.northeast.longitude = 10.5;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
-  values[0].info.tile_size = 11;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
-  values[0].info.vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
-  values[0].info.raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
-  values[0].info.has_attribution = true;
-  values[0].attribution.data = text_12;
-  values[0].attribution.size = sizeof(text_12) - 1;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_URL;
-  values[0].url.data = text_13;
-  values[0].url.size = sizeof(text_13) - 1;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  items_14[0].data = text_15;
-  items_14[0].size = sizeof(text_15) - 1;
-  items_14[1].data = text_16;
-  items_14[1].size = sizeof(text_16) - 1;
-  values[0].tile_urls = items_14;
-  values[0].tile_url_count = 2;
+  values[0].type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
+  values[0].is_volatile = true;
+  values[0].fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+  values[0].attribution.data = text_1;
+  values[0].attribution.size = sizeof(text_1) - 1;
+  values[0].fields |= MLN_STYLE_SOURCE_INFO_URL;
+  values[0].url.data = text_2;
+  values[0].url.size = sizeof(text_2) - 1;
+  values[0].fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
+  items_3[0].data = text_4;
+  items_3[0].size = sizeof(text_4) - 1;
+  items_3[1].data = text_5;
+  items_3[1].size = sizeof(text_5) - 1;
+  values[0].tilejson.tile_urls = items_3;
+  values[0].tilejson.tile_url_count = 2;
+  values[0].tilejson.min_zoom = 6.5;
+  values[0].tilejson.max_zoom = 7.5;
+  values[0].tilejson.scheme = MLN_STYLE_TILE_SCHEME_XYZ;
+  values[0].fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
+  values[0].bounds.southwest.latitude = 8.5;
+  values[0].bounds.southwest.longitude = 9.5;
+  values[0].bounds.northeast.latitude = 10.5;
+  values[0].bounds.northeast.longitude = 11.5;
+  values[0].fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
+  values[0].tile_size = 12;
+  values[0].fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
+  values[0].vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
+  values[0].fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
+  values[0].raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
   *count = 1;
   return values;
 }
 
-static bool mln_adapter_copy_case_style_source_result_matches(
+static bool mln_adapter_copy_case_style_source_info_matches(
   const void* copy_value, const void* source_value, size_t count
 ) {
-  const mln_style_source_result* copy =
-    (const mln_style_source_result*)copy_value;
-  const mln_style_source_result* source =
-    (const mln_style_source_result*)source_value;
+  const mln_style_source_info* copy = (const mln_style_source_info*)copy_value;
+  const mln_style_source_info* source =
+    (const mln_style_source_info*)source_value;
   for (size_t index = 0; index < count; ++index) {
-    if (copy[index].info.type != source[index].info.type) return false;
-    if (copy[index].info.fields != source[index].info.fields) return false;
-    if (copy[index].info.id_size != source[index].info.id_size) return false;
-    if (copy[index].info.is_volatile != source[index].info.is_volatile)
-      return false;
-    if (copy[index].info.has_attribution != source[index].info.has_attribution)
-      return false;
-    if (
-      copy[index].info.attribution_size != source[index].info.attribution_size
-    )
-      return false;
-    if (copy[index].info.url_size != source[index].info.url_size) return false;
-    if (copy[index].info.tile_count != source[index].info.tile_count)
-      return false;
-    if (copy[index].info.min_zoom != source[index].info.min_zoom) return false;
-    if (copy[index].info.max_zoom != source[index].info.max_zoom) return false;
-    if (copy[index].info.scheme != source[index].info.scheme) return false;
-    if (
-      copy[index].info.bounds.southwest.latitude !=
-      source[index].info.bounds.southwest.latitude
-    )
-      return false;
-    if (
-      copy[index].info.bounds.southwest.longitude !=
-      source[index].info.bounds.southwest.longitude
-    )
-      return false;
-    if (
-      copy[index].info.bounds.northeast.latitude !=
-      source[index].info.bounds.northeast.latitude
-    )
-      return false;
-    if (
-      copy[index].info.bounds.northeast.longitude !=
-      source[index].info.bounds.northeast.longitude
-    )
-      return false;
-    if (copy[index].info.tile_size != source[index].info.tile_size)
-      return false;
-    if (copy[index].info.vector_encoding != source[index].info.vector_encoding)
-      return false;
-    if (copy[index].info.raster_encoding != source[index].info.raster_encoding)
-      return false;
+    if (copy[index].type != source[index].type) return false;
+    if (copy[index].fields != source[index].fields) return false;
+    if (copy[index].is_volatile != source[index].is_volatile) return false;
     if (!mln_adapter_copy_case_view(
           copy[index].attribution, source[index].attribution
         ))
@@ -978,66 +812,54 @@ static bool mln_adapter_copy_case_style_source_result_matches(
     if (!mln_adapter_copy_case_view(copy[index].url, source[index].url))
       return false;
     if (
-      source[index].tile_url_count != 0 &&
-      (copy[index].tile_urls == NULL ||
-       copy[index].tile_urls == source[index].tile_urls)
+      source[index].tilejson.tile_url_count != 0 &&
+      (copy[index].tilejson.tile_urls == NULL ||
+       copy[index].tilejson.tile_urls == source[index].tilejson.tile_urls)
     )
       return false;
-    for (size_t index_17 = 0; index_17 < source[index].tile_url_count;
-         ++index_17) {
+    for (size_t index_13 = 0; index_13 < source[index].tilejson.tile_url_count;
+         ++index_13) {
       if (!mln_adapter_copy_case_view(
-            copy[index].tile_urls[index_17], source[index].tile_urls[index_17]
+            copy[index].tilejson.tile_urls[index_13],
+            source[index].tilejson.tile_urls[index_13]
           ))
         return false;
     }
-    if (copy[index].tile_url_count != source[index].tile_url_count)
-      return false;
-  }
-  return true;
-}
-
-static const void* mln_adapter_copy_case_style_source_tile_urls_result_value(
-  size_t* count
-) {
-  static mln_style_source_tile_urls_result values[1];
-  static struct mln_buffer_view items_1[2];
-  static const char text_2[] =
-    "mln_style_source_tile_urls_result[0].tile_urls[0]";
-  static const char text_3[] =
-    "mln_style_source_tile_urls_result[0].tile_urls[1]";
-  values[0].size = sizeof(values[0]);
-  items_1[0].data = text_2;
-  items_1[0].size = sizeof(text_2) - 1;
-  items_1[1].data = text_3;
-  items_1[1].size = sizeof(text_3) - 1;
-  values[0].tile_urls = items_1;
-  values[0].tile_url_count = 2;
-  *count = 1;
-  return values;
-}
-
-static bool mln_adapter_copy_case_style_source_tile_urls_result_matches(
-  const void* copy_value, const void* source_value, size_t count
-) {
-  const mln_style_source_tile_urls_result* copy =
-    (const mln_style_source_tile_urls_result*)copy_value;
-  const mln_style_source_tile_urls_result* source =
-    (const mln_style_source_tile_urls_result*)source_value;
-  for (size_t index = 0; index < count; ++index) {
     if (
-      source[index].tile_url_count != 0 &&
-      (copy[index].tile_urls == NULL ||
-       copy[index].tile_urls == source[index].tile_urls)
+      copy[index].tilejson.tile_url_count !=
+      source[index].tilejson.tile_url_count
     )
       return false;
-    for (size_t index_4 = 0; index_4 < source[index].tile_url_count;
-         ++index_4) {
-      if (!mln_adapter_copy_case_view(
-            copy[index].tile_urls[index_4], source[index].tile_urls[index_4]
-          ))
-        return false;
-    }
-    if (copy[index].tile_url_count != source[index].tile_url_count)
+    if (copy[index].tilejson.min_zoom != source[index].tilejson.min_zoom)
+      return false;
+    if (copy[index].tilejson.max_zoom != source[index].tilejson.max_zoom)
+      return false;
+    if (copy[index].tilejson.scheme != source[index].tilejson.scheme)
+      return false;
+    if (
+      copy[index].bounds.southwest.latitude !=
+      source[index].bounds.southwest.latitude
+    )
+      return false;
+    if (
+      copy[index].bounds.southwest.longitude !=
+      source[index].bounds.southwest.longitude
+    )
+      return false;
+    if (
+      copy[index].bounds.northeast.latitude !=
+      source[index].bounds.northeast.latitude
+    )
+      return false;
+    if (
+      copy[index].bounds.northeast.longitude !=
+      source[index].bounds.northeast.longitude
+    )
+      return false;
+    if (copy[index].tile_size != source[index].tile_size) return false;
+    if (copy[index].vector_encoding != source[index].vector_encoding)
+      return false;
+    if (copy[index].raster_encoding != source[index].raster_encoding)
       return false;
   }
   return true;
@@ -1149,30 +971,18 @@ static const mln_adapter_copy_case mln_adapter_copy_cases[] = {
   {MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT, "mln_screen_point",
    sizeof(mln_screen_point), mln_adapter_copy_case_screen_point_value,
    mln_adapter_copy_case_screen_point_matches},
-  {MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT, "mln_style_image_result",
-   sizeof(mln_style_image_result),
-   mln_adapter_copy_case_style_image_result_value,
-   mln_adapter_copy_case_style_image_result_matches},
-  {MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT,
-   "mln_style_image_stretches_result", sizeof(mln_style_image_stretches_result),
-   mln_adapter_copy_case_style_image_stretches_result_value,
-   mln_adapter_copy_case_style_image_stretches_result_matches},
+  {MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO, "mln_style_image_info",
+   sizeof(mln_style_image_info), mln_adapter_copy_case_style_image_info_value,
+   mln_adapter_copy_case_style_image_info_matches},
   {MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY, "mln_style_layer_entry",
    sizeof(mln_style_layer_entry), mln_adapter_copy_case_style_layer_entry_value,
    mln_adapter_copy_case_style_layer_entry_matches},
-  {MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT, "mln_style_layer_result",
-   sizeof(mln_style_layer_result),
-   mln_adapter_copy_case_style_layer_result_value,
-   mln_adapter_copy_case_style_layer_result_matches},
-  {MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT, "mln_style_source_result",
-   sizeof(mln_style_source_result),
-   mln_adapter_copy_case_style_source_result_value,
-   mln_adapter_copy_case_style_source_result_matches},
-  {MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT,
-   "mln_style_source_tile_urls_result",
-   sizeof(mln_style_source_tile_urls_result),
-   mln_adapter_copy_case_style_source_tile_urls_result_value,
-   mln_adapter_copy_case_style_source_tile_urls_result_matches},
+  {MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO, "mln_style_layer_info",
+   sizeof(mln_style_layer_info), mln_adapter_copy_case_style_layer_info_value,
+   mln_adapter_copy_case_style_layer_info_matches},
+  {MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO, "mln_style_source_info",
+   sizeof(mln_style_source_info), mln_adapter_copy_case_style_source_info_value,
+   mln_adapter_copy_case_style_source_info_matches},
   {MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS,
    "mln_style_transition_options", sizeof(mln_style_transition_options),
    mln_adapter_copy_case_style_transition_options_value,

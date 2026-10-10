@@ -1257,11 +1257,12 @@ final class mln_style_image_info extends Struct {
   @Uint32()
   external int height;
   @Uint32()
-  external int stride;
-  @Size()
-  external int byte_length;
+  external int fields;
+  external mln_buffer_view pixels;
+  external Pointer<mln_image_stretch> stretch_x;
   @Size()
   external int stretch_x_count;
+  external Pointer<mln_image_stretch> stretch_y;
   @Size()
   external int stretch_y_count;
   external mln_image_content content;
@@ -1273,12 +1274,6 @@ final class mln_style_image_info extends Struct {
   external double pixel_ratio;
   @Bool()
   external bool sdf;
-  @Bool()
-  external bool has_content;
-  @Bool()
-  external bool has_text_fit_width;
-  @Bool()
-  external bool has_text_fit_height;
 }
 
 final class mln_style_image_options extends Struct {
@@ -1303,34 +1298,6 @@ final class mln_style_image_options extends Struct {
   external bool sdf;
 }
 
-final class mln_style_image_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
-  external mln_style_image_info info;
-  external mln_buffer_view pixels;
-  external Pointer<mln_image_stretch> stretch_x;
-  @Size()
-  external int stretch_x_count;
-  external Pointer<mln_image_stretch> stretch_y;
-  @Size()
-  external int stretch_y_count;
-}
-
-final class mln_style_image_stretches_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
-  external Pointer<mln_image_stretch> stretch_x;
-  @Size()
-  external int stretch_x_count;
-  external Pointer<mln_image_stretch> stretch_y;
-  @Size()
-  external int stretch_y_count;
-}
-
 final class mln_style_layer_entry extends Struct {
   @Uint32()
   external int size;
@@ -1344,22 +1311,12 @@ final class mln_style_layer_info extends Struct {
   @Uint32()
   external int size;
   @Uint32()
-  external int reserved;
+  external int visibility;
   external mln_buffer_view type;
   @Double()
   external double min_zoom;
   @Double()
   external double max_zoom;
-  @Uint32()
-  external int visibility;
-}
-
-final class mln_style_layer_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
-  external mln_style_layer_info info;
   external mln_buffer_view source_id;
   external mln_buffer_view source_layer;
 }
@@ -1371,24 +1328,11 @@ final class mln_style_source_info extends Struct {
   external int type;
   @Uint32()
   external int fields;
-  @Size()
-  external int id_size;
   @Bool()
   external bool is_volatile;
-  @Bool()
-  external bool has_attribution;
-  @Size()
-  external int attribution_size;
-  @Size()
-  external int url_size;
-  @Size()
-  external int tile_count;
-  @Double()
-  external double min_zoom;
-  @Double()
-  external double max_zoom;
-  @Uint32()
-  external int scheme;
+  external mln_buffer_view attribution;
+  external mln_buffer_view url;
+  external mln_style_source_tile_info tilejson;
   external mln_lat_lng_bounds bounds;
   @Uint32()
   external int tile_size;
@@ -1398,38 +1342,16 @@ final class mln_style_source_info extends Struct {
   external int raster_encoding;
 }
 
-final class mln_style_source_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
-  external mln_style_source_info info;
-  external mln_buffer_view attribution;
-  external mln_buffer_view url;
+final class mln_style_source_tile_info extends Struct {
   external Pointer<mln_buffer_view> tile_urls;
   @Size()
   external int tile_url_count;
-}
-
-final class mln_style_source_tile_info extends Struct {
-  @Size()
-  external int tile_count;
   @Double()
   external double min_zoom;
   @Double()
   external double max_zoom;
   @Uint32()
   external int scheme;
-}
-
-final class mln_style_source_tile_urls_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
-  external Pointer<mln_buffer_view> tile_urls;
-  @Size()
-  external int tile_url_count;
 }
 
 final class mln_style_tile_source_options extends Struct {
@@ -1694,12 +1616,10 @@ const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO = 3939645993;
 const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
 const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = 3048968095;
 const MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT = 990046368;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT = 2311975790;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT = 167536911;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO = 4245014400;
 const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY = 2945408873;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT = 2005255953;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT = 514529690;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT = 3638232521;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO = 3674928708;
+const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO = 3318217596;
 const MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS = 221419390;
 const MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT = 2875519289;
 
@@ -2134,6 +2054,11 @@ const MLN_STATUS_TARGET_LOST = -8;
 const MLN_STATUS_NOT_READY = -9;
 const MLN_STATUS_NOT_FOUND = -10;
 
+// mln_style_image_info_field
+const MLN_STYLE_IMAGE_INFO_CONTENT = 1;
+const MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 2;
+const MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 4;
+
 // mln_style_image_option_field
 const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1;
 const MLN_STYLE_IMAGE_OPTION_SDF = 2;
@@ -2163,6 +2088,7 @@ const MLN_STYLE_SOURCE_INFO_BOUNDS = 4;
 const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8;
 const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16;
 const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32;
+const MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 64;
 
 // mln_style_source_type
 const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;
@@ -3202,96 +3128,6 @@ external int mln_map_cancel_transitions(
 
 @Native<
   Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_copy_layer_source_id(
-  int map,
-  mln_buffer_view layer_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_copy_layer_source_layer(
-  int map,
-  mln_buffer_view layer_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_copy_style_image_premultiplied_rgba8(
-  int map,
-  mln_buffer_view image_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_copy_style_image_stretches(
-  int map,
-  mln_buffer_view image_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_copy_style_source_attribution(
-  int map,
-  mln_buffer_view source_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_copy_style_source_url(
-  int map,
-  mln_buffer_view source_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
     mln_runtime,
     Pointer<mln_map_options>,
     Pointer<mln_completion>,
@@ -3396,7 +3232,7 @@ external int mln_map_get_layer_property(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_get_style_image_info(
+external int mln_map_get_style_image(
   int map,
   mln_buffer_view image_id,
   Pointer<mln_completion> completion,
@@ -3411,7 +3247,7 @@ external int mln_map_get_style_image_info(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_get_style_layer_info(
+external int mln_map_get_style_layer(
   int map,
   mln_buffer_view layer_id,
   Pointer<mln_completion> completion,
@@ -3456,22 +3292,7 @@ external int mln_map_get_style_light_property(
     Pointer<mln_diagnostic>,
   )
 >()
-external int mln_map_get_style_source_info(
-  int map,
-  mln_buffer_view source_id,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    mln_buffer_view,
-    Pointer<mln_completion>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_get_style_source_tile_urls(
+external int mln_map_get_style_source(
   int map,
   mln_buffer_view source_id,
   Pointer<mln_completion> completion,
@@ -3628,15 +3449,6 @@ external int mln_map_lat_lngs_for_pixels_unwrapped(
   int map,
   Pointer<mln_screen_point> points,
   int point_count,
-  Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
->()
-external int mln_map_list_style_layer_ids(
-  int map,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -5577,9 +5389,6 @@ external int mln_runtime_set_resource_transform(
 @Native<mln_source_feature_query_options Function()>()
 external mln_source_feature_query_options
 mln_source_feature_query_options_default();
-
-@Native<mln_style_image_info Function()>()
-external mln_style_image_info mln_style_image_info_default();
 
 @Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();

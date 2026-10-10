@@ -134,7 +134,7 @@ class AndroidAssetStyleTest {
       assertEquals(RuntimeEventType.MAP_STYLE_LOADED, loaded.type, loaded.message)
       assertEquals(
         listOfNotNull(expectedLayer),
-        map.listStyleLayerIds().awaitWithin("the style layer ids"),
+        map.listStyleLayers().awaitWithin("the style layers").map { it.id },
       )
     }
   }

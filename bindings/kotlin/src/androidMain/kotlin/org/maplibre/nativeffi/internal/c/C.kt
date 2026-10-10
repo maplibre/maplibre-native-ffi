@@ -375,54 +375,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_copy_layer_source_id(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_copy_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_copy_style_image_premultiplied_rgba8(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_copy_style_image_stretches(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_copy_style_source_attribution(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_copy_style_source_url(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_map_create(
     runtime: Long,
     options: Long,
@@ -476,7 +428,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_get_style_image_info(
+  actual external fun mln_map_get_style_image(
     map: Long,
     imageId: Long,
     completion: Long,
@@ -484,7 +436,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_get_style_layer_info(
+  actual external fun mln_map_get_style_layer(
     map: Long,
     layerId: Long,
     completion: Long,
@@ -508,15 +460,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_get_style_source_info(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_get_style_source_tile_urls(
+  actual external fun mln_map_get_style_source(
     map: Long,
     sourceId: Long,
     completion: Long,
@@ -603,13 +547,6 @@ internal actual object C {
     map: Long,
     points: Long,
     pointCount: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_map_list_style_layer_ids(
-    map: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
@@ -1664,8 +1601,6 @@ internal actual object C {
   ): Int
 
   @JvmStatic actual external fun mln_source_feature_query_options_default(returned: Long): Unit
-
-  @JvmStatic actual external fun mln_style_image_info_default(returned: Long): Unit
 
   @JvmStatic actual external fun mln_style_image_options_default(returned: Long): Unit
 

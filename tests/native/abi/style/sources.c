@@ -1,6 +1,6 @@
 // Style sources: tile source options and the effective values a source reports,
-// the URL and attribution copies, source listing, volatility, removal, and
-// image sources.
+// its URL, attribution, and inline tile URLs, source listing, volatility,
+// removal, and image sources.
 //
 // URL sources start loading as soon as they are added, so every case that adds
 // one serves the suite's resources through a provider that fails the rest.
@@ -9,30 +9,65 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
-// Reads a source's metadata, and reports whether the source exists.
-static bool read_source(
-  mln_map map, const char* id, mln_style_source_result* out
-) {
-  mln_test_completion completion =
-    mln_test_completion_default(sizeof(mln_style_source_result));
-  MLN_TEST_OK(mln_map_get_style_source_info(
-    map, mln_test_view_of(id), &completion.descriptor, NULL
-  ));
-  MLN_TEST_OK(mln_test_completion_finish(&completion));
-  const bool found = mln_test_completion_value_count(&completion) == 1;
-  *out = (mln_style_source_result){0};
-  if (found) {
-    TEST_ASSERT_TRUE(
-      mln_test_completion_copy_value(&completion, out, sizeof(*out))
+// Deep-copies one source result, whose views die with the callback. Strings
+// longer than their buffers are truncated, which the cases never reach.
+typedef struct source_probe {
+  atomic_bool done;
+  mln_status status;
+  bool found;
+  mln_style_source_info info;
+  char attribution[64];
+  char url[64];
+  char tile_urls[2][64];
+} source_probe;
+
+static void copy_text(mln_buffer_view view, char* out, size_t capacity) {
+  snprintf(out, capacity, "%.*s", (int)view.size, (const char*)view.data);
+}
+
+static void copy_source(void* user_data, const mln_completion_result* result) {
+  source_probe* probe = user_data;
+  probe->status = result->status;
+  probe->found = result->value_count == 1;
+  if (probe->found) {
+    const mln_style_source_info* info = result->value;
+    probe->info = *info;
+    copy_text(
+      info->attribution, probe->attribution, sizeof(probe->attribution)
     );
+    copy_text(info->url, probe->url, sizeof(probe->url));
+    for (size_t index = 0; index < info->tilejson.tile_url_count && index < 2;
+         index += 1) {
+      copy_text(
+        info->tilejson.tile_urls[index], probe->tile_urls[index],
+        sizeof(probe->tile_urls[index])
+      );
+    }
   }
-  mln_test_completion_destroy(&completion);
-  return found;
+  mln_test_flag_set(&probe->done);
+}
+
+// Reads a source's metadata. `found` reports whether the source exists.
+static source_probe read_source(mln_map map, const char* id) {
+  source_probe probe = {.status = MLN_STATUS_INVALID_STATE};
+  atomic_init(&probe.done, false);
+  const mln_completion completion = {
+    .size = sizeof(mln_completion),
+    .callback = copy_source,
+    .user_data = &probe,
+  };
+  MLN_TEST_OK(
+    mln_map_get_style_source(map, mln_test_view_of(id), &completion, NULL)
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_wait_for_flag(&probe.done), "the source query never completed"
+  );
+  MLN_TEST_OK(probe.status);
+  return probe;
 }
 
 static bool source_exists(mln_map map, const char* id) {
-  mln_style_source_result result;
-  return read_source(map, id, &result);
+  return read_source(map, id).found;
 }
 
 static void add_source_json(mln_map map, const char* id, const char* json) {
@@ -214,9 +249,9 @@ static void tile_sources_report_their_effective_options(void) {
     );
     MLN_TEST_OK_MESSAGE(mln_test_completion_settle(&completion), label);
 
-    mln_style_source_result result;
-    TEST_ASSERT_TRUE_MESSAGE(read_source(map, id, &result), label);
-    const mln_style_source_info* info = &result.info;
+    const source_probe probe = read_source(map, id);
+    TEST_ASSERT_TRUE_MESSAGE(probe.found, label);
+    const mln_style_source_info* info = &probe.info;
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(row->type, info->type, label);
     TEST_ASSERT_EQUAL_HEX32_MESSAGE(
       row->present, info->fields & row->present, label
@@ -226,14 +261,16 @@ static void tile_sources_report_their_effective_options(void) {
       expected.tile_size, info->tile_size, label
     );
     if ((info->fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-      TEST_ASSERT_EQUAL_size_t_MESSAGE(1, info->tile_count, label);
+      TEST_ASSERT_EQUAL_size_t_MESSAGE(1, info->tilejson.tile_url_count, label);
       TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-        expected.min_zoom, info->min_zoom, label
+        expected.min_zoom, info->tilejson.min_zoom, label
       );
       TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-        expected.max_zoom, info->max_zoom, label
+        expected.max_zoom, info->tilejson.max_zoom, label
       );
-      TEST_ASSERT_EQUAL_UINT32_MESSAGE(expected.scheme, info->scheme, label);
+      TEST_ASSERT_EQUAL_UINT32_MESSAGE(
+        expected.scheme, info->tilejson.scheme, label
+      );
     }
     if ((info->fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
       TEST_ASSERT_EQUAL_MEMORY_MESSAGE(
@@ -375,28 +412,11 @@ static void tile_source_options_are_validated_at_submission(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Reads a source's URL or attribution copy, and reports whether it has one.
-static bool read_source_text(
-  mln_map map, const char* id, bool attribution, char* out
-) {
-  const mln_buffer_view view = mln_test_view_of(id);
-  mln_test_completion completion = mln_test_completion_buffer_view();
-  MLN_TEST_OK(
-    attribution
-      ? mln_map_copy_style_source_attribution(
-          map, view, &completion.descriptor, NULL
-        )
-      : mln_map_copy_style_source_url(map, view, &completion.descriptor, NULL)
-  );
-  bool found = false;
-  MLN_TEST_OK(mln_test_style_finish_text(&completion, out, 64, &found));
-  return found;
-}
-
-// A URL source reports the URL it was added with, or last set to, and an
-// inline tile source reports the attribution its options carried. A copy of
-// what a source lacks, or of a missing source, completes with no value.
-static void sources_copy_their_url_and_attribution(void) {
+// A URL source reports the URL it was added with, or last set to. An inline
+// tile source reports the attribution its options carried and its tile URLs,
+// and a source reports only the members it has. A missing source completes
+// with no value.
+static void a_source_reports_its_url_attribution_and_tilejson(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_style_serve(runtime, NULL, 0);
@@ -409,9 +429,14 @@ static void sources_copy_their_url_and_attribution(void) {
   attributed.fields = MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
   char attribution[] = "Fixture tiles";
   attributed.attribution = mln_test_view_of(attribution);
+  const mln_buffer_view tiles[] = {
+    MLN_BUFFER_LITERAL("fixture://a/{z}/{x}/{y}.mvt"),
+    MLN_BUFFER_LITERAL("fixture://b/{z}/{x}/{y}.mvt"),
+  };
   mln_test_completion add = mln_test_completion_default(0);
-  MLN_TEST_OK(add_tile_source(
-    map, VECTOR, "inline", false, &attributed, &add.descriptor, NULL
+  MLN_TEST_OK(mln_map_add_vector_source_tiles(
+    map, MLN_BUFFER_LITERAL("inline"), tiles, 2, &attributed, &add.descriptor,
+    NULL
   ));
   // The command copied the attribution before it returned.
   memset(attribution, 'x', strlen(attribution));
@@ -426,22 +451,34 @@ static void sources_copy_their_url_and_attribution(void) {
     MLN_BUFFER_LITERAL("fixture://second.geojson"), &completion.descriptor, NULL
   ));
 
-  char text[64];
-  TEST_ASSERT_TRUE(read_source_text(map, "remote", false, text));
-  TEST_ASSERT_EQUAL_STRING("fixture://tiles.json", text);
-  TEST_ASSERT_TRUE(read_source_text(map, "geojson", false, text));
-  TEST_ASSERT_EQUAL_STRING("fixture://second.geojson", text);
-  TEST_ASSERT_TRUE(read_source_text(map, "inline", true, text));
-  TEST_ASSERT_EQUAL_STRING("Fixture tiles", text);
-  mln_style_source_result result;
-  TEST_ASSERT_TRUE(read_source(map, "inline", &result));
-  TEST_ASSERT_TRUE(result.info.has_attribution);
-  TEST_ASSERT_EQUAL_size_t(strlen(text), result.info.attribution_size);
+  source_probe probe = read_source(map, "remote");
+  TEST_ASSERT_TRUE(probe.found);
+  TEST_ASSERT_EQUAL_HEX32(
+    MLN_STYLE_SOURCE_INFO_URL,
+    probe.info.fields &
+      (MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_ATTRIBUTION |
+       MLN_STYLE_SOURCE_INFO_TILEJSON)
+  );
+  TEST_ASSERT_EQUAL_STRING("fixture://tiles.json", probe.url);
 
-  TEST_ASSERT_FALSE(read_source_text(map, "inline", false, text));
-  TEST_ASSERT_FALSE(read_source_text(map, "remote", true, text));
-  TEST_ASSERT_FALSE(read_source_text(map, "missing", false, text));
-  TEST_ASSERT_FALSE(read_source_text(map, "missing", true, text));
+  probe = read_source(map, "geojson");
+  TEST_ASSERT_TRUE(probe.found);
+  TEST_ASSERT_EQUAL_STRING("fixture://second.geojson", probe.url);
+
+  probe = read_source(map, "inline");
+  TEST_ASSERT_TRUE(probe.found);
+  TEST_ASSERT_EQUAL_HEX32(
+    MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON,
+    probe.info.fields &
+      (MLN_STYLE_SOURCE_INFO_URL | MLN_STYLE_SOURCE_INFO_ATTRIBUTION |
+       MLN_STYLE_SOURCE_INFO_TILEJSON)
+  );
+  TEST_ASSERT_EQUAL_STRING("Fixture tiles", probe.attribution);
+  TEST_ASSERT_EQUAL_size_t(2, probe.info.tilejson.tile_url_count);
+  TEST_ASSERT_EQUAL_STRING("fixture://a/{z}/{x}/{y}.mvt", probe.tile_urls[0]);
+  TEST_ASSERT_EQUAL_STRING("fixture://b/{z}/{x}/{y}.mvt", probe.tile_urls[1]);
+
+  TEST_ASSERT_FALSE(read_source(map, "missing").found);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -472,92 +509,10 @@ static void source_ids_list_in_style_order(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-typedef struct tile_urls_probe {
-  atomic_bool done;
-  mln_status status;
-  size_t value_count;
-  size_t tile_url_count;
-  char urls[2][64];
-} tile_urls_probe;
-
-static void copy_tile_urls(
-  void* user_data, const mln_completion_result* result
-) {
-  tile_urls_probe* probe = user_data;
-  probe->status = result->status;
-  probe->value_count = result->value_count;
-  if (result->value_count == 1) {
-    const mln_style_source_tile_urls_result* urls = result->value;
-    probe->tile_url_count = urls->tile_url_count;
-    for (size_t index = 0; index < urls->tile_url_count && index < 2;
-         index += 1) {
-      snprintf(
-        probe->urls[index], sizeof(probe->urls[index]), "%.*s",
-        (int)urls->tile_urls[index].size,
-        (const char*)urls->tile_urls[index].data
-      );
-    }
-  }
-  mln_test_flag_set(&probe->done);
-}
-
-static tile_urls_probe read_tile_urls(
-  mln_runtime runtime, mln_map map, const char* source_id
-) {
-  tile_urls_probe probe = {.status = MLN_STATUS_INVALID_STATE};
-  atomic_init(&probe.done, false);
-  const mln_completion completion = {
-    .size = sizeof(mln_completion),
-    .callback = copy_tile_urls,
-    .user_data = &probe,
-  };
-  MLN_TEST_OK(mln_map_get_style_source_tile_urls(
-    map, mln_test_view_of(source_id), &completion, NULL
-  ));
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  TEST_ASSERT_TRUE(atomic_load(&probe.done));
-  MLN_TEST_OK(probe.status);
-  return probe;
-}
-
-// A found source completes with one result even when it holds no inline tile
-// URLs, so a host can tell a URL-backed source from a missing one.
-static void style_source_tile_urls_distinguish_empty_from_missing(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_style_serve(runtime, NULL, 0);
-  const mln_buffer_view tiles[] = {
-    MLN_BUFFER_LITERAL("fixture://a/{z}/{x}/{y}.mvt"),
-    MLN_BUFFER_LITERAL("fixture://b/{z}/{x}/{y}.mvt"),
-  };
-  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
-    map, MLN_BUFFER_LITERAL("inline"), tiles, 2, NULL, &completion.descriptor,
-    NULL
-  ));
-  MLN_TEST_AWAIT_OK(add_tile_source(
-    map, VECTOR, "remote", true, NULL, &completion.descriptor, NULL
-  ));
-
-  tile_urls_probe probe = read_tile_urls(runtime, map, "inline");
-  TEST_ASSERT_EQUAL_size_t(1, probe.value_count);
-  TEST_ASSERT_EQUAL_size_t(2, probe.tile_url_count);
-  TEST_ASSERT_EQUAL_STRING("fixture://a/{z}/{x}/{y}.mvt", probe.urls[0]);
-  TEST_ASSERT_EQUAL_STRING("fixture://b/{z}/{x}/{y}.mvt", probe.urls[1]);
-
-  probe = read_tile_urls(runtime, map, "remote");
-  TEST_ASSERT_EQUAL_size_t(1, probe.value_count);
-  TEST_ASSERT_EQUAL_size_t(0, probe.tile_url_count);
-  probe = read_tile_urls(runtime, map, "missing");
-  TEST_ASSERT_EQUAL_size_t(0, probe.value_count);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 static bool source_is_volatile(mln_map map) {
-  mln_style_source_result result;
-  TEST_ASSERT_TRUE(read_source(map, "volatile-vector", &result));
-  return result.info.is_volatile;
+  const source_probe probe = read_source(map, "volatile-vector");
+  TEST_ASSERT_TRUE(probe.found);
+  return probe.info.is_volatile;
 }
 
 static void style_source_volatility_round_trips(void) {
@@ -670,9 +625,9 @@ static void image_sources_hold_corners_and_pixels(void) {
   MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
     map, remote_image, corners, 4, png, &completion.descriptor, NULL
   ));
-  mln_style_source_result result;
-  TEST_ASSERT_TRUE(read_source(map, "inline-image", &result));
-  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_IMAGE, result.info.type);
+  const source_probe probe = read_source(map, "inline-image");
+  TEST_ASSERT_TRUE(probe.found);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_IMAGE, probe.info.type);
 
   mln_lat_lng read[4];
   TEST_ASSERT_TRUE(read_corners(map, "remote-image", read));
@@ -768,9 +723,8 @@ static void an_image_source_requests_its_url_as_an_image(void) {
 MLN_TEST_GROUP {
   RUN_TEST(tile_sources_report_their_effective_options);
   RUN_TEST(tile_source_options_are_validated_at_submission);
-  RUN_TEST(sources_copy_their_url_and_attribution);
+  RUN_TEST(a_source_reports_its_url_attribution_and_tilejson);
   RUN_TEST(source_ids_list_in_style_order);
-  RUN_TEST(style_source_tile_urls_distinguish_empty_from_missing);
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
   RUN_TEST(image_sources_hold_corners_and_pixels);

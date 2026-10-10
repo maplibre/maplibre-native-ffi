@@ -213,65 +213,62 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
   TEST_ASSERT_EQUAL_size_t(0, copied_feature->state.size);
   mln_adapter_completion_record_destroy(record);
 
-  mln_style_image_result image = {.size = sizeof(mln_style_image_result)};
-  image.info = mln_style_image_info_default();
-  image.info.content = (mln_image_content){1.0f, 1.0f, 2.0f, 2.0f};
-  image.info.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
-  image.info.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
+  const mln_style_image_info image = {
+    .size = sizeof(mln_style_image_info),
+    .content = {1.0f, 1.0f, 2.0f, 2.0f},
+    .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL,
+    .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL,
+    .pixel_ratio = 1.0f,
+  };
   mln_test_adapter_delivery image_delivery = {0};
   record = copy_one(
-    MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT, &image, sizeof(image),
+    MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO, &image, sizeof(image),
     &image_delivery
   );
-  const mln_style_image_result* copied_image = record->result.value;
+  const mln_style_image_info* copied_image = record->result.value;
   TEST_ASSERT_TRUE(
-    all_zero(&copied_image->info.content, sizeof(copied_image->info.content))
+    all_zero(&copied_image->content, sizeof(copied_image->content))
   );
-  TEST_ASSERT_EQUAL_UINT32(0, copied_image->info.text_fit_width);
-  TEST_ASSERT_EQUAL_UINT32(0, copied_image->info.text_fit_height);
+  TEST_ASSERT_EQUAL_UINT32(0, copied_image->text_fit_width);
+  TEST_ASSERT_EQUAL_UINT32(0, copied_image->text_fit_height);
   mln_adapter_completion_record_destroy(record);
 
-  const mln_buffer_view tile_urls[] = {stale};
-  const mln_style_source_result source = {
-    .size = sizeof(mln_style_source_result),
-    .info =
+  // A clear TILEJSON bit leaves the embedded record unread, so its tile URL
+  // pointer and count are never followed.
+  const mln_style_source_info source = {
+    .size = sizeof(mln_style_source_info),
+    .attribution = stale,
+    .url = stale,
+    .tilejson =
       {
-        .size = sizeof(mln_style_source_info),
-        .attribution_size = 3,
-        .url_size = 3,
-        .tile_count = 1,
+        .tile_urls = (const mln_buffer_view*)&stale,
+        .tile_url_count = SIZE_MAX,
         .min_zoom = 1.0,
         .max_zoom = 2.0,
         .scheme = 1,
-        .bounds = {{1.0, 1.0}, {2.0, 2.0}},
-        .tile_size = 512,
-        .vector_encoding = 1,
-        .raster_encoding = 1,
       },
-    .attribution = stale,
-    .url = stale,
-    .tile_urls = tile_urls,
-    .tile_url_count = 1,
+    .bounds = {{1.0, 1.0}, {2.0, 2.0}},
+    .tile_size = 512,
+    .vector_encoding = 1,
+    .raster_encoding = 1,
   };
   mln_test_adapter_delivery source_delivery = {0};
   record = copy_one(
-    MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT, &source, sizeof(source),
+    MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO, &source, sizeof(source),
     &source_delivery
   );
-  const mln_style_source_result* copied_source = record->result.value;
-  TEST_ASSERT_EQUAL_size_t(0, copied_source->info.attribution_size);
-  TEST_ASSERT_EQUAL_size_t(0, copied_source->info.url_size);
-  TEST_ASSERT_EQUAL_size_t(0, copied_source->info.tile_count);
-  TEST_ASSERT_EQUAL_DOUBLE(0.0, copied_source->info.max_zoom);
-  TEST_ASSERT_TRUE(
-    all_zero(&copied_source->info.bounds, sizeof(copied_source->info.bounds))
-  );
-  TEST_ASSERT_EQUAL_UINT32(0, copied_source->info.tile_size);
-  TEST_ASSERT_EQUAL_UINT32(0, copied_source->info.vector_encoding);
-  TEST_ASSERT_EQUAL_UINT32(0, copied_source->info.raster_encoding);
+  const mln_style_source_info* copied_source = record->result.value;
   TEST_ASSERT_EQUAL_size_t(0, copied_source->attribution.size);
   TEST_ASSERT_EQUAL_size_t(0, copied_source->url.size);
-  TEST_ASSERT_NULL(copied_source->tile_urls);
+  TEST_ASSERT_TRUE(
+    all_zero(&copied_source->tilejson, sizeof(copied_source->tilejson))
+  );
+  TEST_ASSERT_TRUE(
+    all_zero(&copied_source->bounds, sizeof(copied_source->bounds))
+  );
+  TEST_ASSERT_EQUAL_UINT32(0, copied_source->tile_size);
+  TEST_ASSERT_EQUAL_UINT32(0, copied_source->vector_encoding);
+  TEST_ASSERT_EQUAL_UINT32(0, copied_source->raster_encoding);
   mln_adapter_completion_record_destroy(record);
 }
 

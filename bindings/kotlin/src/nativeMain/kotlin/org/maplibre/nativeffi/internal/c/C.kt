@@ -648,84 +648,6 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_copy_layer_source_id(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_copy_layer_source_id(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_copy_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_copy_layer_source_layer(
-      map.toULong(),
-      layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_copy_style_image_premultiplied_rgba8(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_copy_style_image_premultiplied_rgba8(
-      map.toULong(),
-      imageId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_copy_style_image_stretches(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_copy_style_image_stretches(
-      map.toULong(),
-      imageId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_copy_style_source_attribution(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_copy_style_source_attribution(
-      map.toULong(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_copy_style_source_url(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_copy_style_source_url(
-      map.toULong(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_map_create(
     runtime: Long,
     options: Long,
@@ -813,26 +735,26 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_get_style_image_info(
+  actual fun mln_map_get_style_image(
     map: Long,
     imageId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_image_info(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_image(
       map.toULong(),
       imageId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_get_style_layer_info(
+  actual fun mln_map_get_style_layer(
     map: Long,
     layerId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_layer_info(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_layer(
       map.toULong(),
       layerId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
@@ -865,26 +787,13 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_get_style_source_info(
+  actual fun mln_map_get_style_source(
     map: Long,
     sourceId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_source_info(
-      map.toULong(),
-      sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_get_style_source_tile_urls(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_source_tile_urls(
+    org.maplibre.nativeffi.internal.cinterop.mln_map_get_style_source(
       map.toULong(),
       sourceId.toCPointer<mln_buffer_view>()!!.pointed.readValue(),
       completion.toCPointer(),
@@ -1025,13 +934,6 @@ internal actual object C {
       map.toULong(),
       points.toCPointer(),
       pointCount.convert(),
-      completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_list_style_layer_ids(map: Long, completion: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_list_style_layer_ids(
-      map.toULong(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -2765,12 +2667,6 @@ internal actual object C {
   actual fun mln_source_feature_query_options_default(returned: Long) {
     org.maplibre.nativeffi.internal.cinterop
       .mln_source_feature_query_options_default()
-      .place(returned.toCPointer()!!)
-  }
-
-  actual fun mln_style_image_info_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_style_image_info_default()
       .place(returned.toCPointer()!!)
   }
 

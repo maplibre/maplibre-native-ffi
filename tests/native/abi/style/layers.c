@@ -62,9 +62,9 @@ static void copy_layer_result(
   probe->status = result->status;
   probe->found = result->value_count == 1;
   if (probe->found) {
-    const mln_style_layer_result* layer = result->value;
-    probe->info = layer->info;
-    copy_view_into(layer->info.type, probe->type, sizeof(probe->type), NULL);
+    const mln_style_layer_info* layer = result->value;
+    probe->info = *layer;
+    copy_view_into(layer->type, probe->type, sizeof(probe->type), NULL);
     copy_view_into(
       layer->source_id, probe->source_id, sizeof(probe->source_id),
       &probe->source_id_size
@@ -88,7 +88,7 @@ static layer_probe take_layer_result(
     .user_data = &probe,
   };
   MLN_TEST_OK(
-    mln_map_get_style_layer_info(map, mln_test_view_of(id), &completion, NULL)
+    mln_map_get_style_layer(map, mln_test_view_of(id), &completion, NULL)
   );
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   TEST_ASSERT_TRUE(atomic_load(&probe.done));
@@ -348,13 +348,6 @@ static void layers_list_in_style_order_after_moves(void) {
   // Moving a layer before itself leaves the order alone.
   move_layer(map, "dots", "dots");
 
-  const mln_test_style_list ids = mln_test_style_list_layer_ids(map);
-  MLN_TEST_OK(ids.status);
-  TEST_ASSERT_EQUAL_size_t(3, ids.count);
-  TEST_ASSERT_EQUAL_STRING("roads", ids.entries[0].id);
-  TEST_ASSERT_EQUAL_STRING("dots", ids.entries[1].id);
-  TEST_ASSERT_EQUAL_STRING("paper", ids.entries[2].id);
-
   const mln_test_style_list layers = mln_test_style_list_layers(map);
   MLN_TEST_OK(layers.status);
   TEST_ASSERT_EQUAL_size_t(3, layers.count);
@@ -376,21 +369,6 @@ static void layers_list_in_style_order_after_moves(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static mln_status copy_layer_text(
-  mln_map map, const char* layer, bool source_layer, char* out
-) {
-  mln_test_completion completion = mln_test_completion_buffer_view();
-  MLN_TEST_OK(
-    source_layer ? mln_map_copy_layer_source_layer(
-                     map, mln_test_view_of(layer), &completion.descriptor, NULL
-                   )
-                 : mln_map_copy_layer_source_id(
-                     map, mln_test_view_of(layer), &completion.descriptor, NULL
-                   )
-  );
-  return mln_test_style_finish_text(&completion, out, 64, NULL);
-}
-
 // A layer's source and source layer change only on layer types that take a
 // source. The source need not exist yet, and an empty source layer clears it.
 static void source_bindings_change_only_on_layers_that_take_a_source(void) {
@@ -402,28 +380,25 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
   );
   add_layer(map, "{\"id\":\"paper\",\"type\":\"background\"}", "");
 
-  char text[64];
   MLN_TEST_AWAIT_OK(mln_map_set_layer_source_id(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("not-yet-added"),
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(copy_layer_text(map, "dots", false, text));
-  TEST_ASSERT_EQUAL_STRING("not-yet-added", text);
-
-  MLN_TEST_OK(copy_layer_text(map, "dots", true, text));
-  TEST_ASSERT_EQUAL_STRING("", text);
+  layer_probe probe = take_layer_result(runtime, map, "dots");
+  TEST_ASSERT_EQUAL_STRING("not-yet-added", probe.source_id);
+  TEST_ASSERT_EQUAL_STRING("", probe.source_layer);
   MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL("pois"),
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(copy_layer_text(map, "dots", true, text));
-  TEST_ASSERT_EQUAL_STRING("pois", text);
+  probe = take_layer_result(runtime, map, "dots");
+  TEST_ASSERT_EQUAL_STRING("pois", probe.source_layer);
   MLN_TEST_AWAIT_OK(mln_map_set_layer_source_layer(
     map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
     &completion.descriptor, NULL
   ));
-  MLN_TEST_OK(copy_layer_text(map, "dots", true, text));
-  TEST_ASSERT_EQUAL_STRING("", text);
+  probe = take_layer_result(runtime, map, "dots");
+  TEST_ASSERT_EQUAL_STRING("", probe.source_layer);
 
   MLN_TEST_EXPECT_COMMAND_FAILED(
     MLN_STATUS_INVALID_ARGUMENT, "does not take a source",
@@ -439,8 +414,8 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
       &completion.descriptor, NULL
     )
   );
-  MLN_TEST_OK(copy_layer_text(map, "paper", false, text));
-  TEST_ASSERT_EQUAL_STRING("", text);
+  probe = take_layer_result(runtime, map, "paper");
+  TEST_ASSERT_EQUAL_STRING("", probe.source_id);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -504,7 +479,8 @@ static void terrain_layers_require_a_raster_dem_source(void) {
       )
     );
   }
-  const mln_test_style_list ids = mln_test_style_list_layer_ids(map);
+  const mln_test_style_list ids = mln_test_style_list_layers(map);
+  MLN_TEST_OK(ids.status);
   TEST_ASSERT_EQUAL_size_t(3, ids.count);
   TEST_ASSERT_EQUAL_STRING("hillshade", ids.entries[0].id);
   TEST_ASSERT_EQUAL_STRING("relief", ids.entries[1].id);

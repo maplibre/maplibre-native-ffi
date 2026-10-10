@@ -872,18 +872,17 @@ internal unsafe struct mln_style_image_info
     public uint size;
     public uint width;
     public uint height;
-    public uint stride;
-    public nuint byte_length;
+    public mln_style_image_info_field fields;
+    public mln_buffer_view pixels;
+    public mln_image_stretch* stretch_x;
     public nuint stretch_x_count;
+    public mln_image_stretch* stretch_y;
     public nuint stretch_y_count;
     public mln_image_content content;
     public uint text_fit_width;
     public uint text_fit_height;
     public float pixel_ratio;
     public byte sdf;
-    public byte has_content;
-    public byte has_text_fit_width;
-    public byte has_text_fit_height;
 }
 
 internal unsafe struct mln_style_image_options
@@ -901,28 +900,6 @@ internal unsafe struct mln_style_image_options
     public byte sdf;
 }
 
-internal unsafe struct mln_style_image_result
-{
-    public uint size;
-    public uint reserved;
-    public mln_style_image_info info;
-    public mln_buffer_view pixels;
-    public mln_image_stretch* stretch_x;
-    public nuint stretch_x_count;
-    public mln_image_stretch* stretch_y;
-    public nuint stretch_y_count;
-}
-
-internal unsafe struct mln_style_image_stretches_result
-{
-    public uint size;
-    public uint reserved;
-    public mln_image_stretch* stretch_x;
-    public nuint stretch_x_count;
-    public mln_image_stretch* stretch_y;
-    public nuint stretch_y_count;
-}
-
 internal unsafe struct mln_style_layer_entry
 {
     public uint size;
@@ -935,18 +912,10 @@ internal unsafe struct mln_style_layer_entry
 internal unsafe struct mln_style_layer_info
 {
     public uint size;
-    public uint reserved;
+    public uint visibility;
     public mln_buffer_view type;
     public double min_zoom;
     public double max_zoom;
-    public uint visibility;
-}
-
-internal unsafe struct mln_style_layer_result
-{
-    public uint size;
-    public uint reserved;
-    public mln_style_layer_info info;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer;
 }
@@ -956,46 +925,23 @@ internal unsafe struct mln_style_source_info
     public uint size;
     public uint type;
     public mln_style_source_info_field fields;
-    public nuint id_size;
     public byte is_volatile;
-    public byte has_attribution;
-    public nuint attribution_size;
-    public nuint url_size;
-    public nuint tile_count;
-    public double min_zoom;
-    public double max_zoom;
-    public uint scheme;
+    public mln_buffer_view attribution;
+    public mln_buffer_view url;
+    public mln_style_source_tile_info tilejson;
     public mln_lat_lng_bounds bounds;
     public uint tile_size;
     public uint vector_encoding;
     public uint raster_encoding;
 }
 
-internal unsafe struct mln_style_source_result
-{
-    public uint size;
-    public uint reserved;
-    public mln_style_source_info info;
-    public mln_buffer_view attribution;
-    public mln_buffer_view url;
-    public mln_buffer_view* tile_urls;
-    public nuint tile_url_count;
-}
-
 internal unsafe struct mln_style_source_tile_info
 {
-    public nuint tile_count;
+    public mln_buffer_view* tile_urls;
+    public nuint tile_url_count;
     public double min_zoom;
     public double max_zoom;
     public uint scheme;
-}
-
-internal unsafe struct mln_style_source_tile_urls_result
-{
-    public uint size;
-    public uint reserved;
-    public mln_buffer_view* tile_urls;
-    public nuint tile_url_count;
 }
 
 internal unsafe struct mln_style_tile_source_options
@@ -1715,6 +1661,13 @@ internal enum mln_status : int
     MLN_STATUS_NOT_FOUND = -10,
 }
 
+internal enum mln_style_image_info_field : uint
+{
+    MLN_STYLE_IMAGE_INFO_CONTENT = 1,
+    MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 2,
+    MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 4,
+}
+
 internal enum mln_style_image_option_field : uint
 {
     MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1,
@@ -1753,6 +1706,7 @@ internal enum mln_style_source_info_field : uint
     MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8,
     MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16,
     MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32,
+    MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 64,
 }
 
 internal enum mln_style_source_type : uint

@@ -189,7 +189,7 @@ fn array_inputs_are_copied_when_they_are_submitted() {
         wait_for(fixture.map().get_image_source_coordinates("image")),
         Some(expected_coordinates)
     );
-    let copied = wait_for(fixture.map().get_style_image_info("icon")).unwrap();
+    let copied = wait_for(fixture.map().get_style_image("icon")).unwrap();
     assert_eq!(copied.pixels, expected_pixels);
 }
 

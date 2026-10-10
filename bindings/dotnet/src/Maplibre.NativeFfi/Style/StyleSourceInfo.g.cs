@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Fixed source metadata included in <c>mln_style_source_result</c>.
+/// Complete metadata of one style source, borrowed for a completion callback.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_source_info</c> in the <see
@@ -17,43 +17,42 @@ public sealed record StyleSourceInfo
     public StyleSourceType Type { get; set; }
 
     /// <summary>
-    /// Source ID byte length, excluding any null terminator.
-    /// </summary>
-    public ulong IdSize { get; set; }
-
-    /// <summary>
     /// Whether the source is marked volatile.
     /// </summary>
     public bool IsVolatile { get; set; }
 
     /// <summary>
-    /// Attribution byte length, excluding any null terminator.
+    /// Attribution string, when the source sets one. It may be empty.
     /// </summary>
-    public ulong? AttributionSize { get; set; }
+    public string? Attribution { get; set; }
 
     /// <summary>
-    /// URL byte length, meaningful when fields contains URL.
+    /// URL that the source loads from, when it has one.
     /// </summary>
-    public ulong? UrlSize { get; set; }
+    public string? Url { get; set; }
+
+    /// <summary>
+    /// Inline TileJSON metadata, when the source was defined with it.
+    /// </summary>
     public StyleSourceTileInfo? Tilejson { get; set; }
 
     /// <summary>
-    /// Geographic bounds, meaningful when fields contains BOUNDS.
+    /// Geographic bounds, when inline TileJSON sets them.
     /// </summary>
     public LatLngBounds? Bounds { get; set; }
 
     /// <summary>
-    /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
+    /// Tile size in pixels, for a tile source.
     /// </summary>
     public uint? TileSize { get; set; }
 
     /// <summary>
-    /// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
+    /// Vector tile encoding, for a vector source.
     /// </summary>
     public StyleVectorTileEncoding? VectorEncoding { get; set; }
 
     /// <summary>
-    /// DEM encoding, meaningful when fields contains RASTER_ENCODING.
+    /// DEM raster encoding, when inline TileJSON sets one.
     /// </summary>
     public StyleRasterDemEncoding? RasterEncoding { get; set; }
 }

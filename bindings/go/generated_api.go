@@ -971,6 +971,24 @@ const (
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
 )
 
+// StyleImageInfoField corresponds to mln_style_image_info_field. Fields
+// available in mln_style_image_info.
+//
+// See mln_style_image_info_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type StyleImageInfoField uint32
+
+const (
+	// The image sets a content box.
+	StyleImageInfoFieldContent StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_CONTENT)
+	// The image sets how it fits text horizontally.
+	StyleImageInfoFieldTextFitWidth StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH)
+	// The image sets how it fits text vertically.
+	StyleImageInfoFieldTextFitHeight StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT)
+)
+
+func (value StyleImageInfoField) Has(flags StyleImageInfoField) bool { return value&flags == flags }
+
 // StyleImageOptionField corresponds to mln_style_image_option_field. Field mask
 // values for mln_style_image_options.
 //
@@ -1047,6 +1065,8 @@ const (
 	StyleSourceInfoFieldVectorEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
 	// The source exposes a DEM raster encoding.
 	StyleSourceInfoFieldRasterEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
+	// The source carries an attribution string, which may be empty.
+	StyleSourceInfoFieldAttribution StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
 )
 
 func (value StyleSourceInfoField) Has(flags StyleSourceInfoField) bool { return value&flags == flags }
@@ -3972,69 +3992,62 @@ func DefaultSourceFeatureQueryOptions() SourceFeatureQueryOptions {
 	return copySourceFeatureQueryOptions(C.mln_source_feature_query_options_default())
 }
 
-// StyleImageInfo corresponds to mln_style_image_info. Fixed metadata for one
-// runtime style image.
+// StyleImageInfo corresponds to mln_style_image_info. One complete runtime
+// style image, borrowed for a completion callback.
 //
 // See mln_style_image_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleImageInfo struct {
 	Width  uint32
 	Height uint32
-	// Native copied images are exposed as tightly packed premultiplied RGBA8.
-	Stride     uint32
-	ByteLength uint
-	// Interval counts for the stretchable axes.
-	StretchXCount uint
-	StretchYCount uint
-	// Content box, meaningful only when has_content is true.
+	// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes, top row
+	// first.
+	Pixels []byte
+	// Horizontally stretchable intervals.
+	StretchX []ImageStretch
+	// Vertically stretchable intervals.
+	StretchY []ImageStretch
+	// Content box, when the image sets one.
 	Content *ImageContent
-	// One of mln_style_image_text_fit, meaningful only when its flag is true.
+	// How the image fits text horizontally, when it sets this.
 	TextFitWidth *StyleImageTextFit
-	// One of mln_style_image_text_fit, meaningful only when its flag is true.
+	// How the image fits text vertically, when it sets this.
 	TextFitHeight *StyleImageTextFit
-	// Sprite pixel ratio. Defaults to 1.0.
+	// Sprite pixel ratio.
 	PixelRatio float32
-	Sdf        bool
+	// Whether the image is a signed distance field icon.
+	Sdf bool
 }
 
 func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 	var result StyleImageInfo
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
-	result.Stride = uint32(raw.stride)
-	result.ByteLength = uint(raw.byte_length)
-	result.StretchXCount = uint(raw.stretch_x_count)
-	result.StretchYCount = uint(raw.stretch_y_count)
-	result.Content = bindingPresent(bool(raw.has_content), func() ImageContent { return copyImageContent(raw.content) })
-	result.TextFitWidth = bindingPresent(bool(raw.has_text_fit_width), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
-	result.TextFitHeight = bindingPresent(bool(raw.has_text_fit_height), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
+	result.Pixels = bindingBytes(raw.pixels.data, uint64(raw.pixels.size))
+	result.StretchX = func() []ImageStretch {
+		length := bindingLength(uint64(raw.stretch_x_count))
+		result := make([]ImageStretch, length)
+		for i := range result {
+			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_x), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_x), unsafe.Alignof(*raw.stretch_x)))
+			result[i] = copyImageStretch(item)
+		}
+		return result
+	}()
+	result.StretchY = func() []ImageStretch {
+		length := bindingLength(uint64(raw.stretch_y_count))
+		result := make([]ImageStretch, length)
+		for i := range result {
+			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_y), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_y), unsafe.Alignof(*raw.stretch_y)))
+			result[i] = copyImageStretch(item)
+		}
+		return result
+	}()
+	result.Content = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_CONTENT != 0, func() ImageContent { return copyImageContent(raw.content) })
+	result.TextFitWidth = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
+	result.TextFitHeight = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
 	result.PixelRatio = float32(raw.pixel_ratio)
 	result.Sdf = bool(raw.sdf)
 	return result
-}
-
-func nativeStyleImageInfo(input StyleImageInfo, arena *bindingArena) C.mln_style_image_info {
-	raw := C.mln_style_image_info_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_content = false
-	raw.has_text_fit_width = false
-	raw.has_text_fit_height = false
-	raw.width = C.uint32_t(input.Width)
-	raw.height = C.uint32_t(input.Height)
-	raw.stride = C.uint32_t(input.Stride)
-	raw.byte_length = C.size_t(input.ByteLength)
-	raw.stretch_x_count = C.size_t(input.StretchXCount)
-	raw.stretch_y_count = C.size_t(input.StretchYCount)
-	bindingFlagged(&raw.has_content, &raw.content, input.Content, arena, nativeImageContent)
-	bindingFlagged(&raw.has_text_fit_width, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	bindingFlagged(&raw.has_text_fit_height, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	raw.pixel_ratio = C.float(input.PixelRatio)
-	raw.sdf = C.bool(input.Sdf)
-	return raw
-}
-
-func DefaultStyleImageInfo() StyleImageInfo {
-	return copyStyleImageInfo(C.mln_style_image_info_default())
 }
 
 // StyleImageOptions corresponds to mln_style_image_options. Options for runtime
@@ -4131,76 +4144,6 @@ func DefaultStyleImageOptions() StyleImageOptions {
 	return copyStyleImageOptions(C.mln_style_image_options_default())
 }
 
-// StyleImageResult corresponds to mln_style_image_result. Complete style image
-// borrowed for a completion callback.
-//
-// See mln_style_image_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleImageResult struct {
-	Info     StyleImageInfo
-	Pixels   []byte
-	StretchX []ImageStretch
-	StretchY []ImageStretch
-}
-
-func copyStyleImageResult(raw C.mln_style_image_result) StyleImageResult {
-	var result StyleImageResult
-	result.Info = copyStyleImageInfo(raw.info)
-	result.Pixels = bindingBytes(raw.pixels.data, uint64(raw.pixels.size))
-	result.StretchX = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_x_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_x), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_x), unsafe.Alignof(*raw.stretch_x)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	result.StretchY = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_y_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_y), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_y), unsafe.Alignof(*raw.stretch_y)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	return result
-}
-
-// StyleImageStretchesResult corresponds to mln_style_image_stretches_result.
-// Borrowed image-stretch arrays available during a completion callback.
-//
-// See mln_style_image_stretches_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleImageStretchesResult struct {
-	StretchX []ImageStretch
-	StretchY []ImageStretch
-}
-
-func copyStyleImageStretchesResult(raw C.mln_style_image_stretches_result) StyleImageStretchesResult {
-	var result StyleImageStretchesResult
-	result.StretchX = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_x_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_x), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_x), unsafe.Alignof(*raw.stretch_x)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	result.StretchY = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_y_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_y), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_y), unsafe.Alignof(*raw.stretch_y)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	return result
-}
-
 // StyleLayerEntry corresponds to mln_style_layer_entry. One style layer
 // borrowed for a list completion callback.
 //
@@ -4234,48 +4177,33 @@ func copyStyleLayerEntry(raw C.mln_style_layer_entry) StyleLayerEntry {
 	return result
 }
 
-// StyleLayerInfo corresponds to mln_style_layer_info. Fixed layer metadata
-// included in mln_style_layer_result.
+// StyleLayerInfo corresponds to mln_style_layer_info. Complete metadata of one
+// style layer, borrowed for a completion callback.
 //
 // See mln_style_layer_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleLayerInfo struct {
-	// View of a static style-spec layer type string. It stays valid for the life of
-	// the process.
+	// One of mln_style_layer_visibility.
+	Visibility StyleLayerVisibility
+	// The style-spec layer type string. The view stays valid for the life of the
+	// process.
 	Type string
 	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
 	MinZoom float64
 	// Highest zoom at which the layer draws; INFINITY with no upper bound.
 	MaxZoom float64
-	// One of mln_style_layer_visibility.
-	Visibility StyleLayerVisibility
-}
-
-func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
-	var result StyleLayerInfo
-	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
-	result.MinZoom = float64(raw.min_zoom)
-	result.MaxZoom = float64(raw.max_zoom)
-	result.Visibility = StyleLayerVisibility(raw.visibility)
-	return result
-}
-
-// StyleLayerResult corresponds to mln_style_layer_result. Complete layer
-// metadata borrowed for a completion callback.
-//
-// See mln_style_layer_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleLayerResult struct {
-	Info StyleLayerInfo
 	// Source ID. Empty for a layer type that takes no source.
 	SourceId *string
 	// Source-layer ID. Empty when the layer sets none.
 	SourceLayer *string
 }
 
-func copyStyleLayerResult(raw C.mln_style_layer_result) StyleLayerResult {
-	var result StyleLayerResult
-	result.Info = copyStyleLayerInfo(raw.info)
+func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
+	var result StyleLayerInfo
+	result.Visibility = StyleLayerVisibility(raw.visibility)
+	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
+	result.MinZoom = float64(raw.min_zoom)
+	result.MaxZoom = float64(raw.max_zoom)
 	result.SourceId = func() *string {
 		if raw.source_id.size == 0 {
 			return nil
@@ -4293,50 +4221,39 @@ func copyStyleLayerResult(raw C.mln_style_layer_result) StyleLayerResult {
 	return result
 }
 
-// StyleSourceInfo corresponds to mln_style_source_info. Fixed source metadata
-// included in mln_style_source_result.
+// StyleSourceInfo corresponds to mln_style_source_info. Complete metadata of
+// one style source, borrowed for a completion callback.
 //
 // See mln_style_source_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceInfo struct {
 	// One of mln_style_source_type.
 	Type StyleSourceType
-	// Source ID byte length, excluding any null terminator.
-	IdSize uint
 	// Whether the source is marked volatile.
 	IsVolatile bool
-	// Attribution byte length, excluding any null terminator.
-	AttributionSize *uint
-	// URL byte length, meaningful when fields contains URL.
-	UrlSize  *uint
+	// Attribution string, when the source sets one. It may be empty.
+	Attribution *string
+	// URL that the source loads from, when it has one.
+	Url *string
+	// Inline TileJSON metadata, when the source was defined with it.
 	Tilejson *StyleSourceTileInfo
-	// Geographic bounds, meaningful when fields contains BOUNDS.
+	// Geographic bounds, when inline TileJSON sets them.
 	Bounds *LatLngBounds
-	// Tile size in pixels, meaningful when fields contains TILE_SIZE.
+	// Tile size in pixels, for a tile source.
 	TileSize *uint32
-	// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
+	// Vector tile encoding, for a vector source.
 	VectorEncoding *StyleVectorTileEncoding
-	// DEM encoding, meaningful when fields contains RASTER_ENCODING.
+	// DEM raster encoding, when inline TileJSON sets one.
 	RasterEncoding *StyleRasterDemEncoding
 }
 
 func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	var result StyleSourceInfo
 	result.Type = StyleSourceType(raw._type)
-	result.IdSize = uint(raw.id_size)
 	result.IsVolatile = bool(raw.is_volatile)
-	result.AttributionSize = bindingPresent(bool(raw.has_attribution), func() uint { return uint(raw.attribution_size) })
-	result.UrlSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() uint { return uint(raw.url_size) })
-	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo {
-		return func() StyleSourceTileInfo {
-			var inner StyleSourceTileInfo
-			inner.TileCount = uint(raw.tile_count)
-			inner.MinZoom = float64(raw.min_zoom)
-			inner.MaxZoom = float64(raw.max_zoom)
-			inner.Scheme = StyleTileScheme(raw.scheme)
-			return inner
-		}()
-	})
+	result.Attribution = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
+	result.Url = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
+	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo { return copyStyleSourceTileInfo(raw.tilejson) })
 	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
 	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
 	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
@@ -4344,67 +4261,22 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	return result
 }
 
-// StyleSourceResult corresponds to mln_style_source_result. Complete source
-// metadata borrowed for a completion callback.
-//
-// See mln_style_source_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleSourceResult struct {
-	Info        StyleSourceInfo
-	Attribution *string
-	Url         *string
-	TileUrls    []string
-}
-
-func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
-	var result StyleSourceResult
-	result.Info = copyStyleSourceInfo(raw.info)
-	result.Attribution = bindingPresent(bool(raw.info.has_attribution), func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
-	result.Url = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
-	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-		result.TileUrls = func() []string {
-			length := bindingLength(uint64(raw.tile_url_count))
-			result := make([]string, length)
-			for i := range result {
-				item := *(*C.mln_buffer_view)(bindingElement(unsafe.Pointer(raw.tile_urls), i, uint64(unsafe.Sizeof(*raw.tile_urls)), unsafe.Sizeof(*raw.tile_urls), unsafe.Alignof(*raw.tile_urls)))
-				result[i] = bindingString(item.data, uint64(item.size))
-			}
-			return result
-		}()
-	}
-	return result
-}
-
-// StyleSourceTileInfo corresponds to mln_style_source_tile_info. Inline tile
-// metadata selected as one value by the source-info field mask.
+// StyleSourceTileInfo corresponds to mln_style_source_tile_info. Inline
+// TileJSON metadata of a tile source.
 //
 // See mln_style_source_tile_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceTileInfo struct {
-	TileCount uint
-	MinZoom   float64
-	MaxZoom   float64
-	Scheme    StyleTileScheme
+	// Tile URL templates in TileJSON order.
+	TileUrls []string
+	MinZoom  float64
+	MaxZoom  float64
+	// One of mln_style_tile_scheme.
+	Scheme StyleTileScheme
 }
 
 func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileInfo {
 	var result StyleSourceTileInfo
-	result.TileCount = uint(raw.tile_count)
-	result.MinZoom = float64(raw.min_zoom)
-	result.MaxZoom = float64(raw.max_zoom)
-	result.Scheme = StyleTileScheme(raw.scheme)
-	return result
-}
-
-// StyleSourceTileUrlsResult corresponds to mln_style_source_tile_urls_result.
-// Borrowed inline TileJSON tile URLs available during a completion callback.
-//
-// See mln_style_source_tile_urls_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleSourceTileUrlsResult struct{ TileUrls []string }
-
-func copyStyleSourceTileUrlsResult(raw C.mln_style_source_tile_urls_result) StyleSourceTileUrlsResult {
-	var result StyleSourceTileUrlsResult
 	result.TileUrls = func() []string {
 		length := bindingLength(uint64(raw.tile_url_count))
 		result := make([]string, length)
@@ -4414,6 +4286,9 @@ func copyStyleSourceTileUrlsResult(raw C.mln_style_source_tile_urls_result) Styl
 		}
 		return result
 	}()
+	result.MinZoom = float64(raw.min_zoom)
+	result.MaxZoom = float64(raw.max_zoom)
+	result.Scheme = StyleTileScheme(raw.scheme)
 	return result
 }
 
@@ -6265,68 +6140,6 @@ func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], erro
 	}, completionCommand)
 }
 
-// CopyLayerSourceId copies one layer's source ID.
-//
-// See mln_map_copy_layer_source_id in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyLayerSourceId(layerId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_layer_source_id), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_layer_source_id(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionOf(copyOptionalViewText))
-}
-
-// CopyLayerSourceLayer copies one layer's source-layer ID.
-//
-// See mln_map_copy_layer_source_layer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyLayerSourceLayer(layerId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_layer_source_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_layer_source_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionOf(copyOptionalViewText))
-}
-
-// CopyStyleImagePremultipliedRgba8 copies one runtime style image as tightly
-// packed premultiplied RGBA8 pixels.
-//
-// See mln_map_copy_style_image_premultiplied_rgba8 in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleImagePremultipliedRgba8(imageId string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_image_premultiplied_rgba8), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_image_premultiplied_rgba8(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
-}
-
-// CopyStyleImageStretches copies one runtime style image's stretchable
-// intervals.
-//
-// See mln_map_copy_style_image_stretches in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleImageStretches(imageId string) (*Future[*StyleImageStretchesResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_image_stretches), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_image_stretches(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleImageStretchesResult)))
-}
-
-// CopyStyleSourceAttribution copies one style source attribution string.
-//
-// See mln_map_copy_style_source_attribution in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleSourceAttribution(sourceId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_source_attribution), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_source_attribution(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewText)))
-}
-
-// CopyStyleSourceUrl copies one style source URL.
-//
-// See mln_map_copy_style_source_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleSourceUrl(sourceId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_source_url(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewText)))
-}
-
 // MapCreate creates a map on the runtime worker.
 //
 // See mln_map_create in the C API reference:
@@ -6399,24 +6212,24 @@ func (receiver *MapHandle) GetLayerProperty(layerId string, propertyName string)
 	}, completionNullable(completionOf(copyViewBytes)))
 }
 
-// GetStyleImageInfo copies one complete runtime style image.
+// GetStyleImage copies one complete runtime style image.
 //
-// See mln_map_get_style_image_info in the C API reference:
+// See mln_map_get_style_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleImageInfo(imageId string) (*Future[*StyleImageResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_image_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_image_info(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleImageResult)))
+func (receiver *MapHandle) GetStyleImage(imageId string) (*Future[*StyleImageInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleImageInfo)))
 }
 
-// GetStyleLayerInfo copies complete metadata for one style layer.
+// GetStyleLayer copies the complete metadata of one style layer.
 //
-// See mln_map_get_style_layer_info in the C API reference:
+// See mln_map_get_style_layer in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLayerInfo(layerId string) (*Future[*StyleLayerResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_layer_info(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleLayerResult)))
+func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleLayerInfo)))
 }
 
 // GetStyleLayerJson serializes one style layer as a full style-spec layer JSON
@@ -6441,24 +6254,14 @@ func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*
 	}, completionNullable(completionOf(copyViewBytes)))
 }
 
-// GetStyleSourceInfo copies complete metadata for one style source.
+// GetStyleSource copies the complete metadata of one style source.
 //
-// See mln_map_get_style_source_info in the C API reference:
+// See mln_map_get_style_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleSourceInfo(sourceId string) (*Future[*StyleSourceResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_source_info(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleSourceResult)))
-}
-
-// GetStyleSourceTileUrls copies one style source's inline TileJSON tile URLs.
-//
-// See mln_map_get_style_source_tile_urls in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleSourceTileUrls(sourceId string) (*Future[*StyleSourceTileUrlsResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source_tile_urls), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_source_tile_urls(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleSourceTileUrlsResult)))
+func (receiver *MapHandle) GetStyleSource(sourceId string) (*Future[*StyleSourceInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleSourceInfo)))
 }
 
 // GetStyleTransitionOptions reads the style's global transition options.
@@ -6568,16 +6371,6 @@ func (receiver *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) (*Fut
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_lat_lngs_for_pixels_unwrapped), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_lat_lngs_for_pixels_unwrapped(C.mln_map(raw), bindingArray(points, arena, nativeScreenPoint), bindingCount[C.size_t](len(points)), completion, diagnostic))
 	}, completionListOf(copyLatLng))
-}
-
-// ListStyleLayerIds copies style layer IDs in style order.
-//
-// See mln_map_list_style_layer_ids in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) ListStyleLayerIds() (*Future[[]string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_layer_ids), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_list_style_layer_ids(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyViewText))
 }
 
 // ListStyleLayers starts an ordered query of every style layer in style order.

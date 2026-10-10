@@ -284,48 +284,6 @@ internal expect object C {
 
   fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_copy_layer_source_id(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_image_premultiplied_rgba8(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_image_stretches(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_source_attribution(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_source_url(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_create(runtime: Long, options: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
@@ -358,19 +316,9 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_get_style_image_info(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_map_get_style_image(map: Long, imageId: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_get_style_layer_info(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_map_get_style_layer(map: Long, layerId: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_get_style_layer_json(
     map: Long,
@@ -386,14 +334,7 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_get_style_source_info(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_get_style_source_tile_urls(
+  fun mln_map_get_style_source(
     map: Long,
     sourceId: Long,
     completion: Long,
@@ -464,8 +405,6 @@ internal expect object C {
     completion: Long,
     outDiagnostic: Long,
   ): Int
-
-  fun mln_map_list_style_layer_ids(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int
 
@@ -1241,8 +1180,6 @@ internal expect object C {
   ): Int
 
   fun mln_source_feature_query_options_default(returned: Long): Unit
-
-  fun mln_style_image_info_default(returned: Long): Unit
 
   fun mln_style_image_options_default(returned: Long): Unit
 

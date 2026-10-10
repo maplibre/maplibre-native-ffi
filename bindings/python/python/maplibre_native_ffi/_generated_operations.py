@@ -80,14 +80,12 @@ from ._generated_values import (
     ScreenBox,
     ScreenPoint,
     SourceFeatureQueryOptions,
+    StyleImageInfo,
     StyleImageOptions,
-    StyleImageResult,
-    StyleImageStretchesResult,
     StyleLayerEntry,
-    StyleLayerResult,
+    StyleLayerInfo,
     StyleLayerVisibility,
-    StyleSourceResult,
-    StyleSourceTileUrlsResult,
+    StyleSourceInfo,
     StyleTileSourceOptions,
     StyleTransitionOptions,
     TextureReadbackResult,
@@ -617,62 +615,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.cancel_transitions()
 
-    def copy_layer_source_id(self, layer_id: str) -> Future[str | None]:
-        """Copies one layer's source ID.
-
-        See `mln_map_copy_layer_source_id` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_layer_source_id(layer_id)
-
-    def copy_layer_source_layer(self, layer_id: str) -> Future[str | None]:
-        """Copies one layer's source-layer ID.
-
-        See `mln_map_copy_layer_source_layer` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_layer_source_layer(layer_id)
-
-    def copy_style_image_premultiplied_rgba8(
-        self, image_id: str
-    ) -> Future[bytes | None]:
-        """Copies one runtime style image as tightly packed premultiplied RGBA8
-        pixels.
-
-        See `mln_map_copy_style_image_premultiplied_rgba8` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_style_image_premultiplied_rgba8(image_id)
-
-    def copy_style_image_stretches(
-        self, image_id: str
-    ) -> Future[StyleImageStretchesResult | None]:
-        """Copies one runtime style image's stretchable intervals.
-
-        See `mln_map_copy_style_image_stretches` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return map_future(
-            self._native.copy_style_image_stretches(image_id),
-            lambda value: _maybe(StyleImageStretchesResult._from_native, value),
-        )
-
-    def copy_style_source_attribution(self, source_id: str) -> Future[str | None]:
-        """Copies one style source attribution string.
-
-        See `mln_map_copy_style_source_attribution` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_style_source_attribution(source_id)
-
-    def copy_style_source_url(self, source_id: str) -> Future[str | None]:
-        """Copies one style source URL.
-
-        See `mln_map_copy_style_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_style_source_url(source_id)
-
     def dump_debug_logs(self) -> Future[CommandCompletion]:
         """Submits an ordered debug-log command.
 
@@ -734,26 +676,26 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.get_layer_property(layer_id, property_name)
 
-    def get_style_image_info(self, image_id: str) -> Future[StyleImageResult | None]:
+    def get_style_image(self, image_id: str) -> Future[StyleImageInfo | None]:
         """Copies one complete runtime style image.
 
-        See `mln_map_get_style_image_info` in the
+        See `mln_map_get_style_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.get_style_image_info(image_id),
-            lambda value: _maybe(StyleImageResult._from_native, value),
+            self._native.get_style_image(image_id),
+            lambda value: _maybe(StyleImageInfo._from_native, value),
         )
 
-    def get_style_layer_info(self, layer_id: str) -> Future[StyleLayerResult | None]:
-        """Copies complete metadata for one style layer.
+    def get_style_layer(self, layer_id: str) -> Future[StyleLayerInfo | None]:
+        """Copies the complete metadata of one style layer.
 
-        See `mln_map_get_style_layer_info` in the
+        See `mln_map_get_style_layer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.get_style_layer_info(layer_id),
-            lambda value: _maybe(StyleLayerResult._from_native, value),
+            self._native.get_style_layer(layer_id),
+            lambda value: _maybe(StyleLayerInfo._from_native, value),
         )
 
     def get_style_layer_json(self, layer_id: str) -> Future[bytes | None]:
@@ -772,28 +714,15 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.get_style_light_property(property_name)
 
-    def get_style_source_info(self, source_id: str) -> Future[StyleSourceResult | None]:
-        """Copies complete metadata for one style source.
+    def get_style_source(self, source_id: str) -> Future[StyleSourceInfo | None]:
+        """Copies the complete metadata of one style source.
 
-        See `mln_map_get_style_source_info` in the
+        See `mln_map_get_style_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.get_style_source_info(source_id),
-            lambda value: _maybe(StyleSourceResult._from_native, value),
-        )
-
-    def get_style_source_tile_urls(
-        self, source_id: str
-    ) -> Future[StyleSourceTileUrlsResult | None]:
-        """Copies one style source's inline TileJSON tile URLs.
-
-        See `mln_map_get_style_source_tile_urls` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return map_future(
-            self._native.get_style_source_tile_urls(source_id),
-            lambda value: _maybe(StyleSourceTileUrlsResult._from_native, value),
+            self._native.get_style_source(source_id),
+            lambda value: _maybe(StyleSourceInfo._from_native, value),
         )
 
     def get_style_transition_options(self) -> Future[StyleTransitionOptions]:
@@ -912,17 +841,6 @@ class _MapHandleOperations(GeneratedOperations):
         return map_future(
             self._native.lat_lngs_for_pixels_unwrapped(points),
             lambda value: tuple(LatLng._from_native(item) for item in value),
-        )
-
-    def list_style_layer_ids(self) -> Future[tuple[str, ...]]:
-        """Copies style layer IDs in style order.
-
-        See `mln_map_list_style_layer_ids` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return map_future(
-            self._native.list_style_layer_ids(),
-            lambda value: tuple(item for item in value),
         )
 
     def list_style_layers(self) -> Future[tuple[StyleLayerEntry, ...]]:

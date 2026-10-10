@@ -713,166 +713,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Copies one layer's source ID.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_copy_layer_source_id</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<string?> CopyLayerSourceIdAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_copy_layer_source_id");
-        return scope.QueryOptional<mln_buffer_view, string>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_copy_layer_source_id(
-                    Handle,
-                    scope.Utf8(layerId),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyOptionalUtf8View,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies one layer's source-layer ID.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_copy_layer_source_layer</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<string?> CopyLayerSourceLayerAsync(
-        string layerId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_copy_layer_source_layer");
-        return scope.QueryOptional<mln_buffer_view, string>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_copy_layer_source_layer(
-                    Handle,
-                    scope.Utf8(layerId),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyOptionalUtf8View,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies one runtime style image as tightly packed premultiplied RGBA8
-    /// pixels.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_copy_style_image_premultiplied_rgba8</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<byte[]?> CopyStyleImagePremultipliedRgba8Async(
-        string imageId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_copy_style_image_premultiplied_rgba8");
-        return scope.QueryOptional<mln_buffer_view, byte[]>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_copy_style_image_premultiplied_rgba8(
-                    Handle,
-                    scope.Utf8(imageId),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyBufferView,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies one runtime style image's stretchable intervals.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_copy_style_image_stretches</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<StyleImageStretchesResult?> CopyStyleImageStretchesAsync(
-        string imageId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_copy_style_image_stretches");
-        return scope.QueryOptionalValue<
-            mln_style_image_stretches_result,
-            StyleImageStretchesResult
-        >(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_copy_style_image_stretches(
-                    Handle,
-                    scope.Utf8(imageId),
-                    completion,
-                    diagnostic
-                ),
-            CopyStyleImageStretchesResult,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies one style source attribution string.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_copy_style_source_attribution</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<string?> CopyStyleSourceAttributionAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_copy_style_source_attribution");
-        return scope.QueryOptional<mln_buffer_view, string>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_copy_style_source_attribution(
-                    Handle,
-                    scope.Utf8(sourceId),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyUtf8View,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies one style source URL.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_copy_style_source_url</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<string?> CopyStyleSourceUrlAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_copy_style_source_url");
-        return scope.QueryOptional<mln_buffer_view, string>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_copy_style_source_url(
-                    Handle,
-                    scope.Utf8(sourceId),
-                    completion,
-                    diagnostic
-                ),
-            ValueStructs.CopyUtf8View,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
     /// Submits an ordered debug-log command.
     /// </summary>
     /// <remarks>
@@ -1019,50 +859,50 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// Copies one complete runtime style image.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_get_style_image_info</c> in the <see
+    /// See <c>mln_map_get_style_image</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleImageResult?> GetStyleImageInfoAsync(
+    public Task<StyleImageInfo?> GetStyleImageAsync(
         string imageId,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_image_info");
-        return scope.QueryOptionalValue<mln_style_image_result, StyleImageResult>(
+        using var scope = new NativeCallScope(this, "mln_map_get_style_image");
+        return scope.QueryOptional<mln_style_image_info, StyleImageInfo>(
             (completion, diagnostic) =>
-                NativeMethods.mln_map_get_style_image_info(
+                NativeMethods.mln_map_get_style_image(
                     Handle,
                     scope.Utf8(imageId),
                     completion,
                     diagnostic
                 ),
-            CopyStyleImageResult,
+            CopyStyleImageInfo,
             cancellationToken
         );
     }
 
     /// <summary>
-    /// Copies complete metadata for one style layer.
+    /// Copies the complete metadata of one style layer.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_get_style_layer_info</c> in the <see
+    /// See <c>mln_map_get_style_layer</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleLayerResult?> GetStyleLayerInfoAsync(
+    public Task<StyleLayerInfo?> GetStyleLayerAsync(
         string layerId,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_layer_info");
-        return scope.QueryOptionalValue<mln_style_layer_result, StyleLayerResult>(
+        using var scope = new NativeCallScope(this, "mln_map_get_style_layer");
+        return scope.QueryOptionalValue<mln_style_layer_info, StyleLayerInfo>(
             (completion, diagnostic) =>
-                NativeMethods.mln_map_get_style_layer_info(
+                NativeMethods.mln_map_get_style_layer(
                     Handle,
                     scope.Utf8(layerId),
                     completion,
                     diagnostic
                 ),
-            CopyStyleLayerResult,
+            CopyStyleLayerInfo,
             cancellationToken
         );
     }
@@ -1120,56 +960,27 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Copies complete metadata for one style source.
+    /// Copies the complete metadata of one style source.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_get_style_source_info</c> in the <see
+    /// See <c>mln_map_get_style_source</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleSourceResult?> GetStyleSourceInfoAsync(
+    public Task<StyleSourceInfo?> GetStyleSourceAsync(
         string sourceId,
         CancellationToken cancellationToken = default
     )
     {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_source_info");
-        return scope.QueryOptional<mln_style_source_result, StyleSourceResult>(
+        using var scope = new NativeCallScope(this, "mln_map_get_style_source");
+        return scope.QueryOptional<mln_style_source_info, StyleSourceInfo>(
             (completion, diagnostic) =>
-                NativeMethods.mln_map_get_style_source_info(
+                NativeMethods.mln_map_get_style_source(
                     Handle,
                     scope.Utf8(sourceId),
                     completion,
                     diagnostic
                 ),
-            CopyStyleSourceResult,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies one style source's inline TileJSON tile URLs.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_get_style_source_tile_urls</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<StyleSourceTileUrlsResult?> GetStyleSourceTileUrlsAsync(
-        string sourceId,
-        CancellationToken cancellationToken = default
-    )
-    {
-        using var scope = new NativeCallScope(this, "mln_map_get_style_source_tile_urls");
-        return scope.QueryOptionalValue<
-            mln_style_source_tile_urls_result,
-            StyleSourceTileUrlsResult
-        >(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_get_style_source_tile_urls(
-                    Handle,
-                    scope.Utf8(sourceId),
-                    completion,
-                    diagnostic
-                ),
-            CopyStyleSourceTileUrlsResult,
+            CopyStyleSourceInfo,
             cancellationToken
         );
     }
@@ -1447,24 +1258,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     diagnostic
                 ),
             CopyLatLng,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Copies style layer IDs in style order.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_list_style_layer_ids</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
-    /// </remarks>
-    public Task<string[]> ListStyleLayerIdsAsync(CancellationToken cancellationToken = default)
-    {
-        using var scope = new NativeCallScope(this, "mln_map_list_style_layer_ids");
-        return scope.QueryArray<mln_buffer_view, string>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_list_style_layer_ids(Handle, completion, diagnostic),
-            ValueStructs.CopyUtf8View,
             cancellationToken
         );
     }

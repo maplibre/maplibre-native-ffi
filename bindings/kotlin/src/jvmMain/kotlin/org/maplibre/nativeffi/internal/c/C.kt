@@ -327,60 +327,6 @@ internal actual object C {
     )
   private val mln_map_cancel_transitions =
     Ffm.downcall("mln_map_cancel_transitions", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_copy_layer_source_id =
-    Ffm.downcall(
-      "mln_map_copy_layer_source_id",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_copy_layer_source_layer =
-    Ffm.downcall(
-      "mln_map_copy_layer_source_layer",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_copy_style_image_premultiplied_rgba8 =
-    Ffm.downcall(
-      "mln_map_copy_style_image_premultiplied_rgba8",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_copy_style_image_stretches =
-    Ffm.downcall(
-      "mln_map_copy_style_image_stretches",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_copy_style_source_attribution =
-    Ffm.downcall(
-      "mln_map_copy_style_source_attribution",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_copy_style_source_url =
-    Ffm.downcall(
-      "mln_map_copy_style_source_url",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_create =
     Ffm.downcall("mln_map_create", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_dispose = Ffm.downcall("mln_map_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
@@ -418,18 +364,18 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_get_style_image_info =
+  private val mln_map_get_style_image =
     Ffm.downcall(
-      "mln_map_get_style_image_info",
+      "mln_map_get_style_image",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_get_style_layer_info =
+  private val mln_map_get_style_layer =
     Ffm.downcall(
-      "mln_map_get_style_layer_info",
+      "mln_map_get_style_layer",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -454,18 +400,9 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_get_style_source_info =
+  private val mln_map_get_style_source =
     Ffm.downcall(
-      "mln_map_get_style_source_info",
-      JAVA_INT,
-      JAVA_LONG,
-      mln_buffer_view,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
-  private val mln_map_get_style_source_tile_urls =
-    Ffm.downcall(
-      "mln_map_get_style_source_tile_urls",
+      "mln_map_get_style_source",
       JAVA_INT,
       JAVA_LONG,
       mln_buffer_view,
@@ -560,8 +497,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_map_list_style_layer_ids =
-    Ffm.downcall("mln_map_list_style_layer_ids", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_list_style_layers =
     Ffm.downcall("mln_map_list_style_layers", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_list_style_source_ids =
@@ -1489,8 +1424,6 @@ internal actual object C {
     )
   private val mln_source_feature_query_options_default =
     Ffm.downcall("mln_source_feature_query_options_default", mln_source_feature_query_options)
-  private val mln_style_image_info_default =
-    Ffm.downcall("mln_style_image_info_default", mln_style_image_info)
   private val mln_style_image_options_default =
     Ffm.downcall("mln_style_image_options_default", mln_style_image_options)
   private val mln_style_tile_source_options_default =
@@ -2166,84 +2099,6 @@ internal actual object C {
   actual fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_cancel_transitions.invokeExact(map, completion, outDiagnostic) as Int
 
-  actual fun mln_map_copy_layer_source_id(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_copy_layer_source_id.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_copy_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_copy_layer_source_layer.invokeExact(
-      map,
-      Ffm.value(layerId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_copy_style_image_premultiplied_rgba8(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_copy_style_image_premultiplied_rgba8.invokeExact(
-      map,
-      Ffm.value(imageId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_copy_style_image_stretches(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_copy_style_image_stretches.invokeExact(
-      map,
-      Ffm.value(imageId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_copy_style_source_attribution(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_copy_style_source_attribution.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_copy_style_source_url(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_copy_style_source_url.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
   actual fun mln_map_create(
     runtime: Long,
     options: Long,
@@ -2308,26 +2163,26 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_get_style_image_info(
+  actual fun mln_map_get_style_image(
     map: Long,
     imageId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_get_style_image_info.invokeExact(
+    mln_map_get_style_image.invokeExact(
       map,
       Ffm.value(imageId, mln_buffer_view),
       completion,
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_get_style_layer_info(
+  actual fun mln_map_get_style_layer(
     map: Long,
     layerId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_get_style_layer_info.invokeExact(
+    mln_map_get_style_layer.invokeExact(
       map,
       Ffm.value(layerId, mln_buffer_view),
       completion,
@@ -2360,26 +2215,13 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
-  actual fun mln_map_get_style_source_info(
+  actual fun mln_map_get_style_source(
     map: Long,
     sourceId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int =
-    mln_map_get_style_source_info.invokeExact(
-      map,
-      Ffm.value(sourceId, mln_buffer_view),
-      completion,
-      outDiagnostic,
-    ) as Int
-
-  actual fun mln_map_get_style_source_tile_urls(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_get_style_source_tile_urls.invokeExact(
+    mln_map_get_style_source.invokeExact(
       map,
       Ffm.value(sourceId, mln_buffer_view),
       completion,
@@ -2504,9 +2346,6 @@ internal actual object C {
       completion,
       outDiagnostic,
     ) as Int
-
-  actual fun mln_map_list_style_layer_ids(map: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_map_list_style_layer_ids.invokeExact(map, completion, outDiagnostic) as Int
 
   actual fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_list_style_layers.invokeExact(map, completion, outDiagnostic) as Int
@@ -3925,11 +3764,6 @@ internal actual object C {
     ) as MemorySegment
   }
 
-  actual fun mln_style_image_info_default(returned: Long) {
-    mln_style_image_info_default.invokeExact(Ffm.into(returned, mln_style_image_info))
-      as MemorySegment
-  }
-
   actual fun mln_style_image_options_default(returned: Long) {
     mln_style_image_options_default.invokeExact(Ffm.into(returned, mln_style_image_options))
       as MemorySegment
@@ -4542,24 +4376,6 @@ internal val mln_image_content: GroupLayout =
     JAVA_FLOAT.withName("top"),
     JAVA_FLOAT.withName("right"),
     JAVA_FLOAT.withName("bottom"),
-  )
-internal val mln_style_image_info: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("width"),
-    JAVA_INT.withName("height"),
-    JAVA_INT.withName("stride"),
-    JAVA_LONG.withName("byte_length"),
-    JAVA_LONG.withName("stretch_x_count"),
-    JAVA_LONG.withName("stretch_y_count"),
-    mln_image_content.withName("content"),
-    JAVA_INT.withName("text_fit_width"),
-    JAVA_INT.withName("text_fit_height"),
-    JAVA_FLOAT.withName("pixel_ratio"),
-    JAVA_BOOLEAN.withName("sdf"),
-    JAVA_BOOLEAN.withName("has_content"),
-    JAVA_BOOLEAN.withName("has_text_fit_width"),
-    JAVA_BOOLEAN.withName("has_text_fit_height"),
   )
 internal val mln_style_image_options: GroupLayout =
   Ffm.struct(

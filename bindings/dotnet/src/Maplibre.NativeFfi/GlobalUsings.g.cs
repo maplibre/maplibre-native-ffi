@@ -16,6 +16,7 @@ global using static Maplibre.NativeFfi.Internal.C.mln_projection_mode_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_queried_feature_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_rendered_feature_query_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_source_feature_query_option_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_style_image_info_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_image_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_source_info_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_style_tile_source_option_field;

@@ -1094,36 +1094,6 @@ CameraQueryResult _readCameraQueryResult(raw.mln_camera_query_result source) =>
       camera: _readCameraOptions(source.camera),
     );
 
-Pointer<raw.mln_image_stretch> _writeImageStretch(
-  ImageStretch value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_image_stretch>();
-  result.ref.from = value.from;
-  result.ref.to = value.to;
-  return result;
-}
-
-ImageStretch _readImageStretch(raw.mln_image_stretch source) =>
-    ImageStretch(source.from, source.to);
-
-StyleImageStretchesResult _readStyleImageStretchesResult(
-  raw.mln_style_image_stretches_result source,
-) => StyleImageStretchesResult(
-  stretchX: List<ImageStretch>.unmodifiable(
-    List.generate(
-      source.stretch_x_count,
-      (index) => _readImageStretch(source.stretch_x[index]),
-    ),
-  ),
-  stretchY: List<ImageStretch>.unmodifiable(
-    List.generate(
-      source.stretch_y_count,
-      (index) => _readImageStretch(source.stretch_y[index]),
-    ),
-  ),
-);
-
 Pointer<raw.mln_logical_extent> _writeLogicalExtent(
   LogicalExtent value,
   Arena arena,
@@ -1187,6 +1157,19 @@ Pointer<raw.mln_feature_state_selector> _writeFeatureStateSelector(
   return result;
 }
 
+Pointer<raw.mln_image_stretch> _writeImageStretch(
+  ImageStretch value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_image_stretch>();
+  result.ref.from = value.from;
+  result.ref.to = value.to;
+  return result;
+}
+
+ImageStretch _readImageStretch(raw.mln_image_stretch source) =>
+    ImageStretch(source.from, source.to);
+
 Pointer<raw.mln_image_content> _writeImageContent(
   ImageContent value,
   Arena arena,
@@ -1206,54 +1189,43 @@ ImageContent _readImageContent(raw.mln_image_content source) => ImageContent(
   bottom: source.bottom,
 );
 
-StyleImageInfo _readStyleImageInfo(raw.mln_style_image_info source) =>
-    StyleImageInfo(
-      width: source.width,
-      height: source.height,
-      stride: source.stride,
-      byteLength: source.byte_length,
-      stretchXCount: source.stretch_x_count,
-      stretchYCount: source.stretch_y_count,
-      content: source.has_content ? _readImageContent(source.content) : null,
-      textFitWidth: source.has_text_fit_width
-          ? StyleImageTextFit.fromRawValue(source.text_fit_width)
-          : null,
-      textFitHeight: source.has_text_fit_height
-          ? StyleImageTextFit.fromRawValue(source.text_fit_height)
-          : null,
-      pixelRatio: source.pixel_ratio,
-      sdf: source.sdf,
-    );
-
-StyleImageResult _readStyleImageResult(raw.mln_style_image_result source) =>
-    StyleImageResult(
-      info: _readStyleImageInfo(source.info),
-      pixels: _copyBufferView(source.pixels),
-      stretchX: List<ImageStretch>.unmodifiable(
-        List.generate(
-          source.stretch_x_count,
-          (index) => _readImageStretch(source.stretch_x[index]),
-        ),
-      ),
-      stretchY: List<ImageStretch>.unmodifiable(
-        List.generate(
-          source.stretch_y_count,
-          (index) => _readImageStretch(source.stretch_y[index]),
-        ),
-      ),
-    );
+StyleImageInfo _readStyleImageInfo(
+  raw.mln_style_image_info source,
+) => StyleImageInfo(
+  width: source.width,
+  height: source.height,
+  pixels: _copyBufferView(source.pixels),
+  stretchX: List<ImageStretch>.unmodifiable(
+    List.generate(
+      source.stretch_x_count,
+      (index) => _readImageStretch(source.stretch_x[index]),
+    ),
+  ),
+  stretchY: List<ImageStretch>.unmodifiable(
+    List.generate(
+      source.stretch_y_count,
+      (index) => _readImageStretch(source.stretch_y[index]),
+    ),
+  ),
+  content: (source.fields & raw.MLN_STYLE_IMAGE_INFO_CONTENT) != 0
+      ? _readImageContent(source.content)
+      : null,
+  textFitWidth: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_width)
+      : null,
+  textFitHeight: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_height)
+      : null,
+  pixelRatio: source.pixel_ratio,
+  sdf: source.sdf,
+);
 
 StyleLayerInfo _readStyleLayerInfo(raw.mln_style_layer_info source) =>
     StyleLayerInfo(
+      visibility: StyleLayerVisibility.fromRawValue(source.visibility),
       type: utf8.decode(_copyBufferView(source.type)),
       minZoom: source.min_zoom,
       maxZoom: source.max_zoom,
-      visibility: StyleLayerVisibility.fromRawValue(source.visibility),
-    );
-
-StyleLayerResult _readStyleLayerResult(raw.mln_style_layer_result source) =>
-    StyleLayerResult(
-      info: _readStyleLayerInfo(source.info),
       sourceId: source.source_id.size == 0
           ? null
           : utf8.decode(_copyBufferView(source.source_id)),
@@ -1262,22 +1234,32 @@ StyleLayerResult _readStyleLayerResult(raw.mln_style_layer_result source) =>
           : utf8.decode(_copyBufferView(source.source_layer)),
     );
 
+StyleSourceTileInfo _readStyleSourceTileInfo(
+  raw.mln_style_source_tile_info source,
+) => StyleSourceTileInfo(
+  tileUrls: List<String>.unmodifiable(
+    List.generate(
+      source.tile_url_count,
+      (index) => utf8.decode(_copyBufferView(source.tile_urls[index])),
+    ),
+  ),
+  minZoom: source.min_zoom,
+  maxZoom: source.max_zoom,
+  scheme: StyleTileScheme.fromRawValue(source.scheme),
+);
+
 StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
     StyleSourceInfo(
       type: StyleSourceType.fromRawValue(source.type),
-      idSize: source.id_size,
       isVolatile: source.is_volatile,
-      attributionSize: source.has_attribution ? source.attribution_size : null,
-      urlSize: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
-          ? source.url_size
+      attribution: (source.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
+          ? utf8.decode(_copyBufferView(source.attribution))
+          : null,
+      url: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
+          ? utf8.decode(_copyBufferView(source.url))
           : null,
       tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
-          ? StyleSourceTileInfo(
-              tileCount: source.tile_count,
-              minZoom: source.min_zoom,
-              maxZoom: source.max_zoom,
-              scheme: StyleTileScheme.fromRawValue(source.scheme),
-            )
+          ? _readStyleSourceTileInfo(source.tilejson)
           : null,
       bounds: (source.fields & raw.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0
           ? _readLatLngBounds(source.bounds)
@@ -1294,37 +1276,6 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
           ? StyleRasterDemEncoding.fromRawValue(source.raster_encoding)
           : null,
     );
-
-StyleSourceResult _readStyleSourceResult(raw.mln_style_source_result source) =>
-    StyleSourceResult(
-      info: _readStyleSourceInfo(source.info),
-      attribution: source.info.has_attribution
-          ? utf8.decode(_copyBufferView(source.attribution))
-          : null,
-      url: (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
-          ? utf8.decode(_copyBufferView(source.url))
-          : null,
-      tileUrls: (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
-          ? List<String>.unmodifiable(
-              List.generate(
-                source.tile_url_count,
-                (index) =>
-                    utf8.decode(_copyBufferView(source.tile_urls[index])),
-              ),
-            )
-          : null,
-    );
-
-StyleSourceTileUrlsResult _readStyleSourceTileUrlsResult(
-  raw.mln_style_source_tile_urls_result source,
-) => StyleSourceTileUrlsResult(
-  tileUrls: List<String>.unmodifiable(
-    List.generate(
-      source.tile_url_count,
-      (index) => utf8.decode(_copyBufferView(source.tile_urls[index])),
-    ),
-  ),
-);
 
 Pointer<raw.mln_style_transition_options> _writeStyleTransitionOptions(
   StyleTransitionOptions value,
@@ -3090,25 +3041,11 @@ final _resultString = _CompletionValue(
   (element) =>
       utf8.decode(_copyBufferView(element.cast<raw.mln_buffer_view>().ref)),
 );
-final _resultStringOrNull = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW,
-  sizeOf<raw.mln_buffer_view>(),
-  (element) => element.cast<raw.mln_buffer_view>().ref.data == nullptr
-      ? null
-      : utf8.decode(_copyBufferView(element.cast<raw.mln_buffer_view>().ref)),
-);
-final _resultStyleImageResult = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT,
-  sizeOf<raw.mln_style_image_result>(),
+final _resultStyleImageInfo = _CompletionValue(
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO,
+  sizeOf<raw.mln_style_image_info>(),
   (element) =>
-      _readStyleImageResult(element.cast<raw.mln_style_image_result>().ref),
-);
-final _resultStyleImageStretchesResult = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT,
-  sizeOf<raw.mln_style_image_stretches_result>(),
-  (element) => _readStyleImageStretchesResult(
-    element.cast<raw.mln_style_image_stretches_result>().ref,
-  ),
+      _readStyleImageInfo(element.cast<raw.mln_style_image_info>().ref),
 );
 final _resultStyleLayerEntry = _CompletionValue(
   raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY,
@@ -3116,24 +3053,17 @@ final _resultStyleLayerEntry = _CompletionValue(
   (element) =>
       _readStyleLayerEntry(element.cast<raw.mln_style_layer_entry>().ref),
 );
-final _resultStyleLayerResult = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT,
-  sizeOf<raw.mln_style_layer_result>(),
+final _resultStyleLayerInfo = _CompletionValue(
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO,
+  sizeOf<raw.mln_style_layer_info>(),
   (element) =>
-      _readStyleLayerResult(element.cast<raw.mln_style_layer_result>().ref),
+      _readStyleLayerInfo(element.cast<raw.mln_style_layer_info>().ref),
 );
-final _resultStyleSourceResult = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT,
-  sizeOf<raw.mln_style_source_result>(),
+final _resultStyleSourceInfo = _CompletionValue(
+  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO,
+  sizeOf<raw.mln_style_source_info>(),
   (element) =>
-      _readStyleSourceResult(element.cast<raw.mln_style_source_result>().ref),
-);
-final _resultStyleSourceTileUrlsResult = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT,
-  sizeOf<raw.mln_style_source_tile_urls_result>(),
-  (element) => _readStyleSourceTileUrlsResult(
-    element.cast<raw.mln_style_source_tile_urls_result>().ref,
-  ),
+      _readStyleSourceInfo(element.cast<raw.mln_style_source_info>().ref),
 );
 final _resultStyleTransitionOptions = _CompletionValue(
   raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS,
@@ -3721,16 +3651,6 @@ SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_source_feature_query_options_default();
   return _readSourceFeatureQueryOptions(nativeResult);
-}
-
-/// Returns default runtime style image metadata.
-///
-/// See `mln_style_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-StyleImageInfo styleImageInfoDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_image_info_default();
-  return _readStyleImageInfo(nativeResult);
 }
 
 /// Returns default runtime style image options.
@@ -4616,93 +4536,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Copies one layer's source ID.
-  ///
-  /// See `mln_map_copy_layer_source_id` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<String?> copyLayerSourceId(String layerId) => _query(
-    _resultStringOrNull,
-    (arena, completion) => raw.mln_map_copy_layer_source_id(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Copies one layer's source-layer ID.
-  ///
-  /// See `mln_map_copy_layer_source_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<String?> copyLayerSourceLayer(String layerId) => _query(
-    _resultStringOrNull,
-    (arena, completion) => raw.mln_map_copy_layer_source_layer(
-      _handle.raw,
-      nativeStringView(layerId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Copies one runtime style image as tightly packed premultiplied RGBA8
-  /// pixels.
-  ///
-  /// See `mln_map_copy_style_image_premultiplied_rgba8` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<Uint8List?> copyStyleImagePremultipliedRgba8(String imageId) =>
-      _queryOptional(
-        _resultUint8ListOrNull,
-        (arena, completion) => raw.mln_map_copy_style_image_premultiplied_rgba8(
-          _handle.raw,
-          nativeStringView(imageId, arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
-
-  /// Copies one runtime style image's stretchable intervals.
-  ///
-  /// See `mln_map_copy_style_image_stretches` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<StyleImageStretchesResult?> copyStyleImageStretches(String imageId) =>
-      _queryOptional(
-        _resultStyleImageStretchesResult,
-        (arena, completion) => raw.mln_map_copy_style_image_stretches(
-          _handle.raw,
-          nativeStringView(imageId, arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
-
-  /// Copies one style source attribution string.
-  ///
-  /// See `mln_map_copy_style_source_attribution` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<String?> copyStyleSourceAttribution(String sourceId) => _queryOptional(
-    _resultStringOrNull,
-    (arena, completion) => raw.mln_map_copy_style_source_attribution(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
-  /// Copies one style source URL.
-  ///
-  /// See `mln_map_copy_style_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<String?> copyStyleSourceUrl(String sourceId) => _queryOptional(
-    _resultStringOrNull,
-    (arena, completion) => raw.mln_map_copy_style_source_url(
-      _handle.raw,
-      nativeStringView(sourceId, arena).value,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
-
   /// Consumes a map handle without observing its asynchronous retirement.
   ///
   /// See `mln_map_dispose` in the
@@ -4792,11 +4625,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
 
   /// Copies one complete runtime style image.
   ///
-  /// See `mln_map_get_style_image_info` in the
+  /// See `mln_map_get_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<StyleImageResult?> getStyleImageInfo(String imageId) => _queryOptional(
-    _resultStyleImageResult,
-    (arena, completion) => raw.mln_map_get_style_image_info(
+  Future<StyleImageInfo?> getStyleImage(String imageId) => _queryOptional(
+    _resultStyleImageInfo,
+    (arena, completion) => raw.mln_map_get_style_image(
       _handle.raw,
       nativeStringView(imageId, arena).value,
       completion,
@@ -4804,13 +4637,13 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Copies complete metadata for one style layer.
+  /// Copies the complete metadata of one style layer.
   ///
-  /// See `mln_map_get_style_layer_info` in the
+  /// See `mln_map_get_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<StyleLayerResult?> getStyleLayerInfo(String layerId) => _queryOptional(
-    _resultStyleLayerResult,
-    (arena, completion) => raw.mln_map_get_style_layer_info(
+  Future<StyleLayerInfo?> getStyleLayer(String layerId) => _queryOptional(
+    _resultStyleLayerInfo,
+    (arena, completion) => raw.mln_map_get_style_layer(
       _handle.raw,
       nativeStringView(layerId, arena).value,
       completion,
@@ -4847,35 +4680,19 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
         ),
       );
 
-  /// Copies complete metadata for one style source.
+  /// Copies the complete metadata of one style source.
   ///
-  /// See `mln_map_get_style_source_info` in the
+  /// See `mln_map_get_style_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<StyleSourceResult?> getStyleSourceInfo(String sourceId) =>
-      _queryOptional(
-        _resultStyleSourceResult,
-        (arena, completion) => raw.mln_map_get_style_source_info(
-          _handle.raw,
-          nativeStringView(sourceId, arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
-
-  /// Copies one style source's inline TileJSON tile URLs.
-  ///
-  /// See `mln_map_get_style_source_tile_urls` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<StyleSourceTileUrlsResult?> getStyleSourceTileUrls(String sourceId) =>
-      _queryOptional(
-        _resultStyleSourceTileUrlsResult,
-        (arena, completion) => raw.mln_map_get_style_source_tile_urls(
-          _handle.raw,
-          nativeStringView(sourceId, arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
+  Future<StyleSourceInfo?> getStyleSource(String sourceId) => _queryOptional(
+    _resultStyleSourceInfo,
+    (arena, completion) => raw.mln_map_get_style_source(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
 
   /// Reads the style's global transition options.
   ///
@@ -5042,19 +4859,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         );
       });
-
-  /// Copies style layer IDs in style order.
-  ///
-  /// See `mln_map_list_style_layer_ids` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<List<String>> listStyleLayerIds() => _queryList(
-    _resultString,
-    (arena, completion) => raw.mln_map_list_style_layer_ids(
-      _handle.raw,
-      completion,
-      nativeDiagnostic,
-    ),
-  );
 
   /// Starts an ordered query of every style layer in style order.
   ///

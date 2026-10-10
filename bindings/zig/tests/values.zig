@@ -27,10 +27,10 @@ test "strings cross as terminated and explicit-length views" {
     try fixture.loadStyle();
     const source_id = "nul\x00source";
     try support.expectCommitted(try maplibre.mapAddStyleSourceJson(fixture.map, source_id, "{\"type\":\"geojson\",\"data\":{\"type\":\"FeatureCollection\",\"features\":[]}}", null));
-    var info = (try support.resolve(try maplibre.mapGetStyleSourceInfo(testing.allocator, fixture.map, source_id, null))).?;
+    var info = (try support.resolve(try maplibre.mapGetStyleSource(testing.allocator, fixture.map, source_id, null))).?;
     defer info.deinit();
-    try testing.expectEqual(source_id.len, info.value.info.id_size);
-    try testing.expect(try support.resolve(try maplibre.mapGetStyleSourceInfo(testing.allocator, fixture.map, "nul", null)) == null);
+    try testing.expectEqual(maplibre.StyleSourceType.geojson, info.value.type);
+    try testing.expect(try support.resolve(try maplibre.mapGetStyleSource(testing.allocator, fixture.map, "nul", null)) == null);
 }
 
 // A null optional field sets no presence bit, so the command leaves that value
@@ -140,10 +140,10 @@ test "an array input is copied at submission" {
     @memset(&pixels, 0);
     try support.expectCommitted(submitted);
 
-    var copy = (try support.resolve(try maplibre.mapCopyStyleImagePremultipliedRgba8(testing.allocator, fixture.map, "copied", null))).?;
+    var copy = (try support.resolve(try maplibre.mapGetStyleImage(testing.allocator, fixture.map, "copied", null))).?;
     defer copy.deinit();
-    try testing.expectEqual(@as(usize, pixels.len), copy.value.len);
-    for (copy.value) |byte| try testing.expectEqual(@as(u8, 0x80), byte);
+    try testing.expectEqual(@as(usize, pixels.len), copy.value.pixels.len);
+    for (copy.value.pixels) |byte| try testing.expectEqual(@as(u8, 0x80), byte);
 }
 
 // A struct's field defaults come from the header's field annotations, so the

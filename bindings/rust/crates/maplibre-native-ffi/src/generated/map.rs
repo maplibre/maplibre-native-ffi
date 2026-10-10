@@ -580,124 +580,6 @@ impl MapHandle {
         })
     }
 
-    /// Copies one layer's source ID.
-    ///
-    /// See `mln_map_copy_layer_source_id` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_layer_source_id(&self, layer_id: &str) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_layer_source_id")?;
-        let layer_id = call.input(&layer_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_layer_source_id(map, layer_id, completion, out_diagnostic)
-            },
-            |result| {
-                let value = completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { convert::nonempty(value) }?)
-            },
-        )
-    }
-
-    /// Copies one layer's source-layer ID.
-    ///
-    /// See `mln_map_copy_layer_source_layer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_layer_source_layer(&self, layer_id: &str) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_layer_source_layer")?;
-        let layer_id = call.input(&layer_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_layer_source_layer(map, layer_id, completion, out_diagnostic)
-            },
-            |result| {
-                let value = completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { convert::nonempty(value) }?)
-            },
-        )
-    }
-
-    /// Copies one runtime style image as tightly packed premultiplied RGBA8
-    /// pixels.
-    ///
-    /// See `mln_map_copy_style_image_premultiplied_rgba8` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_image_premultiplied_rgba8(
-        &self,
-        image_id: &str,
-    ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self
-            .inner
-            .call("mln_map_copy_style_image_premultiplied_rgba8")?;
-        let image_id = call.input(&image_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_image_premultiplied_rgba8(
-                    map,
-                    image_id,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
-    /// Copies one runtime style image's stretchable intervals.
-    ///
-    /// See `mln_map_copy_style_image_stretches` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_image_stretches(
-        &self,
-        image_id: &str,
-    ) -> Result<NativeFuture<Option<StyleImageStretchesResult>>> {
-        let mut call = self.inner.call("mln_map_copy_style_image_stretches")?;
-        let image_id = call.input(&image_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_image_stretches(map, image_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_style_image_stretches_result, _>,
-        )
-    }
-
-    /// Copies one style source attribution string.
-    ///
-    /// See `mln_map_copy_style_source_attribution` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_source_attribution(
-        &self,
-        source_id: &str,
-    ) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_style_source_attribution")?;
-        let source_id = call.input(&source_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_source_attribution(
-                    map,
-                    source_id,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
-    /// Copies one style source URL.
-    ///
-    /// See `mln_map_copy_style_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_source_url(&self, source_id: &str) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_style_source_url")?;
-        let source_id = call.input(&source_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_source_url(map, source_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
     /// Consumes a map handle without observing its asynchronous retirement.
     ///
     /// See `mln_map_dispose` in the
@@ -820,37 +702,31 @@ impl MapHandle {
 
     /// Copies one complete runtime style image.
     ///
-    /// See `mln_map_get_style_image_info` in the
+    /// See `mln_map_get_style_image` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_image_info(
-        &self,
-        image_id: &str,
-    ) -> Result<NativeFuture<Option<StyleImageResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_image_info")?;
+    pub fn get_style_image(&self, image_id: &str) -> Result<NativeFuture<Option<StyleImageInfo>>> {
+        let mut call = self.inner.call("mln_map_get_style_image")?;
         let image_id = call.input(&image_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_image_info(map, image_id, completion, out_diagnostic)
+                sys::mln_map_get_style_image(map, image_id, completion, out_diagnostic)
             },
-            completion::optional::<sys::mln_style_image_result, _>,
+            completion::optional::<sys::mln_style_image_info, _>,
         )
     }
 
-    /// Copies complete metadata for one style layer.
+    /// Copies the complete metadata of one style layer.
     ///
-    /// See `mln_map_get_style_layer_info` in the
+    /// See `mln_map_get_style_layer` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_layer_info(
-        &self,
-        layer_id: &str,
-    ) -> Result<NativeFuture<Option<StyleLayerResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_layer_info")?;
+    pub fn get_style_layer(&self, layer_id: &str) -> Result<NativeFuture<Option<StyleLayerInfo>>> {
+        let mut call = self.inner.call("mln_map_get_style_layer")?;
         let layer_id = call.input(&layer_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_layer_info(map, layer_id, completion, out_diagnostic)
+                sys::mln_map_get_style_layer(map, layer_id, completion, out_diagnostic)
             },
-            completion::optional::<sys::mln_style_layer_result, _>,
+            completion::optional::<sys::mln_style_layer_info, _>,
         )
     }
 
@@ -892,39 +768,21 @@ impl MapHandle {
         )
     }
 
-    /// Copies complete metadata for one style source.
+    /// Copies the complete metadata of one style source.
     ///
-    /// See `mln_map_get_style_source_info` in the
+    /// See `mln_map_get_style_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_source_info(
+    pub fn get_style_source(
         &self,
         source_id: &str,
-    ) -> Result<NativeFuture<Option<StyleSourceResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_source_info")?;
+    ) -> Result<NativeFuture<Option<StyleSourceInfo>>> {
+        let mut call = self.inner.call("mln_map_get_style_source")?;
         let source_id = call.input(&source_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_source_info(map, source_id, completion, out_diagnostic)
+                sys::mln_map_get_style_source(map, source_id, completion, out_diagnostic)
             },
-            completion::optional::<sys::mln_style_source_result, _>,
-        )
-    }
-
-    /// Copies one style source's inline TileJSON tile URLs.
-    ///
-    /// See `mln_map_get_style_source_tile_urls` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_source_tile_urls(
-        &self,
-        source_id: &str,
-    ) -> Result<NativeFuture<Option<StyleSourceTileUrlsResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_source_tile_urls")?;
-        let source_id = call.input(&source_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_source_tile_urls(map, source_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_style_source_tile_urls_result, _>,
+            completion::optional::<sys::mln_style_source_info, _>,
         )
     }
 
@@ -1137,20 +995,6 @@ impl MapHandle {
                 )
             },
             completion::list::<sys::mln_lat_lng, _>,
-        )
-    }
-
-    /// Copies style layer IDs in style order.
-    ///
-    /// See `mln_map_list_style_layer_ids` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn list_style_layer_ids(&self) -> Result<NativeFuture<Vec<String>>> {
-        let call = self.inner.call("mln_map_list_style_layer_ids")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_list_style_layer_ids(map, completion, out_diagnostic)
-            },
-            completion::list::<sys::mln_buffer_view, _>,
         )
     }
 

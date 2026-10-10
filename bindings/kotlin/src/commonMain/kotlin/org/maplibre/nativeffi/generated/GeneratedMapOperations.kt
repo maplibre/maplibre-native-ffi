@@ -556,121 +556,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies one layer's source ID.
-   *
-   * See `mln_map_copy_layer_source_id` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyLayerSourceId(layerId: String): Deferred<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_layer_source_id",
-      { result -> readViewString(CompletionBridge.value(result)).takeIf { it.isNotEmpty() } },
-    ) {
-      check(C.mln_map_copy_layer_source_id(handle, view(layerId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one layer's source-layer ID.
-   *
-   * See `mln_map_copy_layer_source_layer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyLayerSourceLayer(layerId: String): Deferred<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_layer_source_layer",
-      { result -> readViewString(CompletionBridge.value(result)).takeIf { it.isNotEmpty() } },
-    ) {
-      check(C.mln_map_copy_layer_source_layer(handle, view(layerId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
-   *
-   * See `mln_map_copy_style_image_premultiplied_rgba8` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<ByteArray?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_image_premultiplied_rgba8",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
-      },
-    ) {
-      check(
-        C.mln_map_copy_style_image_premultiplied_rgba8(
-          handle,
-          view(imageId),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Copies one runtime style image's stretchable intervals.
-   *
-   * See `mln_map_copy_style_image_stretches` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleImageStretches(imageId: String): Deferred<StyleImageStretchesResult?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_image_stretches",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleImageStretchesResult(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_copy_style_image_stretches(handle, view(imageId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one style source attribution string.
-   *
-   * See `mln_map_copy_style_source_attribution` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleSourceAttribution(sourceId: String): Deferred<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_source_attribution",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_copy_style_source_attribution(handle, view(sourceId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one style source URL.
-   *
-   * See `mln_map_copy_style_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleSourceUrl(sourceId: String): Deferred<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_source_url",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_copy_style_source_url(handle, view(sourceId), completion, diagnostic))
-    }
-
-  /**
    * Consumes a map handle without observing its asynchronous retirement.
    *
    * See `mln_map_dispose` in the
@@ -805,39 +690,39 @@ public abstract class GeneratedMapOperations internal constructor() {
   /**
    * Copies one complete runtime style image.
    *
-   * See `mln_map_get_style_image_info` in the
+   * See `mln_map_get_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleImageInfo(imageId: String): Deferred<StyleImageResult?> =
+  public fun getStyleImage(imageId: String): Deferred<StyleImageInfo?> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_image_info",
+      "mln_map_get_style_image",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleImageResult(CompletionBridge.value(result))
+        else readStyleImageInfo(CompletionBridge.value(result))
       },
     ) {
-      check(C.mln_map_get_style_image_info(handle, view(imageId), completion, diagnostic))
+      check(C.mln_map_get_style_image(handle, view(imageId), completion, diagnostic))
     }
 
   /**
-   * Copies complete metadata for one style layer.
+   * Copies the complete metadata of one style layer.
    *
-   * See `mln_map_get_style_layer_info` in the
+   * See `mln_map_get_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayerInfo(layerId: String): Deferred<StyleLayerResult?> =
+  public fun getStyleLayer(layerId: String): Deferred<StyleLayerInfo?> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_layer_info",
+      "mln_map_get_style_layer",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleLayerResult(CompletionBridge.value(result))
+        else readStyleLayerInfo(CompletionBridge.value(result))
       },
     ) {
-      check(C.mln_map_get_style_layer_info(handle, view(layerId), completion, diagnostic))
+      check(C.mln_map_get_style_layer(handle, view(layerId), completion, diagnostic))
     }
 
   /**
@@ -879,41 +764,22 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies complete metadata for one style source.
+   * Copies the complete metadata of one style source.
    *
-   * See `mln_map_get_style_source_info` in the
+   * See `mln_map_get_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleSourceInfo(sourceId: String): Deferred<StyleSourceResult?> =
+  public fun getStyleSource(sourceId: String): Deferred<StyleSourceInfo?> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_source_info",
+      "mln_map_get_style_source",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleSourceResult(CompletionBridge.value(result))
+        else readStyleSourceInfo(CompletionBridge.value(result))
       },
     ) {
-      check(C.mln_map_get_style_source_info(handle, view(sourceId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one style source's inline TileJSON tile URLs.
-   *
-   * See `mln_map_get_style_source_tile_urls` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun getStyleSourceTileUrls(sourceId: String): Deferred<StyleSourceTileUrlsResult?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_style_source_tile_urls",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleSourceTileUrlsResult(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_source_tile_urls(handle, view(sourceId), completion, diagnostic))
+      check(C.mln_map_get_style_source(handle, view(sourceId), completion, diagnostic))
     }
 
   /**
@@ -1145,30 +1011,6 @@ public abstract class GeneratedMapOperations internal constructor() {
           diagnostic,
         )
       )
-    }
-
-  /**
-   * Copies style layer IDs in style order.
-   *
-   * See `mln_map_list_style_layer_ids` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun listStyleLayerIds(): Deferred<List<String>> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_list_style_layer_ids",
-      { result ->
-        readArray(
-          CompletionBridge.valuePointer(result),
-          CompletionBridge.valueCount(result),
-          2 * NativeMemory.addressSize.toLong(),
-        ) {
-          readViewString(it)
-        }
-      },
-    ) {
-      check(C.mln_map_list_style_layer_ids(handle, completion, diagnostic))
     }
 
   /**

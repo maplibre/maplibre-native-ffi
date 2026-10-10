@@ -73,16 +73,6 @@ public extension Maplibre {
     }
   }
 
-  /// Returns default runtime style image metadata.
-  ///
-  /// See `mln_style_image_info_default` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  static func styleImageInfoDefault() throws -> StyleImageInfo {
-    try nativeDirect("mln_style_image_info_default") { _ in
-      StyleImageInfo(raw: mln_style_image_info_default())
-    }
-  }
-
   /// Returns default runtime style image options.
   ///
   /// See `mln_style_image_options_default` in the

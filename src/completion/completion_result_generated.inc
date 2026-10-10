@@ -28,48 +28,6 @@ struct CompletionResult<&mln_map_camera_query> {
   static constexpr bool nullable = false;
 };
 template <>
-struct CompletionResult<&mln_map_copy_layer_source_id> {
-  static constexpr bool has_value = true;
-  using type = mln_buffer_view;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_copy_layer_source_layer> {
-  static constexpr bool has_value = true;
-  using type = mln_buffer_view;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_copy_style_image_premultiplied_rgba8> {
-  static constexpr bool has_value = true;
-  using type = mln_buffer_view;
-  static constexpr bool array = false;
-  static constexpr bool nullable = true;
-};
-template <>
-struct CompletionResult<&mln_map_copy_style_image_stretches> {
-  static constexpr bool has_value = true;
-  using type = mln_style_image_stretches_result;
-  static constexpr bool array = false;
-  static constexpr bool nullable = true;
-};
-template <>
-struct CompletionResult<&mln_map_copy_style_source_attribution> {
-  static constexpr bool has_value = true;
-  using type = mln_buffer_view;
-  static constexpr bool array = false;
-  static constexpr bool nullable = true;
-};
-template <>
-struct CompletionResult<&mln_map_copy_style_source_url> {
-  static constexpr bool has_value = true;
-  using type = mln_buffer_view;
-  static constexpr bool array = false;
-  static constexpr bool nullable = true;
-};
-template <>
 struct CompletionResult<&mln_map_create> {
   static constexpr bool has_value = true;
   using type = mln_map;
@@ -112,16 +70,16 @@ struct CompletionResult<&mln_map_get_layer_property> {
   static constexpr bool nullable = true;
 };
 template <>
-struct CompletionResult<&mln_map_get_style_image_info> {
+struct CompletionResult<&mln_map_get_style_image> {
   static constexpr bool has_value = true;
-  using type = mln_style_image_result;
+  using type = mln_style_image_info;
   static constexpr bool array = false;
   static constexpr bool nullable = true;
 };
 template <>
-struct CompletionResult<&mln_map_get_style_layer_info> {
+struct CompletionResult<&mln_map_get_style_layer> {
   static constexpr bool has_value = true;
-  using type = mln_style_layer_result;
+  using type = mln_style_layer_info;
   static constexpr bool array = false;
   static constexpr bool nullable = true;
 };
@@ -140,16 +98,9 @@ struct CompletionResult<&mln_map_get_style_light_property> {
   static constexpr bool nullable = true;
 };
 template <>
-struct CompletionResult<&mln_map_get_style_source_info> {
+struct CompletionResult<&mln_map_get_style_source> {
   static constexpr bool has_value = true;
-  using type = mln_style_source_result;
-  static constexpr bool array = false;
-  static constexpr bool nullable = true;
-};
-template <>
-struct CompletionResult<&mln_map_get_style_source_tile_urls> {
-  static constexpr bool has_value = true;
-  using type = mln_style_source_tile_urls_result;
+  using type = mln_style_source_info;
   static constexpr bool array = false;
   static constexpr bool nullable = true;
 };
@@ -199,13 +150,6 @@ template <>
 struct CompletionResult<&mln_map_lat_lngs_for_pixels_unwrapped> {
   static constexpr bool has_value = true;
   using type = mln_lat_lng;
-  static constexpr bool array = true;
-  static constexpr bool nullable = false;
-};
-template <>
-struct CompletionResult<&mln_map_list_style_layer_ids> {
-  static constexpr bool has_value = true;
-  using type = mln_buffer_view;
   static constexpr bool array = true;
   static constexpr bool nullable = false;
 };

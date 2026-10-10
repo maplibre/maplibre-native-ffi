@@ -384,10 +384,6 @@ static mln_test_style_list run_list_query(
   return list;
 }
 
-mln_test_style_list mln_test_style_list_layer_ids(mln_map map) {
-  return run_list_query(map, mln_map_list_style_layer_ids, false);
-}
-
 mln_test_style_list mln_test_style_list_layers(mln_map map) {
   return run_list_query(map, mln_map_list_style_layers, true);
 }

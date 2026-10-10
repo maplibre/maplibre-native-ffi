@@ -188,22 +188,10 @@ auto capture_mln_screen_point(
   return result;
 }
 template <bool Writing>
-auto capture_mln_style_image_result(
-  [[maybe_unused]] Arena<Writing>& arena, mln_style_image_result source
-) -> mln_style_image_result {
+auto capture_mln_style_image_info(
+  [[maybe_unused]] Arena<Writing>& arena, mln_style_image_info source
+) -> mln_style_image_info {
   auto result = source;
-  if (source.info.has_content) {
-  } else {
-    result.info.content = {};
-  }
-  if (source.info.has_text_fit_width) {
-  } else {
-    result.info.text_fit_width = {};
-  }
-  if (source.info.has_text_fit_height) {
-  } else {
-    result.info.text_fit_height = {};
-  }
   result.pixels = buffer(arena, source.pixels);
   result.stretch_x = span(
     arena, source.stretch_x, source.stretch_x_count,
@@ -219,28 +207,18 @@ auto capture_mln_style_image_result(
       return copied_1;
     }
   );
-  return result;
-}
-template <bool Writing>
-auto capture_mln_style_image_stretches_result(
-  [[maybe_unused]] Arena<Writing>& arena,
-  mln_style_image_stretches_result source
-) -> mln_style_image_stretches_result {
-  auto result = source;
-  result.stretch_x = span(
-    arena, source.stretch_x, source.stretch_x_count,
-    [&]([[maybe_unused]] auto& arena, auto element_1) {
-      auto copied_1 = element_1;
-      return copied_1;
-    }
-  );
-  result.stretch_y = span(
-    arena, source.stretch_y, source.stretch_y_count,
-    [&]([[maybe_unused]] auto& arena, auto element_1) {
-      auto copied_1 = element_1;
-      return copied_1;
-    }
-  );
+  if ((source.fields & MLN_STYLE_IMAGE_INFO_CONTENT) != 0) {
+  } else {
+    result.content = {};
+  }
+  if ((source.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0) {
+  } else {
+    result.text_fit_width = {};
+  }
+  if ((source.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0) {
+  } else {
+    result.text_fit_height = {};
+  }
   return result;
 }
 template <bool Writing>
@@ -255,73 +233,33 @@ auto capture_mln_style_layer_entry(
   return result;
 }
 template <bool Writing>
-auto capture_mln_style_layer_result(
-  [[maybe_unused]] Arena<Writing>& arena, mln_style_layer_result source
-) -> mln_style_layer_result {
+auto capture_mln_style_layer_info(
+  [[maybe_unused]] Arena<Writing>& arena, mln_style_layer_info source
+) -> mln_style_layer_info {
   auto result = source;
-  result.info.type = buffer(arena, source.info.type);
+  result.type = buffer(arena, source.type);
   result.source_id = buffer(arena, source.source_id);
   result.source_layer = buffer(arena, source.source_layer);
   return result;
 }
 template <bool Writing>
-auto capture_mln_style_source_result(
-  [[maybe_unused]] Arena<Writing>& arena, mln_style_source_result source
-) -> mln_style_source_result {
+auto capture_mln_style_source_info(
+  [[maybe_unused]] Arena<Writing>& arena, mln_style_source_info source
+) -> mln_style_source_info {
   auto result = source;
-  if (source.info.has_attribution) {
-  } else {
-    result.info.attribution_size = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_URL) != 0) {
-  } else {
-    result.info.url_size = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.tile_count = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.min_zoom = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.max_zoom = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.scheme = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
-  } else {
-    result.info.bounds = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0) {
-  } else {
-    result.info.tile_size = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0) {
-  } else {
-    result.info.vector_encoding = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0) {
-  } else {
-    result.info.raster_encoding = {};
-  }
-  if (source.info.has_attribution) {
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
     result.attribution = buffer(arena, source.attribution);
   } else {
     result.attribution = {};
   }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_URL) != 0) {
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_URL) != 0) {
     result.url = buffer(arena, source.url);
   } else {
     result.url = {};
   }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-    result.tile_urls = span(
-      arena, source.tile_urls, source.tile_url_count,
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
+    result.tilejson.tile_urls = span(
+      arena, source.tilejson.tile_urls, source.tilejson.tile_url_count,
       [&]([[maybe_unused]] auto& arena, auto element_2) {
         auto copied_2 = element_2;
         copied_2 = buffer(arena, element_2);
@@ -329,24 +267,24 @@ auto capture_mln_style_source_result(
       }
     );
   } else {
-    result.tile_urls = {};
+    result.tilejson = {};
   }
-  return result;
-}
-template <bool Writing>
-auto capture_mln_style_source_tile_urls_result(
-  [[maybe_unused]] Arena<Writing>& arena,
-  mln_style_source_tile_urls_result source
-) -> mln_style_source_tile_urls_result {
-  auto result = source;
-  result.tile_urls = span(
-    arena, source.tile_urls, source.tile_url_count,
-    [&]([[maybe_unused]] auto& arena, auto element_1) {
-      auto copied_1 = element_1;
-      copied_1 = buffer(arena, element_1);
-      return copied_1;
-    }
-  );
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
+  } else {
+    result.bounds = {};
+  }
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_TILE_SIZE) != 0) {
+  } else {
+    result.tile_size = {};
+  }
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING) != 0) {
+  } else {
+    result.vector_encoding = {};
+  }
+  if ((source.fields & MLN_STYLE_SOURCE_INFO_RASTER_ENCODING) != 0) {
+  } else {
+    result.raster_encoding = {};
+  }
   return result;
 }
 template <bool Writing>
@@ -414,12 +352,10 @@ inline auto valid_kind(std::uint32_t kind) -> bool {
     case MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS:
     case MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE:
     case MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT:
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT:
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT:
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO:
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY:
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT:
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT:
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT:
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO:
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO:
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS:
     case MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT:
       return true;
@@ -541,23 +477,13 @@ auto value(
           return capture_mln_screen_point(storage, source);
         }
       );
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_RESULT:
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO:
       if (result.value_count != 1)
         throw std::invalid_argument{"invalid completion count"};
       return span(
-        arena, static_cast<const mln_style_image_result*>(result.value),
+        arena, static_cast<const mln_style_image_info*>(result.value),
         result.value_count, [](auto& storage, auto source) {
-          return capture_mln_style_image_result(storage, source);
-        }
-      );
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_STRETCHES_RESULT:
-      if (result.value_count != 1)
-        throw std::invalid_argument{"invalid completion count"};
-      return span(
-        arena,
-        static_cast<const mln_style_image_stretches_result*>(result.value),
-        result.value_count, [](auto& storage, auto source) {
-          return capture_mln_style_image_stretches_result(storage, source);
+          return capture_mln_style_image_info(storage, source);
         }
       );
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY:
@@ -567,32 +493,22 @@ auto value(
           return capture_mln_style_layer_entry(storage, source);
         }
       );
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_RESULT:
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO:
       if (result.value_count != 1)
         throw std::invalid_argument{"invalid completion count"};
       return span(
-        arena, static_cast<const mln_style_layer_result*>(result.value),
+        arena, static_cast<const mln_style_layer_info*>(result.value),
         result.value_count, [](auto& storage, auto source) {
-          return capture_mln_style_layer_result(storage, source);
+          return capture_mln_style_layer_info(storage, source);
         }
       );
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT:
+    case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO:
       if (result.value_count != 1)
         throw std::invalid_argument{"invalid completion count"};
       return span(
-        arena, static_cast<const mln_style_source_result*>(result.value),
+        arena, static_cast<const mln_style_source_info*>(result.value),
         result.value_count, [](auto& storage, auto source) {
-          return capture_mln_style_source_result(storage, source);
-        }
-      );
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_TILE_URLS_RESULT:
-      if (result.value_count != 1)
-        throw std::invalid_argument{"invalid completion count"};
-      return span(
-        arena,
-        static_cast<const mln_style_source_tile_urls_result*>(result.value),
-        result.value_count, [](auto& storage, auto source) {
-          return capture_mln_style_source_tile_urls_result(storage, source);
+          return capture_mln_style_source_info(storage, source);
         }
       );
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS:

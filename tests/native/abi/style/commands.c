@@ -9,11 +9,11 @@
 
 static bool source_exists(mln_map map, const char* id) {
   mln_test_completion completion =
-    mln_test_completion_default(sizeof(mln_style_source_result));
-  MLN_TEST_OK(mln_map_get_style_source_info(
+    mln_test_completion_default(sizeof(mln_style_source_info));
+  MLN_TEST_OK(mln_map_get_style_source(
     map, mln_test_view_of(id), &completion.descriptor, NULL
   ));
-  mln_style_source_result result;
+  mln_style_source_info result;
   bool found = false;
   MLN_TEST_OK(mln_test_completion_finish_optional(
     &completion, &result, sizeof(result), &found
@@ -23,11 +23,11 @@ static bool source_exists(mln_map map, const char* id) {
 
 static bool image_exists(mln_map map, const char* id) {
   mln_test_completion completion =
-    mln_test_completion_default(sizeof(mln_style_image_result));
-  MLN_TEST_OK(mln_map_get_style_image_info(
+    mln_test_completion_default(sizeof(mln_style_image_info));
+  MLN_TEST_OK(mln_map_get_style_image(
     map, mln_test_view_of(id), &completion.descriptor, NULL
   ));
-  mln_style_image_result result;
+  mln_style_image_info result;
   bool found = false;
   MLN_TEST_OK(mln_test_completion_finish_optional(
     &completion, &result, sizeof(result), &found
@@ -223,14 +223,6 @@ static void missing_style_ids_report_not_found(void) {
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_NOT_FOUND,
     mln_map_get_layer_filter(map, layer, &completion.descriptor, NULL)
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_NOT_FOUND,
-    mln_map_copy_layer_source_id(map, layer, &completion.descriptor, NULL)
-  );
-  MLN_TEST_AWAIT_COMMAND(
-    MLN_STATUS_NOT_FOUND,
-    mln_map_copy_layer_source_layer(map, layer, &completion.descriptor, NULL)
   );
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

@@ -44,24 +44,24 @@ func TestPresenceFieldsRoundTrip(t *testing.T) {
 		Content:       &ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5},
 		TextFitHeight: &fit,
 	})))
-	image := await(t, submitted(f.m.GetStyleImageInfo("patch")))
+	image := await(t, submitted(f.m.GetStyleImage("patch")))
 	if image == nil {
-		t.Fatal("GetStyleImageInfo(patch) found nothing")
+		t.Fatal("GetStyleImage(patch) found nothing")
 	}
-	if image.Info.Content == nil || *image.Info.Content != (ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5}) {
-		t.Fatalf("Content = %+v, want the one set", image.Info.Content)
+	if image.Content == nil || *image.Content != (ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5}) {
+		t.Fatalf("Content = %+v, want the one set", image.Content)
 	}
-	if image.Info.TextFitWidth != nil {
-		t.Fatalf("TextFitWidth = %v, want absent", *image.Info.TextFitWidth)
+	if image.TextFitWidth != nil {
+		t.Fatalf("TextFitWidth = %v, want absent", *image.TextFitWidth)
 	}
-	if image.Info.TextFitHeight == nil || *image.Info.TextFitHeight != fit {
-		t.Fatalf("TextFitHeight = %v, want proportional", image.Info.TextFitHeight)
+	if image.TextFitHeight == nil || *image.TextFitHeight != fit {
+		t.Fatalf("TextFitHeight = %v, want proportional", image.TextFitHeight)
 	}
 	if !slices.Equal(image.StretchX, []ImageStretch{{From: 0, To: 1}}) || len(image.StretchY) != 0 {
 		t.Fatalf("stretches = %v, %v, want the one X interval", image.StretchX, image.StretchY)
 	}
-	if missing := await(t, submitted(f.m.GetStyleImageInfo("missing"))); missing != nil {
-		t.Fatalf("GetStyleImageInfo(missing) = %+v, want nil", missing)
+	if missing := await(t, submitted(f.m.GetStyleImage("missing"))); missing != nil {
+		t.Fatalf("GetStyleImage(missing) = %+v, want nil", missing)
 	}
 
 	// Go cannot default a struct field to true, so the placement switch is an
@@ -100,7 +100,7 @@ func TestArrayInputsAreCopiedAtSubmission(t *testing.T) {
 	if got := await(t, submitted(f.m.GetImageSourceCoordinates("image"))); len(got) != 4 || got[0] != (LatLng{Latitude: 1, Longitude: 1}) {
 		t.Fatalf("image source coordinates = %v, want the submitted ones", got)
 	}
-	if got := await(t, submitted(f.m.GetStyleImageInfo("marker"))); got == nil || !slices.Equal(got.Pixels, []byte{0, 255, 0, 255}) {
+	if got := await(t, submitted(f.m.GetStyleImage("marker"))); got == nil || !slices.Equal(got.Pixels, []byte{0, 255, 0, 255}) {
 		t.Fatalf("style image = %+v, want the submitted pixels", got)
 	}
 }

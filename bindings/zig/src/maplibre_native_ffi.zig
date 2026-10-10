@@ -3832,63 +3832,92 @@ pub const Status = enum(i32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Fixed metadata for one runtime style image.
+/// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleImageInfo = struct {
     width: u32 = std.mem.zeroes(u32),
     height: u32 = std.mem.zeroes(u32),
-    /// Native copied images are exposed as tightly packed premultiplied RGBA8.
-    stride: u32 = std.mem.zeroes(u32),
-    byte_length: usize = std.mem.zeroes(usize),
-    /// Interval counts for the stretchable axes.
-    stretch_x_count: usize = std.mem.zeroes(usize),
-    stretch_y_count: usize = std.mem.zeroes(usize),
-    /// Content box, meaningful only when has_content is true.
+    pixels: []const u8 = &.{},
+    stretch_x: []const ImageStretch = &.{},
+    stretch_y: []const ImageStretch = &.{},
     content: ?ImageContent = null,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
     text_fit_width: ?StyleImageTextFit = null,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
     text_fit_height: ?StyleImageTextFit = null,
-    /// Sprite pixel ratio. Defaults to 1.0.
-    pixel_ratio: f32 = 1.0,
+    pixel_ratio: f32 = std.mem.zeroes(f32),
     sdf: bool = std.mem.zeroes(bool),
-    pub fn toNative(self: StyleImageInfo) c.mln_style_image_info {
-        var raw = c.mln_style_image_info_default();
-        raw.has_content = false;
-        raw.has_text_fit_width = false;
-        raw.has_text_fit_height = false;
+    pub fn toNative(self: StyleImageInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_image_info {
+        _ = roots;
+        var raw = std.mem.zeroes(c.mln_style_image_info);
+        raw.fields = 0;
+        raw.size = @sizeOf(c.mln_style_image_info);
         raw.width = self.width;
         raw.height = self.height;
-        raw.stride = self.stride;
-        raw.byte_length = self.byte_length;
-        raw.stretch_x_count = self.stretch_x_count;
-        raw.stretch_y_count = self.stretch_y_count;
-        marshal.present(&raw.has_content, true, &raw.content, self.content);
-        marshal.present(&raw.has_text_fit_width, true, &raw.text_fit_width, self.text_fit_width);
-        marshal.present(&raw.has_text_fit_height, true, &raw.text_fit_height, self.text_fit_height);
+        raw.pixels = marshal.view(self.pixels);
+        raw.stretch_x = blk: {
+            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_x.len);
+            for (self.stretch_x, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.stretch_x_count = std.math.cast(@TypeOf(raw.stretch_x_count), self.stretch_x.len) orelse return error.InvalidArgument;
+        raw.stretch_y = blk: {
+            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_y.len);
+            for (self.stretch_y, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.stretch_y_count = std.math.cast(@TypeOf(raw.stretch_y_count), self.stretch_y.len) orelse return error.InvalidArgument;
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_CONTENT, &raw.content, self.content);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH, &raw.text_fit_width, self.text_fit_width);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT, &raw.text_fit_height, self.text_fit_height);
         raw.pixel_ratio = self.pixel_ratio;
         raw.sdf = self.sdf;
         return raw;
     }
-    pub fn fromNative(raw: c.mln_style_image_info) StyleImageInfo {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_image_info) status.Error!StyleImageInfo {
         return .{
             .width = raw.width,
             .height = raw.height,
-            .stride = raw.stride,
-            .byte_length = raw.byte_length,
-            .stretch_x_count = raw.stretch_x_count,
-            .stretch_y_count = raw.stretch_y_count,
-            .content = if (raw.has_content) ImageContent.fromNative(raw.content) else null,
-            .text_fit_width = if (raw.has_text_fit_width) StyleImageTextFit.fromNative(raw.text_fit_width) else null,
-            .text_fit_height = if (raw.has_text_fit_height) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
+            .pixels = try marshal.copyView(allocator, raw.pixels),
+            .stretch_x = blk: {
+                const copied = try allocator.alloc(ImageStretch, raw.stretch_x_count);
+                for (try marshal.nativeSlice(c.mln_image_stretch, raw.stretch_x, raw.stretch_x_count), 0..) |item, index| copied[index] = ImageStretch.fromNative(item);
+                break :blk copied;
+            },
+            .stretch_y = blk: {
+                const copied = try allocator.alloc(ImageStretch, raw.stretch_y_count);
+                for (try marshal.nativeSlice(c.mln_image_stretch, raw.stretch_y, raw.stretch_y_count), 0..) |item, index| copied[index] = ImageStretch.fromNative(item);
+                break :blk copied;
+            },
+            .content = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_CONTENT != 0) ImageContent.fromNative(raw.content) else null,
+            .text_fit_width = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0) StyleImageTextFit.fromNative(raw.text_fit_width) else null,
+            .text_fit_height = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
             .pixel_ratio = raw.pixel_ratio,
             .sdf = raw.sdf,
         };
     }
+};
+
+/// Fields available in `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const StyleImageInfoField = struct {
+    /// The image sets a content box.
+    content: bool = false,
+    /// The image sets how it fits text horizontally.
+    text_fit_width: bool = false,
+    /// The image sets how it fits text vertically.
+    text_fit_height: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// Field mask values for `mln_style_image_options`.
@@ -3977,96 +4006,6 @@ pub const StyleImageOptions = struct {
     }
 };
 
-/// Complete style image borrowed for a completion callback.
-///
-/// See `mln_style_image_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleImageResult = struct {
-    info: StyleImageInfo = .{},
-    pixels: []const u8 = &.{},
-    stretch_x: []const ImageStretch = &.{},
-    stretch_y: []const ImageStretch = &.{},
-    pub fn toNative(self: StyleImageResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_image_result {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_image_result);
-        raw.size = @sizeOf(c.mln_style_image_result);
-        raw.info = self.info.toNative();
-        raw.pixels = marshal.view(self.pixels);
-        raw.stretch_x = blk: {
-            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_x.len);
-            for (self.stretch_x, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.stretch_x_count = std.math.cast(@TypeOf(raw.stretch_x_count), self.stretch_x.len) orelse return error.InvalidArgument;
-        raw.stretch_y = blk: {
-            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_y.len);
-            for (self.stretch_y, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.stretch_y_count = std.math.cast(@TypeOf(raw.stretch_y_count), self.stretch_y.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_image_result) status.Error!StyleImageResult {
-        return .{
-            .info = StyleImageInfo.fromNative(raw.info),
-            .pixels = try marshal.copyView(allocator, raw.pixels),
-            .stretch_x = blk: {
-                const copied = try allocator.alloc(ImageStretch, raw.stretch_x_count);
-                for (try marshal.nativeSlice(c.mln_image_stretch, raw.stretch_x, raw.stretch_x_count), 0..) |item, index| copied[index] = ImageStretch.fromNative(item);
-                break :blk copied;
-            },
-            .stretch_y = blk: {
-                const copied = try allocator.alloc(ImageStretch, raw.stretch_y_count);
-                for (try marshal.nativeSlice(c.mln_image_stretch, raw.stretch_y, raw.stretch_y_count), 0..) |item, index| copied[index] = ImageStretch.fromNative(item);
-                break :blk copied;
-            },
-        };
-    }
-};
-
-/// Borrowed image-stretch arrays available during a completion callback.
-///
-/// See `mln_style_image_stretches_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleImageStretchesResult = struct {
-    stretch_x: []const ImageStretch = &.{},
-    stretch_y: []const ImageStretch = &.{},
-    pub fn toNative(self: StyleImageStretchesResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_image_stretches_result {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_image_stretches_result);
-        raw.size = @sizeOf(c.mln_style_image_stretches_result);
-        raw.stretch_x = blk: {
-            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_x.len);
-            for (self.stretch_x, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.stretch_x_count = std.math.cast(@TypeOf(raw.stretch_x_count), self.stretch_x.len) orelse return error.InvalidArgument;
-        raw.stretch_y = blk: {
-            const items = try allocator.alloc(c.mln_image_stretch, self.stretch_y.len);
-            for (self.stretch_y, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
-            break :blk items.ptr;
-        };
-        raw.stretch_y_count = std.math.cast(@TypeOf(raw.stretch_y_count), self.stretch_y.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_image_stretches_result) status.Error!StyleImageStretchesResult {
-        return .{
-            .stretch_x = blk: {
-                const copied = try allocator.alloc(ImageStretch, raw.stretch_x_count);
-                for (try marshal.nativeSlice(c.mln_image_stretch, raw.stretch_x, raw.stretch_x_count), 0..) |item, index| copied[index] = ImageStretch.fromNative(item);
-                break :blk copied;
-            },
-            .stretch_y = blk: {
-                const copied = try allocator.alloc(ImageStretch, raw.stretch_y_count);
-                for (try marshal.nativeSlice(c.mln_image_stretch, raw.stretch_y, raw.stretch_y_count), 0..) |item, index| copied[index] = ImageStretch.fromNative(item);
-                break :blk copied;
-            },
-        };
-    }
-};
-
 /// How a stretchable image fits text along one axis.
 ///
 /// See `mln_style_image_text_fit` in the
@@ -4111,57 +4050,37 @@ pub const StyleLayerEntry = struct {
     }
 };
 
-/// Fixed layer metadata included in `mln_style_layer_result`.
+/// Complete metadata of one style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleLayerInfo = struct {
+    visibility: StyleLayerVisibility = std.mem.zeroes(StyleLayerVisibility),
     type: []const u8 = &.{},
     min_zoom: f64 = std.mem.zeroes(f64),
     max_zoom: f64 = std.mem.zeroes(f64),
-    visibility: StyleLayerVisibility = std.mem.zeroes(StyleLayerVisibility),
+    source_id: ?[]const u8 = null,
+    source_layer: ?[]const u8 = null,
     pub fn toNative(self: StyleLayerInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_layer_info {
         _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_layer_info);
         raw.size = @sizeOf(c.mln_style_layer_info);
+        raw.visibility = self.visibility.toNative();
         raw.type = marshal.view(self.type);
         raw.min_zoom = self.min_zoom;
         raw.max_zoom = self.max_zoom;
-        raw.visibility = self.visibility.toNative();
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_info) status.Error!StyleLayerInfo {
-        return .{
-            .type = try marshal.copyView(allocator, raw.type),
-            .min_zoom = raw.min_zoom,
-            .max_zoom = raw.max_zoom,
-            .visibility = StyleLayerVisibility.fromNative(raw.visibility),
-        };
-    }
-};
-
-/// Complete layer metadata borrowed for a completion callback.
-///
-/// See `mln_style_layer_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleLayerResult = struct {
-    info: StyleLayerInfo = .{},
-    source_id: ?[]const u8 = null,
-    source_layer: ?[]const u8 = null,
-    pub fn toNative(self: StyleLayerResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_layer_result {
-        var raw = std.mem.zeroes(c.mln_style_layer_result);
-        raw.size = @sizeOf(c.mln_style_layer_result);
-        raw.info = try self.info.toNative(allocator, roots);
         raw.source_id = if (self.source_id) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.source_layer = if (self.source_layer) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_result) status.Error!StyleLayerResult {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_info) status.Error!StyleLayerInfo {
         return .{
-            .info = try StyleLayerInfo.fromNative(allocator, raw.info),
+            .visibility = StyleLayerVisibility.fromNative(raw.visibility),
+            .type = try marshal.copyView(allocator, raw.type),
+            .min_zoom = raw.min_zoom,
+            .max_zoom = raw.max_zoom,
             .source_id = if (raw.source_id.size == 0) null else try marshal.copyView(allocator, raw.source_id),
             .source_layer = if (raw.source_layer.size == 0) null else try marshal.copyView(allocator, raw.source_layer),
         };
@@ -4192,61 +4111,52 @@ pub const StyleRasterDemEncoding = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Fixed source metadata included in `mln_style_source_result`.
+/// Complete metadata of one style source, borrowed for a completion callback.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceInfo = struct {
-    tilejson: ?StyleSourceTileInfo = null,
-    /// One of `mln_style_source_type`.
     type: StyleSourceType = std.mem.zeroes(StyleSourceType),
-    /// Source ID byte length, excluding any null terminator.
-    id_size: usize = std.mem.zeroes(usize),
-    /// Whether the source is marked volatile.
     is_volatile: bool = std.mem.zeroes(bool),
-    /// Attribution byte length, excluding any null terminator.
-    attribution_size: ?usize = null,
-    /// URL byte length, meaningful when fields contains URL.
-    url_size: ?usize = null,
-    /// Geographic bounds, meaningful when fields contains BOUNDS.
+    attribution: ?[]const u8 = null,
+    url: ?[]const u8 = null,
+    tilejson: ?StyleSourceTileInfo = null,
     bounds: ?LatLngBounds = null,
-    /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
     tile_size: ?u32 = null,
-    /// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
     vector_encoding: ?StyleVectorTileEncoding = null,
-    /// DEM encoding, meaningful when fields contains RASTER_ENCODING.
     raster_encoding: ?StyleRasterDemEncoding = null,
-    pub fn toNative(self: StyleSourceInfo) c.mln_style_source_info {
+    pub fn toNative(self: StyleSourceInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_info {
         var raw = std.mem.zeroes(c.mln_style_source_info);
         raw.fields = 0;
-        raw.has_attribution = false;
-        if (self.tilejson) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_TILEJSON;
-            raw.tile_count = item.tile_count;
-            raw.min_zoom = item.min_zoom;
-            raw.max_zoom = item.max_zoom;
-            raw.scheme = item.scheme.toNative();
-        }
         raw.size = @sizeOf(c.mln_style_source_info);
         raw.type = self.type.toNative();
-        raw.id_size = self.id_size;
         raw.is_volatile = self.is_volatile;
-        marshal.present(&raw.has_attribution, true, &raw.attribution_size, self.attribution_size);
-        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_URL, &raw.url_size, self.url_size);
+        if (self.attribution) |item| {
+            raw.fields |= c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+            raw.attribution = marshal.view(item);
+        }
+        if (self.url) |item| {
+            raw.fields |= c.MLN_STYLE_SOURCE_INFO_URL;
+            raw.url = marshal.view(item);
+        }
+        if (self.tilejson) |item| {
+            raw.fields |= c.MLN_STYLE_SOURCE_INFO_TILEJSON;
+            raw.tilejson = try item.toNative(allocator, roots);
+        }
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_BOUNDS, &raw.bounds, self.bounds);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILE_SIZE, &raw.tile_size, self.tile_size);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, &raw.vector_encoding, self.vector_encoding);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, &raw.raster_encoding, self.raster_encoding);
         return raw;
     }
-    pub fn fromNative(raw: c.mln_style_source_info) StyleSourceInfo {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_info) status.Error!StyleSourceInfo {
         return .{
-            .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) .{ .tile_count = raw.tile_count, .min_zoom = raw.min_zoom, .max_zoom = raw.max_zoom, .scheme = StyleTileScheme.fromNative(raw.scheme) } else null,
             .type = StyleSourceType.fromNative(raw.type),
-            .id_size = raw.id_size,
             .is_volatile = raw.is_volatile,
-            .attribution_size = if (raw.has_attribution) raw.attribution_size else null,
-            .url_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) raw.url_size else null,
+            .attribution = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) try marshal.copyView(allocator, raw.attribution) else null,
+            .url = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) try marshal.copyView(allocator, raw.url) else null,
+            .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) try StyleSourceTileInfo.fromNative(allocator, raw.tilejson) else null,
             .bounds = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS != 0) LatLngBounds.fromNative(raw.bounds) else null,
             .tile_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0) raw.tile_size else null,
             .vector_encoding = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0) StyleVectorTileEncoding.fromNative(raw.vector_encoding) else null,
@@ -4272,8 +4182,10 @@ pub const StyleSourceInfoField = struct {
     vector_encoding: bool = false,
     /// The source exposes a DEM raster encoding.
     raster_encoding: bool = false,
+    /// The source carries an attribution string, which may be empty.
+    attribution: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4282,107 +4194,40 @@ pub const StyleSourceInfoField = struct {
     pub const unionWith = methods.unionWith;
 };
 
-/// Complete source metadata borrowed for a completion callback.
-///
-/// See `mln_style_source_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleSourceResult = struct {
-    info: StyleSourceInfo = .{},
-    attribution: ?[]const u8 = null,
-    url: ?[]const u8 = null,
-    tile_urls: ?[]const []const u8 = null,
-    pub fn toNative(self: StyleSourceResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_result {
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_source_result);
-        raw.size = @sizeOf(c.mln_style_source_result);
-        raw.info = self.info.toNative();
-        if (self.attribution) |item| {
-            raw.info.has_attribution = true;
-            raw.attribution = marshal.view(item);
-        }
-        if (self.url) |item| {
-            raw.info.fields |= c.MLN_STYLE_SOURCE_INFO_URL;
-            raw.url = marshal.view(item);
-        }
-        if (self.tile_urls) |item| {
-            raw.info.fields |= c.MLN_STYLE_SOURCE_INFO_TILEJSON;
-            raw.tile_urls = blk: {
-                const items = try allocator.alloc(c.mln_buffer_view, item.len);
-                for (item, 0..) |array_item_0, index| items[index] = marshal.view(array_item_0);
-                break :blk items.ptr;
-            };
-        }
-        raw.tile_url_count = std.math.cast(@TypeOf(raw.tile_url_count), if (self.tile_urls) |items| items.len else 0) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_result) status.Error!StyleSourceResult {
-        return .{
-            .info = StyleSourceInfo.fromNative(raw.info),
-            .attribution = if (raw.info.has_attribution) try marshal.copyView(allocator, raw.attribution) else null,
-            .url = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) try marshal.copyView(allocator, raw.url) else null,
-            .tile_urls = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) blk: {
-                const copied = try allocator.alloc([]const u8, raw.tile_url_count);
-                for (try marshal.nativeSlice(c.mln_buffer_view, raw.tile_urls, raw.tile_url_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
-                break :blk copied;
-            } else null,
-        };
-    }
-};
-
-/// Inline tile metadata selected as one value by the source-info field mask.
+/// Inline TileJSON metadata of a tile source.
 ///
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceTileInfo = struct {
-    tile_count: usize = std.mem.zeroes(usize),
+    tile_urls: []const []const u8 = &.{},
     min_zoom: f64 = std.mem.zeroes(f64),
     max_zoom: f64 = std.mem.zeroes(f64),
     scheme: StyleTileScheme = std.mem.zeroes(StyleTileScheme),
-    pub fn toNative(self: StyleSourceTileInfo) c.mln_style_source_tile_info {
-        var raw = std.mem.zeroes(c.mln_style_source_tile_info);
-        raw.tile_count = self.tile_count;
-        raw.min_zoom = self.min_zoom;
-        raw.max_zoom = self.max_zoom;
-        raw.scheme = self.scheme.toNative();
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_style_source_tile_info) StyleSourceTileInfo {
-        return .{
-            .tile_count = raw.tile_count,
-            .min_zoom = raw.min_zoom,
-            .max_zoom = raw.max_zoom,
-            .scheme = StyleTileScheme.fromNative(raw.scheme),
-        };
-    }
-};
-
-/// Borrowed inline TileJSON tile URLs available during a completion callback.
-///
-/// See `mln_style_source_tile_urls_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleSourceTileUrlsResult = struct {
-    tile_urls: []const []const u8 = &.{},
-    pub fn toNative(self: StyleSourceTileUrlsResult, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_tile_urls_result {
+    pub fn toNative(self: StyleSourceTileInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_source_tile_info {
         _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_source_tile_urls_result);
-        raw.size = @sizeOf(c.mln_style_source_tile_urls_result);
+        var raw = std.mem.zeroes(c.mln_style_source_tile_info);
         raw.tile_urls = blk: {
             const items = try allocator.alloc(c.mln_buffer_view, self.tile_urls.len);
             for (self.tile_urls, 0..) |array_item_0, index| items[index] = marshal.view(array_item_0);
             break :blk items.ptr;
         };
         raw.tile_url_count = std.math.cast(@TypeOf(raw.tile_url_count), self.tile_urls.len) orelse return error.InvalidArgument;
+        raw.min_zoom = self.min_zoom;
+        raw.max_zoom = self.max_zoom;
+        raw.scheme = self.scheme.toNative();
         return raw;
     }
 
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_tile_urls_result) status.Error!StyleSourceTileUrlsResult {
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_tile_info) status.Error!StyleSourceTileInfo {
         return .{
             .tile_urls = blk: {
                 const copied = try allocator.alloc([]const u8, raw.tile_url_count);
                 for (try marshal.nativeSlice(c.mln_buffer_view, raw.tile_urls, raw.tile_url_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
                 break :blk copied;
             },
+            .min_zoom = raw.min_zoom,
+            .max_zoom = raw.max_zoom,
+            .scheme = StyleTileScheme.fromNative(raw.scheme),
         };
     }
 };
@@ -5789,54 +5634,6 @@ pub fn mapCancelTransitions(map: Map, diagnostic: ?*diagnostics.Diagnostic) stat
     return call.submit("mln_map_cancel_transitions", .lease, map, call.command, null, diagnostic, .{});
 }
 
-/// Copies one layer's source ID.
-///
-/// See `mln_map_copy_layer_source_id` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapCopyLayerSourceId(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_copy_layer_source_id", .lease, map, call.orEmpty(call.value(OwnedValue([]const u8), c.mln_buffer_view), c.mln_buffer_view), allocator, diagnostic, .{layer_id});
-}
-
-/// Copies one layer's source-layer ID.
-///
-/// See `mln_map_copy_layer_source_layer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapCopyLayerSourceLayer(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_copy_layer_source_layer", .lease, map, call.orEmpty(call.value(OwnedValue([]const u8), c.mln_buffer_view), c.mln_buffer_view), allocator, diagnostic, .{layer_id});
-}
-
-/// Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
-///
-/// See `mln_map_copy_style_image_premultiplied_rgba8` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapCopyStyleImagePremultipliedRgba8(allocator: std.mem.Allocator, map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_copy_style_image_premultiplied_rgba8", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{image_id});
-}
-
-/// Copies one runtime style image's stretchable intervals.
-///
-/// See `mln_map_copy_style_image_stretches` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapCopyStyleImageStretches(allocator: std.mem.Allocator, map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleImageStretchesResult)) {
-    return call.submit("mln_map_copy_style_image_stretches", .lease, map, call.orNull(call.value(OwnedValue(StyleImageStretchesResult), c.mln_style_image_stretches_result)), allocator, diagnostic, .{image_id});
-}
-
-/// Copies one style source attribution string.
-///
-/// See `mln_map_copy_style_source_attribution` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapCopyStyleSourceAttribution(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_copy_style_source_attribution", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{source_id});
-}
-
-/// Copies one style source URL.
-///
-/// See `mln_map_copy_style_source_url` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapCopyStyleSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const u8)) {
-    return call.submit("mln_map_copy_style_source_url", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{source_id});
-}
-
 /// Creates a map on the runtime worker.
 ///
 /// See `mln_map_create` in the
@@ -5904,18 +5701,18 @@ pub fn mapGetLayerProperty(allocator: std.mem.Allocator, map: Map, layer_id: []c
 
 /// Copies one complete runtime style image.
 ///
-/// See `mln_map_get_style_image_info` in the
+/// See `mln_map_get_style_image` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetStyleImageInfo(allocator: std.mem.Allocator, map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleImageResult)) {
-    return call.submit("mln_map_get_style_image_info", .lease, map, call.orNull(call.value(OwnedValue(StyleImageResult), c.mln_style_image_result)), allocator, diagnostic, .{image_id});
+pub fn mapGetStyleImage(allocator: std.mem.Allocator, map: Map, image_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleImageInfo)) {
+    return call.submit("mln_map_get_style_image", .lease, map, call.orNull(call.value(OwnedValue(StyleImageInfo), c.mln_style_image_info)), allocator, diagnostic, .{image_id});
 }
 
-/// Copies complete metadata for one style layer.
+/// Copies the complete metadata of one style layer.
 ///
-/// See `mln_map_get_style_layer_info` in the
+/// See `mln_map_get_style_layer` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetStyleLayerInfo(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleLayerResult)) {
-    return call.submit("mln_map_get_style_layer_info", .lease, map, call.orNull(call.value(OwnedValue(StyleLayerResult), c.mln_style_layer_result)), allocator, diagnostic, .{layer_id});
+pub fn mapGetStyleLayer(allocator: std.mem.Allocator, map: Map, layer_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleLayerInfo)) {
+    return call.submit("mln_map_get_style_layer", .lease, map, call.orNull(call.value(OwnedValue(StyleLayerInfo), c.mln_style_layer_info)), allocator, diagnostic, .{layer_id});
 }
 
 /// Serializes one style layer as a full style-spec layer JSON object.
@@ -5934,20 +5731,12 @@ pub fn mapGetStyleLightProperty(allocator: std.mem.Allocator, map: Map, property
     return call.submit("mln_map_get_style_light_property", .lease, map, call.orNull(call.value(OwnedValue([]const u8), c.mln_buffer_view)), allocator, diagnostic, .{property_name});
 }
 
-/// Copies complete metadata for one style source.
+/// Copies the complete metadata of one style source.
 ///
-/// See `mln_map_get_style_source_info` in the
+/// See `mln_map_get_style_source` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetStyleSourceInfo(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleSourceResult)) {
-    return call.submit("mln_map_get_style_source_info", .lease, map, call.orNull(call.value(OwnedValue(StyleSourceResult), c.mln_style_source_result)), allocator, diagnostic, .{source_id});
-}
-
-/// Copies one style source's inline TileJSON tile URLs.
-///
-/// See `mln_map_get_style_source_tile_urls` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetStyleSourceTileUrls(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleSourceTileUrlsResult)) {
-    return call.submit("mln_map_get_style_source_tile_urls", .lease, map, call.orNull(call.value(OwnedValue(StyleSourceTileUrlsResult), c.mln_style_source_tile_urls_result)), allocator, diagnostic, .{source_id});
+pub fn mapGetStyleSource(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue(StyleSourceInfo)) {
+    return call.submit("mln_map_get_style_source", .lease, map, call.orNull(call.value(OwnedValue(StyleSourceInfo), c.mln_style_source_info)), allocator, diagnostic, .{source_id});
 }
 
 /// Reads the style's global transition options.
@@ -6030,14 +5819,6 @@ pub fn mapLatLngsForPixels(allocator: std.mem.Allocator, map: Map, points: []con
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, points: []const ScreenPoint, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const LatLng)) {
     return call.submit("mln_map_lat_lngs_for_pixels_unwrapped", .lease, map, call.slice(LatLng, c.mln_lat_lng), allocator, diagnostic, .{ points, points.len });
-}
-
-/// Copies style layer IDs in style order.
-///
-/// See `mln_map_list_style_layer_ids` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapListStyleLayerIds(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const []const u8)) {
-    return call.submit("mln_map_list_style_layer_ids", .lease, map, call.slice([]const u8, c.mln_buffer_view), allocator, diagnostic, .{});
 }
 
 /// Starts an ordered query of every style layer in style order.
@@ -7337,14 +7118,6 @@ pub fn runtimeSetResourceTransform(allocator: std.mem.Allocator, runtime: Runtim
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub fn sourceFeatureQueryOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(SourceFeatureQueryOptions) {
     return call.direct("mln_source_feature_query_options_default", .none, {}, OwnedValue(SourceFeatureQueryOptions), allocator, .{});
-}
-
-/// Returns default runtime style image metadata.
-///
-/// See `mln_style_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn styleImageInfoDefault() status.Error!StyleImageInfo {
-    return call.direct("mln_style_image_info_default", .none, {}, StyleImageInfo, null, .{});
 }
 
 /// Returns default runtime style image options.

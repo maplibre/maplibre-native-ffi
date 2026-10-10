@@ -19,7 +19,7 @@ public sealed class CallbackLifetimeTests
 
         // Removing the source is what makes native release the registration.
         await fixture.Map.RemoveStyleSourceAsync("custom", TestWaits.Token);
-        Assert.Null(await fixture.Map.GetStyleSourceInfoAsync("custom", TestWaits.Token));
+        Assert.Null(await fixture.Map.GetStyleSourceAsync("custom", TestWaits.Token));
         Assert.False(Gc.IsAlive(accepted));
 
         // Native validates the zoom range before it takes the registration.

@@ -126,8 +126,8 @@ class GeneratedShapesTest {
         val image = PremultipliedRgba8Image(width.toUInt(), width.toUInt(), stride.toUInt(), pixels)
         map.setStyleImage("image", image, StyleImageOptions()).awaitCommitted()
         // The submission copies the rows out of the padded stride, and the readback is unpadded.
-        val copied = map.copyStyleImagePremultipliedRgba8("image").awaitWithin("the image")
-        assertContentEquals(expected, copied)
+        val copied = map.getStyleImage("image").awaitWithin("the image")
+        assertContentEquals(expected, copied?.pixels)
       }
     }
   }

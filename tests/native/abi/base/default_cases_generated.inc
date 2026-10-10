@@ -717,51 +717,6 @@ static void mln_source_feature_query_options_default_holds_its_annotated_values(
   );
 }
 
-static void mln_style_image_info_default_holds_its_annotated_values(void) {
-  const mln_style_image_info value = mln_style_image_info_default();
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_style_image_info), (uint64_t)value.size,
-    "mln_style_image_info.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.width, "mln_style_image_info.width"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.height, "mln_style_image_info.height"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.stride, "mln_style_image_info.stride"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.byte_length, "mln_style_image_info.byte_length"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.stretch_x_count,
-    "mln_style_image_info.stretch_x_count"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.stretch_y_count,
-    "mln_style_image_info.stretch_y_count"
-  );
-  TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-    1.0, (double)value.pixel_ratio, "mln_style_image_info.pixel_ratio"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.sdf, "mln_style_image_info.sdf"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_content, "mln_style_image_info.has_content"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_text_fit_width,
-    "mln_style_image_info.has_text_fit_width"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_text_fit_height,
-    "mln_style_image_info.has_text_fit_height"
-  );
-}
-
 static void mln_style_image_options_default_holds_its_annotated_values(void) {
   const mln_style_image_options value = mln_style_image_options_default();
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
@@ -1222,7 +1177,6 @@ static void mln_webgpu_surface_descriptor_default_holds_its_annotated_values(
   X(mln_rendered_feature_query_options_default_holds_its_annotated_values)     \
   X(mln_runtime_options_default_holds_its_annotated_values)                    \
   X(mln_source_feature_query_options_default_holds_its_annotated_values)       \
-  X(mln_style_image_info_default_holds_its_annotated_values)                   \
   X(mln_style_image_options_default_holds_its_annotated_values)                \
   X(mln_style_tile_source_options_default_holds_its_annotated_values)          \
   X(mln_style_transition_options_default_holds_its_annotated_values)           \

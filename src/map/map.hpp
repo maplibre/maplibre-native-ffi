@@ -4,10 +4,14 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <vector>
+
+#include <mln/style/image.hpp>
 
 #include "completion/completion_result.hpp"
 #include "maplibre_native_c.h"
@@ -46,38 +50,58 @@ auto custom_mvt_vector_source_options_default() noexcept
 auto premultiplied_rgba8_image_default() noexcept
   -> mln_premultiplied_rgba8_image;
 auto style_image_options_default() noexcept -> mln_style_image_options;
-auto style_image_info_default() noexcept -> mln_style_image_info;
 auto style_transition_options_default() noexcept
   -> mln_style_transition_options;
 
+// A style source's metadata. info holds every scalar member; the strings back
+// its views when the result is delivered.
+struct StyleSourceRecord {
+  mln_style_source_info info{};
+  std::string attribution;
+  std::string url;
+  std::vector<std::string> tile_urls;
+};
+
+// A style layer's metadata. type views the layer type's static string.
 struct StyleLayerRecord {
   std::string id;
-  std::string type;
+  std::string_view type;
   std::string source_id;
   std::string source_layer;
+  double min_zoom = 0;
+  double max_zoom = 0;
+  uint32_t visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
+};
+
+// A runtime style image. image shares the style's immutable image data, so the
+// record outlives later style changes without copying pixels.
+struct StyleImageRecord {
+  std::optional<mln::style::Image> image;
+  uint32_t fields = 0;
+  std::vector<mln_image_stretch> stretch_x;
+  std::vector<mln_image_stretch> stretch_y;
 };
 
 struct StyleOperationResult {
   bool found = false;
-  mln_style_source_info source_info{};
-  mln_style_layer_info layer_info{};
+  StyleSourceRecord source;
+  StyleLayerRecord layer;
   std::vector<StyleLayerRecord> layers;
-  mln_style_image_info image_info{};
+  StyleImageRecord image;
   mln_style_transition_options transition_options{};
   std::string bytes;
   std::vector<std::string> strings;
-  std::string attribution;
-  std::string url;
-  std::string source_id;
-  std::string source_layer;
-  std::vector<mln_image_stretch> stretch_x;
-  std::vector<mln_image_stretch> stretch_y;
   std::vector<mln_lat_lng> coordinates;
 };
 
 using StyleWork = std::function<mln_status(MapObject&, StyleOperationResult&)>;
 using StyleDelivery =
   void (*)(const mln_completion&, const StyleOperationResult&) noexcept;
+
+// Views a found image record as the C value. The pixel and stretch views
+// borrow from record.
+auto style_image_info(const StyleImageRecord& record) noexcept
+  -> mln_style_image_info;
 
 // Presents a style read's result as the C value that Function delivers. The
 // generated result table picks the arm, so the value type, its shape, and
@@ -108,27 +132,16 @@ auto deliver_style_result(
     Value::deliver(descriptor, views(result.strings));
   } else if constexpr (std::is_same_v<Type, mln_buffer_view>) {
     Value::deliver(descriptor, view(result.bytes));
-  } else if constexpr (std::is_same_v<Type, mln_style_source_result>) {
-    const auto tile_urls = views(result.strings);
-    Value::deliver(
-      descriptor, {.size = sizeof(mln_style_source_result),
-                   .reserved = 0,
-                   .info = result.source_info,
-                   .attribution = view(result.attribution),
-                   .url = view(result.url),
-                   .tile_urls = tile_urls.data(),
-                   .tile_url_count = tile_urls.size()}
-    );
-  } else if constexpr (
-    std::is_same_v<Type, mln_style_source_tile_urls_result>
-  ) {
-    const auto tile_urls = views(result.strings);
-    Value::deliver(
-      descriptor, {.size = sizeof(mln_style_source_tile_urls_result),
-                   .reserved = 0,
-                   .tile_urls = tile_urls.data(),
-                   .tile_url_count = tile_urls.size()}
-    );
+  } else if constexpr (std::is_same_v<Type, mln_style_source_info>) {
+    const auto& source = result.source;
+    const auto tile_urls = views(source.tile_urls);
+    auto info = source.info;
+    info.size = sizeof(mln_style_source_info);
+    info.attribution = view(source.attribution);
+    info.url = view(source.url);
+    info.tilejson.tile_urls = tile_urls.data();
+    info.tilejson.tile_url_count = tile_urls.size();
+    Value::deliver(descriptor, info);
   } else if constexpr (std::is_same_v<Type, mln_style_layer_entry>) {
     auto layers = std::vector<mln_style_layer_entry>{};
     layers.reserve(result.layers.size());
@@ -136,40 +149,26 @@ auto deliver_style_result(
       layers.push_back(
         {.size = sizeof(mln_style_layer_entry),
          .id = view(entry.id),
-         .type = view(entry.type),
+         .type = {.data = entry.type.data(), .size = entry.type.size()},
          .source_id = view(entry.source_id),
          .source_layer = view(entry.source_layer)}
       );
     }
     Value::deliver(descriptor, layers);
-  } else if constexpr (std::is_same_v<Type, mln_style_layer_result>) {
+  } else if constexpr (std::is_same_v<Type, mln_style_layer_info>) {
+    const auto& layer = result.layer;
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_layer_result),
-                   .reserved = 0,
-                   .info = result.layer_info,
-                   .source_id = view(result.source_id),
-                   .source_layer = view(result.source_layer)}
+      descriptor,
+      {.size = sizeof(mln_style_layer_info),
+       .visibility = layer.visibility,
+       .type = {.data = layer.type.data(), .size = layer.type.size()},
+       .min_zoom = layer.min_zoom,
+       .max_zoom = layer.max_zoom,
+       .source_id = view(layer.source_id),
+       .source_layer = view(layer.source_layer)}
     );
-  } else if constexpr (std::is_same_v<Type, mln_style_image_result>) {
-    Value::deliver(
-      descriptor, {.size = sizeof(mln_style_image_result),
-                   .reserved = 0,
-                   .info = result.image_info,
-                   .pixels = view(result.bytes),
-                   .stretch_x = result.stretch_x.data(),
-                   .stretch_x_count = result.stretch_x.size(),
-                   .stretch_y = result.stretch_y.data(),
-                   .stretch_y_count = result.stretch_y.size()}
-    );
-  } else if constexpr (std::is_same_v<Type, mln_style_image_stretches_result>) {
-    Value::deliver(
-      descriptor, {.size = sizeof(mln_style_image_stretches_result),
-                   .reserved = 0,
-                   .stretch_x = result.stretch_x.data(),
-                   .stretch_x_count = result.stretch_x.size(),
-                   .stretch_y = result.stretch_y.data(),
-                   .stretch_y_count = result.stretch_y.size()}
-    );
+  } else if constexpr (std::is_same_v<Type, mln_style_image_info>) {
+    Value::deliver(descriptor, style_image_info(result.image));
   } else if constexpr (std::is_same_v<Type, mln_style_transition_options>) {
     Value::deliver(descriptor, result.transition_options);
   } else if constexpr (std::is_same_v<Type, mln_lat_lng> && Value::array) {
@@ -267,24 +266,11 @@ auto map_add_style_source_json(
 ) -> mln_status;
 auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   -> mln_status;
-auto map_get_style_source_info(
-  MapObject& live, mln_buffer_view source_id, mln_style_source_info* out_info,
-  bool* out_found
-) -> mln_status;
+auto map_get_style_source(
+  MapObject& live, mln_buffer_view source_id, StyleSourceRecord& out_source
+) -> bool;
 auto map_set_style_source_volatile(
   MapObject& live, mln_buffer_view source_id, bool is_volatile
-) -> mln_status;
-auto map_copy_style_source_attribution(
-  MapObject& live, mln_buffer_view source_id, std::string& out_attribution,
-  bool* out_found
-) -> mln_status;
-auto map_copy_style_source_url(
-  MapObject& live, mln_buffer_view source_id, std::string& out_url,
-  bool* out_found
-) -> mln_status;
-auto map_get_style_source_tile_urls(
-  MapObject& live, mln_buffer_view source_id,
-  std::vector<std::string>& out_tile_urls, bool* out_found
 ) -> mln_status;
 auto map_list_style_source_ids(
   MapObject& live, std::vector<std::string>& out_source_ids
@@ -367,19 +353,9 @@ auto map_set_style_image(
 ) -> mln_status;
 auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   -> mln_status;
-auto map_get_style_image_info(
-  MapObject& live, mln_buffer_view image_id, mln_style_image_info* out_info,
-  bool* out_found
-) -> mln_status;
-auto map_copy_style_image_stretches(
-  MapObject& live, mln_buffer_view image_id,
-  std::vector<mln_image_stretch>& out_stretch_x,
-  std::vector<mln_image_stretch>& out_stretch_y, bool* out_found
-) -> mln_status;
-auto map_copy_style_image_premultiplied_rgba8(
-  MapObject& live, mln_buffer_view image_id, std::string& out_pixels,
-  bool* out_found
-) -> mln_status;
+auto map_get_style_image(
+  MapObject& live, mln_buffer_view image_id, StyleImageRecord& out_image
+) -> bool;
 auto map_add_image_source_url(
   MapObject& live, mln_buffer_view source_id, const mln_lat_lng* coordinates,
   size_t coordinate_count, mln_buffer_view url
@@ -433,13 +409,9 @@ auto map_add_style_layer_json(
 ) -> mln_status;
 auto map_remove_style_layer(MapObject& live, mln_buffer_view layer_id)
   -> mln_status;
-auto map_get_style_layer_info(
-  MapObject& live, mln_buffer_view layer_id, mln_style_layer_info* out_info,
-  bool* out_found
-) -> mln_status;
-auto map_list_style_layer_ids(
-  MapObject& live, std::vector<std::string>& out_layer_ids
-) -> mln_status;
+auto map_get_style_layer(
+  MapObject& live, mln_buffer_view layer_id, StyleLayerRecord& out_layer
+) -> bool;
 auto map_move_style_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
@@ -483,14 +455,8 @@ auto map_get_layer_filter(
 auto map_set_layer_source_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_layer
 ) -> mln_status;
-auto map_copy_layer_source_layer(
-  MapObject& live, mln_buffer_view layer_id, std::string& out_source_layer
-) -> mln_status;
 auto map_set_layer_source_id(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id
-) -> mln_status;
-auto map_copy_layer_source_id(
-  MapObject& live, mln_buffer_view layer_id, std::string& out_source_id
 ) -> mln_status;
 auto map_set_layer_min_zoom(
   MapObject& live, mln_buffer_view layer_id, double min_zoom

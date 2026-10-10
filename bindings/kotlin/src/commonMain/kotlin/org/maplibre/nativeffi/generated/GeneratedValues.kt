@@ -1157,6 +1157,32 @@ public data class Status(public val rawValue: Int) {
 }
 
 /**
+ * Fields available in `mln_style_image_info`.
+ *
+ * See `mln_style_image_info_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class StyleImageInfoField(public val rawValue: UInt) {
+  public infix fun or(other: StyleImageInfoField): StyleImageInfoField =
+    StyleImageInfoField(rawValue or other.rawValue)
+
+  public infix fun and(other: StyleImageInfoField): StyleImageInfoField =
+    StyleImageInfoField(rawValue and other.rawValue)
+
+  public operator fun contains(other: StyleImageInfoField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    /** The image sets a content box. */
+    public val CONTENT: StyleImageInfoField = StyleImageInfoField(1u)
+    /** The image sets how it fits text horizontally. */
+    public val TEXT_FIT_WIDTH: StyleImageInfoField = StyleImageInfoField(2u)
+    /** The image sets how it fits text vertically. */
+    public val TEXT_FIT_HEIGHT: StyleImageInfoField = StyleImageInfoField(4u)
+  }
+}
+
+/**
  * Field mask values for `mln_style_image_options`.
  *
  * See `mln_style_image_option_field` in the
@@ -1252,6 +1278,8 @@ public data class StyleSourceInfoField(public val rawValue: UInt) {
     public val VECTOR_ENCODING: StyleSourceInfoField = StyleSourceInfoField(16u)
     /** The source exposes a DEM raster encoding. */
     public val RASTER_ENCODING: StyleSourceInfoField = StyleSourceInfoField(32u)
+    /** The source carries an attribution string, which may be empty. */
+    public val ATTRIBUTION: StyleSourceInfoField = StyleSourceInfoField(64u)
   }
 }
 
@@ -2595,6 +2623,14 @@ public data class SourceFeatureQueryOptions(
 )
 
 /**
+ * One stretchable interval along an image axis, in image pixels.
+ *
+ * See `mln_image_stretch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class ImageStretch(public val from: Float = 0f, public val to: Float = 0f)
+
+/**
  * Content-box insets in image pixels, measured from the image's top-left.
  *
  * See `mln_image_content` in the
@@ -2606,40 +2642,6 @@ public data class ImageContent(
   public val right: Float = 0f,
   public val bottom: Float = 0f,
 )
-
-/**
- * Fixed metadata for one runtime style image.
- *
- * See `mln_style_image_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageInfo(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
-  /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
-  public val stride: UInt = 0u,
-  public val byteLength: ULong = 0uL,
-  /** Interval counts for the stretchable axes. */
-  public val stretchXCount: ULong = 0uL,
-  public val stretchYCount: ULong = 0uL,
-  /** Content box, meaningful only when has_content is true. */
-  public val content: ImageContent? = null,
-  /** One of `mln_style_image_text_fit`, meaningful only when its flag is true. */
-  public val textFitWidth: StyleImageTextFit? = null,
-  /** One of `mln_style_image_text_fit`, meaningful only when its flag is true. */
-  public val textFitHeight: StyleImageTextFit? = null,
-  /** Sprite pixel ratio. Defaults to 1.0. */
-  public val pixelRatio: Float = 1.0f,
-  public val sdf: Boolean = false,
-)
-
-/**
- * One stretchable interval along an image axis, in image pixels.
- *
- * See `mln_image_stretch` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class ImageStretch(public val from: Float = 0f, public val to: Float = 0f)
 
 /**
  * Options for runtime style images.
@@ -3122,17 +3124,6 @@ public data class CameraQueryResult(
 )
 
 /**
- * Borrowed image-stretch arrays available during a completion callback.
- *
- * See `mln_style_image_stretches_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageStretchesResult(
-  public val stretchX: List<ImageStretch> = emptyList(),
-  public val stretchY: List<ImageStretch> = emptyList(),
-)
-
-/**
  * Feature-state source, feature, and key selector.
  *
  * See `mln_feature_state_selector` in the
@@ -3150,43 +3141,47 @@ public data class FeatureStateSelector(
 )
 
 /**
- * Complete style image borrowed for a completion callback.
+ * One complete runtime style image, borrowed for a completion callback.
  *
- * See `mln_style_image_result` in the
+ * See `mln_style_image_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public data class StyleImageResult(
-  public val info: StyleImageInfo = StyleImageInfo(),
+public data class StyleImageInfo(
+  public val width: UInt = 0u,
+  public val height: UInt = 0u,
+  /** Premultiplied RGBA8 pixels in tightly packed rows of width &#42; 4 bytes, top row first. */
   public val pixels: ByteArray = byteArrayOf(),
+  /** Horizontally stretchable intervals. */
   public val stretchX: List<ImageStretch> = emptyList(),
+  /** Vertically stretchable intervals. */
   public val stretchY: List<ImageStretch> = emptyList(),
+  /** Content box, when the image sets one. */
+  public val content: ImageContent? = null,
+  /** How the image fits text horizontally, when it sets this. */
+  public val textFitWidth: StyleImageTextFit? = null,
+  /** How the image fits text vertically, when it sets this. */
+  public val textFitHeight: StyleImageTextFit? = null,
+  /** Sprite pixel ratio. */
+  public val pixelRatio: Float = 0f,
+  /** Whether the image is a signed distance field icon. */
+  public val sdf: Boolean = false,
 )
 
 /**
- * Fixed layer metadata included in `mln_style_layer_result`.
+ * Complete metadata of one style layer, borrowed for a completion callback.
  *
  * See `mln_style_layer_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleLayerInfo(
-  /** View of a static style-spec layer type string. It stays valid for the life of the process. */
+  /** One of `mln_style_layer_visibility`. */
+  public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
+  /** The style-spec layer type string. The view stays valid for the life of the process. */
   public val type: String = "",
   /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
   public val minZoom: Double = 0.0,
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
   public val maxZoom: Double = 0.0,
-  /** One of `mln_style_layer_visibility`. */
-  public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
-)
-
-/**
- * Complete layer metadata borrowed for a completion callback.
- *
- * See `mln_style_layer_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleLayerResult(
-  public val info: StyleLayerInfo = StyleLayerInfo(),
   /** Source ID. Empty for a layer type that takes no source. */
   public val sourceId: String? = null,
   /** Source-layer ID. Empty when the layer sets none. */
@@ -3194,20 +3189,22 @@ public data class StyleLayerResult(
 )
 
 /**
- * Inline tile metadata selected as one value by the source-info field mask.
+ * Inline TileJSON metadata of a tile source.
  *
  * See `mln_style_source_tile_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleSourceTileInfo(
-  public val tileCount: ULong = 0uL,
+  /** Tile URL templates in TileJSON order. */
+  public val tileUrls: List<String> = emptyList(),
   public val minZoom: Double = 0.0,
   public val maxZoom: Double = 0.0,
+  /** One of `mln_style_tile_scheme`. */
   public val scheme: StyleTileScheme = StyleTileScheme(0u),
 )
 
 /**
- * Fixed source metadata included in `mln_style_source_result`.
+ * Complete metadata of one style source, borrowed for a completion callback.
  *
  * See `mln_style_source_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3215,45 +3212,23 @@ public data class StyleSourceTileInfo(
 public data class StyleSourceInfo(
   /** One of `mln_style_source_type`. */
   public val type: StyleSourceType = StyleSourceType(0u),
-  /** Source ID byte length, excluding any null terminator. */
-  public val idSize: ULong = 0uL,
   /** Whether the source is marked volatile. */
   public val isVolatile: Boolean = false,
-  /** Attribution byte length, excluding any null terminator. */
-  public val attributionSize: ULong? = null,
-  /** URL byte length, meaningful when fields contains URL. */
-  public val urlSize: ULong? = null,
+  /** Attribution string, when the source sets one. It may be empty. */
+  public val attribution: String? = null,
+  /** URL that the source loads from, when it has one. */
+  public val url: String? = null,
+  /** Inline TileJSON metadata, when the source was defined with it. */
   public val tilejson: StyleSourceTileInfo? = null,
-  /** Geographic bounds, meaningful when fields contains BOUNDS. */
+  /** Geographic bounds, when inline TileJSON sets them. */
   public val bounds: LatLngBounds? = null,
-  /** Tile size in pixels, meaningful when fields contains TILE_SIZE. */
+  /** Tile size in pixels, for a tile source. */
   public val tileSize: UInt? = null,
-  /** Vector encoding, meaningful when fields contains VECTOR_ENCODING. */
+  /** Vector tile encoding, for a vector source. */
   public val vectorEncoding: StyleVectorTileEncoding? = null,
-  /** DEM encoding, meaningful when fields contains RASTER_ENCODING. */
+  /** DEM raster encoding, when inline TileJSON sets one. */
   public val rasterEncoding: StyleRasterDemEncoding? = null,
 )
-
-/**
- * Complete source metadata borrowed for a completion callback.
- *
- * See `mln_style_source_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleSourceResult(
-  public val info: StyleSourceInfo = StyleSourceInfo(),
-  public val attribution: String? = null,
-  public val url: String? = null,
-  public val tileUrls: List<String>? = null,
-)
-
-/**
- * Borrowed inline TileJSON tile URLs available during a completion callback.
- *
- * See `mln_style_source_tile_urls_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleSourceTileUrlsResult(public val tileUrls: List<String> = emptyList())
 
 /**
  * One style layer borrowed for a list completion callback.

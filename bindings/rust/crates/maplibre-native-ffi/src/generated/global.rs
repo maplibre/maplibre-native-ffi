@@ -509,16 +509,6 @@ pub fn source_feature_query_options_default() -> Result<SourceFeatureQueryOption
     Ok(unsafe { from_native(value) }?)
 }
 
-/// Returns default runtime style image metadata.
-///
-/// See `mln_style_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn style_image_info_default() -> Result<StyleImageInfo> {
-    let mut call = Call::global("mln_style_image_info_default")?;
-    let value = call.run(|_| unsafe { sys::mln_style_image_info_default() });
-    Ok(unsafe { from_native(value) }?)
-}
-
 /// Returns default runtime style image options.
 ///
 /// See `mln_style_image_options_default` in the

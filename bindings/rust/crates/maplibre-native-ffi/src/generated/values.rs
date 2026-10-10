@@ -5002,57 +5002,76 @@ pub enum Status: i32 {
 } Unknown
 }
 
-/// Fixed metadata for one runtime style image.
+/// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleImageInfo {
     pub width: u32,
     pub height: u32,
-    /// Native copied images are exposed as tightly packed premultiplied RGBA8.
-    pub stride: u32,
-    pub byte_length: usize,
-    /// Interval counts for the stretchable axes.
-    pub stretch_x_count: usize,
-    pub stretch_y_count: usize,
-    /// Content box, meaningful only when has_content is true.
+    /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes,
+    /// top row first.
+    pub pixels: Vec<u8>,
+    /// Horizontally stretchable intervals.
+    pub stretch_x: Vec<ImageStretch>,
+    /// Vertically stretchable intervals.
+    pub stretch_y: Vec<ImageStretch>,
+    /// Content box, when the image sets one.
     pub content: Option<ImageContent>,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// How the image fits text horizontally, when it sets this.
     pub text_fit_width: Option<StyleImageTextFit>,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// How the image fits text vertically, when it sets this.
     pub text_fit_height: Option<StyleImageTextFit>,
-    /// Sprite pixel ratio. Defaults to 1.0.
+    /// Sprite pixel ratio.
     pub pixel_ratio: f32,
+    /// Whether the image is a signed distance field icon.
     pub sdf: bool,
-}
-impl Default for StyleImageInfo {
-    fn default() -> Self {
-        convert::native_default(unsafe { sys::mln_style_image_info_default() })
-    }
 }
 impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
     unsafe fn from_native(raw: sys::mln_style_image_info) -> Result<Self> {
         Ok(Self {
             width: raw.width,
             height: raw.height,
-            stride: raw.stride,
-            byte_length: raw.byte_length,
-            stretch_x_count: raw.stretch_x_count,
-            stretch_y_count: raw.stretch_y_count,
-            content: unsafe { convert::present(raw.has_content, true, raw.content) }?,
+            pixels: unsafe { from_native(raw.pixels) }?,
+            stretch_x: unsafe { convert::copy_array(raw.stretch_x, raw.stretch_x_count) }?,
+            stretch_y: unsafe { convert::copy_array(raw.stretch_y, raw.stretch_y_count) }?,
+            content: unsafe {
+                convert::present(raw.fields, sys::MLN_STYLE_IMAGE_INFO_CONTENT, raw.content)
+            }?,
             text_fit_width: unsafe {
-                convert::present(raw.has_text_fit_width, true, raw.text_fit_width)
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH,
+                    raw.text_fit_width,
+                )
             }?,
             text_fit_height: unsafe {
-                convert::present(raw.has_text_fit_height, true, raw.text_fit_height)
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
+                    raw.text_fit_height,
+                )
             }?,
             pixel_ratio: raw.pixel_ratio,
             sdf: raw.sdf,
         })
     }
+}
+
+native_flags! {
+/// Fields available in `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub struct StyleImageInfoField: u32 {
+    /// The image sets a content box.
+    const CONTENT = 1;
+    /// The image sets how it fits text horizontally.
+    const TEXT_FIT_WIDTH = 2;
+    /// The image sets how it fits text vertically.
+    const TEXT_FIT_HEIGHT = 4;
+}
 }
 
 native_flags! {
@@ -5177,46 +5196,6 @@ impl FromNative<sys::mln_style_image_options> for StyleImageOptions {
     }
 }
 
-/// Complete style image borrowed for a completion callback.
-///
-/// See `mln_style_image_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct StyleImageResult {
-    pub info: StyleImageInfo,
-    pub pixels: Vec<u8>,
-    pub stretch_x: Vec<ImageStretch>,
-    pub stretch_y: Vec<ImageStretch>,
-}
-impl FromNative<sys::mln_style_image_result> for StyleImageResult {
-    unsafe fn from_native(raw: sys::mln_style_image_result) -> Result<Self> {
-        Ok(Self {
-            info: unsafe { from_native(raw.info) }?,
-            pixels: unsafe { from_native(raw.pixels) }?,
-            stretch_x: unsafe { convert::copy_array(raw.stretch_x, raw.stretch_x_count) }?,
-            stretch_y: unsafe { convert::copy_array(raw.stretch_y, raw.stretch_y_count) }?,
-        })
-    }
-}
-
-/// Borrowed image-stretch arrays available during a completion callback.
-///
-/// See `mln_style_image_stretches_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct StyleImageStretchesResult {
-    pub stretch_x: Vec<ImageStretch>,
-    pub stretch_y: Vec<ImageStretch>,
-}
-impl FromNative<sys::mln_style_image_stretches_result> for StyleImageStretchesResult {
-    unsafe fn from_native(raw: sys::mln_style_image_stretches_result) -> Result<Self> {
-        Ok(Self {
-            stretch_x: unsafe { convert::copy_array(raw.stretch_x, raw.stretch_x_count) }?,
-            stretch_y: unsafe { convert::copy_array(raw.stretch_y, raw.stretch_y_count) }?,
-        })
-    }
-}
-
 native_enum! {
 /// How a stretchable image fits text along one axis.
 ///
@@ -5251,49 +5230,33 @@ impl FromNative<sys::mln_style_layer_entry> for StyleLayerEntry {
     }
 }
 
-/// Fixed layer metadata included in `mln_style_layer_result`.
+/// Complete metadata of one style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleLayerInfo {
-    /// View of a static style-spec layer type string. It stays valid for the
-    /// life of the process.
+    /// One of `mln_style_layer_visibility`.
+    pub visibility: StyleLayerVisibility,
+    /// The style-spec layer type string. The view stays valid for the life of
+    /// the process.
     pub r#type: String,
     /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
     pub min_zoom: f64,
     /// Highest zoom at which the layer draws; INFINITY with no upper bound.
     pub max_zoom: f64,
-    /// One of `mln_style_layer_visibility`.
-    pub visibility: StyleLayerVisibility,
-}
-impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
-    unsafe fn from_native(raw: sys::mln_style_layer_info) -> Result<Self> {
-        Ok(Self {
-            r#type: unsafe { from_native(raw.type_) }?,
-            min_zoom: raw.min_zoom,
-            max_zoom: raw.max_zoom,
-            visibility: unsafe { from_native(raw.visibility) }?,
-        })
-    }
-}
-
-/// Complete layer metadata borrowed for a completion callback.
-///
-/// See `mln_style_layer_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct StyleLayerResult {
-    pub info: StyleLayerInfo,
     /// Source ID. Empty for a layer type that takes no source.
     pub source_id: Option<String>,
     /// Source-layer ID. Empty when the layer sets none.
     pub source_layer: Option<String>,
 }
-impl FromNative<sys::mln_style_layer_result> for StyleLayerResult {
-    unsafe fn from_native(raw: sys::mln_style_layer_result) -> Result<Self> {
+impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
+    unsafe fn from_native(raw: sys::mln_style_layer_info) -> Result<Self> {
         Ok(Self {
-            info: unsafe { from_native(raw.info) }?,
+            visibility: unsafe { from_native(raw.visibility) }?,
+            r#type: unsafe { from_native(raw.type_) }?,
+            min_zoom: raw.min_zoom,
+            max_zoom: raw.max_zoom,
             source_id: unsafe { convert::nonempty(raw.source_id) }?,
             source_layer: unsafe { convert::nonempty(raw.source_layer) }?,
         })
@@ -5322,50 +5285,51 @@ pub enum StyleRasterDemEncoding: u32 {
 } Unknown
 }
 
-/// Fixed source metadata included in `mln_style_source_result`.
+/// Complete metadata of one style source, borrowed for a completion callback.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleSourceInfo {
-    pub tilejson: Option<StyleSourceTileInfo>,
     /// One of `mln_style_source_type`.
     pub r#type: StyleSourceType,
-    /// Source ID byte length, excluding any null terminator.
-    pub id_size: usize,
     /// Whether the source is marked volatile.
     pub is_volatile: bool,
-    /// Attribution byte length, excluding any null terminator.
-    pub attribution_size: Option<usize>,
-    /// URL byte length, meaningful when fields contains URL.
-    pub url_size: Option<usize>,
-    /// Geographic bounds, meaningful when fields contains BOUNDS.
+    /// Attribution string, when the source sets one. It may be empty.
+    pub attribution: Option<String>,
+    /// URL that the source loads from, when it has one.
+    pub url: Option<String>,
+    /// Inline TileJSON metadata, when the source was defined with it.
+    pub tilejson: Option<StyleSourceTileInfo>,
+    /// Geographic bounds, when inline TileJSON sets them.
     pub bounds: Option<LatLngBounds>,
-    /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
+    /// Tile size in pixels, for a tile source.
     pub tile_size: Option<u32>,
-    /// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
+    /// Vector tile encoding, for a vector source.
     pub vector_encoding: Option<StyleVectorTileEncoding>,
-    /// DEM encoding, meaningful when fields contains RASTER_ENCODING.
+    /// DEM raster encoding, when inline TileJSON sets one.
     pub raster_encoding: Option<StyleRasterDemEncoding>,
 }
 impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
     unsafe fn from_native(raw: sys::mln_style_source_info) -> Result<Self> {
         Ok(Self {
-            tilejson: if raw.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-                Some(StyleSourceTileInfo {
-                    tile_count: raw.tile_count,
-                    min_zoom: raw.min_zoom,
-                    max_zoom: raw.max_zoom,
-                    scheme: unsafe { from_native(raw.scheme) }?,
-                })
-            } else {
-                None
-            },
             r#type: unsafe { from_native(raw.type_) }?,
-            id_size: raw.id_size,
             is_volatile: raw.is_volatile,
-            attribution_size: (raw.has_attribution).then_some(raw.attribution_size),
-            url_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0).then_some(raw.url_size),
+            attribution: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION,
+                    raw.attribution,
+                )
+            }?,
+            url: unsafe { convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_URL, raw.url) }?,
+            tilejson: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_SOURCE_INFO_TILEJSON,
+                    raw.tilejson,
+                )
+            }?,
             bounds: unsafe {
                 convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_BOUNDS, raw.bounds)
             }?,
@@ -5407,88 +5371,31 @@ pub struct StyleSourceInfoField: u32 {
     const VECTOR_ENCODING = 16;
     /// The source exposes a DEM raster encoding.
     const RASTER_ENCODING = 32;
+    /// The source carries an attribution string, which may be empty.
+    const ATTRIBUTION = 64;
 }
 }
 
-/// Complete source metadata borrowed for a completion callback.
-///
-/// See `mln_style_source_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct StyleSourceResult {
-    pub info: StyleSourceInfo,
-    pub attribution: Option<String>,
-    pub url: Option<String>,
-    pub tile_urls: Option<Vec<String>>,
-}
-impl FromNative<sys::mln_style_source_result> for StyleSourceResult {
-    unsafe fn from_native(raw: sys::mln_style_source_result) -> Result<Self> {
-        Ok(Self {
-            info: unsafe { from_native(raw.info) }?,
-            attribution: unsafe {
-                convert::present(raw.info.has_attribution, true, raw.attribution)
-            }?,
-            url: unsafe {
-                convert::present(raw.info.fields, sys::MLN_STYLE_SOURCE_INFO_URL, raw.url)
-            }?,
-            tile_urls: if raw.info.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-                Some(unsafe { convert::copy_array(raw.tile_urls, raw.tile_url_count) }?)
-            } else {
-                None
-            },
-        })
-    }
-}
-
-/// Inline tile metadata selected as one value by the source-info field mask.
+/// Inline TileJSON metadata of a tile source.
 ///
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleSourceTileInfo {
-    pub tile_count: usize,
+    /// Tile URL templates in TileJSON order.
+    pub tile_urls: Vec<String>,
     pub min_zoom: f64,
     pub max_zoom: f64,
+    /// One of `mln_style_tile_scheme`.
     pub scheme: StyleTileScheme,
-}
-impl StyleSourceTileInfo {
-    pub const fn new(
-        tile_count: usize,
-        min_zoom: f64,
-        max_zoom: f64,
-        scheme: StyleTileScheme,
-    ) -> Self {
-        Self {
-            tile_count,
-            min_zoom,
-            max_zoom,
-            scheme,
-        }
-    }
 }
 impl FromNative<sys::mln_style_source_tile_info> for StyleSourceTileInfo {
     unsafe fn from_native(raw: sys::mln_style_source_tile_info) -> Result<Self> {
         Ok(Self {
-            tile_count: raw.tile_count,
+            tile_urls: unsafe { convert::copy_array(raw.tile_urls, raw.tile_url_count) }?,
             min_zoom: raw.min_zoom,
             max_zoom: raw.max_zoom,
             scheme: unsafe { from_native(raw.scheme) }?,
-        })
-    }
-}
-
-/// Borrowed inline TileJSON tile URLs available during a completion callback.
-///
-/// See `mln_style_source_tile_urls_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct StyleSourceTileUrlsResult {
-    pub tile_urls: Vec<String>,
-}
-impl FromNative<sys::mln_style_source_tile_urls_result> for StyleSourceTileUrlsResult {
-    unsafe fn from_native(raw: sys::mln_style_source_tile_urls_result) -> Result<Self> {
-        Ok(Self {
-            tile_urls: unsafe { convert::copy_array(raw.tile_urls, raw.tile_url_count) }?,
         })
     }
 }

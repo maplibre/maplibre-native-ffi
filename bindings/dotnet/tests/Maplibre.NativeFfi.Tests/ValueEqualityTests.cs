@@ -73,8 +73,8 @@ public sealed class ValueEqualityTests
             value => ((SourceFeatureQueryOptions)value).SourceLayerIds!
         ),
         ["tile URLs"] = (
-            urls => new StyleSourceTileUrlsResult(urls),
-            value => ((StyleSourceTileUrlsResult)value).TileUrls
+            urls => new StyleSourceTileInfo { TileUrls = urls },
+            value => ((StyleSourceTileInfo)value).TileUrls
         ),
     };
 

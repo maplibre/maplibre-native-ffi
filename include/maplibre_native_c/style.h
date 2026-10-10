@@ -107,6 +107,8 @@ typedef enum MLN_BINDING(
   MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 4U,
   /** The source exposes a DEM raster encoding. */
   MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 5U,
+  /** The source carries an attribution string, which may be empty. */
+  MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 1U << 6U,
 } mln_style_source_info_field;
 
 /** Field mask values for mln_style_tile_source_options. */
@@ -155,24 +157,15 @@ typedef struct mln_image_stretch {
   float to;
 } mln_image_stretch MLN_BINDING("fields=ordered");
 
-/** Borrowed image-stretch arrays available during a completion callback. */
-typedef struct mln_style_image_stretches_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
-  const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
-  size_t stretch_x_count;
-  const mln_image_stretch* stretch_y MLN_BINDING("length=stretch_y_count");
-  size_t stretch_y_count;
-} mln_style_image_stretches_result;
-
-/** Borrowed inline TileJSON tile URLs available during a completion callback.
- */
-typedef struct mln_style_source_tile_urls_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
-  const mln_buffer_view* tile_urls MLN_BINDING("length=tile_url_count");
-  size_t tile_url_count;
-} mln_style_source_tile_urls_result;
+/** Fields available in mln_style_image_info. */
+typedef enum MLN_BINDING("kind=bitmask") mln_style_image_info_field : uint32_t {
+  /** The image sets a content box. */
+  MLN_STYLE_IMAGE_INFO_CONTENT = 1U << 0U,
+  /** The image sets how it fits text horizontally. */
+  MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 1U << 1U,
+  /** The image sets how it fits text vertically. */
+  MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 1U << 2U,
+} mln_style_image_info_field;
 
 /**
  * Content-box insets in image pixels, measured from the image's top-left.
@@ -267,62 +260,55 @@ typedef enum mln_location_indicator_image_kind : uint32_t {
   MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW = 2,
 } mln_location_indicator_image_kind;
 
-/** Inline tile metadata selected as one value by the source-info field mask. */
+/**
+ * Inline TileJSON metadata of a tile source.
+ *
+ * mln_style_source_info carries it when fields contains TILEJSON.
+ */
 typedef struct mln_style_source_tile_info {
-  size_t tile_count;
+  /** Tile URL templates in TileJSON order. */
+  const mln_buffer_view* tile_urls MLN_BINDING("length=tile_url_count");
+  size_t tile_url_count;
   double min_zoom;
   double max_zoom;
+  /** One of mln_style_tile_scheme. */
   uint32_t scheme MLN_BINDING("enum=mln_style_tile_scheme");
 } mln_style_source_tile_info;
 
-/** Fixed source metadata included in mln_style_source_result. */
+/**
+ * Complete metadata of one style source, borrowed for a completion callback.
+ *
+ * Views and arrays remain valid until the completion callback returns. Each
+ * masked member is meaningful only when fields contains its bit.
+ */
 typedef struct mln_style_source_info {
   uint32_t size;
   /** One of mln_style_source_type. */
   uint32_t type MLN_BINDING("enum=mln_style_source_type");
   /** Bitwise combination of mln_style_source_info_field values. */
   uint32_t fields MLN_BINDING("enum=mln_style_source_info_field");
-  /** Source ID byte length, excluding any null terminator. */
-  size_t id_size;
   /** Whether the source is marked volatile. */
   bool is_volatile;
-  bool has_attribution;
-  /** Attribution byte length, excluding any null terminator. */
-  size_t attribution_size MLN_BINDING("mask=has_attribution");
-  /** URL byte length, meaningful when fields contains URL. */
-  size_t url_size MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_URL");
-  /** Inline tile URL count, meaningful when fields contains TILEJSON. */
-  size_t tile_count MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** Minimum zoom, meaningful when fields contains TILEJSON. */
-  double min_zoom MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** Maximum zoom, meaningful when fields contains TILEJSON. */
-  double max_zoom MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** One of mln_style_tile_scheme, meaningful when fields contains TILEJSON. */
-  uint32_t scheme MLN_BINDING(
-    "enum=mln_style_tile_scheme;mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;"
-    "group_type=mln_style_source_tile_info"
-  );
-  /** Geographic bounds, meaningful when fields contains BOUNDS. */
+  /** Attribution string, when the source sets one. It may be empty. */
+  mln_buffer_view attribution
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
+  /** URL that the source loads from, when it has one. */
+  mln_buffer_view url MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_URL");
+  /** Inline TileJSON metadata, when the source was defined with it. */
+  mln_style_source_tile_info tilejson
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON");
+  /** Geographic bounds, when inline TileJSON sets them. */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_BOUNDS");
-  /** Tile size in pixels, meaningful when fields contains TILE_SIZE. */
+  /** Tile size in pixels, for a tile source. */
   uint32_t tile_size
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILE_SIZE");
-  /** Vector encoding, meaningful when fields contains VECTOR_ENCODING. */
+  /** Vector tile encoding, for a vector source. */
   uint32_t vector_encoding MLN_BINDING(
     "mask=fields;bit=MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;enum=mln_style_"
     "vector_tile_encoding"
   );
-  /** DEM encoding, meaningful when fields contains RASTER_ENCODING. */
+  /** DEM raster encoding, when inline TileJSON sets one. */
   uint32_t raster_encoding MLN_BINDING(
     "mask=fields;bit=MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;enum=mln_style_"
     "raster_dem_encoding"
@@ -344,46 +330,30 @@ typedef struct mln_style_layer_entry {
   mln_buffer_view source_layer MLN_BINDING("optional=empty");
 } mln_style_layer_entry;
 
-/** Complete source metadata borrowed for a completion callback. */
-typedef struct mln_style_source_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
-  mln_style_source_info info;
-  mln_buffer_view attribution MLN_BINDING("mask=info.has_attribution");
-  mln_buffer_view url
-    MLN_BINDING("mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_URL");
-  const mln_buffer_view* tile_urls MLN_BINDING(
-    "length=tile_url_count;mask=info.fields;"
-    "bit=MLN_STYLE_SOURCE_INFO_TILEJSON"
-  );
-  size_t tile_url_count;
-} mln_style_source_result;
-
-/** Fixed layer metadata included in mln_style_layer_result. */
+/**
+ * Complete metadata of one style layer, borrowed for a completion callback.
+ *
+ * source_id and source_layer remain valid until the completion callback
+ * returns.
+ */
 typedef struct mln_style_layer_info {
   uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
-  /** View of a static style-spec layer type string. It stays valid for the
-     life of the process. */
+  /** One of mln_style_layer_visibility. */
+  uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility");
+  /**
+   * The style-spec layer type string. The view stays valid for the life of the
+   * process.
+   */
   mln_buffer_view type;
   /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
   double min_zoom;
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
   double max_zoom;
-  /** One of mln_style_layer_visibility. */
-  uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility");
-} mln_style_layer_info;
-
-/** Complete layer metadata borrowed for a completion callback. */
-typedef struct mln_style_layer_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
-  mln_style_layer_info info;
   /** Source ID. Empty for a layer type that takes no source. */
   mln_buffer_view source_id MLN_BINDING("optional=empty");
   /** Source-layer ID. Empty when the layer sets none. */
   mln_buffer_view source_layer MLN_BINDING("optional=empty");
-} mln_style_layer_result;
+} mln_style_layer_info;
 
 /** Options for vector and raster tile sources. */
 typedef struct mln_style_tile_source_options {
@@ -652,46 +622,47 @@ typedef struct mln_style_image_options {
   bool sdf MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_SDF");
 } mln_style_image_options;
 
-/** Fixed metadata for one runtime style image. */
+/**
+ * One complete runtime style image, borrowed for a completion callback.
+ *
+ * pixels and the stretch arrays remain valid until the completion callback
+ * returns. Each masked member is meaningful only when fields contains its bit.
+ */
 typedef struct mln_style_image_info {
   uint32_t size;
   uint32_t width;
   uint32_t height;
-  /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
-  uint32_t stride;
-  size_t byte_length;
+  /** Bitwise combination of mln_style_image_info_field values. */
+  uint32_t fields MLN_BINDING("enum=mln_style_image_info_field");
   /**
-   * Interval counts for the stretchable axes.
+   * Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes, top
+   * row first.
    */
-  size_t stretch_x_count;
-  size_t stretch_y_count;
-  /** Content box, meaningful only when has_content is true. */
-  mln_image_content content MLN_BINDING("mask=has_content");
-  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
-  uint32_t text_fit_width
-    MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_width");
-  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
-  uint32_t text_fit_height
-    MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_height");
-  /** Sprite pixel ratio. Defaults to 1.0. */
-  float pixel_ratio MLN_BINDING("default=1.0");
-  bool sdf;
-  bool has_content;
-  bool has_text_fit_width;
-  bool has_text_fit_height;
-} mln_style_image_info;
-
-/** Complete style image borrowed for a completion callback. */
-typedef struct mln_style_image_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
-  mln_style_image_info info;
   mln_buffer_view pixels MLN_BINDING("encoding=bytes");
+  /** Horizontally stretchable intervals. */
   const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
   size_t stretch_x_count;
+  /** Vertically stretchable intervals. */
   const mln_image_stretch* stretch_y MLN_BINDING("length=stretch_y_count");
   size_t stretch_y_count;
-} mln_style_image_result;
+  /** Content box, when the image sets one. */
+  mln_image_content content
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_CONTENT");
+  /** How the image fits text horizontally, when it sets this. */
+  uint32_t text_fit_width MLN_BINDING(
+    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;enum=mln_style_image_"
+    "text_fit"
+  );
+  /** How the image fits text vertically, when it sets this. */
+  uint32_t text_fit_height MLN_BINDING(
+    "mask=fields;bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;enum=mln_style_"
+    "image_text_fit"
+  );
+  /** Sprite pixel ratio. */
+  float pixel_ratio;
+  /** Whether the image is a signed distance field icon. */
+  bool sdf;
+} mln_style_image_info;
 
 /**
  * Global style transition options.
@@ -772,9 +743,6 @@ mln_premultiplied_rgba8_image_default(void) MLN_NOEXCEPT;
 MLN_API mln_style_image_options
 mln_style_image_options_default(void) MLN_NOEXCEPT;
 
-/** Returns default runtime style image metadata. */
-MLN_API mln_style_image_info mln_style_image_info_default(void) MLN_NOEXCEPT;
-
 /** Returns default global style transition options. */
 MLN_API mln_style_transition_options
 mln_style_transition_options_default(void) MLN_NOEXCEPT;
@@ -829,11 +797,12 @@ MLN_API mln_status mln_map_remove_style_source(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies complete metadata for one style source.
+ * Copies the complete metadata of one style source.
  *
- * A found source completes with one borrowed mln_style_source_result. A missing
- * source completes successfully with no value. The binding must copy strings
- * and tile URL views before the callback returns.
+ * A found source completes with one borrowed mln_style_source_info that
+ * includes its attribution, URL, and inline TileJSON tile URLs. A missing
+ * source completes successfully with no value. Copy retained views before the
+ * callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -842,8 +811,8 @@ MLN_API mln_status mln_map_remove_style_source(
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=query;result=mln_style_source_result;nullable=true")
-MLN_API mln_status mln_map_get_style_source_info(
+MLN_BINDING("execution=query;result=mln_style_source_info;nullable=true")
+MLN_API mln_status mln_map_get_style_source(
   mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -855,7 +824,7 @@ MLN_API mln_status mln_map_get_style_source_info(
  * implementations that fetch tiles stop storing them in persistent storage.
  * Other source types retain the value for inspection without changing how they
  * load. The change applies when the command commits and is visible through
- * mln_map_get_style_source_info as info.is_volatile.
+ * mln_map_get_style_source as is_volatile.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
@@ -871,68 +840,6 @@ MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_source_volatile(
   mln_map map, mln_buffer_view source_id, bool is_volatile,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies one style source attribution string.
- *
- * A found attribution completes with one borrowed mln_buffer_view. A missing
- * source or attribution completes successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=query;result=mln_buffer_view;nullable=true")
-MLN_API mln_status mln_map_copy_style_source_attribution(
-  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies one style source URL.
- *
- * A found URL completes with one borrowed mln_buffer_view. A missing source or
- * URL completes successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=query;result=mln_buffer_view;nullable=true")
-MLN_API mln_status mln_map_copy_style_source_url(
-  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies one style source's inline TileJSON tile URLs.
- *
- * A found source completes with one borrowed mln_style_source_tile_urls_result
- * whose tile_urls array is empty for a URL-backed source or a source without
- * inline TileJSON. A missing source completes successfully with no value. The
- * binding must copy the views before the callback returns.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING(
-  "execution=query;result=mln_style_source_tile_urls_result;"
-  "nullable=true"
-)
-MLN_API mln_status mln_map_get_style_source_tile_urls(
-  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1582,9 +1489,9 @@ MLN_API mln_status mln_map_remove_style_image(
 /**
  * Copies one complete runtime style image.
  *
- * A found image completes with one borrowed mln_style_image_result containing
- * metadata, pixels, and stretch intervals. A missing image completes
- * successfully with no value.
+ * A found image completes with one borrowed mln_style_image_info that includes
+ * its pixels and stretch intervals. A missing image completes successfully with
+ * no value. Copy retained pixels and intervals before the callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -1593,52 +1500,8 @@ MLN_API mln_status mln_map_remove_style_image(
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=query;result=mln_style_image_result;nullable=true")
-MLN_API mln_status mln_map_get_style_image_info(
-  mln_map map, mln_buffer_view image_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
- *
- * A found image completes with one borrowed mln_buffer_view. A missing image
- * completes successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;nullable=true;"
-  "encoding=bytes"
-)
-MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
-  mln_map map, mln_buffer_view image_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies one runtime style image's stretchable intervals.
- *
- * A found image completes with one borrowed mln_style_image_stretches_result.
- * A missing image completes successfully with no value.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING(
-  "execution=query;result=mln_style_image_stretches_result;"
-  "nullable=true"
-)
-MLN_API mln_status mln_map_copy_style_image_stretches(
+MLN_BINDING("execution=query;result=mln_style_image_info;nullable=true")
+MLN_API mln_status mln_map_get_style_image(
   mln_map map, mln_buffer_view image_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -2039,10 +1902,11 @@ MLN_API mln_status mln_map_remove_style_layer(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies complete metadata for one style layer.
+ * Copies the complete metadata of one style layer.
  *
- * A found layer completes with one borrowed mln_style_layer_result. A missing
- * layer completes successfully with no value.
+ * A found layer completes with one borrowed mln_style_layer_info that includes
+ * its source ID and source-layer ID. A missing layer completes successfully
+ * with no value. Copy retained views before the callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -2051,27 +1915,10 @@ MLN_API mln_status mln_map_remove_style_layer(
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=query;result=mln_style_layer_result;nullable=true")
-MLN_API mln_status mln_map_get_style_layer_info(
+MLN_BINDING("execution=query;result=mln_style_layer_info;nullable=true")
+MLN_API mln_status mln_map_get_style_layer(
   mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies style layer IDs in style order.
- *
- * The completion borrows an array of mln_buffer_view values.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=query;result=mln_buffer_view;shape=array")
-MLN_API mln_status mln_map_list_style_layer_ids(
-  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2399,28 +2246,6 @@ MLN_API mln_status mln_map_set_layer_source_layer(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies one layer's source-layer ID.
- *
- * The completion borrows one mln_buffer_view, which is empty when the layer
- * carries no source-layer ID.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- */
-MLN_BINDING("execution=query;result=mln_buffer_view;optional=empty")
-MLN_API mln_status mln_map_copy_layer_source_layer(
-  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Sets one layer's source ID.
  *
  * layer_id and source_id are borrowed for the call and copied before return.
@@ -2445,28 +2270,6 @@ MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_source_id(
   mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
- * Copies one layer's source ID.
- *
- * The completion borrows one mln_buffer_view, which is empty when the layer
- * carries no source ID.
- *
- * Returns:
- * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
- *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
- */
-MLN_BINDING("execution=query;result=mln_buffer_view;optional=empty")
-MLN_API mln_status mln_map_copy_layer_source_id(
-  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
-  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

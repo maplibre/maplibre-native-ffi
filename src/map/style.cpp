@@ -1165,42 +1165,6 @@ auto to_native_premultiplied_rgba8_image(
   return result;
 }
 
-auto style_image_info_from_native(const mln::style::Image& image)
-  -> mln_style_image_info {
-  const auto& pixels = image.getImage();
-  return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
-    .width = pixels.size.width,
-    .height = pixels.size.height,
-    .stride = static_cast<uint32_t>(pixels.stride()),
-    .byte_length = pixels.bytes(),
-    .stretch_x_count = image.getStretchX().size(),
-    .stretch_y_count = image.getStretchY().size(),
-    .content =
-      image.getContent().has_value()
-        ? mln_image_content{
-            .left = image.getContent()->left,
-            .top = image.getContent()->top,
-            .right = image.getContent()->right,
-            .bottom = image.getContent()->bottom
-          }
-        : mln_image_content{.left = 0, .top = 0, .right = 0, .bottom = 0},
-    .text_fit_width =
-      image.getTextFitWidth().has_value()
-        ? from_native_text_fit(*image.getTextFitWidth())
-        : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
-    .text_fit_height =
-      image.getTextFitHeight().has_value()
-        ? from_native_text_fit(*image.getTextFitHeight())
-        : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
-    .pixel_ratio = image.getPixelRatio(),
-    .sdf = image.isSdf(),
-    .has_content = image.getContent().has_value(),
-    .has_text_fit_width = image.getTextFitWidth().has_value(),
-    .has_text_fit_height = image.getTextFitHeight().has_value()
-  };
-}
-
 auto validate_image_source_coordinates(
   const mln_lat_lng* coordinates, size_t coordinate_count
 ) -> mln_status {
@@ -1468,26 +1432,6 @@ auto style_image_options_default() noexcept -> mln_style_image_options {
   };
 }
 
-auto style_image_info_default() noexcept -> mln_style_image_info {
-  return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
-    .width = 0,
-    .height = 0,
-    .stride = 0,
-    .byte_length = 0,
-    .stretch_x_count = 0,
-    .stretch_y_count = 0,
-    .content = {.left = 0, .top = 0, .right = 0, .bottom = 0},
-    .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
-    .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
-    .pixel_ratio = 1.0F,
-    .sdf = false,
-    .has_content = false,
-    .has_text_fit_width = false,
-    .has_text_fit_height = false
-  };
-}
-
 auto style_transition_options_default() noexcept
   -> mln_style_transition_options {
   return mln_style_transition_options{
@@ -1586,146 +1530,62 @@ auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   return MLN_STATUS_OK;
 }
 
-auto map_get_style_source_info(
-  MapObject& live, mln_buffer_view source_id, mln_style_source_info* out_info,
-  bool* out_found
-) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_source_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+auto map_get_style_source(
+  MapObject& live, mln_buffer_view source_id, StyleSourceRecord& out_source
+) -> bool {
   const auto* source =
     map_native(live).getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  *out_info = mln_style_source_info{};
-  out_info->size = sizeof(mln_style_source_info);
-  out_info->type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
   if (source == nullptr) {
-    return MLN_STATUS_OK;
+    return false;
   }
 
-  const auto attribution = source->getAttribution();
-  out_info->type = to_c_source_type(source->getType());
-  out_info->id_size = source->getID().size();
-  out_info->is_volatile = source->isVolatile();
-  out_info->has_attribution = attribution.has_value();
-  out_info->attribution_size = attribution ? attribution->size() : 0;
-
-  const auto url = source_url(*source);
-  if (url) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_URL;
-    out_info->url_size = url->size();
+  auto& info = out_source.info;
+  info.type = to_c_source_type(source->getType());
+  info.is_volatile = source->isVolatile();
+  if (auto attribution = source->getAttribution()) {
+    info.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+    out_source.attribution = std::move(*attribution);
+  }
+  if (auto url = source_url(*source)) {
+    info.fields |= MLN_STYLE_SOURCE_INFO_URL;
+    out_source.url = std::move(*url);
   }
 
   const auto* tile_source = tile_source_from_source(*source);
   if (tile_source == nullptr) {
-    return MLN_STATUS_OK;
+    return true;
   }
 
-  out_info->fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
-  out_info->tile_size = tile_source->getTileSize();
+  info.fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
+  info.tile_size = tile_source->getTileSize();
   if (const auto* vector_source = source->as<mln::style::VectorSource>()) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
-    out_info->vector_encoding =
-      to_c_vector_encoding(vector_source->getEncoding());
+    info.fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
+    info.vector_encoding = to_c_vector_encoding(vector_source->getEncoding());
   }
 
   const auto* tileset = inline_tileset(*tile_source);
   if (tileset == nullptr) {
-    return MLN_STATUS_OK;
+    return true;
   }
 
-  out_info->fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  out_info->tile_count = tileset->tiles.size();
-  out_info->min_zoom = tileset->zoomRange.min;
-  out_info->max_zoom = tileset->zoomRange.max;
-  out_info->scheme = to_c_tile_scheme(tileset->scheme);
+  info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
+  info.tilejson.min_zoom = tileset->zoomRange.min;
+  info.tilejson.max_zoom = tileset->zoomRange.max;
+  info.tilejson.scheme = to_c_tile_scheme(tileset->scheme);
+  out_source.tile_urls = tileset->tiles;
   if (tileset->bounds) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
-    out_info->bounds = from_native_lat_lng_bounds(*tileset->bounds);
+    info.fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
+    info.bounds = from_native_lat_lng_bounds(*tileset->bounds);
   }
   if (tileset->vectorEncoding) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
-    out_info->vector_encoding = to_c_vector_encoding(*tileset->vectorEncoding);
+    info.fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
+    info.vector_encoding = to_c_vector_encoding(*tileset->vectorEncoding);
   }
   if (tileset->rasterEncoding) {
-    out_info->fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
-    out_info->raster_encoding = to_c_raster_encoding(*tileset->rasterEncoding);
+    info.fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
+    info.raster_encoding = to_c_raster_encoding(*tileset->rasterEncoding);
   }
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_style_source_attribution(
-  MapObject& live, mln_buffer_view source_id, std::string& out_attribution,
-  bool* out_found
-) -> mln_status {
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  *out_found = false;
-  out_attribution.clear();
-  if (source == nullptr) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto attribution = source->getAttribution();
-  if (!attribution) {
-    return MLN_STATUS_OK;
-  }
-  *out_found = true;
-  out_attribution = *attribution;
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_style_source_url(
-  MapObject& live, mln_buffer_view source_id, std::string& out_url,
-  bool* out_found
-) -> mln_status {
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  const auto url = source == nullptr ? std::nullopt : source_url(*source);
-  *out_found = url.has_value();
-  out_url = url.value_or(std::string{});
-  return MLN_STATUS_OK;
-}
-
-auto map_get_style_source_tile_urls(
-  MapObject& live, mln_buffer_view source_id,
-  std::vector<std::string>& out_tile_urls, bool* out_found
-) -> mln_status {
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  out_tile_urls.clear();
-  if (source == nullptr) {
-    return MLN_STATUS_OK;
-  }
-
-  if (const auto* tile_source = tile_source_from_source(*source)) {
-    if (const auto* tileset = inline_tileset(*tile_source)) {
-      out_tile_urls = tileset->tiles;
-    }
-  }
-  return MLN_STATUS_OK;
+  return true;
 }
 
 auto map_list_style_source_ids(
@@ -2406,80 +2266,66 @@ auto map_remove_style_image(MapObject& live, mln_buffer_view image_id)
   return MLN_STATUS_OK;
 }
 
-auto map_get_style_image_info(
-  MapObject& live, mln_buffer_view image_id, mln_style_image_info* out_info,
-  bool* out_found
-) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_image_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto image =
+auto map_get_style_image(
+  MapObject& live, mln_buffer_view image_id, StyleImageRecord& out_image
+) -> bool {
+  const auto found =
     map_native(live).getStyle().getImage(string_from_view(image_id));
-  *out_found = image.has_value();
-  *out_info =
-    image ? style_image_info_from_native(*image) : style_image_info_default();
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_style_image_stretches(
-  MapObject& live, mln_buffer_view image_id,
-  std::vector<mln_image_stretch>& out_stretch_x,
-  std::vector<mln_image_stretch>& out_stretch_y, bool* out_found
-) -> mln_status {
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (!found) {
+    return false;
   }
 
-  const auto image =
-    map_native(live).getStyle().getImage(string_from_view(image_id));
-  *out_found = image.has_value();
-  out_stretch_x.clear();
-  out_stretch_y.clear();
-  if (!image) {
-    return MLN_STATUS_OK;
-  }
-
+  // Image's copy shares the style's immutable image data. Image declares no
+  // assignment, so the record constructs its copy in place.
+  const auto& image = out_image.image.emplace(*found);
+  out_image.fields =
+    (image.getContent() ? MLN_STYLE_IMAGE_INFO_CONTENT : 0U) |
+    (image.getTextFitWidth() ? MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH : 0U) |
+    (image.getTextFitHeight() ? MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT : 0U);
   for (const auto& [stretches, out] : {
-         std::pair{&image->getStretchX(), &out_stretch_x},
-         std::pair{&image->getStretchY(), &out_stretch_y},
+         std::pair{&image.getStretchX(), &out_image.stretch_x},
+         std::pair{&image.getStretchY(), &out_image.stretch_y},
        }) {
     out->reserve(stretches->size());
     for (const auto& [from, to] : *stretches) {
       out->push_back(mln_image_stretch{.from = from, .to = to});
     }
   }
-  return MLN_STATUS_OK;
+  return true;
 }
 
-auto map_copy_style_image_premultiplied_rgba8(
-  MapObject& live, mln_buffer_view image_id, std::string& out_pixels,
-  bool* out_found
-) -> mln_status {
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto image =
-    map_native(live).getStyle().getImage(string_from_view(image_id));
-  *out_found = image.has_value();
-  out_pixels.clear();
-  if (!image) {
-    return MLN_STATUS_OK;
-  }
-
-  const auto& pixels = image->getImage();
-  out_pixels.assign(
-    reinterpret_cast<const char*>(pixels.data.get()), pixels.bytes()
-  );
-  return MLN_STATUS_OK;
+auto style_image_info(const StyleImageRecord& record) noexcept
+  -> mln_style_image_info {
+  const auto& image = *record.image;
+  const auto& pixels = image.getImage();
+  const auto& content = image.getContent();
+  const auto text_fit = [](const std::optional<mln::style::TextFit>& value) {
+    return value ? from_native_text_fit(*value)
+                 : static_cast<uint32_t>(
+                     MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK
+                   );
+  };
+  return mln_style_image_info{
+    .size = sizeof(mln_style_image_info),
+    .width = pixels.size.width,
+    .height = pixels.size.height,
+    .fields = record.fields,
+    .pixels = {.data = pixels.data.get(), .size = pixels.bytes()},
+    .stretch_x = record.stretch_x.data(),
+    .stretch_x_count = record.stretch_x.size(),
+    .stretch_y = record.stretch_y.data(),
+    .stretch_y_count = record.stretch_y.size(),
+    .content =
+      content ? mln_image_content{.left = content->left,
+                                  .top = content->top,
+                                  .right = content->right,
+                                  .bottom = content->bottom}
+              : mln_image_content{.left = 0, .top = 0, .right = 0, .bottom = 0},
+    .text_fit_width = text_fit(image.getTextFitWidth()),
+    .text_fit_height = text_fit(image.getTextFitHeight()),
+    .pixel_ratio = image.getPixelRatio(),
+    .sdf = image.isSdf()
+  };
 }
 
 auto map_add_image_source_url(
@@ -2937,58 +2783,41 @@ auto map_remove_style_layer(MapObject& live, mln_buffer_view layer_id)
   return MLN_STATUS_OK;
 }
 
-auto map_get_style_layer_info(
-  MapObject& live, mln_buffer_view layer_id, mln_style_layer_info* out_info,
-  bool* out_found
-) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_layer_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+namespace {
 
+auto style_layer_record(const mln::style::Layer& layer) -> StyleLayerRecord {
+  return {
+    .id = layer.getID(),
+    .type = layer.getTypeInfo()->type,
+    .source_id = layer.getSourceID(),
+    .source_layer = layer.getSourceLayer(),
+    .min_zoom = static_cast<double>(layer.getMinZoom()),
+    .max_zoom = static_cast<double>(layer.getMaxZoom()),
+    .visibility = layer.getVisibility() == mln::style::VisibilityType::None
+                    ? MLN_STYLE_LAYER_VISIBILITY_NONE
+                    : MLN_STYLE_LAYER_VISIBILITY_VISIBLE
+  };
+}
+
+}  // namespace
+
+auto map_get_style_layer(
+  MapObject& live, mln_buffer_view layer_id, StyleLayerRecord& out_layer
+) -> bool {
   const auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
-  *out_found = layer != nullptr;
-  *out_info = mln_style_layer_info{};
-  out_info->size = sizeof(mln_style_layer_info);
   if (layer == nullptr) {
-    return MLN_STATUS_OK;
+    return false;
   }
-
-  out_info->type = string_view_from_literal(layer->getTypeInfo()->type);
-  out_info->min_zoom = static_cast<double>(layer->getMinZoom());
-  out_info->max_zoom = static_cast<double>(layer->getMaxZoom());
-  out_info->visibility =
-    layer->getVisibility() == mln::style::VisibilityType::None
-      ? MLN_STYLE_LAYER_VISIBILITY_NONE
-      : MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
-  return MLN_STATUS_OK;
+  out_layer = style_layer_record(*layer);
+  return true;
 }
 
 auto map_list_style_layers(
   MapObject& live, std::vector<StyleLayerRecord>& layers
 ) -> mln_status {
   for (const auto* layer : map_native(live).getStyle().getLayers()) {
-    layers.push_back(
-      {.id = layer->getID(),
-       .type = layer->getTypeInfo()->type,
-       .source_id = layer->getSourceID(),
-       .source_layer = layer->getSourceLayer()}
-    );
-  }
-  return MLN_STATUS_OK;
-}
-
-auto map_list_style_layer_ids(
-  MapObject& live, std::vector<std::string>& out_layer_ids
-) -> mln_status {
-  out_layer_ids.clear();
-  for (const auto* layer : map_native(live).getStyle().getLayers()) {
-    out_layer_ids.push_back(layer->getID());
+    layers.push_back(style_layer_record(*layer));
   }
   return MLN_STATUS_OK;
 }
@@ -3384,18 +3213,6 @@ auto map_set_layer_source_layer(
   return MLN_STATUS_OK;
 }
 
-auto map_copy_layer_source_layer(
-  MapObject& live, mln_buffer_view layer_id, std::string& out_source_layer
-) -> mln_status {
-  mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(live, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  out_source_layer = layer->getSourceLayer();
-  return MLN_STATUS_OK;
-}
-
 auto map_set_layer_source_id(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id
 ) -> mln_status {
@@ -3409,18 +3226,6 @@ auto map_set_layer_source_id(
   }
 
   layer->setSourceID(string_from_view(source_id));
-  return MLN_STATUS_OK;
-}
-
-auto map_copy_layer_source_id(
-  MapObject& live, mln_buffer_view layer_id, std::string& out_source_id
-) -> mln_status {
-  mln::style::Layer* layer = nullptr;
-  const auto status = resolve_layer_for_access(live, layer_id, layer);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  out_source_id = layer->getSourceID();
   return MLN_STATUS_OK;
 }
 

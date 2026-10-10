@@ -664,19 +664,6 @@ public object GeneratedApi {
     }
 
   /**
-   * Returns default runtime style image metadata.
-   *
-   * See `mln_style_image_info_default` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun styleImageInfoDefault(): StyleImageInfo =
-    nativeCall(null, null, "mln_style_image_info_default") {
-      val out = sized(w(60, 72), w(4, 8))
-      C.mln_style_image_info_default(out)
-      readStyleImageInfo(out)
-    }
-
-  /**
    * Returns default runtime style image options.
    *
    * See `mln_style_image_options_default` in the

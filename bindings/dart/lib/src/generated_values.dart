@@ -916,6 +916,26 @@ final class Status extends _Enum {
   static const notFound = Status.fromRawValue(-10);
 }
 
+/// Fields available in `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class StyleImageInfoField extends _Flags<StyleImageInfoField> {
+  const StyleImageInfoField.fromRawValue(super.rawValue);
+
+  /// The image sets a content box.
+  static const content = StyleImageInfoField.fromRawValue(1);
+
+  /// The image sets how it fits text horizontally.
+  static const textFitWidth = StyleImageInfoField.fromRawValue(2);
+
+  /// The image sets how it fits text vertically.
+  static const textFitHeight = StyleImageInfoField.fromRawValue(4);
+  @override
+  StyleImageInfoField _of(int rawValue) =>
+      StyleImageInfoField.fromRawValue(rawValue);
+}
+
 /// Field mask values for `mln_style_image_options`.
 ///
 /// See `mln_style_image_option_field` in the
@@ -989,6 +1009,9 @@ final class StyleSourceInfoField extends _Flags<StyleSourceInfoField> {
 
   /// The source exposes a DEM raster encoding.
   static const rasterEncoding = StyleSourceInfoField.fromRawValue(32);
+
+  /// The source carries an attribution string, which may be empty.
+  static const attribution = StyleSourceInfoField.fromRawValue(64);
   @override
   StyleSourceInfoField _of(int rawValue) =>
       StyleSourceInfoField.fromRawValue(rawValue);
@@ -2339,36 +2362,6 @@ final class CameraQueryResult extends _Value {
   List<Object?> get _members => [generation, camera];
 }
 
-/// One stretchable interval along an image axis, in image pixels.
-///
-/// See `mln_image_stretch` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class ImageStretch extends _Value {
-  const ImageStretch(this.from, this.to);
-  final double from;
-  final double to;
-
-  @override
-  List<Object?> get _members => [from, to];
-}
-
-/// Borrowed image-stretch arrays available during a completion callback.
-///
-/// See `mln_style_image_stretches_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleImageStretchesResult extends _Value {
-  StyleImageStretchesResult({
-    required List<ImageStretch> stretchX,
-    required List<ImageStretch> stretchY,
-  }) : stretchX = List.unmodifiable(stretchX),
-       stretchY = List.unmodifiable(stretchY);
-  final List<ImageStretch> stretchX;
-  final List<ImageStretch> stretchY;
-
-  @override
-  List<Object?> get _members => [stretchX, stretchY];
-}
-
 /// Logical map extent in UI pixels and device-pixel scale.
 ///
 /// See `mln_logical_extent` in the
@@ -2460,6 +2453,19 @@ final class FeatureStateSelector extends _Value {
   List<Object?> get _members => [sourceId, sourceLayerId, featureId, stateKey];
 }
 
+/// One stretchable interval along an image axis, in image pixels.
+///
+/// See `mln_image_stretch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class ImageStretch extends _Value {
+  const ImageStretch(this.from, this.to);
+  final double from;
+  final double to;
+
+  @override
+  List<Object?> get _members => [from, to];
+}
+
 /// Content-box insets in image pixels, measured from the image's top-left.
 ///
 /// See `mln_image_content` in the
@@ -2480,56 +2486,62 @@ final class ImageContent extends _Value {
   List<Object?> get _members => [left, top, right, bottom];
 }
 
-/// Fixed metadata for one runtime style image.
+/// One complete runtime style image, borrowed for a completion callback.
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleImageInfo extends _Value {
-  const StyleImageInfo({
+  StyleImageInfo({
     this.width = 0,
     this.height = 0,
-    this.stride = 0,
-    this.byteLength = 0,
-    this.stretchXCount = 0,
-    this.stretchYCount = 0,
+    Uint8List? pixels,
+    required List<ImageStretch> stretchX,
+    required List<ImageStretch> stretchY,
     this.content,
     this.textFitWidth,
     this.textFitHeight,
-    this.pixelRatio = 1.0,
+    this.pixelRatio = 0,
     this.sdf = false,
-  });
+  }) : pixels = Uint8List.fromList(
+         pixels ?? const <int>[],
+       ).asUnmodifiableView(),
+       stretchX = List.unmodifiable(stretchX),
+       stretchY = List.unmodifiable(stretchY);
   final int width;
   final int height;
 
-  /// Native copied images are exposed as tightly packed premultiplied RGBA8.
-  final int stride;
-  final int byteLength;
+  /// Premultiplied RGBA8 pixels in tightly packed rows of width \* 4 bytes, top
+  /// row first.
+  final Uint8List pixels;
 
-  /// Interval counts for the stretchable axes.
-  final int stretchXCount;
-  final int stretchYCount;
+  /// Horizontally stretchable intervals.
+  final List<ImageStretch> stretchX;
 
-  /// Content box, meaningful only when has_content is true.
+  /// Vertically stretchable intervals.
+  final List<ImageStretch> stretchY;
+
+  /// Content box, when the image sets one.
   final ImageContent? content;
 
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// How the image fits text horizontally, when it sets this.
   final StyleImageTextFit? textFitWidth;
 
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// How the image fits text vertically, when it sets this.
   final StyleImageTextFit? textFitHeight;
 
-  /// Sprite pixel ratio. Defaults to 1.0.
+  /// Sprite pixel ratio.
   final double pixelRatio;
+
+  /// Whether the image is a signed distance field icon.
   final bool sdf;
 
   @override
   List<Object?> get _members => [
     width,
     height,
-    stride,
-    byteLength,
-    stretchXCount,
-    stretchYCount,
+    pixels,
+    stretchX,
+    stretchY,
     content,
     textFitWidth,
     textFitHeight,
@@ -2538,44 +2550,25 @@ final class StyleImageInfo extends _Value {
   ];
 }
 
-/// Complete style image borrowed for a completion callback.
-///
-/// See `mln_style_image_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleImageResult extends _Value {
-  StyleImageResult({
-    this.info = const StyleImageInfo(),
-    Uint8List? pixels,
-    required List<ImageStretch> stretchX,
-    required List<ImageStretch> stretchY,
-  }) : pixels = Uint8List.fromList(
-         pixels ?? const <int>[],
-       ).asUnmodifiableView(),
-       stretchX = List.unmodifiable(stretchX),
-       stretchY = List.unmodifiable(stretchY);
-  final StyleImageInfo info;
-  final Uint8List pixels;
-  final List<ImageStretch> stretchX;
-  final List<ImageStretch> stretchY;
-
-  @override
-  List<Object?> get _members => [info, pixels, stretchX, stretchY];
-}
-
-/// Fixed layer metadata included in `mln_style_layer_result`.
+/// Complete metadata of one style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleLayerInfo extends _Value {
   const StyleLayerInfo({
+    this.visibility = const StyleLayerVisibility.fromRawValue(0),
     required this.type,
     this.minZoom = 0,
     this.maxZoom = 0,
-    this.visibility = const StyleLayerVisibility.fromRawValue(0),
+    this.sourceId,
+    this.sourceLayer,
   });
 
-  /// View of a static style-spec layer type string. It stays valid for the life
-  /// of the process.
+  /// One of `mln_style_layer_visibility`.
+  final StyleLayerVisibility visibility;
+
+  /// The style-spec layer type string. The view stays valid for the life of the
+  /// process.
   final String type;
 
   /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
@@ -2584,21 +2577,6 @@ final class StyleLayerInfo extends _Value {
   /// Highest zoom at which the layer draws; INFINITY with no upper bound.
   final double maxZoom;
 
-  /// One of `mln_style_layer_visibility`.
-  final StyleLayerVisibility visibility;
-
-  @override
-  List<Object?> get _members => [type, minZoom, maxZoom, visibility];
-}
-
-/// Complete layer metadata borrowed for a completion callback.
-///
-/// See `mln_style_layer_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleLayerResult extends _Value {
-  const StyleLayerResult({required this.info, this.sourceId, this.sourceLayer});
-  final StyleLayerInfo info;
-
   /// Source ID. Empty for a layer type that takes no source.
   final String? sourceId;
 
@@ -2606,40 +2584,50 @@ final class StyleLayerResult extends _Value {
   final String? sourceLayer;
 
   @override
-  List<Object?> get _members => [info, sourceId, sourceLayer];
+  List<Object?> get _members => [
+    visibility,
+    type,
+    minZoom,
+    maxZoom,
+    sourceId,
+    sourceLayer,
+  ];
 }
 
-/// Inline tile metadata selected as one value by the source-info field mask.
+/// Inline TileJSON metadata of a tile source.
 ///
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleSourceTileInfo extends _Value {
-  const StyleSourceTileInfo({
-    this.tileCount = 0,
+  StyleSourceTileInfo({
+    required List<String> tileUrls,
     this.minZoom = 0,
     this.maxZoom = 0,
     this.scheme = const StyleTileScheme.fromRawValue(0),
-  });
-  final int tileCount;
+  }) : tileUrls = List.unmodifiable(tileUrls);
+
+  /// Tile URL templates in TileJSON order.
+  final List<String> tileUrls;
   final double minZoom;
   final double maxZoom;
+
+  /// One of `mln_style_tile_scheme`.
   final StyleTileScheme scheme;
 
   @override
-  List<Object?> get _members => [tileCount, minZoom, maxZoom, scheme];
+  List<Object?> get _members => [tileUrls, minZoom, maxZoom, scheme];
 }
 
-/// Fixed source metadata included in `mln_style_source_result`.
+/// Complete metadata of one style source, borrowed for a completion callback.
 ///
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleSourceInfo extends _Value {
   const StyleSourceInfo({
     this.type = const StyleSourceType.fromRawValue(0),
-    this.idSize = 0,
     this.isVolatile = false,
-    this.attributionSize,
-    this.urlSize,
+    this.attribution,
+    this.url,
     this.tilejson,
     this.bounds,
     this.tileSize,
@@ -2650,77 +2638,42 @@ final class StyleSourceInfo extends _Value {
   /// One of `mln_style_source_type`.
   final StyleSourceType type;
 
-  /// Source ID byte length, excluding any null terminator.
-  final int idSize;
-
   /// Whether the source is marked volatile.
   final bool isVolatile;
 
-  /// Attribution byte length, excluding any null terminator.
-  final int? attributionSize;
+  /// Attribution string, when the source sets one. It may be empty.
+  final String? attribution;
 
-  /// URL byte length, meaningful when fields contains URL.
-  final int? urlSize;
+  /// URL that the source loads from, when it has one.
+  final String? url;
+
+  /// Inline TileJSON metadata, when the source was defined with it.
   final StyleSourceTileInfo? tilejson;
 
-  /// Geographic bounds, meaningful when fields contains BOUNDS.
+  /// Geographic bounds, when inline TileJSON sets them.
   final LatLngBounds? bounds;
 
-  /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
+  /// Tile size in pixels, for a tile source.
   final int? tileSize;
 
-  /// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
+  /// Vector tile encoding, for a vector source.
   final StyleVectorTileEncoding? vectorEncoding;
 
-  /// DEM encoding, meaningful when fields contains RASTER_ENCODING.
+  /// DEM raster encoding, when inline TileJSON sets one.
   final StyleRasterDemEncoding? rasterEncoding;
 
   @override
   List<Object?> get _members => [
     type,
-    idSize,
     isVolatile,
-    attributionSize,
-    urlSize,
+    attribution,
+    url,
     tilejson,
     bounds,
     tileSize,
     vectorEncoding,
     rasterEncoding,
   ];
-}
-
-/// Complete source metadata borrowed for a completion callback.
-///
-/// See `mln_style_source_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleSourceResult extends _Value {
-  StyleSourceResult({
-    this.info = const StyleSourceInfo(),
-    this.attribution,
-    this.url,
-    List<String>? tileUrls,
-  }) : tileUrls = tileUrls == null ? null : List.unmodifiable(tileUrls);
-  final StyleSourceInfo info;
-  final String? attribution;
-  final String? url;
-  final List<String>? tileUrls;
-
-  @override
-  List<Object?> get _members => [info, attribution, url, tileUrls];
-}
-
-/// Borrowed inline TileJSON tile URLs available during a completion callback.
-///
-/// See `mln_style_source_tile_urls_result` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleSourceTileUrlsResult extends _Value {
-  StyleSourceTileUrlsResult({required List<String> tileUrls})
-    : tileUrls = List.unmodifiable(tileUrls);
-  final List<String> tileUrls;
-
-  @override
-  List<Object?> get _members => [tileUrls];
 }
 
 /// Global style transition options.

@@ -1950,33 +1950,46 @@ fn generated_copy_mln_style_image_info(
     let dict = PyDict::new(py);
     dict.set_item("width", generated_value(py, value.width)?)?;
     dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("stride", generated_value(py, value.stride)?)?;
-    dict.set_item("byte_length", generated_value(py, value.byte_length)?)?;
+    dict.set_item("pixels", unsafe { generated_bytes(py, value.pixels) }?)?;
     dict.set_item(
-        "stretch_x_count",
-        generated_value(py, value.stretch_x_count)?,
+        "stretch_x",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.stretch_x, value.stretch_x_count)? },
+            |element| generated_copy_mln_image_stretch(py, element),
+        )?,
     )?;
     dict.set_item(
-        "stretch_y_count",
-        generated_value(py, value.stretch_y_count)?,
+        "stretch_y",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.stretch_y, value.stretch_y_count)? },
+            |element| generated_copy_mln_image_stretch(py, element),
+        )?,
     )?;
     dict.set_item(
         "content",
-        generated_optional(py, value.has_content, || {
-            generated_copy_mln_image_content(py, &value.content)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_CONTENT != 0,
+            || generated_copy_mln_image_content(py, &value.content),
+        )?,
     )?;
     dict.set_item(
         "text_fit_width",
-        generated_optional(py, value.has_text_fit_width, || {
-            generated_value(py, value.text_fit_width)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0,
+            || generated_value(py, value.text_fit_width),
+        )?,
     )?;
     dict.set_item(
         "text_fit_height",
-        generated_optional(py, value.has_text_fit_height, || {
-            generated_value(py, value.text_fit_height)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0,
+            || generated_value(py, value.text_fit_height),
+        )?,
     )?;
     dict.set_item("pixel_ratio", generated_value(py, value.pixel_ratio)?)?;
     dict.set_item("sdf", generated_value(py, value.sdf)?)?;
@@ -2059,59 +2072,6 @@ fn generated_copy_mln_style_image_options(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_style_image_result(
-    py: Python<'_>,
-    value: &sys::mln_style_image_result,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "info",
-        generated_copy_mln_style_image_info(py, &value.info)?,
-    )?;
-    dict.set_item("pixels", unsafe { generated_bytes(py, value.pixels) }?)?;
-    dict.set_item(
-        "stretch_x",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.stretch_x, value.stretch_x_count)? },
-            |element| generated_copy_mln_image_stretch(py, element),
-        )?,
-    )?;
-    dict.set_item(
-        "stretch_y",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.stretch_y, value.stretch_y_count)? },
-            |element| generated_copy_mln_image_stretch(py, element),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_image_stretches_result(
-    py: Python<'_>,
-    value: &sys::mln_style_image_stretches_result,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "stretch_x",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.stretch_x, value.stretch_x_count)? },
-            |element| generated_copy_mln_image_stretch(py, element),
-        )?,
-    )?;
-    dict.set_item(
-        "stretch_y",
-        generated_list(
-            py,
-            unsafe { generated_slice(value.stretch_y, value.stretch_y_count)? },
-            |element| generated_copy_mln_image_stretch(py, element),
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_style_layer_entry(
     py: Python<'_>,
     value: &sys::mln_style_layer_entry,
@@ -2139,22 +2099,10 @@ fn generated_copy_mln_style_layer_info(
     value: &sys::mln_style_layer_info,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
+    dict.set_item("visibility", generated_value(py, value.visibility)?)?;
     dict.set_item("type", generated_text(py, value.type_)?)?;
     dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
     dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
-    dict.set_item("visibility", generated_value(py, value.visibility)?)?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_layer_result(
-    py: Python<'_>,
-    value: &sys::mln_style_layer_result,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "info",
-        generated_copy_mln_style_layer_info(py, &value.info)?,
-    )?;
     dict.set_item(
         "source_id",
         generated_optional(py, value.source_id.size != 0, || {
@@ -2176,20 +2124,21 @@ fn generated_copy_mln_style_source_info(
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("type", generated_value(py, value.type_)?)?;
-    dict.set_item("id_size", generated_value(py, value.id_size)?)?;
     dict.set_item("is_volatile", generated_value(py, value.is_volatile)?)?;
     dict.set_item(
-        "attribution_size",
-        generated_optional(py, value.has_attribution, || {
-            generated_value(py, value.attribution_size)
-        })?,
+        "attribution",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0,
+            || generated_text(py, value.attribution),
+        )?,
     )?;
     dict.set_item(
-        "url_size",
+        "url",
         generated_optional(
             py,
             value.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0,
-            || generated_value(py, value.url_size),
+            || generated_text(py, value.url),
         )?,
     )?;
     dict.set_item(
@@ -2197,16 +2146,7 @@ fn generated_copy_mln_style_source_info(
         generated_optional(
             py,
             value.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0,
-            || {
-                Ok({
-                    let inner = PyDict::new(py);
-                    inner.set_item("tile_count", generated_value(py, value.tile_count)?)?;
-                    inner.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
-                    inner.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
-                    inner.set_item("scheme", generated_value(py, value.scheme)?)?;
-                    inner.into_any().unbind()
-                })
-            },
+            || generated_copy_mln_style_source_tile_info(py, &value.tilejson),
         )?,
     )?;
     dict.set_item(
@@ -2244,49 +2184,9 @@ fn generated_copy_mln_style_source_info(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_style_source_result(
+fn generated_copy_mln_style_source_tile_info(
     py: Python<'_>,
-    value: &sys::mln_style_source_result,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "info",
-        generated_copy_mln_style_source_info(py, &value.info)?,
-    )?;
-    dict.set_item(
-        "attribution",
-        generated_optional(py, value.info.has_attribution, || {
-            generated_text(py, value.attribution)
-        })?,
-    )?;
-    dict.set_item(
-        "url",
-        generated_optional(
-            py,
-            value.info.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0,
-            || generated_text(py, value.url),
-        )?,
-    )?;
-    dict.set_item(
-        "tile_urls",
-        generated_optional(
-            py,
-            value.info.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0,
-            || {
-                generated_list(
-                    py,
-                    unsafe { generated_slice(value.tile_urls, value.tile_url_count)? },
-                    |element| generated_text(py, *element),
-                )
-            },
-        )?,
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_source_tile_urls_result(
-    py: Python<'_>,
-    value: &sys::mln_style_source_tile_urls_result,
+    value: &sys::mln_style_source_tile_info,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item(
@@ -2297,6 +2197,9 @@ fn generated_copy_mln_style_source_tile_urls_result(
             |element| generated_text(py, *element),
         )?,
     )?;
+    dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
+    dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
+    dict.set_item("scheme", generated_value(py, value.scheme)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -4450,13 +4353,6 @@ fn _default_source_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> 
 }
 
 #[pyfunction]
-fn _default_style_image_info(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
-    let value = unsafe { sys::mln_style_image_info_default() };
-    generated_copy_mln_style_image_info(py, &value)
-}
-
-#[pyfunction]
 fn _default_style_image_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_style_image_options_default() };
@@ -5466,197 +5362,6 @@ impl MapHandle {
             })
         }
     }
-    #[pyo3(signature = (layer_id))]
-    fn copy_layer_source_id(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_copy_layer_source_id", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, value.size != 0, || generated_text(py, value))
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_copy_layer_source_id(
-                        handle,
-                        layer_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (layer_id))]
-    fn copy_layer_source_layer(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_copy_layer_source_layer", self.admission())?;
-        let storage = &mut call.storage;
-        let layer_id_value = storage.buffer(layer_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, value.size != 0, || generated_text(py, value))
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_copy_layer_source_layer(
-                        handle,
-                        layer_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (image_id))]
-    fn copy_style_image_premultiplied_rgba8(
-        &self,
-        py: Python<'_>,
-        image_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_copy_style_image_premultiplied_rgba8",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            if result.value.is_null() {
-                return Ok(py.None());
-            }
-            let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, !value.data.is_null(), || unsafe {
-                generated_bytes(py, value)
-            })
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_copy_style_image_premultiplied_rgba8(
-                        handle,
-                        image_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (image_id))]
-    fn copy_style_image_stretches(
-        &self,
-        py: Python<'_>,
-        image_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_copy_style_image_stretches", self.admission())?;
-        let storage = &mut call.storage;
-        let image_id_value = storage.buffer(image_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            if result.value.is_null() {
-                return Ok(py.None());
-            }
-            let value = completion_value::<sys::mln_style_image_stretches_result>(result)?;
-            generated_copy_mln_style_image_stretches_result(py, &value)
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_copy_style_image_stretches(
-                        handle,
-                        image_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (source_id))]
-    fn copy_style_source_attribution(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(
-            py,
-            "mln_map_copy_style_source_attribution",
-            self.admission(),
-        )?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            if result.value.is_null() {
-                return Ok(py.None());
-            }
-            let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, !value.data.is_null(), || generated_text(py, value))
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_copy_style_source_attribution(
-                        handle,
-                        source_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (source_id))]
-    fn copy_style_source_url(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_copy_style_source_url", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            if result.value.is_null() {
-                return Ok(py.None());
-            }
-            let value = completion_value::<sys::mln_buffer_view>(result)?;
-            generated_optional(py, !value.data.is_null(), || generated_text(py, value))
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_copy_style_source_url(
-                        handle,
-                        source_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
     #[pyo3(signature = ())]
     fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_dump_debug_logs", self.admission())?;
@@ -5804,12 +5509,8 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (image_id))]
-    fn get_style_image_info(
-        &self,
-        py: Python<'_>,
-        image_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_image_info", self.admission())?;
+    fn get_style_image(&self, py: Python<'_>, image_id: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_map_get_style_image", self.admission())?;
         let storage = &mut call.storage;
         let image_id_value = storage.buffer(image_id.clone(), true)?;
         let handle = self.live()?;
@@ -5817,30 +5518,21 @@ impl MapHandle {
             if result.value.is_null() {
                 return Ok(py.None());
             }
-            let value = completion_value::<sys::mln_style_image_result>(result)?;
-            generated_copy_mln_style_image_result(py, &value)
+            let value = completion_value::<sys::mln_style_image_info>(result)?;
+            generated_copy_mln_style_image_info(py, &value)
         };
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_get_style_image_info(
-                        handle,
-                        image_id_value,
-                        completion,
-                        diagnostic,
-                    )
+                    sys::mln_map_get_style_image(handle, image_id_value, completion, diagnostic)
                 },
                 convert,
             )
         }
     }
     #[pyo3(signature = (layer_id))]
-    fn get_style_layer_info(
-        &self,
-        py: Python<'_>,
-        layer_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_layer_info", self.admission())?;
+    fn get_style_layer(&self, py: Python<'_>, layer_id: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_map_get_style_layer", self.admission())?;
         let storage = &mut call.storage;
         let layer_id_value = storage.buffer(layer_id.clone(), true)?;
         let handle = self.live()?;
@@ -5848,18 +5540,13 @@ impl MapHandle {
             if result.value.is_null() {
                 return Ok(py.None());
             }
-            let value = completion_value::<sys::mln_style_layer_result>(result)?;
-            generated_copy_mln_style_layer_result(py, &value)
+            let value = completion_value::<sys::mln_style_layer_info>(result)?;
+            generated_copy_mln_style_layer_info(py, &value)
         };
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_get_style_layer_info(
-                        handle,
-                        layer_id_value,
-                        completion,
-                        diagnostic,
-                    )
+                    sys::mln_map_get_style_layer(handle, layer_id_value, completion, diagnostic)
                 },
                 convert,
             )
@@ -5933,12 +5620,12 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = (source_id))]
-    fn get_style_source_info(
+    fn get_style_source(
         &self,
         py: Python<'_>,
         source_id: &Bound<'_, PyAny>,
     ) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_style_source_info", self.admission())?;
+        let mut call = GeneratedCall::new(py, "mln_map_get_style_source", self.admission())?;
         let storage = &mut call.storage;
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let handle = self.live()?;
@@ -5946,50 +5633,13 @@ impl MapHandle {
             if result.value.is_null() {
                 return Ok(py.None());
             }
-            let value = completion_value::<sys::mln_style_source_result>(result)?;
-            generated_copy_mln_style_source_result(py, &value)
+            let value = completion_value::<sys::mln_style_source_info>(result)?;
+            generated_copy_mln_style_source_info(py, &value)
         };
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_get_style_source_info(
-                        handle,
-                        source_id_value,
-                        completion,
-                        diagnostic,
-                    )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = (source_id))]
-    fn get_style_source_tile_urls(
-        &self,
-        py: Python<'_>,
-        source_id: &Bound<'_, PyAny>,
-    ) -> PyResult<Py<PyAny>> {
-        let mut call =
-            GeneratedCall::new(py, "mln_map_get_style_source_tile_urls", self.admission())?;
-        let storage = &mut call.storage;
-        let source_id_value = storage.buffer(source_id.clone(), true)?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            if result.value.is_null() {
-                return Ok(py.None());
-            }
-            let value = completion_value::<sys::mln_style_source_tile_urls_result>(result)?;
-            generated_copy_mln_style_source_tile_urls_result(py, &value)
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_get_style_source_tile_urls(
-                        handle,
-                        source_id_value,
-                        completion,
-                        diagnostic,
-                    )
+                    sys::mln_map_get_style_source(handle, source_id_value, completion, diagnostic)
                 },
                 convert,
             )
@@ -6275,26 +5925,6 @@ impl MapHandle {
                         completion,
                         diagnostic,
                     )
-                },
-                convert,
-            )
-        }
-    }
-    #[pyo3(signature = ())]
-    fn list_style_layer_ids(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_list_style_layer_ids", self.admission())?;
-        let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_buffer_view>(result)? {
-                list.append(generated_text(py, *value)?)?;
-            }
-            Ok(list.into_any().unbind())
-        };
-        unsafe {
-            call.complete(
-                |completion, diagnostic| {
-                    sys::mln_map_list_style_layer_ids(handle, completion, diagnostic)
                 },
                 convert,
             )
@@ -10038,7 +9668,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
         _default_source_feature_query_options,
         module
     )?)?;
-    module.add_function(wrap_pyfunction!(_default_style_image_info, module)?)?;
     module.add_function(wrap_pyfunction!(_default_style_image_options, module)?)?;
     module.add_function(wrap_pyfunction!(
         _default_style_tile_source_options,

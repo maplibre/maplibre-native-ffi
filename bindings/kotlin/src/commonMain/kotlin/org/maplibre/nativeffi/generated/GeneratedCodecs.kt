@@ -1303,23 +1303,6 @@ internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOpti
     filter = readAddress(source + w(16, 24)).takeIf { it != 0L }?.let { readView(it) },
   )
 
-internal fun readStyleImageInfo(source: Long): StyleImageInfo =
-  StyleImageInfo(
-    width = readU32(source + 4),
-    height = readU32(source + 8),
-    stride = readU32(source + 12),
-    byteLength = readSize(source + 16),
-    stretchXCount = readSize(source + w(20, 24)),
-    stretchYCount = readSize(source + w(24, 32)),
-    content = if (readBool(source + w(57, 69))) readImageContent(source + w(28, 40)) else null,
-    textFitWidth =
-      if (readBool(source + w(58, 70))) StyleImageTextFit(readU32(source + w(44, 56))) else null,
-    textFitHeight =
-      if (readBool(source + w(59, 71))) StyleImageTextFit(readU32(source + w(48, 60))) else null,
-    pixelRatio = readF32(source + w(52, 64)),
-    sdf = readBool(source + w(56, 68)),
-  )
-
 internal fun readStyleImageOptions(source: Long): StyleImageOptions =
   StyleImageOptions(
     stretchX =
@@ -1458,68 +1441,58 @@ internal fun readRuntimeEventBatchView(source: Long): RuntimeEventBatchView =
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
   CameraQueryResult(generation = readU64(source + 8), camera = readCameraOptions(source + 16))
 
-internal fun readStyleImageStretchesResult(source: Long): StyleImageStretchesResult =
-  StyleImageStretchesResult(
+internal fun readStyleImageInfo(source: Long): StyleImageInfo =
+  StyleImageInfo(
+    width = readU32(source + 4),
+    height = readU32(source + 8),
+    pixels = readView(source + 16),
     stretchX =
-      readArray(readAddress(source + 8), readSize(source + w(12, 16)), 8.toLong()) { item ->
+      readArray(readAddress(source + w(24, 32)), readSize(source + w(28, 40)), 8.toLong()) { item ->
         readImageStretch(item)
       },
     stretchY =
-      readArray(readAddress(source + w(16, 24)), readSize(source + w(20, 32)), 8.toLong()) { item ->
+      readArray(readAddress(source + w(32, 48)), readSize(source + w(36, 56)), 8.toLong()) { item ->
         readImageStretch(item)
       },
-  )
-
-internal fun readStyleImageResult(source: Long): StyleImageResult =
-  StyleImageResult(
-    info = readStyleImageInfo(source + 8),
-    pixels = readView(source + w(68, 80)),
-    stretchX =
-      readArray(readAddress(source + w(76, 96)), readSize(source + w(80, 104)), 8.toLong()) { item
-        ->
-        readImageStretch(item)
-      },
-    stretchY =
-      readArray(readAddress(source + w(84, 112)), readSize(source + w(88, 120)), 8.toLong()) { item
-        ->
-        readImageStretch(item)
-      },
-  )
-
-internal fun readStyleLayerResult(source: Long): StyleLayerResult =
-  StyleLayerResult(
-    info = readStyleLayerInfo(source + 8),
-    sourceId = readViewString(source + w(48, 56)).takeIf { it.isNotEmpty() },
-    sourceLayer = readViewString(source + w(56, 72)).takeIf { it.isNotEmpty() },
-  )
-
-internal fun readStyleSourceResult(source: Long): StyleSourceResult =
-  StyleSourceResult(
-    info = readStyleSourceInfo(source + 8),
-    attribution = if (readBool(source + w(25, 33))) readViewString(source + w(112, 136)) else null,
-    url = if ((readU32(source + 16) and 1u) != 0u) readViewString(source + w(120, 152)) else null,
-    tileUrls =
-      if ((readU32(source + 16) and 2u) != 0u)
-        readArray(
-          readAddress(source + w(128, 168)),
-          readSize(source + w(132, 176)),
-          2 * NativeMemory.addressSize.toLong(),
-        ) { item ->
-          readViewString(item)
-        }
+    content =
+      if ((readU32(source + 12) and 1u) != 0u) readImageContent(source + w(40, 64)) else null,
+    textFitWidth =
+      if ((readU32(source + 12) and 2u) != 0u) StyleImageTextFit(readU32(source + w(56, 80)))
       else null,
+    textFitHeight =
+      if ((readU32(source + 12) and 4u) != 0u) StyleImageTextFit(readU32(source + w(60, 84)))
+      else null,
+    pixelRatio = readF32(source + w(64, 88)),
+    sdf = readBool(source + w(68, 92)),
   )
 
-internal fun readStyleSourceTileUrlsResult(source: Long): StyleSourceTileUrlsResult =
-  StyleSourceTileUrlsResult(
-    tileUrls =
-      readArray(
-        readAddress(source + 8),
-        readSize(source + w(12, 16)),
-        2 * NativeMemory.addressSize.toLong(),
-      ) { item ->
-        readViewString(item)
-      }
+internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
+  StyleLayerInfo(
+    visibility = StyleLayerVisibility(readU32(source + 4)),
+    type = readViewString(source + 8),
+    minZoom = readF64(source + w(16, 24)),
+    maxZoom = readF64(source + w(24, 32)),
+    sourceId = readViewString(source + w(32, 40)).takeIf { it.isNotEmpty() },
+    sourceLayer = readViewString(source + w(40, 56)).takeIf { it.isNotEmpty() },
+  )
+
+internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
+  StyleSourceInfo(
+    type = StyleSourceType(readU32(source + 4)),
+    isVolatile = readBool(source + 12),
+    attribution = if ((readU32(source + 8) and 64u) != 0u) readViewString(source + 16) else null,
+    url = if ((readU32(source + 8) and 1u) != 0u) readViewString(source + w(24, 32)) else null,
+    tilejson =
+      if ((readU32(source + 8) and 2u) != 0u) readStyleSourceTileInfo(source + w(32, 48)) else null,
+    bounds = if ((readU32(source + 8) and 4u) != 0u) readLatLngBounds(source + w(64, 88)) else null,
+    tileSize = if ((readU32(source + 8) and 8u) != 0u) readU32(source + w(96, 120)) else null,
+    vectorEncoding =
+      if ((readU32(source + 8) and 16u) != 0u)
+        StyleVectorTileEncoding(readU32(source + w(100, 124)))
+      else null,
+    rasterEncoding =
+      if ((readU32(source + 8) and 32u) != 0u) StyleRasterDemEncoding(readU32(source + w(104, 128)))
+      else null,
   )
 
 internal fun readLatLngBounds(source: Long): LatLngBounds =
@@ -1904,6 +1877,9 @@ internal fun readScreenLineString(source: Long): ScreenLineString =
       }
   )
 
+internal fun readImageStretch(source: Long): ImageStretch =
+  ImageStretch(from = readF32(source), to = readF32(source + 4))
+
 internal fun readImageContent(source: Long): ImageContent =
   ImageContent(
     left = readF32(source),
@@ -1911,9 +1887,6 @@ internal fun readImageContent(source: Long): ImageContent =
     right = readF32(source + 8),
     bottom = readF32(source + 12),
   )
-
-internal fun readImageStretch(source: Long): ImageStretch =
-  ImageStretch(from = readF32(source), to = readF32(source + 4))
 
 internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor =
   VulkanContextDescriptor(
@@ -1968,38 +1941,19 @@ internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent 
     message = message,
   )
 
-internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
-  StyleLayerInfo(
-    type = readViewString(source + 8),
-    minZoom = readF64(source + w(16, 24)),
-    maxZoom = readF64(source + w(24, 32)),
-    visibility = StyleLayerVisibility(readU32(source + w(32, 40))),
-  )
-
-internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
-  StyleSourceInfo(
-    type = StyleSourceType(readU32(source + 4)),
-    idSize = readSize(source + w(12, 16)),
-    isVolatile = readBool(source + w(16, 24)),
-    attributionSize = if (readBool(source + w(17, 25))) readSize(source + w(20, 32)) else null,
-    urlSize = if ((readU32(source + 8) and 1u) != 0u) readSize(source + w(24, 40)) else null,
-    tilejson =
-      if ((readU32(source + 8) and 2u) != 0u)
-        StyleSourceTileInfo(
-          tileCount = readSize(source + w(28, 48)),
-          minZoom = readF64(source + w(32, 56)),
-          maxZoom = readF64(source + w(40, 64)),
-          scheme = StyleTileScheme(readU32(source + w(48, 72))),
-        )
-      else null,
-    bounds = if ((readU32(source + 8) and 4u) != 0u) readLatLngBounds(source + w(56, 80)) else null,
-    tileSize = if ((readU32(source + 8) and 8u) != 0u) readU32(source + w(88, 112)) else null,
-    vectorEncoding =
-      if ((readU32(source + 8) and 16u) != 0u) StyleVectorTileEncoding(readU32(source + w(92, 116)))
-      else null,
-    rasterEncoding =
-      if ((readU32(source + 8) and 32u) != 0u) StyleRasterDemEncoding(readU32(source + w(96, 120)))
-      else null,
+internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
+  StyleSourceTileInfo(
+    tileUrls =
+      readArray(
+        readAddress(source),
+        readSize(source + w(4, 8)),
+        2 * NativeMemory.addressSize.toLong(),
+      ) { item ->
+        readViewString(item)
+      },
+    minZoom = readF64(source + w(8, 16)),
+    maxZoom = readF64(source + w(16, 24)),
+    scheme = StyleTileScheme(readU32(source + w(24, 32))),
   )
 
 internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition =

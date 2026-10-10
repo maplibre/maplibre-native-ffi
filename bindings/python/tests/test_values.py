@@ -29,7 +29,7 @@ def test_strings_cross_as_c_strings_and_as_sized_views(
     # The layer JSON crosses as sized UTF-8 bytes, and the ID comes back
     # through a lookup that takes it as a NUL-terminated string.
     result(map_handle.add_style_layer_json(layer.encode()))
-    assert result(map_handle.list_style_layer_ids()) == (layer_id,)
+    assert [entry.id for entry in result(map_handle.list_style_layers())] == [layer_id]
     stored = result(map_handle.get_style_layer_json(layer_id))
     assert stored is not None
     assert json.loads(stored)["id"] == layer_id
@@ -131,9 +131,10 @@ def test_an_array_input_is_copied_when_it_is_submitted(
     tiles.append("custom://appended/{z}/{x}/{y}.pbf")
 
     assert result(added).disposition == mln.CommandDisposition.COMMITTED
-    urls = result(map_handle.get_style_source_tile_urls("vector"))
-    assert urls is not None
-    assert urls.tile_urls == ("custom://tiles/{z}/{x}/{y}.pbf",)
+    source = result(map_handle.get_style_source("vector"))
+    assert source is not None
+    assert source.tilejson is not None
+    assert source.tilejson.tile_urls == ("custom://tiles/{z}/{x}/{y}.pbf",)
 
 
 def test_public_type_hints_resolve() -> None:

@@ -70,28 +70,13 @@ static void empty_views_are_rejected_at_submission(void) {
                  )
   );
   EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_get_style_source_info(
+    "source_id", mln_map_get_style_source(
                    map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                  )
   );
   EXPECT_EMPTY_REJECTED(
     "source_id", mln_map_set_style_source_volatile(
                    map, empty, true, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_copy_style_source_attribution(
-                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_copy_style_source_url(
-                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                 )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "source_id", mln_map_get_style_source_tile_urls(
-                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                  )
   );
 
@@ -282,17 +267,7 @@ static void empty_views_are_rejected_at_submission(void) {
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "image_id", mln_map_get_style_image_info(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "image_id", mln_map_copy_style_image_premultiplied_rgba8(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "image_id", mln_map_copy_style_image_stretches(
+    "image_id", mln_map_get_style_image(
                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
@@ -413,7 +388,7 @@ static void empty_views_are_rejected_at_submission(void) {
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_get_style_layer_info(
+    "layer_id", mln_map_get_style_layer(
                   map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
   );
@@ -476,11 +451,6 @@ static void empty_views_are_rejected_at_submission(void) {
                 )
   );
   EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_copy_layer_source_layer(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
-  );
-  EXPECT_EMPTY_REJECTED(
     "layer_id", mln_map_set_layer_source_id(
                   map, empty, id, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                 )
@@ -489,11 +459,6 @@ static void empty_views_are_rejected_at_submission(void) {
     "source_id", mln_map_set_layer_source_id(
                    map, id, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
                  )
-  );
-  EXPECT_EMPTY_REJECTED(
-    "layer_id", mln_map_copy_layer_source_id(
-                  map, empty, &completion.descriptor, MLN_TEST_DIAGNOSTIC
-                )
   );
   EXPECT_EMPTY_REJECTED(
     "layer_id", mln_map_set_layer_min_zoom(
