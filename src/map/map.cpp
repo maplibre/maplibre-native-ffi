@@ -84,7 +84,6 @@
 
 #include "map/map.hpp"
 
-#include "bytes/buffer.hpp"
 #include "completion/completion.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"

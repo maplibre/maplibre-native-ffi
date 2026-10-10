@@ -7,7 +7,6 @@
 #include <utility>
 #include <vector>
 
-#include "bytes/buffer.hpp"
 #include "completion/completion_result.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
@@ -32,23 +31,6 @@ auto copy_view(mln_buffer_view view, std::string& out) -> mln_status {
   }
   const auto* bytes = static_cast<const char*>(view.data);
   out.assign(bytes == nullptr ? "" : bytes, view.size);
-  return MLN_STATUS_OK;
-}
-
-auto take_buffer_bytes(mln_buffer buffer, std::any& out) -> mln_status {
-  mln_buffer_view view{};
-  const auto status = buffer_get(buffer, &view);
-  if (status != MLN_STATUS_OK) {
-    buffer_destroy(buffer);
-    return status;
-  }
-  auto bytes = std::string{};
-  const auto copy_status = copy_view(view, bytes);
-  buffer_destroy(buffer);
-  if (copy_status != MLN_STATUS_OK) {
-    return copy_status;
-  }
-  out = std::move(bytes);
   return MLN_STATUS_OK;
 }
 
@@ -403,13 +385,13 @@ auto render_session_query_feature_extensions_start(
         return mln_buffer_view{copied[i].data(), copied[i].size()};
       };
       const auto argument_view = view(4);
-      auto buffer = mln_buffer{MLN_HANDLE_NULL};
+      auto bytes = std::string{};
       const auto status = render_session_query_feature_extensions(
         target.self, view(0), view(1), view(2), view(3),
-        has_arguments ? &argument_view : nullptr, &buffer
+        has_arguments ? &argument_view : nullptr, bytes
       );
-      return status == MLN_STATUS_OK ? take_buffer_bytes(buffer, result)
-                                     : status;
+      if (status == MLN_STATUS_OK) result = std::move(bytes);
+      return status;
     },
     completion,
     complete_query_buffer<&mln_render_session_query_feature_extensions>

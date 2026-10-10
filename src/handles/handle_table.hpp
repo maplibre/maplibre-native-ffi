@@ -26,7 +26,6 @@ enum class HandleKind : std::uint8_t {
   Map = 2,
   MapProjection = 3,
   RenderSession = 4,
-  Buffer = 7,
   ResourceRequest = 12,
   EventBatch = 16,
   AcquiredFrame = 20,

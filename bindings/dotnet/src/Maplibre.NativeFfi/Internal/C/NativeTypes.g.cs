@@ -5,8 +5,6 @@ namespace Maplibre.NativeFfi.Internal.C;
 
 internal readonly record struct MlnAcquiredFrame(ulong Value) : IMlnHandle;
 
-internal readonly record struct MlnBuffer(ulong Value) : IMlnHandle;
-
 internal readonly record struct MlnEventBatch(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnGeojsonSourceData(ulong Value) : IMlnHandle;

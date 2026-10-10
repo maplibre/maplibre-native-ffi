@@ -10,7 +10,6 @@
 #include <utility>
 #include <vector>
 
-#include "bytes/buffer.hpp"
 #include "c_api/boundary.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
@@ -189,17 +188,6 @@ auto valid_tile_urls(const mln_buffer_view* tiles, size_t tile_count) -> bool {
     }
   }
   return true;
-}
-
-auto take_buffer(mln_buffer buffer, std::string& out) -> mln_status {
-  mln_buffer_view view{};
-  const auto status = mln::core::buffer_get(buffer, &view);
-  if (status == MLN_STATUS_OK) {
-    const auto* bytes = static_cast<const char*>(view.data);
-    out.assign(bytes == nullptr ? "" : bytes, view.size);
-  }
-  mln::core::buffer_destroy(buffer);
-  return status;
 }
 
 // Adds one callback-backed source. An accepted command hands user_data to the
@@ -1601,13 +1589,10 @@ auto mln_map_get_style_layer_json(
       [id = std::move(id)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
-        auto buffer = mln_buffer{MLN_HANDLE_NULL};
-        const auto status = mln::core::map_get_style_layer_json(
-          live, id.view(), &buffer, &result.found
+        mln::core::map_get_style_layer_json(
+          live, id.view(), result.bytes, result.found
         );
-        return status == MLN_STATUS_OK && result.found
-                 ? take_buffer(buffer, result.bytes)
-                 : status;
+        return MLN_STATUS_OK;
       },
       completion
     );
@@ -1668,10 +1653,8 @@ auto mln_map_get_global_state(
       [](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
-        auto buffer = mln_buffer{MLN_HANDLE_NULL};
-        const auto status = mln::core::map_get_global_state(live, &buffer);
-        if (status != MLN_STATUS_OK) return status;
-        return take_buffer(buffer, result.bytes);
+        result.bytes = mln::core::map_get_global_state(live);
+        return MLN_STATUS_OK;
       },
       completion
     );
@@ -1718,12 +1701,9 @@ auto mln_map_get_style_light_property(
       [name = std::move(name)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
-        auto buffer = mln_buffer{MLN_HANDLE_NULL};
-        const auto status =
-          mln::core::map_get_style_light_property(live, name.view(), &buffer);
-        if (status != MLN_STATUS_OK || buffer == MLN_HANDLE_NULL) return status;
-        result.found = true;
-        return take_buffer(buffer, result.bytes);
+        return mln::core::map_get_style_light_property(
+          live, name.view(), result.bytes, result.found
+        );
       },
       completion
     );
@@ -1845,13 +1825,9 @@ auto mln_map_get_layer_property(
       [id = std::move(id), name = std::move(name)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
-        auto buffer = mln_buffer{MLN_HANDLE_NULL};
-        const auto status = mln::core::map_get_layer_property(
-          live, id.view(), name.view(), &buffer
+        return mln::core::map_get_layer_property(
+          live, id.view(), name.view(), result.bytes, result.found
         );
-        if (status != MLN_STATUS_OK || buffer == MLN_HANDLE_NULL) return status;
-        result.found = true;
-        return take_buffer(buffer, result.bytes);
       },
       completion
     );
@@ -1904,13 +1880,9 @@ auto mln_map_get_layer_filter(
       [owned = std::move(owned)](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
-        auto buffer = mln_buffer{MLN_HANDLE_NULL};
-        const auto status =
-          mln::core::map_get_layer_filter(live, owned.view(), &buffer);
-        if (status != MLN_STATUS_OK) return status;
-        if (buffer == MLN_HANDLE_NULL) return MLN_STATUS_OK;
-        result.found = true;
-        return take_buffer(buffer, result.bytes);
+        return mln::core::map_get_layer_filter(
+          live, owned.view(), result.bytes, result.found
+        );
       },
       completion
     );

@@ -81,7 +81,6 @@
 #include <mln/util/tileset.hpp>
 #include <mln/util/vectors.hpp>
 
-#include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
@@ -3021,27 +3020,15 @@ auto map_move_style_layer(
 }
 
 auto map_get_style_layer_json(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_layer,
-  bool* out_found
-) -> mln_status {
-  if (
-    out_layer == nullptr || *out_layer != MLN_HANDLE_NULL ||
-    out_found == nullptr
-  ) {
-    set_thread_error(
-      "out_layer must not be null, *out_layer must be the null handle, and "
-      "out_found must not be null"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+  MapObject& live, mln_buffer_view layer_id, std::string& out_layer,
+  bool& out_found
+) -> void {
   const auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
-  *out_found = layer != nullptr;
-  if (layer == nullptr) {
-    return MLN_STATUS_OK;
+  out_found = layer != nullptr;
+  if (layer != nullptr) {
+    out_layer = serialize_json_value(layer->serialize());
   }
-  return create_buffer(serialize_json_value(layer->serialize()), out_layer);
 }
 
 auto map_set_global_state_property(
@@ -3060,13 +3047,9 @@ auto map_set_global_state_property(
   return MLN_STATUS_OK;
 }
 
-auto map_get_global_state(MapObject& live, mln_buffer* out_state)
-  -> mln_status {
-  return create_buffer(
-    serialize_json_value(
-      mln::Value{map_native(live).getStyle().getGlobalState()}
-    ),
-    out_state
+auto map_get_global_state(MapObject& live) -> std::string {
+  return serialize_json_value(
+    mln::Value{map_native(live).getStyle().getGlobalState()}
   );
 }
 
@@ -3119,15 +3102,9 @@ auto map_set_style_light_property(
 }
 
 auto map_get_style_light_property(
-  MapObject& live, mln_buffer_view property_name, mln_buffer* out_value
+  MapObject& live, mln_buffer_view property_name, std::string& out_value,
+  bool& out_found
 ) -> mln_status {
-  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_value must not be null and *out_value must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* light = map_native(live).getStyle().getLight();
   if (light == nullptr) {
     set_thread_error("style light does not exist");
@@ -3138,7 +3115,9 @@ auto map_get_style_light_property(
   if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
-  return create_buffer(serialize_json_value(property.getValue()), out_value);
+  out_value = serialize_json_value(property.getValue());
+  out_found = true;
+  return MLN_STATUS_OK;
 }
 
 auto map_set_style_transition_options(
@@ -3253,15 +3232,8 @@ auto map_set_layer_property(
 
 auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer* out_value
+  std::string& out_value, bool& out_found
 ) -> mln_status {
-  if (out_value == nullptr || *out_value != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_value must not be null and *out_value must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3273,7 +3245,9 @@ auto map_get_layer_property(
   if (property.getKind() == mln::style::StyleProperty::Kind::Undefined) {
     return MLN_STATUS_OK;
   }
-  return create_buffer(serialize_json_value(property.getValue()), out_value);
+  out_value = serialize_json_value(property.getValue());
+  out_found = true;
+  return MLN_STATUS_OK;
 }
 
 auto map_set_layer_filter(
@@ -3301,15 +3275,9 @@ auto map_set_layer_filter(
 }
 
 auto map_get_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_filter
+  MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
+  bool& out_found
 ) -> mln_status {
-  if (out_filter == nullptr || *out_filter != MLN_HANDLE_NULL) {
-    set_thread_error(
-      "out_filter must not be null and *out_filter must be the null handle"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3321,7 +3289,9 @@ auto map_get_layer_filter(
   if (filter.is<mln::NullValue>()) {
     return MLN_STATUS_OK;
   }
-  return create_buffer(serialize_json_value(filter), out_filter);
+  out_filter = serialize_json_value(filter);
+  out_found = true;
+  return MLN_STATUS_OK;
 }
 
 namespace {

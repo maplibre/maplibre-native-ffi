@@ -4007,47 +4007,6 @@ final class AcquiredFrameHandle implements Finalizable {
   );
 }
 
-/// Issued `mln_buffer` handle id.
-extension type const NativeBuffer(int raw) implements NativeHandle {}
-
-/// Owner of one native `mln_buffer` handle.
-///
-/// An owned buffer of bytes.
-///
-/// See `mln_buffer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-final class BufferHandle implements Finalizable {
-  BufferHandle._(NativeBuffer handle)
-    : _state = NativeHandleState(handle, 'BufferHandle');
-  final NativeHandleState<NativeBuffer> _state;
-  NativeBuffer get _handle => _state.handle;
-
-  /// Whether this binding object has released its native handle.
-  bool get isClosed => _state.isClosed;
-
-  /// The issued native handle id.
-  BigInt get identity => uint64FromNative(_state.handleId);
-
-  /// Destroys an owned buffer. A null handle is a no-op.
-  ///
-  /// See `mln_buffer_destroy` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-  void close() => _state.close((handle) {
-    raw.mln_buffer_destroy(handle.raw);
-    return nativeStatusOk;
-  });
-
-  /// Borrows the data stored by an owned buffer.
-  ///
-  /// See `mln_buffer_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-  Uint8List getValue() => withNativeArena((arena) {
-    final outView = arena<raw.mln_buffer_view>();
-    _check(raw.mln_buffer_get(_handle.raw, outView, nativeDiagnostic));
-    return _copyBufferView(outView.ref);
-  });
-}
-
 /// Issued `mln_event_batch` handle id.
 extension type const NativeEventBatch(int raw) implements NativeHandle {}
 

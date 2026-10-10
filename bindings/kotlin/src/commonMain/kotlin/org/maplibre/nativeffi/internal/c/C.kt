@@ -33,10 +33,6 @@ internal expect object C {
 
   fun mln_bound_options_default(returned: Long): Unit
 
-  fun mln_buffer_destroy(buffer: Long): Unit
-
-  fun mln_buffer_get(buffer: Long, outView: Long, outDiagnostic: Long): Int
-
   fun mln_c_version(): Int
 
   fun mln_camera_delta_default(returned: Long): Unit

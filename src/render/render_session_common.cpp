@@ -39,7 +39,6 @@
 #include <mln/vulkan/renderable_resource.hpp>
 #endif
 
-#include "bytes/buffer.hpp"
 #include "c_api/autorelease_pool.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
@@ -557,19 +556,6 @@ auto validate_screen_point(mln_screen_point point) -> bool {
   return true;
 }
 
-template <typename Handle>
-auto validate_result_output(Handle* out_result) -> mln_status {
-  if (out_result == nullptr) {
-    mln::core::set_thread_error("out_result must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_result != MLN_HANDLE_NULL) {
-    mln::core::set_thread_error("*out_result must be the null handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
 auto make_string_vector(std::span<const mln_buffer_view> strings)
   -> std::vector<std::string> {
   auto result = std::vector<std::string>{};
@@ -847,23 +833,13 @@ auto to_feature_extension_arguments(const mln_buffer_view* arguments)
   return std::optional<std::map<std::string, mln::Value>>{std::move(result)};
 }
 
-auto create_feature_extension_result(
-  mln::FeatureExtensionValue value, mln_buffer* out_result
-) -> mln_status {
-  const auto output_status = validate_result_output(out_result);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
+auto serialize_feature_extension_result(const mln::FeatureExtensionValue& value)
+  -> std::string {
   if (value.is<mln::Value>()) {
-    return mln::core::create_buffer(
-      mln::core::serialize_json_value(value.get<mln::Value>()), out_result
-    );
+    return mln::core::serialize_json_value(value.get<mln::Value>());
   }
-  return mln::core::create_buffer(
-    mln::core::serialize_feature_collection(
-      value.get<mln::FeatureCollection>()
-    ),
-    out_result
+  return mln::core::serialize_feature_collection(
+    value.get<mln::FeatureCollection>()
   );
 }
 
@@ -2324,16 +2300,12 @@ auto render_session_query_feature_extensions(
   mln_render_session session, mln_buffer_view source_id,
   mln_buffer_view feature, mln_buffer_view extension,
   mln_buffer_view extension_field, const mln_buffer_view* arguments,
-  mln_buffer* out_result
+  std::string& out_result
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
   const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
-  }
-  const auto output_status = validate_result_output(out_result);
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
   }
   if (
     !validate_non_empty_string(source_id, "source_id") ||
@@ -2361,11 +2333,12 @@ auto render_session_query_feature_extensions(
   auto query_feature = mln::Feature{std::move(*native_feature)};
   auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mln::gfx::BackendScope{*backend};
-  auto result = live->renderer->queryFeatureExtensions(
+  const auto result = live->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),
     string_from_view(extension_field), std::move(*native_arguments)
   );
-  return create_feature_extension_result(std::move(result), out_result);
+  out_result = serialize_feature_extension_result(result);
+  return MLN_STATUS_OK;
 }
 
 namespace {

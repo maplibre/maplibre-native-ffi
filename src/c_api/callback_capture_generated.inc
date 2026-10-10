@@ -627,10 +627,6 @@ inline auto dispose_owner(
       static_cast<mln_acquired_frame>(handle), nullptr
     );
   }
-  if (std::strcmp(native_type, "mln_buffer") == 0) {
-    mln_buffer_destroy(static_cast<mln_buffer>(handle));
-    return MLN_STATUS_OK;
-  }
   if (std::strcmp(native_type, "mln_event_batch") == 0) {
     mln_event_batch_release(static_cast<mln_event_batch>(handle));
     return MLN_STATUS_OK;

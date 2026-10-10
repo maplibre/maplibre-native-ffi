@@ -443,22 +443,27 @@ auto map_list_style_layer_ids(
 auto map_move_style_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view before_layer_id
 ) -> mln_status;
+// Writes the layer's style JSON, or sets out_found false when the style has no
+// such layer.
 auto map_get_style_layer_json(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_layer,
-  bool* out_found
-) -> mln_status;
+  MapObject& live, mln_buffer_view layer_id, std::string& out_layer,
+  bool& out_found
+) -> void;
 auto map_set_global_state_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
-auto map_get_global_state(MapObject& live, mln_buffer* out_state) -> mln_status;
+auto map_get_global_state(MapObject& live) -> std::string;
 
 auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
   -> mln_status;
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
+// Writes the property's JSON and sets out_found, which stays false when the
+// property is unset.
 auto map_get_style_light_property(
-  MapObject& live, mln_buffer_view property_name, mln_buffer* out_value
+  MapObject& live, mln_buffer_view property_name, std::string& out_value,
+  bool& out_found
 ) -> mln_status;
 auto map_set_style_transition_options(
   MapObject& live, const mln_style_transition_options* options
@@ -470,15 +475,20 @@ auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
 ) -> mln_status;
+// Writes the property's JSON and sets out_found, which stays false when the
+// property is unset.
 auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
-  mln_buffer* out_value
+  std::string& out_value, bool& out_found
 ) -> mln_status;
 auto map_set_layer_filter(
   MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status;
+// Writes the filter's JSON and sets out_found, which stays false when the layer
+// has no filter.
 auto map_get_layer_filter(
-  MapObject& live, mln_buffer_view layer_id, mln_buffer* out_filter
+  MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
+  bool& out_found
 ) -> mln_status;
 auto map_set_layer_source_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_layer

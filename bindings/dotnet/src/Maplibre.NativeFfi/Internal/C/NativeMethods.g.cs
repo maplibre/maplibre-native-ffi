@@ -85,16 +85,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_bound_options mln_bound_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial void mln_buffer_destroy(MlnBuffer buffer);
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_buffer_get(
-        MlnBuffer buffer,
-        mln_buffer_view* out_view,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial uint mln_c_version();
 
     [LibraryImport(LibraryName)]

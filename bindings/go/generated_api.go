@@ -5558,25 +5558,6 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
-// BufferHandle corresponds to mln_buffer. An owned buffer of bytes.
-//
-// See mln_buffer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-type BufferHandle struct{ *bindingOwner }
-
-func adoptBufferHandle(raw uint64, parent any) *BufferHandle {
-	owner := &BufferHandle{bindingAdopt(raw, parent, "BufferHandle", func(raw uint64) { C.mln_buffer_destroy(C.mln_buffer(raw)) })}
-	return owner
-}
-
-// owner returns the handle's owner state, or nil for a nil handle.
-func (handle *BufferHandle) owner() *bindingOwner {
-	if handle == nil {
-		return nil
-	}
-	return handle.bindingOwner
-}
-
 // EventBatchHandle corresponds to mln_event_batch. An owned batch of runtime
 // events from one drain.
 //
@@ -5843,31 +5824,6 @@ func (receiver *AcquiredFrameHandle) Close(consumerCompletion GpuSync) error {
 func AndroidInit(jniEnv uintptr, jniClass uintptr, context uintptr) error {
 	return bindingDo(bindingGlobal(C.binding_operation_mln_android_init), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_android_init(unsafe.Pointer(C.binding_address(C.uintptr_t(jniEnv))), unsafe.Pointer(C.binding_address(C.uintptr_t(jniClass))), unsafe.Pointer(C.binding_address(C.uintptr_t(context))), diagnostic))
-	})
-}
-
-// Close destroys an owned buffer. A null handle is a no-op.
-//
-// See mln_buffer_destroy in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-func (receiver *BufferHandle) Close() error {
-	_, err := bindingDirect(bindingConsuming(receiver.owner(), C.binding_operation_mln_buffer_destroy), func(arena *bindingArena, raw uint64) struct{} {
-		C.mln_buffer_destroy(C.mln_buffer(raw))
-		return struct{}{}
-	})
-	return err
-}
-
-// Get borrows the data stored by an owned buffer.
-//
-// See mln_buffer_get in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
-func (receiver *BufferHandle) Get() ([]byte, error) {
-	var outView C.mln_buffer_view
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_buffer_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_buffer_get(C.mln_buffer(raw), &outView, diagnostic))
-	}, func(arena *bindingArena) []byte {
-		return bindingBytes(outView.data, uint64(outView.size))
 	})
 }
 

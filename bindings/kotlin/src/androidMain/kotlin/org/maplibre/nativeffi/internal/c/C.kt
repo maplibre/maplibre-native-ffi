@@ -79,11 +79,6 @@ internal actual object C {
 
   @JvmStatic actual external fun mln_bound_options_default(returned: Long): Unit
 
-  @JvmStatic actual external fun mln_buffer_destroy(buffer: Long): Unit
-
-  @JvmStatic
-  actual external fun mln_buffer_get(buffer: Long, outView: Long, outDiagnostic: Long): Int
-
   @JvmStatic actual external fun mln_c_version(): Int
 
   @JvmStatic actual external fun mln_camera_delta_default(returned: Long): Unit

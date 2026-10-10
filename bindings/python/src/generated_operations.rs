@@ -4532,11 +4532,6 @@ unsafe extern "C" fn generated_dispose_mln_acquired_frame(
     unsafe { sys::mln_acquired_frame_dispose(handle, std::ptr::null_mut()) }
 }
 
-unsafe extern "C" fn generated_dispose_mln_buffer(handle: sys::mln_buffer) -> sys::mln_status {
-    unsafe { sys::mln_buffer_destroy(handle) };
-    sys::MLN_STATUS_OK
-}
-
 unsafe extern "C" fn generated_dispose_mln_event_batch(
     handle: sys::mln_event_batch,
 ) -> sys::mln_status {
@@ -4694,32 +4689,6 @@ impl AcquiredFrameHandle {
         }?;
         reservation.commit();
         Ok(py.None())
-    }
-}
-
-#[pymethods]
-impl BufferHandle {
-    #[pyo3(signature = ())]
-    fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_buffer_destroy", self.admission())?;
-        let Some(mut reservation) = self.reserve()? else {
-            return Ok(py.None());
-        };
-        let handle = reservation.handle();
-        unsafe { call.run(|| sys::mln_buffer_destroy(handle)) };
-        reservation.commit();
-        Ok(py.None())
-    }
-    #[pyo3(signature = ())]
-    fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_buffer_get", self.admission())?;
-        let read = self.read()?;
-        let handle = read.handle;
-        let mut out_view: sys::mln_buffer_view = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| sys::mln_buffer_get(handle, &mut out_view, diagnostic))
-        }?;
-        unsafe { generated_bytes(py, out_view) }
     }
 }
 
@@ -9551,14 +9520,6 @@ generated_owner!(
     )
 );
 generated_owner!(
-    BufferHandle,
-    "_BufferHandle",
-    mln_buffer,
-    Some(generated_dispose_mln_buffer),
-    None,
-    |_, owner| GeneratedReadScope::new::<sys::mln_buffer, _>(Arc::clone(&owner.state))
-);
-generated_owner!(
     EventBatchHandle,
     "_EventBatchHandle",
     mln_event_batch,
@@ -9967,7 +9928,6 @@ fn supported_render_backend_mask(py: Python<'_>) -> PyResult<Py<PyAny>> {
 fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<GeneratedReadScope>()?;
     module.add_class::<AcquiredFrameHandle>()?;
-    module.add_class::<BufferHandle>()?;
     module.add_class::<EventBatchHandle>()?;
     module.add_class::<GeojsonSourceDataHandle>()?;
     module.add_class::<MapHandle>()?;

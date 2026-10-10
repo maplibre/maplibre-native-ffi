@@ -9,7 +9,6 @@
 
 #include "map/feature_state.hpp"
 
-#include "bytes/buffer.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
 #include "maplibre_native_c.h"

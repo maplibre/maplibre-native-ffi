@@ -39,15 +39,6 @@ pub const AcquiredFrame = owner.Handle("mln_acquired_frame", "AcquiredFrame", st
         try status.call(c.mln_acquired_frame_dispose, .{raw}, null);
     }
 }.dispose);
-/// An owned buffer of bytes.
-///
-/// See `mln_buffer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub const Buffer = owner.Handle("mln_buffer", "Buffer", struct {
-    fn dispose(raw: u64) status.Error!void {
-        c.mln_buffer_destroy(raw);
-    }
-}.dispose);
 /// An owned batch of runtime events from one drain.
 ///
 /// See `mln_event_batch` in the
@@ -5377,22 +5368,6 @@ pub fn animationOptionsDefault() status.Error!AnimationOptions {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn boundOptionsDefault() status.Error!BoundOptions {
     return call.direct("mln_bound_options_default", .none, {}, BoundOptions, null, .{});
-}
-
-/// Destroys an owned buffer. A null handle is a no-op.
-///
-/// See `mln_buffer_destroy` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub fn bufferDestroy(buffer: Buffer) status.Error!void {
-    return call.direct("mln_buffer_destroy", .close, buffer, void, null, .{});
-}
-
-/// Borrows the data stored by an owned buffer.
-///
-/// See `mln_buffer_get` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-pub fn bufferGet(allocator: std.mem.Allocator, buffer: Buffer, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue([]const u8) {
-    return call.invoke("mln_buffer_get", .borrow, buffer, allocator, diagnostic, .{call.out(OwnedValue([]const u8))});
 }
 
 /// Reports the C ABI contract version. The value is 0 while the ABI is

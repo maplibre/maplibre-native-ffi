@@ -10,7 +10,6 @@ import 'native_asset.dart';
 export 'native_abi.dart';
 
 typedef mln_acquired_frame = Uint64;
-typedef mln_buffer = Uint64;
 typedef mln_event_batch = Uint64;
 typedef mln_geojson_source_data = Uint64;
 typedef mln_map = Uint64;
@@ -2640,18 +2639,6 @@ external mln_animation_options mln_animation_options_default();
 
 @Native<mln_bound_options Function()>()
 external mln_bound_options mln_bound_options_default();
-
-@Native<Void Function(mln_buffer)>()
-external void mln_buffer_destroy(int buffer);
-
-@Native<
-  Int32 Function(mln_buffer, Pointer<mln_buffer_view>, Pointer<mln_diagnostic>)
->()
-external int mln_buffer_get(
-  int buffer,
-  Pointer<mln_buffer_view> out_view,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
 
 @Native<Uint32 Function()>()
 external int mln_c_version();

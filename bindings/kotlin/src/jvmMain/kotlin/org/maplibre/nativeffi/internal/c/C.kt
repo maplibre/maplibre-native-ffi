@@ -33,9 +33,6 @@ internal actual object C {
     Ffm.downcall("mln_animation_options_default", mln_animation_options)
   private val mln_bound_options_default =
     Ffm.downcall("mln_bound_options_default", mln_bound_options)
-  private val mln_buffer_destroy = Ffm.downcall("mln_buffer_destroy", null, JAVA_LONG)
-  private val mln_buffer_get =
-    Ffm.downcall("mln_buffer_get", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_c_version = Ffm.downcall("mln_c_version", JAVA_INT)
   private val mln_camera_delta_default = Ffm.downcall("mln_camera_delta_default", mln_camera_delta)
   private val mln_camera_fit_options_default =
@@ -1688,13 +1685,6 @@ internal actual object C {
   actual fun mln_bound_options_default(returned: Long) {
     mln_bound_options_default.invokeExact(Ffm.into(returned, mln_bound_options)) as MemorySegment
   }
-
-  actual fun mln_buffer_destroy(buffer: Long) {
-    mln_buffer_destroy.invoke(buffer)
-  }
-
-  actual fun mln_buffer_get(buffer: Long, outView: Long, outDiagnostic: Long): Int =
-    mln_buffer_get.invokeExact(buffer, outView, outDiagnostic) as Int
 
   actual fun mln_c_version(): Int = mln_c_version.invokeExact() as Int
 

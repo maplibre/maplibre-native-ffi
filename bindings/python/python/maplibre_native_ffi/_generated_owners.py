@@ -2,7 +2,6 @@
 
 from ._generated_operations import (
     _AcquiredFrameHandleOperations,
-    _BufferHandleOperations,
     _EventBatchHandleOperations,
     _GeojsonSourceDataHandleOperations,
     _HttpHeaderTransformResponseScopeOperations,
@@ -47,27 +46,6 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
     """
 
     _handle_name = "AcquiredFrameHandle"
-    _parent: NativeHandleMixin | None
-
-    def __init__(self):
-        raise TypeError("native handles are returned by their owning operations")
-
-    @classmethod
-    def _from_native(cls, native, parent=None):
-        owner = cls.__new__(cls)
-        owner._native = native
-        owner._parent = parent
-        return owner
-
-
-class BufferHandle(_BufferHandleOperations, NativeHandleMixin):
-    """An owned buffer of bytes.
-
-    See `mln_buffer` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-    """
-
-    _handle_name = "BufferHandle"
     _parent: NativeHandleMixin | None
 
     def __init__(self):

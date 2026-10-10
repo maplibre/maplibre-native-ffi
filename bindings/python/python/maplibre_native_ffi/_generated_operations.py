@@ -285,26 +285,6 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return self._native.close(consumer_completion)
 
 
-class _BufferHandleOperations(GeneratedOperations):
-    _native: _native._BufferHandle
-
-    def close(self) -> None:
-        """Destroys an owned buffer. A null handle is a no-op.
-
-        See `mln_buffer_destroy` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-        """
-        return self._native.close()
-
-    def get(self) -> bytes:
-        """Borrows the data stored by an owned buffer.
-
-        See `mln_buffer_get` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-        """
-        return self._native.get()
-
-
 class _EventBatchHandleOperations(GeneratedOperations):
     _native: _native._EventBatchHandle
 

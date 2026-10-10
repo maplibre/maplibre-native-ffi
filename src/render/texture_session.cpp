@@ -11,7 +11,6 @@
 
 #include "render/texture_session.hpp"
 
-#include "bytes/buffer.hpp"
 #include "completion/completion_result.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"

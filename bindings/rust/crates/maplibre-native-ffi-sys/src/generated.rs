@@ -1550,9 +1550,6 @@ pub struct mln_wgl_context_descriptor {
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_acquired_frame(pub u64);
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct mln_buffer(pub u64);
 pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
@@ -1634,7 +1631,6 @@ pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ff
 pub type mln_wake_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 native_handles!(
     mln_acquired_frame,
-    mln_buffer,
     mln_event_batch,
     mln_geojson_source_data,
     mln_map,
@@ -1699,12 +1695,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_animation_options_default() -> mln_animation_options;
     pub fn mln_bound_options_default() -> mln_bound_options;
-    pub fn mln_buffer_destroy(buffer: mln_buffer);
-    pub fn mln_buffer_get(
-        buffer: mln_buffer,
-        out_view: *mut mln_buffer_view,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_c_version() -> u32;
     pub fn mln_camera_delta_default() -> mln_camera_delta;
     pub fn mln_camera_fit_options_default() -> mln_camera_fit_options;

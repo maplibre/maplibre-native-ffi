@@ -123,19 +123,6 @@ static void mln_bound_options_default_jni(
   *MLN_JNI_POINTER(mln_bound_options*, returned) = mln_bound_options_default();
 }
 
-static void mln_buffer_destroy_jni(JNIEnv* env, jclass type, jlong buffer) {
-  mln_buffer_destroy((mln_buffer)buffer);
-}
-
-static jint mln_buffer_get_jni(
-  JNIEnv* env, jclass type, jlong buffer, jlong out_view, jlong out_diagnostic
-) {
-  return (jint)mln_buffer_get(
-    (mln_buffer)buffer, MLN_JNI_POINTER(mln_buffer_view*, out_view),
-    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
-  );
-}
-
 static jint mln_c_version_jni(JNIEnv* env, jclass type) {
   return (jint)mln_c_version();
 }
@@ -2755,8 +2742,6 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_animation_options_default", "(J)V",
    (void*)mln_animation_options_default_jni},
   {"mln_bound_options_default", "(J)V", (void*)mln_bound_options_default_jni},
-  {"mln_buffer_destroy", "(J)V", (void*)mln_buffer_destroy_jni},
-  {"mln_buffer_get", "(JJJ)I", (void*)mln_buffer_get_jni},
   {"mln_c_version", "()I", (void*)mln_c_version_jni},
   {"mln_camera_delta_default", "(J)V", (void*)mln_camera_delta_default_jni},
   {"mln_camera_fit_options_default", "(J)V",

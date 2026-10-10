@@ -125,17 +125,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_buffer_destroy(buffer: Long) {
-    org.maplibre.nativeffi.internal.cinterop.mln_buffer_destroy(buffer.toULong())
-  }
-
-  actual fun mln_buffer_get(buffer: Long, outView: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_buffer_get(
-      buffer.toULong(),
-      outView.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
   actual fun mln_c_version(): Int = org.maplibre.nativeffi.internal.cinterop.mln_c_version().toInt()
 
   actual fun mln_camera_delta_default(returned: Long) {

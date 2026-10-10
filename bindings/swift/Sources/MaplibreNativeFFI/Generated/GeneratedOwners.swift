@@ -40,41 +40,6 @@ public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
   }
 }
 
-struct NativeBufferHandle: NativeHandle {
-  let raw: UInt64; func disposeAbandoned()
-    -> Bool
-  {
-    mln_buffer_destroy(raw); return true
-  }
-}
-
-/// An owned buffer of bytes.
-///
-/// See `mln_buffer` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
-public final class BufferHandle: @unchecked Sendable, NativeReceiver {
-  let handle: NativeHandleBox<NativeBufferHandle>
-  init(adopting raw: mln_buffer) throws {
-    handle = try NativeHandleBox(
-      typeName: "BufferHandle",
-      handle: NativeBufferHandle(raw: raw)
-    )
-  }
-
-  public var isClosed: Bool {
-    handle.isClosed
-  }
-
-  public var id: UInt64 {
-    handle.issued.raw
-  }
-
-  func requireLiveHandle() throws -> NativeBufferHandle {
-    try handle
-      .requireLive()
-  }
-}
-
 struct NativeEventBatchHandle: NativeHandle {
   let raw: UInt64; func disposeAbandoned()
     -> Bool

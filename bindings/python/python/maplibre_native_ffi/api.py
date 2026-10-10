@@ -22,7 +22,6 @@ from ._generated_operations import (
 )
 from ._generated_owners import (
     AcquiredFrameHandle,
-    BufferHandle,
     EventBatchHandle,
     GeojsonSourceDataHandle,
     HttpHeaderTransformResponseScope,
@@ -241,7 +240,6 @@ __all__ = [
     "AnimationOptions",
     "BoundOptionField",
     "BoundOptions",
-    "BufferHandle",
     "CameraChangeMode",
     "CameraDelta",
     "CameraDeltaKind",
