@@ -71,6 +71,13 @@ Ordered queries and lifecycle transitions use typed completions. Bindings expose
 one-shot work through their normal future, promise, task, suspension, or
 explicit async idiom.
 
+Cancelling or timing out a binding's wait ends only that wait. The native work
+continues to its terminal disposition, and its completion still runs. When a
+created handle arrives after the host abandoned its wait, the binding releases
+that handle. A Go context ends one wait, and dropping the future abandons it.
+Dart futures have no cancellation, so a Dart wait can only time out, and the
+future still delivers its result.
+
 Published snapshots provide synchronous copies of state needed by UI and display
 threads. Snapshot reads never call into mutable MapLibre map state. Each
 committed command completion reports the snapshot generation that its commit

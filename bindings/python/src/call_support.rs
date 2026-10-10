@@ -79,7 +79,8 @@ impl<'py> GeneratedCall<'py> {
     }
 
     /// Submits an operation whose completion transfers a handle, which
-    /// `discard` disposes when the interpreter has gone.
+    /// `discard` disposes when the interpreter has gone or the future was
+    /// cancelled first.
     unsafe fn complete_owned<C>(
         &mut self,
         submit: impl FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,

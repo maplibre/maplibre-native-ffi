@@ -38,7 +38,10 @@ public sealed unsafe partial class RuntimeHandle
         state.Retire();
     }
 
-    public Task<MapHandle> MapCreateAsync(MapOptions options)
+    public Task<MapHandle> MapCreateAsync(
+        MapOptions options,
+        CancellationToken cancellationToken = default
+    )
     {
         using var scope = new NativeCallScope(this, "mln_map_create");
         return scope.Query<MlnMap, MapHandle>(
@@ -49,7 +52,8 @@ public sealed unsafe partial class RuntimeHandle
                     completion,
                     diagnostic
                 ),
-            handle => MapHandle.Adopt(this, handle)
+            handle => MapHandle.Adopt(this, handle),
+            cancellationToken
         );
     }
 

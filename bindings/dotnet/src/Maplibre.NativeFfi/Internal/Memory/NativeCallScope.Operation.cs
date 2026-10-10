@@ -69,26 +69,29 @@ internal sealed unsafe partial class NativeCallScope
     internal Task<CommandCompletion> Command(
         CompletionSubmit submit,
         CancellationToken cancellationToken
-    ) => Accepted(NativeCompletion.SubmitCommand(submit)).WaitAsync(cancellationToken);
+    ) => Accepted(NativeCompletion.SubmitCommand(submit, cancellationToken));
 
     /// <summary>Submits an operation that completes without a value.</summary>
-    internal Task Run(CompletionSubmit submit, CancellationToken cancellationToken = default) =>
-        Accepted(NativeCompletion.Submit(submit, static _ => true)).WaitAsync(cancellationToken);
+    internal Task Run(CompletionSubmit submit, CancellationToken cancellationToken) =>
+        Accepted(NativeCompletion.Submit(submit, static _ => true, cancellationToken));
 
-    /// <summary>Submits an operation whose completion carries one value.</summary>
+    /// <summary>
+    /// Submits an operation whose completion carries one value. A disposable
+    /// value that arrives after cancellation is disposed.
+    /// </summary>
     internal Task<T> Query<TNative, T>(
         CompletionSubmit submit,
         Func<TNative, T> copy,
-        CancellationToken cancellationToken = default
+        CancellationToken cancellationToken
     )
         where TNative : unmanaged =>
         Accepted(
-                NativeCompletion.Submit(
-                    submit,
-                    result => copy(NativeCompletion.Value<TNative>(result))
-                )
+            NativeCompletion.Submit(
+                submit,
+                result => copy(NativeCompletion.Value<TNative>(result)),
+                cancellationToken
             )
-            .WaitAsync(cancellationToken);
+        );
 
     /// <summary>Submits an operation whose completion carries zero or one reference value.</summary>
     internal Task<T?> QueryOptional<TNative, T>(
@@ -99,15 +102,13 @@ internal sealed unsafe partial class NativeCallScope
         where TNative : unmanaged
         where T : class =>
         Accepted(
-                NativeCompletion.Submit(
-                    submit,
-                    result =>
-                        result->value_count == 0
-                            ? null
-                            : copy(NativeCompletion.Value<TNative>(result))
-                )
+            NativeCompletion.Submit(
+                submit,
+                result =>
+                    result->value_count == 0 ? null : copy(NativeCompletion.Value<TNative>(result)),
+                cancellationToken
             )
-            .WaitAsync(cancellationToken);
+        );
 
     /// <summary>Submits an operation whose completion carries zero or one value-type value.</summary>
     internal Task<T?> QueryOptionalValue<TNative, T>(
@@ -118,15 +119,15 @@ internal sealed unsafe partial class NativeCallScope
         where TNative : unmanaged
         where T : struct =>
         Accepted(
-                NativeCompletion.Submit(
-                    submit,
-                    result =>
-                        result->value_count == 0
-                            ? (T?)null
-                            : copy(NativeCompletion.Value<TNative>(result))
-                )
+            NativeCompletion.Submit(
+                submit,
+                result =>
+                    result->value_count == 0
+                        ? (T?)null
+                        : copy(NativeCompletion.Value<TNative>(result)),
+                cancellationToken
             )
-            .WaitAsync(cancellationToken);
+        );
 
     /// <summary>Submits an operation whose completion carries an array.</summary>
     internal Task<T[]> QueryArray<TNative, T>(
@@ -135,8 +136,9 @@ internal sealed unsafe partial class NativeCallScope
         CancellationToken cancellationToken
     )
         where TNative : unmanaged =>
-        Accepted(NativeCompletion.Submit(submit, result => CopyValues(result, copy)))
-            .WaitAsync(cancellationToken);
+        Accepted(
+            NativeCompletion.Submit(submit, result => CopyValues(result, copy), cancellationToken)
+        );
 
     /// <summary>Submits an operation whose completion carries an array or a null array.</summary>
     internal Task<T[]?> QueryOptionalArray<TNative, T>(
@@ -146,12 +148,12 @@ internal sealed unsafe partial class NativeCallScope
     )
         where TNative : unmanaged =>
         Accepted(
-                NativeCompletion.Submit(
-                    submit,
-                    result => result->value == null ? null : CopyValues(result, copy)
-                )
+            NativeCompletion.Submit(
+                submit,
+                result => result->value == null ? null : CopyValues(result, copy),
+                cancellationToken
             )
-            .WaitAsync(cancellationToken);
+        );
 
     /// <summary>
     /// Submits an attachment whose owner exists at once, then adopts the

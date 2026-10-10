@@ -1198,13 +1198,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
-    public Task<MapProjectionHandle> ProjectionCreateAsync()
+    public Task<MapProjectionHandle> ProjectionCreateAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         using var scope = new NativeCallScope(this, "mln_map_projection_create");
         return scope.Query<MlnMapProjection, MapProjectionHandle>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_projection_create(Handle, completion, diagnostic),
-            handle => MapProjectionHandle.Adopt(handle)
+            handle => MapProjectionHandle.Adopt(handle),
+            cancellationToken
         );
     }
 

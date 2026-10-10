@@ -78,7 +78,9 @@ func TestFailedCommandDispositionIsData(t *testing.T) {
 }
 
 // Await returns the context's error when the context ends first, and a nil
-// Future reports an error rather than blocking.
+// Future reports an error rather than blocking. A creation whose wait ended
+// and whose Future is dropped retires the map it creates, whether it arrives
+// before or after the Future is collected.
 func TestAwaitEndsWithItsContext(t *testing.T) {
 	pending, _ := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	cancelled, cancel := context.WithCancel(context.Background())
@@ -97,4 +99,15 @@ func TestAwaitEndsWithItsContext(t *testing.T) {
 	if _, err := missing.Await(context.Background()); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil Future Await = %v, want ErrInvalidArgument", err)
 	}
+
+	f := newRuntimeFixture(t)
+	creation, err := f.runtime.MapCreate(DefaultMapOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := creation.Await(cancelled); !errors.Is(err, context.Canceled) {
+		t.Fatalf("MapCreate Await(cancelled) = %v, want context.Canceled", err)
+	}
+	creation = nil
+	closeOnceCollected(t, f.runtime, "the disposal of the map whose wait was cancelled")
 }

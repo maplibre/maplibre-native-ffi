@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+import weakref
 from collections import deque
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -53,17 +54,34 @@ class NativeFuture[T](Future[T]):
         super().add_done_callback(fn)
 
 
-def map_future[T, U](source: Future[T], transform: Callable[[T], U]) -> Future[U]:
-    """Return an eager future that transforms a native completion result.
+def map_future[T, U](
+    source: Future[T],
+    transform: Callable[[T], U],
+    discard: Callable[[T], object] | None = None,
+) -> Future[U]:
+    """Return a future that transforms a native completion result.
 
-    Native work is already running once its submission is accepted, so
-    ``cancel()`` on the derived future returns False, as it does on its
-    source. The derived future always reports the source's outcome.
+    ``cancel()`` on the derived future abandons the wait and cancels its
+    source, and native work continues to its terminal disposition. When the
+    source resolves after the derived future was cancelled, ``discard``
+    releases the value that nothing adopts.
     """
-    result: Future[U] = NativeFuture()
-    result.set_running_or_notify_cancel()
+    result: NativeFuture[U] = NativeFuture()
+    # A weak reference keeps the derived future from holding its source, and
+    # the source's value with it, after both resolve.
+    source_ref = weakref.ref(source)
 
     def complete(completed: Future[T]) -> None:
+        if not result.set_running_or_notify_cancel():
+            # A cancelled source released its value natively, and a failed
+            # one carries none.
+            if (
+                discard is not None
+                and not completed.cancelled()
+                and completed.exception() is None
+            ):
+                discard(completed.result())
+            return
         try:
             try:
                 raw = completed.result()
@@ -81,6 +99,11 @@ def map_future[T, U](source: Future[T], transform: Callable[[T], U]) -> Future[U
             del trace
             result.set_exception(error)
 
+    def propagate_cancel(derived: Future[U]) -> None:
+        if derived.cancelled() and (pending := source_ref()) is not None:
+            pending.cancel()
+
+    result._add_internal_callback(propagate_cancel)
     if isinstance(source, NativeFuture):
         source._add_internal_callback(complete)
     else:

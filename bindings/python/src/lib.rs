@@ -370,9 +370,9 @@ fn new_python_future(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         .import("maplibre_native_ffi._future")?
         .getattr("NativeFuture")?
         .call0()?;
-    // Native work is already running once its C submission is accepted. Mark
-    // the future accordingly so cancel() cannot claim that it stopped the work.
-    future.call_method0("set_running_or_notify_cancel")?;
+    // The future stays pending until its completion arrives, so cancel()
+    // abandons the wait. Native work continues to its terminal disposition
+    // either way.
     Ok(future)
 }
 
@@ -389,6 +389,22 @@ unsafe extern "C" fn complete_python_future(
         let bridge = unsafe { &*user_data.cast::<PyCompletionBridge>() };
         let result = unsafe { &*result };
         let attached = Python::try_attach(|py| {
+            // Claim the future before converting, as an executor claims its
+            // work. A future that cancel() abandoned first takes no value, so
+            // the binding disposes what the result transfers.
+            let claimed = bridge
+                .future
+                .bind(py)
+                .call_method0("set_running_or_notify_cancel")
+                .and_then(|claimed| claimed.is_truthy());
+            match claimed {
+                Ok(true) => {}
+                Ok(false) => return true,
+                Err(error) => {
+                    error.write_unraisable(py, None);
+                    return true;
+                }
+            }
             let converted = if result.status == sys::MLN_STATUS_OK || bridge.accept_error_status {
                 match bridge
                     .convert
@@ -415,8 +431,11 @@ unsafe extern "C" fn complete_python_future(
             if let Err(error) = call {
                 error.write_unraisable(py, None);
             }
+            false
         });
-        if attached.is_none()
+        // Without an interpreter, or with an abandoned future, nothing adopts
+        // the value that the result transfers.
+        if attached.unwrap_or(true)
             && result.status == sys::MLN_STATUS_OK
             && let Some(discard) = bridge.discard
         {
@@ -436,7 +455,8 @@ unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
 ///
 /// With `accept_error_status`, `convert` also receives a failed result, for a
 /// command whose completion reports its own disposition. `discard` disposes a
-/// value that the result transfers when the interpreter has already gone.
+/// value that the result transfers when nothing adopts it: the interpreter has
+/// already gone, or the caller cancelled the future first.
 fn submit_python_future<S, C>(
     py: Python<'_>,
     submit: S,

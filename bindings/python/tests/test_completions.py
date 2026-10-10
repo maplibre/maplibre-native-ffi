@@ -3,7 +3,7 @@
 import asyncio
 import gc
 import threading
-from concurrent.futures import Future
+from concurrent.futures import CancelledError, Future
 
 import maplibre_native_ffi as mln
 import pytest
@@ -80,7 +80,7 @@ def test_a_failed_command_resolves_with_its_status(map_handle: mln.MapHandle) ->
     assert completion.diagnostic
 
 
-def test_waiting_on_accepted_work_times_out_and_cannot_cancel_it(
+def test_cancelling_a_wait_abandons_it_and_releases_the_late_map(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
     handles: list[mln.ResourceRequestHandle] = []
@@ -102,20 +102,34 @@ def test_waiting_on_accepted_work_times_out_and_cannot_cancel_it(
     handle = handles.pop()
     handle.set_cancel_callback(block_retirement)
 
-    # Map retirement runs the cancel callback and resolves after it returns.
+    # Map retirement runs the cancel callback, and the runtime's ordered
+    # submissions hold every later creation behind it.
     closing = map_handle.close()
     assert running.wait(TIMEOUT)
+    created = harness.runtime.map_create()
+    awaited = harness.runtime.map_create()
     with pytest.raises(TimeoutError):
-        closing.result(timeout=0)
-    assert closing.cancel() is False
+        created.result(timeout=0)
+    assert created.cancel() is True
+    with pytest.raises(CancelledError):
+        created.result(timeout=0)
 
     async def wait_briefly() -> None:
-        await asyncio.wait_for(asyncio.wrap_future(closing), timeout=0)
+        # The timeout cancels the asyncio wait, which cancels its future.
+        await asyncio.wait_for(asyncio.wrap_future(awaited), timeout=0)
 
     with pytest.raises(TimeoutError):
         asyncio.run(wait_briefly())
-    assert not closing.cancelled()
+    assert awaited.cancelled()
 
-    release.set()
-    assert result(closing) is None
-    handle.close()
+    with leak_reports() as reports:
+        release.set()
+        assert result(closing) is None
+        handle.close()
+        # The barrier resolves once both creations have delivered their maps
+        # to the cancelled futures. Runtime retirement waits for every map,
+        # so the close resolves only once both late maps have retired.
+        result(harness.runtime.barrier())
+        assert result(harness.runtime.close()) is None
+        gc.collect()
+    assert reports == []
