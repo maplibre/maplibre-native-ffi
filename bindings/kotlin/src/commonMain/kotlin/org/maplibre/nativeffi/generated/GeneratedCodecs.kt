@@ -1433,8 +1433,8 @@ internal fun readWebgpuSurfaceDescriptor(source: Long): WebgpuSurfaceDescriptor 
     format = readU32(source + w(52, 72)),
   )
 
-internal fun readRuntimeEventBatchView(source: Long): RuntimeEventBatchView =
-  RuntimeEventBatchView(
+internal fun readEventBatchView(source: Long): EventBatchView =
+  EventBatchView(
     events =
       readStrided(
         readAddress(source + 8),
@@ -1619,6 +1619,19 @@ internal fun readTextureReadbackResult(source: Long): TextureReadbackResult =
   TextureReadbackResult(
     data = readView(source + 8),
     info = readTextureImageInfo(source + w(16, 24)),
+  )
+
+internal fun readRenderFrameBatchView(source: Long): RenderFrameBatchView =
+  RenderFrameBatchView(
+    results =
+      readStrided(
+        readAddress(source + 8),
+        readSize(source + w(12, 16)),
+        readU32(source + 4).toULong(),
+        48,
+      ) { item ->
+        readRenderFrameResult(item)
+      }
   )
 
 internal fun NativeCall.putWake(target: Long, value: Wake) {

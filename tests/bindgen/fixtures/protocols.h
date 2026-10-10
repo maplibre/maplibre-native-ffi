@@ -18,7 +18,8 @@
   defined(MLN_PROTOCOL_PRESENCE_MASK) ||                                 \
   defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                            \
   defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) || \
-  defined(MLN_PROTOCOL_DEFAULT_REGISTRATION)
+  defined(MLN_PROTOCOL_DEFAULT_REGISTRATION) ||                          \
+  defined(MLN_PROTOCOL_STRIDED_RECORDS)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -553,6 +554,36 @@ mln_status mln_probe_take_parcel(
 BIND("absent_on=MLN_STATUS_NOT_READY")
 mln_status mln_probe_read_level(
   double* out_level BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+#endif
+
+// Plain records that native steps through by a stride it reports, which may
+// exceed the record a binding compiled.
+#ifdef MLN_PROTOCOL_STRIDED_RECORDS
+typedef struct mln_probe_reading {
+  uint32_t size;
+  uint64_t value;
+} mln_probe_reading;
+typedef struct mln_probe_reading_view {
+  uint32_t size;
+  uint32_t reading_size;
+  const mln_probe_reading* readings
+    BIND("length=reading_count;stride=reading_size");
+  size_t reading_count;
+} mln_probe_reading_view;
+typedef unsigned long long mln_probe_ledger BIND(
+  "kind=handle;release=mln_probe_ledger_release;dispose=mln_probe_ledger_"
+  "release"
+);
+void mln_probe_ledger_release(mln_probe_ledger ledger);
+mln_status mln_probe_ledger_open(
+  mln_probe_ledger* out_ledger BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+mln_status mln_probe_ledger_get(
+  mln_probe_ledger ledger,
+  mln_probe_reading_view* out_view BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
 );
 #endif
 

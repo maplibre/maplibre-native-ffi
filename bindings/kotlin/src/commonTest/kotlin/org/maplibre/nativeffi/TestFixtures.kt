@@ -110,7 +110,7 @@ private constructor(val runtime: RuntimeHandle, private val wakes: Channel<Unit>
       withTimeout(WAIT_TIMEOUT) {
         var match: RuntimeEvent? = null
         while (match == null) {
-          match = runtime.drainEvents().use { it.get().events }.firstOrNull(predicate)
+          match = runtime.drainEvents()?.use { it.get().events }?.firstOrNull(predicate)
           // The wake fires when the queue becomes nonempty, so an event queued after this drain
           // leaves a wake behind for the receive.
           if (match == null) wakes.receive()

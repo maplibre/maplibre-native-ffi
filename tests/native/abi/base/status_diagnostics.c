@@ -8,7 +8,7 @@ static void a_failed_call_writes_its_diagnostic_and_a_successful_call_clears_it(
   void
 ) {
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  mln_runtime_event_batch_view view = {0};
+  mln_event_batch_view view = {0};
   MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, &diagnostic));
   TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
 
@@ -21,7 +21,7 @@ static void a_diagnostic_is_written_within_its_declared_size(void) {
   mln_diagnostic diagnostic;
   memset(&diagnostic, 'x', sizeof(diagnostic));
   diagnostic.size = (uint32_t)(offsetof(mln_diagnostic, message) + 4);
-  mln_runtime_event_batch_view view = {0};
+  mln_event_batch_view view = {0};
   MLN_TEST_INVALID(mln_event_batch_get(MLN_HANDLE_NULL, &view, &diagnostic));
   TEST_ASSERT_EQUAL_size_t(3, strlen(diagnostic.message));
   TEST_ASSERT_EQUAL_INT('x', diagnostic.message[4]);
@@ -64,7 +64,7 @@ static void a_value_that_names_no_batch_is_rejected_without_effect(void) {
     const mln_event_batch value = row->handle(runtime);
     const mln_runtime_event sentinel = {0};
     // A valid size makes the handle the argument that fails.
-    mln_runtime_event_batch_view view = {
+    mln_event_batch_view view = {
       .size = sizeof(view), .events = &sentinel, .event_count = 99
     };
     mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};

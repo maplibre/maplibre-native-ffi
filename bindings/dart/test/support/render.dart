@@ -115,8 +115,7 @@ RenderFrameResult? _takeResult(RenderSessionHandle session, BigInt token) {
   final batch = session.drainFrameResults();
   if (batch == null) return null;
   try {
-    for (var index = 0; index < batch.count(); index++) {
-      final result = batch.getValue(index);
+    for (final result in batch.getValue().results) {
       if (result.token == token) return result;
     }
     return null;

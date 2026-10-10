@@ -139,8 +139,7 @@ internal open class RenderTarget(
     var retry = false
     var repaint = false
     batch.use { results ->
-      for (index in 0uL until results.count()) {
-        val result = results.get(index)
+      for (result in results.get().results) {
         demandOutstanding = false
         when (result.disposition) {
           RenderResult.RENDERED -> {

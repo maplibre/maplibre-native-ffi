@@ -200,8 +200,8 @@ void Function(dynamic) _callbackPortHandler(
 
 /// Decodes a synthetic native batch through the production generated converter.
 List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
-  raw.mln_runtime_event_batch_view batch,
-) => _readRuntimeEventBatchView(batch).events;
+  raw.mln_event_batch_view batch,
+) => _readEventBatchView(batch).events;
 
 /// Starts a command and decodes its receipt, including failed dispositions.
 Future<CommandCompletion> _startCommand(

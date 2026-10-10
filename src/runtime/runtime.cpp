@@ -2641,29 +2641,35 @@ auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   }
   auto control_lease = ControlLease{&live->control};
   auto queue = live->event_queue;
+  // An empty queue is a normal poll, so it neither allocates a batch nor sets
+  // a diagnostic.
+  {
+    const std::scoped_lock lock(queue->mutex);
+    if (queue->pending.events.empty()) return MLN_STATUS_NOT_READY;
+  }
+  // Allocating before the swap means a failed allocation loses no events.
   auto owned = std::make_shared<EventBatchObject>();
   {
     const std::scoped_lock lock(queue->mutex);
     owned->storage.events.swap(queue->pending.events);
     owned->storage.messages.swap(queue->pending.messages);
   }
+  // A concurrent drain can empty the queue between the two locks.
+  if (owned->storage.events.empty()) return MLN_STATUS_NOT_READY;
   *out_batch = handle_table<EventBatchObject>().insert(std::move(owned));
   return MLN_STATUS_OK;
 }
 
-auto get_event_batch(
-  mln_event_batch batch, mln_runtime_event_batch_view* out_view
-) -> mln_status {
-  if (
-    out_view == nullptr || out_view->size < sizeof(mln_runtime_event_batch_view)
-  ) {
+auto get_event_batch(mln_event_batch batch, mln_event_batch_view* out_view)
+  -> mln_status {
+  if (out_view == nullptr || out_view->size < sizeof(mln_event_batch_view)) {
     set_thread_error("out_view must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<EventBatchObject>().lease(batch);
   if (live == nullptr) return recorded_handle_fault_status();
-  *out_view = mln_runtime_event_batch_view{
-    .size = sizeof(mln_runtime_event_batch_view),
+  *out_view = mln_event_batch_view{
+    .size = sizeof(mln_event_batch_view),
     .event_size = sizeof(mln_runtime_event),
     .events =
       live->storage.events.empty() ? nullptr : live->storage.events.data(),

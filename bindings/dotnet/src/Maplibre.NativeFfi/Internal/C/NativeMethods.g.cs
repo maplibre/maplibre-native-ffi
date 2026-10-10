@@ -108,7 +108,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_event_batch_get(
         MlnEventBatch batch,
-        mln_runtime_event_batch_view* out_view,
+        mln_event_batch_view* out_view,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1338,17 +1338,9 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_projection_mode mln_projection_mode_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_frame_batch_count(
-        MlnRenderFrameBatch batch,
-        nuint* out_count,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_frame_batch_get(
         MlnRenderFrameBatch batch,
-        nuint index,
-        mln_render_frame_result* out_result,
+        mln_render_frame_batch_view* out_view,
         mln_diagnostic* out_diagnostic
     );
 

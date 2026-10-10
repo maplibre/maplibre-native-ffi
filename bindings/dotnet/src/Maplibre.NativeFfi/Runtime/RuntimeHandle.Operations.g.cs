@@ -168,11 +168,17 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_drain_events</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public EventBatchHandle DrainEvents()
+    public EventBatchHandle? DrainEvents()
     {
         using var call = Enter(this, "mln_runtime_drain_events");
         MlnEventBatch outBatch = default;
-        Check(NativeMethods.mln_runtime_drain_events(Handle, &outBatch, Diagnostic));
+        if (
+            !Present(
+                NativeMethods.mln_runtime_drain_events(Handle, &outBatch, Diagnostic),
+                mln_status.MLN_STATUS_NOT_READY
+            )
+        )
+            return null;
         return EventBatchHandle.Adopt(outBatch);
     }
 

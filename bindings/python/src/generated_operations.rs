@@ -466,6 +466,37 @@ fn generated_copy_mln_egl_context_descriptor(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_event_batch_view(
+    py: Python<'_>,
+    value: &sys::mln_event_batch_view,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "events",
+        generated_list(
+            py,
+            unsafe { generated_strided_values(value.events, value.event_count, value.event_size)? },
+            |element| {
+                Ok({
+                    let item = generated_copy_mln_runtime_event(py, &element)?;
+                    item.bind(py)
+                        .cast::<PyDict>()?
+                        .set_item("message", unsafe {
+                            generated_arena_string(
+                                value.messages,
+                                value.messages_size,
+                                element.message_offset,
+                                element.message_size,
+                            )?
+                        })?;
+                    item
+                })
+            },
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_frame_demand(
     py: Python<'_>,
     value: &sys::mln_frame_demand,
@@ -1352,6 +1383,24 @@ fn generated_copy_mln_render_abandon_result(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_render_frame_batch_view(
+    py: Python<'_>,
+    value: &sys::mln_render_frame_batch_view,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item(
+        "results",
+        generated_list(
+            py,
+            unsafe {
+                generated_strided_values(value.results, value.result_count, value.result_size)?
+            },
+            |element| generated_copy_mln_render_frame_result(py, &element),
+        )?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_render_frame_result(
     py: Python<'_>,
     value: &sys::mln_render_frame_result,
@@ -1744,37 +1793,6 @@ fn generated_copy_mln_runtime_event(
             )?,
             tag => generated_unknown_variant(py, tag)?,
         },
-    )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_runtime_event_batch_view(
-    py: Python<'_>,
-    value: &sys::mln_runtime_event_batch_view,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item(
-        "events",
-        generated_list(
-            py,
-            unsafe { generated_strided_values(value.events, value.event_count, value.event_size)? },
-            |element| {
-                Ok({
-                    let item = generated_copy_mln_runtime_event(py, &element)?;
-                    item.bind(py)
-                        .cast::<PyDict>()?
-                        .set_item("message", unsafe {
-                            generated_arena_string(
-                                value.messages,
-                                value.messages_size,
-                                element.message_offset,
-                                element.message_size,
-                            )?
-                        })?;
-                    item
-                })
-            },
-        )?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -4699,12 +4717,12 @@ impl EventBatchHandle {
         let mut call = GeneratedCall::new(py, "mln_event_batch_get", self.admission())?;
         let read = self.read()?;
         let handle = read.handle;
-        let mut out_view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
-        out_view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as _;
+        let mut out_view: sys::mln_event_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_event_batch_view>() as _;
         unsafe {
             call.status(|diagnostic| sys::mln_event_batch_get(handle, &mut out_view, diagnostic))
         }?;
-        generated_copy_mln_runtime_event_batch_view(py, &out_view)
+        generated_copy_mln_event_batch_view(py, &out_view)
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -8203,29 +8221,18 @@ impl MapProjectionHandle {
 #[pymethods]
 impl RenderFrameBatchHandle {
     #[pyo3(signature = ())]
-    fn count(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_render_frame_batch_count", self.admission())?;
-        let handle = self.live()?;
-        let mut out_count: usize = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_render_frame_batch_count(handle, &mut out_count, diagnostic)
-            })
-        }?;
-        generated_value(py, out_count)
-    }
-    #[pyo3(signature = (index))]
-    fn get(&self, py: Python<'_>, index: usize) -> PyResult<Py<PyAny>> {
+    fn get(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_render_frame_batch_get", self.admission())?;
-        let handle = self.live()?;
-        let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
-        out_result.size = std::mem::size_of::<sys::mln_render_frame_result>() as _;
+        let read = self.read()?;
+        let handle = read.handle;
+        let mut out_view: sys::mln_render_frame_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_render_frame_batch_view>() as _;
         unsafe {
             call.status(|diagnostic| {
-                sys::mln_render_frame_batch_get(handle, index, &mut out_result, diagnostic)
+                sys::mln_render_frame_batch_get(handle, &mut out_view, diagnostic)
             })
         }?;
-        generated_copy_mln_render_frame_result(py, &out_result)
+        generated_copy_mln_render_frame_batch_view(py, &out_view)
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -9062,11 +9069,14 @@ impl RuntimeHandle {
         let mut call = GeneratedCall::new(py, "mln_runtime_drain_events", self.admission())?;
         let handle = self.live()?;
         let mut out_batch: sys::mln_event_batch = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
+        let result = unsafe {
+            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
                 sys::mln_runtime_drain_events(handle, &mut out_batch, diagnostic)
             })
-        }?;
+        };
+        if !result? {
+            return Ok(py.None());
+        }
         unsafe { EventBatchHandle::adopt(py, out_batch, Vec::new()) }
     }
     #[pyo3(signature = ())]

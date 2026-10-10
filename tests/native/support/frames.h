@@ -36,6 +36,16 @@ mln_render_frame_batch mln_test_render_wait_for_results(
   const mln_test_render_fixture* fixture, size_t minimum
 );
 
+// Reads the borrowed view of `batch`, which stays valid until its release.
+mln_render_frame_batch_view mln_test_render_batch_view(
+  mln_render_frame_batch batch
+);
+
+// Returns record `index` of `view`, stepping by its stride.
+const mln_render_frame_result* mln_test_render_view_result(
+  const mln_render_frame_batch_view* view, size_t index
+);
+
 // Copies record `index` of `batch`.
 mln_render_frame_result mln_test_render_batch_result(
   mln_render_frame_batch batch, size_t index

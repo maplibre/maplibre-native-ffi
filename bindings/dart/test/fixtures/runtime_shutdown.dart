@@ -86,7 +86,7 @@ Future<void> abandonSession() async {
     // A wake that came before the result could be drained finds no batch.
     final batch = session.drainFrameResults();
     if (batch != null) {
-      drained = batch.count();
+      drained = batch.getValue().results.length;
       batch.close();
     }
   }

@@ -296,11 +296,9 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
       frame_published, &published, mln_test_deadline_default(),
       "the held call to publish its frame"
     ));
-    auto published_count = std::size_t{0};
-    MLN_TEST_OK(
-      mln_render_frame_batch_count(published.batch, &published_count, nullptr)
+    TEST_ASSERT_EQUAL_size_t(
+      1, mln_test_render_batch_view(published.batch).result_count
     );
-    TEST_ASSERT_EQUAL_size_t(1, published_count);
     TEST_ASSERT_EQUAL_UINT64(107, batch_result(published.batch, 0).token);
     mln_render_frame_batch_release(published.batch);
     auto* thread = mln_test_thread_start(release_when_abandon_waits, &release);
@@ -521,9 +519,7 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
   MLN_TEST_OK(mln_render_session_drain_frame_results(
     fixture.render.session, &batch, nullptr
   ));
-  auto count = std::size_t{0};
-  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, nullptr));
-  TEST_ASSERT_EQUAL_size_t(2, count);
+  TEST_ASSERT_EQUAL_size_t(2, mln_test_render_batch_view(batch).result_count);
   const auto superseded = batch_result(batch, 0);
   const auto stranded = batch_result(batch, 1);
   mln_render_frame_batch_release(batch);

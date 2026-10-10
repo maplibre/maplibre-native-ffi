@@ -102,6 +102,8 @@ void main() {
     'a drained batch is indexed by its stride and copied field by field',
     () async {
       final runtime = runtimeCreate(runtimeOptionsDefault());
+      // Constructing a map queues events, so the drain below has a batch.
+      final map = await runtime.mapCreate(mapOptionsDefault());
       // A stride wider than this binding's own record is what a C API version
       // that added a payload member reports, so the decoder indexes by it.
       final eventSize = sizeOf<raw.mln_runtime_event>() + 8;
@@ -111,15 +113,15 @@ void main() {
       final events = calloc<Uint8>(eventSize * 3);
       final messageBytes = utf8.encode('copied message\u0000tile-source\u0000');
       final messages = calloc<Uint8>(messageBytes.length);
-      final batch = calloc<raw.mln_runtime_event_batch_view>();
+      final batch = calloc<raw.mln_event_batch_view>();
       try {
         // The library this binding runs against reports the record size this
         // binding compiled, so a later mismatch is an ABI change rather than a
         // decode bug.
         withNativeArena((arena) {
           final outBatch = arena<Uint64>();
-          final view = arena<raw.mln_runtime_event_batch_view>();
-          view.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+          final view = arena<raw.mln_event_batch_view>();
+          view.ref.size = sizeOf<raw.mln_event_batch_view>();
           expect(
             raw.mln_runtime_drain_events(
               runtime.identity.toSigned(64).toInt(),
@@ -181,7 +183,7 @@ void main() {
         transition.message_offset = 15;
         transition.message_size = 11;
 
-        batch.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+        batch.ref.size = sizeOf<raw.mln_event_batch_view>();
         batch.ref.event_size = eventSize;
         batch.ref.events = events.cast<raw.mln_runtime_event>();
         batch.ref.event_count = 3;
@@ -239,6 +241,7 @@ void main() {
         calloc.free(batch);
         calloc.free(messages);
         calloc.free(events);
+        await map.close();
         await runtime.close();
       }
     },

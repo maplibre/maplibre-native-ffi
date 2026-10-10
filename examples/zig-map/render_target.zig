@@ -146,10 +146,10 @@ pub const Session = struct {
         var results: FrameResults = .{};
         var batch = try maplibre.renderSessionDrainFrameResults(self.handle.?, null) orelse return results;
         defer batch.deinit();
-        const count = try maplibre.renderFrameBatchCount(batch, null);
-        results.any = count > 0;
-        for (0..count) |index| {
-            const result = try maplibre.renderFrameBatchGet(batch, index, null);
+        var view = try maplibre.renderFrameBatchGet(std.heap.smp_allocator, batch, null);
+        defer view.deinit();
+        results.any = view.value.results.len > 0;
+        for (view.value.results) |result| {
             // No update and size pending wait for the map's next update,
             // superseded demands have a newer one behind them, and no demand
             // carries a timeout.

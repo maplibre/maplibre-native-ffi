@@ -189,6 +189,16 @@ internal unsafe struct mln_egl_context_descriptor
     public void* get_proc_address;
 }
 
+internal unsafe struct mln_event_batch_view
+{
+    public uint size;
+    public uint event_size;
+    public mln_runtime_event* events;
+    public nuint event_count;
+    public sbyte* messages;
+    public nuint messages_size;
+}
+
 internal unsafe struct mln_feature_state_selector
 {
     public uint size;
@@ -572,6 +582,14 @@ internal unsafe struct mln_render_abandon_result
     public uint reserved;
 }
 
+internal unsafe struct mln_render_frame_batch_view
+{
+    public uint size;
+    public uint result_size;
+    public mln_render_frame_result* results;
+    public nuint result_count;
+}
+
 internal unsafe struct mln_render_frame_result
 {
     public uint size;
@@ -749,16 +767,6 @@ internal unsafe struct mln_runtime_event
     public ulong message_offset;
     public uint message_size;
     public mln_runtime_event_payload payload;
-}
-
-internal unsafe struct mln_runtime_event_batch_view
-{
-    public uint size;
-    public uint event_size;
-    public mln_runtime_event* events;
-    public nuint event_count;
-    public sbyte* messages;
-    public nuint messages_size;
 }
 
 internal unsafe struct mln_runtime_event_camera_transition_finished

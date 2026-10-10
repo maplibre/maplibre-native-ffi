@@ -196,12 +196,13 @@ app_error map_state_drain_events(map_state* state, bool* out_render_update) {
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   mln_status status =
     mln_runtime_drain_events(state->runtime, &batch, &diagnostic);
+  if (status == MLN_STATUS_NOT_READY) return APP_OK;
   if (status != MLN_STATUS_OK) {
     diagnostics_log_status("event drain failed", status, &diagnostic);
     return APP_ERROR_EVENT_DRAIN_FAILED;
   }
-  mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view),
+  mln_event_batch_view view = {
+    .size = sizeof(mln_event_batch_view),
   };
   status = mln_event_batch_get(batch, &view, &diagnostic);
   if (status != MLN_STATUS_OK) {

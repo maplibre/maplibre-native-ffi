@@ -654,7 +654,7 @@ struct mln_render_session_object
   // the map will never publish.
   uint64_t resize_submission = 0;
 
-  std::deque<mln_render_frame_result> frame_results;
+  std::vector<mln_render_frame_result> frame_results;
   std::deque<mln::core::PendingFrameDemand> demands;
   // Barrier epochs of the demands currently running on the driver.
   std::vector<uint64_t> active_demand_epochs;
@@ -696,7 +696,7 @@ struct mln_render_session_object
 };
 
 struct mln_render_frame_batch_object {
-  std::deque<mln_render_frame_result> results;
+  std::vector<mln_render_frame_result> results;
 };
 
 struct mln_acquired_frame_object {
@@ -1031,12 +1031,8 @@ auto render_session_service_driver_work(
 auto render_session_drain_frame_results(
   mln_render_session session, mln_render_frame_batch* out_batch
 ) -> mln_status;
-auto render_frame_batch_count(
-  mln_render_frame_batch batch, std::size_t* out_count
-) -> mln_status;
 auto render_frame_batch_get(
-  mln_render_frame_batch batch, std::size_t index,
-  mln_render_frame_result* out_result
+  mln_render_frame_batch batch, mln_render_frame_batch_view* out_view
 ) -> mln_status;
 auto render_frame_batch_release(mln_render_frame_batch batch) noexcept -> void;
 auto render_session_acquire_frame(

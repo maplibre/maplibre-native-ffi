@@ -1186,10 +1186,8 @@ internal actual object C {
     Ffm.downcall("mln_projected_meters_for_lat_lng", JAVA_INT, mln_lat_lng, JAVA_LONG, JAVA_LONG)
   private val mln_projection_mode_default =
     Ffm.downcall("mln_projection_mode_default", mln_projection_mode)
-  private val mln_render_frame_batch_count =
-    Ffm.downcall("mln_render_frame_batch_count", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_frame_batch_get =
-    Ffm.downcall("mln_render_frame_batch_get", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall("mln_render_frame_batch_get", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_frame_batch_release =
     Ffm.downcall("mln_render_frame_batch_release", null, JAVA_LONG)
   private val mln_render_session_abandon =
@@ -3452,15 +3450,8 @@ internal actual object C {
       as MemorySegment
   }
 
-  actual fun mln_render_frame_batch_count(batch: Long, outCount: Long, outDiagnostic: Long): Int =
-    mln_render_frame_batch_count.invokeExact(batch, outCount, outDiagnostic) as Int
-
-  actual fun mln_render_frame_batch_get(
-    batch: Long,
-    index: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int = mln_render_frame_batch_get.invokeExact(batch, index, outResult, outDiagnostic) as Int
+  actual fun mln_render_frame_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
+    mln_render_frame_batch_get.invokeExact(batch, outView, outDiagnostic) as Int
 
   actual fun mln_render_frame_batch_release(batch: Long) {
     mln_render_frame_batch_release.invoke(batch)

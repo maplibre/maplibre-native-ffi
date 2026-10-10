@@ -3,6 +3,7 @@
 // change in its pixels. A frame result reports whether the map wants another
 // frame.
 
+#include "support/frames.h"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -548,15 +549,14 @@ static bool frame_matches(void* context) {
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(seek->fixture->session, &batch, NULL)
   );
-  size_t count = 0;
-  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   bool matched = false;
-  for (size_t index = 0; index < count; index += 1) {
-    mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    MLN_TEST_OK(mln_render_frame_batch_get(batch, index, &result, NULL));
-    matched |= result.disposition == seek->disposition &&
-               (result.disposition != MLN_RENDER_RESULT_RENDERED ||
-                result.needs_repaint == seek->needs_repaint);
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    const mln_render_frame_result* result =
+      mln_test_render_view_result(&view, index);
+    matched |= result->disposition == seek->disposition &&
+               (result->disposition != MLN_RENDER_RESULT_RENDERED ||
+                result->needs_repaint == seek->needs_repaint);
   }
   mln_render_frame_batch_release(batch);
   return matched;

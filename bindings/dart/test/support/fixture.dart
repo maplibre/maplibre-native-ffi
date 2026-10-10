@@ -86,12 +86,14 @@ final class RuntimeFixture {
   ) async {
     while (true) {
       final batch = runtime.drainEvents();
-      try {
-        for (final event in batch.getValue().events) {
-          if (matches(event)) return event;
+      if (batch != null) {
+        try {
+          for (final event in batch.getValue().events) {
+            if (matches(event)) return event;
+          }
+        } finally {
+          batch.close();
         }
-      } finally {
-        batch.close();
       }
       await _events.wait(what);
     }

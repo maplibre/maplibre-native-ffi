@@ -317,7 +317,7 @@ auto mln_runtime_drain_events(
 }
 
 auto mln_event_batch_get(
-  mln_event_batch batch, mln_runtime_event_batch_view* out_view,
+  mln_event_batch batch, mln_event_batch_view* out_view,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

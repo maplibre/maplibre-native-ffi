@@ -803,6 +803,42 @@ pub const EglContextDescriptor = struct {
     }
 };
 
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const EventBatchView = struct {
+    events: []const RuntimeEvent = &.{},
+    pub fn toNative(self: EventBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_event_batch_view {
+        var raw = std.mem.zeroes(c.mln_event_batch_view);
+        raw.size = @sizeOf(c.mln_event_batch_view);
+        raw.events = blk: {
+            const items = try allocator.alloc(c.mln_runtime_event, self.events.len);
+            for (self.events, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
+            break :blk items.ptr;
+        };
+        raw.event_count = std.math.cast(@TypeOf(raw.event_count), self.events.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_event_batch_view) status.Error!EventBatchView {
+        return .{
+            .events = blk: {
+                const copied = try allocator.alloc(RuntimeEvent, raw.event_count);
+                for (0..raw.event_count) |index| {
+                    const item = try marshal.stridedAt(c.mln_runtime_event, raw.events, raw.event_count, raw.event_size, index);
+                    copied[index] = blk_item: {
+                        var converted = try RuntimeEvent.fromNative(allocator, item);
+                        converted.message = try marshal.copyArenaString(allocator, raw.messages, raw.messages_size, item.message_offset, item.message_size);
+                        break :blk_item converted;
+                    };
+                }
+                break :blk copied;
+            },
+        };
+    }
+};
+
 /// Feature-state source, feature, and key selector.
 ///
 /// See `mln_feature_state_selector` in the
@@ -2552,7 +2588,41 @@ pub const RenderDriverKind = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// Immutable result record copied into an owned frame-result batch.
+/// A borrowed view of one owned frame-result batch.
+///
+/// See `mln_render_frame_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+pub const RenderFrameBatchView = struct {
+    results: []const RenderFrameResult = &.{},
+    pub fn toNative(self: RenderFrameBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_render_frame_batch_view {
+        _ = roots;
+        var raw = std.mem.zeroes(c.mln_render_frame_batch_view);
+        raw.size = @sizeOf(c.mln_render_frame_batch_view);
+        raw.results = blk: {
+            const items = try allocator.alloc(c.mln_render_frame_result, self.results.len);
+            for (self.results, 0..) |array_item_0, index| items[index] = array_item_0.toNative();
+            break :blk items.ptr;
+        };
+        raw.result_count = std.math.cast(@TypeOf(raw.result_count), self.results.len) orelse return error.InvalidArgument;
+        return raw;
+    }
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_render_frame_batch_view) status.Error!RenderFrameBatchView {
+        return .{
+            .results = blk: {
+                const copied = try allocator.alloc(RenderFrameResult, raw.result_count);
+                for (0..raw.result_count) |index| {
+                    const item = try marshal.stridedAt(c.mln_render_frame_result, raw.results, raw.result_count, raw.result_size, index);
+                    copied[index] = RenderFrameResult.fromNative(item);
+                }
+                break :blk copied;
+            },
+        };
+    }
+};
+
+/// Terminal result of one frame demand, held by an owned frame-result batch and
+/// copied by `mln_acquired_frame_get_result()`.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3319,42 +3389,6 @@ pub const RuntimeEvent = struct {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .{ .camera_transition_finished = RuntimeEventCameraTransitionFinished.fromNative(raw.payload.camera_transition_finished) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_NONE => .empty,
                 else => |tag| .{ .unknown = @intCast(tag) },
-            },
-        };
-    }
-};
-
-/// A borrowed view of one owned runtime-event batch.
-///
-/// See `mln_runtime_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const RuntimeEventBatchView = struct {
-    events: []const RuntimeEvent = &.{},
-    pub fn toNative(self: RuntimeEventBatchView, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_event_batch_view {
-        var raw = std.mem.zeroes(c.mln_runtime_event_batch_view);
-        raw.size = @sizeOf(c.mln_runtime_event_batch_view);
-        raw.events = blk: {
-            const items = try allocator.alloc(c.mln_runtime_event, self.events.len);
-            for (self.events, 0..) |array_item_0, index| items[index] = try array_item_0.toNative(allocator, roots);
-            break :blk items.ptr;
-        };
-        raw.event_count = std.math.cast(@TypeOf(raw.event_count), self.events.len) orelse return error.InvalidArgument;
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_runtime_event_batch_view) status.Error!RuntimeEventBatchView {
-        return .{
-            .events = blk: {
-                const copied = try allocator.alloc(RuntimeEvent, raw.event_count);
-                for (0..raw.event_count) |index| {
-                    const item = try marshal.stridedAt(c.mln_runtime_event, raw.events, raw.event_count, raw.event_size, index);
-                    copied[index] = blk_item: {
-                        var converted = try RuntimeEvent.fromNative(allocator, item);
-                        converted.message = try marshal.copyArenaString(allocator, raw.messages, raw.messages_size, item.message_offset, item.message_size);
-                        break :blk_item converted;
-                    };
-                }
-                break :blk copied;
             },
         };
     }
@@ -5431,8 +5465,8 @@ pub fn customMvtVectorSourceOptionsDefault(allocator: std.mem.Allocator) status.
 ///
 /// See `mln_event_batch_get` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(RuntimeEventBatchView) {
-    return call.invoke("mln_event_batch_get", .borrow, batch, allocator, diagnostic, .{call.sizedOut(OwnedValue(RuntimeEventBatchView))});
+pub fn eventBatchGet(allocator: std.mem.Allocator, batch: EventBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(EventBatchView) {
+    return call.invoke("mln_event_batch_get", .borrow, batch, allocator, diagnostic, .{call.sizedOut(OwnedValue(EventBatchView))});
 }
 
 /// Releases an owned event batch. A null handle is a no-op.
@@ -6754,20 +6788,12 @@ pub fn projectionModeDefault() status.Error!ProjectionMode {
     return call.direct("mln_projection_mode_default", .none, {}, ProjectionMode, null, .{});
 }
 
-/// Returns the number of records in an owned frame-result batch.
-///
-/// See `mln_render_frame_batch_count` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderFrameBatchCount(batch: RenderFrameBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!usize {
-    return call.invoke("mln_render_frame_batch_count", .lease, batch, null, diagnostic, .{call.out(usize)});
-}
-
-/// Copies one frame-result record.
+/// Borrows the result view stored by an owned frame-result batch.
 ///
 /// See `mln_render_frame_batch_get` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderFrameBatchGet(batch: RenderFrameBatch, index: usize, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderFrameResult {
-    return call.invoke("mln_render_frame_batch_get", .lease, batch, null, diagnostic, .{ index, call.sizedOut(RenderFrameResult) });
+pub fn renderFrameBatchGet(allocator: std.mem.Allocator, batch: RenderFrameBatch, diagnostic: ?*diagnostics.Diagnostic) status.Error!OwnedValue(RenderFrameBatchView) {
+    return call.invoke("mln_render_frame_batch_get", .borrow, batch, allocator, diagnostic, .{call.sizedOut(OwnedValue(RenderFrameBatchView))});
 }
 
 /// Releases a frame-result batch.
@@ -7150,8 +7176,8 @@ pub fn runtimeDispose(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) st
 ///
 /// See `mln_runtime_drain_events` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn runtimeDrainEvents(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!EventBatch {
-    return call.invoke("mln_runtime_drain_events", .lease, runtime, null, diagnostic, .{call.adopt(EventBatch, .none)});
+pub fn runtimeDrainEvents(runtime: Runtime, diagnostic: ?*diagnostics.Diagnostic) status.Error!?EventBatch {
+    return call.invokeUnless("mln_runtime_drain_events", .lease, runtime, null, diagnostic, c.MLN_STATUS_NOT_READY, .{call.adopt(EventBatch, .none)});
 }
 
 /// Reports which runtime-scoped event types this runtime queues.

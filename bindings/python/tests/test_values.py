@@ -80,7 +80,9 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
     # Loading an inline style queues its events before the command commits.
     result(map_handle.set_style_json(EMPTY_STYLE))
 
-    with harness.runtime.drain_events() as batch:
+    batch = harness.runtime.drain_events()
+    assert batch is not None
+    with batch:
         view = batch.get()
     # The copied records outlive the batch that held them.
     types = [event.type for event in view.events]

@@ -25,6 +25,7 @@ from ._generated_values import (
     CustomGeometrySourceOptions,
     CustomMvtVectorSourceOptions,
     EdgeInsets,
+    EventBatchView,
     FeatureStateSelector,
     FrameDemand,
     FreeCameraOptions,
@@ -66,6 +67,7 @@ from ._generated_values import (
     RenderBackendFlag,
     RenderedFeatureQueryOptions,
     RenderedQueryGeometry,
+    RenderFrameBatchView,
     RenderFrameResult,
     RenderSessionAttachOptions,
     RenderSessionCapabilities,
@@ -74,7 +76,6 @@ from ._generated_values import (
     ResourceProvider,
     ResourceResponse,
     ResourceTransform,
-    RuntimeEventBatchView,
     RuntimeEventMask,
     RuntimeOptions,
     ScreenBox,
@@ -288,13 +289,13 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
 class _EventBatchHandleOperations(GeneratedOperations):
     _native: _native._EventBatchHandle
 
-    def get(self) -> RuntimeEventBatchView:
+    def get(self) -> EventBatchView:
         """Borrows the event and message view stored by an owned event batch.
 
         See `mln_event_batch_get` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return RuntimeEventBatchView._from_native(self._native.get())
+        return EventBatchView._from_native(self._native.get())
 
     def close(self) -> None:
         """Releases an owned event batch. A null handle is a no-op.
@@ -1734,21 +1735,13 @@ class _MapProjectionHandleOperations(GeneratedOperations):
 class _RenderFrameBatchHandleOperations(GeneratedOperations):
     _native: _native._RenderFrameBatchHandle
 
-    def count(self) -> int:
-        """Returns the number of records in an owned frame-result batch.
-
-        See `mln_render_frame_batch_count` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return self._native.count()
-
-    def get(self, index: int) -> RenderFrameResult:
-        """Copies one frame-result record.
+    def get(self) -> RenderFrameBatchView:
+        """Borrows the result view stored by an owned frame-result batch.
 
         See `mln_render_frame_batch_get` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
-        return RenderFrameResult._from_native(self._native.get(index))
+        return RenderFrameBatchView._from_native(self._native.get())
 
     def close(self) -> None:
         """Releases a frame-result batch.
@@ -2153,13 +2146,16 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_resource_transform()
 
-    def drain_events(self) -> EventBatchHandle:
+    def drain_events(self) -> EventBatchHandle | None:
         """Drains this runtime's queued events into a new owned batch.
 
         See `mln_runtime_drain_events` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return _adopt_value(self._native.drain_events(), "EventBatchHandle", None)
+        return _maybe(
+            lambda raw: _adopt_value(raw, "EventBatchHandle", None),
+            self._native.drain_events(),
+        )
 
     def get_event_mask(self) -> RuntimeEventMask:
         """Reports which runtime-scoped event types this runtime queues.

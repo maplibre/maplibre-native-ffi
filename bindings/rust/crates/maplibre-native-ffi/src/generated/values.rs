@@ -990,6 +990,37 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     }
 }
 
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct EventBatchView {
+    /// Borrowed array of event_count events in queue order.
+    pub events: Vec<RuntimeEvent>,
+}
+impl FromNative<sys::mln_event_batch_view> for EventBatchView {
+    unsafe fn from_native(raw: sys::mln_event_batch_view) -> Result<Self> {
+        Ok(Self {
+            events: unsafe { convert::strided_items(raw.events, raw.event_count, raw.event_size) }?
+                .into_iter()
+                .map(|item| -> Result<RuntimeEvent> {
+                    let mut value: RuntimeEvent = unsafe { from_native(item) }?;
+                    value.message = unsafe {
+                        convert::arena_string(
+                            raw.messages,
+                            raw.messages_size,
+                            item.message_offset,
+                            item.message_size,
+                        )
+                    }?;
+                    Ok(value)
+                })
+                .collect::<Result<Vec<_>>>()?,
+        })
+    }
+}
+
 /// Feature-state source, feature, and key selector.
 ///
 /// See `mln_feature_state_selector` in the
@@ -3380,7 +3411,28 @@ pub enum RenderDriverKind: u32 {
 } Unknown
 }
 
-/// Immutable result record copied into an owned frame-result batch.
+/// A borrowed view of one owned frame-result batch.
+///
+/// See `mln_render_frame_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct RenderFrameBatchView {
+    /// Borrowed array of result_count terminal frame results in completion
+    /// order. Null when result_count is 0.
+    pub results: Vec<RenderFrameResult>,
+}
+impl FromNative<sys::mln_render_frame_batch_view> for RenderFrameBatchView {
+    unsafe fn from_native(raw: sys::mln_render_frame_batch_view) -> Result<Self> {
+        Ok(Self {
+            results: unsafe {
+                convert::copy_strided(raw.results, raw.result_count, raw.result_size)
+            }?,
+        })
+    }
+}
+
+/// Terminal result of one frame demand, held by an owned frame-result batch and
+/// copied by `mln_acquired_frame_get_result()`.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -4431,37 +4483,6 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE => RuntimeEventPayload::Empty,
                 tag => RuntimeEventPayload::Unknown(tag as u32),
             },
-        })
-    }
-}
-
-/// A borrowed view of one owned runtime-event batch.
-///
-/// See `mln_runtime_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct RuntimeEventBatchView {
-    /// Borrowed array of event_count events in queue order.
-    pub events: Vec<RuntimeEvent>,
-}
-impl FromNative<sys::mln_runtime_event_batch_view> for RuntimeEventBatchView {
-    unsafe fn from_native(raw: sys::mln_runtime_event_batch_view) -> Result<Self> {
-        Ok(Self {
-            events: unsafe { convert::strided_items(raw.events, raw.event_count, raw.event_size) }?
-                .into_iter()
-                .map(|item| -> Result<RuntimeEvent> {
-                    let mut value: RuntimeEvent = unsafe { from_native(item) }?;
-                    value.message = unsafe {
-                        convert::arena_string(
-                            raw.messages,
-                            raw.messages_size,
-                            item.message_offset,
-                            item.message_size,
-                        )
-                    }?;
-                    Ok(value)
-                })
-                .collect::<Result<Vec<_>>>()?,
         })
     }
 }

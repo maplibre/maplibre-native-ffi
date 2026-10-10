@@ -1,6 +1,7 @@
 // Sessions that own their EGL context: the dedicated ownership mode, which
 // only an EGL provider offers.
 
+#include "support/frames.h"
 #include "support/test_support.h"
 
 static void finish_render_barrier(const mln_test_render_fixture* fixture) {
@@ -32,8 +33,7 @@ static void dedicated_egl_surface_renders_and_keeps_its_context_current(void) {
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
   );
-  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  MLN_TEST_OK(mln_render_frame_batch_get(batch, 0, &result, NULL));
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_TRUE(mln_test_egl_context_is_current());
@@ -90,8 +90,7 @@ static void dedicated_egl_texture_uses_a_readback_only_core_worker(void) {
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
   );
-  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  MLN_TEST_OK(mln_render_frame_batch_get(batch, 0, &result, NULL));
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
   TEST_ASSERT_EQUAL_UINT64(demand.token, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   mln_render_frame_batch_release(batch);

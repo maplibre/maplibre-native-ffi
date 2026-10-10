@@ -132,18 +132,16 @@ static inline bool probe_drain_rendered(mln_render_session session) {
     mln_render_session_drain_frame_results(session, &batch, NULL);
   if (status == MLN_STATUS_NOT_READY) return false;
   probe_require(status, "draining frame results");
-  size_t count = 0;
+  mln_render_frame_batch_view view = {.size = sizeof(view)};
   probe_require(
-    mln_render_frame_batch_count(batch, &count, NULL), "counting frame results"
+    mln_render_frame_batch_get(batch, &view, NULL), "reading frame results"
   );
   bool rendered = false;
-  for (size_t index = 0; index < count; index += 1) {
-    mln_render_frame_result result = {.size = sizeof(result)};
-    probe_require(
-      mln_render_frame_batch_get(batch, index, &result, NULL),
-      "reading a frame result"
-    );
-    rendered = rendered || result.disposition == MLN_RENDER_RESULT_RENDERED;
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    const mln_render_frame_result* result =
+      (const mln_render_frame_result*)((const char*)view.results +
+                                       (index * view.result_size));
+    rendered = rendered || result->disposition == MLN_RENDER_RESULT_RENDERED;
   }
   mln_render_frame_batch_release(batch);
   return rendered;

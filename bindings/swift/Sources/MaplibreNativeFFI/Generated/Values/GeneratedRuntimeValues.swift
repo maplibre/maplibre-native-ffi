@@ -35,6 +35,46 @@ public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let animated: CameraChangeMode = .init(rawValue: 1)
 }
 
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct EventBatchView: Equatable, Hashable, Sendable {
+  /// Borrowed array of event_count events in queue order.
+  public var events: [RuntimeEvent]
+  public static var `default`: Self {
+    Self()
+  }
+
+  public init(events: [RuntimeEvent] = []) {
+    self.events = events
+  }
+
+  init(
+    raw: mln_event_batch_view,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
+    events = try NativeInputArena.copyStrided(
+      raw.events,
+      count: raw.event_count,
+      stride: raw.event_size
+    ) { item, bytes in try RuntimeEvent(
+      raw: item,
+      recordBytes: bytes,
+      message: NativeInputArena.copyUTF8Slice(
+        data: raw.messages,
+        size: raw.messages_size,
+        offset: item.message_offset,
+        length: item.message_size
+      )
+    ) }
+  }
+
+  func nativeValue(arena _: NativeInputArena) throws -> mln_event_batch_view {
+    throw NativeStringError("borrowed arena snapshots cannot be submitted")
+  }
+}
+
 public struct HttpHeaderTransform: Sendable {
   public var callback: (@Sendable (
     ResourceKind,
@@ -844,48 +884,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   }
 
   func nativeValue(arena _: NativeInputArena) throws -> mln_runtime_event {
-    throw NativeStringError("borrowed arena snapshots cannot be submitted")
-  }
-}
-
-/// A borrowed view of one owned runtime-event batch.
-///
-/// See `mln_runtime_event_batch_view` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventBatchView: Equatable, Hashable, Sendable {
-  /// Borrowed array of event_count events in queue order.
-  public var events: [RuntimeEvent]
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(events: [RuntimeEvent] = []) {
-    self.events = events
-  }
-
-  init(
-    raw: mln_runtime_event_batch_view,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    events = try NativeInputArena.copyStrided(
-      raw.events,
-      count: raw.event_count,
-      stride: raw.event_size
-    ) { item, bytes in try RuntimeEvent(
-      raw: item,
-      recordBytes: bytes,
-      message: NativeInputArena.copyUTF8Slice(
-        data: raw.messages,
-        size: raw.messages_size,
-        offset: item.message_offset,
-        length: item.message_size
-      )
-    ) }
-  }
-
-  func nativeValue(arena _: NativeInputArena) throws
-    -> mln_runtime_event_batch_view
-  {
     throw NativeStringError("borrowed arena snapshots cannot be submitted")
   }
 }

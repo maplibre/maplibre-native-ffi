@@ -203,8 +203,9 @@ narrows a subscription by naming the types it reads. An unselected event is
 never built, never queued, and never invokes the event wake callback.
 
 One drain transfers the queued event records and their message storage into an
-owned batch. A batch remains readable across later drains and runtime close.
-Copy values that must outlive the batch, then release it.
+owned batch. A drain of an empty queue reports a not-ready status and allocates
+no batch. A batch remains readable across later drains and runtime close. Copy
+values that must outlive the batch, then release it.
 
 Releasing a map or disabling offline-region observation prevents future events
 from that source and leaves queued events unchanged. Each queued event keeps a

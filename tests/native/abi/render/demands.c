@@ -90,23 +90,21 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
   TEST_ASSERT_EQUAL_UINT32(woke, atomic_load(&fixture.frame_wakes));
 
-  size_t count = 99;
-  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
-  TEST_ASSERT_EQUAL_size_t(1, count);
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_render_frame_result), view.result_size);
+  TEST_ASSERT_EQUAL_size_t(1, view.result_count);
+  const mln_render_frame_result* result = mln_test_render_view_result(&view, 0);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_render_frame_result), result->size);
+  TEST_ASSERT_EQUAL_UINT64(201, result->token);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(batch);
   mln_render_frame_batch_release(MLN_HANDLE_NULL);
-  count = 99;
-  MLN_TEST_INVALID_STATE(mln_render_frame_batch_count(batch, &count, NULL));
-  TEST_ASSERT_EQUAL_size_t(99, count);
-  mln_render_frame_result result = {
-    .size = sizeof(mln_render_frame_result), .token = 99
+  mln_render_frame_batch_view stale = {
+    .size = sizeof(mln_render_frame_batch_view), .result_count = 99
   };
-  MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, 0, &result, NULL));
-  MLN_TEST_INVALID(
-    mln_render_frame_batch_get(MLN_HANDLE_NULL, 0, &result, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT64(99, result.token);
+  MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, &stale, NULL));
+  MLN_TEST_INVALID(mln_render_frame_batch_get(MLN_HANDLE_NULL, &stale, NULL));
+  TEST_ASSERT_EQUAL_size_t(99, stale.result_count);
   detach(runtime, map, &fixture);
 }
 
@@ -165,11 +163,10 @@ static void a_full_ring_parks_demands_until_a_release_or_detach(void) {
   MLN_TEST_OK(
     mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
   );
-  size_t count = 0;
-  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, NULL));
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
   bool reported = false;
-  for (size_t index = 0; index < count; index += 1) {
-    reported |= mln_test_render_batch_result(batch, index).token == 503;
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    reported |= mln_test_render_view_result(&view, index)->token == 503;
   }
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_TRUE(reported);

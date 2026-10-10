@@ -157,16 +157,12 @@ func (driver *callerDriver) drainFrameResults() (bool, error) {
 		return false, err
 	}
 	defer batch.Close()
-	count, err := batch.Count()
+	view, err := batch.Get()
 	if err != nil {
 		return false, err
 	}
 	rendered, retry, repaint := false, false, false
-	for i := uint(0); i < count; i++ {
-		result, err := batch.Get(i)
-		if err != nil {
-			return false, err
-		}
+	for _, result := range view.Results {
 		switch result.Disposition {
 		case maplibre.RenderResultRendered:
 			rendered = true

@@ -8,16 +8,16 @@ public extension EventBatchHandle {
   ///
   /// See `mln_event_batch_get` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func get() throws -> RuntimeEventBatchView {
-    var value0 = mln_runtime_event_batch_view()
-    value0.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
+  func get() throws -> EventBatchView {
+    var value0 = mln_event_batch_view()
+    value0.size = UInt32(MemoryLayout<mln_event_batch_view>.size)
     return try nativeInvoke("mln_event_batch_get") { raw, _, diagnostic in
       mln_event_batch_get(
         raw,
         &value0,
         diagnostic
       )
-    } result: { try RuntimeEventBatchView(raw: value0) }
+    } result: { try EventBatchView(raw: value0) }
   }
 
   /// Releases an owned event batch. A null handle is a no-op.

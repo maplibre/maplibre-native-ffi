@@ -193,12 +193,11 @@ final class MetalRenderTarget {
       return FrameResults()
     }
     defer { try? batch.close() }
-    let count = try batch.count()
-    var results = FrameResults(any: count > 0)
+    let view = try batch.get()
+    var results = FrameResults(any: !view.results.isEmpty)
     // No update and size pending wait for the map's next update, superseded
     // demands have a newer one behind them, and no demand carries a timeout.
-    for index in 0 ..< count {
-      let result = try batch.get(index: index)
+    for result in view.results {
       if result.disposition == .rendered {
         results.rendered = true
         results.needsRepaint = result.needsRepaint

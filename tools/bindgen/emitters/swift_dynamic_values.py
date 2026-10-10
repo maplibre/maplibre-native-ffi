@@ -176,7 +176,13 @@ def decode(values, value, source, context="raw"):
         if info:
             copier = "copyUTF8" if info.encoding == "utf8" else "copyData"
             extra = f", {identifier(camel(info.field))}: NativeInputArena.{copier}Slice(data: {context}.{identifier(info.data)}, size: {context}.{identifier(info.size)}, offset: item.{identifier(info.offset)}, length: item.{identifier(info.length)})"
-        return f"try NativeInputArena.copyStrided({source}, count: {context}.{identifier(value.length)}, stride: {context}.{identifier(value.stride)}) {{ item, bytes in try {values.public(value.element)}(raw: item, recordBytes: bytes{extra}) }}"
+        # Only a dynamic record keeps the raw bytes an unknown variant forwards.
+        item = (
+            f"item, bytes in try {values.public(value.element)}(raw: item, recordBytes: bytes{extra})"
+            if dynamic(value.element) or extra
+            else f"item, _ in {values.public(value.element)}(raw: item)"
+        )
+        return f"try NativeInputArena.copyStrided({source}, count: {context}.{identifier(value.length)}, stride: {context}.{identifier(value.stride)}) {{ {item} }}"
     if value.kind == "array":
         if value.ctype.kind == "array":
             return (

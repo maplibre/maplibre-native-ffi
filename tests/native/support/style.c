@@ -48,17 +48,18 @@ static bool frame_arrived(void* context) {
   ) {
     return wait->found;
   }
-  size_t count = 0;
-  (void)mln_render_frame_batch_count(batch, &count, NULL);
-  for (size_t index = 0; index < count; index += 1) {
-    mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-    if (
-      mln_render_frame_batch_get(batch, index, &result, NULL) ==
-        MLN_STATUS_OK &&
-      result.token == wait->token
-    ) {
+  mln_render_frame_batch_view view = {
+    .size = sizeof(mln_render_frame_batch_view)
+  };
+  // A failed read leaves the view empty.
+  (void)mln_render_frame_batch_get(batch, &view, NULL);
+  for (size_t index = 0; index < view.result_count; index += 1) {
+    const mln_render_frame_result* result =
+      (const mln_render_frame_result*)((const char*)view.results +
+                                       (index * view.result_size));
+    if (result->token == wait->token) {
       wait->found = true;
-      wait->disposition = result.disposition;
+      wait->disposition = result->disposition;
     }
   }
   mln_render_frame_batch_release(batch);

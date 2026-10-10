@@ -592,6 +592,16 @@ pub struct mln_egl_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_event_batch_view {
+    pub size: u32,
+    pub event_size: u32,
+    pub events: *const mln_runtime_event,
+    pub event_count: usize,
+    pub messages: *const std::ffi::c_char,
+    pub messages_size: usize,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_feature_state_selector {
     pub size: u32,
     pub fields: u32,
@@ -960,6 +970,14 @@ pub struct mln_render_abandon_result {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_render_frame_batch_view {
+    pub size: u32,
+    pub result_size: u32,
+    pub results: *const mln_render_frame_result,
+    pub result_count: usize,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_render_frame_result {
     pub size: u32,
     pub disposition: u32,
@@ -1121,16 +1139,6 @@ pub struct mln_runtime_event {
     pub message_offset: u64,
     pub message_size: u32,
     pub payload: mln_runtime_event_payload,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_runtime_event_batch_view {
-    pub size: u32,
-    pub event_size: u32,
-    pub events: *const mln_runtime_event,
-    pub event_count: usize,
-    pub messages: *const std::ffi::c_char,
-    pub messages_size: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1704,7 +1712,7 @@ unsafe extern "C" {
     pub fn mln_custom_mvt_vector_source_options_default() -> mln_custom_mvt_vector_source_options;
     pub fn mln_event_batch_get(
         batch: mln_event_batch,
-        out_view: *mut mln_runtime_event_batch_view,
+        out_view: *mut mln_event_batch_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_event_batch_release(batch: mln_event_batch);
@@ -2613,15 +2621,9 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_projection_mode_default() -> mln_projection_mode;
-    pub fn mln_render_frame_batch_count(
-        batch: mln_render_frame_batch,
-        out_count: *mut usize,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_render_frame_batch_get(
         batch: mln_render_frame_batch,
-        index: usize,
-        out_result: *mut mln_render_frame_result,
+        out_view: *mut mln_render_frame_batch_view,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_render_frame_batch_release(batch: mln_render_frame_batch);

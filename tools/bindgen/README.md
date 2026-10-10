@@ -32,16 +32,16 @@ checks the signature that each category requires. A function without a
 completion parameter is `immediate` unless it declares another synchronous
 category.
 
-| Execution       | Operation                                                      |
-| --------------- | -------------------------------------------------------------- |
-| `command`       | Mutates state; completes with a disposition and a generation   |
-| `query`         | Reads state; completes with a value                            |
-| `operation`     | Runs other asynchronous native work; completes with its result |
-| `lifecycle`     | Creates, attaches, or retires a handle                         |
-| `immediate`     | Returns its result synchronously                               |
-| `snapshot`      | Copies current state synchronously from a live handle          |
-| `event_batch`   | Drains queued events or frame results into an owned batch      |
-| `render_driver` | Services graphics work on the thread that the driver requires  |
+| Execution       | Operation                                                                         |
+| --------------- | --------------------------------------------------------------------------------- |
+| `command`       | Mutates state; completes with a disposition and a generation                      |
+| `query`         | Reads state; completes with a value                                               |
+| `operation`     | Runs other asynchronous native work; completes with its result                    |
+| `lifecycle`     | Creates, attaches, or retires a handle                                            |
+| `immediate`     | Returns its result synchronously                                                  |
+| `snapshot`      | Copies current state synchronously from a live handle                             |
+| `event_batch`   | Drains queued events or frame results into an owned batch, or reports none queued |
+| `render_driver` | Services graphics work on the thread that the driver requires                     |
 
 ## Follow the ABI rules
 
@@ -140,9 +140,10 @@ Five keys state what a C shape cannot:
   with a native default keeps such a registration at its disabled default.
 - `absent_on=` on a function names a failure status of `mln_status` that reports
   its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
-  for a drain with nothing queued. A binding returns its language's empty form
-  for that status, such as `None`, `nil`, or `null`, and reads or adopts the
-  output only on success. The schema accepts the key only on a function that
+  for an event or frame-result drain with nothing queued and for a frame
+  acquisition with no rendered frame. A binding returns its language's empty
+  form for that status, such as `None`, `nil`, or `null`, and reads or adopts
+  the output only on success. The schema accepts the key only on a function that
   returns a status, takes no completion, and has exactly one output. The
   semantic plan also rejects it on a borrowed view, a consuming operation, and a
   call that passes a callback registration, because an absent call publishes

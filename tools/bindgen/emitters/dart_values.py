@@ -500,7 +500,15 @@ class Values:
                 if value.item_buffer:
                     item_buffer = value.item_buffer
                     extra = f", {item_buffer.field}: _arenaUtf8({parent}.{item_buffer.data}.cast(), {parent}.{item_buffer.size}, {item_expression}.{item_buffer.offset}, {item_expression}.{item_buffer.length})"
-                item = f"_read{public_name(value.element.native)}({item_expression}, rawRecord: () => {pointer}.cast<Uint8>().asTypedList({parent}.{value.stride}){extra})"
+                # Only a record that ends in a tagged union keeps the raw bytes
+                # an unknown variant forwards.
+                raw_record = (
+                    f", rawRecord: () => {pointer}.cast<Uint8>().asTypedList({parent}.{value.stride})"
+                    if any(f.value.kind == "union" for f in value.element.fields)
+                    and len(self.fields(value.element)) > 1
+                    else ""
+                )
+                item = f"_read{public_name(value.element.native)}({item_expression}{raw_record}{extra})"
             else:
                 item = self.copy(value.element, item_expression)
             result = f"List<{self.public(value.element)}>.unmodifiable(List.generate({count}, (index) => {item}))"

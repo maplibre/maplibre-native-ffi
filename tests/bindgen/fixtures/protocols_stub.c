@@ -10,6 +10,7 @@
 #define MLN_PROTOCOL_DEFAULT_REGISTRATION
 #define MLN_PROTOCOL_ABSENT_HANDLE
 #define MLN_PROTOCOL_ABSENT_VALUE
+#define MLN_PROTOCOL_STRIDED_RECORDS
 #include <stdlib.h>
 #include <string.h>
 
@@ -137,4 +138,41 @@ mln_status mln_probe_read_level(
   const mln_status status = absence_status(count++, out_diagnostic);
   if (status == MLN_STATUS_OK) *out_level = 0.5;
   return status;
+}
+
+// Two readings with a stride wider than mln_probe_reading, as a later C API
+// version that appended a member reports them.
+void mln_probe_ledger_release(mln_probe_ledger ledger) { (void)ledger; }
+
+mln_status mln_probe_ledger_open(
+  mln_probe_ledger* out_ledger, mln_diagnostic* out_diagnostic
+) {
+  (void)out_diagnostic;
+  *out_ledger = 7;
+  return MLN_STATUS_OK;
+}
+
+mln_status mln_probe_ledger_get(
+  mln_probe_ledger ledger, mln_probe_reading_view* out_view,
+  mln_diagnostic* out_diagnostic
+) {
+  if (ledger != 7) return fail(out_diagnostic, "unknown ledger");
+  if (out_view == NULL || out_view->size < sizeof(*out_view)) {
+    return fail(out_diagnostic, "out_view is undersized");
+  }
+  typedef struct wide_reading {
+    mln_probe_reading reading;
+    uint64_t appended;
+  } wide_reading;
+  static const wide_reading readings[2] = {
+    {.reading = {.size = sizeof(wide_reading), .value = 7}, .appended = 0xa5},
+    {.reading = {.size = sizeof(wide_reading), .value = 9}, .appended = 0xa5},
+  };
+  *out_view = (mln_probe_reading_view){
+    .size = sizeof(mln_probe_reading_view),
+    .reading_size = sizeof(wide_reading),
+    .readings = &readings[0].reading,
+    .reading_count = 2,
+  };
+  return MLN_STATUS_OK;
 }

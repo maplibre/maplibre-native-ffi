@@ -6,12 +6,12 @@ namespace Maplibre.NativeFfi;
 /// A borrowed view of one owned runtime-event batch.
 /// </summary>
 /// <remarks>
-/// See <c>mln_runtime_event_batch_view</c> in the <see
+/// See <c>mln_event_batch_view</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
-public readonly record struct RuntimeEventBatchView
+public readonly record struct EventBatchView
 {
-    public RuntimeEventBatchView(RuntimeEvent[] Events)
+    public EventBatchView(RuntimeEvent[] Events)
     {
         this.Events = Events;
     }

@@ -95,7 +95,7 @@ final class MapState {
   /// a render update.
   func drainEvents() throws -> Bool {
     guard !isClosed else { return false }
-    let batch = try runtime.drainEvents()
+    guard let batch = try runtime.drainEvents() else { return false }
     defer { try? batch.close() }
     return try batch.get().events.contains {
       $0.sourceType == .map && $0.source == map.id &&

@@ -1481,6 +1481,23 @@ class EglContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class EventBatchView:
+    """A borrowed view of one owned runtime-event batch.
+
+    See `mln_event_batch_view` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    events: tuple[RuntimeEvent, ...]
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            events=tuple(RuntimeEvent._from_native(item) for item in raw["events"])
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class FeatureStateSelector:
     """Feature-state source, feature, and key selector.
 
@@ -2444,8 +2461,28 @@ class RenderAbandonResult:
 
 
 @dataclass(frozen=True, slots=True)
+class RenderFrameBatchView:
+    """A borrowed view of one owned frame-result batch.
+
+    See `mln_render_frame_batch_view` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
+    results: tuple[RenderFrameResult, ...]
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            results=tuple(
+                RenderFrameResult._from_native(item) for item in raw["results"]
+            )
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RenderFrameResult:
-    """Immutable result record copied into an owned frame-result batch.
+    """Terminal result of one frame demand, held by an owned frame-result batch
+    and copied by `mln_acquired_frame_get_result()`.
 
     See `mln_render_frame_result` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2815,23 +2852,6 @@ class RuntimeEvent:
                 0,
             ),
             message=raw["message"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventBatchView:
-    """A borrowed view of one owned runtime-event batch.
-
-    See `mln_runtime_event_batch_view` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    events: tuple[RuntimeEvent, ...]
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            events=tuple(RuntimeEvent._from_native(item) for item in raw["events"])
         )
 
 

@@ -279,9 +279,8 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   -> mln_status;
 auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
   -> mln_status;
-auto get_event_batch(
-  mln_event_batch batch, mln_runtime_event_batch_view* out_view
-) -> mln_status;
+auto get_event_batch(mln_event_batch batch, mln_event_batch_view* out_view)
+  -> mln_status;
 auto release_event_batch(mln_event_batch batch) noexcept -> void;
 auto set_runtime_event_mask(mln_runtime runtime, uint64_t mask) -> mln_status;
 auto get_runtime_event_mask(mln_runtime runtime, uint64_t* out_mask)

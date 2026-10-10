@@ -487,6 +487,34 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static EventBatchView CopyEventBatchView(mln_event_batch_view value) =>
+        new() { EventsStorage = new(CopyEventBatchViewEvents(value)) };
+
+    internal static RuntimeEvent[] CopyEventBatchViewEvents(mln_event_batch_view value)
+    {
+        var count = checked((int)value.event_count);
+        if (value.event_size < sizeof(mln_runtime_event) || (count != 0 && value.events == null))
+            throw new InvalidOperationException("Invalid native array storage.");
+        var copied = new RuntimeEvent[count];
+        for (var index = 0; index < count; index++)
+        {
+            var record = (byte*)value.events + checked((nuint)index * value.event_size);
+            var item = *(mln_runtime_event*)record;
+            if (
+                item.message_offset > value.messages_size
+                || item.message_size > value.messages_size - item.message_offset
+                || (item.message_size != 0 && value.messages == null)
+            )
+                throw new InvalidOperationException("Invalid native item buffer.");
+            var message = RuntimeStructs.CopyUtf8(
+                (byte*)value.messages + item.message_offset,
+                item.message_size
+            );
+            copied[index] = CopyRuntimeEvent(item, message, record, value.event_size);
+        }
+        return copied;
+    }
+
     internal static mln_feature_state_selector NativeFeatureStateSelector(
         FeatureStateSelector value,
         NativeCallScope scope
@@ -1581,6 +1609,30 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static RenderFrameBatchView CopyRenderFrameBatchView(
+        mln_render_frame_batch_view value
+    ) => new() { ResultsStorage = new(CopyRenderFrameBatchViewResults(value)) };
+
+    internal static RenderFrameResult[] CopyRenderFrameBatchViewResults(
+        mln_render_frame_batch_view value
+    )
+    {
+        var count = checked((int)value.result_count);
+        if (
+            value.result_size < sizeof(mln_render_frame_result)
+            || (count != 0 && value.results == null)
+        )
+            throw new InvalidOperationException("Invalid native array storage.");
+        var copied = new RenderFrameResult[count];
+        for (var index = 0; index < count; index++)
+        {
+            var record = (byte*)value.results + checked((nuint)index * value.result_size);
+            var item = *(mln_render_frame_result*)record;
+            copied[index] = CopyRenderFrameResult(item);
+        }
+        return copied;
+    }
+
     internal static RenderFrameResult CopyRenderFrameResult(mln_render_frame_result value) =>
         new(
             (RenderResult)value.disposition,
@@ -2129,37 +2181,6 @@ internal static unsafe class GeneratedValues
             },
             message
         );
-
-    internal static RuntimeEventBatchView CopyRuntimeEventBatchView(
-        mln_runtime_event_batch_view value
-    ) => new() { EventsStorage = new(CopyRuntimeEventBatchViewEvents(value)) };
-
-    internal static RuntimeEvent[] CopyRuntimeEventBatchViewEvents(
-        mln_runtime_event_batch_view value
-    )
-    {
-        var count = checked((int)value.event_count);
-        if (value.event_size < sizeof(mln_runtime_event) || (count != 0 && value.events == null))
-            throw new InvalidOperationException("Invalid native array storage.");
-        var copied = new RuntimeEvent[count];
-        for (var index = 0; index < count; index++)
-        {
-            var record = (byte*)value.events + checked((nuint)index * value.event_size);
-            var item = *(mln_runtime_event*)record;
-            if (
-                item.message_offset > value.messages_size
-                || item.message_size > value.messages_size - item.message_offset
-                || (item.message_size != 0 && value.messages == null)
-            )
-                throw new InvalidOperationException("Invalid native item buffer.");
-            var message = RuntimeStructs.CopyUtf8(
-                (byte*)value.messages + item.message_offset,
-                item.message_size
-            );
-            copied[index] = CopyRuntimeEvent(item, message, record, value.event_size);
-        }
-        return copied;
-    }
 
     internal static RuntimeEventCameraTransitionFinished CopyRuntimeEventCameraTransitionFinished(
         mln_runtime_event_camera_transition_finished value

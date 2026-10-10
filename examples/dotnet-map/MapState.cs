@@ -150,6 +150,10 @@ internal sealed class MapState : IDisposable
     {
         var requested = false;
         using var batch = runtime.DrainEvents();
+        if (batch is null)
+        {
+            return false;
+        }
         foreach (var runtimeEvent in batch.Get().Events)
         {
             if (runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable)

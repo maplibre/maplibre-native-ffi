@@ -433,6 +433,19 @@ final class mln_egl_context_descriptor extends Struct {
   external Pointer<Void> get_proc_address;
 }
 
+final class mln_event_batch_view extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int event_size;
+  external Pointer<mln_runtime_event> events;
+  @Size()
+  external int event_count;
+  external Pointer<Char> messages;
+  @Size()
+  external int messages_size;
+}
+
 final class mln_feature_state_selector extends Struct {
   @Uint32()
   external int size;
@@ -908,6 +921,16 @@ final class mln_render_abandon_result extends Struct {
   external int reserved;
 }
 
+final class mln_render_frame_batch_view extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int result_size;
+  external Pointer<mln_render_frame_result> results;
+  @Size()
+  external int result_count;
+}
+
 final class mln_render_frame_result extends Struct {
   @Uint32()
   external int size;
@@ -1133,19 +1156,6 @@ final class mln_runtime_event extends Struct {
   @Uint32()
   external int message_size;
   external mln_runtime_event_payload payload;
-}
-
-final class mln_runtime_event_batch_view extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int event_size;
-  external Pointer<mln_runtime_event> events;
-  @Size()
-  external int event_count;
-  external Pointer<Char> messages;
-  @Size()
-  external int messages_size;
 }
 
 final class mln_runtime_event_camera_transition_finished extends Struct {
@@ -2666,13 +2676,13 @@ mln_custom_mvt_vector_source_options_default();
 @Native<
   Int32 Function(
     mln_event_batch,
-    Pointer<mln_runtime_event_batch_view>,
+    Pointer<mln_event_batch_view>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_event_batch_get(
   int batch,
-  Pointer<mln_runtime_event_batch_view> out_view,
+  Pointer<mln_event_batch_view> out_view,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4851,26 +4861,15 @@ external int mln_projected_meters_for_lat_lng(
 external mln_projection_mode mln_projection_mode_default();
 
 @Native<
-  Int32 Function(mln_render_frame_batch, Pointer<Size>, Pointer<mln_diagnostic>)
->()
-external int mln_render_frame_batch_count(
-  int batch,
-  Pointer<Size> out_count,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
   Int32 Function(
     mln_render_frame_batch,
-    Size,
-    Pointer<mln_render_frame_result>,
+    Pointer<mln_render_frame_batch_view>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_frame_batch_get(
   int batch,
-  int index,
-  Pointer<mln_render_frame_result> out_result,
+  Pointer<mln_render_frame_batch_view> out_view,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

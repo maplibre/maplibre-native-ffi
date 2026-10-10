@@ -16,10 +16,10 @@ impl EventBatchHandle {
     ///
     /// See `mln_event_batch_get` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn get(&self) -> Result<RuntimeEventBatchView> {
+    pub fn get(&self) -> Result<EventBatchView> {
         let mut call = self.inner.read("mln_event_batch_get")?;
-        let mut out_view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
-        out_view.size = std::mem::size_of::<sys::mln_runtime_event_batch_view>() as _;
+        let mut out_view: sys::mln_event_batch_view = unsafe { std::mem::zeroed() };
+        out_view.size = std::mem::size_of::<sys::mln_event_batch_view>() as _;
         call.status(|batch, out_diagnostic| unsafe {
             sys::mln_event_batch_get(batch, &mut out_view, out_diagnostic)
         })?;

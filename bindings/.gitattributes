@@ -77,6 +77,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonDisposition.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderResult.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderSession/RenderSessionHandle.Operations.g.cs linguist-generated=true
@@ -106,6 +107,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/AmbientCacheOperation.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/CameraChangeMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchHandle.Operations.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransform.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.g.cs linguist-generated=true
@@ -131,7 +133,6 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventBatchView.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCameraTransitionFinished.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventMask.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionResponseError.g.cs linguist-generated=true

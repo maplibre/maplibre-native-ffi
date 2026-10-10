@@ -2121,23 +2121,10 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_render_frame_batch_count(batch: Long, outCount: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_frame_batch_count(
-      batch.toULong(),
-      outCount.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_frame_batch_get(
-    batch: Long,
-    index: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_render_frame_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_frame_batch_get(
       batch.toULong(),
-      index.convert(),
-      outResult.toCPointer(),
+      outView.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 

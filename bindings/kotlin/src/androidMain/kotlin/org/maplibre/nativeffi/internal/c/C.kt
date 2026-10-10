@@ -1264,17 +1264,9 @@ internal actual object C {
   @JvmStatic actual external fun mln_projection_mode_default(returned: Long): Unit
 
   @JvmStatic
-  actual external fun mln_render_frame_batch_count(
-    batch: Long,
-    outCount: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
   actual external fun mln_render_frame_batch_get(
     batch: Long,
-    index: Long,
-    outResult: Long,
+    outView: Long,
     outDiagnostic: Long,
   ): Int
 

@@ -123,9 +123,9 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
 
   /** Drains every runtime event, and reports whether the map published an update to render. */
   fun drainRenderUpdates(): Boolean =
-    runtime.drainEvents().use {
+    runtime.drainEvents()?.use {
       it.get().events.any { event -> event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE }
-    }
+    } ?: false
 
   override fun close() {
     if (closed) return

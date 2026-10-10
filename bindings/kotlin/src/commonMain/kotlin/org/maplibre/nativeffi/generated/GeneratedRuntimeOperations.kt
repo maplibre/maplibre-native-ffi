@@ -92,11 +92,12 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
    * See `mln_runtime_drain_events` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun drainEvents(): EventBatchHandle =
+  public fun drainEvents(): EventBatchHandle? =
     nativeCall(this, binding, "mln_runtime_drain_events") {
       val out = allocate(8, 8)
-      check(C.mln_runtime_drain_events(handle, out, diagnostic))
-      adopt(out, GeneratedOwnerDisposal::eventBatch) { EventBatchHandle(it) }
+      if (present(C.mln_runtime_drain_events(handle, out, diagnostic), absent = -9))
+        adopt(out, GeneratedOwnerDisposal::eventBatch) { EventBatchHandle(it) }
+      else null
     }
 
   /**

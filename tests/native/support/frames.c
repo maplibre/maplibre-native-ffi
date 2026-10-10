@@ -55,10 +55,12 @@ static bool results_ready(void* context) {
     wait->fixture->session, &batch, NULL
   );
   if (status == MLN_STATUS_OK) {
-    size_t count = 0;
+    mln_render_frame_batch_view view = {
+      .size = sizeof(mln_render_frame_batch_view)
+    };
     if (
-      mln_render_frame_batch_count(batch, &count, NULL) == MLN_STATUS_OK &&
-      count >= wait->minimum
+      mln_render_frame_batch_get(batch, &view, NULL) == MLN_STATUS_OK &&
+      view.result_count >= wait->minimum
     ) {
       wait->batch = batch;
       return true;
@@ -84,12 +86,32 @@ mln_render_frame_batch mln_test_render_wait_for_results(
   return wait.batch;
 }
 
+mln_render_frame_batch_view mln_test_render_batch_view(
+  mln_render_frame_batch batch
+) {
+  mln_render_frame_batch_view view = {
+    .size = sizeof(mln_render_frame_batch_view)
+  };
+  MLN_TEST_OK(mln_render_frame_batch_get(batch, &view, NULL));
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT32(
+    sizeof(mln_render_frame_result), view.result_size
+  );
+  return view;
+}
+
+const mln_render_frame_result* mln_test_render_view_result(
+  const mln_render_frame_batch_view* view, size_t index
+) {
+  TEST_ASSERT_LESS_THAN_size_t(view->result_count, index);
+  return (const mln_render_frame_result*)((const char*)view->results +
+                                          (index * view->result_size));
+}
+
 mln_render_frame_result mln_test_render_batch_result(
   mln_render_frame_batch batch, size_t index
 ) {
-  mln_render_frame_result result = {.size = sizeof(mln_render_frame_result)};
-  MLN_TEST_OK(mln_render_frame_batch_get(batch, index, &result, NULL));
-  return result;
+  const mln_render_frame_batch_view view = mln_test_render_batch_view(batch);
+  return *mln_test_render_view_result(&view, index);
 }
 
 mln_acquired_frame mln_test_render_and_acquire(

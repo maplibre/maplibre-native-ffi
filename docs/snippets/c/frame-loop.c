@@ -51,9 +51,7 @@ static void drain_runtime_events(frame_receiver* receiver, bool* pending) {
     mln_runtime_drain_events(receiver->runtime, &batch, NULL) != MLN_STATUS_OK
   )
     return;
-  mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view)
-  };
+  mln_event_batch_view view = {.size = sizeof(mln_event_batch_view)};
   if (mln_event_batch_get(batch, &view, NULL) == MLN_STATUS_OK) {
     for (size_t index = 0; index < view.event_count; index++) {
       const char* bytes = (const char*)view.events + index * view.event_size;
@@ -73,19 +71,15 @@ static void drain_frame_results(mln_render_session session, bool* pending) {
     MLN_STATUS_OK
   )
     return;
-  size_t count = 0;
-  if (mln_render_frame_batch_count(batch, &count, NULL) == MLN_STATUS_OK) {
-    for (size_t index = 0; index < count; index++) {
-      mln_render_frame_result result = {
-        .size = sizeof(mln_render_frame_result)
-      };
-      if (
-        mln_render_frame_batch_get(batch, index, &result, NULL) ==
-          MLN_STATUS_OK &&
-        result.disposition != MLN_RENDER_RESULT_RENDERED
-      ) {
-        *pending = true;
-      }
+  mln_render_frame_batch_view view = {
+    .size = sizeof(mln_render_frame_batch_view)
+  };
+  if (mln_render_frame_batch_get(batch, &view, NULL) == MLN_STATUS_OK) {
+    for (size_t index = 0; index < view.result_count; index++) {
+      const char* bytes = (const char*)view.results + index * view.result_size;
+      const mln_render_frame_result* result =
+        (const mln_render_frame_result*)bytes;
+      if (result->disposition != MLN_RENDER_RESULT_RENDERED) *pending = true;
     }
   }
   mln_render_frame_batch_release(batch);

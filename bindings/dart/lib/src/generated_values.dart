@@ -1260,7 +1260,8 @@ final class GpuSync extends _Value {
   List<Object?> get _members => [kind, object, value];
 }
 
-/// Immutable result record copied into an owned frame-result batch.
+/// Terminal result of one frame demand, held by an owned frame-result batch and
+/// copied by `mln_acquired_frame_get_result()`.
 ///
 /// See `mln_render_frame_result` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -2067,10 +2068,10 @@ final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
 
 /// A borrowed view of one owned runtime-event batch.
 ///
-/// See `mln_runtime_event_batch_view` in the
+/// See `mln_event_batch_view` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventBatchView extends _Value {
-  RuntimeEventBatchView({required List<RuntimeEvent> events})
+final class EventBatchView extends _Value {
+  EventBatchView({required List<RuntimeEvent> events})
     : events = List.unmodifiable(events);
 
   /// Borrowed array of event_count events in queue order.
@@ -3374,6 +3375,22 @@ final class OpenglSurfaceDescriptor extends _Value {
 
   @override
   List<Object?> get _members => [extent, context, surface];
+}
+
+/// A borrowed view of one owned frame-result batch.
+///
+/// See `mln_render_frame_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+final class RenderFrameBatchView extends _Value {
+  RenderFrameBatchView({required List<RenderFrameResult> results})
+    : results = List.unmodifiable(results);
+
+  /// Borrowed array of result_count terminal frame results in completion order.
+  /// Null when result_count is 0.
+  final List<RenderFrameResult> results;
+
+  @override
+  List<Object?> get _members => [results];
 }
 
 final class RenderAbandonResult extends _Value {

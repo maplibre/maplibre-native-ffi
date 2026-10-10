@@ -126,6 +126,8 @@ typedef struct mln_test_event_batch {
 } mln_test_event_batch;
 
 mln_test_event_batch mln_test_event_batch_default(void);
+// Drains like mln_runtime_drain_events(), except that an empty queue returns
+// MLN_STATUS_OK with a batch of no events.
 mln_status mln_test_drain_events(
   mln_runtime runtime, mln_test_event_batch* out_batch
 );

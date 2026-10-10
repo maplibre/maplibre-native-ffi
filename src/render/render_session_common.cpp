@@ -2348,6 +2348,9 @@ auto publish_frame_result_locked(
 ) noexcept -> void {
   session.latest_result = static_cast<mln_render_result>(result.disposition);
   session.latest_demand_token = result.token;
+  // A batch view's stride is the record size, so every queued record carries
+  // it whichever path built it.
+  result.size = sizeof(mln_render_frame_result);
   session.frame_results.push_back(result);
   if (session.frame_wake && !session.frame_wake_pending) {
     session.frame_wake_pending = true;
@@ -2882,49 +2885,43 @@ auto render_session_drain_frame_results(
   }
   const auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
-  auto results = std::deque<mln_render_frame_result>{};
-  {
-    const auto lock = std::scoped_lock{live->control_mutex};
-    results.swap(live->frame_results);
-    live->frame_wake_pending = false;
-  }
   // An empty queue is a normal poll, so it neither allocates a batch nor sets
   // a diagnostic.
-  if (results.empty()) return MLN_STATUS_NOT_READY;
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    if (live->frame_results.empty()) {
+      live->frame_wake_pending = false;
+      return MLN_STATUS_NOT_READY;
+    }
+  }
+  // Allocating before the swap means a failed allocation loses no results.
   auto batch = std::make_shared<mln_render_frame_batch_object>();
-  batch->results = std::move(results);
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    batch->results.swap(live->frame_results);
+    live->frame_wake_pending = false;
+  }
+  // A concurrent drain can empty the queue between the two locks.
+  if (batch->results.empty()) return MLN_STATUS_NOT_READY;
   *out_batch = handle_table<mln_render_frame_batch_object>().insert(batch);
   return MLN_STATUS_OK;
 }
 
-auto render_frame_batch_count(
-  mln_render_frame_batch batch, std::size_t* out_count
-) -> mln_status {
-  if (out_count == nullptr) {
-    set_thread_error("out_count must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto live = handle_table<mln_render_frame_batch_object>().lease(batch);
-  if (live == nullptr) return recorded_handle_fault_status();
-  *out_count = live->results.size();
-  return MLN_STATUS_OK;
-}
-
 auto render_frame_batch_get(
-  mln_render_frame_batch batch, std::size_t index,
-  mln_render_frame_result* out_result
+  mln_render_frame_batch batch, mln_render_frame_batch_view* out_view
 ) -> mln_status {
-  if (out_result == nullptr || out_result->size < sizeof(*out_result)) {
-    set_thread_error("out_result must not be null and must have a valid size");
+  if (out_view == nullptr || out_view->size < sizeof(*out_view)) {
+    set_thread_error("out_view must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = handle_table<mln_render_frame_batch_object>().lease(batch);
   if (live == nullptr) return recorded_handle_fault_status();
-  if (index >= live->results.size()) {
-    set_thread_error("frame result index is out of range");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  *out_result = live->results[index];
+  *out_view = mln_render_frame_batch_view{
+    .size = sizeof(mln_render_frame_batch_view),
+    .result_size = sizeof(mln_render_frame_result),
+    .results = live->results.empty() ? nullptr : live->results.data(),
+    .result_count = live->results.size(),
+  };
   return MLN_STATUS_OK;
 }
 

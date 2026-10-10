@@ -248,13 +248,15 @@ pub const Fixture = struct {
         const deadline = Deadline.start();
         while (true) {
             const seen = self.events.count.load(.acquire);
-            var batch = try maplibre.runtimeDrainEvents(self.runtime, null);
-            defer batch.deinit();
-            var copy = try maplibre.eventBatchGet(testing.allocator, batch, null);
-            for (copy.value.events) |event| {
-                if (event.type == event_type) return .{ .arena = copy.arena, .value = event };
+            if (try maplibre.runtimeDrainEvents(self.runtime, null)) |drained| {
+                var batch = drained;
+                defer batch.deinit();
+                var copy = try maplibre.eventBatchGet(testing.allocator, batch, null);
+                for (copy.value.events) |event| {
+                    if (event.type == event_type) return .{ .arena = copy.arena, .value = event };
+                }
+                copy.deinit();
             }
-            copy.deinit();
             if (deadline.expired()) return error.EventNotObserved;
             try testing.io.futexWaitTimeout(u32, &self.events.count.raw, seen, .{ .deadline = deadline.at });
         }
@@ -446,8 +448,9 @@ pub const OwnedTexture = struct {
                 try ctx.owner.service();
                 var batch = try maplibre.renderSessionDrainFrameResults(ctx.owner.session, null) orelse return false;
                 defer batch.deinit();
-                for (0..try maplibre.renderFrameBatchCount(batch, null)) |index| {
-                    const result = try maplibre.renderFrameBatchGet(batch, index, null);
+                var view = try maplibre.renderFrameBatchGet(testing.allocator, batch, null);
+                defer view.deinit();
+                for (view.value.results) |result| {
                     if (result.token == ctx.token) ctx.result = result;
                 }
                 return ctx.result != null;

@@ -149,8 +149,8 @@ func decodeEventsForTest(stride uintptr, events []runtimeEventForTest) []Runtime
 		messages = C.CBytes(arena)
 		defer C.free(messages)
 	}
-	return copyRuntimeEventBatchView(C.mln_runtime_event_batch_view{
-		size:          C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_batch_view{})),
+	return copyEventBatchView(C.mln_event_batch_view{
+		size:          C.uint32_t(unsafe.Sizeof(C.mln_event_batch_view{})),
 		event_size:    C.uint32_t(stride),
 		events:        (*C.mln_runtime_event)(storage),
 		event_count:   C.size_t(len(events)),

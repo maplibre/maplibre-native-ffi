@@ -161,7 +161,7 @@ internal class MapLibreSurfaceRenderer(
       if (callerDriver) session.serviceDriverWork(0uL)
       val result =
         session.drainFrameResults()?.use { results ->
-          (0uL until results.count()).map(results::get).lastOrNull { it.token == token }
+          results.get().results.lastOrNull { it.token == token }
         }
       if (result != null) return result
       sessionWork.acquire()

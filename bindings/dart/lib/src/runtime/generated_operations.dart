@@ -734,42 +734,41 @@ RuntimeEvent _readRuntimeEvent(
   },
 );
 
-RuntimeEventBatchView _readRuntimeEventBatchView(
-  raw.mln_runtime_event_batch_view source,
-) => RuntimeEventBatchView(
-  events: (() {
-    if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
-      throwInvalidState('native record stride is too small');
-    }
-    return List<RuntimeEvent>.unmodifiable(
-      List.generate(
-        source.event_count,
-        (index) => _readRuntimeEvent(
-          (source.events.cast<Uint8>() + index * source.event_size)
-              .cast<raw.mln_runtime_event>()
-              .ref,
-          rawRecord: () =>
+EventBatchView _readEventBatchView(raw.mln_event_batch_view source) =>
+    EventBatchView(
+      events: (() {
+        if (source.event_size < sizeOf<raw.mln_runtime_event>()) {
+          throwInvalidState('native record stride is too small');
+        }
+        return List<RuntimeEvent>.unmodifiable(
+          List.generate(
+            source.event_count,
+            (index) => _readRuntimeEvent(
               (source.events.cast<Uint8>() + index * source.event_size)
                   .cast<raw.mln_runtime_event>()
-                  .cast<Uint8>()
-                  .asTypedList(source.event_size),
-          message: _arenaUtf8(
-            source.messages.cast(),
-            source.messages_size,
-            (source.events.cast<Uint8>() + index * source.event_size)
-                .cast<raw.mln_runtime_event>()
-                .ref
-                .message_offset,
-            (source.events.cast<Uint8>() + index * source.event_size)
-                .cast<raw.mln_runtime_event>()
-                .ref
-                .message_size,
+                  .ref,
+              rawRecord: () =>
+                  (source.events.cast<Uint8>() + index * source.event_size)
+                      .cast<raw.mln_runtime_event>()
+                      .cast<Uint8>()
+                      .asTypedList(source.event_size),
+              message: _arenaUtf8(
+                source.messages.cast(),
+                source.messages_size,
+                (source.events.cast<Uint8>() + index * source.event_size)
+                    .cast<raw.mln_runtime_event>()
+                    .ref
+                    .message_offset,
+                (source.events.cast<Uint8>() + index * source.event_size)
+                    .cast<raw.mln_runtime_event>()
+                    .ref
+                    .message_size,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      })(),
     );
-  })(),
-);
 
 Pointer<raw.mln_frame_demand> _writeFrameDemand(
   FrameDemand value,
@@ -2009,6 +2008,26 @@ OpenglSurfaceDescriptor _readOpenglSurfaceDescriptor(
   extent: _readRenderTargetExtent(source.extent),
   context: _readOpenglContextDescriptor(source.context),
   surface: NativePointer(source.surface.address),
+);
+
+RenderFrameBatchView _readRenderFrameBatchView(
+  raw.mln_render_frame_batch_view source,
+) => RenderFrameBatchView(
+  results: (() {
+    if (source.result_size < sizeOf<raw.mln_render_frame_result>()) {
+      throwInvalidState('native record stride is too small');
+    }
+    return List<RenderFrameResult>.unmodifiable(
+      List.generate(
+        source.result_count,
+        (index) => _readRenderFrameResult(
+          (source.results.cast<Uint8>() + index * source.result_size)
+              .cast<raw.mln_render_frame_result>()
+              .ref,
+        ),
+      ),
+    );
+  })(),
 );
 
 RenderAbandonResult _readRenderAbandonResult(
@@ -4032,11 +4051,11 @@ final class EventBatchHandle implements Finalizable {
   ///
   /// See `mln_event_batch_get` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  RuntimeEventBatchView getValue() => withNativeArena((arena) {
-    final outView = arena<raw.mln_runtime_event_batch_view>();
-    outView.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
+  EventBatchView getValue() => withNativeArena((arena) {
+    final outView = arena<raw.mln_event_batch_view>();
+    outView.ref.size = sizeOf<raw.mln_event_batch_view>();
     _check(raw.mln_event_batch_get(_handle.raw, outView, nativeDiagnostic));
-    return _readRuntimeEventBatchView(outView.ref);
+    return _readEventBatchView(outView.ref);
   });
 
   /// Releases an owned event batch. A null handle is a no-op.
@@ -6475,38 +6494,17 @@ final class RenderFrameBatchHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  /// Returns the number of records in an owned frame-result batch.
-  ///
-  /// See `mln_render_frame_batch_count` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  int count() => withNativeArena((arena) {
-    final outCount = arena<Size>();
-    _check(
-      raw.mln_render_frame_batch_count(_handle.raw, outCount, nativeDiagnostic),
-    );
-    return outCount.value;
-  });
-
-  /// Copies one frame-result record.
+  /// Borrows the result view stored by an owned frame-result batch.
   ///
   /// See `mln_render_frame_batch_get` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  RenderFrameResult getValue(int indexValue) => withNativeArena((arena) {
-    final outResult = arena<raw.mln_render_frame_result>();
-    outResult.ref.size = sizeOf<raw.mln_render_frame_result>();
+  RenderFrameBatchView getValue() => withNativeArena((arena) {
+    final outView = arena<raw.mln_render_frame_batch_view>();
+    outView.ref.size = sizeOf<raw.mln_render_frame_batch_view>();
     _check(
-      raw.mln_render_frame_batch_get(
-        _handle.raw,
-        _nativeInteger(
-          indexValue,
-          0,
-          sizeOf<Size>() == 4 ? 4294967295 : 0x7fffffffffffffff,
-        ),
-        outResult,
-        nativeDiagnostic,
-      ),
+      raw.mln_render_frame_batch_get(_handle.raw, outView, nativeDiagnostic),
     );
-    return _readRenderFrameResult(outResult.ref);
+    return _readRenderFrameBatchView(outView.ref);
   });
 
   /// Releases a frame-result batch.
@@ -7232,11 +7230,14 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_runtime_drain_events` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  EventBatchHandle drainEvents() => withNativeArena((arena) {
+  EventBatchHandle? drainEvents() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
-    _check(
+    if (!_present(
       raw.mln_runtime_drain_events(_handle.raw, outBatch, nativeDiagnostic),
-    );
+      raw.MLN_STATUS_NOT_READY,
+    )) {
+      return null;
+    }
     return _adoptOwned(
       outBatch.value,
       () => EventBatchHandle._(NativeEventBatch(outBatch.value)),

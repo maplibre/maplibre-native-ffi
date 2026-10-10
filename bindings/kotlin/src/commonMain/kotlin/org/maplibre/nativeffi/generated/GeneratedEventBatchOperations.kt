@@ -15,11 +15,11 @@ public abstract class GeneratedEventBatchOperations internal constructor() {
    * See `mln_event_batch_get` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun get(): RuntimeEventBatchView =
+  public fun get(): EventBatchView =
     nativeCall(this, binding, "mln_event_batch_get", Access.READ) {
       val out = sized(w(24, 40), w(4, 8))
       check(C.mln_event_batch_get(handle, out, diagnostic))
-      readRuntimeEventBatchView(out)
+      readEventBatchView(out)
     }
 
   /**

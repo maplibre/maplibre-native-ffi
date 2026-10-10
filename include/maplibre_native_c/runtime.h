@@ -410,7 +410,7 @@ typedef struct mln_runtime_options {
  * Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
  *
  * This struct has no size field, because it is a member of
- * mln_runtime_event_payload. mln_runtime_event_batch_view.event_size covers the
+ * mln_runtime_event_payload. mln_event_batch_view.event_size covers the
  * whole event, including its payload.
  */
 typedef struct mln_rendering_stats {
@@ -509,7 +509,7 @@ typedef struct mln_runtime_event_offline_region_tile_count_limit {
  * A host that decodes a payload type this version does not define treats the
  * payload as opaque bytes and forwards them unchanged. Those bytes run from the
  * payload's offset within mln_runtime_event to
- * mln_runtime_event_batch_view.event_size.
+ * mln_event_batch_view.event_size.
  */
 typedef union mln_runtime_event_payload {
   mln_runtime_event_render_frame render_frame
@@ -539,7 +539,7 @@ typedef union mln_runtime_event_payload {
  * batch with one memory copy.
  *
  * Step through an array of these by
- * mln_runtime_event_batch_view.event_size rather than by the size of this
+ * mln_event_batch_view.event_size rather than by the size of this
  * struct: a later version may add a member to
  * mln_runtime_event_payload and widen the stride. Every field below, payload
  * included, keeps its offset across versions.
@@ -567,7 +567,7 @@ typedef struct mln_runtime_event {
   uint32_t payload_type MLN_BINDING("enum=mln_runtime_event_payload_type");
   /**
    * Byte offset of this event's message inside
-   * mln_runtime_event_batch_view.messages. Zero when message_size is 0.
+   * mln_event_batch_view.messages. Zero when message_size is 0.
    */
   uint64_t message_offset;
   /**
@@ -587,7 +587,7 @@ typedef struct mln_runtime_event {
  * Step through events by event_size. The event and message pointers remain
  * valid until the event-batch handle is released.
  */
-typedef struct mln_runtime_event_batch_view {
+typedef struct mln_event_batch_view {
   uint32_t size;
   /**
    * Stride of one event in bytes, at least sizeof(mln_runtime_event) in the
@@ -610,7 +610,7 @@ typedef struct mln_runtime_event_batch_view {
   const char* messages MLN_BINDING("length=messages_size;encoding=bytes");
   /** Number of bytes in messages, including every terminator. */
   size_t messages_size;
-} mln_runtime_event_batch_view;
+} mln_event_batch_view;
 
 typedef struct mln_resource_transform_response {
   uint32_t size;
@@ -1418,7 +1418,8 @@ MLN_API mln_status mln_runtime_dispose(
  * Drains this runtime's queued events into a new owned batch.
  *
  * The drain transfers every event that the queue holds, in queue order. Events
- * that arrive later enter the next batch. The returned handle owns the event
+ * that arrive later enter the next batch, and the event wake fires again when
+ * the first of them arrives. The returned handle owns the event
  * records and their message arena. Later drains and runtime destruction leave
  * the batch readable. Release each batch with mln_event_batch_release().
  *
@@ -1431,14 +1432,18 @@ MLN_API mln_status mln_runtime_dispose(
  * discarded with the runtime.
  *
  * Returns:
- * - MLN_STATUS_OK when out_batch receives an owned batch, including an empty
- *   batch.
+ * - MLN_STATUS_OK when a batch holding at least one event is published in
+ *   *out_batch.
+ * - MLN_STATUS_NOT_READY when no event is queued. This is not an error:
+ *   *out_batch is left unchanged, no batch is allocated, and the caller drains
+ *   again after the next event wake. Bindings return their language's empty
+ *   form instead of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=event_batch")
+MLN_BINDING("execution=event_batch;absent_on=MLN_STATUS_NOT_READY")
 MLN_API mln_status mln_runtime_drain_events(
   mln_runtime runtime, mln_event_batch* out_batch MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -1456,7 +1461,7 @@ MLN_API mln_status mln_runtime_drain_events(
  */
 MLN_API mln_status mln_event_batch_get(
   mln_event_batch batch,
-  mln_runtime_event_batch_view* out_view MLN_BINDING("direction=out"),
+  mln_event_batch_view* out_view MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

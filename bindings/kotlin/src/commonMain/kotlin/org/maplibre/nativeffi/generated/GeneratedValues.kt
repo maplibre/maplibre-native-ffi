@@ -1640,7 +1640,8 @@ public class GpuSync(
 }
 
 /**
- * Immutable result record copied into an owned frame-result batch.
+ * Terminal result of one frame demand, held by an owned frame-result batch and copied by
+ * `mln_acquired_frame_get_result()`.
  *
  * See `mln_render_frame_result` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -3102,10 +3103,10 @@ public data class RuntimeEvent(
 /**
  * A borrowed view of one owned runtime-event batch.
  *
- * See `mln_runtime_event_batch_view` in the
+ * See `mln_event_batch_view` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
-public data class RuntimeEventBatchView(
+public data class EventBatchView(
   /** Borrowed array of event_count events in queue order. */
   public val events: List<RuntimeEvent> = emptyList()
 )
@@ -3465,6 +3466,20 @@ public data class TextureReadbackResult(
   /** Borrowed pixel bytes, valid only during the callback. */
   public val data: ByteArray = byteArrayOf(),
   public val info: TextureImageInfo = TextureImageInfo(),
+)
+
+/**
+ * A borrowed view of one owned frame-result batch.
+ *
+ * See `mln_render_frame_batch_view` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class RenderFrameBatchView(
+  /**
+   * Borrowed array of result_count terminal frame results in completion order. Null when
+   * result_count is 0.
+   */
+  public val results: List<RenderFrameResult> = emptyList()
 )
 
 public data class ResourceResponse(

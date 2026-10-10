@@ -164,9 +164,7 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
 
   mln_event_batch batch = MLN_HANDLE_NULL;
   MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
-  mln_runtime_event_batch_view view = {
-    .size = sizeof(mln_runtime_event_batch_view)
-  };
+  mln_event_batch_view view = {.size = sizeof(mln_event_batch_view)};
   MLN_TEST_OK(mln_event_batch_get(batch, &view, NULL));
   TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
 
@@ -351,7 +349,9 @@ static void event_masks_select_every_type_and_keep_foreign_bits(void) {
       mln_test_thread_start(call_event_api_from_a_foreign_thread, &probe);
     mln_test_thread_join(thread);
 
-    MLN_TEST_OK(probe.drain_status);
+    // The queue was drained above, so the accepted foreign drain finds it
+    // empty.
+    MLN_TEST_STATUS(MLN_STATUS_NOT_READY, probe.drain_status);
     MLN_TEST_OK(probe.runtime_mask_status);
     MLN_TEST_OK(probe.map_mask_status);
   }
@@ -395,6 +395,33 @@ static void event_masks_select_every_type_and_keep_foreign_bits(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A drain of an empty queue reports not ready, leaves its output null, and
+// consumes nothing: the next drain is empty too, and the next event still
+// arrives in a batch.
+static void an_empty_drain_publishes_no_batch(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  for (int attempt = 0; attempt < 2; attempt += 1) {
+    mln_event_batch batch = MLN_HANDLE_NULL;
+    MLN_TEST_STATUS(
+      MLN_STATUS_NOT_READY, mln_runtime_drain_events(runtime, &batch, NULL)
+    );
+    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+  }
+
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_event_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_OK(mln_runtime_drain_events(runtime, &batch, NULL));
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+  mln_event_batch_view view = {.size = sizeof(mln_event_batch_view)};
+  MLN_TEST_OK(mln_event_batch_get(batch, &view, NULL));
+  TEST_ASSERT_GREATER_THAN_size_t(0, view.event_count);
+  mln_event_batch_release(batch);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // A drained batch is an owned handle that stays readable across later drains.
 static void a_drained_batch_is_an_owned_handle(void) {
   mln_runtime runtime = mln_test_create_runtime();
@@ -404,22 +431,19 @@ static void a_drained_batch_is_an_owned_handle(void) {
 
     mln_event_batch first = MLN_HANDLE_NULL;
     MLN_TEST_OK(mln_runtime_drain_events(runtime, &first, NULL));
-    mln_runtime_event_batch_view first_view = {
-      .size = sizeof(mln_runtime_event_batch_view)
-    };
+    mln_event_batch_view first_view = {.size = sizeof(mln_event_batch_view)};
     MLN_TEST_OK(mln_event_batch_get(first, &first_view, NULL));
     TEST_ASSERT_EQUAL_UINT32(sizeof(mln_runtime_event), first_view.event_size);
     TEST_ASSERT_GREATER_THAN_size_t(1, first_view.event_count);
     const size_t first_count = first_view.event_count;
     const mln_runtime_event first_event = first_view.events[0];
 
+    mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
     mln_event_batch second = MLN_HANDLE_NULL;
     MLN_TEST_OK(mln_runtime_drain_events(runtime, &second, NULL));
-    mln_runtime_event_batch_view second_view = {
-      .size = sizeof(mln_runtime_event_batch_view)
-    };
+    mln_event_batch_view second_view = {.size = sizeof(mln_event_batch_view)};
     MLN_TEST_OK(mln_event_batch_get(second, &second_view, NULL));
-    TEST_ASSERT_EQUAL_size_t(0, second_view.event_count);
+    TEST_ASSERT_GREATER_THAN_size_t(0, second_view.event_count);
     TEST_ASSERT_EQUAL_size_t(first_count, first_view.event_count);
     TEST_ASSERT_EQUAL_UINT32(first_event.type, first_view.events[0].type);
 
@@ -438,8 +462,8 @@ static void a_drained_batch_is_an_owned_handle(void) {
     mln_event_batch_release(batch);
     mln_event_batch_release(MLN_HANDLE_NULL);
 
-    mln_runtime_event_batch_view view = {
-      .size = sizeof(mln_runtime_event_batch_view), .event_count = 99
+    mln_event_batch_view view = {
+      .size = sizeof(mln_event_batch_view), .event_count = 99
     };
     MLN_TEST_INVALID_STATE(mln_event_batch_get(batch, &view, NULL));
     TEST_ASSERT_EQUAL_size_t(99, view.event_count);
@@ -457,6 +481,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_creation_mask_applies_during_construction);
   RUN_TEST(clearing_one_type_leaves_the_others_arriving);
   RUN_TEST(a_suppressed_producer_leaves_the_queue_empty);
+  RUN_TEST(an_empty_drain_publishes_no_batch);
   RUN_TEST(a_drained_batch_is_an_owned_handle);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
   RUN_TEST(a_transition_reports_one_terminal_outcome);

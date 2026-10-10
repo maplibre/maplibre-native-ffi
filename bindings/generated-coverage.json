@@ -78,6 +78,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonDisposition.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderAbandonResult.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchHandle.Operations.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameBatchView.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderFrameResult.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderResult.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/RenderSession/RenderSessionHandle.Operations.g.cs",
@@ -107,6 +108,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/AmbientCacheOperation.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/CameraChangeMode.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchHandle.Operations.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/EventBatchView.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransform.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/HttpHeaderTransformResponse.g.cs",
@@ -132,7 +134,6 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs",
-    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventBatchView.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCameraTransitionFinished.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventMask.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionResponseError.g.cs",
@@ -315,7 +316,7 @@
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc"
   ],
-  "function_count": 295,
+  "function_count": 294,
   "languages": {
     "dart": {
       "callback_adapters": {
@@ -499,7 +500,6 @@
         "mln_premultiplied_rgba8_image_default",
         "mln_projected_meters_for_lat_lng",
         "mln_projection_mode_default",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -768,7 +768,6 @@
         "mln_premultiplied_rgba8_image_default",
         "mln_projected_meters_for_lat_lng",
         "mln_projection_mode_default",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -1038,7 +1037,6 @@
         "mln_premultiplied_rgba8_image_default",
         "mln_projected_meters_for_lat_lng",
         "mln_projection_mode_default",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -1308,7 +1306,6 @@
         "mln_premultiplied_rgba8_image_default",
         "mln_projected_meters_for_lat_lng",
         "mln_projection_mode_default",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -1553,7 +1550,6 @@
         "mln_opengl_surface_set_target",
         "mln_plugin_get_register_function_v1",
         "mln_projected_meters_for_lat_lng",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -1900,7 +1896,6 @@
         "mln_premultiplied_rgba8_image_default",
         "mln_projected_meters_for_lat_lng",
         "mln_projection_mode_default",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -2170,7 +2165,6 @@
         "mln_premultiplied_rgba8_image_default",
         "mln_projected_meters_for_lat_lng",
         "mln_projection_mode_default",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -2440,7 +2434,6 @@
         "mln_premultiplied_rgba8_image_default",
         "mln_projected_meters_for_lat_lng",
         "mln_projection_mode_default",
-        "mln_render_frame_batch_count",
         "mln_render_frame_batch_get",
         "mln_render_frame_batch_release",
         "mln_render_session_abandon",
@@ -2532,7 +2525,7 @@
       "unsupported": {}
     }
   },
-  "public_function_count": 263,
+  "public_function_count": 262,
   "runtime_exports": [
     "mln_adapter_arena_adopt_handle",
     "mln_adapter_arena_adopt_release",
@@ -2570,7 +2563,7 @@
   "schema_version": 1,
   "semantic": {
     "resolved_callbacks": 19,
-    "resolved_operations": 261,
+    "resolved_operations": 260,
     "support_relations": {
       "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },
       "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },

@@ -1800,6 +1800,31 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 	return raw
 }
 
+// EventBatchView corresponds to mln_event_batch_view. A borrowed view of one
+// owned runtime-event batch.
+//
+// See mln_event_batch_view in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type EventBatchView struct {
+	// Borrowed array of event_count events in queue order.
+	Events []RuntimeEvent
+}
+
+func copyEventBatchView(raw C.mln_event_batch_view) EventBatchView {
+	var result EventBatchView
+	result.Events = func() []RuntimeEvent {
+		length := bindingLength(uint64(raw.event_count))
+		result := make([]RuntimeEvent, length)
+		for i := range result {
+			item := *(*C.mln_runtime_event)(bindingElement(unsafe.Pointer(raw.events), i, uint64(raw.event_size), unsafe.Sizeof(*raw.events), unsafe.Alignof(*raw.events)))
+			result[i] = copyRuntimeEvent(item)
+			result[i].Message = bindingArenaString(unsafe.Pointer(raw.messages), uint64(raw.messages_size), uint64(item.message_offset), uint64(item.message_size))
+		}
+		return result
+	}()
+	return result
+}
+
 // FeatureStateSelector corresponds to mln_feature_state_selector. Feature-state
 // source, feature, and key selector.
 //
@@ -3098,8 +3123,34 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 	return result
 }
 
-// RenderFrameResult corresponds to mln_render_frame_result. Immutable result
-// record copied into an owned frame-result batch.
+// RenderFrameBatchView corresponds to mln_render_frame_batch_view. A borrowed
+// view of one owned frame-result batch.
+//
+// See mln_render_frame_batch_view in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+type RenderFrameBatchView struct {
+	// Borrowed array of result_count terminal frame results in completion order.
+	// Null when result_count is 0.
+	Results []RenderFrameResult
+}
+
+func copyRenderFrameBatchView(raw C.mln_render_frame_batch_view) RenderFrameBatchView {
+	var result RenderFrameBatchView
+	result.Results = func() []RenderFrameResult {
+		length := bindingLength(uint64(raw.result_count))
+		result := make([]RenderFrameResult, length)
+		for i := range result {
+			item := *(*C.mln_render_frame_result)(bindingElement(unsafe.Pointer(raw.results), i, uint64(raw.result_size), unsafe.Sizeof(*raw.results), unsafe.Alignof(*raw.results)))
+			result[i] = copyRenderFrameResult(item)
+		}
+		return result
+	}()
+	return result
+}
+
+// RenderFrameResult corresponds to mln_render_frame_result. Terminal result of
+// one frame demand, held by an owned frame-result batch and copied by
+// mln_acquired_frame_get_result().
 //
 // See mln_render_frame_result in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -3603,31 +3654,6 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 			return nil
 		}
 		return UnknownVariant{Tag: uint32(raw.payload_type)}
-	}()
-	return result
-}
-
-// RuntimeEventBatchView corresponds to mln_runtime_event_batch_view. A borrowed
-// view of one owned runtime-event batch.
-//
-// See mln_runtime_event_batch_view in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventBatchView struct {
-	// Borrowed array of event_count events in queue order.
-	Events []RuntimeEvent
-}
-
-func copyRuntimeEventBatchView(raw C.mln_runtime_event_batch_view) RuntimeEventBatchView {
-	var result RuntimeEventBatchView
-	result.Events = func() []RuntimeEvent {
-		length := bindingLength(uint64(raw.event_count))
-		result := make([]RuntimeEvent, length)
-		for i := range result {
-			item := *(*C.mln_runtime_event)(bindingElement(unsafe.Pointer(raw.events), i, uint64(raw.event_size), unsafe.Sizeof(*raw.events), unsafe.Alignof(*raw.events)))
-			result[i] = copyRuntimeEvent(item)
-			result[i].Message = bindingArenaString(unsafe.Pointer(raw.messages), uint64(raw.messages_size), uint64(item.message_offset), uint64(item.message_size))
-		}
-		return result
 	}()
 	return result
 }
@@ -5842,13 +5868,13 @@ func CVersion() (uint32, error) {
 //
 // See mln_event_batch_get in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *EventBatchHandle) Get() (RuntimeEventBatchView, error) {
-	var outView C.mln_runtime_event_batch_view
+func (receiver *EventBatchHandle) Get() (EventBatchView, error) {
+	var outView C.mln_event_batch_view
 	outView.size = C.uint32_t(unsafe.Sizeof(outView))
 	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_event_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_event_batch_get(C.mln_event_batch(raw), &outView, diagnostic))
-	}, func(arena *bindingArena) RuntimeEventBatchView {
-		return copyRuntimeEventBatchView(outView)
+	}, func(arena *bindingArena) EventBatchView {
+		return copyEventBatchView(outView)
 	})
 }
 
@@ -7449,30 +7475,17 @@ func ProjectedMetersForLatLng(coordinate LatLng) (ProjectedMeters, error) {
 	})
 }
 
-// Count returns the number of records in an owned frame-result batch.
-//
-// See mln_render_frame_batch_count in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderFrameBatchHandle) Count() (uint, error) {
-	var outCount C.size_t
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_frame_batch_count), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_frame_batch_count(C.mln_render_frame_batch(raw), &outCount, diagnostic))
-	}, func(arena *bindingArena) uint {
-		return uint(outCount)
-	})
-}
-
-// Get copies one frame-result record.
+// Get borrows the result view stored by an owned frame-result batch.
 //
 // See mln_render_frame_batch_get in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderFrameBatchHandle) Get(index uint) (RenderFrameResult, error) {
-	var outResult C.mln_render_frame_result
-	outResult.size = C.uint32_t(unsafe.Sizeof(outResult))
+func (receiver *RenderFrameBatchHandle) Get() (RenderFrameBatchView, error) {
+	var outView C.mln_render_frame_batch_view
+	outView.size = C.uint32_t(unsafe.Sizeof(outView))
 	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_frame_batch_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), C.size_t(index), &outResult, diagnostic))
-	}, func(arena *bindingArena) RenderFrameResult {
-		return copyRenderFrameResult(outResult)
+		return int32(C.mln_render_frame_batch_get(C.mln_render_frame_batch(raw), &outView, diagnostic))
+	}, func(arena *bindingArena) RenderFrameBatchView {
+		return copyRenderFrameBatchView(outView)
 	})
 }
 
@@ -7925,7 +7938,7 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 func (receiver *RuntimeHandle) DrainEvents() (*EventBatchHandle, error) {
 	var outBatch C.mln_event_batch
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_drain_events), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGetUnless(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_drain_events), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_runtime_drain_events(C.mln_runtime(raw), &outBatch, diagnostic))
 	}, func(arena *bindingArena) *EventBatchHandle {
 		adopted := adoptEventBatchHandle(uint64(outBatch), nil)

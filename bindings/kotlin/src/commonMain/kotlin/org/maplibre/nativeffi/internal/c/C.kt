@@ -963,14 +963,7 @@ internal expect object C {
 
   fun mln_projection_mode_default(returned: Long): Unit
 
-  fun mln_render_frame_batch_count(batch: Long, outCount: Long, outDiagnostic: Long): Int
-
-  fun mln_render_frame_batch_get(
-    batch: Long,
-    index: Long,
-    outResult: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_render_frame_batch_get(batch: Long, outView: Long, outDiagnostic: Long): Int
 
   fun mln_render_frame_batch_release(batch: Long): Unit
 
