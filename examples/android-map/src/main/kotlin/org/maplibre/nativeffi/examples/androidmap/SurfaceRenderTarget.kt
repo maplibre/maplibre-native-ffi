@@ -60,8 +60,8 @@ private constructor(
   }
 
   /**
-   * What one frame-result drain saw. A target that was not ready consumed its map update, so the
-   * view retries with a forced frame.
+   * What one frame-result drain saw. No map-update event follows a target that was not ready, so
+   * the view retries on its next frame.
    */
   data class Drained(val rendered: Boolean, val needsRepaint: Boolean, val targetNotReady: Boolean)
 
@@ -179,9 +179,10 @@ private constructor(
     private const val TAG = "MapLibreAndroidMap"
 
     /**
-     * Starts attaching a session, which the UI thread owns until close. The session raises
-     * [frameWake] with frame results and, for a caller driver, [onDriverWork] with driver work.
-     * [onAttached] runs on a native thread with the attachment's failure, or null.
+     * Starts attaching a session. The UI thread services a caller driver and closes the session.
+     * The session raises [frameWake] with frame results and, for a caller driver, [onDriverWork]
+     * with driver work. [onAttached] runs on a native thread with the attachment's failure, or
+     * null.
      */
     fun attach(
       map: MapHandle,

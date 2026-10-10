@@ -160,9 +160,9 @@ final class MetalRenderTarget {
   }
 
   /// Demands a frame and returns the token whose result shows it. A forced
-  /// demand renders even without a newer map update, which a retry after an
-  /// undrawn frame needs. While a borrowed-texture demand is outstanding, the
-  /// demand waits for ``compositorDone()``.
+  /// demand renders even without a newer map update, which a retry after a
+  /// frame that missed the layer needs. While a borrowed-texture demand is
+  /// outstanding, the demand waits for ``compositorDone()``.
   @discardableResult
   func requestFrame(force: Bool = false) throws -> UInt64 {
     if demandOutstanding {

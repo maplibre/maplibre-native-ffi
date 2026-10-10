@@ -42,7 +42,8 @@ typedef struct frame_results {
   bool rendered;
   /// The map asked for another frame while it rendered one.
   bool needs_repaint;
-  /// The target could not produce a frame, so the loop retries later.
+  /// The target could not produce a frame. The map update stays pending, and
+  /// the loop retries later because no map-update event follows.
   bool target_not_ready;
 } frame_results;
 
@@ -73,8 +74,8 @@ void render_session_close(render_session* session);
 
 /// Demands a frame, and writes the token whose result shows it when
 /// out_token is not null. A forced demand renders even without a newer map
-/// update, which a retry after an undrawn frame needs. While a turn-taking
-/// session has a demand outstanding, the demand waits for
+/// update, which a retry after a frame that missed the window needs. While a
+/// turn-taking session has a demand outstanding, the demand waits for
 /// render_session_compositor_done().
 [[nodiscard]] app_error render_session_request_frame(
   render_session* session, bool force, uint64_t* out_token

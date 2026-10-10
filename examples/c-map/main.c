@@ -23,8 +23,8 @@
 /// How long a smoke run waits for its first rendered frame.
 static const Uint32 smoke_timeout_milliseconds = 60000;
 
-/// How long a frame that did not reach the window waits before it retries,
-/// about one display refresh.
+/// How long the loop waits before it retries a frame that did not reach the
+/// window, about one display refresh. No map-update event prompts that retry.
 static const Uint32 frame_retry_milliseconds = 16;
 
 /// How long the render loop waits before SDL checks for a quit signal.
@@ -62,8 +62,10 @@ static app_error show_frame_results(app* app) {
     return APP_OK;
   }
   if (results.target_not_ready || (results.rendered && !presented)) {
-    // The map update was consumed without reaching the window, so the retry
-    // forces a frame rather than waiting for another update.
+    // No map-update event follows a target that was not ready or a frame that
+    // missed the window, so the retry waits about one display refresh. It
+    // forces the frame, because a frame that missed the window consumed its
+    // update.
     app_event_push_after(APP_EVENT_RETRY_FRAME, frame_retry_milliseconds);
   } else if (results.needs_repaint) {
     MAP_TRY(render_session_request_frame(session, false, nullptr));

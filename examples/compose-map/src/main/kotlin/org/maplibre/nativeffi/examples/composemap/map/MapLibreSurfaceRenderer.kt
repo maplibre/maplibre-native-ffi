@@ -51,7 +51,7 @@ internal class MapLibreSurfaceRenderer(
 
   /**
    * Set when the next draw should render even with no newer map update: for a new target, or to
-   * retry a target that was not ready, which consumed the update.
+   * retry a target that was not ready.
    */
   private val frameForced = AtomicBoolean(false)
 
@@ -145,7 +145,8 @@ internal class MapLibreSurfaceRenderer(
         NativeSurfaceRenderResult.Rendered
       }
       RenderResult.TARGET_NOT_READY -> {
-        // The attempt consumed the update, so the next Compose frame forces a retry.
+        // No map-update event follows a target that was not ready, so the next Compose frame
+        // retries. The map update stays pending.
         requestRender(force = true)
         NativeSurfaceRenderResult.Skipped
       }

@@ -7,8 +7,8 @@ import MaplibreNativeFFI
 /// worker. Gestures submit camera commands to `mapState` directly.
 @MainActor
 final class RenderLoop {
-  /// How long a frame that did not reach the layer waits before it retries,
-  /// about one display refresh.
+  /// How long the loop waits before it retries a target that was not ready,
+  /// about one display refresh. No map-update event prompts that retry.
   private static let frameRetryNanoseconds: UInt64 = 16_000_000
 
   let mapState: MapState
@@ -133,8 +133,8 @@ final class RenderLoop {
     do {
       let results = try target.drainResults()
       if results.targetNotReady {
-        // The map update was consumed without reaching the layer, so the
-        // retry forces a frame rather than waiting for another update.
+        // No map-update event follows a target that was not ready, so the
+        // retry waits about one display refresh. The map update stays pending.
         Task { @MainActor [weak self] in
           try? await Task.sleep(nanoseconds: Self.frameRetryNanoseconds)
           self?.requestFrame(force: true)

@@ -17,8 +17,8 @@ use crate::render_target::{Mode, RenderTarget, driver_label};
 use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
-/// How long a frame that did not reach the window waits before it retries,
-/// about one display refresh.
+/// How long the loop waits before it retries a frame that did not reach the
+/// window, about one display refresh. No map-update event prompts that retry.
 const FRAME_RETRY: Duration = Duration::from_millis(16);
 
 pub struct App {
@@ -150,8 +150,8 @@ impl App {
             return;
         }
         self.retry_at = None;
-        // The map update was consumed without reaching the window, so the
-        // retry forces a frame rather than waiting for another update.
+        // A frame that missed the window consumed its update, so the retry
+        // forces the frame.
         if let Err(error) = self
             .target_mut()
             .session_mut()
@@ -184,8 +184,10 @@ impl App {
             return Ok(());
         }
         if results.target_not_ready || (results.rendered && !presented) {
-            // The map update was consumed without reaching the window, so the
-            // retry forces a frame rather than waiting for another update.
+            // No map-update event follows a target that was not ready or a
+            // frame that missed the window, so the retry waits about one
+            // display refresh. It forces the frame, because a frame that
+            // missed the window consumed its update.
             self.retry_at = Some(Instant::now() + FRAME_RETRY);
         } else if results.needs_repaint {
             target.session_mut().request_frame(false)?;

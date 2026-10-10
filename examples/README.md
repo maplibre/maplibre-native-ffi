@@ -73,9 +73,13 @@ These rules hold in every example, and the code alone does not show why:
 
 - A wake runs on a native thread. It only schedules a drain or a driver service
   on the host loop, and returns.
-- A frame result of target-not-ready, or a rendered frame that the host could
-  not present, demands again after about one display refresh without the
-  render-if-needed flag, because the attempt consumed the map update.
+- After a frame result of no-update or size-pending, the host waits for the next
+  map-update event. The map publishes one when it has something new, including
+  after a resize.
+- After a frame result of target-not-ready, or a rendered frame that the host
+  could not show, the host demands again after about one display refresh,
+  because no map-update event follows. The demand omits the render-if-needed
+  flag, because a frame that the host could not show consumed its update.
 - A Vulkan core worker in a texture mode submits on a second queue from the
   graphics family, because the host compositor submits on its own queue at the
   same time. A device with one graphics queue, such as MoltenVK, uses the caller

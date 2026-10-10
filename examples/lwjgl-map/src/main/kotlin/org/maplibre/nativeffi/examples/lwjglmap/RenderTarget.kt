@@ -124,9 +124,10 @@ internal open class RenderTarget(
 
   /**
    * Drains every frame result and shows the newest rendered frame, reporting whether it reached the
-   * window. A rendered frame that asks for another, as during a paint transition, demands it. A
-   * target that was not ready, or a frame that missed the window, consumed its map update, so a
-   * forced retry follows after about one refresh.
+   * window. A rendered frame that asks for another, as during a paint transition, demands it. No
+   * map-update event follows a target that was not ready or a frame that missed the window, so a
+   * retry follows after about one refresh. The retry is forced, because a frame that missed the
+   * window consumed its update.
    */
   protected fun drainFrameResults(): Boolean {
     val batch =
