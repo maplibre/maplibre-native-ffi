@@ -260,11 +260,7 @@ app_error render_session_resize(
 app_error render_session_resize_map(
   render_session* session, viewport current_viewport
 ) {
-  const mln_logical_extent extent = {
-    .width = current_viewport.logical_width,
-    .height = current_viewport.logical_height,
-    .scale_factor = current_viewport.scale_factor,
-  };
+  const mln_logical_extent extent = render_target_extent(current_viewport);
   const mln_completion completion = diagnostics_completion("map resize failed");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =

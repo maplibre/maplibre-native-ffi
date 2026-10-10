@@ -10,7 +10,7 @@ const support = @import("fixture.zig");
 const extent = maplibre.LogicalExtent{ .width = 32, .height = 16, .scale_factor = 1.0 };
 
 fn createFixture() !*support.Fixture {
-    const fixture = try support.Fixture.create(.{ .extent = .{ .width = extent.width, .height = extent.height, .scale_factor = extent.scale_factor } });
+    const fixture = try support.Fixture.create(.{ .extent = extent });
     errdefer fixture.destroy();
     try fixture.loadStyle();
     return fixture;

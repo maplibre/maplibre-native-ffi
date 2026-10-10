@@ -414,16 +414,19 @@ MLN_API void mln_acquired_frame_view_end(
  * Starts an ordered logical resize. The completion runs after the selected
  * driver applies the extent and updates the map viewport.
  *
- * scale_factor is fixed when the session attaches, because the renderer bakes
- * its pixel ratio into compiled shaders. An extent that changes it is rejected;
- * destroy the session and attach again instead.
+ * scale_factor must equal the session's current value, set at attachment or by
+ * the latest target replacement, because the renderer bakes its pixel ratio
+ * into compiled shaders. To change it, replace a surface or borrowed texture
+ * through the backend's set_target function, or detach and attach again. The
+ * map keeps the scale factor it was created with and takes only the new width
+ * and height.
  *
  * Returns:
  * - MLN_STATUS_OK when the resize is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; completion
  *   is null or undersized; extent has a zero width or height, or a
  *   scale_factor that is not finite and positive; or extent.scale_factor
- *   differs from the value fixed at attachment.
+ *   differs from the session's current value.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when the target is a caller-owned texture, which its

@@ -3,6 +3,7 @@ const maplibre = @import("maplibre_native_ffi");
 
 const diagnostics = @import("diagnostics.zig");
 const events = @import("events.zig");
+const render_target = @import("render_target.zig");
 const types = @import("types.zig");
 
 pub const MapState = struct {
@@ -34,7 +35,7 @@ pub const MapState = struct {
         // The render loop re-arms from the frame result's repaint flag, so the
         // map only has to report updates that arrive between frames.
         var map_future = maplibre.mapCreate(allocator, runtime, .{
-            .initial_extent = .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor },
+            .initial_extent = render_target.extent(viewport),
             .map_mode = .continuous,
             .event_mask = .{ .map_render_update_available = true },
         }, &diagnostic) catch |err| {

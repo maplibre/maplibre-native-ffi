@@ -118,14 +118,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
               .mapCreate(
                 GeneratedApi.mapOptionsDefault()
                   .copy(
-                    initialExtent =
-                      GeneratedApi.mapOptionsDefault()
-                        .initialExtent
-                        .copy(
-                          width = (viewport.width()).toUInt(),
-                          height = (viewport.height()).toUInt(),
-                          scaleFactor = viewport.scaleFactor(),
-                        ),
+                    initialExtent = RenderTarget.extent(viewport),
                     mapMode = MapMode.CONTINUOUS,
                     eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
                   )

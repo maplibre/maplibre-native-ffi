@@ -56,7 +56,7 @@ func newRenderFixture(t *testing.T) *renderFixture {
 
 	extent := LogicalExtent{Width: 32, Height: 16, ScaleFactor: 1}
 	mapOptions := DefaultMapOptions()
-	mapOptions.InitialExtent = LogicalExtent{Width: extent.Width, Height: extent.Height, ScaleFactor: extent.ScaleFactor}
+	mapOptions.InitialExtent = extent
 	r := &renderFixture{
 		fixture:    newFixtureWith(t, mapOptions),
 		frames:     make(chan struct{}, 1),

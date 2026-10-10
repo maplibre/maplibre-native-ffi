@@ -240,9 +240,30 @@ class Values:
                     f"    {raw} = {self.native(field.value, 'self.' + local)}"
                 )
         initial = f"{value.default}()" if value.default else f"{value.native}()"
+        # A record without a default function of its own zero-fills, so its
+        # default sets each field's annotated initial value over that.
+        initials = (
+            []
+            if value.default
+            else [
+                f"    value.{identifier(camel(field.name))} = {self.initial(field)}"
+                for field in value.fields
+                if field.initial is not None
+                and field.public
+                and field.name not in grouped
+                and not (field.presence and field.presence.mask)
+            ]
+        )
+        default = (
+            f"  public static var `default`: Self {{\n    var value = Self(raw: {initial})\n"
+            + "\n".join(initials)
+            + "\n    return value\n  }"
+            if initials
+            else f"  public static var `default`: Self {{ Self(raw: {initial}) }}"
+        )
         return f"""{doc(self.bound, value.native)}public struct {public}: Equatable, Hashable, Sendable {{
 {chr(10).join(fields)}
-  public static var `default`: Self {{ Self(raw: {initial}) }}
+{default}
   public init({", ".join(init)}) {{
 {chr(10).join(assignments)}
   }}
@@ -256,6 +277,13 @@ class Values:
   }}
 }}
 """
+
+    def initial(self, field):
+        """A field's annotated initial value as a public Swift expression."""
+        initial = field.initial
+        if field.value.kind == "enum":
+            return f"{self.public(field.value)}.{identifier(camel(initial.member))}"
+        return initial.literal
 
     def enumeration(self, value):
         public = self.public(value)

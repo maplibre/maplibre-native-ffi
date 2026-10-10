@@ -24,6 +24,11 @@ if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
   exit(0)
 }
 
+// A record built from its initializer defaults equals the native default,
+// including a nested record that has no default function of its own.
+try Maplibre.probeSettingsCheck(settings: ProbeSettings())
+try Maplibre.probeSettingsCheck(settings: ProbeSettings(extent: ProbeExtent()))
+
 let point = ProbePoint(type: 9.5, gain: 3.25)
 let input = ProbeOptions(
   title: "",

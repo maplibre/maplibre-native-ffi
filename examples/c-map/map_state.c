@@ -2,6 +2,7 @@
 
 #include "diagnostics.h"
 #include "events.h"
+#include "render_target.h"
 #include "util.h"
 
 static app_error create_runtime(map_state* state) {
@@ -20,11 +21,7 @@ static app_error create_runtime(map_state* state) {
 
 static app_error create_map(map_state* state, viewport initial_viewport) {
   mln_map_options options = mln_map_options_default();
-  options.initial_extent = (mln_logical_extent){
-    .width = initial_viewport.logical_width,
-    .height = initial_viewport.logical_height,
-    .scale_factor = initial_viewport.scale_factor,
-  };
+  options.initial_extent = render_target_extent(initial_viewport);
   options.map_mode = MLN_MAP_MODE_CONTINUOUS;
   // The render loop re-arms from the frame result's repaint flag, so the map
   // only has to report updates that arrive between frames.

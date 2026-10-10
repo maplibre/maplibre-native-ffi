@@ -891,7 +891,11 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   /// Device pixels per UI pixel. Defaults to 1.0.
   public var scaleFactor: Double
   public static var `default`: Self {
-    Self(raw: mln_logical_extent())
+    var value = Self(raw: mln_logical_extent())
+    value.width = 256
+    value.height = 256
+    value.scaleFactor = 1.0
+    return value
   }
 
   public init(

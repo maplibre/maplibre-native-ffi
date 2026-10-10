@@ -10,7 +10,6 @@ import org.maplibre.nativeffi.generated.CameraUpdateMode
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GesturePhase
 import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventMask
@@ -25,12 +24,7 @@ import org.maplibre.nativeffi.generated.Wake
 internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson: String? = null) :
   AutoCloseable {
   private var closed = false
-  private var currentSize =
-    LogicalExtent(
-      initialExtent.width.toUInt(),
-      initialExtent.height.toUInt(),
-      initialExtent.scaleFactor,
-    )
+  private var currentSize = initialExtent.toLogicalExtent()
   private val initialCamera =
     CameraOptions(center = LatLng(37.7749, -122.4194), zoom = 13.0, bearing = 12.0, pitch = 30.0)
 
@@ -49,12 +43,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
           .mapCreate(
             GeneratedApi.mapOptionsDefault()
               .copy(
-                initialExtent =
-                  LogicalExtent(
-                    initialExtent.width.toUInt(),
-                    initialExtent.height.toUInt(),
-                    initialExtent.scaleFactor,
-                  ),
+                initialExtent = currentSize,
                 mapMode = MapMode.CONTINUOUS,
                 eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
               )
@@ -131,7 +120,7 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
    * carries only the graphics resource and the map resize is the sole extent authority here.
    */
   fun resize(extent: SurfaceExtent) {
-    val size = LogicalExtent(extent.width.toUInt(), extent.height.toUInt(), extent.scaleFactor)
+    val size = extent.toLogicalExtent()
     if (size != currentSize) {
       currentSize = size
       map.resize(size)

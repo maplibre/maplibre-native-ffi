@@ -27,6 +27,7 @@ class SwiftEmitterTests(unittest.TestCase):
         header = protocol_header(
             groups=(
                 "values",
+                "defaults",
                 "keywords",
                 "default_registration",
                 "absent_handle",

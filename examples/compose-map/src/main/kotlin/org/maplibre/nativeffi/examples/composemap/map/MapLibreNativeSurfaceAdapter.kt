@@ -163,7 +163,7 @@ internal object MapLibreNativeSurfaceAdapter {
   )
 }
 
-private fun SurfaceExtent.toLogicalExtent(): LogicalExtent =
+internal fun SurfaceExtent.toLogicalExtent(): LogicalExtent =
   LogicalExtent(width.toUInt(), height.toUInt(), scaleFactor)
 
 private fun NativeHandle.toPointer(): NativePointer = NativePointer.ofAddress(address)

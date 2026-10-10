@@ -3354,12 +3354,12 @@ auto render_session_resize_start(
       set_thread_error("cannot resize while a texture frame is acquired");
       return MLN_STATUS_INVALID_STATE;
     }
-    // The renderer bakes its pixel ratio into compiled shaders, so a scale
-    // factor the session did not attach with cannot be applied in place.
+    // The renderer bakes its pixel ratio into compiled shaders, so only an
+    // attachment or a target replacement can change the session's scale.
     if (extent.scale_factor != live->scale_factor) {
       set_thread_error(
-        "render session scale_factor is fixed at attachment; destroy the "
-        "session and attach again to change it"
+        "render session scale_factor is set at attachment or by a target "
+        "replacement; a resize cannot change it"
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
@@ -3394,7 +3394,15 @@ auto render_session_resize_start(
     // the first new-size frame when the host next acquires the oldest result.
     invalidate_unacquired_texture_frames_locked(*live);
   }
-  const auto post = map_post_resize(live->map, extent);
+  // The map's scale factor is fixed at creation and may differ from the
+  // session's, so the map takes the new size at its own scale.
+  const auto post = map_post_resize(
+    live->map, mln_logical_extent{
+                 .width = extent.width,
+                 .height = extent.height,
+                 .scale_factor = map_scale_factor(live->map),
+               }
+  );
   if (post != MLN_STATUS_OK) {
     {
       // No driver work will clear the extent the snapshot is already
