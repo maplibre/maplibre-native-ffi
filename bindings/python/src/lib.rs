@@ -41,6 +41,9 @@ struct NativeHandleState<T: maplibre_core::handle::NativeHandle> {
     closing: bool,
     _typed_handle: std::marker::PhantomData<fn() -> T>,
     dispose_abandoned: Option<unsafe extern "C" fn(T) -> sys::mln_status>,
+    /// The release that interpreter shutdown starts and waits for, for a
+    /// root handle whose release reports retirement through a completion.
+    exit_release: Option<ExitReleaseFn<T>>,
     /// The native type name, which a leak report carries.
     type_name: &'static str,
     /// The public type name, which a lifecycle error names.
@@ -72,6 +75,7 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
             closing: false,
             _typed_handle: std::marker::PhantomData,
             dispose_abandoned: None,
+            exit_release: None,
             type_name,
             owner_name,
         })
@@ -119,6 +123,11 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
 
     fn with_disposal(mut self, dispose: unsafe extern "C" fn(T) -> sys::mln_status) -> Self {
         self.dispose_abandoned = Some(dispose);
+        self
+    }
+
+    fn with_exit_release(mut self, release: ExitReleaseFn<T>) -> Self {
+        self.exit_release = Some(release);
         self
     }
 
@@ -173,11 +182,18 @@ impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
 /// The longest interpreter shutdown waits for its runtimes to retire.
 const EXIT_RETIREMENT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// Starts a root handle's release, which reports retirement to `completion`.
+type ExitReleaseFn<T> = unsafe extern "C" fn(T, *const sys::mln_completion) -> sys::mln_status;
+
 /// An owner that interpreter shutdown retires. The interpreter finalizes before
 /// the C runtime's exit handlers run, so native callbacks into it must stop
-/// first, and releasing each runtime and waiting for its completion stops them.
+/// first, and releasing each root owner and waiting for its completion stops
+/// them.
 trait ExitOwner: Send + Sync {
-    fn is_runtime(&self) -> bool;
+    /// Whether shutdown releases this owner and waits for its retirement.
+    fn releases_at_exit(&self) -> bool;
+    /// Starts the release of a handle that `take_at_exit` returned.
+    fn release_at_exit(&self, raw: u64, completion: &sys::mln_completion) -> sys::mln_status;
     /// Takes the handle from an idle owner, so neither close nor finalization
     /// reaches it again. An owner in a read or close on another thread stays.
     fn take_at_exit(&self) -> Option<u64>;
@@ -185,8 +201,19 @@ trait ExitOwner: Send + Sync {
 }
 
 impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleState<T>> {
-    fn is_runtime(&self) -> bool {
-        std::any::TypeId::of::<T>() == std::any::TypeId::of::<sys::mln_runtime>()
+    fn releases_at_exit(&self) -> bool {
+        self.lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .exit_release
+            .is_some()
+    }
+
+    fn release_at_exit(&self, raw: u64, completion: &sys::mln_completion) -> sys::mln_status {
+        let Some(release) = self.lock().unwrap_or_else(|p| p.into_inner()).exit_release else {
+            return sys::MLN_STATUS_INVALID_STATE;
+        };
+        // SAFETY: take_at_exit transferred sole ownership of the handle.
+        unsafe { release(T::from_raw(raw), completion) }
     }
 
     fn take_at_exit(&self) -> Option<u64> {
@@ -224,13 +251,13 @@ static EXIT_OWNERS: Mutex<ExitOwners> = Mutex::new(ExitOwners {
 });
 
 /// Shares a new owner's state and enrolls it for retirement at interpreter
-/// shutdown. The first runtime registers the shutdown hook.
+/// shutdown. The first owner that shutdown releases registers the hook.
 fn generated_owner_state<T: maplibre_core::handle::NativeHandle>(
     state: NativeHandleState<T>,
 ) -> Arc<Mutex<NativeHandleState<T>>> {
     let state = Arc::new(Mutex::new(state));
     let owner: Arc<dyn ExitOwner> = state.clone();
-    if owner.is_runtime() {
+    if owner.releases_at_exit() {
         static REGISTERED: std::sync::atomic::AtomicBool =
             std::sync::atomic::AtomicBool::new(false);
         if !REGISTERED.swap(true, Ordering::AcqRel) {
@@ -273,8 +300,8 @@ unsafe extern "C" fn release_exit_release(user_data: *mut c_void) {
     drop(unsafe { Arc::from_raw(user_data.cast::<ExitRelease>()) });
 }
 
-/// Disposes every owner the interpreter still holds, then releases each
-/// runtime and waits for its retirement, so no native thread can call into a
+/// Disposes every owner the interpreter still holds, then releases each root
+/// owner and waits for its retirement, so no native thread can call into a
 /// finalized interpreter.
 #[pyfunction]
 fn retire_owners_at_exit(py: Python<'_>) {
@@ -286,13 +313,13 @@ fn retire_owners_at_exit(py: Python<'_>) {
     // Native threads finishing this work may need the GIL to deliver results
     // and release callbacks.
     py.detach(move || {
-        for owner in owners.iter().filter(|owner| !owner.is_runtime()) {
+        for owner in owners.iter().filter(|owner| !owner.releases_at_exit()) {
             if let Some(raw) = owner.take_at_exit() {
                 owner.dispose_at_exit(raw);
             }
         }
         let mut releases = Vec::new();
-        for owner in owners.iter().filter(|owner| owner.is_runtime()) {
+        for owner in owners.iter().filter(|owner| owner.releases_at_exit()) {
             let Some(raw) = owner.take_at_exit() else {
                 continue;
             };
@@ -306,9 +333,7 @@ fn retire_owners_at_exit(py: Python<'_>) {
                 user_data: Arc::into_raw(Arc::clone(&release)).cast_mut().cast(),
                 release_user_data: Some(release_exit_release),
             };
-            let runtime = <sys::mln_runtime as maplibre_core::handle::NativeHandle>::from_raw(raw);
-            // SAFETY: take_at_exit transferred sole ownership of the handle.
-            let status = unsafe { sys::mln_runtime_release(runtime, &completion, ptr::null_mut()) };
+            let status = owner.release_at_exit(raw, &completion);
             if status == sys::MLN_STATUS_OK {
                 releases.push(release);
             } else {

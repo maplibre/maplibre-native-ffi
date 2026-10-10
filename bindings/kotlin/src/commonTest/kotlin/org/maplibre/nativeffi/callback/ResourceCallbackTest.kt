@@ -40,10 +40,10 @@ class ResourceCallbackTest {
       val request = claimed.awaitWithin("the provider to claim the request")
       val cancels = AtomicInt(0)
 
-      assertFalse(request.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
+      assertFalse(request.setCancelCallback { cancels.addAndFetch(1) })
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
       // Native keeps the first registration, and the rejected second one keeps no root.
-      assertFailsWith<InvalidStateException> { request.resourceRequestSetCancelCallback {} }
+      assertFailsWith<InvalidStateException> { request.setCancelCallback {} }
       assertEquals(1, request.bindingCallbacks.rootCountForTesting())
 
       // Releasing the unanswered request fails it and releases the callback, which can no longer
@@ -52,7 +52,7 @@ class ResourceCallbackTest {
       // on its way to the map is not a child of the runtime, so the fixture's releases do not
       // wait for it.
       request.close()
-      request.resourceRequestWaitUntilRetired()
+      request.waitUntilRetired()
       assertEquals(0, request.bindingCallbacks.rootCountForTesting())
       assertEquals(0, cancels.load())
     }
@@ -67,7 +67,7 @@ class ResourceCallbackTest {
       val cancelled = CompletableDeferred<Unit>()
       val cancels = AtomicInt(0)
       assertFalse(
-        request.resourceRequestSetCancelCallback {
+        request.setCancelCallback {
           cancels.addAndFetch(1)
           cancelled.complete(Unit)
         }
@@ -75,7 +75,7 @@ class ResourceCallbackTest {
 
       map.release().awaitWithin("the map release")
       cancelled.awaitWithin("the cancel callback")
-      assertTrue(request.resourceRequestCancelled())
+      assertTrue(request.cancelled())
       // Release waits for a running cancel callback to return, and native releases the callback
       // once it has, so the root is gone once the request is.
       request.close()
@@ -95,7 +95,7 @@ class ResourceCallbackTest {
     // The fixture has released the runtime, whose teardown cancelled the request. The request
     // outlives the runtime until the provider releases it.
     val cancels = AtomicInt(0)
-    assertTrue(request.resourceRequestSetCancelCallback { cancels.addAndFetch(1) })
+    assertTrue(request.setCancelCallback { cancels.addAndFetch(1) })
     assertEquals(0, request.bindingCallbacks.rootCountForTesting())
     assertEquals(0, cancels.load())
     request.close()
@@ -112,7 +112,7 @@ class ResourceCallbackTest {
           runCatching { fixtureRuntime.barrier() }.exceptionOrNull(),
           runCatching { fixtureRuntime.release() }.exceptionOrNull(),
           runCatching {
-              handle.resourceRequestComplete(
+              handle.complete(
                 ResourceResponse(
                   ResourceResponseStatus.OK,
                   bytes = EMPTY_STYLE_JSON.encodeToByteArray(),
@@ -159,12 +159,12 @@ class ResourceCallbackTest {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
       val request = claimed.awaitWithin("the provider to claim the request")
 
-      request.resourceRequestComplete(
+      request.complete(
         ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray())
       )
       // A request takes one response.
       assertFailsWith<InvalidStateException> {
-        request.resourceRequestComplete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+        request.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
       }
       request.close()
       awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
@@ -218,11 +218,11 @@ class ResourceCallbackTest {
       map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
       val request = claimed.awaitWithin("the provider to claim the request")
       assertFailsWith<InvalidArgumentException> {
-        request.resourceRequestComplete(
+        request.complete(
           ResourceResponse(ResourceResponseStatus.ERROR, errorMessage = "bad\u0000message")
         )
       }
-      request.resourceRequestComplete(
+      request.complete(
         ResourceResponse(ResourceResponseStatus.OK, bytes = EMPTY_STYLE_JSON.encodeToByteArray())
       )
       request.close()

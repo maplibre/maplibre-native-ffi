@@ -33,21 +33,18 @@ extern "C" {
  *
  * Returns:
  * - MLN_STATUS_OK when the creation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the projection fails to construct on the map
  *   worker.
  */
-MLN_BINDING(
-  "execution=lifecycle;result=mln_map_projection;shape=value;ownership=owned"
-)
+MLN_BINDING("execution=lifecycle;result=mln_map_projection")
 MLN_API mln_status mln_map_projection_create(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -55,15 +52,15 @@ MLN_API mln_status mln_map_projection_create(
  *
  * The close retires the handle, waits for projection calls already running on
  * other threads, and destroys the projection before it returns. A later call
- * with the retired handle returns MLN_STATUS_INVALID_ARGUMENT. This function
+ * with the retired handle returns MLN_STATUS_INVALID_STATE. This function
  * may be called from any thread.
  *
  * Returns:
  * - MLN_STATUS_OK when the projection was closed by this call.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or already retired.
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_close(
   mln_map_projection projection, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -77,11 +74,11 @@ MLN_API mln_status mln_map_projection_close(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, or
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, or
  *   out_camera is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_get_camera(
   mln_map_projection projection,
   mln_camera_options* out_camera MLN_BINDING("direction=out"),
@@ -98,14 +95,13 @@ MLN_API mln_status mln_map_projection_get_camera(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, or camera
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, or camera
  *   is null, undersized, or carries an invalid field.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_set_camera(
-  mln_map_projection projection,
-  const mln_camera_options* camera MLN_BINDING("length=1"),
+  mln_map_projection projection, const mln_camera_options* camera,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -117,16 +113,15 @@ MLN_API mln_status mln_map_projection_set_camera(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
  *   coordinates is null, coordinate_count is zero, a coordinate is out of
  *   range, or padding is not finite.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_set_visible_coordinates(
   mln_map_projection projection,
-  const mln_lat_lng* coordinates
-    MLN_BINDING("length=coordinate_count;ownership=borrowed"),
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
   size_t coordinate_count, mln_edge_insets padding,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -141,15 +136,15 @@ MLN_API mln_status mln_map_projection_set_visible_coordinates(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, geometry
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, geometry
  *   is not a GeoJSON Geometry or carries no coordinate, or padding is not
  *   finite.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_set_visible_geometry(
   mln_map_projection projection,
-  mln_buffer_view geometry MLN_BINDING("encoding=json;lifetime=call"),
+  mln_buffer_view geometry MLN_BINDING("encoding=json"),
   mln_edge_insets padding, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -162,11 +157,11 @@ MLN_API mln_status mln_map_projection_set_visible_geometry(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live, out_point
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle, out_point
  *   is null, or coordinate is out of range.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
   mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point MLN_BINDING("direction=out"),
@@ -183,11 +178,11 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
  *   out_coordinate is null, or point is not finite.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),
@@ -204,11 +199,11 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
  *   out_coordinate is null, or point contains non-finite values.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
   mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),
@@ -224,12 +219,12 @@ MLN_API mln_status mln_map_projection_lat_lng_for_pixel_unwrapped(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when projection is null or not live,
+ * - MLN_STATUS_INVALID_ARGUMENT when projection is an invalid handle,
  *   out_meters_per_pixel is null, or latitude is not finite or falls outside
  *   the range from -90 to 90 degrees.
+ * - MLN_STATUS_INVALID_STATE when projection has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
   mln_map_projection projection, double latitude,
   double* out_meters_per_pixel MLN_BINDING("direction=out"),
@@ -245,7 +240,6 @@ MLN_API mln_status mln_map_projection_meters_per_pixel_at_latitude(
  *   invalid latitude or longitude values.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_projected_meters_for_lat_lng(
   mln_lat_lng coordinate,
   mln_projected_meters* out_meters MLN_BINDING("direction=out"),
@@ -261,7 +255,6 @@ MLN_API mln_status mln_projected_meters_for_lat_lng(
  *   non-finite values.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_lat_lng_for_projected_meters(
   mln_projected_meters meters,
   mln_lat_lng* out_coordinate MLN_BINDING("direction=out"),

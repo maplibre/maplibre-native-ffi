@@ -43,17 +43,16 @@ extern "C" {
  *
  * Returns:
  * - MLN_STATUS_OK when accepted.
- * - MLN_STATUS_INVALID_ARGUMENT for an invalid map, view, or completion.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT for an invalid map handle, view, or
+ *   completion.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_global_state_property(
-  mln_map map,
-  mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view value MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view property_name,
+  mln_buffer_view value MLN_BINDING("encoding=json"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Queries the global-state JSON object, including style defaults.
@@ -61,22 +60,18 @@ MLN_API mln_status mln_map_set_global_state_property(
  *
  * Returns:
  * - MLN_STATUS_OK when accepted.
- * - MLN_STATUS_INVALID_ARGUMENT for an invalid map or completion.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT for an invalid map handle or completion.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "encoding=json"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_map_get_global_state(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 typedef uint64_t mln_geojson_source_data MLN_BINDING(
-  "kind=handle;release=mln_geojson_source_data_destroy;parent=none;dispose=mln_"
-  "geojson_source_data_destroy"
+  "kind=handle;release=mln_geojson_source_data_destroy;"
+  "dispose=mln_geojson_source_data_destroy"
 );
 
 /** Style source type values returned by source metadata queries. */
@@ -155,28 +150,25 @@ typedef enum mln_style_raster_dem_encoding : uint32_t {
 typedef struct mln_image_stretch {
   float from;
   float to;
-} mln_image_stretch;
+} mln_image_stretch MLN_BINDING("fields=ordered");
 
 /** Borrowed image-stretch arrays available during a completion callback. */
 typedef struct mln_style_image_stretches_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
-  const mln_image_stretch* stretch_x
-    MLN_BINDING("length=stretch_x_count;ownership=borrowed");
-  size_t stretch_x_count MLN_BINDING("kind=count");
-  const mln_image_stretch* stretch_y
-    MLN_BINDING("length=stretch_y_count;ownership=borrowed");
-  size_t stretch_y_count MLN_BINDING("kind=count");
+  uint32_t size;
+  uint32_t reserved MLN_BINDING("kind=reserved");
+  const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
+  size_t stretch_x_count;
+  const mln_image_stretch* stretch_y MLN_BINDING("length=stretch_y_count");
+  size_t stretch_y_count;
 } mln_style_image_stretches_result;
 
 /** Borrowed inline TileJSON tile URLs available during a completion callback.
  */
 typedef struct mln_style_source_tile_urls_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
-  const mln_buffer_view* tile_urls
-    MLN_BINDING("length=tile_url_count;ownership=borrowed;encoding=utf8");
-  size_t tile_url_count MLN_BINDING("kind=count");
+  uint32_t size;
+  uint32_t reserved MLN_BINDING("kind=reserved");
+  const mln_buffer_view* tile_urls MLN_BINDING("length=tile_url_count");
+  size_t tile_url_count;
 } mln_style_source_tile_urls_result;
 
 /**
@@ -282,17 +274,16 @@ typedef struct mln_style_source_tile_info {
 
 /** Fixed source metadata included in mln_style_source_result. */
 typedef struct mln_style_source_info {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One of mln_style_source_type. */
   uint32_t type MLN_BINDING("enum=mln_style_source_type");
   /** Bitwise combination of mln_style_source_info_field values. */
-  uint32_t fields
-    MLN_BINDING("kind=presence_mask;enum=mln_style_source_info_field");
+  uint32_t fields MLN_BINDING("enum=mln_style_source_info_field");
   /** Source ID byte length, excluding any null terminator. */
   size_t id_size;
   /** Whether the source is marked volatile. */
   bool is_volatile;
-  bool has_attribution MLN_BINDING("kind=presence_mask");
+  bool has_attribution;
   /** Attribution byte length, excluding any null terminator. */
   size_t attribution_size MLN_BINDING("mask=has_attribution");
   /** URL byte length, meaningful when fields contains URL. */
@@ -343,36 +334,35 @@ typedef struct mln_style_source_info {
  * no source, and source_layer is empty when the layer names none.
  */
 typedef struct mln_style_layer_entry {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  mln_buffer_view id MLN_BINDING("encoding=utf8");
-  mln_buffer_view type MLN_BINDING("encoding=utf8");
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;optional=empty");
-  mln_buffer_view source_layer MLN_BINDING("encoding=utf8;optional=empty");
+  uint32_t size;
+  mln_buffer_view id;
+  mln_buffer_view type;
+  mln_buffer_view source_id MLN_BINDING("optional=empty");
+  mln_buffer_view source_layer MLN_BINDING("optional=empty");
 } mln_style_layer_entry;
 
 /** Complete source metadata borrowed for a completion callback. */
 typedef struct mln_style_source_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t size;
+  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_source_info info;
-  mln_buffer_view attribution
-    MLN_BINDING("encoding=utf8;mask=info.has_attribution");
+  mln_buffer_view attribution MLN_BINDING("mask=info.has_attribution");
   mln_buffer_view url
-    MLN_BINDING("encoding=utf8;mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_URL");
+    MLN_BINDING("mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_URL");
   const mln_buffer_view* tile_urls MLN_BINDING(
-    "length=tile_url_count;ownership=borrowed;encoding=utf8;mask=info.fields;"
+    "length=tile_url_count;mask=info.fields;"
     "bit=MLN_STYLE_SOURCE_INFO_TILEJSON"
   );
-  size_t tile_url_count MLN_BINDING("kind=count");
+  size_t tile_url_count;
 } mln_style_source_result;
 
 /** Fixed layer metadata included in mln_style_layer_result. */
 typedef struct mln_style_layer_info {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t size;
+  uint32_t reserved MLN_BINDING("kind=reserved");
   /** View of a static style-spec layer type string. It stays valid for the
      life of the process. */
-  mln_buffer_view type MLN_BINDING("encoding=utf8");
+  mln_buffer_view type;
   /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
   double min_zoom;
   /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
@@ -383,27 +373,25 @@ typedef struct mln_style_layer_info {
 
 /** Complete layer metadata borrowed for a completion callback. */
 typedef struct mln_style_layer_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t size;
+  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_layer_info info;
   /** Source ID. Empty for a layer type that takes no source. */
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;optional=empty");
+  mln_buffer_view source_id MLN_BINDING("optional=empty");
   /** Source-layer ID. Empty when the layer sets none. */
-  mln_buffer_view source_layer MLN_BINDING("encoding=utf8;optional=empty");
+  mln_buffer_view source_layer MLN_BINDING("optional=empty");
 } mln_style_layer_result;
 
 /** Options for vector and raster tile sources. */
 typedef struct mln_style_tile_source_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields
-    MLN_BINDING("kind=presence_mask;enum=mln_style_tile_source_option_field");
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_style_tile_source_option_field");
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM");
   double max_zoom
     MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM");
-  mln_buffer_view attribution MLN_BINDING(
-    "encoding=utf8;mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION"
-  );
+  mln_buffer_view attribution
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION");
   /** One of mln_style_tile_scheme. Defaults to MLN_STYLE_TILE_SCHEME_XYZ. */
   uint32_t scheme MLN_BINDING(
     "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;enum=mln_style_tile_"
@@ -424,9 +412,7 @@ typedef struct mln_style_tile_source_options {
     "mask=fields;bit=MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;enum=mln_"
     "style_raster_dem_encoding"
   );
-} mln_style_tile_source_options MLN_BINDING(
-  "default=mln_style_tile_source_options_default"
-);
+} mln_style_tile_source_options;
 
 /**
  * Options for GeoJSON sources.
@@ -437,9 +423,8 @@ typedef struct mln_style_tile_source_options {
  * matching options.
  */
 typedef struct mln_geojson_source_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields
-    MLN_BINDING("kind=presence_mask;enum=mln_geojson_source_option_field");
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_geojson_source_option_field");
   /** Minimum tiling zoom. Defaults to 0. */
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM");
@@ -497,9 +482,7 @@ typedef struct mln_geojson_source_options {
    */
   bool synchronous_tiling
     MLN_BINDING("mask=fields;bit=MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_TILING");
-} mln_geojson_source_options MLN_BINDING(
-  "default=mln_geojson_source_options_default"
-);
+} mln_geojson_source_options;
 
 /** Canonical tile identity used by custom geometry and custom MVT vector source
  * callbacks. */
@@ -511,21 +494,17 @@ typedef struct mln_canonical_tile_id {
 
 /** Callback invoked for custom geometry source tile requests and cancels. */
 typedef void (*mln_custom_geometry_source_tile_callback)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  mln_canonical_tile_id tile_id
-) MLN_BINDING("thread=native;failure=contain");
+  void* user_data, mln_canonical_tile_id tile_id
+);
 
 /** Releases a custom geometry source's callback context. */
-typedef void (*mln_custom_geometry_source_release_callback)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner")
-) MLN_BINDING("thread=native;failure=contain;reentry=forbid");
+MLN_BINDING("reentry=forbid")
+typedef void (*mln_custom_geometry_source_release_callback)(void* user_data);
 
 /** Options for custom geometry sources. */
 typedef struct mln_custom_geometry_source_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields MLN_BINDING(
-    "kind=presence_mask;enum=mln_custom_geometry_source_option_field"
-  );
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_custom_geometry_source_option_field");
   /** Required tile fetch callback. */
   mln_custom_geometry_source_tile_callback fetch_tile
     MLN_BINDING("nullable=true");
@@ -533,7 +512,7 @@ typedef struct mln_custom_geometry_source_options {
   mln_custom_geometry_source_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
   /** Caller-owned callback context retained by pointer. */
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+  void* user_data MLN_BINDING("kind=context");
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM");
   double max_zoom
@@ -566,27 +545,22 @@ typedef struct mln_custom_geometry_source_options {
    */
   mln_custom_geometry_source_release_callback release_user_data;
 } mln_custom_geometry_source_options MLN_BINDING(
-  "default=mln_custom_geometry_source_options_default;kind=callback_"
-  "registration;user_data=user_data;release=release_user_data"
+  "kind=callback_registration;release=release_user_data"
 );
 
 /** Callback invoked for custom MVT vector source tile requests and cancels. */
 typedef void (*mln_custom_mvt_vector_source_tile_callback)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  mln_canonical_tile_id tile_id
-) MLN_BINDING("thread=native;failure=contain");
+  void* user_data, mln_canonical_tile_id tile_id
+);
 
 /** Releases a custom MVT vector source's callback context. */
-typedef void (*mln_custom_mvt_vector_source_release_callback)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner")
-) MLN_BINDING("thread=native;failure=contain;reentry=forbid");
+MLN_BINDING("reentry=forbid")
+typedef void (*mln_custom_mvt_vector_source_release_callback)(void* user_data);
 
 /** Options for custom MVT vector sources. */
 typedef struct mln_custom_mvt_vector_source_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields MLN_BINDING(
-    "kind=presence_mask;enum=mln_custom_mvt_vector_source_option_field"
-  );
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_custom_mvt_vector_source_option_field");
   /** Required tile fetch callback. */
   mln_custom_mvt_vector_source_tile_callback fetch_tile
     MLN_BINDING("nullable=true");
@@ -594,7 +568,7 @@ typedef struct mln_custom_mvt_vector_source_options {
   mln_custom_mvt_vector_source_tile_callback cancel_tile
     MLN_BINDING("nullable=true");
   /** Caller-owned callback context retained by pointer. */
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+  void* user_data MLN_BINDING("kind=context");
   double min_zoom
     MLN_BINDING("mask=fields;bit=MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM");
   double max_zoom
@@ -617,49 +591,44 @@ typedef struct mln_custom_mvt_vector_source_options {
    */
   mln_custom_mvt_vector_source_release_callback release_user_data;
 } mln_custom_mvt_vector_source_options MLN_BINDING(
-  "default=mln_custom_mvt_vector_source_options_default;kind=callback_"
-  "registration;user_data=user_data;release=release_user_data"
+  "kind=callback_registration;release=release_user_data"
 );
 
 /** Caller-owned premultiplied RGBA8 image pixels. */
 typedef struct mln_premultiplied_rgba8_image {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   uint32_t width;
   uint32_t height;
   /** Bytes per image row. Must be at least width * 4. */
   uint32_t stride;
   /** Premultiplied RGBA8 pixels. Must not be null for a non-empty image. */
-  const uint8_t* pixels
-    MLN_BINDING("length=byte_length;ownership=borrowed;encoding=bytes");
+  const uint8_t* pixels MLN_BINDING("length=byte_length;encoding=bytes");
   /** Available bytes at pixels. */
-  size_t byte_length MLN_BINDING("kind=count");
-} mln_premultiplied_rgba8_image MLN_BINDING(
-  "default=mln_premultiplied_rgba8_image_default"
-);
+  size_t byte_length;
+} mln_premultiplied_rgba8_image;
 
 /** Options for runtime style images. */
 typedef struct mln_style_image_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields
-    MLN_BINDING("kind=presence_mask;enum=mln_style_image_option_field");
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_style_image_option_field");
   /**
    * Horizontally stretchable intervals. Borrowed for the call and copied before
    * return. May be null only when stretch_x_count is 0.
    */
   const mln_image_stretch* stretch_x MLN_BINDING(
-    "length=stretch_x_count;ownership=borrowed;mask=fields;bit=MLN_STYLE_IMAGE_"
-    "OPTION_STRETCH_X"
+    "length=stretch_x_count;mask=fields;"
+    "bit=MLN_STYLE_IMAGE_OPTION_STRETCH_X"
   );
-  size_t stretch_x_count MLN_BINDING("kind=count");
+  size_t stretch_x_count;
   /**
    * Vertically stretchable intervals. Borrowed for the call and copied before
    * return. May be null only when stretch_y_count is 0.
    */
   const mln_image_stretch* stretch_y MLN_BINDING(
-    "length=stretch_y_count;ownership=borrowed;mask=fields;bit=MLN_STYLE_IMAGE_"
-    "OPTION_STRETCH_Y"
+    "length=stretch_y_count;mask=fields;"
+    "bit=MLN_STYLE_IMAGE_OPTION_STRETCH_Y"
   );
-  size_t stretch_y_count MLN_BINDING("kind=count");
+  size_t stretch_y_count;
   /** Content box used when icon-text-fit applies. */
   mln_image_content content
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_CONTENT");
@@ -678,13 +647,11 @@ typedef struct mln_style_image_options {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO");
   /** Whether the image is a signed distance field icon. Defaults to false. */
   bool sdf MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_OPTION_SDF");
-} mln_style_image_options MLN_BINDING(
-  "default=mln_style_image_options_default"
-);
+} mln_style_image_options;
 
 /** Fixed metadata for one runtime style image. */
 typedef struct mln_style_image_info {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   uint32_t width;
   uint32_t height;
   /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
@@ -705,23 +672,21 @@ typedef struct mln_style_image_info {
     MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_height");
   float pixel_ratio;
   bool sdf;
-  bool has_content MLN_BINDING("kind=presence_mask");
-  bool has_text_fit_width MLN_BINDING("kind=presence_mask");
-  bool has_text_fit_height MLN_BINDING("kind=presence_mask");
-} mln_style_image_info MLN_BINDING("default=mln_style_image_info_default");
+  bool has_content;
+  bool has_text_fit_width;
+  bool has_text_fit_height;
+} mln_style_image_info;
 
 /** Complete style image borrowed for a completion callback. */
 typedef struct mln_style_image_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t size;
+  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_image_info info;
   mln_buffer_view pixels MLN_BINDING("encoding=bytes");
-  const mln_image_stretch* stretch_x
-    MLN_BINDING("length=stretch_x_count;ownership=borrowed");
-  size_t stretch_x_count MLN_BINDING("kind=count");
-  const mln_image_stretch* stretch_y
-    MLN_BINDING("length=stretch_y_count;ownership=borrowed");
-  size_t stretch_y_count MLN_BINDING("kind=count");
+  const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
+  size_t stretch_x_count;
+  const mln_image_stretch* stretch_y MLN_BINDING("length=stretch_y_count");
+  size_t stretch_y_count;
 } mln_style_image_result;
 
 /**
@@ -736,9 +701,8 @@ typedef struct mln_style_image_result {
  * every property that declares none.
  */
 typedef struct mln_style_transition_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields
-    MLN_BINDING("kind=presence_mask;enum=mln_style_transition_option_field");
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_style_transition_option_field");
   /**
    * Transition duration in milliseconds. Must be finite and non-negative.
    * Values that would overflow MapLibre Native's internal duration are invalid.
@@ -778,46 +742,36 @@ typedef struct mln_style_transition_options {
   bool enable_placement_transitions MLN_BINDING(
     "mask=fields;bit=MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS"
   );
-} mln_style_transition_options MLN_BINDING(
-  "default=mln_style_transition_options_default"
-);
+} mln_style_transition_options;
 
 /** Returns default tile source options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_style_tile_source_options
 mln_style_tile_source_options_default(void) MLN_NOEXCEPT;
 
 /** Returns default GeoJSON source options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_geojson_source_options
 mln_geojson_source_options_default(void) MLN_NOEXCEPT;
 
 /** Returns default custom geometry source options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_custom_geometry_source_options
 mln_custom_geometry_source_options_default(void) MLN_NOEXCEPT;
 
 /** Returns default custom MVT vector source options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_custom_mvt_vector_source_options
 mln_custom_mvt_vector_source_options_default(void) MLN_NOEXCEPT;
 
 /** Returns a default premultiplied RGBA8 image descriptor. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_premultiplied_rgba8_image
 mln_premultiplied_rgba8_image_default(void) MLN_NOEXCEPT;
 
 /** Returns default runtime style image options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_style_image_options
 mln_style_image_options_default(void) MLN_NOEXCEPT;
 
 /** Returns default runtime style image metadata. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_style_image_info mln_style_image_info_default(void) MLN_NOEXCEPT;
 
 /** Returns default global style transition options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_style_transition_options
 mln_style_transition_options_default(void) MLN_NOEXCEPT;
 
@@ -830,23 +784,21 @@ mln_style_transition_options_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, source_json is empty or invalid, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID, or the
  *   source JSON cannot be converted.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_source_json(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view source_json MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id,
+  mln_buffer_view source_json MLN_BINDING("encoding=json"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -857,20 +809,18 @@ MLN_API mln_status mln_map_add_style_source_json(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_STATE when the source exists but a layer still uses it.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_source(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -883,19 +833,14 @@ MLN_API mln_status mln_map_remove_style_source(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_style_source_result;shape=value;ownership="
-  "borrowed;nullable=true"
-)
+MLN_BINDING("execution=query;result=mln_style_source_result;nullable=true")
 MLN_API mln_status mln_map_get_style_source_info(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -910,20 +855,18 @@ MLN_API mln_status mln_map_get_style_source_info(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_source_volatile(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  bool is_volatile, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, bool is_volatile,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -934,19 +877,14 @@ MLN_API mln_status mln_map_set_style_source_volatile(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "nullable=true;encoding=utf8"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;nullable=true")
 MLN_API mln_status mln_map_copy_style_source_attribution(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -958,19 +896,14 @@ MLN_API mln_status mln_map_copy_style_source_attribution(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "nullable=true;encoding=utf8"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;nullable=true")
 MLN_API mln_status mln_map_copy_style_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -984,19 +917,17 @@ MLN_API mln_status mln_map_copy_style_source_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING(
-  "execution=query;result=mln_style_source_tile_urls_result;shape=value;"
-  "ownership=borrowed;nullable=true"
+  "execution=query;result=mln_style_source_tile_urls_result;"
+  "nullable=true"
 )
 MLN_API mln_status mln_map_get_style_source_tile_urls(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1007,18 +938,14 @@ MLN_API mln_status mln_map_get_style_source_tile_urls(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=array;ownership=borrowed;"
-  "encoding=utf8"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;shape=array")
 MLN_API mln_status mln_map_list_style_source_ids(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1030,24 +957,20 @@ MLN_API mln_status mln_map_list_style_source_ids(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
  *   is invalid, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, a source
  *   already has that ID, or the options cannot be converted.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geojson_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_geojson_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  const mln_geojson_source_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1081,13 +1004,10 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  *   or a feature carries geometry other than a point.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_geojson_source_data_create(
-  mln_buffer_view data MLN_BINDING("encoding=bytes;lifetime=call"),
-  const mln_geojson_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  mln_geojson_source_data* out_data
-    MLN_BINDING("direction=out;ownership=owned"),
+  mln_buffer_view data MLN_BINDING("encoding=bytes"),
+  const mln_geojson_source_options* options MLN_BINDING("nullable=true"),
+  mln_geojson_source_data* out_data MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1098,7 +1018,6 @@ MLN_API mln_status mln_geojson_source_data_create(
  * Sources the data was installed on keep their own reference, so destroying
  * the handle never invalidates a source.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_geojson_source_data_destroy(
   mln_geojson_source_data data
 ) MLN_NOEXCEPT;
@@ -1113,22 +1032,20 @@ MLN_API void mln_geojson_source_data_destroy(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid, or data is null or not live.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
+ *   invalid, or data is an invalid handle.
+ * - MLN_STATUS_INVALID_STATE when map or data has been released, or the map is
+ *   closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when source_id is empty or a source already
  *   has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_geojson_source_data(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_geojson_source_data data,
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1139,22 +1056,19 @@ MLN_API mln_status mln_map_add_geojson_source_data(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
  *   is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geojson_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1175,9 +1089,10 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or not live, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
+ *   invalid or empty, data is an invalid handle, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when map or data has been released, or the map is
+ *   closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1185,13 +1100,10 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source, or
  *   the data was prepared with options that do not match the source's options.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geojson_source_data(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_geojson_source_data data,
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_geojson_source_data data,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1206,21 +1118,19 @@ MLN_API mln_status mln_map_set_geojson_source_data(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a GeoJSON source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  bool enabled, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, bool enabled,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1232,24 +1142,20 @@ MLN_API mln_status mln_map_set_geojson_source_synchronous_tiling(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
  *   is invalid, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
  *   already has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_vector_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_style_tile_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1260,9 +1166,9 @@ MLN_API mln_status mln_map_add_vector_source_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid, tile URLs are null or invalid, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1270,17 +1176,13 @@ MLN_API mln_status mln_map_add_vector_source_url(
  *   any tile URL is empty, a source already has that ID, or the tileset cannot
  *   be built.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_vector_source_tiles(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_buffer_view* tiles
-    MLN_BINDING("length=tile_count;ownership=borrowed;encoding=utf8"),
+  mln_map map, mln_buffer_view source_id,
+  const mln_buffer_view* tiles MLN_BINDING("length=tile_count"),
   size_t tile_count,
-  const mln_style_tile_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1291,24 +1193,20 @@ MLN_API mln_status mln_map_add_vector_source_tiles(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
  *   is invalid, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
  *   already has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_style_tile_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1319,9 +1217,9 @@ MLN_API mln_status mln_map_add_raster_source_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid, tile URLs are null or invalid, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1329,17 +1227,13 @@ MLN_API mln_status mln_map_add_raster_source_url(
  *   any tile URL is empty, a source already has that ID, or the tileset cannot
  *   be built.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_source_tiles(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_buffer_view* tiles
-    MLN_BINDING("length=tile_count;ownership=borrowed;encoding=utf8"),
+  mln_map map, mln_buffer_view source_id,
+  const mln_buffer_view* tiles MLN_BINDING("length=tile_count"),
   size_t tile_count,
-  const mln_style_tile_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1351,24 +1245,20 @@ MLN_API mln_status mln_map_add_raster_source_tiles(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
  *   is invalid, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when source_id or url is empty, or a source
  *   already has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_dem_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_style_tile_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1379,9 +1269,9 @@ MLN_API mln_status mln_map_add_raster_dem_source_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid, tile URLs are null or invalid, or options is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1389,17 +1279,13 @@ MLN_API mln_status mln_map_add_raster_dem_source_url(
  *   any tile URL is empty, a source already has that ID, or the tileset cannot
  *   be built.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_raster_dem_source_tiles(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_buffer_view* tiles
-    MLN_BINDING("length=tile_count;ownership=borrowed;encoding=utf8"),
+  mln_map map, mln_buffer_view source_id,
+  const mln_buffer_view* tiles MLN_BINDING("length=tile_count"),
   size_t tile_count,
-  const mln_style_tile_source_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_style_tile_source_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1430,9 +1316,9 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid, options is null or invalid, or fetch_tile is null.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1440,13 +1326,11 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  *   has that ID. This API runs release_user_data once, because the accepted
  *   command already referenced user_data.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_geometry_source(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_custom_geometry_source_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_geometry_source_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1457,10 +1341,10 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, tile_id is invalid, data is empty, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1468,14 +1352,11 @@ MLN_API mln_status mln_map_add_custom_geometry_source(
  * - MLN_STATUS_INVALID_ARGUMENT when the data is not valid GeoJSON, or the
  *   source is not a custom geometry source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_canonical_tile_id tile_id,
-  mln_buffer_view data MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data MLN_BINDING("encoding=json"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1483,9 +1364,9 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, tile_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1493,13 +1374,10 @@ MLN_API mln_status mln_map_set_custom_geometry_source_tile_data(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
  *   source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_canonical_tile_id tile_id,
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1507,9 +1385,9 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, bounds is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1517,13 +1395,10 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_tile(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom geometry
  *   source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_lat_lng_bounds bounds,
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_lat_lng_bounds bounds,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1557,9 +1432,9 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid, options is null or invalid, or fetch_tile is null.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1567,13 +1442,11 @@ MLN_API mln_status mln_map_invalidate_custom_geometry_source_region(
  *   has that ID. This API runs release_user_data once, because the accepted
  *   command already referenced user_data.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_custom_mvt_vector_source(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_custom_mvt_vector_source_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id,
+  const mln_custom_mvt_vector_source_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1589,10 +1462,10 @@ MLN_API mln_status mln_map_add_custom_mvt_vector_source(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, tile_id is invalid, data is a null pointer with a
- *   nonzero size, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
+ *   invalid or empty, tile_id is invalid, data is a null pointer with a nonzero
+ *   size, or completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1600,14 +1473,11 @@ MLN_API mln_status mln_map_add_custom_mvt_vector_source(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
  *   source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_canonical_tile_id tile_id,
-  mln_buffer_view data MLN_BINDING("encoding=bytes;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view data MLN_BINDING("encoding=bytes"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1622,10 +1492,10 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, tile_id is invalid, message is a null pointer with a
  *   nonzero size, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1633,13 +1503,10 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_data(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
  *   source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_canonical_tile_id tile_id,
-  mln_buffer_view message MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  mln_buffer_view message, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1648,9 +1515,9 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, tile_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1658,13 +1525,10 @@ MLN_API mln_status mln_map_set_custom_mvt_vector_source_tile_error(
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not a custom MVT vector
  *   source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_invalidate_custom_mvt_vector_source_tile(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_canonical_tile_id tile_id,
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_canonical_tile_id tile_id,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1679,20 +1543,18 @@ MLN_API mln_status mln_map_invalidate_custom_mvt_vector_source_tile(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
  *   invalid or empty, image or options is invalid, image pixels are null, image
  *   dimensions or stride are invalid, or image byte_length is too small.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_image(
-  mln_map map,
-  mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_premultiplied_rgba8_image* image MLN_BINDING("length=1"),
-  const mln_style_image_options* options MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view image_id,
+  const mln_premultiplied_rgba8_image* image,
+  const mln_style_image_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1703,19 +1565,17 @@ MLN_API mln_status mln_map_set_style_image(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no runtime style image has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_image(
-  mln_map map,
-  mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1728,19 +1588,14 @@ MLN_API mln_status mln_map_remove_style_image(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_style_image_result;shape=value;ownership="
-  "borrowed;nullable=true"
-)
+MLN_BINDING("execution=query;result=mln_style_image_result;nullable=true")
 MLN_API mln_status mln_map_get_style_image_info(
-  mln_map map,
-  mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1752,19 +1607,17 @@ MLN_API mln_status mln_map_get_style_image_info(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "nullable=true;encoding=bytes"
+  "execution=query;result=mln_buffer_view;nullable=true;"
+  "encoding=bytes"
 )
 MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
-  mln_map map,
-  mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1776,19 +1629,17 @@ MLN_API mln_status mln_map_copy_style_image_premultiplied_rgba8(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, image_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING(
-  "execution=query;result=mln_style_image_stretches_result;shape=value;"
-  "ownership=borrowed;nullable=true"
+  "execution=query;result=mln_style_image_stretches_result;"
+  "nullable=true"
 )
 MLN_API mln_status mln_map_copy_style_image_stretches(
-  mln_map map,
-  mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view image_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1805,25 +1656,21 @@ MLN_API mln_status mln_map_copy_style_image_stretches(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, coordinates is null or invalid, or coordinate_count
- *   is not 4.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
+ *   is invalid or empty, coordinates is null or invalid, or coordinate_count is
+ *   not 4.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_image_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_lat_lng* coordinates
-    MLN_BINDING("length=coordinate_count;ownership=borrowed"),
-  size_t coordinate_count,
-  mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id,
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
+  size_t coordinate_count, mln_buffer_view url,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1839,26 +1686,22 @@ MLN_API mln_status mln_map_add_image_source_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, coordinates is null or invalid, coordinate_count is not
  *   4, image is invalid, image pixels are null, image dimensions or stride are
  *   invalid, or image byte_length is too small.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when a source already has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_image_source_image(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_lat_lng* coordinates
-    MLN_BINDING("length=coordinate_count;ownership=borrowed"),
-  size_t coordinate_count,
-  const mln_premultiplied_rgba8_image* image MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id,
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
+  size_t coordinate_count, const mln_premultiplied_rgba8_image* image,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1869,22 +1712,19 @@ MLN_API mln_status mln_map_add_image_source_image(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id or url
  *   is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_url(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view url MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view source_id, mln_buffer_view url,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1895,23 +1735,21 @@ MLN_API mln_status mln_map_set_image_source_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, image is invalid, image pixels are null, image dimensions
  *   or stride are invalid, image byte_length is too small, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_image(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_premultiplied_rgba8_image* image MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id,
+  const mln_premultiplied_rgba8_image* image, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1924,24 +1762,21 @@ MLN_API mln_status mln_map_set_image_source_image(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, coordinates is null or invalid, coordinate_count is not
  *   4, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style source has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_image_source_coordinates(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_lat_lng* coordinates
-    MLN_BINDING("length=coordinate_count;ownership=borrowed"),
-  size_t coordinate_count,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id,
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
+  size_t coordinate_count, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1953,23 +1788,18 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, source_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the source exists and is not an image
  *   source.
  */
-MLN_BINDING(
-  "execution=query;result=mln_lat_lng;shape=array;ownership=borrowed;nullable="
-  "true"
-)
+MLN_BINDING("execution=query;result=mln_lat_lng;shape=array;nullable=true")
 MLN_API mln_status mln_map_get_image_source_coordinates(
-  mln_map map,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1982,10 +1812,10 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   source_id is invalid or empty, before_layer_id is invalid, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
+ *   source_id is invalid or empty, before_layer_id is invalid, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -1994,15 +1824,11 @@ MLN_API mln_status mln_map_get_image_source_coordinates(
  * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id, or source_id
  *   is not a raster DEM source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_hillshade_layer(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view before_layer_id
-    MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2015,10 +1841,10 @@ MLN_API mln_status mln_map_add_hillshade_layer(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   source_id is invalid or empty, before_layer_id is invalid, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
+ *   source_id is invalid or empty, before_layer_id is invalid, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2027,15 +1853,11 @@ MLN_API mln_status mln_map_add_hillshade_layer(
  * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id, or source_id
  *   is not a raster DEM source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_color_relief_layer(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view before_layer_id
-    MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2047,9 +1869,9 @@ MLN_API mln_status mln_map_add_color_relief_layer(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, before_layer_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2057,14 +1879,11 @@ MLN_API mln_status mln_map_add_color_relief_layer(
  *   has it.
  * - MLN_STATUS_INVALID_ARGUMENT when a layer already has layer_id.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_location_indicator_layer(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view before_layer_id
-    MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id,
+  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2076,10 +1895,10 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, coordinate or altitude is invalid, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2087,12 +1906,10 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
  * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
  *   layer.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_location_indicator_location(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_lat_lng coordinate, double altitude,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view layer_id, mln_lat_lng coordinate,
+  double altitude, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2101,9 +1918,9 @@ MLN_API mln_status mln_map_set_location_indicator_location(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, bearing is not finite float32, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2111,12 +1928,10 @@ MLN_API mln_status mln_map_set_location_indicator_location(
  * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
  *   layer.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_location_indicator_bearing(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double bearing, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, double bearing,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2124,10 +1939,10 @@ MLN_API mln_status mln_map_set_location_indicator_bearing(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, radius is negative or not finite float32, or completion
  *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2135,12 +1950,10 @@ MLN_API mln_status mln_map_set_location_indicator_bearing(
  * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
  *   layer.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double radius, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, double radius,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2151,10 +1964,10 @@ MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
  *   image_id is invalid or empty, image_kind is invalid, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2162,13 +1975,11 @@ MLN_API mln_status mln_map_set_location_indicator_accuracy_radius(
  * - MLN_STATUS_INVALID_ARGUMENT when the layer is not a location indicator
  *   layer.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_location_indicator_image_name(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
+  mln_map map, mln_buffer_view layer_id,
   uint32_t image_kind MLN_BINDING("enum=mln_location_indicator_image_kind"),
-  mln_buffer_view image_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_buffer_view image_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2187,9 +1998,9 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_json is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_json is
  *   empty or invalid, before_layer_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2198,14 +2009,11 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
  * - MLN_STATUS_INVALID_ARGUMENT when the layer JSON cannot be converted, or a
  *   layer already has the JSON's id.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_add_style_layer_json(
-  mln_map map,
-  mln_buffer_view layer_json MLN_BINDING("encoding=json;lifetime=call"),
-  mln_buffer_view before_layer_id
-    MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_json MLN_BINDING("encoding=json"),
+  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2216,19 +2024,17 @@ MLN_API mln_status mln_map_add_style_layer_json(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_remove_style_layer(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2240,19 +2046,14 @@ MLN_API mln_status mln_map_remove_style_layer(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_style_layer_result;shape=value;ownership="
-  "borrowed;nullable=true"
-)
+MLN_BINDING("execution=query;result=mln_style_layer_result;nullable=true")
 MLN_API mln_status mln_map_get_style_layer_info(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2263,18 +2064,14 @@ MLN_API mln_status mln_map_get_style_layer_info(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=array;ownership=borrowed;"
-  "encoding=utf8"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;shape=array")
 MLN_API mln_status mln_map_list_style_layer_ids(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2285,16 +2082,14 @@ MLN_API mln_status mln_map_list_style_layer_ids(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is not live or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_style_layer_entry;shape=array;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_style_layer_entry;shape=array")
 MLN_API mln_status mln_map_list_style_layers(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2305,23 +2100,20 @@ MLN_API mln_status mln_map_list_style_layers(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, before_layer_id is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has layer_id, or before_layer_id
  *   is non-empty and no style layer has it.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_move_style_layer(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view before_layer_id
-    MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id,
+  mln_buffer_view before_layer_id MLN_BINDING("optional=empty"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2332,19 +2124,17 @@ MLN_API mln_status mln_map_move_style_layer(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "nullable=true;encoding=json"
+  "execution=query;result=mln_buffer_view;nullable=true;"
+  "encoding=json"
 )
 MLN_API mln_status mln_map_get_style_layer_json(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2356,20 +2146,18 @@ MLN_API mln_status mln_map_get_style_layer_json(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, light_json is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, light_json is
  *   empty or invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_INVALID_ARGUMENT when the light JSON cannot be converted.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_light_json(
-  mln_map map,
-  mln_buffer_view light_json MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view light_json MLN_BINDING("encoding=json"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2381,9 +2169,9 @@ MLN_API mln_status mln_map_set_style_light_json(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, property_name is
  *   invalid or empty, value is empty or invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2391,13 +2179,11 @@ MLN_API mln_status mln_map_set_style_light_json(
  * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown, or the
  *   value cannot be converted for that property.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_light_property(
-  mln_map map,
-  mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view value MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view property_name,
+  mln_buffer_view value MLN_BINDING("encoding=json"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2408,19 +2194,17 @@ MLN_API mln_status mln_map_set_style_light_property(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, property_name is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, property_name is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "nullable=true;encoding=json"
+  "execution=query;result=mln_buffer_view;nullable=true;"
+  "encoding=json"
 )
 MLN_API mln_status mln_map_get_style_light_property(
-  mln_map map,
-  mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view property_name, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2437,9 +2221,9 @@ MLN_API mln_status mln_map_get_style_light_property(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null
  *   or undersized, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2448,12 +2232,10 @@ MLN_API mln_status mln_map_get_style_light_property(
  *   duration range. A rejected command changes nothing.
  * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_style_transition_options(
-  mln_map map,
-  const mln_style_transition_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_style_transition_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2474,18 +2256,14 @@ MLN_API mln_status mln_map_set_style_transition_options(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=query;result=mln_style_transition_options;shape=value;ownership="
-  "borrowed"
-)
+MLN_BINDING("execution=query;result=mln_style_transition_options")
 MLN_API mln_status mln_map_get_style_transition_options(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2498,10 +2276,10 @@ MLN_API mln_status mln_map_get_style_transition_options(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
- *   property_name is invalid or empty, value is empty or invalid, or
- *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
+ *   property_name is invalid or empty, value is empty or invalid, or completion
+ *   is invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -2509,14 +2287,11 @@ MLN_API mln_status mln_map_get_style_transition_options(
  * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown for that
  *   layer, or the value cannot be converted for that property.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_property(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view value MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  mln_buffer_view value MLN_BINDING("encoding=json"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2527,24 +2302,21 @@ MLN_API mln_status mln_map_set_layer_property(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id or
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id or
  *   property_name is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "nullable=true;encoding=json"
+  "execution=query;result=mln_buffer_view;nullable=true;"
+  "encoding=json"
 )
 MLN_API mln_status mln_map_get_layer_property(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view property_name MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view property_name,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2557,23 +2329,20 @@ MLN_API mln_status mln_map_get_layer_property(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, filter is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the filter cannot be converted.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_filter(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_buffer_view* filter
-    MLN_BINDING("length=1;encoding=json;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id,
+  const mln_buffer_view* filter MLN_BINDING("encoding=json;nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2584,22 +2353,20 @@ MLN_API mln_status mln_map_set_layer_filter(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
 MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "nullable=true;encoding=json"
+  "execution=query;result=mln_buffer_view;nullable=true;"
+  "encoding=json"
 )
 MLN_API mln_status mln_map_get_layer_filter(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2614,23 +2381,20 @@ MLN_API mln_status mln_map_get_layer_filter(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, source_layer is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_source_layer(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view source_layer
-    MLN_BINDING("encoding=utf8;lifetime=call;optional=empty"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id,
+  mln_buffer_view source_layer MLN_BINDING("optional=empty"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2641,22 +2405,17 @@ MLN_API mln_status mln_map_set_layer_source_layer(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "encoding=utf8;optional=empty"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;optional=empty")
 MLN_API mln_status mln_map_copy_layer_source_layer(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2672,22 +2431,19 @@ MLN_API mln_status mln_map_copy_layer_source_layer(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, source_id is invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  * - MLN_STATUS_INVALID_ARGUMENT when the layer's type does not take a source.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_source_id(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, mln_buffer_view source_id,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2698,22 +2454,17 @@ MLN_API mln_status mln_map_set_layer_source_id(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "encoding=utf8;optional=empty"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;optional=empty")
 MLN_API mln_status mln_map_copy_layer_source_id(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_buffer_view layer_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -2725,20 +2476,18 @@ MLN_API mln_status mln_map_copy_layer_source_id(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, min_zoom is NaN, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_min_zoom(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double min_zoom, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, double min_zoom,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2749,20 +2498,18 @@ MLN_API mln_status mln_map_set_layer_min_zoom(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
  *   invalid or empty, max_zoom is NaN, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_max_zoom(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  double max_zoom, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view layer_id, double max_zoom,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -2772,22 +2519,20 @@ MLN_API mln_status mln_map_set_layer_max_zoom(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, layer_id is
- *   invalid or empty, visibility is not an mln_style_layer_visibility value,
- *   or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, layer_id is
+ *   invalid or empty, visibility is not an mln_style_layer_visibility value, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NOT_FOUND when no style layer has that ID.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_layer_visibility(
-  mln_map map,
-  mln_buffer_view layer_id MLN_BINDING("encoding=utf8;lifetime=call"),
+  mln_map map, mln_buffer_view layer_id,
   uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

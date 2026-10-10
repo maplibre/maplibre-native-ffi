@@ -1,5 +1,4 @@
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Runtime;
 using NativeMaplibre = Maplibre.NativeFfi.Maplibre;
 
 NativeMaplibre.LoadNativeLibrary();

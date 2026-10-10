@@ -1,6 +1,5 @@
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Style;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

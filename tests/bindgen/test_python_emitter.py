@@ -70,11 +70,11 @@ class PythonEmitterTests(unittest.TestCase):
         api = self.parse("""
 typedef struct mln_position { double latitude; double longitude; } mln_position;
 typedef struct mln_new_entry {
-  mln_buffer_view title BIND("encoding=utf8;optional=empty");
+  mln_buffer_view title BIND("optional=empty");
   mln_position position;
   double class;
 } mln_new_entry;
-BIND("execution=query;result=mln_new_entry;shape=array;ownership=borrowed")
+BIND("execution=query;result=mln_new_entry;shape=array")
 mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(python.coverage(api)["generated"], ["mln_map_new_entries"])
@@ -92,9 +92,9 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, ml
 
     def test_input_identifiers_cannot_shadow_callback_runtime_locals(self):
         api = self.parse("""
-BIND("execution=command;result=void;shape=none;ownership=value")
+BIND("execution=command")
 mln_status mln_map_match(mln_map map, double self, double input_self, double py,
-                       mln_buffer_view title BIND("encoding=utf8"), double title_view,
+                       mln_buffer_view title, double title_view,
                        const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertEqual(python.coverage(api)["generated"], ["mln_map_match"])
@@ -106,7 +106,7 @@ mln_status mln_map_match(mln_map map, double self, double input_self, double py,
     def test_escaped_field_collisions_fail_before_generating_an_api(self):
         api = self.parse("""
 typedef struct mln_entry { double class; double class_; } mln_entry;
-BIND("execution=query;result=mln_entry;shape=value;ownership=borrowed")
+BIND("execution=query;result=mln_entry")
 mln_status mln_map_entry(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         result = python.coverage(api)
@@ -115,9 +115,9 @@ mln_status mln_map_entry(mln_map map, const mln_completion *completion, mln_diag
 
     def test_operations_cannot_take_owner_member_names(self):
         api = self.parse("""
-typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy;parent=none");
-BIND("execution=immediate") mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status mln_host_closed(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+typedef unsigned long long mln_host BIND("kind=handle;release=mln_host_destroy");
+mln_status mln_host_destroy(mln_host host, mln_diagnostic *out_diagnostic);
+mln_status mln_host_closed(mln_host host, bool *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         result = python.coverage(api)
         # The release alone becomes close.

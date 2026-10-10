@@ -38,10 +38,7 @@ class Values:
     def check(self, value: ValuePlan) -> None:
         if value.response:
             return
-        if value.kind == "handle" and any(
-            callback.decision and callback.decision.handle.native == value.native
-            for callback in self.bound.callbacks.values()
-        ):
+        if value.kind == "handle" and value.native in self.bound.decisions:
             return
         if value.registration:
             from .rust_callbacks import validate
@@ -69,14 +66,7 @@ class Values:
         if value.kind != "record":
             raise Unsupported(f"{value.native}: {value.kind} needs a Rust conversion")
         for field in value.fields:
-            if field.role in {
-                "size",
-                "reserved",
-                "presence_mask",
-                "count",
-                "stride",
-                "arena",
-            }:
+            if not field.public:
                 continue
             if field.presence and field.presence.variant:
                 raise Unsupported(
@@ -94,12 +84,7 @@ class Values:
         if value.kind == "handle":
             if value.native not in self.used:
                 self.used[value.native] = value
-                decision = next(
-                    callback.decision
-                    for callback in self.bound.callbacks.values()
-                    if callback.decision
-                    and callback.decision.handle.native == value.native
-                )
+                decision = self.bound.decisions[value.native]
                 complete = self.bound.operations_by_name[decision.complete]
                 for parameter in complete.inputs:
                     if parameter.name != complete.receiver:

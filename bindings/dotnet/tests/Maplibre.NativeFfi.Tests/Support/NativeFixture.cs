@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

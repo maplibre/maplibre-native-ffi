@@ -27,7 +27,9 @@ hand; change the header, the compiler rule, or the runtime helper, and
 regenerate.
 
 Pick the execution category that describes the native operation. The schema
-checks the signature that each category requires.
+checks the signature that each category requires. A function without a
+completion parameter is `immediate` unless it declares another synchronous
+category.
 
 | Execution       | Operation                                                      |
 | --------------- | -------------------------------------------------------------- |
@@ -40,12 +42,59 @@ checks the signature that each category requires.
 | `event_batch`   | Drains queued events or frame results into an owned batch      |
 | `render_driver` | Services graphics work on the thread that the driver requires  |
 
+## Annotate only what convention leaves open
+
+The frontend completes each declaration's metadata with the conventions that
+`Conventions` in `schema.py` derives from its C shape, so every later stage
+reads a complete contract. An annotation states a departure from convention, and
+the schema rejects one that restates a default.
+
+| Declaration                         | Default                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| Function without a completion       | `execution=immediate`                                                                      |
+| Completion function                 | `result=void`; a value result has `shape=value` and is `borrowed`, or `owned` for a handle |
+| Parameter                           | `direction=in`; an output pointer to a handle is `owned`                                   |
+| Pointer                             | `ownership=borrowed`, except a callback                                                    |
+| Pointer to a record                 | `length=1`                                                                                 |
+| Character pointer                   | `length=nul;encoding=utf8`                                                                 |
+| Buffer view or pointer to one       | `encoding=utf8`                                                                            |
+| `void*`                             | `kind=context` in a callback signature, `kind=native_pointer` elsewhere                    |
+| Value                               | `lifetime=owner` for a context, `lifetime=call` otherwise                                  |
+| First struct member `uint32_t size` | `kind=size;default=sizeof`                                                                 |
+| Member that a sibling names         | `kind=count` for `length`, `kind=presence_mask` for `mask`, `kind=tag` for `tag`           |
+| `kind=reserved` member              | `default=0`                                                                                |
+| Callback typedef                    | `thread=native;reentry=allow`; a void callback has `failure=contain`                       |
+| Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                  |
+| Callback registration               | `user_data` names its one `kind=context` member or parameter                               |
+| Record typedef                      | `default` names the one function that takes no arguments and returns the record            |
+
+`STRUCT_SIZE_FIELD` in `schema.py` names the size member, because other structs
+begin with an unrelated `uint32_t` member. A struct whose size member has
+another name annotates it `kind=size`. `protocol.py` names the protocol types
+that every handwritten runtime is written against: the status enum, the
+diagnostic, the completion and its result, and the buffer view. No other rule
+reads a declaration's name.
+
+Two keys state what a C shape cannot:
+
+- `prefix=` on a handle names the prefix of its operations when that differs
+  from the handle's type name, as `mln_resource_request` does for
+  `mln_resource_request_handle`.
+- `fields=ordered` on a record of plain values says that its field order is part
+  of its meaning, as with coordinates, so a binding may construct it
+  positionally. The schema rejects it on a record with control, pointer, or
+  array members.
+
+An annotation that names another declaration, such as `reentry_calls`,
+`complete`, `cancel_registration`, or `wait_retired`, must name one that exists;
+the schema reports the name that does not resolve.
+
 ## Where each rule lives
 
 | Change                                              | Module              |
 | --------------------------------------------------- | ------------------- |
 | Header extraction and attribute parsing             | `frontend.py`       |
-| Accepted attributes and signature constraints       | `schema.py`         |
+| Conventions, accepted attributes, and signatures    | `schema.py`         |
 | Value shapes, presence, and ownership relationships | `semantic.py`       |
 | Native copies for deferred callbacks and results    | `native_capture.py` |
 | Language syntax and runtime calls                   | `emitters/`         |
@@ -53,6 +102,20 @@ checks the signature that each category requires.
 Resolve a new relationship once in `semantic.py` and let every emitter consume
 the plan. Emitters choose syntax and report the shapes that they cannot lower;
 they never invent ownership.
+
+The plan also names each public member once, and an emitter only converts its
+case and escapes keywords:
+
+| Plan field              | Rule                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| `OperationPlan.member`  | `name=` if declared; else the name without its receiver's prefix; else without `mln_`       |
+| `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                 |
+| `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                 |
+| `PresenceGroup.member`  | A bit without its enum's shared prefix, or a boolean mask without `has_`                    |
+| `MaskFlag.member`       | The flag constant without its enum's shared prefix                                          |
+| `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
+| `OperationPlan.status`  | Whether the function returns the status enum                                                |
+| `OperationPlan.support` | The record default or handle disposal that the operation backs                              |
 
 ## Test a change
 

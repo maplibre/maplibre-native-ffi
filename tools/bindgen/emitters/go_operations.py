@@ -3,6 +3,7 @@
 from dataclasses import replace
 
 from ..model import ModelError
+from ..semantic import output_member
 from .go import GO_KEYWORDS, name, native_call
 from .go_values import Values, absent, public
 
@@ -12,14 +13,7 @@ def element(value):
 
 
 def method_name(plan, receiver, handle):
-    method = name(
-        plan.function.metadata.get(
-            "name",
-            plan.name.removeprefix(
-                (handle.native.removesuffix("_handle") + "_") if handle else "mln_"
-            ),
-        )
-    ).removeprefix("Mln")
+    method = name(plan.member)
     if handle and handle.handle and plan.name == handle.handle.release:
         return "Close"
     if receiver and method in {"Close", "IsClosed", "ID"}:
@@ -108,14 +102,7 @@ def operation(plan, values):
     receiver_name = plan.receiver or plan.scoped_receiver
     receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
     handle = element(receiver.value) if receiver else None
-    decision = next(
-        (
-            c.decision
-            for c in values.api.callbacks.values()
-            if c.decision and handle and c.decision.handle.native == handle.native
-        ),
-        None,
-    )
+    decision = values.api.decisions.get(handle.native) if handle else None
     if plan.direct_registrations:
         from .go_callbacks import direct_operation
 
@@ -125,7 +112,7 @@ def operation(plan, values):
     if decision and plan.name == decision.handle.release:
         return f"func (receiver *{values.owner(handle.native)}) Close() error {{ return bindingCloseDecision(receiver.owner(), {operation_id}) }}\n"
     if plan.view:
-        method = "With" + method.removeprefix("Get")
+        method = "With" + name(plan.view.stem)
     internal = {
         "arena",
         "raw",
@@ -146,7 +133,7 @@ def operation(plan, values):
         parts = p.name.split("_")
         label = parts[0] + "".join(name(part) for part in parts[1:])
         if p.name in {o.name for o in plan.outputs}:
-            label = "out" + name(p.name.removeprefix("out_"))
+            label = "out" + name(output_member(p.name))
         while label in GO_KEYWORDS or label in internal or label in labels.values():
             label += "_"
         labels[p.name] = label
@@ -282,7 +269,7 @@ def operation(plan, values):
     elif (
         not outputs
         and plan.function.return_type.canonical != "void"
-        and plan.function.return_type.spelling != "mln_status"
+        and not plan.status
     ):
         values.require(plan.result)
         result_type = values.type(plan.result)
@@ -292,7 +279,7 @@ def operation(plan, values):
     products = ""
     if len(output_types) > 1:
         returned = name(plan.name.removeprefix("mln_")) + "Result"
-        names = [name(p.name.removeprefix("out_")) for p, _, _ in outputs] + (
+        names = [name(output_member(p.name)) for p, _, _ in outputs] + (
             ["Completion"] if plan.completion else []
         )
         products = (
@@ -312,26 +299,21 @@ def operation(plan, values):
         returned = converted = None
     closure_setup = "".join(line + "\n" for line in body_setup)
     if plan.view:
-        if len(outputs) != 1 or plan.completion:
+        if plan.completion:
             raise ModelError(
-                [f"{plan.name}: borrowed view requires a single immediate result"]
+                [f"{plan.name}: borrowed view requires an immediate result"]
             )
         value = outputs[0][1]
         values.views[value.native] = value
         view_type = public(value.native) + "View"
         signature.append(f"callback func({view_type}) error")
-        begin = "nil"
-        end = "nil"
-        if plan.view.owner.view_begin:
-            opened = native_call(
-                values.api.source.functions_by_name[plan.view.owner.view_begin],
-                f"C.{handle.native}(raw)",
-                "token",
-            )
-            begin = f"func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {{\nreturn int32({opened})\n}}"
-            end = (
-                f"func(token unsafe.Pointer) {{ C.{plan.view.owner.view_end}(token) }}"
-            )
+        opened = native_call(
+            values.api.source.functions_by_name[plan.view.begin],
+            f"C.{handle.native}(raw)",
+            "token",
+        )
+        begin = f"func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {{\nreturn int32({opened})\n}}"
+        end = f"func(token unsafe.Pointer) {{ C.{plan.view.end}(token) }}"
         get = f"func(raw uint64, diagnostic *C.mln_diagnostic) int32 {{\nreturn int32({call})\n}}"
         wrap = f"func(scope *bindingScope) {view_type} {{ return {view_type}{{value: {conversions[0]}, scope: scope}} }}"
         body = "".join(line + "\n" for line in setup)

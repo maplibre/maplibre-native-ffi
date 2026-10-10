@@ -84,18 +84,15 @@ internal func startClose() throws -> NativeFuture<Void>? {{
     )
 
 
-def owner_name(native):
+def owner_name(handle):
+    """The public owner class of a handle plan."""
     from .swift import name
 
-    return name(native.removeprefix("mln_").removesuffix("_handle")) + "Handle"
+    return name(handle.stem) + "Handle"
 
 
 def decision_handles(bound):
-    return {
-        callback.decision.handle.native
-        for callback in bound.callbacks.values()
-        if callback.decision
-    }
+    return set(bound.decisions)
 
 
 def public_handles(bound):
@@ -117,7 +114,7 @@ def public_handles(bound):
 def owner_declarations(bound):
     chunks = []
     for handle in public_handles(bound):
-        owner = owner_name(handle.native)
+        owner = owner_name(handle)
         raw = "Native" + owner
         cleanup = handle.dispose or handle.release
         function = bound.source.functions_by_name[cleanup]
@@ -132,7 +129,11 @@ def owner_declarations(bound):
             f"struct {raw}: NativeHandle {{ let raw: UInt64; func disposeAbandoned() -> Bool {{ {body} }} }}\n"
         )
         decision = handle.native in decision_handles(bound)
-        parent = f", parent: {owner_name(handle.parent)}" if handle.parent else ""
+        parent = (
+            f", parent: {owner_name(bound.handles[handle.parent])}"
+            if handle.parent
+            else ""
+        )
         passed = ", parent: parent" if handle.parent else ""
         if decision:
             parent += ", pendingDecision: Bool = false"

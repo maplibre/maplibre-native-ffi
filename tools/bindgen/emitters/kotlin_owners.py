@@ -26,14 +26,7 @@ def receives(plan, native):
 
 
 def decision(bound, native):
-    return next(
-        (
-            callback.decision
-            for callback in bound.callbacks.values()
-            if callback.decision and callback.decision.handle.native == native
-        ),
-        None,
-    )
+    return bound.decisions.get(native)
 
 
 def release(bound, native, plans):
@@ -82,7 +75,7 @@ def state_type(bound, native):
 
 def generate_owners(bound, plans):
     return {
-        f"src/commonMain/kotlin/org/maplibre/nativeffi/generated/{owner_name(native)}.kt": owner(
+        f"src/commonMain/kotlin/org/maplibre/nativeffi/generated/{owner_name(bound.handles[native])}.kt": owner(
             bound, native, plans
         )
         for native in generated_owners(bound)
@@ -92,7 +85,7 @@ def generate_owners(bound, plans):
 def owner(bound, native, plans):
     handle = bound.handles[native]
     family = name(native)
-    owner_class = owner_name(native)
+    owner_class = owner_name(handle)
     closes = release(bound, native, plans)
     supertypes = [f"Generated{family}Operations()"]
     if closes:
@@ -104,7 +97,7 @@ def owner(bound, native, plans):
             raise ValueError(
                 f"{native}: parent retention {handle.parent_retention} needs a Kotlin owner"
             )
-        parameters.append(f"parent: {owner_name(handle.parent)}")
+        parameters.append(f"parent: {owner_name(bound.handles[handle.parent])}")
         parents = ", parent"
     dispose = family[0].lower() + family[1:]
     parameters.append(f"dispose: (Long) -> Unit = GeneratedOwnerDisposal::{dispose}")

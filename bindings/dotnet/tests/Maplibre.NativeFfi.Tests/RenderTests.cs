@@ -1,7 +1,6 @@
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Render;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

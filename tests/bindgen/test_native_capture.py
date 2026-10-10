@@ -296,9 +296,9 @@ typedef struct mln_capture_fixture {
   const mln_buffer_view* extra MLN_BINDING("length=count;nullable=true");
   size_t count;
   uint32_t fields;
-  const char* name MLN_BINDING("length=nul;encoding=utf8;mask=fields;bit=MLN_CAPTURE_FIXTURE_NAME");
+  const char* name MLN_BINDING("mask=fields;bit=MLN_CAPTURE_FIXTURE_NAME");
 } mln_capture_fixture;
-MLN_BINDING("execution=query;result=mln_capture_fixture;shape=value;ownership=borrowed")
+MLN_BINDING("execution=query;result=mln_capture_fixture")
 MLN_API mln_status mln_map_capture_fixture(mln_map map, const mln_completion* completion, mln_diagnostic *out_diagnostic) MLN_NOEXCEPT;
 """
 

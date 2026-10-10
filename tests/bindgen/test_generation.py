@@ -62,7 +62,8 @@ class GenerationTests(unittest.TestCase):
                     self.assertEqual(
                         set(coverage["generated"])
                         | set(coverage["unsupported"])
-                        | set(coverage.get("support", ())),
+                        | set(coverage.get("support", ()))
+                        | set(coverage.get("callback_adapters", ())),
                         {function.name for function in api.public_functions},
                     )
 
@@ -81,7 +82,7 @@ typedef int64_t mln_offset;
 typedef size_t mln_count;
 typedef enum mln_flags : uint64_t { MLN_FLAGS_HIGH = 0x100000000ULL } mln_flags;
 typedef struct mln_values { mln_counter_alias counter; mln_offset offset; mln_count count; mln_flags flags; } mln_values;
-BIND("execution=immediate") mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         before = self.parse(source.replace("UNDERLYING", "long"))
         after = self.parse(source.replace("UNDERLYING", "long long"))
@@ -102,16 +103,16 @@ BIND("execution=immediate") mln_status mln_roundtrip(mln_values input, mln_value
             with self.subTest(emitter=emitter.__name__):
                 original = self.parse(
                     """
-BIND("execution=query;result=double;shape=value;ownership=borrowed")
+BIND("execution=query;result=double")
 mln_status mln_map_test_scale(mln_map map, double latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """,
                     owned_map=True,
                 )
                 renamed = self.parse(
                     """
-BIND("execution=query;result=double;shape=value;ownership=borrowed")
+BIND("execution=query;result=double")
 mln_status mln_map_new_scale(mln_map map, float latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("receiver=map;execution=command;result=void;shape=none;ownership=value")
+BIND("receiver=map;execution=command")
 mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """,
                     owned_map=True,
@@ -127,9 +128,9 @@ mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *
 
     def test_a_new_handle_generates_without_emitter_tables(self):
         api = self.parse("""
-typedef unsigned long long mln_widget BIND("kind=handle;release=mln_widget_close;dispose=mln_widget_close;parent=none");
-BIND("execution=immediate") void mln_widget_close(mln_widget widget);
-BIND("execution=query;result=double;shape=value;ownership=borrowed")
+typedef unsigned long long mln_widget BIND("kind=handle;release=mln_widget_close;dispose=mln_widget_close");
+void mln_widget_close(mln_widget widget);
+BIND("execution=query;result=double")
 mln_status mln_widget_scale(mln_widget widget, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
@@ -141,11 +142,11 @@ mln_status mln_widget_scale(mln_widget widget, const mln_completion *completion,
     def test_partial_field_metadata_rejects_whole_record_and_operation(self):
         api = self.parse("""
 typedef struct mln_new_entry {
-  mln_buffer_view title BIND("encoding=utf8");
+  mln_buffer_view title;
   const double *positions;
   unsigned long count;
 } mln_new_entry;
-BIND("execution=query;result=mln_new_entry;shape=array;ownership=borrowed")
+BIND("execution=query;result=mln_new_entry;shape=array")
 mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
@@ -156,11 +157,10 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, ml
 
     def test_every_declaration_is_generated_or_has_a_reason(self):
         api = self.parse("""
-BIND("execution=query;result=double;shape=value;ownership=borrowed")
+BIND("execution=query;result=double")
 mln_status mln_map_scalar(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("execution=command;result=void;shape=none;ownership=value")
+BIND("execution=command")
 mln_status mln_map_span(mln_map map, const double *values, unsigned count, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate")
 void mln_global_hook(void (*callback)(void *), void *context);
 """)
         names = set(api.functions_by_name)
@@ -178,7 +178,7 @@ void mln_global_hook(void (*callback)(void *), void *context);
     def test_union_results_require_active_variant_decoding(self):
         api = self.parse("""
 typedef union mln_variant { double number; bool flag; } mln_variant;
-BIND("execution=query;result=mln_variant;shape=array;ownership=borrowed")
+BIND("execution=query;result=mln_variant;shape=array")
 mln_status mln_map_variants(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
@@ -193,7 +193,7 @@ mln_status mln_map_variants(mln_map map, const mln_completion *completion, mln_d
             ("", 'mln_map map BIND("consumes=always")'),
         ):
             api = self.parse(f"""
-BIND("execution=command;result=void;shape=none;ownership=value{contract}")
+BIND("execution=command{contract}")
 mln_status mln_map_consume({receiver}, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
             for emitter in EMITTERS:
@@ -204,16 +204,14 @@ mln_status mln_map_consume({receiver}, const mln_completion *completion, mln_dia
 
     def test_consumption_policy_rejects_ambiguous_values(self):
         with self.assertRaisesRegex(ModelError, "unsupported consumes"):
-            self.parse(
-                'BIND("execution=immediate;consumes=map") void mln_map_consume(mln_map map);'
-            )
+            self.parse('BIND("consumes=map") void mln_map_consume(mln_map map);')
 
     def test_nullable_record_field_preserves_pointer_presence(self):
         api = self.parse("""
 typedef struct mln_nullable_entry {
-  mln_buffer_view title BIND("encoding=utf8;nullable=true");
+  mln_buffer_view title BIND("nullable=true");
 } mln_nullable_entry;
-BIND("execution=query;result=mln_nullable_entry;shape=array;ownership=borrowed")
+BIND("execution=query;result=mln_nullable_entry;shape=array")
 mln_status mln_map_nullable_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
@@ -229,7 +227,7 @@ mln_status mln_map_nullable_entries(mln_map map, const mln_completion *completio
         api = self.parse("""
 typedef unsigned int uint32_t;
 typedef struct mln_bit_entry { uint32_t flags : 3; } mln_bit_entry;
-BIND("execution=query;result=mln_bit_entry;shape=array;ownership=borrowed")
+BIND("execution=query;result=mln_bit_entry;shape=array")
 mln_status mln_map_bit_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:
@@ -240,9 +238,9 @@ mln_status mln_map_bit_entries(mln_map map, const mln_completion *completion, ml
 
     def test_retained_input_requires_a_lifetime_adapter(self):
         api = self.parse("""
-BIND("execution=command;result=void;shape=none;ownership=value")
+BIND("execution=command")
 mln_status mln_map_store_view(mln_map map,
-  mln_buffer_view view BIND("encoding=utf8;lifetime=owner"),
+  mln_buffer_view view BIND("lifetime=owner"),
   const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in EMITTERS:

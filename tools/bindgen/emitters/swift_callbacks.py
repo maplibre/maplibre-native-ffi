@@ -64,7 +64,6 @@ def descriptor(values, plan):
 
     registration = plan.registration
     public = values.public(plan)
-    controls = {registration.user_data, registration.release}
     callbacks = set(registration.callbacks)
     fields, arguments, assignments, materialize, defaults = [], [], [], [], []
     for field in plan.fields:
@@ -83,13 +82,7 @@ def descriptor(values, plan):
                 f"    raw.{identifier(field.name)} = try NativeInputArena.count({length})"
             )
             continue
-        if field.name in controls or field.role in {
-            "reserved",
-            "count",
-            "presence_mask",
-        }:
-            continue
-        if field.role == "size":
+        if not field.public:
             continue
         if field.name in callbacks:
             callback = values.bound.callbacks[field.value.native]
@@ -188,7 +181,7 @@ def descriptor(values, plan):
             decision = callback.decision
             from .swift_ownership import owner_name
 
-            setup += f"  guard let decisionOwner = try? {owner_name(decision.handle.native)}(adopting: {identifier(decision.parameter)}, pendingDecision: true) else {{ {fail} }}\n"
+            setup += f"  guard let decisionOwner = try? {owner_name(decision.handle)}(adopting: {identifier(decision.parameter)}, pendingDecision: true) else {{ {fail} }}\n"
         guard = ""
         if callback.reentry_policy:
             policy = callback.reentry_policy
@@ -239,20 +232,14 @@ def direct_operation(plan, values):
     function = plan.function.name
     receiver = next(
         (
-            parameter.value.native
+            parameter.value
             for parameter in plan.inputs
             if parameter.name == plan.receiver
         ),
         None,
     )
-    owner = owner_name(receiver) if receiver else "Maplibre"
-    method = identifier(
-        camel(
-            function.removeprefix(
-                receiver.removesuffix("_handle") + "_" if receiver else "mln_"
-            )
-        )
-    )
+    owner = owner_name(receiver.handle) if receiver else "Maplibre"
+    method = identifier(camel(plan.member))
     thunk = "invoke" + name(function)
     params = ", ".join(
         f"{identifier(parameter.name)}: {raw_type(parameter.value.ctype)}"

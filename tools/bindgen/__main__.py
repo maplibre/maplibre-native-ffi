@@ -14,6 +14,7 @@ from .compiler import compile_api
 from .frontend import parse_headers
 from .model import Api, ModelError
 from .schema import validate
+from .semantic import support_relation
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -98,16 +99,16 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
             "resolved_operations": len(bound.operations),
             "resolved_callbacks": len(bound.callbacks),
             "support_relations": {
-                plan.name: plan.support_for
+                plan.name: support_relation(plan)
                 for plan in bound.operations
-                if plan.role == "support"
+                if plan.support
             },
         },
         "files": sorted(outputs),
         "languages": reports,
     }
-    outputs["bindings/generated-coverage.json"] = (
-        json.dumps(report, indent=2, sort_keys=True) + "\n"
+    outputs["bindings/generated-coverage.json"] = dprint_format(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", "json"
     )
     return outputs, report
 
@@ -119,6 +120,19 @@ def run_tool(*command: str, cwd: Path = ROOT, quiet: bool = False, **options):
     return subprocess.run(
         ["mise", "exec", "--no-deps", "--", *command], cwd=cwd, check=True, **options
     )
+
+
+def dprint_format(source: str, extension: str) -> str:
+    """Format a source with the formatter dprint routes the extension to."""
+    return run_tool(
+        "dprint",
+        "fmt",
+        "--stdin",
+        extension,
+        input=source,
+        capture_output=True,
+        text=True,
+    ).stdout
 
 
 def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
@@ -135,16 +149,8 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
         if not path.endswith((".h", ".inc", ".c")):
             continue
         target = staging / path
-        formatted = run_tool(
-            "dprint",
-            "fmt",
-            "--stdin",
-            "cpp" if target.suffix == ".inc" else "h",
-            input=target.read_text(),
-            capture_output=True,
-            text=True,
-        )
-        target.write_text(formatted.stdout)
+        extension = "cpp" if target.suffix == ".inc" else "h"
+        target.write_text(dprint_format(target.read_text(), extension))
     run_tool(
         "gofumpt",
         "-w",

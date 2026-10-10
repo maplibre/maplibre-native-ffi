@@ -1,7 +1,5 @@
 using System.Reflection;
 using Maplibre.NativeFfi.Internal.Pointer;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

@@ -49,13 +49,11 @@ typedef struct mln_adapter_log_callback_arguments {
   uint32_t severity MLN_BINDING("enum=mln_log_severity");
   uint32_t event MLN_BINDING("enum=mln_log_event");
   int64_t code;
-  const char* message
-    MLN_BINDING("encoding=utf8;length=nul;ownership=borrowed;lifetime=owner");
+  const char* message MLN_BINDING("lifetime=owner");
 } mln_adapter_log_callback_arguments;
 /** Copied arguments of one deferred mln_resource_provider_callback call. */
 typedef struct mln_adapter_resource_provider_callback_arguments {
-  const mln_resource_request* request
-    MLN_BINDING("length=1;ownership=borrowed;lifetime=owner");
+  const mln_resource_request* request MLN_BINDING("lifetime=owner");
   mln_resource_request_handle handle;
 } mln_adapter_resource_provider_callback_arguments;
 #endif

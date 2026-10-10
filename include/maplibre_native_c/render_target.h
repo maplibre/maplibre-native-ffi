@@ -29,7 +29,7 @@ typedef uint64_t mln_vulkan_non_dispatchable_handle;
 
 /** Logical render target extent in UI pixels. */
 typedef struct mln_render_target_extent {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical map width in UI pixels. */
   uint32_t width;
   /** Logical map height in UI pixels. */
@@ -71,7 +71,7 @@ typedef enum MLN_BINDING(
  * still requires normal detach or abandonment before session destruction.
  */
 typedef struct mln_render_session_attach_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One mln_render_driver_kind value. */
   uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
   /**
@@ -79,18 +79,16 @@ typedef struct mln_render_session_attach_options {
    * one slot regardless of this value. Ignored by other targets.
    */
   uint32_t requested_texture_ring_depth;
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t reserved MLN_BINDING("kind=reserved");
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   mln_wake frame_wake;
   /** Wakes the graphics receiver when caller-driver work is available. */
   mln_wake driver_work_wake;
-} mln_render_session_attach_options MLN_BINDING(
-  "default=mln_render_session_attach_options_default"
-);
+} mln_render_session_attach_options;
 
 /** Driver and target capabilities fixed for one attached render session. */
 typedef struct mln_render_session_capabilities {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One mln_render_driver_kind value. */
   uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
   /** Granted owned-texture slot count, or zero for a target without a ring. */
@@ -120,7 +118,7 @@ typedef enum mln_gpu_sync_kind : uint32_t {
  * borrowed until a later session barrier or detach completes.
  */
 typedef struct mln_gpu_sync {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One mln_gpu_sync_kind value. */
   uint32_t kind MLN_BINDING("enum=mln_gpu_sync_kind");
   /**
@@ -133,53 +131,50 @@ typedef struct mln_gpu_sync {
    */
   uint64_t object;
   uint64_t value;
-} mln_gpu_sync MLN_BINDING("default=mln_gpu_sync_default");
+} mln_gpu_sync;
 
 /** Returns CPU-complete synchronization for this C API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_gpu_sync mln_gpu_sync_default(void) MLN_NOEXCEPT;
 
 /** Metal backend context fields shared by Metal render targets. */
 typedef struct mln_metal_context_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** id<MTLDevice> / MTL::Device*. Retained when the target requires it. */
-  void* device MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* device;
 } mln_metal_context_descriptor;
 
 /** Vulkan backend context fields shared by Vulkan render targets. */
 typedef struct mln_vulkan_context_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Borrowed VkInstance. Required. */
-  void* instance MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* instance;
   /** Borrowed VkPhysicalDevice. Required. */
-  void* physical_device MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* physical_device;
   /** Borrowed VkDevice. Required. */
-  void* device MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* device;
   /** Borrowed graphics VkQueue. Required. */
-  void* graphics_queue MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* graphics_queue;
   /** Queue family index for graphics_queue. Must support graphics commands. */
   uint32_t graphics_queue_family_index;
   /** PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles.
    */
-  void* get_instance_proc_addr
-    MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* get_instance_proc_addr;
   /** PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device. */
-  void* get_device_proc_addr
-    MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* get_device_proc_addr;
 } mln_vulkan_context_descriptor;
 
 /** WebGPU backend context fields shared by WebGPU render targets. */
 typedef struct mln_webgpu_context_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Borrowed WGPUInstance. Optional for texture targets. */
-  void* instance MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* instance;
   /** Borrowed WGPUDevice. Required. */
-  void* device MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* device;
   /**
    * Borrowed WGPUQueue. Optional; null uses the device default queue. A
    * non-null queue must belong to device.
    */
-  void* queue MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* queue;
 } mln_webgpu_context_descriptor;
 
 /** OpenGL context providers supported by this build. */
@@ -235,37 +230,37 @@ typedef enum mln_opengl_client_api : uint32_t {
 
 /** WGL context fields shared by OpenGL render targets on Windows. */
 typedef struct mln_wgl_context_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Borrowed HDC used to create the session context. Required. */
-  void* device_context MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* device_context;
   /**
    * Borrowed HGLRC whose share group the session context joins. Required under
    * shared ownership. A dedicated session joins no share group, so it must be
    * null there.
    */
-  void* share_context MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* share_context;
   /** Optional wglGetProcAddress-compatible function for the host loader. */
-  void* get_proc_address MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* get_proc_address;
 } mln_wgl_context_descriptor;
 
 /** EGL context fields shared by OpenGL render targets. */
 typedef struct mln_egl_context_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Borrowed EGLDisplay. Required and kept initialized through teardown. */
-  void* display MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* display;
   /**
    * Borrowed EGLConfig used to create the session context. Required.
    * OpenGL texture targets require EGL_SURFACE_TYPE to include
    * EGL_PBUFFER_BIT.
    */
-  void* config MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* config;
   /**
    * Borrowed EGLContext whose share group the session context joins. Required
    * under shared ownership, where the session also takes its client API from
    * this context. A dedicated session joins no share group, so it must be null
    * there and names client_api instead.
    */
-  void* share_context MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* share_context;
   /**
    * Client API the session creates its context for. Required under dedicated
    * ownership. A shared session queries share_context for it, so this is
@@ -273,7 +268,7 @@ typedef struct mln_egl_context_descriptor {
    */
   mln_opengl_client_api client_api;
   /** Optional eglGetProcAddress-compatible function for the host loader. */
-  void* get_proc_address MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* get_proc_address;
 } mln_egl_context_descriptor;
 
 /** WebGL context placement. */
@@ -289,7 +284,7 @@ typedef enum mln_webgl_context_kind : uint32_t {
 
 /** WebGL context fields shared by OpenGL render targets in the browser. */
 typedef struct mln_webgl_context_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One mln_webgl_context_kind value. */
   uint32_t kind MLN_BINDING("enum=mln_webgl_context_kind");
   /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
@@ -299,7 +294,7 @@ typedef struct mln_webgl_context_descriptor {
    * Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
    * canvas must still be transferable when attachment starts.
    */
-  mln_buffer_view canvas_selector MLN_BINDING("encoding=utf8");
+  mln_buffer_view canvas_selector;
 } mln_webgl_context_descriptor;
 
 /** Backend-specific OpenGL context data. */
@@ -314,9 +309,9 @@ typedef union mln_opengl_context_descriptor_data {
 
 /** OpenGL backend context fields shared by OpenGL render targets. */
 typedef struct mln_opengl_context_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** WGL, EGL, or WebGL context provider. */
-  mln_opengl_context_platform platform MLN_BINDING("kind=tag");
+  mln_opengl_context_platform platform;
   /**
    * Whether the session shares its driver thread and graphics objects with the
    * host. A private EGL owned texture and a transferred WebGL canvas are
@@ -330,7 +325,6 @@ typedef struct mln_opengl_context_descriptor {
  * Returns default caller-graphics-thread attachment policy with no wakes and a
  * one-slot texture ring.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_render_session_attach_options
 mln_render_session_attach_options_default(void) MLN_NOEXCEPT;
 
@@ -346,9 +340,8 @@ mln_render_session_attach_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_INVALID_ARGUMENT when extent is null or invalid, out_width or
  *   out_height is null, or the scaled dimensions are too large.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_target_extent_physical_size(
-  const mln_render_target_extent* extent MLN_BINDING("length=1"),
+  const mln_render_target_extent* extent,
   uint32_t* out_width MLN_BINDING("direction=out"),
   uint32_t* out_height MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -357,7 +350,7 @@ MLN_API mln_status mln_render_target_extent_physical_size(
 /**
  * Returns OpenGL context providers supported by this build.
  */
-MLN_BINDING("execution=immediate;enum=mln_opengl_context_provider_flag")
+MLN_BINDING("enum=mln_opengl_context_provider_flag")
 MLN_API uint32_t mln_opengl_supported_context_provider_mask(void) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

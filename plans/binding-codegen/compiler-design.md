@@ -27,8 +27,11 @@ their target width.
 `MLN_BINDING("key=value;...")` expands to a Clang annotation when the compiler
 extracts headers, and to nothing in ordinary builds. An annotation belongs to
 the declaration, field, parameter, or typedef whose contract it describes. It
-contains no target-language templates or function-name inventories. Every public
-function declares an execution category.
+contains no target-language templates or function-name inventories. The schema
+derives each convention from the declaration's C shape, such as immediate
+execution for a function without a completion, and an annotation states only a
+departure from convention. Every completion function declares its execution
+category.
 
 `include/binding-interfaces.toml` separates the public C interface from the
 native binding-runtime interface. Clang resolves the include closure of both

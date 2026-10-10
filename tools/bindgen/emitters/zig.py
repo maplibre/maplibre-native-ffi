@@ -143,8 +143,9 @@ pub const OwnedValue = marshal.OwnedValue;
                 if function.return_type.kind == "void"
                 else status_call(function, ["raw"], "null")
             )
+        public = pascal(handle.native.removeprefix("mln_"))
         owners.append(
-            f'pub const {pascal(handle.native.removeprefix("mln_"))} = owner.Handle("{handle.native}", struct {{ fn dispose(raw: u64) status.Error!void {{ {" ".join(calls)} }} }}.dispose);'
+            f'pub const {public} = owner.Handle("{handle.native}", "{public}", struct {{ fn dispose(raw: u64) status.Error!void {{ {" ".join(calls)} }} }}.dispose);'
         )
     # The generated surface is the package root, next to the runtime types it
     # exposes, so the package needs no file of re-exports.

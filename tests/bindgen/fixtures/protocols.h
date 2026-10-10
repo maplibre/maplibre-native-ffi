@@ -11,6 +11,9 @@
 #define MLN_BINDGEN_PROTOCOLS_H
 
 // Groups that declare fixed-width types include the standard headers.
+#if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES)
+#define MLN_PROTOCOL_STANDARD_TYPES
+#endif
 #if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) || \
   defined(MLN_PROTOCOL_PRESENCE_MASK) ||                              \
   defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                         \
@@ -72,31 +75,25 @@ typedef enum mln_command_disposition : uint32_t {
   MLN_COMMAND_DISPOSITION_CANCELLED = 3,
 } mln_command_disposition;
 typedef struct mln_completion_result {
-  uint32_t size BIND("kind=size;default=sizeof");
+  uint32_t size;
   mln_status status;
   uint32_t disposition BIND("enum=mln_command_disposition");
-  uint32_t reserved BIND("kind=reserved;default=0");
+  uint32_t reserved BIND("kind=reserved");
   uint64_t generation;
-  mln_buffer_view diagnostic BIND("encoding=utf8");
-  const void* value BIND("kind=erased;ownership=borrowed");
+  mln_buffer_view diagnostic;
+  const void* value BIND("kind=erased");
   size_t value_count;
 } mln_completion_result;
 typedef void (*mln_completion_callback)(
-  void* user_data BIND("kind=context;lifetime=owner"),
-  const mln_completion_result* result
-    BIND("ownership=borrowed;lifetime=call;direction=in;length=1")
-) BIND("thread=native;failure=contain");
-typedef void (*mln_completion_release)(
-  void* user_data BIND("kind=context;lifetime=owner")
-) BIND("thread=native;failure=contain");
-typedef struct mln_completion {
-  uint32_t size BIND("kind=size;default=sizeof");
-  mln_completion_callback callback;
-  void* user_data BIND("kind=context;ownership=borrowed");
-  mln_completion_release release_user_data;
-} mln_completion BIND(
-  "kind=callback_registration;user_data=user_data;release=release_user_data"
+  void* user_data, const mln_completion_result* result
 );
+typedef void (*mln_completion_release)(void* user_data);
+typedef struct mln_completion {
+  uint32_t size;
+  mln_completion_callback callback;
+  void* user_data BIND("kind=context");
+  mln_completion_release release_user_data;
+} mln_completion BIND("kind=callback_registration;release=release_user_data");
 #else
 typedef struct mln_completion {
   void* state;
@@ -107,18 +104,16 @@ typedef unsigned long long mln_runtime;
 #ifdef MLN_PROTOCOL_ABI_VERSION
 // The C ABI version query, for a probe that compiles a binding's handwritten
 // runtime, which checks the version before its first call.
-BIND("execution=immediate") uint32_t mln_c_version(void);
+uint32_t mln_c_version(void);
 #endif
 
 // The map is a plain value unless a test asks for one of its owner forms.
 #if defined(MLN_PROTOCOL_MAP_CLOSE)
 typedef unsigned long long mln_map
-  BIND("kind=handle;release=mln_map_close;dispose=mln_map_close;parent=none");
-BIND("execution=immediate") void mln_map_close(mln_map map);
+  BIND("kind=handle;release=mln_map_close;dispose=mln_map_close");
+void mln_map_close(mln_map map);
 #elif defined(MLN_PROTOCOL_MAP_RELEASE)
-typedef unsigned long long mln_map
-  BIND("kind=handle;release=mln_map_release;parent=none");
-BIND("execution=immediate")
+typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
 void mln_map_release(mln_map map BIND("consumes=always"));
 #else
 typedef unsigned long long mln_map;
@@ -135,28 +130,23 @@ typedef struct mln_probe_point {
   MLN_PROTOCOL_GAIN_TYPE gain;
 } mln_probe_point;
 typedef struct mln_probe_options {
-  mln_buffer_view title BIND("encoding=utf8;nullable=true");
-  bool has_point BIND("kind=presence_mask");
+  mln_buffer_view title BIND("nullable=true");
+  bool has_point;
   mln_probe_point point BIND("mask=has_point");
-  const mln_probe_point* left
-    BIND("length=left_count;ownership=borrowed;nullable=true");
-  uint16_t left_count BIND("kind=count");
-  const mln_probe_point* right BIND("length=right_count;ownership=borrowed");
-  uint32_t right_count BIND("kind=count");
+  const mln_probe_point* left BIND("length=left_count;nullable=true");
+  uint16_t left_count;
+  const mln_probe_point* right BIND("length=right_count");
+  uint32_t right_count;
 } mln_probe_options;
-BIND("execution=immediate")
 mln_status mln_probe_roundtrip(
   mln_probe_options input, mln_probe_options* out_options BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
 typedef struct mln_probe_text_result {
-  mln_buffer_view text BIND("encoding=utf8;nullable=true");
+  mln_buffer_view text BIND("nullable=true");
 } mln_probe_text_result;
-BIND("execution=immediate")
 mln_status mln_probe_nullable_text(
-  const char* text
-    BIND("length=text_size;encoding=utf8;nullable=true;ownership=borrowed"),
-  uint16_t text_size BIND("kind=count"),
+  const char* text BIND("length=text_size;nullable=true"), uint16_t text_size,
   mln_probe_text_result* out_result BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
@@ -170,7 +160,6 @@ typedef struct mln_keyword_entry {
   double defer;
   double raw;
 } mln_keyword_entry;
-BIND("execution=immediate")
 mln_status mln_keyword_combine(
   double defer, double self, double raw, double bindingArg0,
   mln_keyword_entry* out_entry BIND("direction=out"),
@@ -190,25 +179,90 @@ typedef struct mln_lat_lng {
   double longitude;
 } mln_lat_lng;
 typedef struct mln_camera {
-  uint32_t abi_size BIND("kind=size;default=sizeof");
-  uint64_t fields BIND("kind=presence_mask;enum=mln_camera_field");
+  uint32_t abi_size BIND("kind=size");
+  uint64_t fields BIND("enum=mln_camera_field");
   double latitude
     BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
   double longitude
     BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
   double zoom BIND("mask=fields;bit=MLN_CAMERA_ZOOM");
-} mln_camera BIND("default=mln_camera_default");
+} mln_camera;
 typedef struct mln_snapshot {
   mln_camera camera;
   uint64_t generation;
-  const mln_lat_lng* coordinates
-    BIND("length=coordinate_count;ownership=borrowed");
-  size_t coordinate_count BIND("kind=count");
+  const mln_lat_lng* coordinates BIND("length=coordinate_count");
+  size_t coordinate_count;
 } mln_snapshot;
-BIND("execution=immediate") mln_camera mln_camera_default(void);
-BIND("execution=query;result=mln_snapshot;shape=value;ownership=borrowed")
+mln_camera mln_camera_default(void);
+BIND("execution=query;result=mln_snapshot")
 mln_status mln_map_snapshot(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_CONVENTIONS
+// Declarations annotated only where they depart from convention: a versioned
+// struct with its size and reserved members, UTF-8 text, a presence mask that
+// a member names, a default constructor, a record passed by pointer, and a
+// command that completes without a value.
+typedef enum BIND("kind=bitmask") mln_label_field : uint32_t {
+  MLN_LABEL_FIELD_TEXT_SIZE = 1
+} mln_label_field;
+typedef struct mln_label {
+  uint32_t size;
+  uint32_t fields BIND("enum=mln_label_field");
+  mln_buffer_view text;
+  double text_size BIND("mask=fields;bit=MLN_LABEL_FIELD_TEXT_SIZE");
+  uint32_t reserved BIND("kind=reserved");
+} mln_label;
+mln_label mln_label_default(void);
+BIND("execution=command")
+mln_status mln_map_set_label(
+  mln_map map, const mln_label* label, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_PLAN_NAMES
+// Names that the semantic plan derives once for every binding: a handle whose
+// operations begin with a prefix other than its type name, an explicit member
+// name, a record whose field order is its meaning, and presence groups whose
+// record name shares no prefix with its bit constants.
+typedef uint64_t mln_pass_handle BIND(
+  "kind=handle;release=mln_pass_close;dispose=mln_pass_close;prefix=mln_pass"
+);
+void mln_pass_close(mln_pass_handle pass);
+mln_status mln_pass_redeem(
+  mln_pass_handle pass, mln_diagnostic* out_diagnostic
+);
+BIND("name=punch")
+mln_status mln_pass_stamp(mln_pass_handle pass, mln_diagnostic* out_diagnostic);
+typedef struct mln_point {
+  double x;
+  double y;
+} mln_point BIND("fields=ordered");
+typedef enum BIND("kind=bitmask") mln_frame_window_field : uint32_t {
+  MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN = 1u << 0u,
+  MLN_FRAME_WINDOW_FIELD_SCALE = 1u << 1u,
+  MLN_FRAME_WINDOW_FIELD_LOCKED = 1u << 2u,
+} mln_frame_window_field;
+typedef struct mln_frame_window {
+  uint32_t size;
+  uint32_t fields BIND("enum=mln_frame_window_field");
+  double x BIND(
+    "mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN;group_type=mln_point"
+  );
+  double y BIND(
+    "mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN;group_type=mln_point"
+  );
+  double scale BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_SCALE");
+  bool has_extent;
+  double width BIND("mask=has_extent");
+  double height BIND("mask=has_extent");
+} mln_frame_window;
+mln_status mln_pass_set_window(
+  mln_pass_handle pass, const mln_frame_window* window,
+  mln_diagnostic* out_diagnostic
 );
 #endif
 
@@ -225,10 +279,10 @@ typedef union mln_event_payload {
   mln_event_frame frame BIND("variant=MLN_EVENT_FRAME");
 } mln_event_payload;
 typedef struct mln_event {
-  unsigned int kind BIND("kind=tag;enum=mln_event_kind");
+  unsigned int kind BIND("enum=mln_event_kind");
   mln_event_payload payload BIND("tag=kind");
 } mln_event;
-BIND("execution=query;result=mln_event;shape=value;ownership=borrowed")
+BIND("execution=query;result=mln_event")
 mln_status mln_map_event(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
@@ -237,20 +291,19 @@ mln_status mln_map_event(
 #ifdef MLN_PROTOCOL_OWNED_OUTPUT
 // An owned output whose parent is an input other than the receiver.
 typedef unsigned long long mln_forest BIND(
-  "kind=handle;release=mln_forest_close;dispose=mln_forest_close;parent=none"
+  "kind=handle;release=mln_forest_close;"
+  "dispose=mln_forest_close"
 );
 typedef unsigned long long mln_seed
-  BIND("kind=handle;release=mln_seed_close;dispose=mln_seed_close;parent=none");
+  BIND("kind=handle;release=mln_seed_close;dispose=mln_seed_close");
 typedef unsigned long long mln_tree BIND(
   "kind=handle;release=mln_tree_close;dispose=mln_tree_close;parent=mln_forest"
 );
-BIND("execution=immediate") void mln_forest_close(mln_forest forest);
-BIND("execution=immediate") void mln_seed_close(mln_seed seed);
-BIND("execution=immediate") void mln_tree_close(mln_tree tree);
-BIND("execution=immediate")
+void mln_forest_close(mln_forest forest);
+void mln_seed_close(mln_seed seed);
+void mln_tree_close(mln_tree tree);
 mln_status mln_seed_plant(
-  mln_seed seed, mln_forest forest,
-  mln_tree* out_tree BIND("direction=out;ownership=owned"),
+  mln_seed seed, mln_forest forest, mln_tree* out_tree BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
 #endif
@@ -258,29 +311,27 @@ mln_status mln_seed_plant(
 #ifdef MLN_PROTOCOL_CHILD_OWNER
 // A child owner created by its parent's operation.
 typedef unsigned long long mln_measurement BIND(
-  "kind=handle;release=mln_measurement_close;dispose=mln_measurement_close;"
-  "parent=none"
+  "kind=handle;release=mln_measurement_close;"
+  "dispose=mln_measurement_close"
 );
 typedef unsigned long long mln_sample_handle BIND(
   "kind=handle;release=mln_sample_close;dispose=mln_sample_close;"
   "parent=mln_measurement"
 );
-BIND("execution=immediate")
 mln_status mln_measurement_create(
-  mln_measurement* out_owner BIND("direction=out;ownership=owned"),
+  mln_measurement* out_owner BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
-BIND("execution=immediate") void mln_measurement_close(mln_measurement owner);
-BIND("execution=immediate") void mln_sample_close(mln_sample_handle sample);
-BIND("execution=immediate")
+void mln_measurement_close(mln_measurement owner);
+void mln_sample_close(mln_sample_handle sample);
 mln_status mln_measurement_read(
   mln_measurement owner, double* out_value BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
-BIND("receiver=measurement;execution=immediate")
+BIND("receiver=measurement")
 mln_status mln_measurement_take_sample(
   mln_measurement measurement,
-  mln_sample_handle* out_sample BIND("direction=out;ownership=owned"),
+  mln_sample_handle* out_sample BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
 #endif
@@ -291,23 +342,17 @@ typedef struct mln_sample_point {
   unsigned int x;
   unsigned int y;
 } mln_sample_point;
-typedef void (*mln_sample_notification)(
-  void* context BIND("kind=context;lifetime=owner"), mln_sample_point point
-) BIND("thread=native;failure=contain");
-typedef void (*mln_sample_release)(
-  void* context BIND("kind=context;lifetime=owner")
-) BIND("thread=native;failure=contain");
+typedef void (*mln_sample_notification)(void* context, mln_sample_point point);
+typedef void (*mln_sample_release)(void* context);
 typedef struct mln_sample_options {
-  unsigned int size BIND("kind=size;default=sizeof");
+  unsigned int size;
   mln_sample_notification changed;
-  void* context BIND("kind=context;lifetime=owner");
+  void* context BIND("kind=context");
   mln_sample_release release;
-} mln_sample_options BIND(
-  "kind=callback_registration;user_data=context;release=release"
-);
-BIND("receiver=map;execution=command;result=void;shape=none;ownership=value")
+} mln_sample_options BIND("kind=callback_registration;release=release");
+BIND("receiver=map;execution=command")
 mln_status mln_map_observe_sample(
-  mln_map map, const mln_sample_options* options BIND("length=1"),
+  mln_map map, const mln_sample_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 #endif
@@ -315,10 +360,8 @@ mln_status mln_map_observe_sample(
 #ifdef MLN_PROTOCOL_DIRECT_REGISTRATION
 // A direct callback registration that native may decline through an output.
 typedef unsigned long long mln_ticket
-  BIND("kind=handle;release=mln_ticket_release;parent=none");
-typedef void (*mln_runtime_callback_release)(
-  void* context BIND("kind=context;lifetime=owner")
-) BIND("thread=native;failure=contain");
+  BIND("kind=handle;release=mln_ticket_release");
+typedef void (*mln_runtime_callback_release)(void* context);
 // The cancel callback may call back into the ticket's own protocol.
 #ifdef MLN_PROTOCOL_DECISION
 #define MLN_PROTOCOL_TICKET_CALLS                                \
@@ -327,30 +370,27 @@ typedef void (*mln_runtime_callback_release)(
 #else
 #define MLN_PROTOCOL_TICKET_CALLS "mln_ticket_on_cancel,mln_ticket_release"
 #endif
-typedef void (*mln_ticket_cancel)(
-  void* context BIND("kind=context;lifetime=owner")
-)
-  BIND(
-    "reentry=protocol;reentry_owner=registration;"
-    "reentry_calls=" MLN_PROTOCOL_TICKET_CALLS ";thread=native;failure=contain"
-  );
-BIND("execution=immediate") void mln_ticket_release(mln_ticket ticket);
+typedef void (*mln_ticket_cancel)(void* context) BIND(
+  "reentry=protocol;reentry_owner=registration;"
+  "reentry_calls=" MLN_PROTOCOL_TICKET_CALLS
+);
+void mln_ticket_release(mln_ticket ticket);
 BIND(
-  "execution=immediate;registration=callback;user_data=context;"
-  "release_callback=release;accepted_unless=cancelled"
+  "registration=callback;release_callback=release;"
+  "accepted_unless=cancelled"
 )
 mln_status mln_ticket_on_cancel(
   mln_ticket ticket, mln_ticket_cancel callback,
-  void* context BIND("kind=context;ownership=borrowed"),
-  mln_runtime_callback_release release, bool* cancelled BIND("direction=out"),
-  mln_diagnostic* out_diagnostic
+  void* context BIND("kind=context"), mln_runtime_callback_release release,
+  bool* cancelled BIND("direction=out"), mln_diagnostic* out_diagnostic
 );
 #endif
 
 #ifdef MLN_PROTOCOL_DECISION
 // A provider callback that claims or passes through an issued decision handle.
 typedef unsigned long long mln_host BIND(
-  "kind=handle;release=mln_host_destroy;dispose=mln_host_destroy;parent=none"
+  "kind=handle;release=mln_host_destroy;"
+  "dispose=mln_host_destroy"
 );
 typedef enum mln_decision : unsigned {
   MLN_DECISION_DELEGATE = 0,
@@ -359,38 +399,33 @@ typedef enum mln_decision : unsigned {
 typedef struct mln_ticket_response {
   unsigned code;
 } mln_ticket_response;
-typedef unsigned (*mln_ticket_provider_callback)(void* context BIND("kind=context;lifetime=owner"), mln_ticket ticket) BIND(
-  "thread=native;enum=mln_decision;failure=MLN_DECISION_DELEGATE;"
+typedef unsigned (*mln_ticket_provider_callback)(void* context, mln_ticket ticket) BIND(
+  "enum=mln_decision;failure=MLN_DECISION_DELEGATE;"
   "decision_handle=ticket;decision_accept=MLN_DECISION_CLAIM;"
-  "decision_pass=MLN_DECISION_DELEGATE;complete=mln_ticket_answer;"
-  "cancelled=mln_ticket_cancelled;cancel_registration=mln_ticket_on_cancel;"
+  "decision_pass=MLN_DECISION_DELEGATE;"
+  "complete=mln_ticket_answer;cancelled=mln_ticket_cancelled;"
+  "cancel_registration=mln_ticket_on_cancel;"
   "wait_retired=mln_ticket_await"
 );
 typedef struct mln_ticket_provider {
   mln_ticket_provider_callback callback;
-  void* user_data BIND("kind=context;ownership=borrowed");
+  void* user_data BIND("kind=context");
   mln_runtime_callback_release release;
-} mln_ticket_provider BIND(
-  "kind=callback_registration;user_data=user_data;release=release"
-);
-BIND("execution=immediate")
+} mln_ticket_provider BIND("kind=callback_registration;release=release");
 mln_status mln_host_destroy(mln_host host, mln_diagnostic* out_diagnostic);
-BIND("execution=command;result=void;shape=none;ownership=value")
+BIND("execution=command")
 mln_status mln_host_set_provider(
-  mln_host host, const mln_ticket_provider* provider BIND("length=1"),
+  mln_host host, const mln_ticket_provider* provider,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
-BIND("execution=immediate")
 mln_status mln_ticket_answer(
-  mln_ticket ticket, const mln_ticket_response* response BIND("length=1"),
+  mln_ticket ticket, const mln_ticket_response* response,
   mln_diagnostic* out_diagnostic
 );
-BIND("execution=immediate")
 mln_status mln_ticket_cancelled(
   mln_ticket ticket, bool* result BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
-BIND("execution=immediate")
 mln_status mln_ticket_await(
   mln_ticket ticket BIND("handle_access=issued"), mln_diagnostic* out_diagnostic
 );
@@ -399,20 +434,13 @@ mln_status mln_ticket_await(
 #ifdef MLN_PROTOCOL_DEFERRED_CALLBACK
 // A callback that a native adapter answers at once and delivers to the host
 // later with copied arguments.
-typedef void (*mln_notice_release)(
-  void* context BIND("kind=context;lifetime=owner")
-) BIND("thread=native;failure=contain");
+typedef void (*mln_notice_release)(void* context);
 typedef unsigned (*mln_notice_callback)(
-  void* context BIND("kind=context;lifetime=owner"), int code,
-  const char* text BIND("length=nul;encoding=utf8;lifetime=call")
-) BIND("thread=native;failure=0;deferred=1");
-BIND(
-  "execution=immediate;registration=callback;user_data=context;"
-  "release_callback=release"
-)
+  void* context, int code, const char* text
+) BIND("failure=0;deferred=1");
+BIND("registration=callback;release_callback=release")
 mln_status mln_notice_set_callback(
-  mln_notice_callback callback,
-  void* context BIND("kind=context;ownership=borrowed"),
+  mln_notice_callback callback, void* context BIND("kind=context"),
   mln_notice_release release, mln_diagnostic* out_diagnostic
 );
 #endif

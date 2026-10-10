@@ -21,6 +21,6 @@ internal constructor(
     get() = binding.isClosed
 
   public override fun close() {
-    resourceRequestRelease()
+    release()
   }
 }

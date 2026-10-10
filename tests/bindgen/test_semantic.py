@@ -5,7 +5,7 @@ import unittest
 from support import parse
 
 from tools.bindgen.model import ModelError
-from tools.bindgen.semantic import bind
+from tools.bindgen.semantic import DefaultSupport, DisposeSupport, bind
 
 
 class SemanticTests(unittest.TestCase):
@@ -26,7 +26,7 @@ typedef int64_t custom_signed;
 typedef size_t custom_count;
 typedef enum flags : uint64_t {{ FLAG_HIGH = 0x100000000ULL }} flags;
 typedef struct values {{ nested_unsigned id; custom_signed offset; custom_count count; flags mask; }} values;
-BIND("execution=immediate") mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """),
                     require_complete=True,
                 )
@@ -46,9 +46,9 @@ BIND("execution=immediate") mln_status read_values(values *out BIND("direction=o
     def test_adapter_projection_preserves_public_value_contract(self):
         source = """
 typedef enum category : unsigned { CATEGORY_A = 1 } category;
-typedef struct request { unsigned size BIND("kind=size;default=sizeof"); unsigned kind BIND("enum=category"); const char *url BIND("length=nul;encoding=utf8;ownership=borrowed;nullable=true"); } request;
-typedef struct queued { void *context BIND("kind=context"); unsigned kind; const char *url BIND("length=nul;encoding=utf8;ownership=borrowed;nullable=true"); } queued BIND("projection=request");
-BIND("execution=immediate") mln_status capture(queued *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+typedef struct request { unsigned size; unsigned kind BIND("enum=category"); const char *url BIND("nullable=true"); } request;
+typedef struct queued { void *context BIND("kind=context"); unsigned kind; const char *url BIND("nullable=true"); } queued BIND("projection=request");
+mln_status capture(queued *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         projection = model.values["queued"].projection
@@ -68,9 +68,9 @@ BIND("execution=immediate") mln_status capture(queued *out BIND("direction=out")
     def test_public_enums_and_retired_handle_access(self):
         source = """
 typedef enum event_code : unsigned { CAMERA_CHANGED = 3 } event_code;
-typedef unsigned long owner BIND("kind=handle;release=release_owner;parent=none");
-BIND("execution=immediate") void release_owner(owner value);
-BIND("execution=immediate") mln_status await_owner(owner value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
+typedef unsigned long owner BIND("kind=handle;release=release_owner");
+void release_owner(owner value);
+mln_status await_owner(owner value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(
@@ -91,13 +91,13 @@ BIND("execution=immediate") mln_status await_owner(owner value BIND("handle_acce
 
     def test_view_scope_and_empty_union_have_verified_relationships(self):
         source = """
-typedef unsigned long owner BIND("kind=handle;release=release_owner;parent=none;view_begin=begin_view;view_end=end_view");
-BIND("execution=immediate") void release_owner(owner value);
-BIND("execution=immediate") mln_status begin_view(owner value, void **scope BIND("direction=out;kind=context"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") void end_view(void *scope BIND("kind=context"));
+typedef unsigned long owner BIND("kind=handle;release=release_owner;view_begin=begin_view;view_end=end_view");
+void release_owner(owner value);
+mln_status begin_view(owner value, void **scope BIND("direction=out;kind=context"), mln_diagnostic *out_diagnostic);
+void end_view(void *scope BIND("kind=context"));
 typedef enum event_tag : int { NONE = 0, NUMBER = -1 } event_tag;
 typedef struct event { event_tag tag; union { double number BIND("variant=NUMBER"); } payload BIND("tag=tag;empty_variant=NONE"); } event;
-BIND("execution=immediate") mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(model.handles["owner"].view_begin, "begin_view")
@@ -123,7 +123,7 @@ BIND("execution=immediate") mln_status read_event(event *value BIND("direction=o
     def test_nested_count_and_union_are_resolved_once(self):
         source = """
 typedef enum choice : unsigned { TEXT = 1, NUMBER = 2 } choice;
-typedef struct text { const char *data BIND("length=count;encoding=utf8"); unsigned count; } text;
+typedef struct text { const char *data BIND("length=count"); unsigned count; } text;
 typedef struct value {
   choice tag;
   union {
@@ -131,7 +131,7 @@ typedef struct value {
     double number BIND("variant=NUMBER");
   } data BIND("tag=tag");
 } value;
-BIND("execution=immediate") mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         result = api.operations[0].outputs[0].value.element
@@ -165,12 +165,12 @@ BIND("execution=immediate") mln_status read_value(value *out BIND("direction=out
         source = """
 typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1, ZOOM = 2 } fields;
 typedef struct options {
-  unsigned fields BIND("kind=presence_mask;enum=fields");
+  unsigned fields BIND("enum=fields");
   double latitude BIND("mask=fields;bit=CENTER");
   double longitude BIND("mask=fields;bit=CENTER");
   double zoom BIND("mask=fields;bit=ZOOM");
 } options;
-BIND("execution=immediate") mln_status write_options(const options *value BIND("length=1"), mln_diagnostic *out_diagnostic);
+mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
@@ -186,11 +186,11 @@ BIND("execution=immediate") mln_status write_options(const options *value BIND("
     def test_boolean_presence_preserves_optional_groups(self):
         source = """
 typedef struct range_value {
-  bool has_range BIND("kind=presence_mask");
+  bool has_range;
   unsigned start BIND("mask=has_range");
   unsigned end BIND("mask=has_range");
 } range_value;
-BIND("execution=immediate") mln_status write_range(const range_value *value BIND("length=1"), mln_diagnostic *out_diagnostic);
+mln_status write_range(const range_value *value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
@@ -208,11 +208,11 @@ BIND("execution=immediate") mln_status write_range(const range_value *value BIND
     def test_nested_registration_and_callback_context_are_resolved(self):
         api = bind(
             self.parse("""
-typedef void (*notify)(void *state BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-typedef void (*release)(void *state BIND("kind=context;lifetime=owner")) BIND("thread=native;failure=contain");
-typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;user_data=state;release=retire");
+typedef void (*notify)(void *state);
+typedef void (*release)(void *state);
+typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
 typedef struct settings { signals wake; } settings;
-BIND("execution=immediate") mln_status create(const settings *options BIND("length=1"), mln_diagnostic *out_diagnostic);
+mln_status create(const settings *options, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -227,11 +227,11 @@ BIND("execution=immediate") mln_status create(const settings *options BIND("leng
 
     def test_native_adapter_has_verified_callback_signature_and_protocol(self):
         source = """
-typedef struct reply { void *context BIND("kind=context;ownership=borrowed"); } reply BIND("kind=callback_response");
+typedef struct reply { void *context BIND("kind=context"); } reply BIND("kind=callback_response");
 typedef struct rules { int value; } rules;
-typedef void (*answer)(void *state BIND("kind=context"), reply *out BIND("direction=out;length=1")) BIND("failure=contain;thread=native;reentry=protocol;reentry_owner=out;reentry_calls=reply_set");
-BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1"), int value, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate;callback_adapter=answer;context_type=rules;invokes=reply_set") void adapter(void *state BIND("kind=context"), reply *out BIND("direction=out"));
+typedef void (*answer)(void *state, reply *out BIND("direction=out")) BIND("reentry=protocol;reentry_owner=out;reentry_calls=reply_set");
+mln_status reply_set(reply *response, int value, mln_diagnostic *out_diagnostic);
+BIND("callback_adapter=answer;context_type=rules") void adapter(void *state BIND("kind=context"), reply *out BIND("direction=out"));
 """
         api = bind(self.parse(source), require_complete=True)
         policy = api.callbacks["answer"].reentry_policy
@@ -249,16 +249,12 @@ BIND("execution=immediate;callback_adapter=answer;context_type=rules;invokes=rep
                 require_complete=True,
             )
         adapter = api.callback_adapters[0]
+        self.assertEqual((adapter.callback, adapter.context), ("answer", "rules"))
+        # The adapter answers through the response its callback writes.
         self.assertEqual(
-            (adapter.callback, adapter.context, adapter.invokes),
-            ("answer", "rules", ("reply_set",)),
+            [plan.name for plan in api.adapter_operations(adapter)], ["reply_set"]
         )
         self.assertIn("rules", api.values)
-        with self.assertRaisesRegex(ModelError, "outside its callback protocol"):
-            bind(
-                self.parse(source.replace("invokes=reply_set", "invokes=adapter")),
-                require_complete=True,
-            )
         with self.assertRaisesRegex(ModelError, "signature differs"):
             bind(
                 self.parse(source.replace("void adapter(", "int adapter(")),
@@ -270,12 +266,12 @@ BIND("execution=immediate;callback_adapter=answer;context_type=rules;invokes=rep
 typedef struct item { unsigned int offset; unsigned int count; } item;
 typedef struct batch {
  unsigned int stride;
- const item *items BIND("length=count;ownership=borrowed;stride=stride;item_name=message;item_buffer=bytes;item_buffer_size=byte_count;item_offset=offset;item_length=count;item_encoding=utf8");
- unsigned int count BIND("kind=count");
- const char *bytes BIND("length=byte_count;encoding=bytes;ownership=borrowed");
- unsigned int byte_count BIND("kind=count");
+ const item *items BIND("length=count;stride=stride;item_name=message;item_buffer=bytes;item_buffer_size=byte_count;item_offset=offset;item_length=count;item_encoding=utf8");
+ unsigned int count;
+ const char *bytes BIND("length=byte_count;encoding=bytes");
+ unsigned int byte_count;
 } batch;
-BIND("execution=immediate") mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+mln_status capture(batch *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = next(f.value for f in api.values["batch"].fields if f.name == "items")
@@ -285,7 +281,7 @@ BIND("execution=immediate") mln_status capture(batch *out BIND("direction=out"),
                 self.parse(
                     source.replace(
                         'batch *out BIND("direction=out")',
-                        'const batch *input BIND("length=1;ownership=borrowed")',
+                        "const batch *input",
                     )
                 ),
                 require_complete=True,
@@ -311,7 +307,7 @@ BIND("execution=immediate") mln_status capture(batch *out BIND("direction=out"),
 
     def test_callback_reentry_policy_is_explicit(self):
         source = """
-typedef void (*logger)(void *state BIND("kind=context")) BIND("failure=contain;thread=native;reentry=forbid");
+typedef void (*logger)(void *state) BIND("reentry=forbid");
 """
         api = bind(self.parse(source), require_complete=True)
         self.assertEqual(api.callbacks["logger"].reentry, "forbid")
@@ -324,7 +320,7 @@ typedef void (*logger)(void *state BIND("kind=context")) BIND("failure=contain;t
     def test_counted_character_encoding_resolves_as_buffer(self):
         api = bind(
             self.parse("""
-BIND("execution=immediate") mln_status set_text(const char *value BIND("length=count;encoding=utf8;ownership=borrowed"), unsigned int count, mln_diagnostic *out_diagnostic);
+mln_status set_text(const char *value BIND("length=count"), unsigned int count, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -335,8 +331,8 @@ BIND("execution=immediate") mln_status set_text(const char *value BIND("length=c
         byte_api = bind(
             self.parse("""
 typedef unsigned char byte;
-typedef struct payload { const byte *bytes BIND("length=count;encoding=bytes;ownership=borrowed"); unsigned int count BIND("kind=count"); } payload;
-BIND("execution=immediate") mln_status capture(payload *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+typedef struct payload { const byte *bytes BIND("length=count;encoding=bytes"); unsigned int count; } payload;
+mln_status capture(payload *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -345,9 +341,9 @@ BIND("execution=immediate") mln_status capture(payload *out BIND("direction=out"
 
     def test_callback_response_preserves_scope_and_native_receiver(self):
         source = """
-typedef struct reply { void *context BIND("kind=context;ownership=borrowed"); } reply BIND("kind=callback_response");
-typedef void (*answer)(reply *out BIND("direction=out;length=1")) BIND("failure=ignore;thread=native");
-BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1;direction=inout"), int value, mln_diagnostic *out_diagnostic);
+typedef struct reply { void *context BIND("kind=context"); } reply BIND("kind=callback_response");
+typedef void (*answer)(reply *out BIND("direction=out"));
+mln_status reply_set(reply *response BIND("direction=inout"), int value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         response = api.values["reply"].response
@@ -360,36 +356,50 @@ BIND("execution=immediate") mln_status reply_set(reply *response BIND("length=1;
         )
         with self.assertRaisesRegex(ModelError, "one context"):
             bind(
-                self.parse(source.replace("kind=context", "kind=native_pointer")),
+                self.parse(source.replace(' BIND("kind=context")', "")),
                 require_complete=True,
             )
 
     def test_borrowed_output_view_tracks_owner_and_parent_invalidation(self):
         source = """
-typedef unsigned long long parent BIND("kind=handle;release=parent_close;dispose=parent_close;abandon=parent_abandon;parent=none");
-typedef unsigned long long child BIND("kind=handle;release=child_close;dispose=child_close;parent=parent");
-typedef struct view { void *texture BIND("kind=native_pointer;ownership=borrowed"); } view;
-BIND("execution=immediate") mln_status parent_close(parent value, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status parent_abandon(parent value, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status child_close(child value, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate;view_owner=owner") mln_status child_view(child owner, view *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
+typedef unsigned long long parent BIND("kind=handle;release=parent_close;dispose=parent_close;abandon=parent_abandon");
+typedef unsigned long long child BIND("kind=handle;release=child_close;dispose=child_close;parent=parent;view_begin=child_begin;view_end=child_end");
+typedef struct view { void *texture; } view;
+mln_status parent_close(parent value, mln_diagnostic *out_diagnostic);
+mln_status parent_abandon(parent value, mln_diagnostic *out_diagnostic);
+mln_status child_close(child value, mln_diagnostic *out_diagnostic);
+mln_status child_begin(child value, void **out_token BIND("direction=out;kind=context"), mln_diagnostic *out_diagnostic);
+void child_end(void *token BIND("kind=context"));
+BIND("view_owner=owner") mln_status child_get_view(child owner, view *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
-        view = api.operations_by_name["child_view"].view
+        view = api.operations_by_name["child_get_view"].view
         self.assertEqual(view.owner_parameter, "owner")
         self.assertEqual(view.owner.native, "child")
         self.assertEqual(
             view.invalidated_by, ("child_close", "parent_close", "parent_abandon")
+        )
+        self.assertEqual(
+            (view.output.name, view.begin, view.end, view.stem),
+            ("out", "child_begin", "child_end", "view"),
         )
         with self.assertRaisesRegex(ModelError, "input handle"):
             bind(
                 self.parse(source.replace("view_owner=owner", "view_owner=out")),
                 require_complete=True,
             )
+        # A view needs its owner's scope operations.
+        with self.assertRaisesRegex(ModelError, "declares view_begin and view_end"):
+            bind(
+                self.parse(
+                    source.replace(";view_begin=child_begin;view_end=child_end", "")
+                ),
+                require_complete=True,
+            )
 
     def test_ambiguous_pointer_cannot_become_a_generated_operation(self):
         source = """
-BIND("execution=immediate") mln_status write_data(const double *values, mln_diagnostic *out_diagnostic);
+mln_status write_data(const double *values, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source))
         self.assertFalse(model.operations)
@@ -397,10 +407,10 @@ BIND("execution=immediate") mln_status write_data(const double *values, mln_diag
         with self.assertRaisesRegex(ModelError, "pointer requires length"):
             bind(self.parse(source), require_complete=True)
 
-    def test_record_pointer_cardinality_is_explicit(self):
+    def test_record_pointer_addresses_one_record_unless_counted(self):
         source = """
 typedef struct coordinate { double latitude; double longitude; } coordinate;
-BIND("execution=immediate") mln_status project(
+mln_status project(
   const coordinate *coordinates BIND("length=count"), unsigned count, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
@@ -409,21 +419,22 @@ BIND("execution=immediate") mln_status project(
             (array.kind, array.length, array.element.kind), ("array", "count", "record")
         )
         single = bind(
-            self.parse(source.replace("length=count", "length=1")),
+            self.parse(source.replace(' BIND("length=count")', "")),
             require_complete=True,
         )
-        self.assertEqual(single.operations[0].inputs[0].value.kind, "reference")
-        with self.assertRaisesRegex(ModelError, "pointer requires length"):
-            bind(
-                self.parse(source.replace(' BIND("length=count")', "")),
-                require_complete=True,
-            )
+        reference = single.operations[0].inputs[0].value
+        self.assertEqual(
+            (reference.kind, reference.length, reference.ownership),
+            ("reference", "1", "borrowed"),
+        )
+        with self.assertRaisesRegex(ModelError, "length=1 restates the default"):
+            self.parse(source.replace("length=count", "length=1"))
 
     def test_enum_output_keeps_output_storage_indirection(self):
         model = bind(
             self.parse("""
 typedef enum flags : unsigned { FIRST = 1, SECOND = 2 } flags;
-BIND("execution=immediate") mln_status read_flags(
+mln_status read_flags(
   unsigned *out BIND("direction=out;enum=flags"), mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
@@ -435,7 +446,7 @@ BIND("execution=immediate") mln_status read_flags(
     def test_counted_output_preserves_array_storage(self):
         model = bind(
             self.parse("""
-BIND("execution=immediate") mln_status copy_values(
+mln_status copy_values(
   double *out BIND("direction=out;length=count"), unsigned count, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
@@ -445,14 +456,14 @@ BIND("execution=immediate") mln_status copy_values(
 
     def test_callback_signature_and_retirement_form_one_registration(self):
         source = """
-typedef void (*notify)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
-typedef void (*release)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
+typedef void (*notify)(void *context);
+typedef void (*release)(void *context);
 typedef struct registration {
   notify callback;
   void *context BIND("kind=context");
   release release;
-} registration BIND("kind=callback_registration;user_data=context;release=release");
-BIND("execution=immediate") mln_status install(const registration *value BIND("length=1"), mln_diagnostic *out_diagnostic);
+} registration BIND("kind=callback_registration;release=release");
+mln_status install(const registration *value, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         plan = model.operations[0].registrations[0]
@@ -478,43 +489,54 @@ BIND("execution=immediate") mln_status install(const registration *value BIND("l
                 self.parse(
                     source.replace(
                         '  void *context BIND("kind=context");', "  unsigned context;"
-                    )
+                    ).replace("release=release", "release=release;user_data=context")
                 ),
                 require_complete=True,
             )
-        with self.assertRaisesRegex(ModelError, "callback requires failure and thread"):
+        with self.assertRaisesRegex(ModelError, "void callback contains its failure"):
             bind(
                 self.parse(
-                    source.replace("thread=native;failure=contain", "thread=native", 1)
+                    source.replace(
+                        "(*notify)(void *context);",
+                        '(*notify)(void *context) BIND("failure=0");',
+                    )
                 ),
                 require_complete=True,
             )
 
     def test_default_support_is_derived_from_a_checked_consumer(self):
         source = """
-typedef struct options { double zoom; } options BIND("default=make_options");
-BIND("execution=immediate") options make_options(void);
-BIND("execution=immediate") mln_status set_options(const options *value BIND("length=1"), mln_diagnostic *out_diagnostic);
+typedef struct options { double zoom; } options;
+options make_options(void);
+mln_status set_options(const options *value, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         constructor = model.operations_by_name["make_options"]
-        self.assertEqual(
-            (constructor.role, constructor.support_for), ("support", "default:options")
-        )
+        self.assertEqual(constructor.support, DefaultSupport("options"))
+        self.assertEqual(model.defaults, {"options": constructor})
         self.assertEqual(model.operations_by_name["set_options"].role, "public")
+        # A constructor that takes arguments is no default, and naming one fails.
+        with_argument = source.replace(
+            "make_options(void)", "make_options(int ignored)"
+        )
+        model = bind(self.parse(with_argument), require_complete=True)
+        self.assertEqual(model.operations_by_name["make_options"].role, "public")
         with self.assertRaisesRegex(ModelError, "no-argument constructor"):
             bind(
                 self.parse(
-                    source.replace("make_options(void)", "make_options(int ignored)")
+                    with_argument.replace(
+                        "} options;", '} options BIND("default=make_options");'
+                    )
                 ),
                 require_complete=True,
             )
-        with self.assertRaisesRegex(ModelError, "checked default-constructor consumer"):
+        # The relation is derived, never declared.
+        with self.assertRaisesRegex(ModelError, "unknown metadata key 'support'"):
             bind(
                 self.parse(
                     source.replace(
-                        'BIND("execution=immediate") mln_status set_options',
-                        'BIND("execution=immediate;support=runtime") mln_status set_options',
+                        "mln_status set_options",
+                        'BIND("support=default:options") mln_status set_options',
                     )
                 ),
                 require_complete=True,
@@ -522,14 +544,14 @@ BIND("execution=immediate") mln_status set_options(const options *value BIND("le
 
     def test_attachment_keeps_immediate_owner_separate_from_completion(self):
         source = """
-typedef unsigned long root BIND("kind=handle;release=close_root;parent=none");
+typedef unsigned long root BIND("kind=handle;release=close_root");
 typedef unsigned long child BIND("kind=handle;release=close_child;parent=root;abandon=abandon_child");
-BIND("execution=immediate") mln_status close_root(root value, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status close_child(child value, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status abandon_child(child value, mln_diagnostic *out_diagnostic);
-BIND("execution=lifecycle;result=void;shape=none;ownership=value") mln_status attach(
-  root parent, child *owner BIND("direction=out;ownership=owned"),
-  const mln_completion *done BIND("length=1"), mln_diagnostic *out_diagnostic);
+mln_status close_root(root value, mln_diagnostic *out_diagnostic);
+mln_status close_child(child value, mln_diagnostic *out_diagnostic);
+mln_status abandon_child(child value, mln_diagnostic *out_diagnostic);
+BIND("execution=lifecycle") mln_status attach(
+  root parent, child *owner BIND("direction=out"),
+  const mln_completion *done, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         operation = model.operations_by_name["attach"]
@@ -566,10 +588,10 @@ BIND("execution=lifecycle;result=void;shape=none;ownership=value") mln_status at
     def test_consuming_release_preserves_required_synchronization(self):
         model = bind(
             self.parse("""
-typedef unsigned long frame BIND("kind=handle;release=release_frame;parent=none");
+typedef unsigned long frame BIND("kind=handle;release=release_frame");
 typedef struct sync { unsigned kind; unsigned long object; } sync;
-BIND("execution=immediate") mln_status release_frame(
-  frame *value BIND("direction=inout;consumes=success"), const sync *consumer BIND("length=1"), mln_diagnostic *out_diagnostic);
+mln_status release_frame(
+  frame *value BIND("direction=inout;consumes=success"), const sync *consumer, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -581,16 +603,16 @@ BIND("execution=immediate") mln_status release_frame(
     def test_resource_decision_protocol_uses_verified_relationships(self):
         source = """
 typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
-typedef unsigned long request BIND("kind=handle;release=release_request;parent=none");
-typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
-typedef void (*release_cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
-typedef unsigned (*provider)(request ticket) BIND("thread=native;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
-BIND("execution=immediate") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
+typedef unsigned long request BIND("kind=handle;release=release_request");
+typedef void (*cancel)(void *context);
+typedef void (*release_cancel)(void *context);
+typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
+mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
+BIND("registration=callback;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
   request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") void release_request(request value);
-BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
+void release_request(request value);
+mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         decision = model.callbacks["provider"].decision
@@ -616,7 +638,7 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
                 "wait_retired=answer",
                 "issued decision handle",
             ),
-            ("handle_access=issued", "handle_access=live", "issued decision handle"),
+            (' BIND("handle_access=issued")', "", "issued decision handle"),
             ("decision_accept=CLAIM", "decision_accept=DELEGATE", "distinct values"),
             ("complete=answer", "complete=is_missing", "immediate status operation"),
             (
@@ -637,17 +659,17 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
     def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):
         source = """
 typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
-typedef unsigned long request BIND("kind=handle;release=release_request;parent=none");
-typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
-typedef void (*release_cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");
-typedef unsigned (*provider)(void *context BIND("kind=context"), const char *url BIND("length=nul;encoding=utf8;lifetime=call"), request ticket) BIND("thread=native;enum=decision;failure=DELEGATE;deferred=CLAIM;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
-typedef unsigned (*logger)(void *context BIND("kind=context"), int code) BIND("thread=native;failure=0;deferred=1");
-BIND("execution=immediate") mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate;registration=callback;user_data=context;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
+typedef unsigned long request BIND("kind=handle;release=release_request");
+typedef void (*cancel)(void *context);
+typedef void (*release_cancel)(void *context);
+typedef unsigned (*provider)(void *context, const char *url, request ticket) BIND("enum=decision;failure=DELEGATE;deferred=CLAIM;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
+typedef unsigned (*logger)(void *context, int code) BIND("failure=0;deferred=1");
+mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
+mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
+BIND("registration=callback;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
   request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") void release_request(request value);
-BIND("execution=immediate") mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
+void release_request(request value);
+mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(model.callbacks["provider"].deferred, "CLAIM")
@@ -657,19 +679,15 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
             ("deferred=CLAIM", "deferred=DELEGATE", "requires the accept value"),
             ("deferred=1", "deferred=-1", "integer the callback result"),
             ("deferred=1", "deferred=yes", "integer the callback result"),
-            (
-                'void *context BIND("kind=context"), int code',
-                "int code",
-                "one context parameter",
-            ),
+            ("void *context, int code", "int code", "one context parameter"),
             (
                 "int code) BIND",
                 'int *code BIND("direction=out")) BIND',
                 "copyable input",
             ),
             (
-                'typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain");',
-                'typedef void (*cancel)(void *context BIND("kind=context")) BIND("thread=native;failure=contain;deferred=0");',
+                "typedef void (*cancel)(void *context);",
+                'typedef void (*cancel)(void *context) BIND("deferred=0");',
                 "callback with a result",
             ),
         ):
@@ -682,8 +700,8 @@ BIND("execution=immediate") mln_status await_retirement(request value BIND("hand
         model = bind(
             self.parse("""
 typedef struct entry { double value; } entry;
-BIND("execution=query;result=entry;shape=array;ownership=borrowed;nullable=true")
-mln_status query(const mln_completion *completion BIND("length=1"), mln_diagnostic *out_diagnostic);
+BIND("execution=query;result=entry;shape=array;nullable=true")
+mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """),
             require_complete=True,
         )
@@ -718,13 +736,14 @@ mln_status query(const mln_completion *completion BIND("length=1"), mln_diagnost
 
     def test_disposal_support_requires_a_handle_consumer(self):
         source = """
-typedef unsigned long owner BIND("kind=handle;release=close_owner;dispose=discard_owner;parent=none");
-BIND("execution=immediate") mln_status close_owner(owner value, mln_diagnostic *out_diagnostic);
-BIND("execution=immediate") mln_status discard_owner(owner value, mln_diagnostic *out_diagnostic);
+typedef unsigned long owner BIND("kind=handle;release=close_owner;dispose=discard_owner");
+mln_status close_owner(owner value, mln_diagnostic *out_diagnostic);
+mln_status discard_owner(owner value, mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
         self.assertEqual(
-            model.operations_by_name["discard_owner"].support_for, "dispose:owner"
+            model.operations_by_name["discard_owner"].support,
+            DisposeSupport(model.handles["owner"]),
         )
         self.assertEqual(model.operations_by_name["close_owner"].role, "public")
         with self.assertRaisesRegex(ModelError, "receiver must be this handle type"):

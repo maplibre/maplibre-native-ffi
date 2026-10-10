@@ -10,8 +10,18 @@ from textwrap import dedent
 
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters.rust import RUST_KEYWORDS, native_call
+from tools.bindgen.emitters.rust_callbacks import decision_table
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
-from tools.bindgen.semantic import BoundApi, DecisionPlan, HandlePlan, OperationPlan
+from tools.bindgen.semantic import (
+    BoundApi,
+    DecisionPlan,
+    DefaultSupport,
+    DisposeSupport,
+    HandlePlan,
+    OperationPlan,
+    output_member,
+    support_relation,
+)
 
 from .python_values import Values, ok, public_name, scalar_type
 
@@ -30,9 +40,14 @@ SCALARS = {
 OWNERS: dict[str, str] = {}
 # Runtime adapter exports, which no owner disposes through.
 RUNTIME_EXPORTS: set[str] = set()
-# Callback decision protocols by the native handle type they issue. Their
-# owners hold the core decision state instead of a NativeHandleState.
-DECISIONS: dict[str, DecisionPlan] = {}
+
+
+def owned_decision(bound: BoundApi, native: str) -> DecisionPlan | None:
+    """The decision protocol that issues an owned handle type, if any.
+
+    Its owner holds the core decision state instead of a NativeHandleState.
+    """
+    return bound.decisions.get(native) if native in OWNERS else None
 
 
 def ctype(type_: CType) -> str:
@@ -89,7 +104,7 @@ def result_converter(
         return "None", "None", "py_none", None
     if result.kind == "handle" and result.ownership == "owned" and result.handle:
         owner = OWNERS.get(result.native)
-        if owner is None or result.native in DECISIONS:
+        if owner is None or owned_decision(values.api, result.native):
             raise unsupported(
                 plan.function, "owned result needs a supported handle constructor"
             )
@@ -164,10 +179,8 @@ def operation(
     )
     if scoped:
         values.supported(receiver.value)
-    decision = DECISIONS.get(native_owner)
-    name = function.name.removeprefix(
-        native_owner.removesuffix("_handle") + "_"
-    ).removeprefix("mln_")
+    decision = owned_decision(values.api, native_owner)
+    name = plan.member
     release = bool(
         receiver
         and receiver.value.handle
@@ -176,7 +189,7 @@ def operation(
     if release:
         name = "close"
     if plan.view:
-        name = "with_" + name.removeprefix("get_")
+        name = "with_" + plan.view.stem
     if iskeyword(name) or name in RUST_KEYWORDS:
         name += "_"
     if not safe_identifier(name):
@@ -223,10 +236,6 @@ def operation(
             while local in used_names:
                 local += "_"
         used_names.add(local)
-        if value.lifetime != "call":
-            raise unsupported(
-                function, f"parameter {local} requires retained input storage"
-            )
         if value.kind == "handle" and value.native in OWNERS:
             public = OWNERS[value.native]
             rust = f"&{public}"
@@ -399,6 +408,7 @@ def operation(
             and plan.result.ownership == "owned"
         ):
             helper = "complete_owned"
+            values.disposed.add(plan.result.native)
             discard = f"|result| {{ if !result.value.is_null() && result.value_count == 1 {{ unsafe {{ generated_dispose_{plan.result.native}(result.value.cast::<sys::{plan.result.native}>().read()); }} }} }}"
         call = native_call(function, [arguments[p.name] for p in function.parameters])
         # The converters run outside the native call's unsafe contract.
@@ -450,6 +460,7 @@ def operation(
                 "        unsafe {", "        let future = unsafe {", 1
             )
             for output, value in outputs:
+                values.disposed.add(value.native)
                 body.append(
                     f"        let mut {output}_owner = GeneratedOwnedOutput::new({output}, generated_dispose_{value.native});"
                 )
@@ -460,13 +471,13 @@ def operation(
             body.append("        let result = PyDict::new(py);")
             for output, _ in outputs:
                 body.append(
-                    f'        result.set_item("{output.removeprefix("out_")}", {output}_python)?;'
+                    f'        result.set_item("{output_member(output)}", {output}_python)?;'
                 )
             body.append('        result.set_item("completion", future)?;')
             body.append("        Ok(result.into_any().unbind())")
             product_name = public_name(function.name) + "Result"
             product_fields = [
-                f"    {output.removeprefix('out_')}: {OWNERS[value.native]}"
+                f"    {output_member(output)}: {OWNERS[value.native]}"
                 for output, value in outputs
             ]
             product_fields.append(f"    completion: {public_result}")
@@ -487,7 +498,7 @@ def operation(
                     "self" if receiver and parent == receiver.name else parent or "None"
                 )
                 public_copies.append(
-                    f"{output.removeprefix('out_')}=_adopt_value(raw[{output.removeprefix('out_')!r}], {OWNERS[value.native]!r}, {parent})"
+                    f"{output_member(output)}=_adopt_value(raw[{output_member(output)!r}], {OWNERS[value.native]!r}, {parent})"
                 )
             public_copies.append('completion=raw["completion"]')
             expression = f"{product_name}(" + ", ".join(public_copies) + ")"
@@ -521,7 +532,7 @@ def operation(
                 "    def close(self) -> None: ...\n",
                 None,
             )
-        status = ctype(function.return_type) == "mln_status"
+        status = plan.status
         body = setup + [
             f"        let result = unsafe {{ call.status(|diagnostic| {call}) }};"
             if status
@@ -571,7 +582,7 @@ def operation(
             body.append("        let dict = PyDict::new(py);")
             for output, value in outputs:
                 body.append(
-                    f'        dict.set_item("{output.removeprefix("out_")}", {values.copy(value, output)})?;'
+                    f'        dict.set_item("{output_member(output)}", {values.copy(value, output)})?;'
                 )
             body.append("        Ok(dict.into_any().unbind())")
             product_name = public_name(function.name) + "Result"
@@ -580,7 +591,7 @@ def operation(
                 + product_name
                 + "(NamedTuple):\n"
                 + "\n".join(
-                    f"    {output.removeprefix('out_')}: {values.type(value)}"
+                    f"    {output_member(output)}: {values.type(value)}"
                     for output, value in outputs
                 )
                 + "\n"
@@ -588,7 +599,7 @@ def operation(
             expression = (
                 f"{product_name}("
                 + ", ".join(
-                    values.facade_copy(value, f"raw[{output.removeprefix('out_')!r}]")
+                    values.facade_copy(value, f"raw[{output_member(output)!r}]")
                     for output, value in outputs
                 )
                 + ")"
@@ -700,7 +711,7 @@ def compact(body: list[str]) -> list[str]:
     return result
 
 
-def state_owner(owner: str, handle: HandlePlan) -> str:
+def state_owner(owner: str, handle: HandlePlan, bound: BoundApi) -> str:
     """Declare the PyO3 class for a handle whose ownership NativeHandleState tracks."""
     native = handle.native
     read_scope = (
@@ -713,12 +724,25 @@ def state_owner(owner: str, handle: HandlePlan) -> str:
         if handle.dispose and handle.dispose not in RUNTIME_EXPORTS
         else "None"
     )
+    exit_release = "None"
+    if handle.observable_root_release:
+        # Interpreter shutdown starts this release and waits for its completion.
+        exit_release = f"Some(generated_exit_release_{native})"
+        call = native_call(
+            bound.source.functions_by_name[handle.release],
+            ["handle", "completion"],
+            diagnostic="std::ptr::null_mut()",
+        )
+        definitions = f'unsafe extern "C" fn generated_exit_release_{native}(handle: sys::{native}, completion: *const sys::mln_completion) -> sys::mln_status {{ unsafe {{ {call} }} }}\n'
+    else:
+        definitions = ""
     return (
-        f'generated_owner!({owner}, "_{owner}", {native}, {dispose}, {read_scope});\n'
+        definitions
+        + f'generated_owner!({owner}, "_{owner}", {native}, {dispose}, {exit_release}, {read_scope});\n'
     )
 
 
-def decision_owner(owner: str) -> str:
+def decision_owner(owner: str, handle: HandlePlan) -> str:
     """Emit the PyO3 class for a handle issued by a callback decision protocol."""
     return f"""
 #[pyclass(name = "_{owner}")]
@@ -726,7 +750,7 @@ struct {owner} {{
     // The accepted cancel callback, which native owns until it retires.
     cancel_root: Mutex<std::sync::Weak<GeneratedCallbackRoot>>,
     // Dropped by hand, with the GIL released; see the Drop impl below.
-    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
+    state: ManuallyDrop<Arc<maplibre_core::decision::DecisionHandleState<sys::{handle.native}>>>,
 }}
 impl Drop for {owner} {{
     fn drop(&mut self) {{
@@ -773,21 +797,12 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     OWNERS.clear()
     OWNERS.update(
         {
-            name: public_name(name)
-            + ("" if public_name(name).endswith("Handle") else "Handle")
-            for name in bound.public_handles
+            name: pascal(handle.stem) + "Handle"
+            for name, handle in bound.public_handles.items()
         }
     )
     RUNTIME_EXPORTS.clear()
     RUNTIME_EXPORTS.update(bound.source.runtime_exports)
-    DECISIONS.clear()
-    DECISIONS.update(
-        {
-            callback.decision.handle.native: callback.decision
-            for callback in bound.callbacks.values()
-            if callback.decision and callback.decision.handle.native in OWNERS
-        }
-    )
     values = Values(bound)
     for value in bound.public_values.values():
         if value.kind == "enum":
@@ -802,11 +817,18 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             dict(values.inputs),
             dict(values.enums),
             set(values.outputs),
+            set(values.disposed),
         )
         try:
             owner, native, public, stub, record = operation(plan, values)
         except ModelError as error:
-            values.records, values.inputs, values.enums, values.outputs = saved_values
+            (
+                values.records,
+                values.inputs,
+                values.enums,
+                values.outputs,
+                values.disposed,
+            ) = saved_values
             errors[function.name] = str(error)
             continue
         rust[owner].append(native)
@@ -818,11 +840,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     default_native = []
     default_names = []
     for plan in bound.operations:
-        if (
-            plan.role != "support"
-            or not (plan.support_for or "").startswith("default:")
-            or plan.result is None
-        ):
+        if not isinstance(plan.support, DefaultSupport) or plan.result is None:
             continue
         saved = (
             dict(values.records),
@@ -836,6 +854,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
             values.records, values.inputs, values.enums, values.outputs = saved
             continue
         values.defaults.add(plan.result.native)
+        errors.pop(plan.name, None)
         name = "_default_" + plan.result.native.removeprefix("mln_")
         default_names.append(name)
         default_native.append(
@@ -847,13 +866,14 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     for handle in bound.handles.values():
         if not handle.dispose or handle.dispose in bound.source.runtime_exports:
             continue
-        state_owned = handle.native in OWNERS and handle.native not in DECISIONS
-        if (
-            not state_owned
-            and f"generated_dispose_{handle.native}"
-            not in rust_values + "".join("".join(methods) for methods in rust.values())
-        ):
+        state_owned = handle.native in OWNERS and not owned_decision(
+            bound, handle.native
+        )
+        if not state_owned and handle.native not in values.disposed:
             continue
+        support = bound.operations_by_name.get(handle.dispose)
+        if support and isinstance(support.support, DisposeSupport):
+            errors.pop(handle.dispose, None)
         disposer = bound.source.functions_by_name[handle.dispose]
         # Finalization reports only whether disposal succeeded.
         call = f"unsafe {{ {native_call(disposer, ['handle'], diagnostic='std::ptr::null_mut()')} }}"
@@ -876,9 +896,10 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     )
     for native_owner, owner in OWNERS.items():
         files["src/generated_operations.rs"] += (
-            decision_owner(owner)
-            if native_owner in DECISIONS
-            else state_owner(owner, bound.handles[native_owner])
+            decision_owner(owner, bound.handles[native_owner])
+            + decision_table(bound, bound.decisions[native_owner], owner)
+            if owned_decision(bound, native_owner)
+            else state_owner(owner, bound.handles[native_owner], bound)
         )
     scope_owners = {
         name: public_name(name) + "Scope"
@@ -887,7 +908,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
     }
     global_native = "\n".join(rust.get("", []))
     global_names = default_names + [
-        plan.name.removeprefix("mln_")
+        plan.member
         for plan in bound.operations
         if plan.name in generated
         and plan.receiver is None
@@ -996,7 +1017,7 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         if isinstance(node, ast.ClassDef)
     )
     public_globals = sorted(
-        plan.name.removeprefix("mln_")
+        plan.member
         for plan in bound.operations
         if plan.name in generated
         and plan.receiver is None
@@ -1030,10 +1051,6 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         + repr(sorted(set(exports)))
         + "\n"
     )
-    emitted = "\n".join(files.values())
-    for plan in bound.operations:
-        if plan.role == "support" and f"sys::{plan.name}(" in emitted:
-            errors.pop(plan.name, None)
     return files, generated, errors
 
 
@@ -1045,8 +1062,8 @@ def coverage(api: Api | BoundApi) -> dict:
     _, generated, errors = lower(api)
     bound = compile_api(api)
     support = {
-        plan.name: plan.support_for
+        plan.name: support_relation(plan)
         for plan in bound.operations
-        if plan.role == "support" and plan.name not in errors
+        if plan.support and plan.name not in errors
     }
     return {"generated": generated, "support": support, "unsupported": errors}

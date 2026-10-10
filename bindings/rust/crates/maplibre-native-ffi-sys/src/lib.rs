@@ -46,20 +46,6 @@ macro_rules! native_handles {
 }
 use native_handles;
 
-/// The length of a diagnostic message buffer, including its null byte.
-pub const MLN_DIAGNOSTIC_MESSAGE_CAPACITY: u32 = 4096;
-
-/// The diagnostic message of one status-returning call.
-///
-/// Every binding supplies the trailing `out_diagnostic` parameter the same
-/// way, so the generator leaves this record to the crate.
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_diagnostic {
-    pub size: u32,
-    pub message: [std::ffi::c_char; MLN_DIAGNOSTIC_MESSAGE_CAPACITY as usize],
-}
-
 /// Upstream's `mln/plugin/plugin_api.h` declares the plugin ABI. This crate
 /// declares only the registration entry point, which this library exports;
 /// a plugin integration binds the descriptor types itself.

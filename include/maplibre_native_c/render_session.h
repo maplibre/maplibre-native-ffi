@@ -27,15 +27,15 @@ extern "C" {
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT for an invalid session or output pointer.
- * - MLN_STATUS_INVALID_STATE when the target has no rendered projection.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   out_projection is null or does not point to the null handle.
+ * - MLN_STATUS_INVALID_STATE when session has been released, or the target has
+ *   no rendered projection.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_projection_create(
   mln_render_session session,
-  mln_map_projection* out_projection
-    MLN_BINDING("direction=out;ownership=owned"),
+  mln_map_projection* out_projection MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -80,7 +80,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
 
 /** One nonblocking request for a frame. */
 typedef struct mln_frame_demand {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** A bitwise OR of mln_frame_demand_flag values. */
   uint32_t flags MLN_BINDING("enum=mln_frame_demand_flag");
   /** Host identity returned with the terminal frame result. */
@@ -90,11 +90,11 @@ typedef struct mln_frame_demand {
   /** Positive time allowed before driver work begins, in nanoseconds; zero has
    * no limit. */
   uint64_t timeout_ns;
-} mln_frame_demand MLN_BINDING("default=mln_frame_demand_default");
+} mln_frame_demand;
 
 /** Immutable result record copied into an owned frame-result batch. */
 typedef struct mln_render_frame_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One mln_render_result value. */
   uint32_t disposition MLN_BINDING("enum=mln_render_result");
   uint64_t token;
@@ -118,7 +118,7 @@ typedef struct mln_render_frame_result {
 
 /** Any-thread render-session snapshot. */
 typedef struct mln_render_session_snapshot {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One mln_render_session_state value. */
   uint32_t state MLN_BINDING("enum=mln_render_session_state");
   /** One mln_render_driver_kind value. */
@@ -147,16 +147,15 @@ typedef enum mln_render_abandon_disposition : uint32_t {
 } mln_render_abandon_disposition;
 
 typedef struct mln_render_abandon_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One mln_render_abandon_disposition value. */
   uint32_t disposition MLN_BINDING("enum=mln_render_abandon_disposition");
   /** Backend resource groups intentionally retained until process exit. */
   uint32_t quarantined_resource_count;
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t reserved MLN_BINDING("kind=reserved");
 } mln_render_abandon_result;
 
 /** Returns a zero-token, render-if-needed, nonpresenting frame demand. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_frame_demand mln_frame_demand_default(void) MLN_NOEXCEPT;
 
 /**
@@ -164,11 +163,11 @@ MLN_API mln_frame_demand mln_frame_demand_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or out_capabilities
- *   is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   out_capabilities is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_get_capabilities(
   mln_render_session session,
   mln_render_session_capabilities* out_capabilities
@@ -181,8 +180,9 @@ MLN_API mln_status mln_render_session_get_capabilities(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or out_snapshot is
- *   null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   out_snapshot is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=snapshot")
@@ -202,15 +202,14 @@ MLN_API mln_status mln_render_session_get_snapshot(
  *
  * Returns:
  * - MLN_STATUS_OK when the demand is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, demand is null or
- *   undersized, or demand->flags carries a bit outside mln_frame_demand_flag.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, demand is
+ *   null or undersized, or demand->flags carries a bit outside
+ *   mln_frame_demand_flag.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_request_frame(
-  mln_render_session session,
-  const mln_frame_demand* demand MLN_BINDING("length=1"),
+  mln_render_session session, const mln_frame_demand* demand,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -223,15 +222,15 @@ MLN_API mln_status mln_render_session_request_frame(
  * - MLN_STATUS_NOT_READY when no frame result is queued. This is not an error:
  *   *out_batch is left unchanged, no batch is allocated, and the caller retries
  *   after the next demand.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or out_batch is null
- *   or does not point to the null handle.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_batch
+ *   is null or does not point to the null handle.
+ * - MLN_STATUS_INVALID_STATE when session has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_render_session_drain_frame_results(
   mln_render_session session,
-  mln_render_frame_batch* out_batch
-    MLN_BINDING("direction=out;ownership=owned"),
+  mln_render_frame_batch* out_batch MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -240,10 +239,11 @@ MLN_API mln_status mln_render_session_drain_frame_results(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is not live, or out_count is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_count
+ *   is null.
+ * - MLN_STATUS_INVALID_STATE when batch has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_frame_batch_count(
   mln_render_frame_batch batch, size_t* out_count MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -254,11 +254,11 @@ MLN_API mln_status mln_render_frame_batch_count(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is not live, index is out of range,
- *   or out_result is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, index is out
+ *   of range, or out_result is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when batch has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_frame_batch_get(
   mln_render_frame_batch batch, size_t index,
   mln_render_frame_result* out_result MLN_BINDING("direction=out"),
@@ -266,7 +266,6 @@ MLN_API mln_status mln_render_frame_batch_get(
 ) MLN_NOEXCEPT;
 
 /** Releases a frame-result batch. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_render_frame_batch_release(
   mln_render_frame_batch batch
 ) MLN_NOEXCEPT;
@@ -280,17 +279,16 @@ MLN_API void mln_render_frame_batch_release(
  * - MLN_STATUS_NOT_READY when no rendered frame is available. This is not an
  *   error: *out_frame is left unchanged, and the caller retries after the next
  *   demand reports MLN_RENDER_RESULT_RENDERED.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or out_frame is null
- *   or does not point to the null handle.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_frame
+ *   is null or does not point to the null handle.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_UNSUPPORTED when the target does not grant
  *   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_acquire_frame(
   mln_render_session session,
-  mln_acquired_frame* out_frame MLN_BINDING("direction=out;ownership=owned"),
+  mln_acquired_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -299,12 +297,12 @@ MLN_API mln_status mln_render_session_acquire_frame(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when frame is not live or already released, or
- *   out_result is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle, or out_result
+ *   is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_acquired_frame_get_result(
   mln_acquired_frame frame,
   mln_render_frame_result* out_result MLN_BINDING("direction=out"),
@@ -316,12 +314,13 @@ MLN_API mln_status mln_acquired_frame_get_result(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when frame is not live or already released, or
- *   out_sync is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle, or out_sync is
+ *   null or undersized.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate;view_owner=frame")
+MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_producer_sync(
   mln_acquired_frame frame, mln_gpu_sync* out_sync MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -339,19 +338,17 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  *
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
- * - MLN_STATUS_INVALID_ARGUMENT when frame is null, points at the null handle
- *   or a handle that is not live, or consumer_completion is undersized.
- * - MLN_STATUS_INVALID_STATE when the frame was already released.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is null or points at an invalid
+ *   handle, or consumer_completion is undersized.
+ * - MLN_STATUS_INVALID_STATE when *frame has been released.
  * - MLN_STATUS_BUSY while a binding-owned borrowed view scope is active.
  * - MLN_STATUS_UNSUPPORTED when the backend does not support the named
  *   mln_gpu_sync_kind. The handle is not consumed.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_acquired_frame_release(
   mln_acquired_frame* frame MLN_BINDING("direction=inout;consumes=success"),
-  const mln_gpu_sync* consumer_completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_gpu_sync* consumer_completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -364,11 +361,11 @@ MLN_API mln_status mln_acquired_frame_release(
  *
  * Returns:
  * - MLN_STATUS_OK when the resize is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; extent or completion
- *   is null or undersized; the extent is not positive; or its scale_factor
- *   differs from the one the session attached with.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; extent or
+ *   completion is null or undersized; the extent is not positive; or its
+ *   scale_factor differs from the one the session attached with.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when the target is a caller-owned texture, which its
  *   owner sizes through the backend's set_target function.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -382,12 +379,10 @@ MLN_API mln_status mln_acquired_frame_release(
  *   driver applies the extent.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_render_session_resize(
-  mln_render_session session,
-  const mln_render_target_extent* extent MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, const mln_render_target_extent* extent,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -396,9 +391,9 @@ MLN_API mln_status mln_render_session_resize(
  *
  * Returns:
  * - MLN_STATUS_OK when the barrier is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or completion is null
- *   or undersized.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -406,10 +401,9 @@ MLN_API mln_status mln_render_session_resize(
  *   terminal result.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_barrier(
-  mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -418,9 +412,9 @@ MLN_API mln_status mln_render_session_barrier(
  *
  * Returns:
  * - MLN_STATUS_OK when the submission is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or completion is null
- *   or undersized.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -428,10 +422,9 @@ MLN_API mln_status mln_render_session_barrier(
  * - MLN_STATUS_INVALID_STATE when the session detached first.
  * - MLN_STATUS_TARGET_LOST when the session was abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_reduce_memory_use(
-  mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -440,9 +433,9 @@ MLN_API mln_status mln_render_session_reduce_memory_use(
  *
  * Returns:
  * - MLN_STATUS_OK when the submission is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or completion is null
- *   or undersized.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -450,10 +443,9 @@ MLN_API mln_status mln_render_session_reduce_memory_use(
  * - MLN_STATUS_INVALID_STATE when the session detached first.
  * - MLN_STATUS_TARGET_LOST when the session was abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_clear_data(
-  mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -462,9 +454,9 @@ MLN_API mln_status mln_render_session_clear_data(
  *
  * Returns:
  * - MLN_STATUS_OK when the submission is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or completion is null
- *   or undersized.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -472,10 +464,9 @@ MLN_API mln_status mln_render_session_clear_data(
  * - MLN_STATUS_INVALID_STATE when the session detached first.
  * - MLN_STATUS_TARGET_LOST when the session was abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_render_session_dump_debug_logs(
-  mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -489,9 +480,10 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  * Returns:
  * - MLN_STATUS_OK when the serviced items are counted in *out_serviced, which
  *   may be zero.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live or is being disposed,
- *   or out_serviced is null.
- * - MLN_STATUS_INVALID_STATE when the session is driven by its own core worker.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   out_serviced is null.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is driven by its
+ *   own core worker.
  * - MLN_STATUS_TARGET_LOST after abandonment or dispose of the session or of
  *   one of its acquired frames.
  * - MLN_STATUS_WRONG_THREAD when another native thread already fixed the
@@ -515,10 +507,10 @@ MLN_API mln_status mln_render_session_service_driver_work(
  *
  * Returns:
  * - MLN_STATUS_OK when the detach is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or completion is null
- *   or undersized.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a frame is
- *   still acquired.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a frame is still acquired.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Demands still outstanding receive MLN_RENDER_RESULT_TARGET_NOT_READY.
@@ -527,10 +519,9 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * - MLN_STATUS_OK once the target is released.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_render_session_detach(
-  mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -556,12 +547,12 @@ MLN_API mln_status mln_render_session_detach(
  * - MLN_STATUS_BUSY when a borrowed view scope is active, a caller-driver call
  *   is in flight, or the caller is inside one of the session's driver calls.
  *   Nothing changes.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or out_result is null
- *   or undersized.
- * - MLN_STATUS_INVALID_STATE when the session already released its target.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   out_result is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released, or the session
+ *   already released its target.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_abandon(
   mln_render_session session,
   mln_render_abandon_result* out_result MLN_BINDING("direction=out"),
@@ -576,14 +567,13 @@ MLN_API mln_status mln_render_session_abandon(
  *
  * Returns:
  * - MLN_STATUS_OK when the handle is retired.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live.
- * - MLN_STATUS_INVALID_STATE when the session is neither detached nor
- *   abandoned, or a detached session still has an acquired frame.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is neither
+ *   detached nor abandoned, or a detached session still has an acquired frame.
  * - MLN_STATUS_BUSY when pending abandonment still has active borrowed views
  *   or driver work. The session owner remains live.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_destroy(
   mln_render_session session, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -598,10 +588,10 @@ MLN_API mln_status mln_render_session_destroy(
  * accessors report target loss after acceptance; their owners still release or
  * dispose those frames.
  *
- * Returns MLN_STATUS_OK on acceptance, or MLN_STATUS_INVALID_ARGUMENT for a
- * handle that is null or already consumed.
+ * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
+ * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been
+ * released.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_render_session_dispose(
   mln_render_session session, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -616,9 +606,9 @@ MLN_API mln_status mln_render_session_dispose(
  * or disposed after abandonment.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
- * invalid handle, or MLN_STATUS_INVALID_STATE for a frame already consumed.
+ * invalid handle, or MLN_STATUS_INVALID_STATE for a frame that has been
+ * released.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_acquired_frame_dispose(
   mln_acquired_frame frame, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

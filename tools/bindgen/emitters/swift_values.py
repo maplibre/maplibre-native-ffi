@@ -32,7 +32,7 @@ class Values:
         if value.kind == "handle":
             from .swift_ownership import owner_name
 
-            return owner_name(value.native)
+            return owner_name(value.handle)
         if value.kind == "native_pointer":
             return "NativePointer"
         if value.kind == "scalar":
@@ -102,19 +102,7 @@ class Values:
         if value.kind != "record":
             return
         for field in value.fields:
-            if value.registration and field.name in {
-                value.registration.user_data,
-                value.registration.release,
-            }:
-                continue
-            if field.role in {
-                "size",
-                "reserved",
-                "presence_mask",
-                "count",
-                "stride",
-                "arena",
-            }:
+            if not field.public:
                 continue
             if field.presence and field.presence.variant:
                 raise ModelError(
@@ -174,14 +162,7 @@ class Values:
                     f"    raw.{field.name} = {'false' if field.value.ctype.canonical in {'_Bool', 'bool'} else '0'}"
                 )
         for flag in value.mask_flags:
-            mask = next(
-                field.value for field in value.fields if field.name == flag.mask
-            )
-            prefix = (
-                commonprefix([key for key, _ in mask.enum_values]).rsplit("_", 1)[0]
-                + "_"
-            )
-            local = identifier(camel(flag.name.removeprefix(prefix).lower()))
+            local = identifier(camel(flag.member))
             fields.append(f"  public var {local}: Bool")
             init.append(f"{local}: Bool = {public}.default.{local}")
             assignments.append(f"    self.{local} = {local}")
@@ -201,10 +182,7 @@ class Values:
             if len(group.fields) == 1:
                 continue
             child = self.bound.values[group.type]
-            prefix = value.native.removeprefix("mln_").removesuffix("s").upper() + "_"
-            local = identifier(
-                camel(group.bit.removeprefix("MLN_").removeprefix(prefix).lower())
-            )
+            local = identifier(camel(group.member))
             fields.append(f"  public var {local}: {self.public(child)}?")
             init.append(f"{local}: {self.public(child)}? = {public}.default.{local}")
             assignments.append(f"    self.{local} = {local}")
@@ -232,10 +210,7 @@ class Values:
                         f"    {raw} = UInt32(MemoryLayout<{value.native}>.size)"
                     )
                 continue
-            if (
-                field.role in {"reserved", "presence_mask", "count", "stride", "arena"}
-                or field.name in grouped
-            ):
+            if not field.public or field.name in grouped:
                 continue
             optional = field.presence and field.presence.mask
             field_type = self.public(field.value)

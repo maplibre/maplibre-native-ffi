@@ -64,7 +64,7 @@ internal fun denyingProvider(
 
 /** Completes this request with the fixture's NOT_FOUND error and releases it. */
 internal fun ResourceRequestHandle.deny(): ResourceProviderDecision {
-  resourceRequestComplete(
+  complete(
     ResourceResponse(
       status = ResourceResponseStatus.ERROR,
       errorReason = ResourceErrorReason.NOT_FOUND,
@@ -77,9 +77,7 @@ internal fun ResourceRequestHandle.deny(): ResourceProviderDecision {
 
 /** Completes this request with [body] and releases it. */
 internal fun ResourceRequestHandle.serve(body: String): ResourceProviderDecision {
-  resourceRequestComplete(
-    ResourceResponse(status = ResourceResponseStatus.OK, bytes = body.encodeToByteArray())
-  )
+  complete(ResourceResponse(status = ResourceResponseStatus.OK, bytes = body.encodeToByteArray()))
   close()
   return ResourceProviderDecision.HANDLE
 }

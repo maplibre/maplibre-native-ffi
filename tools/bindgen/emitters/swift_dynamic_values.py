@@ -244,12 +244,12 @@ def declaration(values, value):
         if len(group.fields) < 2:
             continue
         grouped.update(group.fields)
-        local = identifier(camel(group.mask.removeprefix("has_")))
+        local = identifier(camel(group.member))
         members = [field for field in value.fields if field.name in group.fields]
         group_type = (
             values.public(values.bound.values[group.type])
             if group.type
-            else typ + name(group.mask.removeprefix("has_"))
+            else typ + name(group.member)
         )
         if not group.type:
             group_fields = "\n".join(
@@ -300,10 +300,6 @@ def declaration(values, value):
                 f"    {raw} = UInt32(MemoryLayout<{value.native}>.size)"
             )
             continue
-        if f.role == "presence_mask":
-            continue
-        if f.role in {"reserved", "tag", "stride", "arena"}:
-            continue
         if f.role == "count":
             array = next(
                 member for member in value.fields if member.value.length == f.name
@@ -317,6 +313,8 @@ def declaration(values, value):
             encode_lines.append(
                 f"    {raw} = try NativeInputArena.count({source}{'?.count ?? 0' if optional else '.count'})"
             )
+            continue
+        if not f.public:
             continue
         if f.value.kind == "union":
             union = f.value

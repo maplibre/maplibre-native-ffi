@@ -19,7 +19,7 @@ def plain(plan):
 
 def validate(values, plan):
     for f in plain(plan).fields:
-        if f.role not in {"size", "reserved", "count", "presence_mask"}:
+        if f.public:
             values.require(f.value, input=True)
     for member in plan.registration.callbacks:
         callback = values.api.callbacks[
@@ -262,14 +262,9 @@ def direct_operation(plan, values):
     setup.append(f"return {returned}")
     body = f"bindingCall(func() {result} {{ {'; '.join(setup)} }})"
     if receiver:
-        method = name(
-            plan.name.removeprefix(receiver.value.native.removesuffix("_handle") + "_")
-        )
-        signature_ = f"func (receiver *{values.owner(receiver.value.native)}) {method}(callback {callback_type})"
+        signature_ = f"func (receiver *{values.owner(receiver.value.native)}) {name(plan.member)}(callback {callback_type})"
     else:
-        signature_ = (
-            f"func {name(plan.name.removeprefix('mln_'))}(callback {callback_type})"
-        )
+        signature_ = f"func {name(plan.member)}(callback {callback_type})"
     if result == "bool":
         return f"{signature_} (bool, error) {{ return {body} }}"
     return f"{signature_} error {{ _, err := {body}; return err }}"

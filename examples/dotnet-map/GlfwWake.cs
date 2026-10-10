@@ -1,4 +1,3 @@
-using Maplibre.NativeFfi.Runtime;
 using Silk.NET.GLFW;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;

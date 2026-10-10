@@ -10,9 +10,9 @@ from tools.bindgen import native_ports
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api
-from tools.bindgen.names import camel, type_name
+from tools.bindgen.names import camel, pascal, type_name
 from tools.bindgen.native_capture import copy_kind
-from tools.bindgen.semantic import BoundApi, OperationPlan
+from tools.bindgen.semantic import BoundApi, OperationPlan, output_member
 
 from .dart_values import (
     Unsupported,
@@ -33,7 +33,7 @@ def native_call(function, arguments):
 def adopt_owner(owned, expression, receiver, function, values):
     if owned.handle.native not in values.bound.public_handles:
         raise Unsupported("owned output requires a generated class")
-    public, native = owner_names(owned.handle.native)
+    public, native = owner_names(owned.handle)
     parent = ""
     if owned.handle.parent in values.bound.public_handles:
         if not owned.parent_parameter:
@@ -57,6 +57,26 @@ def adopt_owner(owned, expression, receiver, function, values):
     return public, result
 
 
+def release_callback(registration, inputs, values) -> str:
+    """The C type of a registration's release callback.
+
+    A port adapter's release takes only the context and returns nothing, so
+    the registration's release callback must have that shape.
+    """
+    release = values.bound.callbacks.get(inputs[registration.release_callback].native)
+    if (
+        release is None
+        or release.result.ctype.kind != "void"
+        or len(release.parameters) != 1
+        or release.parameters[0].name != release.context
+        or release.decision
+        or release.deferred
+        or release.reentry_policy
+    ):
+        raise Unsupported("port registration requires a void context release callback")
+    return release.native
+
+
 def lower_port_registration(plan, registration, callback, values):
     """Lower a receiver's direct registration that a native port delivers.
 
@@ -67,15 +87,10 @@ def lower_port_registration(plan, registration, callback, values):
     receiver = type_name(function.parameters[0].type) if plan.receiver else None
     if receiver not in values.bound.public_handles:
         raise Unsupported("port registration requires an owned receiver")
-    if (
-        plan.execution != "immediate"
-        or plan.completion
-        or type_name(function.return_type) != "mln_status"
-    ):
+    if plan.execution != "immediate" or plan.completion or not plan.status:
         raise Unsupported("port registration requires immediate admission status")
     inputs = {p.name: p.value for p in plan.inputs}
-    if inputs[registration.release_callback].native != "mln_runtime_callback_release":
-        raise Unsupported("port registration requires the runtime release callback")
+    release = release_callback(registration, inputs, values)
     controls = {
         function.parameters[0].name,
         registration.callback,
@@ -101,12 +116,12 @@ def lower_port_registration(plan, registration, callback, values):
         if parameter.name != callback.context:
             expression, offset = values.port_copy(parameter.value, offset)
             decoded.append(expression)
-    name = camel(function.name.removeprefix(receiver.removesuffix("_handle") + "_"))
+    name = camel(plan.member)
     arguments = {
         function.parameters[0].name: "handle.raw",
         registration.callback: f"raw.mln_adapter_dart_port_function({key}).cast()",
         registration.user_data: "port.context",
-        registration.release_callback: "Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(raw.mln_adapter_dart_port_release).cast()",
+        registration.release_callback: f"Native.addressOf<NativeFunction<raw.{release}Function>>(raw.mln_adapter_dart_port_release).cast()",
         registration.accepted_unless: "declined",
     }
     call = native_call(function, [arguments[p.name] for p in function.parameters])
@@ -145,11 +160,7 @@ def lower_deferred_registration(plan, registration, callback, values):
     receiver = type_name(function.parameters[0].type) if plan.receiver else None
     if receiver and receiver not in values.bound.public_handles:
         raise Unsupported("deferred registration requires an owned receiver")
-    if (
-        plan.execution != "immediate"
-        or plan.completion
-        or type_name(function.return_type) != "mln_status"
-    ):
+    if plan.execution != "immediate" or plan.completion or not plan.status:
         raise Unsupported("deferred registration requires immediate admission status")
     if not registration.release_callback or registration.accepted_unless:
         raise Unsupported("deferred registration requires an unconditional release")
@@ -164,7 +175,7 @@ def lower_deferred_registration(plan, registration, callback, values):
     value = inputs[registration.callback]
     values.check(value)
     key = deferred_key(callback)
-    release = inputs[registration.release_callback].native
+    release = release_callback(registration, inputs, values)
     arguments = {
         registration.callback: f"raw.mln_adapter_deferred_callback_function({key}).cast()",
         registration.user_data: "port.context",
@@ -172,11 +183,10 @@ def lower_deferred_registration(plan, registration, callback, values):
     }
     if receiver:
         arguments[function.parameters[0].name] = "_handle.raw"
-        name = camel(function.name.removeprefix(receiver.removesuffix("_handle") + "_"))
         roots = "_callbackPorts"
     else:
-        name = camel(function.name.removeprefix("mln_"))
         roots = "_globalCallbackPorts"
+    name = camel(plan.member)
     call = native_call(function, [arguments[p.name] for p in function.parameters])
     body = (
         f"    final port = {roots}.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}(callback, message));\n"
@@ -242,17 +252,10 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         "render_driver",
     }:
         raise Unsupported("execution requires another runtime skeleton")
-    status_return = type_name(function.return_type) == "mln_status"
+    status_return = plan.status
     if not status_return and plan.completion:
         raise Unsupported("asynchronous operation requires admission status")
-    name = camel(
-        function.name.removeprefix(
-            receiver.removesuffix("_handle") + "_"
-            if receiver
-            and function.name.startswith(receiver.removesuffix("_handle") + "_")
-            else "mln_"
-        )
-    )
+    name = camel(plan.member)
     handle_plan = values.bound.handles.get(receiver)
     if (
         plan.consumes
@@ -374,8 +377,6 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         if parameter.name not in inputs:
             raise Unsupported("parameter missing a resolved input contract")
         value = inputs[parameter.name].value
-        if value.lifetime not in {"call", "value"}:
-            raise Unsupported("input requires retained native storage")
         values.check(value)
         if value.kind == "buffer" and value.nullable and value.buffer_form != "view":
             raise Unsupported(
@@ -598,17 +599,18 @@ def completion_value(values: Values, element, read) -> str:
 
 
 def attachment_name(owned):
-    return owner_names(owned.handle.native)[0].removesuffix("Handle") + "Attachment"
+    return pascal(owned.handle.stem) + "Attachment"
 
 
 def lower(api: Api | BoundApi):
     methods, generated, unsupported = defaultdict(list), [], {}
     bound = compile_api(api)
     values = Values(bound)
+    port_owners = values.port_owners
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
-    conflicts = conflicting_functions(bound.source, "dart")
+    conflicts = conflicting_functions(bound, "dart")
     for plan in bound.operations:
         try:
             if plan.name in conflicts:
@@ -621,6 +623,12 @@ def lower(api: Api | BoundApi):
             values.results.update(local_values.results)
             methods[owner].append(body)
             generated.append(plan.name)
+            if owner != "Globals" and (
+                plan.direct_registrations
+                or (plan.registrations and not plan.owned_outputs)
+            ):
+                # The receiver roots the ports of the callbacks it registers.
+                port_owners.add(owner)
         except Unsupported as error:
             unsupported[plan.name] = f"{plan.function.location}: {error}"
     return methods, generated, unsupported, values
@@ -655,7 +663,7 @@ def render_scoped_views(bound, generated, values):
                 f"  {'ScopedNativePointer' if native_pointer else typ} get {name} => {result};"
             )
         chunks.append(
-            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner.native)[0]} owner, this._value) : _scope = _NativeViewScope(owner._state, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _NativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
+            f"final class Scoped{public} {{\n  Scoped{public}._({owner_names(plan.view.owner)[0]} owner, this._value) : _scope = _NativeViewScope(owner._state, raw.{plan.view.owner.view_begin}, raw.{plan.view.owner.view_end});\n  final {public} _value;\n  final _NativeViewScope _scope;\n  T withView<T>(T Function(Scoped{public}) use) => _scope.use(() => use(this));\n"
             + "\n".join(getters)
             + "\n}\n"
         )
@@ -664,19 +672,19 @@ def render_scoped_views(bound, generated, values):
     return "\n".join(chunks)
 
 
-def render_owner(native, handle, bodies, bound):
-    public, native_type = owner_names(native)
+def render_owner(native, handle, bodies, bound, ports):
+    public, native_type = owner_names(handle)
     parameters, fields = [], []
     if handle.parent in bound.public_handles:
         parameters.append("this._parent")
         fields.append(
             "  // Keeps the parent owner reachable while this owner lives.\n"
-            f"  // ignore: unused_field\n  final {owner_names(handle.parent)[0]} _parent;"
+            f"  // ignore: unused_field\n  final {owner_names(bound.handles[handle.parent])[0]} _parent;"
         )
-    if any("_callbackPorts" in body for body in bodies):
+    if ports:
         fields.append(
             "  // Roots this owner's port registrations for as long as it lives.\n"
-            "  final _callbackPorts = _NativeCallbackPorts();"
+            "  @override\n  final _callbackPorts = _NativeCallbackPorts();"
         )
     fields.append(f"  final NativeHandleState<{native_type}> _state;")
     fields.append(f"  {native_type} get _handle => _state.handle;")
@@ -685,7 +693,7 @@ def render_owner(native, handle, bodies, bound):
         f"/// Issued `{native}` handle id.\n"
         f"extension type const {native_type}(int raw) implements NativeHandle {{}}\n\n"
         f"/// Owner of one native `{native}` handle.\n"
-        f"final class {public} implements Finalizable {{\n"
+        f"final class {public} implements Finalizable{', _CallbackPortOwner' if ports else ''} {{\n"
         f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"
         + "\n".join(fields)
         + "\n\n  /// Whether this binding object has released its native handle.\n"
@@ -705,13 +713,13 @@ def render_attachments(bound, generated):
             continue
         for owned in plan.completion.immediate_owners:
             name = attachment_name(owned)
-            field = camel(owned.parameter.removeprefix("out_"))
+            field = camel(output_member(owned.parameter))
             chunks[name] = (
                 f"/// A new {field} and the completion of the attachment that created it.\n"
                 f"final class {name} {{\n"
                 f"  const {name}(this.{field}, this.completed);\n\n"
                 f"  /// The {field}, usable at once while attachment completes.\n"
-                f"  final {owner_names(owned.handle.native)[0]} {field};\n\n"
+                f"  final {owner_names(owned.handle)[0]} {field};\n\n"
                 "  /// Completes after native attachment finishes.\n"
                 "  final Future<void> completed;\n}\n"
             )
@@ -762,7 +770,15 @@ def generate(api: Api | BoundApi) -> str:
     ]
     chunks.extend(abi_checked(body) for body in methods.get("Globals", []))
     for native, handle in sorted(bound.public_handles.items()):
-        chunks.append(render_owner(native, handle, methods.get(native, []), bound))
+        chunks.append(
+            render_owner(
+                native,
+                handle,
+                methods.get(native, []),
+                bound,
+                native in values.port_owners,
+            )
+        )
     chunks.extend(render_attachments(bound, generated))
     chunks.append(render_scoped_views(bound, generated, values))
     return "\n".join(chunks)
@@ -788,18 +804,21 @@ def abi_checked(body: str) -> str:
 
 def coverage(api: Api | BoundApi):
     _, generated, unsupported, values = lower(api)
-    support = {}
+    adapters = {}
     bound = values.bound
     for value in values.used.values():
         if value.registration:
             for adapter in values.registration_adapters(value):
-                for name in adapter.invokes:
-                    if bound.operations_by_name[name].scoped_receiver:
-                        support[name] = (
-                            f"native callback adapter {adapter.function} for {value.native}"
-                        )
-                        unsupported.pop(name, None)
-    return {"generated": generated, "support": support, "unsupported": unsupported}
+                for plan in bound.adapter_operations(adapter):
+                    adapters[plan.name] = (
+                        f"native callback adapter {adapter.function} for {value.native}"
+                    )
+                    unsupported.pop(plan.name, None)
+    return {
+        "generated": generated,
+        "callback_adapters": adapters,
+        "unsupported": unsupported,
+    }
 
 
 def generate_values(api: Api | BoundApi) -> str:

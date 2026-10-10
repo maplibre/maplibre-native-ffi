@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from ..model import CType
+from ..protocol import COMPLETION
+from ..semantic import public_stem
 from .kotlin_values import Unsupported, identifier, name, owner_class
 
 
@@ -29,7 +31,7 @@ class Site:
 
 
 def status_callback(callback):
-    return callback.result.native == "mln_status"
+    return callback.status
 
 
 def check(value, values):
@@ -136,13 +138,25 @@ VOID_POINTER = CType(
 VOID = CType("void", "void", "void")
 
 
+def completion_result_type(bound):
+    """The result pointer that the completion registration's callback receives."""
+    completion = bound.values.get(COMPLETION)
+    if completion is None or completion.registration is None:
+        return None
+    for member in completion.registration.callbacks:
+        field = next(f for f in completion.fields if f.name == member)
+        callback = bound.callbacks[field.value.native]
+        for parameter in callback.parameters:
+            if parameter.name != callback.context:
+                return parameter.value.ctype
+    return None
+
+
 def sites(values):
     """The registry of upcall sites, starting with the runtime's own."""
     if values.sites is None:
         values.sites = {}
-        typedefs = values.bound.source.typedefs_by_name
-        completion = typedefs.get("mln_completion_callback")
-        result = completion.parameters[1].type if completion else VOID_POINTER
+        result = completion_result_type(values.bound) or VOID_POINTER
         context = ("userData", VOID_POINTER, "Long")
         for site in (
             Site(
@@ -279,7 +293,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
             continue
         if decision and parameter.name == decision.parameter:
             lines.append(
-                f"val decisionOwner = {owner_class(decision.handle.native)}({identifier(parameter.name)})"
+                f"val decisionOwner = {owner_class(decision.handle)}({identifier(parameter.name)})"
             )
             arguments.append("decisionOwner")
         else:
@@ -471,9 +485,9 @@ def operation(plan, values, native):
         return direct_operation(plan, values, native)
     decision = next(
         (
-            c.decision
-            for c in values.bound.callbacks.values()
-            if c.decision and plan.name in (c.decision.complete, c.decision.cancelled)
+            decision
+            for decision in values.bound.decisions.values()
+            if plan.name in (decision.complete, decision.cancelled)
         ),
         None,
     )
@@ -483,7 +497,9 @@ def operation(plan, values, native):
             p for p in plan.inputs if p.name != plan.receiver and p.name not in lengths
         ]
         params = [(parameter_name(p.name), values.public(p.value)) for p in inputs]
-        method = identifier(plan.name.removeprefix("mln_"))
+        # A response operation takes its response as an argument, so it keeps
+        # the whole name that a free function has.
+        method = identifier(plan.member if plan.receiver else public_stem(plan.name))
         arguments = call_arguments(plan, values)
         if decision and plan.name == decision.cancelled:
             arguments.append("out")
@@ -585,7 +601,7 @@ def direct_operation(plan, values, native):
         wrapper,
         values,
     )
-    method = identifier(plan.name.removeprefix("mln_"))
+    method = identifier(plan.member)
 
     def call(disabled):
         arguments = []

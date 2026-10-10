@@ -3,7 +3,7 @@
 using static Maplibre.NativeFfi.Internal.NativeCall;
 using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
-namespace Maplibre.NativeFfi.Map;
+namespace Maplibre.NativeFfi;
 
 public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, INativeOwner<MlnMap>
 {
@@ -99,7 +99,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     public Task<CommandCompletion> AddGeojsonSourceDataAsync(
         string sourceId,
-        GeoJsonSourceDataHandle data,
+        GeojsonSourceDataHandle data,
         CancellationToken cancellationToken = default
     )
     {
@@ -1074,7 +1074,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
-    public Task<string[]> StyleLayerIdsAsync(CancellationToken cancellationToken = default)
+    public Task<string[]> ListStyleLayerIdsAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_list_style_layer_ids");
         return scope.QueryArray<mln_buffer_view, string>(
@@ -1085,7 +1085,9 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
-    public Task<StyleLayerEntry[]> StyleLayersAsync(CancellationToken cancellationToken = default)
+    public Task<StyleLayerEntry[]> ListStyleLayersAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         using var scope = new NativeCallScope(this, "mln_map_list_style_layers");
         return scope.QueryArray<mln_style_layer_entry, StyleLayerEntry>(
@@ -1096,7 +1098,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
-    public Task<string[]> StyleSourceIdsAsync(CancellationToken cancellationToken = default)
+    public Task<string[]> ListStyleSourceIdsAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_list_style_source_ids");
         return scope.QueryArray<mln_buffer_view, string>(
@@ -1499,7 +1501,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
 
     public Task<CommandCompletion> SetGeojsonSourceDataAsync(
         string sourceId,
-        GeoJsonSourceDataHandle data,
+        GeojsonSourceDataHandle data,
         CancellationToken cancellationToken = default
     )
     {

@@ -568,6 +568,12 @@ pub struct mln_custom_mvt_vector_source_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_diagnostic {
+    pub size: u32,
+    pub message: [std::ffi::c_char; 4096],
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_edge_insets {
     pub top: f64,
     pub left: f64,

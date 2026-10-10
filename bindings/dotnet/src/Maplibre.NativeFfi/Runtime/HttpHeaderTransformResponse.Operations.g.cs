@@ -3,7 +3,7 @@
 using static Maplibre.NativeFfi.Internal.NativeCall;
 using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
-namespace Maplibre.NativeFfi.Runtime;
+namespace Maplibre.NativeFfi;
 
 public sealed unsafe partial class HttpHeaderTransformResponse
 {

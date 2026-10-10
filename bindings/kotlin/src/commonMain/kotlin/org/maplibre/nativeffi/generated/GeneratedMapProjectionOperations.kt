@@ -46,7 +46,7 @@ public abstract class GeneratedMapProjectionOperations internal constructor() {
 
   public fun metersPerPixelAtLatitude(latitude: Double): Double =
     nativeCall(this, binding, "mln_map_projection_meters_per_pixel_at_latitude") {
-      val out = allocate(8)
+      val out = allocate(8, 8)
       check(C.mln_map_projection_meters_per_pixel_at_latitude(handle, latitude, out, diagnostic))
       readF64(out)
     }

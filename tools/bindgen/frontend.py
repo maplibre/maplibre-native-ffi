@@ -27,6 +27,8 @@ from .model import (
     Record,
     Typedef,
 )
+from .protocol import DIAGNOSTIC
+from .schema import apply_defaults
 
 # libclang creates its enum members after class construction. Its Python
 # bindings expose these objects dynamically, without static type declarations.
@@ -36,16 +38,13 @@ TypeKind: Any = cindex.TypeKind
 ANNOTATION_PREFIX = "mln:"
 
 
-DIAGNOSTIC_RECORD = "mln_diagnostic"
-
-
 def is_diagnostic_type(native: cindex.Type) -> bool:
     if native.kind != cindex.TypeKind.POINTER:
         return False
     pointee = native.get_pointee()
     return (
         not pointee.is_const_qualified()
-        and pointee.get_canonical().get_declaration().spelling == DIAGNOSTIC_RECORD
+        and pointee.get_canonical().get_declaration().spelling == DIAGNOSTIC
     )
 
 
@@ -317,8 +316,7 @@ class Extractor:
                     )
                 functions[name] = function
             elif kind in (CursorKind.STRUCT_DECL, CursorKind.UNION_DECL):
-                if self.record_name(cursor) != DIAGNOSTIC_RECORD:
-                    self.record(cursor)
+                self.record(cursor)
             elif kind == CursorKind.ENUM_DECL:
                 enums[name] = Enum(
                     name=name,
@@ -336,8 +334,6 @@ class Extractor:
                     location=self.location(cursor),
                     documentation=cursor.raw_comment or "",
                 )
-            elif kind == CursorKind.TYPEDEF_DECL and name == DIAGNOSTIC_RECORD:
-                continue
             elif kind == CursorKind.TYPEDEF_DECL:
                 typedefs[name] = Typedef(
                     name=name,
@@ -381,8 +377,25 @@ def parse_headers(
 
     `clang_args` supplies target defines and include paths, including the
     installed MapLibre Native plugin headers. Pass `headers` for fixture tests.
-    Compiler errors are fatal; partial ASTs never reach an emitter.
+    Compiler errors are fatal; partial ASTs never reach an emitter. The result
+    carries each declaration's complete metadata: its annotations together with
+    the defaults that its C shape implies.
     """
+    return apply_defaults(
+        extract_headers(
+            include_directory, headers=headers, clang_args=clang_args, clang=clang
+        )
+    )
+
+
+def extract_headers(
+    include_directory: Path,
+    *,
+    headers: tuple[str, ...] | None = None,
+    clang_args: tuple[str, ...] = (),
+    clang: str = "clang",
+) -> Api:
+    """Parse the headers into declarations that carry only their annotations."""
     include_directory = include_directory.resolve()
     classify_interfaces = (
         headers is None and (include_directory / "binding-interfaces.toml").is_file()
@@ -435,7 +448,7 @@ def parse_headers(
                 ]
             )
         interfaces = {
-            name: parse_headers(
+            name: extract_headers(
                 include_directory,
                 headers=tuple(entries),
                 clang_args=clang_args,

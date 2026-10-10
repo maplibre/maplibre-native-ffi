@@ -1,6 +1,3 @@
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Render;
-
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal interface IGraphicsContext : IDisposable

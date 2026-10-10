@@ -7,7 +7,6 @@ as an array's count or a presence mask.
 """
 
 from dataclasses import replace
-from os.path import commonprefix
 
 from .rust import Unsupported, identifier, native_identifier, pascal
 
@@ -181,12 +180,7 @@ def declaration(values, value):
                 f"raw.{native_identifier(field.name)} = std::mem::size_of::<{raw}>() as _;",
             )
     for flag in value.mask_flags:
-        mask_plan = next(f.value for f in value.fields if f.name == flag.mask)
-        prefix = (
-            commonprefix([key for key, _ in mask_plan.enum_values]).rsplit("_", 1)[0]
-            + "_"
-        )
-        local = identifier(flag.name.removeprefix(prefix).lower())
+        local = identifier(flag.member)
         mask = native_identifier(flag.mask)
         fields.append(f"    pub {local}: bool,")
         writes.append(
@@ -200,18 +194,13 @@ def declaration(values, value):
             continue
         grouped.update(group.fields)
         mask, bit = presence(f"raw.{native_identifier(group.mask)}", group.bit)
+        local = identifier(group.member)
         if group.type:
-            # Header mask names supply the semantic group label; the group type
-            # supplies the member names and their conversion rules.
-            child = values.bound.values[group.type]
-            prefix = value.native.removeprefix("mln_").removesuffix("s").upper() + "_"
-            local = identifier(
-                group.bit.removeprefix("MLN_").removeprefix(prefix).lower()
-            )
-            group_name = values.public(child)
+            # The group type supplies the member names and their conversion
+            # rules.
+            group_name = values.public(values.bound.values[group.type])
         else:
-            local = identifier(group.mask.removeprefix("has_"))
-            group_name = name + pascal(local)
+            group_name = name + pascal(group.member)
             extra.append(
                 f"#[derive(Debug, Clone, PartialEq, Default)] pub struct {group_name} {{ "
                 + ", ".join(
@@ -245,15 +234,6 @@ def declaration(values, value):
         if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:
             continue
         place, local = f"raw.{native_identifier(field.name)}", identifier(field.name)
-        if field.role in {
-            "size",
-            "presence_mask",
-            "reserved",
-            "tag",
-            "stride",
-            "arena",
-        }:
-            continue
         if field.role == "count":
             arrays = [f for f in value.fields if f.value.length == field.name]
             if not arrays:
@@ -268,6 +248,8 @@ def declaration(values, value):
                 else f"{source}.len()"
             )
             writes.append(f"{place} = convert::count({length})?;")
+            continue
+        if not field.public:
             continue
         if field.value.kind == "union":
             union = field.value
@@ -299,16 +281,12 @@ def declaration(values, value):
             args.append(f"{local}: {typ}")
             names.append(local)
     constructors = []
-    public_fields = [field for field in value.fields if field.role == "value"]
+    public_fields = [field for field in value.fields if field.public]
     if len(public_fields) == 1 and public_fields[0].value.kind == "union":
         field = public_fields[0]
         union_name = values.public(field.value)
         for member in field.value.fields:
-            method = (
-                member.name + "_"
-                if member.name in {"box", "type"}
-                else identifier(member.name)
-            )
+            method = identifier(member.name)
             constructors.append(
                 f"pub fn {method}(value: {values.public(member.value)}) -> Self {{ Self {{ {identifier(field.name)}: {union_name}::{pascal(member.name)}(value) }} }}"
             )

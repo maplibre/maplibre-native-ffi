@@ -6,18 +6,10 @@ from dataclasses import replace
 from os.path import commonprefix
 
 from .. import native_ports
+from ..managed_contracts import DART_RESERVED
 from ..names import camel, pascal
 from ..native_capture import arguments_record, deferred_constant
 from ..semantic import BoundApi, ValuePlan
-
-POSITIONAL = {
-    "mln_lat_lng",
-    "mln_screen_point",
-    "mln_vec3",
-    "mln_quaternion",
-    "mln_image_stretch",
-    "mln_unit_bezier",
-}
 
 SCALARS = {
     "bool": ("bool", "Bool"),
@@ -55,9 +47,9 @@ def deferred_key(callback) -> str:
     return f"(raw.{deferred_constant(callback.native)} & 0xffffffff)"
 
 
-def owner_names(native: str) -> tuple[str, str]:
-    """The public owner class and native handle type for a handle."""
-    name = public_name(native.removesuffix("_handle"))
+def owner_names(handle) -> tuple[str, str]:
+    """The public owner class and native handle type for a handle plan."""
+    name = pascal(handle.stem)
     return name + "Handle", "Native" + name
 
 
@@ -71,29 +63,14 @@ def public_name(native: str) -> str:
 
 def identifier(native: str) -> str:
     name = camel(native)
-    return (
-        name + "Value"
-        if name
-        in {
-            "class",
-            "default",
-            "switch",
-            "operator",
-            "in",
-            "is",
-            "with",
-            "return",
-            "null",
-            "true",
-            "false",
-        }
-        else name
-    )
+    return name + "Value" if name in DART_RESERVED else name
 
 
 class Values:
     def __init__(self, bound: BoundApi):
         self.bound = bound
+        # The owners whose generated operations root callback ports.
+        self.port_owners: set[str] = set()
         self.used: dict[str, ValuePlan] = {
             name: value
             for name, value in bound.public_values.items()
@@ -283,7 +260,7 @@ class Values:
     def public(self, value):
         self.check(value)
         if value.kind == "handle":
-            name = owner_names(value.native)[0]
+            name = owner_names(value.handle)[0]
         elif value.kind == "native_pointer":
             name = "NativePointer"
         elif value.kind in {"scalar", "enum"}:
@@ -528,19 +505,7 @@ class Values:
                 if group.mask in emitted:
                     continue
                 emitted.add(group.mask)
-                if group.bit:
-                    enum = next(
-                        e
-                        for e in self.bound.source.enums
-                        if any(v.name == group.bit for v in e.values)
-                    )
-                    prefix = (
-                        commonprefix([v.name for v in enum.values]).rsplit("_", 1)[0]
-                        + "_"
-                    )
-                    name = identifier(group.bit.removeprefix(prefix).lower())
-                else:
-                    name = identifier(group.mask.removeprefix("has_"))
+                name = identifier(group.member)
                 children = [f for f in fields if f.name in group.fields]
                 typ = (
                     public_name(group.type)
@@ -604,7 +569,7 @@ class Values:
                 default = self.default_expression(children[0].value)
                 if default is None:
                     return None
-                if value.native in POSITIONAL:
+                if value.ordered:
                     args.append(default)
             return f"const {public_name(value.native)}({', '.join(args)})"
         return None
@@ -640,7 +605,7 @@ class Values:
             "  final record = Pointer<raw.mln_adapter_deferred_call_record>.fromAddress(message[1] as int);",
         ]
         if decision:
-            owner, native = owner_names(decision.handle.native)
+            owner, native = owner_names(decision.handle)
             lines += [f"  {owner}? owner;"]
         lines += [
             "  try {",
@@ -685,11 +650,7 @@ class Values:
             for field in self.fields(value):
                 expression, offset = self.port_copy(field.value, offset)
                 args.append(
-                    (
-                        ""
-                        if value.native in POSITIONAL
-                        else identifier(field.name) + ": "
-                    )
+                    ("" if value.ordered else identifier(field.name) + ": ")
                     + expression
                 )
             return public_name(value.native) + "(" + ", ".join(args) + ")", offset
@@ -1075,17 +1036,11 @@ class Values:
             members = self.members(value)
             flags = []
             for flag in value.mask_flags:
-                mask = next(f.value for f in value.fields if f.name == flag.mask)
-                prefix = (
-                    commonprefix([name for name, _ in mask.enum_values]).rsplit("_", 1)[
-                        0
-                    ]
-                    + "_"
-                )
-                flags.append((identifier(flag.name.removeprefix(prefix).lower()), flag))
+                flags.append((identifier(flag.member), flag))
             fields = "\n".join(f"  final {typ} {name};" for name, typ, _, _ in members)
             fields += "\n" + "\n".join(f"  final bool {name};" for name, _ in flags)
-            positional = value.native in POSITIONAL
+            # A record whose field order is its meaning constructs positionally.
+            positional = value.ordered
             args, initializers = [], []
             for name, typ, children, group in members:
                 default = (
@@ -1217,7 +1172,7 @@ class Values:
                     decoded.append(f"{identifier(field.name)}: {copied}")
                 if optional:
                     write.append("  }")
-                if group and group.type in POSITIONAL:
+                if group and group.type and self.bound.values[group.type].ordered:
                     decoded = [item.split(": ", 1)[1] for item in decoded]
                 capture = (
                     (public_name(group.type) if group and group.type else "")

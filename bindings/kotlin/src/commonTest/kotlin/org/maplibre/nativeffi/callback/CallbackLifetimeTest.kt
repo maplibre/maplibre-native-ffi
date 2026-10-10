@@ -33,7 +33,7 @@ class CallbackLifetimeTest {
     claimed: CompletableDeferred<TestWeakReference>
   ): ResourceProvider = denyingProvider { request, handle ->
     if (request.requestedUrl != STYLE_URL) return@denyingProvider null
-    handle.resourceRequestSetCancelCallback { handle.close() }
+    handle.setCancelCallback { handle.close() }
     claimed.complete(TestWeakReference(handle))
     ResourceProviderDecision.HANDLE
   }

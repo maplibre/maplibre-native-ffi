@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Tests;
 

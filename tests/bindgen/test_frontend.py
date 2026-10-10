@@ -24,11 +24,11 @@ class FrontendTests(unittest.TestCase):
             (root / "public.h").write_text(
                 "#pragma once\n"
                 + protocol_header(
-                    'BIND("execution=immediate") mln_status public_operation(mln_diagnostic *out_diagnostic);\n'
+                    "mln_status public_operation(mln_diagnostic *out_diagnostic);\n"
                 )
             )
             (root / "runtime.h").write_text(
-                '#include "public.h"\ntypedef enum runtime_kind { RUNTIME_COPY = 1 } runtime_kind;\nBIND("execution=immediate") mln_status runtime_operation(mln_diagnostic *out_diagnostic);\n'
+                '#include "public.h"\ntypedef enum runtime_kind { RUNTIME_COPY = 1 } runtime_kind;\nmln_status runtime_operation(mln_diagnostic *out_diagnostic);\n'
             )
             api = parse_headers(root)
             self.assertEqual(api.runtime_exports, ("runtime_operation",))
@@ -39,7 +39,7 @@ class FrontendTests(unittest.TestCase):
             )
             self.assertEqual(len(api.functions), 2)
             (root / "orphan.h").write_text(
-                '#pragma once\n#include "public.h"\nBIND("execution=immediate") mln_status omitted_operation(mln_diagnostic *out_diagnostic);\n'
+                '#pragma once\n#include "public.h"\nmln_status omitted_operation(mln_diagnostic *out_diagnostic);\n'
             )
             with self.assertRaisesRegex(
                 ModelError, "outside all interface entrypoints"
@@ -57,16 +57,15 @@ class FrontendTests(unittest.TestCase):
 
     def test_preserves_aliases_qualifiers_callbacks_and_nested_layout(self):
         api = self.parse("""
-typedef void (*mln_callback)(void *context, const mln_map *maps BIND("length=count;lifetime=call"), unsigned count);
+typedef void (*mln_callback)(void *context, const mln_map *maps BIND("length=count"), unsigned count);
 typedef struct mln_value {
     unsigned flags;
     union { int integer; double number; } value;
-    const mln_map *maps BIND("length=count;ownership=borrowed");
+    const mln_map *maps BIND("length=count");
     unsigned count;
     mln_callback callback;
     int fixed[3];
 } mln_value;
-BIND("execution=immediate")
 mln_status mln_read(mln_runtime runtime, const mln_map *map,
                    double *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
@@ -74,7 +73,11 @@ mln_status mln_read(mln_runtime runtime, const mln_map *map,
         self.assertEqual(function.parameters[0].type.declaration, "mln_runtime")
         self.assertEqual(function.parameters[1].type.pointee.declaration, "mln_map")
         self.assertTrue(function.parameters[1].type.pointee.const)
-        self.assertEqual(function.parameters[2].metadata, {"direction": "out"})
+        # The frontend completes the annotation with the pointer's defaults.
+        self.assertEqual(
+            function.parameters[2].metadata,
+            {"direction": "out", "lifetime": "call", "ownership": "borrowed"},
+        )
         record = api.records_by_name["mln_value"]
         self.assertEqual(
             [field.name for field in record.fields],
@@ -87,13 +90,18 @@ mln_status mln_read(mln_runtime runtime, const mln_map *map,
         callback_parameters = api.typedefs_by_name["mln_callback"].parameters
         self.assertEqual(callback_parameters[1].name, "maps")
         self.assertEqual(
-            callback_parameters[1].metadata, {"length": "count", "lifetime": "call"}
+            callback_parameters[1].metadata,
+            {
+                "direction": "in",
+                "length": "count",
+                "lifetime": "call",
+                "ownership": "borrowed",
+            },
         )
         validate(api)
 
     def test_pointer_and_pointee_qualifiers_remain_distinct(self):
         api = self.parse("""
-BIND("execution=immediate")
 void mln_qualified(const volatile double *restrict value);
 """)
         pointer = api.functions[0].parameters[0].type
@@ -141,7 +149,7 @@ typedef enum mln_i32 : sample_i32 { MLN_I32_NEGATIVE = -17 } mln_i32;
     def test_model_is_independent_of_checkout_path(self):
         source = protocol_header("""
 typedef struct mln_options { union { int one; float two; } choice; } mln_options;
-BIND("execution=immediate") mln_options mln_options_default(void);
+mln_options mln_options_default(void);
 """)
         models = []
         for _ in range(2):
@@ -154,10 +162,8 @@ BIND("execution=immediate") mln_options mln_options_default(void);
         with self.assertRaisesRegex(ModelError, "unknown type name"):
             self.parse("mln_typo mln_broken(void);")
 
-    def test_erased_query_requires_explicit_payload_contract(self):
-        with self.assertRaisesRegex(
-            ModelError, "erased completion payload requires result"
-        ):
+    def test_query_requires_a_result_and_defaults_its_payload(self):
+        with self.assertRaisesRegex(ModelError, "query requires a value payload"):
             validate(
                 self.parse("""
 BIND("execution=query")
@@ -165,14 +171,23 @@ mln_status mln_query(mln_map map, const mln_completion *completion, mln_diagnost
 """)
             )
         api = self.parse("""
-BIND("execution=query;result=double;shape=value;ownership=borrowed")
+BIND("execution=query;result=double")
 mln_status mln_query(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         validate(api)
+        self.assertEqual(
+            api.functions_by_name["mln_query"].metadata,
+            {
+                "execution": "query",
+                "ownership": "borrowed",
+                "result": "double",
+                "shape": "value",
+            },
+        )
 
     def test_metadata_typos_and_const_output_are_rejected(self):
         api = self.parse("""
-BIND("execution=immediate;ownershp=borrowed")
+BIND("ownershp=borrowed")
 mln_status mln_read(const double *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """)
         with self.assertRaises(ModelError) as raised:
@@ -183,11 +198,9 @@ mln_status mln_read(const double *value BIND("direction=out"), mln_diagnostic *o
     def test_completion_storage_helpers_are_immediate(self):
         validate(
             self.parse("""
-BIND("execution=immediate")
 mln_status mln_completion_create(mln_completion *out_completion BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("execution=immediate")
 void mln_completion_reject(mln_completion *completion);
-BIND("execution=operation;result=void;shape=none;ownership=value")
+BIND("execution=operation")
 mln_status mln_barrier(const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         )
@@ -202,7 +215,7 @@ BIND("execution=immediate;execution=query") mln_status mln_duplicate(mln_diagnos
 
     def test_erased_results_reject_unsafe_ownership_and_absence_contracts(self):
         api = self.parse("""
-BIND("execution=query;result=double;shape=value;ownership=owned;encoding=utf8;nullable=true;optional=empty")
+BIND("execution=query;result=double;ownership=owned;encoding=utf8;nullable=true;optional=empty")
 mln_status mln_unsafe_result(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         with self.assertRaises(ModelError) as raised:
@@ -214,7 +227,6 @@ mln_status mln_unsafe_result(mln_map map, const mln_completion *completion, mln_
 
     def test_bad_span_relation_and_scalar_encoding_are_rejected(self):
         api = self.parse("""
-BIND("execution=immediate")
 mln_status mln_bad_span(const double *items BIND("length=missing"),
                         double number BIND("encoding=utf8"), mln_diagnostic *out_diagnostic);
 """)
@@ -227,7 +239,7 @@ mln_status mln_bad_span(const double *items BIND("length=missing"),
         with self.assertRaisesRegex(ModelError, "mln_status acceptance gating"):
             validate(
                 self.parse("""
-BIND("execution=query;result=double;shape=value;ownership=borrowed")
+BIND("execution=query;result=double")
 void mln_broken_submission(mln_map map, const mln_completion *completion);
 """)
             )
@@ -251,14 +263,14 @@ typedef struct mln_record {
             validate(
                 self.parse("""
 typedef struct mln_opaque mln_opaque;
-BIND("execution=query;result=mln_opaque;shape=value;ownership=borrowed")
+BIND("execution=query;result=mln_opaque")
 mln_status mln_invalid_value(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
             )
 
     def test_status_functions_report_through_a_final_diagnostic(self):
         api = self.parse("""
-BIND("execution=immediate") mln_status mln_resize(mln_map map, double scale, mln_diagnostic *out_diagnostic);
+mln_status mln_resize(mln_map map, double scale, mln_diagnostic *out_diagnostic);
 """)
         (function,) = api.functions
         self.assertTrue(function.diagnostic)
@@ -274,17 +286,17 @@ BIND("execution=immediate") mln_status mln_resize(mln_map map, double scale, mln
                 self.subTest(declaration=declaration),
                 self.assertRaisesRegex(ModelError, "final mln_diagnostic"),
             ):
-                validate(self.parse(f'BIND("execution=immediate") {declaration}\n'))
+                validate(self.parse(f"{declaration}\n"))
         with self.assertRaisesRegex(ModelError, "must be the last parameter"):
             self.parse(
-                'BIND("execution=immediate") mln_status mln_resize(mln_diagnostic *out_diagnostic, mln_map map);\n'
+                "mln_status mln_resize(mln_diagnostic *out_diagnostic, mln_map map);\n"
             )
 
     def test_variadic_functions_require_an_explicit_backend_design(self):
         with self.assertRaisesRegex(ModelError, "variadic public functions"):
             validate(
                 self.parse("""
-BIND("execution=immediate") mln_status mln_format(const char *format, ...);
+mln_status mln_format(const char *format, ...);
 """)
             )
 

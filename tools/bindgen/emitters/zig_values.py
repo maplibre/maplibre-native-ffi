@@ -103,14 +103,7 @@ class Values:
         if value.kind != "record":
             return
         for field in value.fields:
-            if field.role in {
-                "size",
-                "reserved",
-                "presence_mask",
-                "count",
-                "stride",
-                "arena",
-            }:
+            if not field.public:
                 continue
             if field.presence and field.presence.variant:
                 raise ModelError(
@@ -163,14 +156,7 @@ class Values:
                     f"        raw.{field.name} = {'false' if field.value.ctype.canonical in {'_Bool', 'bool'} else '0'};"
                 )
         for flag in value.mask_flags:
-            mask = next(
-                field.value for field in value.fields if field.name == flag.mask
-            )
-            prefix = (
-                commonprefix([key for key, _ in mask.enum_values]).rsplit("_", 1)[0]
-                + "_"
-            )
-            local = identifier(flag.name.removeprefix(prefix).lower())
+            local = identifier(flag.member)
             fields.append(f"    {local}: bool = false,")
             copies.append(
                 f"            .{local} = raw.{flag.mask} & c.{flag.name} != 0,"
@@ -188,10 +174,7 @@ class Values:
             if len(group.fields) == 1:
                 continue
             child = self.bound.values[group.type]
-            prefix = value.native.removeprefix("mln_").removesuffix("s").upper() + "_"
-            local = identifier(
-                group.bit.removeprefix("MLN_").removeprefix(prefix).lower()
-            )
+            local = identifier(group.member)
             fields.append(f"    {local}: ?{self.public(child)} = null,")
             writes.append(
                 f"        if (self.{local}) |item| {{ raw.{identifier(group.mask)} |= c.{group.bit}; "
@@ -215,10 +198,7 @@ class Values:
                 if not value.default:
                     writes.append(f"        raw.{local} = @sizeOf(c.{value.native});")
                 continue
-            if (
-                field.role in {"reserved", "presence_mask", "count", "stride", "arena"}
-                or field.name in grouped
-            ):
+            if not field.public or field.name in grouped:
                 continue
             optional = field.presence and field.presence.mask
             initial = (

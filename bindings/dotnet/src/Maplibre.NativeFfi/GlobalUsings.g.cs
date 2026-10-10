@@ -1,5 +1,4 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
-global using Maplibre.NativeFfi.Base;
 global using Maplibre.NativeFfi.Internal;
 global using Maplibre.NativeFfi.Internal.C;
 global using static Maplibre.NativeFfi.Internal.C.mln_animation_option_field;
@@ -25,9 +24,3 @@ global using Maplibre.NativeFfi.Internal.Callback;
 global using Maplibre.NativeFfi.Internal.Memory;
 global using Maplibre.NativeFfi.Internal.Pointer;
 global using Maplibre.NativeFfi.Internal.Struct;
-global using Maplibre.NativeFfi.Logging;
-global using Maplibre.NativeFfi.Map;
-global using Maplibre.NativeFfi.Query;
-global using Maplibre.NativeFfi.Render;
-global using Maplibre.NativeFfi.Runtime;
-global using Maplibre.NativeFfi.Style;

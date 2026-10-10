@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 

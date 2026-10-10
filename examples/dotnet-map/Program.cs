@@ -1,7 +1,4 @@
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 

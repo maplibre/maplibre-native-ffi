@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Camera;
-using Maplibre.NativeFfi.Map;
 using Silk.NET.GLFW;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;

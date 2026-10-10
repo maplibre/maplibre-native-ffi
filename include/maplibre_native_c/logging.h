@@ -64,18 +64,16 @@ typedef enum mln_log_event : uint32_t {
  * A deferring adapter consumes each record at once for a host that cannot run
  * code on a logging thread, and delivers a copy of the record later.
  */
+MLN_BINDING("failure=0;reentry=forbid;deferred=1")
 typedef uint32_t (*mln_log_callback)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  uint32_t severity MLN_BINDING("enum=mln_log_severity"),
+  void* user_data, uint32_t severity MLN_BINDING("enum=mln_log_severity"),
   uint32_t event MLN_BINDING("enum=mln_log_event"), int64_t code,
   const char* message
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;lifetime=call")
-) MLN_BINDING("thread=native;failure=0;reentry=forbid;deferred=1");
+);
 
 /** Releases user_data from a log callback registration. */
-typedef void (*mln_log_callback_release)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner")
-) MLN_BINDING("thread=native;failure=contain;reentry=forbid");
+MLN_BINDING("reentry=forbid")
+typedef void (*mln_log_callback_release)(void* user_data);
 
 /**
  * Installs a process-global MapLibre Native log callback.
@@ -104,13 +102,9 @@ typedef void (*mln_log_callback_release)(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING(
-  "execution=immediate;registration=callback;user_data=user_data;"
-  "release_callback=release_user_data"
-)
+MLN_BINDING("registration=callback;release_callback=release_user_data")
 MLN_API mln_status mln_log_set_callback(
-  mln_log_callback callback,
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed"),
+  mln_log_callback callback, void* user_data MLN_BINDING("kind=context"),
   mln_log_callback_release release_user_data, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -121,7 +115,6 @@ MLN_API mln_status mln_log_set_callback(
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status
 mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
 
@@ -137,7 +130,6 @@ mln_log_clear_callback(mln_diagnostic* out_diagnostic) MLN_NOEXCEPT;
  * - MLN_STATUS_INVALID_ARGUMENT when mask contains unknown bits.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_log_set_async_severity_mask(
   uint32_t mask MLN_BINDING("enum=mln_log_severity_mask"),
   mln_diagnostic* out_diagnostic

@@ -1,7 +1,5 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Render;
 using Silk.NET.GLFW;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;

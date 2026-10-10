@@ -11,7 +11,7 @@ public abstract class GeneratedRenderFrameBatchOperations internal constructor()
 
   public fun count(): ULong =
     nativeCall(this, binding, "mln_render_frame_batch_count") {
-      val out = allocate(8)
+      val out = allocate(w(4, 8), w(4, 8))
       check(C.mln_render_frame_batch_count(handle, out, diagnostic))
       readSize(out)
     }

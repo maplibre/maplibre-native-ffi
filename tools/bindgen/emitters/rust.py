@@ -252,11 +252,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             for parameter in plan.inputs
             if parameter.name == plan.receiver
         )
-        if any(
-            callback.decision
-            and callback.decision.handle.native == receiver_value.native
-            for callback in value_types.bound.callbacks.values()
-        ):
+        if receiver_value.native in value_types.bound.decisions:
             value_types.add(receiver_value)
             return "global", ""
     if plan.scoped_receiver:
@@ -381,7 +377,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             # Counts precede the conversions, which shadow their slices.
             prelude.append(f"let {local} = convert::count({lengths[parameter.name]})?;")
             args.append(local)
-        elif pointee and ctype(pointee) == "mln_completion":
+        elif plan.completion and parameter.name == plan.completion.parameter:
             args.append(local)
         elif value_plan and value_plan.kind == "enum":
             value_types.add(value_plan)
@@ -431,13 +427,8 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             args.append(local)
         elif value_plan and value_plan.buffer_form == "view":
             encoding = value_plan.encoding
-            if (
-                encoding not in {"utf8", "json", "bytes"}
-                or value_plan.lifetime != "call"
-            ):
-                raise Unsupported(
-                    f"parameter {parameter.name} needs buffer encoding and call lifetime"
-                )
+            if encoding not in {"utf8", "json", "bytes"}:
+                raise Unsupported(f"parameter {parameter.name} needs buffer encoding")
             optional = value_plan.nullable or value_plan.optional == "empty"
             public = "&str" if encoding == "utf8" else "&[u8]"
             signature.append(
@@ -451,7 +442,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             and ctype(pointee) == "char"
             and pointee.const
             and value_plan.encoding == "utf8"
-            and value_plan.lifetime == "call"
         ):
             signature.append(f"{local}: &str")
             setup.append(f"let {local} = call.input({local})?;")
@@ -557,9 +547,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             raise Unsupported(
                 f"parameter {parameter.name}: {parameter.type.spelling} needs ownership/shape lowering"
             )
-    method = function.name.removeprefix(
-        receiver + "_" if receiver else "mln_"
-    ).removeprefix("mln_")
+    method = plan.member
     if method in {"native", "submit_command", "submit_query", "drop", "adopt"} or (
         method == "close" and not consuming
     ):
@@ -663,11 +651,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             if value.registration
             else value.kind == "native_pointer"
             or bool(value.element and has_pointer(value.element))
-            or any(
-                has_pointer(field.value)
-                for field in value.fields
-                if field.role not in {"reserved", "context"}
-            )
+            or any(has_pointer(field.value) for field in value.fields if field.public)
         )
 
     unsafe_input = any(
@@ -751,14 +735,11 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         )
         modules.append("global")
     assert not chunks, f"operations without an owner module: {sorted(chunks)}"
-    decisions = {
-        callback.decision.handle.native: callback.decision
-        for callback in bound.callbacks.values()
-        if callback.decision
-    }
+    from .rust_callbacks import decision_table
+
     decision_tables = [
-        f"pub(crate) const {native.removeprefix('mln_').upper()}_FUNCTIONS: maplibre_core::resource::ResourceRequestHandleFns = unsafe {{ maplibre_core::resource::ResourceRequestHandleFns::new(sys::{decision.complete}, sys::{decision.handle.release}) }};\n"
-        for native, decision in sorted(decisions.items())
+        decision_table(bound, decision, pascal(native))
+        for native, decision in sorted(bound.decisions.items())
     ]
     from .rust_direct import declaration as direct_declaration
 

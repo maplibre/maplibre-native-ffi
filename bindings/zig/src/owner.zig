@@ -55,31 +55,14 @@ const State = struct {
     }
 };
 
-/// The public type name for the native handle type `native`: `mln_map`
-/// becomes `Map`.
-fn publicName(comptime native: []const u8) []const u8 {
-    comptime {
-        const words = if (std.mem.startsWith(u8, native, "mln_")) native["mln_".len..] else native;
-        var result: []const u8 = "";
-        var upper = true;
-        for (words) |char| {
-            if (char == '_') {
-                upper = true;
-            } else {
-                result = result ++ .{if (upper) std.ascii.toUpper(char) else char};
-                upper = false;
-            }
-        }
-        return result;
-    }
-}
-
-pub fn Handle(comptime name: []const u8, comptime dispose: *const fn (u64) status.Error!void) type {
+/// The owner of one native handle type. `name` is the C type and `public`
+/// the generated type that lifecycle errors name.
+pub fn Handle(comptime name: []const u8, comptime public: []const u8, comptime dispose: *const fn (u64) status.Error!void) type {
     return struct {
         const Self = @This();
         pub const native_name = name;
         /// The public type name that lifecycle errors name.
-        pub const type_name = publicName(name);
+        pub const type_name = public;
         var mutex: std.Io.Mutex = .init;
         var registry: std.AutoHashMapUnmanaged(u64, *State) = .empty;
         raw: u64,
@@ -267,7 +250,7 @@ test "copied owners defer disposal through borrowed copies exactly once" {
             disposals += 1;
         }
     };
-    const Owner = Handle("mln_borrowed_owner_test", Probe.dispose);
+    const Owner = Handle("mln_borrowed_owner_test", "BorrowedOwnerTest", Probe.dispose);
     Probe.disposals = 0;
     var value = try Owner.adopt(71, null);
     const copy = value;
@@ -295,7 +278,7 @@ test "rejected close restores owner and accepted provider actions force ownershi
             disposals += 1;
         }
     };
-    const Owner = Handle("mln_provider_owner_test", Probe.dispose);
+    const Owner = Handle("mln_provider_owner_test", "ProviderOwnerTest", Probe.dispose);
     Probe.disposals = 0;
     var value = try Owner.adopt(81, null);
     const closing = (try value.beginClose(null)).?;
@@ -347,7 +330,7 @@ const ThreadProbe = struct {
 
 test "a borrow on another thread holds off disposal until it ends" {
     ThreadProbe.reset();
-    const Owner = Handle("mln_threaded_borrow_test", ThreadProbe.dispose);
+    const Owner = Handle("mln_threaded_borrow_test", "ThreadedBorrowTest", ThreadProbe.dispose);
     var value = try Owner.adopt(91, null);
     var borrowed: sync.Latch = .{};
     var finish: sync.Latch = .{};
@@ -379,7 +362,7 @@ test "a borrow on another thread holds off disposal until it ends" {
 // rather than a leak, and there is no leak for the binding to report.
 test "an owner abandoned inside a callback scope disposes off the callback stack" {
     ThreadProbe.reset();
-    const Owner = Handle("mln_finalizer_owner_test", ThreadProbe.dispose);
+    const Owner = Handle("mln_finalizer_owner_test", "FinalizerOwnerTest", ThreadProbe.dispose);
     var inline_value = try Owner.adopt(101, null);
     inline_value.deinit();
     try std.testing.expectEqual(std.Thread.getCurrentId(), ThreadProbe.thread.load(.acquire));

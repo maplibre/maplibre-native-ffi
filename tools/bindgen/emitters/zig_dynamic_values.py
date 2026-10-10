@@ -149,8 +149,8 @@ def declaration(values, value):
     for group in value.presence_groups:
         if len(group.fields) < 2 or group.type:
             continue
-        local = identifier(group.mask.removeprefix("has_"))
-        name = typ + pascal(group.mask.removeprefix("has_"))
+        local = identifier(group.member)
+        name = typ + pascal(group.member)
         members = [next(f for f in value.fields if f.name == n) for n in group.fields]
         groups.append(
             f"pub const {name} = struct {{ "
@@ -196,8 +196,6 @@ def declaration(values, value):
                 f"        {raw} = {'false' if field.value.ctype.canonical in {'bool', '_Bool'} else '0'};",
             )
             continue
-        if field.role in {"reserved", "tag", "stride", "arena"}:
-            continue
         if field.role == "count":
             array = next(f for f in value.fields if f.value.length == field.name)
             if array.role == "arena":
@@ -213,6 +211,8 @@ def declaration(values, value):
             writes.append(
                 f"        {raw} = std.math.cast(@TypeOf({raw}), {length}) orelse return error.InvalidArgument;"
             )
+            continue
+        if not field.public:
             continue
         if field.value.kind == "union":
             union = field.value

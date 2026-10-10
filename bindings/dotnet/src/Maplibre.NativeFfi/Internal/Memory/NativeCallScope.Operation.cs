@@ -2,7 +2,6 @@ using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Error;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Pointer;
-using Maplibre.NativeFfi.Runtime;
 
 namespace Maplibre.NativeFfi.Internal.Memory;
 

@@ -61,7 +61,7 @@ class OwnedTextureSessionTest {
       val sibling = session.acquireFrame()
 
       var escaped: GpuSync? = null
-      frame.withGetProducerSync { sync ->
+      frame.withProducerSync { sync ->
         escaped = sync
         val kind = sync.kind
         // The view borrows the frame, so neither the frame nor its session can go away under it.
@@ -90,7 +90,7 @@ class OwnedTextureSessionTest {
       val entered = CompletableDeferred<Unit>()
       val leave = CompletableDeferred<Unit>()
       val borrower = TestThread {
-        frame.withGetProducerSync {
+        frame.withProducerSync {
           entered.complete(Unit)
           runBlocking { leave.await() }
         }

@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.internal.status
 
+import org.maplibre.nativeffi.internal.c.DiagnosticLayout
 import org.maplibre.nativeffi.internal.memory.readCString
 import org.maplibre.nativeffi.internal.memory.writeU32
 
@@ -10,8 +11,9 @@ import org.maplibre.nativeffi.internal.memory.writeU32
  * right after on the same thread, so calls nested in callbacks during that call cannot clobber it.
  */
 internal object NativeDiagnostics {
-  /** `sizeof(mln_diagnostic)`: a `uint32_t` size and a 4096-byte message. */
-  const val SIZE: Int = 4 + 4096
+  /** `sizeof(mln_diagnostic)`, from the generated layout. */
+  val SIZE: Int
+    get() = DiagnosticLayout.SIZEOF
 
   /** Calls native with this thread's diagnostic and throws the mapped exception on failure. */
   inline fun check(call: (Long) -> Int) {
@@ -23,7 +25,7 @@ internal object NativeDiagnostics {
   fun buffer(): Long = threadDiagnostic().also { writeU32(it, SIZE.toUInt()) }
 
   /** Copies the message that the last call through [diagnostic] wrote. */
-  fun message(diagnostic: Long): String = readCString(diagnostic + 4)
+  fun message(diagnostic: Long): String = readCString(diagnostic + DiagnosticLayout.MESSAGE)
 }
 
 /** This thread's [NativeDiagnostics.SIZE]-byte buffer, freed once the thread ends. */

@@ -22,3 +22,9 @@ internal object CompletionResultLayout {
   val VALUE: Int = w(32, 40)
   val VALUE_COUNT: Int = w(36, 48)
 }
+
+internal object DiagnosticLayout {
+  val SIZEOF: Int = 4100
+  val SIZE: Int = 0
+  val MESSAGE: Int = 4
+}

@@ -45,12 +45,12 @@ internal suspend fun abandonAMapAndAwaitItsDisposal() {
     val request = claimed.awaitWithin("the provider to claim the style request")
     try {
       val cancelled = CompletableDeferred<Unit>()
-      if (request.resourceRequestSetCancelCallback { cancelled.complete(Unit) }) {
+      if (request.setCancelCallback { cancelled.complete(Unit) }) {
         cancelled.complete(Unit)
       }
       holder.map = null
       awaitWhileCollecting("the abandoned map's disposal to cancel its request", cancelled)
-      assertTrue(request.resourceRequestCancelled())
+      assertTrue(request.cancelled())
     } finally {
       request.close()
     }

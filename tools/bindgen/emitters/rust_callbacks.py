@@ -99,8 +99,8 @@ def callback_output(values, callback):
     """The host callback's Rust result and the C value that it returns."""
     if callback.result.ctype.kind == "void":
         return "()", "()", "value"
-    if callback.result.native == "mln_status":
-        return "Result<()>", "sys::mln_status", "value"
+    if callback.status:
+        return "Result<()>", f"sys::{callback.result.native}", "value"
     result = callback.result
     public = values.public(result)
     raw = native_type(values, result.ctype)
@@ -135,7 +135,7 @@ def trampoline(values, callback, name, host, state="Self"):
     returns = "" if raw == "()" else f" -> {raw}"
     context = locals_by_name[callback.context]
     host = f"{host}({copies})"
-    if raw == "sys::mln_status":
+    if callback.status:
         failure = (
             f"sys::{callback.failure}"
             if callback.failure not in {None, "contain"}
@@ -199,24 +199,14 @@ def declaration(values, value):
             constructors.append(
                 f"pub fn new<F>(callback: F) -> Self where F: {function} {{ Self::default().with_{field.name}(callback) }}"
             )
-    hidden = {
-        *value.registration.callbacks,
-        value.registration.user_data,
-        value.registration.release,
-    }
     for field in value.fields:
         place = f"raw.{native_identifier(field.name)}"
         if field.role == "presence_mask":
             writes.insert(0, f"{place} = 0;")
-        if field.name in hidden or field.role in {
-            "reserved",
-            "presence_mask",
-            "count",
-            "tag",
-        }:
-            continue
         if field.role == "size":
             writes.insert(0, f"{place} = std::mem::size_of::<{raw}>() as _;")
+            continue
+        if not field.public or field.name in value.registration.callbacks:
             continue
         public = identifier(field.name)
         masked = field.presence and field.presence.mask
@@ -299,20 +289,20 @@ def decision_trampoline(values, callback, name, public):
         if callback.failure not in {None, "contain"}
         else "Default::default()"
     )
-    functions = f"{decision.handle.native.removeprefix('mln_').upper()}_FUNCTIONS"
+    functions = decision_table_name(decision)
     return f"""unsafe extern "C" fn {name}({raw_arguments}) -> {raw} {{
     let _policy = callback::enter({reentry(callback, locals_by_name)});
-    // SAFETY: native lends the provider this live request handle.
-    let Ok(request_state) = (unsafe {{ maplibre_core::resource::ResourceRequestHandleState::new({locals_by_name[decision.parameter]}, {functions}) }}) else {{
+    // SAFETY: native lends the callback this live decision handle.
+    let Ok(request_state) = (unsafe {{ maplibre_core::decision::DecisionHandleState::new({locals_by_name[decision.parameter]}, {functions}) }}) else {{
         return {fallback};
     }};
     // SAFETY: native passes the registration that this trampoline's
     // descriptor transferred.
     let state = unsafe {{ callback::state::<Self>({locals_by_name[callback.context]}) }};
     match callback::invoke(None, None, || Ok(Some(callback::require(&state.{public})?({copies}).to_native()))) {{
-        Some(sys::{decision.accept}) => request_state.finish_provider_decision(true),
-        Some(sys::{decision.pass_through}) => request_state.finish_provider_decision(false),
-        _ => request_state.finish_provider_exception(),
+        Some(sys::{decision.accept}) => request_state.finish_decision(true),
+        Some(sys::{decision.pass_through}) => request_state.finish_decision(false),
+        _ => request_state.finish_exception(),
     }}
 }}"""
 
@@ -398,12 +388,37 @@ impl {name}<'_> {{
 """
 
 
-def decision_declaration(values, value):
-    decision = next(
-        callback.decision
-        for callback in values.bound.callbacks.values()
-        if callback.decision and callback.decision.handle.native == value.native
+def decision_table_name(decision) -> str:
+    """The generated constant that holds one decision protocol's functions."""
+    return f"{decision.handle.stem.upper()}_DECISION"
+
+
+def decision_reentry(bound, decision) -> tuple[str, ...]:
+    """The operations a decision handle's cancellation notification may call."""
+    plan = bound.operations_by_name[decision.cancel_registration]
+    (registration,) = plan.direct_registrations
+    callback = bound.callbacks[
+        next(p.value.native for p in plan.inputs if p.name == registration.callback)
+    ]
+    return callback.reentry_policy.operations if callback.reentry_policy else ()
+
+
+def decision_table(bound, decision, owner: str) -> str:
+    """Declare the function table that one decision protocol's state uses."""
+    handle = decision.handle.native
+    reentry = ", ".join(f'"{name}"' for name in decision_reentry(bound, decision))
+    return (
+        f"pub(crate) const {decision_table_name(decision)}: "
+        f"maplibre_core::decision::DecisionHandleFns<sys::{handle}> = unsafe {{ "
+        f"maplibre_core::decision::DecisionHandleFns::new("
+        f'"{owner}", sys::{decision.accept}, sys::{decision.pass_through}, '
+        f"sys::{decision.handle.release}, sys::{decision.cancel_registration}, "
+        f"&[{reentry}]) }};\n"
     )
+
+
+def decision_declaration(values, value):
+    decision = values.bound.decisions[value.native]
     complete = values.bound.operations_by_name[decision.complete]
     functions = values.bound.source.functions_by_name
 
@@ -420,15 +435,14 @@ def decision_declaration(values, value):
         if parameter.name != complete.receiver
     )
     name = values.name(value)
-    prefix = value.native.removesuffix("_handle") + "_"
 
     def method(operation):
-        return identifier(operation.removeprefix(prefix))
+        return identifier(values.bound.operations_by_name[operation].member)
 
     cancel_registration(values, decision)
     return f'''#[derive(Debug)]
 pub struct {name} {{
-    state: std::sync::Arc<maplibre_core::resource::ResourceRequestHandleState>,
+    state: std::sync::Arc<maplibre_core::decision::DecisionHandleState<sys::{decision.handle.native}>>,
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }}
 impl {name} {{
@@ -449,7 +463,7 @@ impl {name} {{
     pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {{
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("{decision.cancel_registration}", native.0)?;
-        self.state.set_cancel_callback(Box::new(callback))
+        self.state.register_cancel(Box::new(callback))
     }}
     pub fn {method(decision.wait_retired)}(&self) -> Result<()> {{
         let native = self.state.issued_handle();

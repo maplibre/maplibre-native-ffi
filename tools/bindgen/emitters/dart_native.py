@@ -3,14 +3,14 @@
 The output holds only the forms the binding uses: one `@Native` external per C
 function, a `Struct` or `Union` per record, a top-level integer constant per
 C enum constant, and a `NativeFunction` typedef per callback typedef. Handle
-typedefs alias their integer carrier. The handwritten `native_abi.dart`
-declares `mln_diagnostic`, which the frontend strips from every signature it
-describes, and the library re-exports it. A fixed-size array field fails
-generation, because no current header needs its inline layout.
+typedefs alias their integer carrier, and a fixed-size array field sits inline
+as an `@Array`. The handwritten `native_abi.dart` declares the macros that the
+binding reads, and the library re-exports it.
 """
 
 from __future__ import annotations
 
+from tools.bindgen.managed_contracts import DART_RESERVED
 from tools.bindgen.model import CType, Function, Record
 from tools.bindgen.semantic import BoundApi
 
@@ -132,6 +132,19 @@ class Declarations:
         )
 
     def field(self, name: str, ctype: CType) -> str:
+        while ctype.kind == "typedef" and ctype.declaration in self.typedefs:
+            if self.typedefs[ctype.declaration].type.kind != "array":
+                break
+            ctype = self.typedefs[ctype.declaration].type
+        if ctype.kind == "array" and ctype.element is not None:
+            # A fixed-size array sits inline in its record.
+            if ctype.length is None:
+                raise ValueError(f"{ctype.spelling}: a flexible array has no layout")
+            element = self.native(ctype.element, field=True)
+            return (
+                f"  @Array({ctype.length})\n"
+                f"  external Array<{element}> {identifier(name)};\n"
+            )
         native = self.native(ctype, field=True)
         if native in self.bound.handles:
             native = "Uint64"
@@ -168,47 +181,10 @@ class Declarations:
         )
 
 
-# Words that no Dart declaration can use as a name. Built-in identifiers such as
-# `extension` remain valid field and parameter names.
-RESERVED = {
-    "assert",
-    "break",
-    "case",
-    "catch",
-    "class",
-    "const",
-    "continue",
-    "default",
-    "do",
-    "else",
-    "enum",
-    "extends",
-    "false",
-    "final",
-    "finally",
-    "for",
-    "if",
-    "in",
-    "is",
-    "new",
-    "null",
-    "rethrow",
-    "return",
-    "super",
-    "switch",
-    "this",
-    "throw",
-    "true",
-    "try",
-    "var",
-    "void",
-    "while",
-    "with",
-}
-
-
 def identifier(name: str) -> str:
-    if name in RESERVED:
+    """A C name as a raw declaration name; built-in identifiers such as
+    `extension` remain valid field and parameter names."""
+    if name in DART_RESERVED:
         raise ValueError(f"{name}: C identifier is a Dart reserved word")
     return name
 
@@ -233,7 +209,6 @@ def generate(bound: BoundApi) -> str:
         "@DefaultAsset(nativeAssetId)\n"
         "library;\n\n"
         "import 'dart:ffi';\n\n"
-        "import 'native_abi.dart';\n"
         "import 'native_asset.dart';\n\n"
         "export 'native_abi.dart';\n\n"
         + handles

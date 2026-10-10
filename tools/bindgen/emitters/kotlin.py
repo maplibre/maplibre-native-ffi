@@ -26,13 +26,6 @@ COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
 PLATFORMS = {"jvmMain": "jvm", "nativeMain": "native", "androidMain": "android"}
 JNI = "src/androidMain/jni/mln_jni_generated.c"
 
-# C functions the handwritten runtime calls through `C`.
-RUNTIME_FUNCTIONS = (
-    "mln_c_version",
-    "mln_plugin_get_register_function_v1",
-    "mln_android_init",
-)
-
 OPERATION_IMPORTS = """\
 import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.internal.async.CompletionBridge
@@ -54,7 +47,7 @@ def lower(api: Api | BoundApi):
     unsupported.update(
         {name: "\n".join(reasons) for name, reasons in bound.unsupported.items()}
     )
-    conflicts = conflicting_functions(api, "kotlin")
+    conflicts = conflicting_functions(bound, "kotlin")
     for plan in bound.operations:
         function = plan.function
         try:
@@ -154,9 +147,6 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     outputs[f"{COMMON}/generated/GeneratedValues.kt"] = values.common()
     outputs[f"{COMMON}/internal/c/Upcalls.kt"] = kotlin_callbacks.upcalls(values)
     called = {**native.functions, **values.functions}
-    for name in RUNTIME_FUNCTIONS:
-        if name in bound.source.functions_by_name:
-            called[name] = bound.source.functions_by_name[name]
     shims = NativeShims(bound, called, kotlin_callbacks.sites(values).values())
     outputs[f"{COMMON}/internal/c/C.kt"] = shims.common()
     outputs[f"{COMMON}/internal/c/RuntimeLayouts.kt"] = shims.runtime_layouts()

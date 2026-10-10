@@ -69,12 +69,6 @@ class Values:
         raise ModelError([f"Go: {value.native}: {reason}"])
 
     def require(self, value, input=False):
-        if (
-            input
-            and value.kind in {"buffer", "array", "reference"}
-            and value.lifetime != "call"
-        ):
-            self.fail(value, "retained input requires a lifetime adapter")
         if value.response:
             self.records[value.native] = value
             return
@@ -107,14 +101,7 @@ class Values:
             self.records[value.native] = value
             (self.inputs if input else self.outputs).add(value.native)
             for f in value.fields:
-                if f.role not in {
-                    "size",
-                    "count",
-                    "stride",
-                    "arena",
-                    "reserved",
-                    "presence_mask",
-                }:
+                if f.public:
                     self.require(f.value, input)
             if input and value.default and value.native not in self.outputs:
                 self.require(value, input=False)
@@ -171,8 +158,7 @@ class Values:
         return public(parent.native) + name(member.name)
 
     def owner(self, native):
-        result = public(native)
-        return result if result.endswith("Handle") else result + "Handle"
+        return name(self.api.handles[native].stem) + "Handle"
 
     def group(self, value, group):
         if group.type:
@@ -188,7 +174,7 @@ class Values:
         )
         return ValuePlan(
             kind="record",
-            native=value.native + "_" + group.mask.removeprefix("has_"),
+            native=value.native + "_" + group.member,
             ctype=value.ctype,
             fields=fields,
         )
@@ -198,15 +184,7 @@ class Values:
             n: g for g in value.presence_groups if len(g.fields) > 1 for n in g.fields
         }
         for f in value.fields:
-            if f.role in {
-                "size",
-                "count",
-                "stride",
-                "arena",
-                "reserved",
-                "presence_mask",
-                "tag",
-            }:
+            if not f.public:
                 continue
             arena = self.arenas.get(value.native)
             if arena and f.name in {arena.offset, arena.length}:
@@ -215,13 +193,7 @@ class Values:
                 group = groups[f.name]
                 if group.fields[0] != f.name:
                     continue
-                bits = [g.bit for g in value.presence_groups if g.bit]
-                prefix = os.path.commonprefix(bits).rsplit("_", 1)[0] + "_"
-                member = name(
-                    group.bit.removeprefix(prefix).lower()
-                    if group.bit
-                    else group.mask.removeprefix("has_")
-                )
+                member = name(group.member)
                 yield member, replace(self.group(value, group), nullable=True), f, group
             else:
                 yield (
@@ -233,11 +205,7 @@ class Values:
                     None,
                 )
         for flag in value.mask_flags:
-            bits = [g.bit for g in value.presence_groups if g.bit] + [
-                f.name for f in value.mask_flags
-            ]
-            prefix = os.path.commonprefix(bits).rsplit("_", 1)[0] + "_"
-            yield name(flag.name.removeprefix(prefix).lower()), None, flag, None
+            yield name(flag.member), None, flag, None
 
     def copy(self, value, expr, scope="raw"):
         if expr.startswith("*"):

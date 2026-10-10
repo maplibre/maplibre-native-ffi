@@ -27,15 +27,10 @@ def disposer(bound: BoundApi, handle: HandlePlan):
 
 def owned_handles(bound: BoundApi) -> dict[str, HandlePlan]:
     """Public handles a Rust owner can hold and dispose from `Drop`."""
-    decisions = {
-        callback.decision.handle.native
-        for callback in bound.callbacks.values()
-        if callback.decision
-    }
     candidates = {
         native: handle
         for native, handle in bound.public_handles.items()
-        if native not in decisions and disposer(bound, handle)
+        if native not in bound.decisions and disposer(bound, handle)
     }
     # An owner retains its parent's state, so a parent without an owner leaves
     # its children without one too.

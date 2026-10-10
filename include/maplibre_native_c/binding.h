@@ -9,8 +9,12 @@
 /**
  * Attaches a binding contract to a declaration during header extraction.
  *
- * Keys and values are validated by tools/bindgen/schema.py. The attribute has
- * no effect on the C ABI, compiler warnings, or ordinary header consumers.
+ * A contract states only what the declaration's C shape leaves open; the
+ * conventions in tools/bindgen/schema.py supply the rest, and the schema
+ * rejects a key that restates one of them. A function or callback typedef
+ * carries its contract before the declaration; a parameter, field, or record
+ * typedef carries it after the name. The attribute has no effect on the C ABI,
+ * compiler warnings, or ordinary header consumers.
  */
 #if defined(MLN_BINDGEN) && defined(__clang__)
 #define MLN_BINDING(contract) __attribute__((annotate("mln:" contract)))

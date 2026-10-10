@@ -8,7 +8,7 @@ from pathlib import Path
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
-from tools.bindgen.semantic import BoundApi, OperationPlan
+from tools.bindgen.semantic import BoundApi, OperationPlan, output_member
 
 SCALARS = {
     "double": "Double",
@@ -83,7 +83,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
     owner = (
         name(receiver.removeprefix("mln_"))
         if plan.scoped_receiver
-        else owner_name(receiver)
+        else owner_name(value_types.bound.handles[receiver])
         if receiver
         else "Maplibre"
     )
@@ -123,19 +123,14 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         and value.length != "nul"
         and not value.length.isdigit()
     }
+    output_names = {parameter.name for parameter in plan.outputs}
     for parameter_index, param in enumerate(params):
-        type_ = native(param.type)
-        if param.metadata.get("lifetime", "call") != "call":
-            raise unsupported(
-                function,
-                f"parameter {param.name}: retained storage requires a lifetime adapter",
-            )
         local = f"bindingArg{parameter_index}"
         label = identifier(camel(param.name)) + " " + local
         value_plan = input_plans.get(param.name)
         if param.name in lengths:
             arguments.append(f"try NativeInputArena.count({lengths[param.name]})")
-        elif param.metadata.get("direction") == "out":
+        elif param.name in output_names:
             outputs.append(param)
             arguments.append(f"&value{len(outputs) - 1}")
         elif value_plan and value_plan.kind in {"record", "enum"}:
@@ -186,32 +181,11 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                 )
             )
             arguments.append(encode(value_types, value_plan, local))
-        elif type_ in SCALARS:
-            declarations.append(f"{label}: {SCALARS[type_]}")
-            arguments.append(local)
-        elif (
-            value_plan is not None and value_plan.buffer_form == "view"
-        ) and param.metadata.get("encoding") in (
-            "utf8",
-            "bytes",
-            "json",
-        ):
-            public = "String" if param.metadata["encoding"] == "utf8" else "Data"
-            if param.metadata.get("optional") == "empty":
-                declarations.append(f"{label}: {public}? = nil")
-                arguments.append(
-                    f"arena.view({local} ?? {chr(34) + chr(34) if public == 'String' else 'Data()'})"
-                )
-            else:
-                declarations.append(f"{label}: {public}")
-                arguments.append(f"arena.view({local})")
         else:
-            raise unsupported(function, f"parameter {param.name}: unsupported {type_}")
-    method = camel(
-        function.name.removeprefix(
-            receiver.removesuffix("_handle") + "_" if receiver else "mln_"
-        ).removeprefix("mln_")
-    )
+            raise unsupported(
+                function, f"parameter {param.name}: unsupported {native(param.type)}"
+            )
+    method = camel(plan.member)
     if method in {"close", "requireLiveHandle", "deinit"}:
         raise unsupported(function, "method name is reserved by the handle runtime")
     method = identifier(method)
@@ -249,9 +223,9 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                 function, "multiple immediate completion owners require a result record"
             )
         owned = plan.completion.immediate_owners[0]
-        public = owner_name(owned.handle.native)
-        result = public.removesuffix("Handle") + "Attachment"
-        member = camel(owned.parameter.removeprefix("out_"))
+        public = owner_name(owned.handle)
+        result = name(owned.handle.stem) + "Attachment"
+        member = camel(output_member(owned.parameter))
         value_types.attachments[result] = (
             f"public struct {result}: Sendable {{ public let {member}: {public}; public let completion: Task<Void, Error> }}\n"
         )
@@ -265,10 +239,23 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
             owner,
         )
     if completion and execution in ("query", "command", "operation", "lifecycle"):
-        shape = function.metadata.get("shape")
-        result_type = function.metadata.get("result")
-        nullable = function.metadata.get("nullable") == "true"
-        empty_optional = function.metadata.get("optional") == "empty"
+        returned = plan.result
+        shape = (
+            "none"
+            if returned is None
+            else "array"
+            if returned.kind == "array"
+            else "value"
+        )
+        result_type = returned.native if returned else "void"
+        nullable = bool(returned and returned.nullable)
+        empty_optional = bool(returned and returned.optional == "empty")
+        # An array's elements carry its text encoding.
+        encoding = (
+            (returned.element.encoding if shape == "array" else returned.encoding)
+            if returned
+            else None
+        )
         start = "Start"
         conversion = ""
         # A result that one initializer copies from its single native value.
@@ -297,23 +284,23 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                 )
                 conversion = f"try {result}(adopting: NativeCompletion.value(result, as: {plan.result.native}.self){parent})"
                 copying = f"{{ try {result}(adopting: $0{parent}) }}"
-            elif function.metadata.get("ownership") != "borrowed":
+            elif returned.ownership != "borrowed":
                 raise unsupported(
                     function,
                     "payload needs a borrowed ownership rule or an owned-result adapter",
                 )
             if plan.result and plan.result.kind == "handle":
                 pass
-            elif shape == "value" and result_type in SCALARS:
-                result = SCALARS[result_type]
+            elif shape == "value" and returned.kind == "scalar":
+                result = value_types.public(returned)
                 conversion = f"try NativeCompletion.value(result, as: {result}.self)"
             elif (
                 shape == "value"
                 and plan.result is not None
                 and plan.result.buffer_form == "view"
-                and function.metadata.get("encoding") in ("utf8", "json", "bytes")
+                and encoding in ("utf8", "json", "bytes")
             ):
-                text = function.metadata["encoding"] == "utf8"
+                text = encoding == "utf8"
                 result = "String" if text else "Data"
                 conversion = (
                     f"try NativeCompletion.{'string' if text else 'data'}(result)"
@@ -333,7 +320,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                 and plan.result is not None
                 and plan.result.element is not None
                 and plan.result.element.buffer_form == "view"
-                and function.metadata.get("encoding") == "utf8"
+                and encoding == "utf8"
             ):
                 result = "[String]"
                 conversion = "try NativeCompletion.values(result, as: mln_buffer_view.self).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) }"
@@ -453,7 +440,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
             if len(types) == 1
             else "("
             + ", ".join(
-                f"{identifier(camel(output.name.removeprefix('out_')))}: {typ}"
+                f"{identifier(camel(output_member(output.name)))}: {typ}"
                 for output, typ in zip(outputs, types)
             )
             + ")"

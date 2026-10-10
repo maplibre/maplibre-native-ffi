@@ -1,5 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-namespace Maplibre.NativeFfi.Style;
+namespace Maplibre.NativeFfi;
 
 public readonly partial record struct CanonicalTileId(uint Z, uint X, uint Y);

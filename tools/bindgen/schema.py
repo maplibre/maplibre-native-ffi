@@ -6,7 +6,10 @@ unsupported shapes; they never invent ownership or erased completion types.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .model import Api, CType, Function, ModelError
+from .protocol import BUFFER_VIEW, is_buffer_view, is_completion, is_status
 
 EXECUTIONS = frozenset(
     {
@@ -36,7 +39,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "receiver",
         "consumes",
         "name",
-        "support",
         "kind",
         "length",
         "registration",
@@ -46,7 +48,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "view_owner",
         "callback_adapter",
         "context_type",
-        "invokes",
         "enum",
     }
 )
@@ -76,7 +77,7 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
     }
 )
 RECORD_KEYS = COMMON_KEYS | frozenset(
-    {"kind", "default", "mask", "tag", "release", "user_data", "projection"}
+    {"kind", "default", "mask", "tag", "release", "user_data", "projection", "fields"}
 )
 TYPEDEF_KEYS = COMMON_KEYS | frozenset(
     {
@@ -106,9 +107,34 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "cancel_registration",
         "wait_retired",
         "deferred",
+        "prefix",
+        "fields",
     }
 )
 ENUM_KEYS = frozenset({"kind"})
+# Function keys that describe a returned value rather than the call.
+VALUE_KEYS = COMMON_KEYS | frozenset({"kind", "length", "enum"})
+
+# The roles that `kind` names at each declaration site.
+KINDS = {
+    "function": frozenset({"native_pointer"}),
+    "parameter": frozenset({"context", "native_pointer"}),
+    "field": frozenset(
+        {
+            "size",
+            "reserved",
+            "count",
+            "presence_mask",
+            "tag",
+            "context",
+            "native_pointer",
+            "erased",
+        }
+    ),
+    "record": frozenset({"callback_registration", "callback_response"}),
+    "typedef": frozenset({"handle", "callback_registration", "callback_response"}),
+    "enum": frozenset({"open", "bitmask"}),
+}
 
 
 # Integer ranges of the scalar results a deferred callback can answer with.
@@ -126,15 +152,6 @@ INTEGER_RANGES = {
 }
 
 
-def is_completion(type_: CType) -> bool:
-    return bool(
-        type_.kind == "pointer"
-        and type_.pointee
-        and type_.pointee.const
-        and type_.pointee.declaration == "mln_completion"
-    )
-
-
 def has_completion(function: Function) -> bool:
     return any(is_completion(parameter.type) for parameter in function.parameters)
 
@@ -143,12 +160,314 @@ def has_diagnostic(function: Function) -> bool:
     return function.diagnostic
 
 
+# Conventions: the metadata that a declaration's C shape implies. A header
+# annotates only what differs from these defaults, and the frontend fills them
+# in, so every later stage reads a complete contract.
+
+# A struct whose first member is `uint32_t size` is versioned: that member holds
+# the struct's byte size, which a binding sets to sizeof the struct it writes.
+# The name is the convention's only signal, since other structs begin with an
+# unrelated uint32_t member.
+STRUCT_SIZE_FIELD = "size"
+# Pointers whose kind already says that the generator never reads through them.
+OPAQUE_POINTER_KINDS = frozenset({"context", "native_pointer", "erased"})
+TEXT_POINTEE_KINDS = frozenset({"char_s", "char_u"})
+# Values that only restate the absence of a key; never written, never needed.
+IMPLICIT = {"handle_access": "live", "nullable": "false"}
+
+
+class Conventions:
+    """Derive each declaration's default metadata from its C shape.
+
+    Each rule reads the explicit metadata of the declaration it completes and
+    never another declaration's name, so a renamed declaration keeps its
+    contract.
+    """
+
+    def __init__(self, api: Api):
+        self.api = api
+        self.typedefs = api.typedefs_by_name
+        self.records = api.records_by_name
+
+    def resolve(self, type_: CType) -> CType:
+        seen = set()
+        while (
+            type_.kind == "typedef"
+            and type_.declaration in self.typedefs
+            and type_.declaration not in seen
+        ):
+            seen.add(type_.declaration)
+            type_ = self.typedefs[type_.declaration].type
+        return type_
+
+    def is_record(self, type_: CType) -> bool:
+        record = self.records.get(self.resolve(type_).declaration or "")
+        return record is not None and record.complete
+
+    def value(
+        self, type_: CType, explicit: dict[str, str], *, callback: bool = False
+    ) -> dict[str, str]:
+        """Defaults for a parameter, field, or return value of this C type.
+
+        An untyped pointer is the context of the callback whose signature
+        declares it, and elsewhere a native pointer that bindings pass through.
+        A context outlives the call that passes it; every other value lasts for
+        the call. A buffer view or character pointer holds UTF-8 text. A pointer
+        borrows its target. A character pointer is NUL-terminated, and a pointer
+        to a record addresses one record.
+        """
+        defaults = {}
+        resolved = self.resolve(type_)
+        pointee = (
+            self.resolve(resolved.pointee)
+            if resolved.kind == "pointer" and resolved.pointee
+            else None
+        )
+        if pointee is not None and pointee.kind == "void":
+            defaults["kind"] = "context" if callback else "native_pointer"
+        kind = explicit.get("kind", defaults.get("kind"))
+        defaults["lifetime"] = "owner" if kind == "context" else "call"
+        if is_buffer_view(type_) or is_buffer_view(resolved):
+            defaults["encoding"] = "utf8"
+        if pointee is None:
+            return defaults
+        if pointee.kind == "function" and kind != "native_pointer":
+            return defaults
+        defaults["ownership"] = "borrowed"
+        if kind in OPAQUE_POINTER_KINDS:
+            return defaults
+        if pointee.kind in TEXT_POINTEE_KINDS:
+            defaults.update(length="nul", encoding="utf8")
+        elif self.is_record(pointee):
+            defaults["length"] = "1"
+            if is_buffer_view(resolved.pointee) or is_buffer_view(pointee):
+                defaults["encoding"] = "utf8"
+        return defaults
+
+    def parameter(
+        self, type_: CType, explicit: dict[str, str], *, callback: bool = False
+    ) -> dict[str, str]:
+        """A parameter is an input; a handle that it outputs is the caller's."""
+        defaults = {"direction": "in", **self.value(type_, explicit, callback=callback)}
+        resolved = self.resolve(type_)
+        handle = (
+            self.typedefs.get(resolved.pointee.declaration or "")
+            if resolved.kind == "pointer" and resolved.pointee
+            else None
+        )
+        if (
+            explicit.get("direction") == "out"
+            and handle is not None
+            and handle.metadata.get("kind") == "handle"
+        ):
+            defaults["ownership"] = "owned"
+        return defaults
+
+    def field(self, record, index: int, explicit: dict[str, str]) -> dict[str, str]:
+        """Field roles follow from the struct layout and sibling references.
+
+        A versioned struct's leading size member holds its byte size, a reserved
+        member holds zero, and a member that a sibling's length, mask, or tag
+        names is that sibling's count, presence mask, or union tag.
+        """
+        field = record.fields[index]
+        defaults = {}
+        if (
+            index == 0
+            and record.kind == "struct"
+            and field.name == STRUCT_SIZE_FIELD
+            and field.type.canonical == "unsigned int"
+        ):
+            defaults["kind"] = "size"
+        for key, role in (
+            ("length", "count"),
+            ("mask", "presence_mask"),
+            ("tag", "tag"),
+        ):
+            if any(item.metadata.get(key) == field.name for item in record.fields):
+                defaults["kind"] = role
+        kind = explicit.get("kind", defaults.get("kind"))
+        if kind == "size":
+            defaults["default"] = "sizeof"
+        elif kind == "reserved":
+            defaults["default"] = "0"
+        return {**self.value(field.type, {**defaults, **explicit}), **defaults}
+
+    def function(self, function: Function) -> dict[str, str]:
+        """A function without a completion runs immediately; a completion
+        without a result delivers none, and a result is one borrowed value
+        unless it is a handle, which the completion transfers. A callback
+        registration passes its context parameter as the user data."""
+        explicit = function.metadata
+        defaults = {}
+        if "registration" in explicit:
+            contexts = [
+                parameter.name
+                for parameter in function.parameters
+                if parameter.metadata.get("kind") == "context"
+            ]
+            if len(contexts) == 1:
+                defaults["user_data"] = contexts[0]
+        if not has_completion(function):
+            defaults["execution"] = "immediate"
+            if not is_status(function.return_type) and (
+                function.return_type.kind != "void"
+            ):
+                defaults.update(self.value(function.return_type, explicit))
+            return defaults
+        result = explicit.get("result", "void")
+        handle = self.typedefs.get(result)
+        defaults.update(
+            result="void",
+            shape="none" if result == "void" else "value",
+            ownership="value"
+            if result == "void"
+            else "owned"
+            if handle and handle.metadata.get("kind") == "handle"
+            else "borrowed",
+        )
+        if result == BUFFER_VIEW:
+            defaults["encoding"] = "utf8"
+        return defaults
+
+    def typedef(self, typedef) -> dict[str, str]:
+        """A callback runs on a native thread, allows reentry, and contains a
+        failure it cannot report; a handle has no parent, and its operations
+        begin with its own name; a registration's user
+        data is its context field; and a record's default value comes from the
+        one function that takes nothing and returns it."""
+        explicit = typedef.metadata
+        defaults = {}
+        signature = typedef.type.pointee if typedef.type.kind == "pointer" else None
+        if signature is not None and signature.kind == "function":
+            defaults.update(thread="native", reentry="allow")
+            if signature.result is not None and signature.result.kind == "void":
+                defaults["failure"] = "contain"
+        if explicit.get("kind") == "handle":
+            defaults.update(parent="none", prefix=typedef.name)
+        record = self.records.get(typedef.name)
+        if explicit.get("kind") == "callback_registration" and record:
+            contexts = [
+                field.name
+                for field in record.fields
+                if field.metadata.get("kind") == "context"
+            ]
+            if len(contexts) == 1:
+                defaults["user_data"] = contexts[0]
+        if self.is_record(typedef.type):
+            constructors = [
+                function.name
+                for function in self.api.functions
+                if not function.parameters
+                and function.return_type.declaration == typedef.name
+            ]
+            if len(constructors) == 1:
+                defaults["default"] = constructors[0]
+        return defaults
+
+
+def apply_defaults(api: Api) -> Api:
+    """Complete every declaration's metadata with its conventional defaults.
+
+    An explicit annotation that restates a default is an error, so the headers
+    stay minimal and each annotation marks a real departure from convention.
+    """
+    conventions = Conventions(api)
+    errors: list[str] = []
+
+    def complete(
+        explicit: dict[str, str], defaults: dict[str, str], context: str
+    ) -> dict[str, str]:
+        for key, value in explicit.items():
+            if defaults.get(key, IMPLICIT.get(key)) == value:
+                errors.append(f"{context}: {key}={value} restates the default")
+        return dict(sorted({**defaults, **explicit}.items()))
+
+    functions = []
+    for function in api.functions:
+        context = f"{function.location}: {function.name}"
+        functions.append(
+            replace(
+                function,
+                metadata=complete(
+                    function.metadata, conventions.function(function), context
+                ),
+                parameters=tuple(
+                    replace(
+                        parameter,
+                        metadata=complete(
+                            parameter.metadata,
+                            conventions.parameter(parameter.type, parameter.metadata),
+                            f"{context} parameter {parameter.name}",
+                        ),
+                    )
+                    for parameter in function.parameters
+                ),
+            )
+        )
+    records = tuple(
+        replace(
+            record,
+            fields=tuple(
+                replace(
+                    field,
+                    metadata=complete(
+                        field.metadata,
+                        conventions.field(record, index, field.metadata),
+                        f"{field.location}: {record.name}.{field.name}",
+                    ),
+                )
+                for index, field in enumerate(record.fields)
+            ),
+        )
+        for record in api.records
+    )
+    typedefs = tuple(
+        replace(
+            typedef,
+            metadata=complete(
+                typedef.metadata,
+                conventions.typedef(typedef),
+                f"{typedef.location}: {typedef.name}",
+            ),
+            parameters=tuple(
+                replace(
+                    parameter,
+                    metadata=complete(
+                        parameter.metadata,
+                        conventions.parameter(
+                            parameter.type, parameter.metadata, callback=True
+                        ),
+                        f"{typedef.location}: {typedef.name} callback parameter "
+                        f"{parameter.name}",
+                    ),
+                )
+                for parameter in typedef.parameters
+            ),
+        )
+        for typedef in api.typedefs
+    )
+    for enum in api.enums:
+        if enum.metadata.get("kind") == "open":
+            errors.append(
+                f"{enum.location}: {enum.name}: kind=open restates the default"
+            )
+    if errors:
+        raise ModelError(errors)
+    return replace(api, functions=tuple(functions), records=records, typedefs=typedefs)
+
+
 def metadata_errors(
-    metadata: dict[str, str], allowed: frozenset[str], context: str
+    metadata: dict[str, str],
+    allowed: frozenset[str],
+    context: str,
+    kinds: frozenset[str] = frozenset(),
 ) -> list[str]:
     errors = [
         f"{context}: unknown metadata key {key!r}" for key in metadata.keys() - allowed
     ]
+    if "kind" in metadata and metadata["kind"] not in kinds:
+        errors.append(f"{context}: unsupported kind={metadata['kind']!r}")
     values = {
         "execution": EXECUTIONS,
         "shape": SHAPES,
@@ -179,10 +498,7 @@ def value_metadata_errors(
     type_: CType, metadata: dict[str, str], context: str
 ) -> list[str]:
     errors = []
-    is_buffer = (
-        type_.declaration == "mln_buffer_view"
-        or type_.canonical == "struct mln_buffer_view"
-    )
+    is_buffer = is_buffer_view(type_)
     is_text_pointer = bool(type_.pointee and type_.pointee.kind in {"char_s", "char_u"})
     is_pointer = type_.kind == "pointer"
     if "encoding" in metadata and not (is_buffer or is_text_pointer or is_pointer):
@@ -255,7 +571,9 @@ def validate(api: Api) -> None:
     for function in api.functions:
         context = f"{function.location}: {function.name}"
         metadata = function.metadata
-        errors.extend(metadata_errors(metadata, FUNCTION_KEYS, context))
+        errors.extend(
+            metadata_errors(metadata, FUNCTION_KEYS, context, KINDS["function"])
+        )
         if "view_owner" in metadata:
             owner = next(
                 (
@@ -274,13 +592,24 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: view_owner requires an input handle parameter"
                 )
+            elif not {"view_begin", "view_end"} <= handle.metadata.keys():
+                errors.append(
+                    f"{context}: view_owner requires a handle that declares view_begin and view_end"
+                )
             if owner and owner.metadata.get("direction", "in") != "in":
                 errors.append(f"{context}: view_owner must remain owned by the caller")
-            if not any(
-                parameter.metadata.get("direction") == "out"
+            views = [
+                parameter
                 for parameter in function.parameters
+                if parameter.metadata.get("direction") == "out"
+            ]
+            if len(views) != 1 or not (
+                views[0].type.pointee
+                and api.records_by_name.get(views[0].type.pointee.declaration or "")
             ):
-                errors.append(f"{context}: view_owner requires a borrowed output view")
+                errors.append(
+                    f"{context}: view_owner requires one borrowed output record"
+                )
         if "enum" in metadata and metadata["enum"] not in {
             enum.name for enum in api.enums
         }:
@@ -303,54 +632,12 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: callback adapter requires a known context type"
                 )
-            scoped_records = (
-                {
-                    p.type.pointee.declaration
-                    for p in callback.parameters
-                    if p.type.pointee
-                    and p.metadata.get("direction") in {"out", "inout"}
-                }
-                if callback
-                else set()
-            )
-            allowed = {
-                f.name
-                for f in api.functions
-                if f.parameters
-                and f.parameters[0].type.pointee
-                and f.parameters[0].type.pointee.declaration in scoped_records
-            }
-            if callback:
-                allowed.update(
-                    callback.metadata.get(key)
-                    for key in ("complete", "cancelled", "cancel_registration")
-                )
-                decision_parameter = next(
-                    (
-                        p
-                        for p in callback.parameters
-                        if p.name == callback.metadata.get("decision_handle")
-                    ),
-                    None,
-                )
-                decision_type = (
-                    api.typedefs_by_name.get(decision_parameter.type.declaration or "")
-                    if decision_parameter
-                    else None
-                )
-                if decision_type:
-                    allowed.add(decision_type.metadata.get("release"))
-            for invoked in metadata.get("invokes", "").split(","):
-                if invoked and invoked not in allowed:
-                    errors.append(
-                        f"{context}: callback adapter invokes a function outside its callback protocol"
-                    )
-        elif "context_type" in metadata or "invokes" in metadata:
+        elif "context_type" in metadata:
             errors.append(f"{context}: adapter relationships require callback_adapter")
         execution = metadata.get("execution")
         if execution is None:
             errors.append(f"{context}: missing execution metadata")
-        returns_status = function.return_type.declaration == "mln_status"
+        returns_status = is_status(function.return_type)
         if function.diagnostic != (
             returns_status and "callback_adapter" not in metadata
         ):
@@ -361,7 +648,7 @@ def validate(api: Api) -> None:
             )
         completion = has_completion(function)
         if completion:
-            if function.return_type.declaration != "mln_status":
+            if not is_status(function.return_type):
                 errors.append(
                     f"{context}: completion submission requires mln_status acceptance gating"
                 )
@@ -417,39 +704,38 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{context}: owned completion requires a declared handle type"
                     )
-            if (
-                "encoding" in metadata
-                and result != "mln_buffer_view"
-                and shape != "bytes"
-            ):
+            if "encoding" in metadata and result != BUFFER_VIEW and shape != "bytes":
                 errors.append(
                     f"{context}: encoded completion requires a buffer view or byte shape"
                 )
-            if metadata.get("optional") == "empty" and result != "mln_buffer_view":
+            if metadata.get("optional") == "empty" and result != BUFFER_VIEW:
                 errors.append(
                     f"{context}: optional=empty requires a buffer view result"
                 )
-        elif execution in COMPLETION_EXECUTIONS:
-            errors.append(
-                f"{context}: {execution} execution requires a completion parameter"
-            )
+        else:
+            if execution in COMPLETION_EXECUTIONS:
+                errors.append(
+                    f"{context}: {execution} execution requires a completion parameter"
+                )
+            if "result" in metadata or "shape" in metadata:
+                errors.append(f"{context}: result and shape describe a completion")
+            if is_status(function.return_type) or (function.return_type.kind == "void"):
+                extra = sorted(metadata.keys() & VALUE_KEYS)
+                if extra:
+                    errors.append(
+                        f"{context}: a function without a return value takes no "
+                        f"value metadata ({', '.join(extra)})"
+                    )
         if function.variadic:
             errors.append(
                 f"{context}: variadic public functions cannot be generated safely"
             )
         parameters = {parameter.name: parameter for parameter in function.parameters}
-        if "support" in metadata:
-            role, separator, owner = metadata["support"].partition(":")
-            typedef = api.typedefs_by_name.get(owner)
-            if (
-                not separator
-                or role != "default"
-                or typedef is None
-                or typedef.metadata.get("default") != function.name
-            ):
-                errors.append(
-                    f"{context}: support requires a checked default-constructor consumer"
-                )
+        if "receiver" in metadata and (
+            not function.parameters
+            or metadata["receiver"] != function.parameters[0].name
+        ):
+            errors.append(f"{context}: receiver must name the first parameter")
         if (
             metadata.keys() & {"user_data", "release_callback", "accepted_unless"}
             and "registration" not in metadata
@@ -507,11 +793,13 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{context}: accepted_unless requires a boolean output"
                     )
-        if "receiver" in metadata and metadata["receiver"] not in parameters:
-            errors.append(f"{context}: receiver names an absent parameter")
         for parameter in function.parameters:
             pcontext = f"{context} parameter {parameter.name}"
-            errors.extend(metadata_errors(parameter.metadata, PARAMETER_KEYS, pcontext))
+            errors.extend(
+                metadata_errors(
+                    parameter.metadata, PARAMETER_KEYS, pcontext, KINDS["parameter"]
+                )
+            )
             errors.extend(
                 value_metadata_errors(parameter.type, parameter.metadata, pcontext)
             )
@@ -547,7 +835,9 @@ def validate(api: Api) -> None:
                 errors.append(f"{pcontext}: length names an absent parameter")
     for record in api.records:
         context = f"{record.location}: {record.name}"
-        errors.extend(metadata_errors(record.metadata, RECORD_KEYS, context))
+        errors.extend(
+            metadata_errors(record.metadata, RECORD_KEYS, context, KINDS["record"])
+        )
         projection = record.metadata.get("projection") or (
             api.typedefs_by_name[record.name].metadata.get("projection")
             if record.name in api.typedefs_by_name
@@ -579,10 +869,13 @@ def validate(api: Api) -> None:
                         errors.append(
                             f"{context}: projection field {source_field.name} must preserve its source C type"
                         )
-        fields = {field.name for field in record.fields}
+        if "fields" in record.metadata:
+            errors.extend(ordered_errors(record, record.metadata["fields"], context))
         for field in record.fields:
             fcontext = f"{field.location}: {record.name}.{field.name}"
-            errors.extend(metadata_errors(field.metadata, FIELD_KEYS, fcontext))
+            errors.extend(
+                metadata_errors(field.metadata, FIELD_KEYS, fcontext, KINDS["field"])
+            )
             errors.extend(value_metadata_errors(field.type, field.metadata, fcontext))
             if "stride" in field.metadata:
                 stride = field_path(record.name, field.metadata["stride"])
@@ -759,22 +1052,31 @@ def validate(api: Api) -> None:
                     errors.append(f"{fcontext}: {key} names an absent field")
     for typedef in api.typedefs:
         context = f"{typedef.location}: {typedef.name}"
-        errors.extend(metadata_errors(typedef.metadata, TYPEDEF_KEYS, context))
+        errors.extend(
+            metadata_errors(typedef.metadata, TYPEDEF_KEYS, context, KINDS["typedef"])
+        )
         if "projection" in typedef.metadata and typedef.name not in api.records_by_name:
             errors.append(f"{context}: projection requires a record typedef")
+        if "fields" in typedef.metadata:
+            errors.extend(
+                ordered_errors(
+                    api.records_by_name.get(typedef.name),
+                    typedef.metadata["fields"],
+                    context,
+                )
+            )
+        if "prefix" in typedef.metadata and typedef.metadata.get("kind") != "handle":
+            errors.append(f"{context}: prefix names a handle's operations")
         for parameter in typedef.parameters:
             pcontext = f"{context} callback parameter {parameter.name}"
-            errors.extend(metadata_errors(parameter.metadata, PARAMETER_KEYS, pcontext))
+            errors.extend(
+                metadata_errors(
+                    parameter.metadata, PARAMETER_KEYS, pcontext, KINDS["parameter"]
+                )
+            )
             errors.extend(
                 value_metadata_errors(parameter.type, parameter.metadata, pcontext)
             )
-        release = typedef.metadata.get("release")
-        if (
-            release
-            and typedef.metadata.get("kind") != "callback_registration"
-            and release not in api.functions_by_name
-        ):
-            errors.append(f"{context}: release names an absent function")
         if typedef.metadata.get("kind") == "callback_registration":
             record = api.records_by_name.get(typedef.name)
             fields = {field.name: field for field in record.fields} if record else {}
@@ -814,8 +1116,6 @@ def validate(api: Api) -> None:
                     f"{context}: registration user_data requires a void context pointer"
                 )
         dispose = typedef.metadata.get("dispose")
-        if dispose and dispose not in api.functions_by_name:
-            errors.append(f"{context}: dispose names an absent function")
         default = typedef.metadata.get("default")
         if default:
             constructor = api.functions_by_name.get(default)
@@ -850,7 +1150,7 @@ def validate(api: Api) -> None:
                     or begin.parameters[0].type.declaration != typedef.name
                     or begin.parameters[1].type.canonical != "void **"
                     or begin.parameters[1].metadata.get("direction") != "out"
-                    or begin.return_type.declaration != "mln_status"
+                    or not is_status(begin.return_type)
                     or end.parameters[0].type.canonical != "void *"
                     or end.return_type.kind != "void"
                 ):
@@ -880,7 +1180,7 @@ def validate(api: Api) -> None:
                 if receiver.declaration != typedef.name:
                     errors.append(f"{context}: {key} receiver must be this handle type")
                 if (
-                    operation.return_type.declaration != "mln_status"
+                    not is_status(operation.return_type)
                     and operation.return_type.kind != "void"
                 ):
                     errors.append(f"{context}: {key} must return status or void")
@@ -940,6 +1240,24 @@ def validate(api: Api) -> None:
             errors.append(
                 f"{context}: reentry owner and operations require protocol mode"
             )
+        signature = typedef.type.pointee
+        if signature is not None and signature.kind == "function":
+            failure = typedef.metadata.get("failure")
+            if signature.result is not None and signature.result.kind == "void":
+                if failure != "contain":
+                    errors.append(f"{context}: a void callback contains its failure")
+            elif failure is None or failure == "contain":
+                errors.append(
+                    f"{context}: a callback with a result declares the failure it returns"
+                )
+            else:
+                errors.extend(
+                    callback_result_errors(
+                        typedef, failure, "failure", enum_constants, context
+                    )
+                )
+        elif "failure" in typedef.metadata:
+            errors.append(f"{context}: failure requires a callback")
         if "deferred" in typedef.metadata:
             errors.extend(deferred_errors(typedef, enum_constants, context))
         decision_keys = {
@@ -993,7 +1311,7 @@ def validate(api: Api) -> None:
                     operation is None
                     or not operation.parameters
                     or operation.parameters[0].type.declaration != handle.name
-                    or operation.return_type.declaration != "mln_status"
+                    or not is_status(operation.return_type)
                     or has_completion(operation)
                 ):
                     errors.append(
@@ -1009,7 +1327,7 @@ def validate(api: Api) -> None:
                 or wait.parameters[0].metadata.get("consumes") is not None
                 or wait.metadata.get("consumes") is not None
                 or wait.metadata.get("execution") != "immediate"
-                or wait.return_type.declaration != "mln_status"
+                or not is_status(wait.return_type)
                 or has_completion(wait)
             ):
                 errors.append(
@@ -1036,14 +1354,127 @@ def validate(api: Api) -> None:
             parent = api.typedefs_by_name[parent].metadata.get("parent", "none")
     for enum in api.enums:
         errors.extend(
-            metadata_errors(enum.metadata, ENUM_KEYS, f"{enum.location}: {enum.name}")
-        )
-        if enum.metadata.get("kind") not in {None, "open", "bitmask"}:
-            errors.append(
-                f"{enum.location}: {enum.name}: enum kind must be open or bitmask"
+            metadata_errors(
+                enum.metadata, ENUM_KEYS, f"{enum.location}: {enum.name}", KINDS["enum"]
             )
+        )
+    errors.extend(reference_errors(api))
     if errors:
         raise ModelError(errors)
+
+
+# Keys whose values name other declarations, by the kind of declaration named.
+# A list value separates its names with commas.
+FUNCTION_REFERENCES = {
+    "function": (),
+    "typedef": (
+        "release",
+        "dispose",
+        "abandon",
+        "view_begin",
+        "view_end",
+        "default",
+        "complete",
+        "cancelled",
+        "cancel_registration",
+        "wait_retired",
+        "reentry_calls",
+    ),
+}
+PARAMETER_REFERENCES = {
+    "function": (
+        "receiver",
+        "view_owner",
+        "registration",
+        "user_data",
+        "release_callback",
+        "accepted_unless",
+    ),
+    "typedef": ("decision_handle", "reentry_owner"),
+}
+
+
+def reference_errors(api: Api) -> list[str]:
+    """Reject an annotation that names a function or parameter that is absent.
+
+    Later checks give each relationship its meaning; this one makes a misspelled
+    or renamed declaration fail with the name that no longer resolves.
+    """
+    errors = []
+    functions = api.functions_by_name
+
+    def check(site: str, declaration, context: str) -> None:
+        metadata = declaration.metadata
+        for key in FUNCTION_REFERENCES[site]:
+            if key == "release" and metadata.get("kind") == "callback_registration":
+                continue  # A registration's release names its descriptor field.
+            for name in filter(None, metadata.get(key, "").split(",")):
+                if name not in functions:
+                    errors.append(f"{context}: {key} names an absent function {name!r}")
+        parameters = {parameter.name for parameter in declaration.parameters}
+        for key in PARAMETER_REFERENCES[site]:
+            name = metadata.get(key)
+            if key == "reentry_owner" and name == "registration":
+                continue  # The callback's registration function owns its reentry.
+            if name is not None and name not in parameters:
+                errors.append(f"{context}: {key} names an absent parameter {name!r}")
+
+    for function in api.functions:
+        check("function", function, f"{function.location}: {function.name}")
+    for typedef in api.typedefs:
+        check("typedef", typedef, f"{typedef.location}: {typedef.name}")
+    return errors
+
+
+def ordered_errors(record, value: str, context: str) -> list[str]:
+    """Check a `fields=ordered` record: a struct of plain values only.
+
+    Its fields are the whole value in declaration order, so none may be
+    control state, a pointer, or an array.
+    """
+    if value != "ordered":
+        return [f"{context}: unsupported fields={value!r}"]
+    if (
+        record is None
+        or record.kind != "struct"
+        or not record.complete
+        or any(
+            "kind" in field.metadata or field.type.kind in {"pointer", "array"}
+            for field in record.fields
+        )
+    ):
+        return [f"{context}: fields=ordered requires a struct of plain values"]
+    return []
+
+
+def callback_result_errors(
+    typedef, value: str, key: str, enum_constants, context: str
+) -> list[str]:
+    """Check that a callback can return `value` as its declared result."""
+    signature = typedef.type.pointee
+    enum = typedef.metadata.get("enum")
+    result = signature.result
+    if enum is None and result is not None:
+        named = result.declaration or ""
+        enum = (
+            named
+            if any(owner == named for owner, _ in enum_constants.values())
+            else None
+        )
+    if enum:
+        if enum_constants.get(value, (None,))[0] != enum:
+            return [f"{context}: {key} must name a value of {enum}"]
+        return []
+    bounds = (
+        INTEGER_RANGES.get(result.canonical.removeprefix("const ")) if result else None
+    )
+    try:
+        number = int(value, 0)
+    except ValueError:
+        number = None
+    if bounds is None or number is None or not bounds[0] <= number <= bounds[1]:
+        return [f"{context}: {key} must be an integer the callback result can hold"]
+    return []
 
 
 def deferred_errors(typedef, enum_constants, context: str) -> list[str]:
@@ -1062,21 +1493,7 @@ def deferred_errors(typedef, enum_constants, context: str) -> list[str]:
         or signature.result.kind == "void"
     ):
         return [f"{context}: deferred requires a callback with a result"]
-    errors = []
-    enum = typedef.metadata.get("enum")
-    if enum:
-        if enum_constants.get(value, (None,))[0] != enum:
-            errors.append(f"{context}: deferred must name a value of {enum}")
-    else:
-        bounds = INTEGER_RANGES.get(signature.result.canonical.removeprefix("const "))
-        try:
-            number = int(value, 0)
-        except ValueError:
-            number = None
-        if bounds is None or number is None or not bounds[0] <= number <= bounds[1]:
-            errors.append(
-                f"{context}: deferred must be an integer the callback result can hold"
-            )
+    errors = callback_result_errors(typedef, value, "deferred", enum_constants, context)
     contexts = [p for p in typedef.parameters if p.metadata.get("kind") == "context"]
     if len(contexts) != 1:
         errors.append(f"{context}: deferred requires one context parameter")

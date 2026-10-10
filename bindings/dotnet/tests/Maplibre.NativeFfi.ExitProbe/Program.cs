@@ -1,9 +1,7 @@
 // Leaves a runtime, a map, a held resource request, and process-global callbacks live, then
 // returns from Main. The test suite runs this and expects a clean exit: native threads still
 // running at exit must not call into a runtime that is shutting down.
-using Maplibre.NativeFfi.Logging;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Runtime;
+using Maplibre.NativeFfi;
 using NativeMaplibre = Maplibre.NativeFfi.Maplibre;
 
 NativeMaplibre.LoadNativeLibrary();

@@ -1,10 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
-using Maplibre.NativeFfi.Base;
 using Maplibre.NativeFfi.Error;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

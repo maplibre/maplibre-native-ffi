@@ -3837,13 +3837,14 @@ final class GeojsonSourceDataHandle implements Finalizable {
 extension type const NativeMap(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_map` handle.
-final class MapHandle implements Finalizable {
+final class MapHandle implements Finalizable, _CallbackPortOwner {
   MapHandle._(this._parent, NativeMap handle)
     : _state = NativeHandleState(handle, 'MapHandle');
   // Keeps the parent owner reachable while this owner lives.
   // ignore: unused_field
   final RuntimeHandle _parent;
   // Roots this owner's port registrations for as long as it lives.
+  @override
   final _callbackPorts = _NativeCallbackPorts();
   final NativeHandleState<NativeMap> _state;
   NativeMap get _handle => _state.handle;
@@ -5914,10 +5915,11 @@ final class RenderSessionHandle implements Finalizable {
 extension type const NativeResourceRequest(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_resource_request_handle` handle.
-final class ResourceRequestHandle implements Finalizable {
+final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   ResourceRequestHandle._(NativeResourceRequest handle)
     : _state = NativeHandleState(handle, 'ResourceRequestHandle');
   // Roots this owner's port registrations for as long as it lives.
+  @override
   final _callbackPorts = _NativeCallbackPorts();
   final NativeHandleState<NativeResourceRequest> _state;
   NativeResourceRequest get _handle => _state.handle;
@@ -6005,10 +6007,11 @@ final class ResourceRequestHandle implements Finalizable {
 extension type const NativeRuntime(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_runtime` handle.
-final class RuntimeHandle implements Finalizable {
+final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   RuntimeHandle._(NativeRuntime handle)
     : _state = NativeHandleState(handle, 'RuntimeHandle');
   // Roots this owner's port registrations for as long as it lives.
+  @override
   final _callbackPorts = _NativeCallbackPorts();
   final NativeHandleState<NativeRuntime> _state;
   NativeRuntime get _handle => _state.handle;

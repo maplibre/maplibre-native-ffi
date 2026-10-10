@@ -18,20 +18,18 @@ extern "C" {
 
 /** Metal attachment options for a native surface. */
 typedef struct mln_metal_surface_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical surface extent. */
   mln_render_target_extent extent;
   /** Metal backend context. device is optional for Metal surfaces. */
   mln_metal_context_descriptor context;
   /** CAMetalLayer* / CA::MetalLayer* retained by the session. Required. */
-  void* layer MLN_BINDING("kind=native_pointer;ownership=borrowed");
-} mln_metal_surface_descriptor MLN_BINDING(
-  "default=mln_metal_surface_descriptor_default"
-);
+  void* layer;
+} mln_metal_surface_descriptor;
 
 /** Vulkan attachment options for a native surface. */
 typedef struct mln_vulkan_surface_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical surface extent. */
   mln_render_target_extent extent;
   /**
@@ -42,13 +40,11 @@ typedef struct mln_vulkan_surface_descriptor {
   mln_vulkan_context_descriptor context;
   /** Borrowed VkSurfaceKHR bit pattern. Required. */
   mln_vulkan_non_dispatchable_handle surface;
-} mln_vulkan_surface_descriptor MLN_BINDING(
-  "default=mln_vulkan_surface_descriptor_default"
-);
+} mln_vulkan_surface_descriptor;
 
 /** WebGPU attachment options for a native surface. */
 typedef struct mln_webgpu_surface_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical surface extent. */
   mln_render_target_extent extent;
   /** Borrowed WebGPU context. device is required. */
@@ -58,19 +54,17 @@ typedef struct mln_webgpu_surface_descriptor {
    * session configures it for this device and extent, and unconfigures it when
    * the session ends.
    */
-  void* surface MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* surface;
   /**
    * WGPUTextureFormat to configure the surface with. Required. A browser host
    * takes it from navigator.gpu.getPreferredCanvasFormat().
    */
   uint32_t format;
-} mln_webgpu_surface_descriptor MLN_BINDING(
-  "default=mln_webgpu_surface_descriptor_default"
-);
+} mln_webgpu_surface_descriptor;
 
 /** OpenGL attachment options for a native surface. */
 typedef struct mln_opengl_surface_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical surface extent. */
   mln_render_target_extent extent;
   /** Borrowed OpenGL context provider data. */
@@ -79,36 +73,30 @@ typedef struct mln_opengl_surface_descriptor {
    * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
    * both required. Null for WebGL, whose context carries its canvas binding.
    */
-  void* surface MLN_BINDING("kind=native_pointer;ownership=borrowed");
-} mln_opengl_surface_descriptor MLN_BINDING(
-  "default=mln_opengl_surface_descriptor_default"
-);
+  void* surface;
+} mln_opengl_surface_descriptor;
 
 /**
  * Returns Metal surface descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_metal_surface_descriptor
 mln_metal_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns Vulkan surface descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_vulkan_surface_descriptor
 mln_vulkan_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns OpenGL surface descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_opengl_surface_descriptor
 mln_opengl_surface_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns WebGPU surface descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_webgpu_surface_descriptor
 mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
 
@@ -129,10 +117,11 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -141,14 +130,12 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_metal_surface_attach(
-  mln_map map,
-  const mln_metal_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_metal_surface_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -165,10 +152,11 @@ MLN_API mln_status mln_metal_surface_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -180,14 +168,12 @@ MLN_API mln_status mln_metal_surface_attach(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_vulkan_surface_attach(
-  mln_map map,
-  const mln_vulkan_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_vulkan_surface_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -205,10 +191,11 @@ MLN_API mln_status mln_vulkan_surface_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable, or the requested driver does not match the
  *   context placement.
@@ -219,14 +206,12 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_opengl_surface_attach(
-  mln_map map,
-  const mln_opengl_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -243,10 +228,11 @@ MLN_API mln_status mln_opengl_surface_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; out_session is null or does not point to the null handle; or the
  *   requested driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -256,14 +242,12 @@ MLN_API mln_status mln_opengl_surface_attach(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_webgpu_surface_attach(
-  mln_map map,
-  const mln_webgpu_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_webgpu_surface_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -274,10 +258,10 @@ MLN_API mln_status mln_webgpu_surface_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; or a required backend handle is null.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
  *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -287,12 +271,10 @@ MLN_API mln_status mln_webgpu_surface_attach(
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_metal_surface_set_target(
-  mln_render_session session,
-  const mln_metal_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -303,10 +285,10 @@ MLN_API mln_status mln_metal_surface_set_target(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; or a required backend handle is null.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
  *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -320,12 +302,10 @@ MLN_API mln_status mln_metal_surface_set_target(
  * - MLN_STATUS_NATIVE_ERROR when querying the replacement surface fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_vulkan_surface_set_target(
-  mln_render_session session,
-  const mln_vulkan_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -336,10 +316,10 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; or a required backend handle is null.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
  *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -349,12 +329,10 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another share group.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_opengl_surface_set_target(
-  mln_render_session session,
-  const mln_opengl_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -365,10 +343,10 @@ MLN_API mln_status mln_opengl_surface_set_target(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; or a required backend handle is null.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; or a required backend handle is null.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   session does not render through a native surface.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -381,12 +359,10 @@ MLN_API mln_status mln_opengl_surface_set_target(
  *   session built its render pipelines for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_webgpu_surface_set_target(
-  mln_render_session session,
-  const mln_webgpu_surface_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

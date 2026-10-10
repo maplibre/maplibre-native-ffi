@@ -9,7 +9,7 @@ internal readonly record struct MlnBuffer(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnEventBatch(ulong Value) : IMlnHandle;
 
-internal readonly record struct MlnGeoJsonSourceData(ulong Value) : IMlnHandle;
+internal readonly record struct MlnGeojsonSourceData(ulong Value) : IMlnHandle;
 
 internal readonly record struct MlnMap(ulong Value) : IMlnHandle;
 
@@ -159,6 +159,18 @@ internal unsafe struct mln_custom_mvt_vector_source_options
     public double min_zoom;
     public double max_zoom;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
+internal unsafe struct mln_diagnostic
+{
+    public uint size;
+    public MessageArray message;
+
+    [System.Runtime.CompilerServices.InlineArray(4096)]
+    public struct MessageArray
+    {
+        private sbyte element;
+    }
 }
 
 internal unsafe struct mln_edge_insets

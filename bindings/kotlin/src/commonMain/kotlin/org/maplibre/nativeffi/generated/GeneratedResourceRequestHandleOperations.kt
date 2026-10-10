@@ -12,24 +12,24 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
   internal abstract val binding: DecisionOwnerState
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
-  public fun resourceRequestCancelled(): Boolean =
+  public fun cancelled(): Boolean =
     nativeCall(this, binding, "mln_resource_request_cancelled", Access.READ) {
       val out = allocate(1)
       check(C.mln_resource_request_cancelled(handle, out, diagnostic))
       readBool(out)
     }
 
-  public fun resourceRequestComplete(response: ResourceResponse): Unit =
+  public fun complete(response: ResourceResponse): Unit =
     nativeComplete(this, binding, "mln_resource_request_complete") {
       check(C.mln_resource_request_complete(handle, writeResourceResponse(response), diagnostic))
     }
 
-  public fun resourceRequestRelease(): Unit =
+  public fun release(): Unit =
     nativeClose(this, binding, "mln_resource_request_release") {
       C.mln_resource_request_release(handle)
     }
 
-  public fun resourceRequestSetCancelCallback(callback: ResourceRequestCancelCallback): Boolean =
+  public fun setCancelCallback(callback: ResourceRequestCancelCallback): Boolean =
     nativeCall(this, binding, "mln_resource_request_set_cancel_callback", Access.READ) {
       val token =
         registrations.register(GeneratedResourceRequestCancelCallbackRegistration(callback), handle)
@@ -49,7 +49,7 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
       outCancelled
     }
 
-  public fun resourceRequestWaitUntilRetired(): Unit =
+  public fun waitUntilRetired(): Unit =
     nativeCall(this, binding, "mln_resource_request_wait_until_retired", Access.ISSUED) {
       check(C.mln_resource_request_wait_until_retired(handle, diagnostic))
     }

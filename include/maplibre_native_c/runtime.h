@@ -47,7 +47,7 @@ typedef enum mln_offline_region_download_state : uint32_t {
 
 /** Offline region status snapshot. */
 typedef struct mln_offline_region_status {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One of mln_offline_region_download_state. */
   uint32_t download_state MLN_BINDING("enum=mln_offline_region_download_state");
   uint64_t completed_resource_count;
@@ -352,7 +352,6 @@ typedef enum mln_resource_provider_decision : uint32_t {
  * - MLN_STATUS_INVALID_ARGUMENT when out_status is null.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_network_status_get(
   uint32_t* out_status MLN_BINDING("direction=out;enum=mln_network_status"),
   mln_diagnostic* out_diagnostic
@@ -371,7 +370,6 @@ MLN_API mln_status mln_network_status_get(
  * - MLN_STATUS_INVALID_ARGUMENT when status is not a mln_network_status value.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_network_status_set(
   uint32_t status MLN_BINDING("enum=mln_network_status"),
   mln_diagnostic* out_diagnostic
@@ -379,7 +377,7 @@ MLN_API mln_status mln_network_status_set(
 
 /** Options used when creating a runtime. */
 typedef struct mln_runtime_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** No flags are currently defined. Must be zero. */
   uint32_t flags;
   /**
@@ -390,11 +388,9 @@ typedef struct mln_runtime_options {
    * directory after mln_android_init. Other paths read the filesystem.
    * Explicit file:// URLs use their own paths, independently of this root.
    */
-  const char* asset_path
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
+  const char* asset_path MLN_BINDING("nullable=true");
   /** Cache database path. Copied during runtime creation. */
-  const char* cache_path
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
+  const char* cache_path MLN_BINDING("nullable=true");
   /**
    * Runtime-scoped event types this runtime queues, as a bitwise OR of
    * mln_runtime_event_mask values.
@@ -408,7 +404,7 @@ typedef struct mln_runtime_options {
   uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
   /** Wakes the receiver when the runtime event queue becomes nonempty. */
   mln_wake event_wake;
-} mln_runtime_options MLN_BINDING("default=mln_runtime_options_default");
+} mln_runtime_options;
 
 /**
  * Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.
@@ -568,8 +564,7 @@ typedef struct mln_runtime_event {
    */
   int32_t code;
   /** One of mln_runtime_event_payload_type. */
-  uint32_t payload_type
-    MLN_BINDING("kind=tag;enum=mln_runtime_event_payload_type");
+  uint32_t payload_type MLN_BINDING("enum=mln_runtime_event_payload_type");
   /**
    * Byte offset of this event's message inside
    * mln_runtime_event_batch_view.messages. Zero when message_size is 0.
@@ -593,7 +588,7 @@ typedef struct mln_runtime_event {
  * valid until the event-batch handle is released.
  */
 typedef struct mln_runtime_event_batch_view {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /**
    * Stride of one event in bytes, at least sizeof(mln_runtime_event) in the
    * header a caller compiled against. Index events with this value.
@@ -601,31 +596,30 @@ typedef struct mln_runtime_event_batch_view {
   uint32_t event_size;
   /** Borrowed array of event_count events in queue order. */
   const mln_runtime_event* events MLN_BINDING(
-    "length=event_count;ownership=borrowed;stride=event_size;item_name="
-    "message;item_buffer=messages;item_buffer_size=messages_size;item_offset="
-    "message_offset;item_length=message_size;item_encoding=utf8"
+    "length=event_count;stride=event_size;item_name=message;"
+    "item_buffer=messages;item_buffer_size=messages_size;"
+    "item_offset=message_offset;item_length=message_size;"
+    "item_encoding=utf8"
   );
   /** Number of events in events. */
-  size_t event_count MLN_BINDING("kind=count");
+  size_t event_count;
   /**
    * Borrowed message arena holding every event's message bytes, each followed
    * by a null terminator. Null when messages_size is 0.
    */
-  const char* messages
-    MLN_BINDING("length=messages_size;ownership=borrowed;encoding=bytes");
+  const char* messages MLN_BINDING("length=messages_size;encoding=bytes");
   /** Number of bytes in messages, including every terminator. */
-  size_t messages_size MLN_BINDING("kind=count");
+  size_t messages_size;
 } mln_runtime_event_batch_view;
 
 typedef struct mln_resource_transform_response {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Replacement URL. Null or empty keeps the original URL. Copied on return.
    */
-  const char* url
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
+  const char* url MLN_BINDING("nullable=true");
   /** C API-managed callback context. Callback implementations leave unchanged.
    */
-  void* context MLN_BINDING("kind=context;ownership=borrowed");
+  void* context MLN_BINDING("kind=context;lifetime=call");
 } mln_resource_transform_response MLN_BINDING("kind=callback_response");
 
 /**
@@ -643,14 +637,10 @@ typedef struct mln_resource_transform_response {
  * - MLN_STATUS_INVALID_STATE when called outside a resource transform callback.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_resource_transform_response_set_url(
-  mln_resource_transform_response* response
-    MLN_BINDING("length=1;direction=inout"),
-  const char* url MLN_BINDING(
-    "encoding=utf8;lifetime=call;length=url_size;ownership=borrowed"
-  ),
-  size_t url_size, mln_diagnostic* out_diagnostic
+  mln_resource_transform_response* response,
+  const char* url MLN_BINDING("length=url_size"), size_t url_size,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -672,9 +662,16 @@ MLN_API mln_status mln_resource_transform_response_set_url(
  *   resource request.
  * - The C API invokes release_user_data after the final callback returns.
  */
-typedef mln_status (*mln_resource_transform_callback)(void* user_data MLN_BINDING("kind=context;lifetime=owner"), uint32_t kind MLN_BINDING("enum=mln_resource_kind"), const char* url MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;lifetime=call"), mln_resource_transform_response* out_response MLN_BINDING("ownership=borrowed;lifetime=call;direction=out")) MLN_BINDING(
-  "reentry=protocol;reentry_owner=out_response;reentry_calls=mln_resource_"
-  "transform_response_set_url;thread=native;failure=MLN_STATUS_NATIVE_ERROR"
+MLN_BINDING(
+  "failure=MLN_STATUS_NATIVE_ERROR;"
+  "reentry=protocol;"
+  "reentry_owner=out_response;"
+  "reentry_calls=mln_resource_transform_response_set_url"
+)
+typedef mln_status (*mln_resource_transform_callback)(
+  void* user_data, uint32_t kind MLN_BINDING("enum=mln_resource_kind"),
+  const char* url,
+  mln_resource_transform_response* out_response MLN_BINDING("direction=out")
 );
 
 /**
@@ -690,25 +687,23 @@ typedef mln_status (*mln_resource_transform_callback)(void* user_data MLN_BINDIN
  * caller transfers user_data ownership before entering that function and
  * reclaims it only when registration is rejected.
  */
-typedef void (*mln_runtime_callback_release)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner")
-) MLN_BINDING("thread=native;failure=contain");
+typedef void (*mln_runtime_callback_release)(void* user_data);
 
 typedef struct mln_resource_transform {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   mln_resource_transform_callback callback;
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+  void* user_data MLN_BINDING("kind=context");
   /** Optional. Invoked exactly once for each accepted registration. */
   mln_runtime_callback_release release_user_data;
 } mln_resource_transform MLN_BINDING(
-  "kind=callback_registration;user_data=user_data;release=release_user_data"
+  "kind=callback_registration;release=release_user_data"
 );
 
 typedef struct mln_http_header_transform_response {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** C API-managed callback context. Callback implementations leave unchanged.
    */
-  void* context MLN_BINDING("kind=context;ownership=borrowed");
+  void* context MLN_BINDING("kind=context;lifetime=call");
 } mln_http_header_transform_response MLN_BINDING("kind=callback_response");
 
 /**
@@ -731,17 +726,11 @@ typedef struct mln_http_header_transform_response {
  *   transform callback.
  * - MLN_STATUS_NATIVE_ERROR when native allocation fails.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_http_header_transform_response_set(
-  mln_http_header_transform_response* response MLN_BINDING("length=1"),
-  const char* name MLN_BINDING(
-    "encoding=utf8;lifetime=call;length=name_size;ownership=borrowed"
-  ),
-  size_t name_size,
-  const char* value MLN_BINDING(
-    "encoding=utf8;lifetime=call;length=value_size;ownership=borrowed"
-  ),
-  size_t value_size, mln_diagnostic* out_diagnostic
+  mln_http_header_transform_response* response,
+  const char* name MLN_BINDING("length=name_size"), size_t name_size,
+  const char* value MLN_BINDING("length=value_size"), size_t value_size,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -759,23 +748,30 @@ MLN_API mln_status mln_http_header_transform_response_set(
  * discards every header collected during the invocation and lets the request
  * proceed unchanged.
  */
-typedef mln_status (*mln_http_header_transform_callback)(void* user_data MLN_BINDING("kind=context;lifetime=owner"), uint32_t kind MLN_BINDING("enum=mln_resource_kind"), const char* url MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;lifetime=call"), mln_http_header_transform_response* out_response MLN_BINDING("ownership=borrowed;lifetime=call;direction=out")) MLN_BINDING(
-  "reentry=protocol;reentry_owner=out_response;reentry_calls=mln_http_header_"
-  "transform_response_set;thread=native;failure=MLN_STATUS_NATIVE_ERROR"
+MLN_BINDING(
+  "failure=MLN_STATUS_NATIVE_ERROR;"
+  "reentry=protocol;"
+  "reentry_owner=out_response;"
+  "reentry_calls=mln_http_header_transform_response_set"
+)
+typedef mln_status (*mln_http_header_transform_callback)(
+  void* user_data, uint32_t kind MLN_BINDING("enum=mln_resource_kind"),
+  const char* url,
+  mln_http_header_transform_response* out_response MLN_BINDING("direction=out")
 );
 
 typedef struct mln_http_header_transform {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   mln_http_header_transform_callback callback;
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+  void* user_data MLN_BINDING("kind=context");
   /** Optional. Invoked exactly once for each accepted registration. */
   mln_runtime_callback_release release_user_data;
 } mln_http_header_transform MLN_BINDING(
-  "kind=callback_registration;user_data=user_data;release=release_user_data"
+  "kind=callback_registration;release=release_user_data"
 );
 
 typedef struct mln_resource_request {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /**
    * URL entering the network layer, before tile server normalization.
    *
@@ -784,8 +780,7 @@ typedef struct mln_resource_request {
    * Tile coordinates, glyph ranges, and sprite suffixes are already
    * substituted.
    */
-  const char* requested_url
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
+  const char* requested_url MLN_BINDING("nullable=true");
   /**
    * URL to fetch, after resource-kind normalization against the runtime's
    * tile server options and API key.
@@ -798,45 +793,40 @@ typedef struct mln_resource_request {
    * fails such a request, so a provider that only fetches over HTTP checks the
    * scheme before serving it.
    */
-  const char* resolved_url
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
+  const char* resolved_url MLN_BINDING("nullable=true");
   uint32_t kind MLN_BINDING("enum=mln_resource_kind");
   uint32_t loading_method MLN_BINDING("enum=mln_resource_loading_method");
   uint32_t priority MLN_BINDING("enum=mln_resource_priority");
   uint32_t usage MLN_BINDING("enum=mln_resource_usage");
   uint32_t storage_policy MLN_BINDING("enum=mln_resource_storage_policy");
-  bool has_range MLN_BINDING("kind=presence_mask");
+  bool has_range;
   uint64_t range_start MLN_BINDING("mask=has_range");
   uint64_t range_end MLN_BINDING("mask=has_range");
-  bool has_prior_modified MLN_BINDING("kind=presence_mask");
+  bool has_prior_modified;
   int64_t prior_modified_unix_ms MLN_BINDING("mask=has_prior_modified");
-  bool has_prior_expires MLN_BINDING("kind=presence_mask");
+  bool has_prior_expires;
   int64_t prior_expires_unix_ms MLN_BINDING("mask=has_prior_expires");
-  const char* prior_etag
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
+  const char* prior_etag MLN_BINDING("nullable=true");
   const uint8_t* prior_data
-    MLN_BINDING("length=prior_data_size;ownership=borrowed;encoding=bytes");
-  size_t prior_data_size MLN_BINDING("kind=count");
+    MLN_BINDING("length=prior_data_size;encoding=bytes");
+  size_t prior_data_size;
 } mln_resource_request;
 
 typedef struct mln_resource_response {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   uint32_t status MLN_BINDING("enum=mln_resource_response_status");
   uint32_t error_reason MLN_BINDING("enum=mln_resource_error_reason");
   /** Response bytes. May be null only when byte_count is 0. */
-  const uint8_t* bytes
-    MLN_BINDING("length=byte_count;ownership=borrowed;encoding=bytes");
-  size_t byte_count MLN_BINDING("kind=count");
-  const char* error_message
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
+  const uint8_t* bytes MLN_BINDING("length=byte_count;encoding=bytes");
+  size_t byte_count;
+  const char* error_message MLN_BINDING("nullable=true");
   bool must_revalidate;
-  bool has_modified MLN_BINDING("kind=presence_mask");
+  bool has_modified;
   int64_t modified_unix_ms MLN_BINDING("mask=has_modified");
-  bool has_expires MLN_BINDING("kind=presence_mask");
+  bool has_expires;
   int64_t expires_unix_ms MLN_BINDING("mask=has_expires");
-  const char* etag
-    MLN_BINDING("length=nul;encoding=utf8;ownership=borrowed;nullable=true");
-  bool has_retry_after MLN_BINDING("kind=presence_mask");
+  const char* etag MLN_BINDING("nullable=true");
+  bool has_retry_after;
   int64_t retry_after_unix_ms MLN_BINDING("mask=has_retry_after");
 } mln_resource_response;
 
@@ -873,20 +863,28 @@ typedef struct mln_resource_response {
  * a host that cannot run code on this thread, and delivers a copy of the
  * request with the handle for the host to complete later.
  */
-typedef uint32_t (*mln_resource_provider_callback)(void* user_data MLN_BINDING("kind=context;lifetime=owner"), const mln_resource_request* request MLN_BINDING("ownership=borrowed;lifetime=call;direction=in;length=1"), mln_resource_request_handle handle) MLN_BINDING(
-  "reentry=protocol;reentry_owner=handle;reentry_calls=mln_resource_request_"
-  "complete,mln_resource_request_cancelled,mln_resource_request_set_cancel_"
-  "callback,mln_resource_request_release;thread=native;enum=mln_resource_"
-  "provider_decision;failure=MLN_"
-  "RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
-  "decision_handle=handle;decision_accept=MLN_RESOURCE_PROVIDER_DECISION_"
-  "HANDLE;"
+MLN_BINDING(
+  "enum=mln_resource_provider_decision;"
+  "failure=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
+  "deferred=MLN_RESOURCE_PROVIDER_DECISION_HANDLE;"
+  "decision_handle=handle;"
+  "decision_accept=MLN_RESOURCE_PROVIDER_DECISION_HANDLE;"
   "decision_pass=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
-  "complete=mln_resource_request_complete;cancelled=mln_resource_request_"
-  "cancelled;"
+  "complete=mln_resource_request_complete;"
+  "cancelled=mln_resource_request_cancelled;"
   "cancel_registration=mln_resource_request_set_cancel_callback;"
   "wait_retired=mln_resource_request_wait_until_retired;"
-  "deferred=MLN_RESOURCE_PROVIDER_DECISION_HANDLE"
+  "reentry=protocol;"
+  "reentry_owner=handle;"
+  "reentry_calls="
+  "mln_resource_request_complete,"
+  "mln_resource_request_cancelled,"
+  "mln_resource_request_set_cancel_callback,"
+  "mln_resource_request_release"
+)
+typedef uint32_t (*mln_resource_provider_callback)(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle handle
 );
 
 /**
@@ -901,24 +899,30 @@ typedef uint32_t (*mln_resource_provider_callback)(void* user_data MLN_BINDING("
  * functions. It may call resource request handle functions for the cancelled
  * handle, including mln_resource_request_release().
  */
-typedef void (*mln_resource_request_cancel_callback)(
-    void *user_data MLN_BINDING("kind=context;lifetime=owner"))
-    MLN_BINDING("reentry=protocol;reentry_owner=registration;reentry_calls=mln_resource_request_complete,mln_resource_request_cancelled,mln_resource_request_set_cancel_callback,mln_resource_request_release;thread=native;failure=contain");
+MLN_BINDING(
+  "reentry=protocol;"
+  "reentry_owner=registration;"
+  "reentry_calls="
+  "mln_resource_request_complete,"
+  "mln_resource_request_cancelled,"
+  "mln_resource_request_set_cancel_callback,"
+  "mln_resource_request_release"
+)
+typedef void (*mln_resource_request_cancel_callback)(void* user_data);
 
 typedef struct mln_resource_provider {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   mln_resource_provider_callback callback;
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+  void* user_data MLN_BINDING("kind=context");
   /** Optional. Invoked exactly once for each accepted registration. */
   mln_runtime_callback_release release_user_data;
 } mln_resource_provider MLN_BINDING(
-  "kind=callback_registration;user_data=user_data;release=release_user_data"
+  "kind=callback_registration;release=release_user_data"
 );
 
 /**
  * Returns runtime options initialized for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
 
 /**
@@ -937,10 +941,9 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  *   handle.
  * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_runtime_create(
-  const mln_runtime_options* options MLN_BINDING("length=1"),
-  mln_runtime* out_runtime MLN_BINDING("direction=out;ownership=owned"),
+  const mln_runtime_options* options,
+  mln_runtime* out_runtime MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -974,18 +977,16 @@ MLN_API mln_status mln_runtime_create(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, provider is
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, provider is
  *   null, provider->size is too small, callback is null, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_resource_provider(
-  mln_runtime runtime,
-  const mln_resource_provider* provider MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_runtime runtime, const mln_resource_provider* provider,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1000,14 +1001,14 @@ MLN_API mln_status mln_runtime_set_resource_provider(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_clear_resource_provider(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1024,15 +1025,14 @@ MLN_API mln_status mln_runtime_clear_resource_provider(
  *
  * Returns:
  * - MLN_STATUS_OK when the response was accepted for asynchronous delivery.
- * - MLN_STATUS_INVALID_ARGUMENT when handle or response is null.
- * - MLN_STATUS_INVALID_STATE when the request was cancelled, already completed,
- *   or can no longer accept a response.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or response
+ *   is null.
+ * - MLN_STATUS_INVALID_STATE when handle has been released, or the request was
+ *   cancelled, already completed, or can no longer accept a response.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_resource_request_complete(
-  mln_resource_request_handle handle,
-  const mln_resource_response* response MLN_BINDING("length=1"),
+  mln_resource_request_handle handle, const mln_resource_response* response,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1046,9 +1046,10 @@ MLN_API mln_status mln_resource_request_complete(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handle or out_cancelled is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or
+ *   out_cancelled is null.
+ * - MLN_STATUS_INVALID_STATE when handle has been released.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_resource_request_cancelled(
   mln_resource_request_handle handle,
   bool* out_cancelled MLN_BINDING("direction=out"),
@@ -1080,18 +1081,19 @@ MLN_API mln_status mln_resource_request_cancelled(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is stale or released, or when
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or when
  *   callback or out_cancelled is null.
- * - MLN_STATUS_INVALID_STATE when the request already has a cancel callback.
+ * - MLN_STATUS_INVALID_STATE when handle has been released, or the request
+ *   already has a cancel callback.
  */
 MLN_BINDING(
-  "execution=immediate;registration=callback;user_data=user_data;"
-  "release_callback=release_user_data;accepted_unless=out_cancelled"
+  "registration=callback;release_callback=release_user_data;"
+  "accepted_unless=out_cancelled"
 )
 MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_resource_request_handle handle,
   mln_resource_request_cancel_callback callback,
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed"),
+  void* user_data MLN_BINDING("kind=context"),
   mln_runtime_callback_release release_user_data,
   bool* out_cancelled MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -1111,11 +1113,10 @@ MLN_API mln_status mln_resource_request_set_cancel_callback(
  * mln_runtime_release() or mln_map_release() return MLN_STATUS_INVALID_STATE.
  * Passing
  * MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
- * released. A released handle reports MLN_STATUS_INVALID_ARGUMENT from every
+ * released. A released handle reports MLN_STATUS_INVALID_STATE from every
  * other request entry point except wait_until_retired, including from a copy
  * another thread holds.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_resource_request_release(
   mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
@@ -1133,7 +1134,6 @@ MLN_API void mln_resource_request_release(
  * - MLN_STATUS_OK once the request is retired, including when it already was.
  * - MLN_STATUS_INVALID_ARGUMENT when handle is MLN_HANDLE_NULL.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_resource_request_wait_until_retired(
   mln_resource_request_handle handle MLN_BINDING("handle_access=issued"),
   mln_diagnostic* out_diagnostic
@@ -1157,18 +1157,16 @@ MLN_API mln_status mln_resource_request_wait_until_retired(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
  *   null, transform->size is too small, callback is null, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_resource_transform(
-  mln_runtime runtime,
-  const mln_resource_transform* transform MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_runtime runtime, const mln_resource_transform* transform,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1182,14 +1180,14 @@ MLN_API mln_status mln_runtime_set_resource_transform(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_clear_resource_transform(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1211,21 +1209,19 @@ MLN_API mln_status mln_runtime_clear_resource_transform(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, transform is
  *   null, transform->size is too small, callback is null, or completion is
  *   invalid.
  * - MLN_STATUS_UNSUPPORTED on OpenHarmony and in the browser, whose HTTP
  *   clients cannot prevent transformed headers from following a cross-origin
  *   redirect. A resource provider serves those requests instead.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_http_header_transform(
-  mln_runtime runtime,
-  const mln_http_header_transform* transform MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_runtime runtime, const mln_http_header_transform* transform,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1238,14 +1234,14 @@ MLN_API mln_status mln_runtime_set_http_header_transform(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_clear_http_header_transform(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1258,21 +1254,20 @@ MLN_API mln_status mln_runtime_clear_http_header_transform(
  *
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, operation is
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, operation is
  *   not an mln_ambient_cache_operation value, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
  *
  * Completes with:
  * - MLN_STATUS_OK when the maintenance operation finished.
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_run_ambient_cache_operation(
   mln_runtime runtime,
   uint32_t operation MLN_BINDING("enum=mln_ambient_cache_operation"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -1288,19 +1283,18 @@ MLN_API mln_status mln_runtime_run_ambient_cache_operation(
  *
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
  *
  * Completes with:
  * - MLN_STATUS_OK when the budget was applied.
  * - MLN_STATUS_NATIVE_ERROR when the database reports a failure.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
-  mln_runtime runtime, uint64_t size,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_runtime runtime, uint64_t size, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1312,14 +1306,14 @@ MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size(
  *
  * Returns:
  * - MLN_STATUS_OK when the barrier is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or completion
- *   is invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
+ *   completion is invalid.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when acceptance fails.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_runtime_barrier(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1384,15 +1378,15 @@ MLN_API mln_status mln_runtime_barrier(
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or
  *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the runtime has a live or pending child or is
- *   already closing.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released, or the runtime has
+ *   a live or pending child or is already closing.
  * - MLN_STATUS_NATIVE_ERROR when teardown could not be scheduled.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_runtime_release(
-  mln_runtime runtime, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_runtime runtime, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1409,10 +1403,10 @@ MLN_API mln_status mln_runtime_release(
  *
  * Returns:
  * - MLN_STATUS_OK when the handle was consumed.
- * - MLN_STATUS_INVALID_ARGUMENT when the handle is null or not live.
- * - MLN_STATUS_INVALID_STATE when the runtime is already closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is already
+ *   closing.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_runtime_dispose(
   mln_runtime runtime, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -1436,15 +1430,14 @@ MLN_API mln_status mln_runtime_dispose(
  * Returns:
  * - MLN_STATUS_OK when out_batch receives an owned batch, including an empty
  *   batch.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or out_batch
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_runtime_drain_events(
-  mln_runtime runtime,
-  mln_event_batch* out_batch MLN_BINDING("direction=out;ownership=owned"),
+  mln_runtime runtime, mln_event_batch* out_batch MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -1453,11 +1446,11 @@ MLN_API mln_status mln_runtime_drain_events(
  *
  * Returns:
  * - MLN_STATUS_OK when out_view receives the borrowed view.
- * - MLN_STATUS_INVALID_ARGUMENT when batch is null or not live, or out_view is
+ * - MLN_STATUS_INVALID_ARGUMENT when batch is an invalid handle, or out_view is
  *   null or out_view->size is too small.
+ * - MLN_STATUS_INVALID_STATE when batch has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_event_batch_get(
   mln_event_batch batch,
   mln_runtime_event_batch_view* out_view MLN_BINDING("direction=out"),
@@ -1465,7 +1458,6 @@ MLN_API mln_status mln_event_batch_get(
 ) MLN_NOEXCEPT;
 
 /** Releases an owned event batch. A null handle is a no-op. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
 
 /**
@@ -1490,12 +1482,11 @@ MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle, or mask holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or mask
+ *   holds a bit outside MLN_RUNTIME_EVENT_MASK_ALL.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_runtime_set_event_mask(
   mln_runtime runtime, uint64_t mask MLN_BINDING("enum=mln_runtime_event_mask"),
   mln_diagnostic* out_diagnostic
@@ -1511,12 +1502,11 @@ MLN_API mln_status mln_runtime_set_event_mask(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle, or out_mask is null.
- * - MLN_STATUS_INVALID_STATE when the runtime is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_mask
+ *   is null.
+ * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_runtime_get_event_mask(
   mln_runtime runtime,
   uint64_t* out_mask MLN_BINDING("direction=out;enum=mln_runtime_event_mask"),

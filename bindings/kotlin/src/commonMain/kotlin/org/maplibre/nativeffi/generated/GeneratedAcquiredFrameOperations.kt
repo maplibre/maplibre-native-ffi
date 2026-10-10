@@ -14,7 +14,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       check(C.mln_acquired_frame_dispose(handle, diagnostic))
     }
 
-  public fun <T> withGetMetalTexture(block: (MetalOwnedTextureFrame) -> T): T =
+  public fun <T> withMetalTexture(block: (MetalOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_metal_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
@@ -26,7 +26,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       }
     }
 
-  public fun <T> withGetOpenglTexture(block: (OpenglOwnedTextureFrame) -> T): T =
+  public fun <T> withOpenglTexture(block: (OpenglOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_opengl_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
@@ -38,7 +38,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       }
     }
 
-  public fun <T> withGetProducerSync(block: (GpuSync) -> T): T =
+  public fun <T> withProducerSync(block: (GpuSync) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_producer_sync", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
@@ -57,7 +57,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       readRenderFrameResult(out)
     }
 
-  public fun <T> withGetVulkanTexture(block: (VulkanOwnedTextureFrame) -> T): T =
+  public fun <T> withVulkanTexture(block: (VulkanOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_vulkan_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
@@ -69,7 +69,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       }
     }
 
-  public fun <T> withGetWebgpuTexture(block: (WebgpuOwnedTextureFrame) -> T): T =
+  public fun <T> withWebgpuTexture(block: (WebgpuOwnedTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_webgpu_texture", Access.READ) {
       borrowView(
         { C.mln_adapter_acquired_frame_view_begin(handle, it, diagnostic) },
@@ -83,7 +83,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
 
   public fun release(consumerCompletion: GpuSync = GeneratedApi.gpuSyncDefault()): Unit =
     nativeClose(this, binding, "mln_acquired_frame_release") {
-      val holder = allocate(8).also { writeI64(it, handle) }
+      val holder = allocate(8, 8).also { writeI64(it, handle) }
       check(C.mln_acquired_frame_release(holder, writeGpuSync(consumerCompletion), diagnostic))
     }
 }

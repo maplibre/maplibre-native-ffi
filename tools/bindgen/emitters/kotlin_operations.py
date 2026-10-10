@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from ..managed_contracts import LOCALS
-from ..names import camel
+from ..semantic import output_member
 from .kotlin_values import Unsupported, identifier, name, owner_name
 
 EXECUTIONS = {
@@ -40,11 +40,6 @@ class Native:
     def checked(self, function, arguments):
         """A call that throws on a failed status, or the bare call for one without a status."""
         if not function.diagnostic:
-            if "mln_status" in (
-                function.return_type.declaration,
-                function.return_type.spelling,
-            ):
-                raise Unsupported("status result requires a diagnostic parameter")
             return self.call(function, arguments)
         return f"check({self.call(function, [*arguments, 'diagnostic'])})"
 
@@ -66,11 +61,8 @@ def receiver_value(plan):
 
 
 def method_name(plan):
-    """Name an operation's method after its receiver prefix, or its whole name."""
-    prefix = receiver_value(plan).native + "_" if plan.receiver else "mln_"
-    return identifier(
-        plan.name.removeprefix(prefix if plan.name.startswith(prefix) else "mln_")
-    )
+    """Name an operation's method after its language-neutral member."""
+    return identifier(plan.member)
 
 
 def copies_borrowed(value):
@@ -139,11 +131,6 @@ def signature(plan, values):
     ]
     params = []
     for parameter in inputs:
-        if parameter.value.kind != "handle" and parameter.value.lifetime not in {
-            "call",
-            "value",
-        }:
-            raise Unsupported("input requires retained storage")
         if (
             parameter.value.kind == "buffer"
             and parameter.value.nullable
@@ -190,7 +177,7 @@ def outputs_signature(plan, values):
         values.check(value)
         if value.kind not in {"scalar", "enum", "record", "buffer"}:
             raise Unsupported("output parameter requires copied value storage")
-        fields.append((identifier(parameter.name.removeprefix("out_")), value))
+        fields.append((identifier(output_member(parameter.name)), value))
     values.multiple[result_name] = fields
     return result_name
 
@@ -290,7 +277,7 @@ def output_storage(value, values):
                 )
         return allocation, values.decode(value, "{out}")
     if value.kind in {"scalar", "enum"}:
-        return "allocate(8)", values.decode(value, "{out}")
+        return values.storage(value.ctype), values.decode(value, "{out}")
     raise Unsupported("immediate output requires scalar or copied record storage")
 
 
@@ -457,12 +444,12 @@ def owned(plan, values, native):
             if parent_param.name == plan.receiver
             else parameter_name(parent_param.name)
         )
-    create = f"{{ {owner_name(handle.native)}(it{parent}) }}"
+    create = f"{{ {owner_name(handle)}(it{parent}) }}"
     attachment = immediate_owner and bool(plan.completion)
     if attachment:
         returns = name(handle.native) + "Attachment"
         values.attachments[returns] = (
-            identifier(plan.owned_outputs[0].parameter.removeprefix("out_")),
+            identifier(output_member(plan.owned_outputs[0].parameter)),
             result,
         )
     else:
@@ -496,7 +483,12 @@ def owned(plan, values, native):
             f"{callbacks}, {drop}, ::{returns})"
         )
     else:
-        body = f"val out = allocate(8); {native.checked(plan.function, arguments)}; {adopted}"
+        slot = next(
+            p.type.pointee
+            for p in plan.function.parameters
+            if p.name == plan.owned_outputs[0].parameter
+        )
+        body = f"val out = {values.storage(slot)}; {native.checked(plan.function, arguments)}; {adopted}"
     return f'{head} nativeCall({owners}, "{plan.name}") {{ {encodings(plan)}{body} }}\n'
 
 
@@ -511,7 +503,9 @@ def lifecycle(plan, values, native):
         )
         if value.default and not _typ.endswith("?"):
             defaults[local] = (
-                "GeneratedApi." + camel(value.default.removeprefix("mln_")) + "()"
+                "GeneratedApi."
+                + method_name(values.bound.operations_by_name[value.default])
+                + "()"
             )
     arguments = call_arguments(plan, values)
     receiver_index = next(
@@ -519,7 +513,12 @@ def lifecycle(plan, values, native):
     )
     setup = []
     if plan.inputs[receiver_index].value.kind == "reference":
-        setup.append("val holder = allocate(8).also { writeI64(it, handle) }")
+        slot = next(
+            p.type.pointee for p in plan.function.parameters if p.name == plan.receiver
+        )
+        setup.append(
+            f"val holder = {values.storage(slot)}.also {{ writeI64(it, handle) }}"
+        )
         arguments[receiver_index] = "holder"
     if plan.completion:
         arguments.append("completion")
@@ -538,14 +537,11 @@ def lifecycle(plan, values, native):
 
 def view(plan, values, native):
     method, _params, _inputs, result, result_type = signature(plan, values)
-    owner = plan.view.owner
-    if not owner.view_begin or not owner.view_end:
-        raise Unsupported("borrowed view requires a native scope gate")
-    method = "with" + method[0].upper() + method[1:]
+    method = identifier("with_" + plan.view.stem)
     functions = values.bound.source.functions_by_name
     allocation, _decoded = output_storage(result, values)
-    begin = native.status(functions[owner.view_begin], ["handle", "it"])
-    end = native.checked(functions[owner.view_end], ["it"])
+    begin = native.status(functions[plan.view.begin], ["handle", "it"])
+    end = native.checked(functions[plan.view.end], ["it"])
     read = native.checked(plan.function, ["handle", "out"])
     decoded = values.decode(result, "out", "scope")
     # The view holds a read, so the binding refuses to close its owner until

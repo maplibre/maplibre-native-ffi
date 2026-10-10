@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Logging;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

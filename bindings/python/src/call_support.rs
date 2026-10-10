@@ -125,6 +125,8 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
     /// Disposes a handle that no close consumed, for a handle type with a
     /// disposal.
     const DISPOSE: Option<unsafe extern "C" fn(Self::Native) -> sys::mln_status>;
+    /// The release that interpreter shutdown starts and waits for, if any.
+    const EXIT_RELEASE: Option<ExitReleaseFn<Self::Native>>;
 
     fn shared(&self) -> &Arc<Mutex<NativeHandleState<Self::Native>>>;
     fn from_shared(state: Arc<Mutex<NativeHandleState<Self::Native>>>) -> Self;
@@ -182,6 +184,9 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
         if let Some(dispose) = Self::DISPOSE {
             state = state.with_disposal(dispose);
         }
+        if let Some(release) = Self::EXIT_RELEASE {
+            state = state.with_exit_release(release);
+        }
         Py::new(py, Self::from_shared(generated_owner_state(state))).map(|value| value.into_any())
     }
 }
@@ -189,7 +194,7 @@ trait GeneratedOwner: pyo3::PyClass + Into<pyo3::PyClassInitializer<Self>> {
 /// Declares the Python class `$name` that owns one `$native` handle, and its
 /// members that every owner shares.
 macro_rules! generated_owner {
-    ($owner:ident, $name:literal, $native:ident, $dispose:expr, $read_scope:expr) => {
+    ($owner:ident, $name:literal, $native:ident, $dispose:expr, $exit_release:expr, $read_scope:expr) => {
         #[pyclass(name = $name)]
         struct $owner {
             state: Arc<Mutex<NativeHandleState<sys::$native>>>,
@@ -200,6 +205,7 @@ macro_rules! generated_owner {
             const NATIVE: &'static str = stringify!($native);
             const OWNER_NAME: &'static str = stringify!($owner);
             const DISPOSE: Option<unsafe extern "C" fn(sys::$native) -> sys::mln_status> = $dispose;
+            const EXIT_RELEASE: Option<ExitReleaseFn<sys::$native>> = $exit_release;
 
             fn shared(&self) -> &Arc<Mutex<NativeHandleState<sys::$native>>> {
                 &self.state

@@ -19,18 +19,16 @@ extern "C" {
 
 /** Metal attachment options for an owned texture target. */
 typedef struct mln_metal_owned_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical texture extent. */
   mln_render_target_extent extent;
   /** Metal backend context. device is required. */
   mln_metal_context_descriptor context;
-} mln_metal_owned_texture_descriptor MLN_BINDING(
-  "default=mln_metal_owned_texture_descriptor_default"
-);
+} mln_metal_owned_texture_descriptor;
 
 /** Metal attachment options for a borrowed texture target. */
 typedef struct mln_metal_borrowed_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /**
    * Logical texture extent. The map viewport uses width and height and the
    * renderer uses scale_factor; the physical size is stated separately below.
@@ -50,14 +48,12 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * rejects a mismatch. The caller owns the texture and must keep it valid
    * until detach or destroy.
    */
-  void* texture MLN_BINDING("kind=native_pointer;ownership=borrowed");
-} mln_metal_borrowed_texture_descriptor MLN_BINDING(
-  "default=mln_metal_borrowed_texture_descriptor_default"
-);
+  void* texture;
+} mln_metal_borrowed_texture_descriptor;
 
 /** Metal frame acquired from a session-owned texture target. */
 typedef struct mln_metal_owned_texture_frame {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
   /** Physical Metal texture width in device pixels. */
@@ -69,27 +65,25 @@ typedef struct mln_metal_owned_texture_frame {
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
   /** Borrowed id<MTLTexture> / MTL::Texture*. Valid until frame release. */
-  void* texture MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* texture;
   /** Borrowed id<MTLDevice> / MTL::Device*. Valid until frame release. */
-  void* device MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* device;
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
   uint64_t pixel_format;
 } mln_metal_owned_texture_frame;
 
 /** Vulkan attachment options for an owned texture target. */
 typedef struct mln_vulkan_owned_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical texture extent. */
   mln_render_target_extent extent;
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
-} mln_vulkan_owned_texture_descriptor MLN_BINDING(
-  "default=mln_vulkan_owned_texture_descriptor_default"
-);
+} mln_vulkan_owned_texture_descriptor;
 
 /** Vulkan attachment options for a borrowed texture target. */
 typedef struct mln_vulkan_borrowed_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /**
    * Logical texture extent. The map viewport uses width and height and the
    * renderer uses scale_factor; the physical size is stated separately below.
@@ -132,13 +126,11 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
   uint32_t initial_layout;
   /** Backend-native VkImageLayout value left after rendering succeeds. */
   uint32_t final_layout;
-} mln_vulkan_borrowed_texture_descriptor MLN_BINDING(
-  "default=mln_vulkan_borrowed_texture_descriptor_default"
-);
+} mln_vulkan_borrowed_texture_descriptor;
 
 /** Vulkan frame acquired from a session-owned texture target. */
 typedef struct mln_vulkan_owned_texture_frame {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
   /** Physical Vulkan image width in device pixels. */
@@ -154,7 +146,7 @@ typedef struct mln_vulkan_owned_texture_frame {
   /** Borrowed VkImageView bit pattern. Valid until frame release. */
   mln_vulkan_non_dispatchable_handle image_view;
   /** Borrowed VkDevice. Valid until frame release. */
-  void* device MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* device;
   /** Backend-native VkFormat value. */
   uint32_t format;
   /** Backend-native VkImageLayout value; Vulkan frames are host-sampleable. */
@@ -163,7 +155,7 @@ typedef struct mln_vulkan_owned_texture_frame {
 
 /** OpenGL attachment options for an owned texture target. */
 typedef struct mln_opengl_owned_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical texture extent. */
   mln_render_target_extent extent;
   /**
@@ -172,13 +164,11 @@ typedef struct mln_opengl_owned_texture_descriptor {
    * WebGL ownership creates a private core-worker context for CPU readback.
    */
   mln_opengl_context_descriptor context;
-} mln_opengl_owned_texture_descriptor MLN_BINDING(
-  "default=mln_opengl_owned_texture_descriptor_default"
-);
+} mln_opengl_owned_texture_descriptor;
 
 /** OpenGL attachment options for a borrowed texture target. */
 typedef struct mln_opengl_borrowed_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /**
    * Logical texture extent. The map viewport uses width and height and the
    * renderer uses scale_factor; the physical size is stated separately below.
@@ -207,24 +197,20 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   uint32_t texture;
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   uint32_t target;
-} mln_opengl_borrowed_texture_descriptor MLN_BINDING(
-  "default=mln_opengl_borrowed_texture_descriptor_default"
-);
+} mln_opengl_borrowed_texture_descriptor;
 
 /** WebGPU attachment options for an owned texture target. */
 typedef struct mln_webgpu_owned_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical texture extent. */
   mln_render_target_extent extent;
   /** Borrowed WebGPU context. device is required. */
   mln_webgpu_context_descriptor context;
-} mln_webgpu_owned_texture_descriptor MLN_BINDING(
-  "default=mln_webgpu_owned_texture_descriptor_default"
-);
+} mln_webgpu_owned_texture_descriptor;
 
 /** WebGPU attachment options for a borrowed texture target. */
 typedef struct mln_webgpu_borrowed_texture_descriptor {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Logical texture extent. */
   mln_render_target_extent extent;
   /** Physical texture width in device pixels. */
@@ -242,22 +228,20 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
    * dimensions and format must match this descriptor. Include TextureBinding
    * usage when the host will sample from the texture after rendering.
    */
-  void* texture MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* texture;
   /**
    * Borrowed WGPUTextureView for texture. Required.
    *
    * The view must be a 2D color view compatible with texture and format.
    */
-  void* texture_view MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* texture_view;
   /** Backend-native WGPUTextureFormat value. Undefined is invalid. */
   uint32_t format;
-} mln_webgpu_borrowed_texture_descriptor MLN_BINDING(
-  "default=mln_webgpu_borrowed_texture_descriptor_default"
-);
+} mln_webgpu_borrowed_texture_descriptor;
 
 /** WebGPU frame acquired from a session-owned texture target. */
 typedef struct mln_webgpu_owned_texture_frame {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
   /** Physical WebGPU texture width in device pixels. */
@@ -269,18 +253,18 @@ typedef struct mln_webgpu_owned_texture_frame {
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
   /** Borrowed WGPUTexture. Valid until frame release. */
-  void* texture MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* texture;
   /** Borrowed WGPUTextureView. Valid until frame release. */
-  void* texture_view MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* texture_view;
   /** Borrowed WGPUDevice. Valid until frame release. */
-  void* device MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  void* device;
   /** Backend-native WGPUTextureFormat value. */
   uint32_t format;
 } mln_webgpu_owned_texture_frame;
 
 /** OpenGL frame acquired from a session-owned texture target. */
 typedef struct mln_opengl_owned_texture_frame {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
   /** Physical OpenGL texture width in device pixels. */
@@ -305,7 +289,7 @@ typedef struct mln_opengl_owned_texture_frame {
 
 /** CPU image readback metadata for a texture target frame. */
 typedef struct mln_texture_image_info {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Physical image width in device pixels. */
   uint32_t width;
   /** Physical image height in device pixels. */
@@ -314,12 +298,12 @@ typedef struct mln_texture_image_info {
   uint32_t stride;
   /** Required output buffer byte length. */
   size_t byte_length;
-} mln_texture_image_info MLN_BINDING("default=mln_texture_image_info_default");
+} mln_texture_image_info;
 
 /** Texture readback borrowed for a completion callback. */
 typedef struct mln_texture_readback_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t size;
+  uint32_t reserved MLN_BINDING("kind=reserved");
   /** Borrowed pixel bytes, valid only during the callback. */
   mln_buffer_view data MLN_BINDING("encoding=bytes");
   mln_texture_image_info info;
@@ -328,63 +312,54 @@ typedef struct mln_texture_readback_result {
 /**
  * Returns Metal owned-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_metal_owned_texture_descriptor
 mln_metal_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns Metal borrowed-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_metal_borrowed_texture_descriptor
 mln_metal_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns Vulkan owned-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_vulkan_owned_texture_descriptor
 mln_vulkan_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns Vulkan borrowed-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_vulkan_borrowed_texture_descriptor
 mln_vulkan_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns OpenGL owned-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_opengl_owned_texture_descriptor
 mln_opengl_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns OpenGL borrowed-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_opengl_borrowed_texture_descriptor
 mln_opengl_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns WebGPU owned-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_webgpu_owned_texture_descriptor
 mln_webgpu_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns WebGPU borrowed-texture descriptor defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_webgpu_borrowed_texture_descriptor
 mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns texture image info defaults for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_texture_image_info
 mln_texture_image_info_default(void) MLN_NOEXCEPT;
 
@@ -402,11 +377,12 @@ mln_texture_image_info_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -415,14 +391,12 @@ mln_texture_image_info_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_metal_owned_texture_attach(
-  mln_map map,
-  const mln_metal_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -440,11 +414,12 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -453,15 +428,12 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_metal_borrowed_texture_attach(
-  mln_map map,
-  const mln_metal_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -478,11 +450,12 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -494,14 +467,12 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_vulkan_owned_texture_attach(
-  mln_map map,
-  const mln_vulkan_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -519,11 +490,12 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -535,15 +507,12 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  *   graphics_queue_family_index that names no graphics queue family.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_vulkan_borrowed_texture_attach(
-  mln_map map,
-  const mln_vulkan_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -566,11 +535,12 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable, or the requested driver does not match the
  *   context placement.
@@ -581,14 +551,12 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_opengl_owned_texture_attach(
-  mln_map map,
-  const mln_opengl_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -606,11 +574,12 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable, or the requested driver is not
  *   MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
@@ -621,15 +590,12 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_opengl_borrowed_texture_attach(
-  mln_map map,
-  const mln_opengl_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -645,11 +611,12 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -659,14 +626,12 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_webgpu_owned_texture_attach(
-  mln_map map,
-  const mln_webgpu_owned_texture_descriptor* descriptor MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -685,11 +650,12 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the attachment is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live; descriptor,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
  *   driver kind is unknown.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -699,15 +665,12 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when target initialization fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=lifecycle;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=lifecycle")
 MLN_API mln_status mln_webgpu_borrowed_texture_attach(
-  mln_map map,
-  const mln_webgpu_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_render_session_attach_options* options MLN_BINDING("length=1"),
-  mln_render_session* out_session MLN_BINDING("direction=out;ownership=owned"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session MLN_BINDING("direction=out"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -718,11 +681,11 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; a required backend handle is null; or
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; a required backend handle is null; or
  *   the stated physical size is not positive.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -734,13 +697,11 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
  *   this session compiled its pipeline states for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_metal_borrowed_texture_set_target(
   mln_render_session session,
-  const mln_metal_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_metal_borrowed_texture_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -751,11 +712,11 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; a required backend handle is null; or
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; a required backend handle is null; or
  *   the stated physical size is not positive.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -767,13 +728,11 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  *   layouts this session built its render pass for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
   mln_render_session session,
-  const mln_vulkan_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -784,11 +743,11 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; a required backend handle is null; or
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; a required backend handle is null; or
  *   the stated physical size is not positive.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -798,13 +757,11 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_opengl_borrowed_texture_set_target(
   mln_render_session session,
-  const mln_opengl_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_opengl_borrowed_texture_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -815,11 +772,11 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live; descriptor or
- *   completion is null or undersized; a required backend handle is null; or
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
+ *   or completion is null or undersized; a required backend handle is null; or
  *   the stated physical size is not positive.
- * - MLN_STATUS_INVALID_STATE when the session is not attached, or a texture
- *   frame is still acquired.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -832,13 +789,11 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
  *   session built its render pipelines for.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING("execution=operation;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=operation")
 MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
   mln_render_session session,
-  const mln_webgpu_borrowed_texture_descriptor* descriptor
-    MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -850,9 +805,9 @@ MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
  *
  * Returns:
  * - MLN_STATUS_OK when the readback is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is not live, or completion is null
- *   or undersized.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
+ *   completion is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -864,13 +819,9 @@ MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
  * - MLN_STATUS_NATIVE_ERROR when the read fails.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
-MLN_BINDING(
-  "execution=query;result=mln_texture_readback_result;shape=value;ownership="
-  "borrowed"
-)
+MLN_BINDING("execution=query;result=mln_texture_readback_result")
 MLN_API mln_status mln_texture_read_premultiplied_rgba8(
-  mln_render_session session,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -882,14 +833,15 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when frame is not live or already released, or
- *   out_frame is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle, or out_frame
+ *   is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_UNSUPPORTED when the frame was produced by a different render
  *   backend.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate;view_owner=frame")
+MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_metal_texture(
   mln_acquired_frame frame,
   mln_metal_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
@@ -904,14 +856,15 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when frame is not live or already released, or
- *   out_frame is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle, or out_frame
+ *   is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_UNSUPPORTED when the frame was produced by a different render
  *   backend.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate;view_owner=frame")
+MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
   mln_acquired_frame frame,
   mln_vulkan_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
@@ -926,14 +879,15 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when frame is not live or already released, or
- *   out_frame is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle, or out_frame
+ *   is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_UNSUPPORTED when the frame was produced by a different render
  *   backend.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate;view_owner=frame")
+MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_opengl_texture(
   mln_acquired_frame frame,
   mln_opengl_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
@@ -948,14 +902,15 @@ MLN_API mln_status mln_acquired_frame_get_opengl_texture(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when frame is not live or already released, or
- *   out_frame is null or undersized.
+ * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle, or out_frame
+ *   is null or undersized.
+ * - MLN_STATUS_INVALID_STATE when frame has been released.
  * - MLN_STATUS_UNSUPPORTED when the frame was produced by a different render
  *   backend.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate;view_owner=frame")
+MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_webgpu_texture(
   mln_acquired_frame frame,
   mln_webgpu_owned_texture_frame* out_frame MLN_BINDING("direction=out"),

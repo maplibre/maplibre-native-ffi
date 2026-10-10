@@ -94,6 +94,8 @@ class Values:
         self.inputs: dict[str, ValuePlan] = {}
         self.outputs: set[str] = set()
         self.defaults: set[str] = set()
+        # Handle types whose generated disposer an operation calls.
+        self.disposed: set[str] = set()
         self.enums: dict[str, ValuePlan] = {}
         self.item_buffers = {}
 
@@ -143,18 +145,11 @@ class Values:
             else:
                 self.outputs.add(plan.native)
             return
-        names = [field_name(f.name) for f in plan.fields if f.role == "value"]
+        names = [field_name(f.name) for f in plan.fields if f.public]
         if len(names) != len(set(names)) or any(n.startswith("_") for n in names):
             self.fail(plan, "record fields collide with generated identifiers")
         for field in plan.fields:
-            if field.role in {
-                "size",
-                "reserved",
-                "count",
-                "stride",
-                "arena",
-                "presence_mask",
-            }:
+            if not field.public:
                 continue
             self.supported(field.value, input=input)
         for group in plan.presence_groups:
@@ -211,7 +206,7 @@ class Values:
         )
         return ValuePlan(
             kind="record",
-            native=plan.native + "_" + group.mask.removeprefix("has_"),
+            native=plan.native + "_" + group.member,
             ctype=plan.ctype,
             fields=fields,
         )
@@ -237,31 +232,14 @@ class Values:
             for name in group.fields
         }
         for field in plan.fields:
-            if field.role in {
-                "size",
-                "reserved",
-                "count",
-                "stride",
-                "arena",
-                "presence_mask",
-                "tag",
-            }:
+            if not field.public:
                 continue
             if field.name in grouped:
                 group = grouped[field.name]
                 if field.name != group.fields[0]:
                     continue
-                # The group bit names the field, without the prefix that every
-                # bit in the mask shares.
-                bits = [g.bit for g in plan.presence_groups if g.bit]
-                prefix = os.path.commonprefix(bits).rsplit("_", 1)[0] + "_"
-                name = (
-                    group.bit.removeprefix(prefix).lower()
-                    if group.bit
-                    else group.mask.removeprefix("has_")
-                )
                 yield (
-                    name,
+                    group.member,
                     replace(self.group_value(plan, group), nullable=True),
                     field,
                     group,
@@ -274,11 +252,7 @@ class Values:
                 )
                 yield field_name(field.name), value, field, None
         for flag in plan.mask_flags:
-            bits = [g.bit for g in plan.presence_groups if g.bit] + [
-                f.name for f in plan.mask_flags
-            ]
-            prefix = os.path.commonprefix(bits).rsplit("_", 1)[0] + "_"
-            yield flag.name.removeprefix(prefix).lower(), None, flag, None
+            yield flag.member, None, flag, None
 
     def copy(self, plan: ValuePlan, expr: str, *, scope: str = "value") -> str:
         """An expression that copies the C value `expr` into a Python object."""

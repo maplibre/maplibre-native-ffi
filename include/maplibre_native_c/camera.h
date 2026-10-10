@@ -20,30 +20,23 @@ extern "C" {
 /**
  * Returns empty camera options initialized for this C API version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_camera_options mln_camera_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty animation options initialized for this C API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_animation_options mln_animation_options_default(void) MLN_NOEXCEPT;
 /** Returns an empty relative camera update initialized for this API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_camera_delta mln_camera_delta_default(void) MLN_NOEXCEPT;
 /** Returns an empty atomic camera update initialized for this API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_camera_update mln_camera_update_default(void) MLN_NOEXCEPT;
 
 /** Returns empty camera fitting options initialized for this C API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_camera_fit_options
 mln_camera_fit_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty map bound options initialized for this C API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_bound_options mln_bound_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty free camera options initialized for this C API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_free_camera_options
 mln_free_camera_options_default(void) MLN_NOEXCEPT;
 
@@ -51,16 +44,13 @@ mln_free_camera_options_default(void) MLN_NOEXCEPT;
  * Returns empty axonometric rendering options initialized for this C API
  * version.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_projection_mode mln_projection_mode_default(void) MLN_NOEXCEPT;
 
 /** Returns empty viewport options initialized for this C API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_map_viewport_options
 mln_map_viewport_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty tile tuning options initialized for this C API version. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
 
 /**
@@ -71,19 +61,18 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options carries
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options carries
  *   a bit outside mln_map_debug_option, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when applying the mask throws on the map worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_debug_options(
   mln_map map, uint32_t options MLN_BINDING("enum=mln_map_debug_option"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits a rendering-stats visibility command.
@@ -93,19 +82,18 @@ MLN_API mln_status mln_map_set_debug_options(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when applying the visibility throws on the map
  *   worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
-  mln_map map, bool enabled,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, bool enabled, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
@@ -113,18 +101,17 @@ MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the dump throws on the map worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_dump_debug_logs(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits a copied viewport-options command.
@@ -134,20 +121,19 @@ MLN_API mln_status mln_map_dump_debug_logs(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map
  *   worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_viewport_options(
-  mln_map map, const mln_map_viewport_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_map_viewport_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 /**
  * Submits a copied tile-options command.
@@ -157,20 +143,19 @@ MLN_API mln_status mln_map_set_viewport_options(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map
  *   worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_tile_options(
-  mln_map map, const mln_map_tile_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_map_tile_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -181,8 +166,9 @@ MLN_API mln_status mln_map_set_tile_options(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, out_camera is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, out_camera is
  *   null or undersized, or out_generation is null.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_BINDING("execution=snapshot")
@@ -212,20 +198,19 @@ MLN_API mln_status mln_map_camera_snapshot_get(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, update is null
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, update is null
  *   or undersized, update->mode or update->gesture_phase is out of range,
  *   update->camera or update->animation is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the camera write throws on the map worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_update_camera(
-  mln_map map, const mln_camera_update* update MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_camera_update* update,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -236,19 +221,18 @@ MLN_API mln_status mln_map_update_camera(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, delta is null or
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, delta is null or
  *   undersized, delta->kind is out of range, the offset, scale, or anchor the
  *   kind uses is not finite, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the camera write throws on the map worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_apply_camera_delta(
-  mln_map map, const mln_camera_delta* delta MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, const mln_camera_delta* delta, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -262,18 +246,17 @@ MLN_API mln_status mln_map_apply_camera_delta(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the cancellation throws on the map worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_transitions(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -284,21 +267,17 @@ MLN_API mln_status mln_map_cancel_transitions(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or completion is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when reading the camera throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_camera_query_result;shape=value;ownership="
-  "borrowed"
-)
+MLN_BINDING("execution=query;result=mln_camera_query_result")
 MLN_API mln_status mln_map_camera_query(
-  mln_map map, const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -310,24 +289,20 @@ MLN_API mln_status mln_map_camera_query(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, bounds is not a
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, bounds is not a
  *   valid ordered pair of coordinates, or fit_options is undersized or carries
  *   an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the fit throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_camera_options;shape=value;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
   mln_map map, mln_lat_lng_bounds bounds,
-  const mln_camera_fit_options* fit_options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_camera_fit_options* fit_options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -338,28 +313,23 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, coordinates is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, coordinates is
  *   null, coordinate_count is zero, a coordinate is out of range, or
  *   fit_options is undersized or carries an invalid field, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the fit throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_camera_options;shape=value;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_lat_lngs(
   mln_map map,
-  const mln_lat_lng* coordinates
-    MLN_BINDING("length=coordinate_count;ownership=borrowed"),
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
   size_t coordinate_count,
-  const mln_camera_fit_options* fit_options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  const mln_camera_fit_options* fit_options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -370,25 +340,20 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, geometry is not
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, geometry is not
  *   a GeoJSON Geometry, carries no coordinate, or fit_options is undersized or
  *   carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the fit throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_camera_options;shape=value;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_camera_options")
 MLN_API mln_status mln_map_camera_for_geometry(
-  mln_map map,
-  mln_buffer_view geometry MLN_BINDING("encoding=json;lifetime=call"),
-  const mln_camera_fit_options* fit_options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, mln_buffer_view geometry MLN_BINDING("encoding=json"),
+  const mln_camera_fit_options* fit_options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -402,21 +367,18 @@ MLN_API mln_status mln_map_camera_for_geometry(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, camera is null,
  *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the projection throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_lat_lng_bounds;shape=value;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
-  mln_map map, const mln_camera_options* camera MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_camera_options* camera,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -432,21 +394,18 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, camera is null,
  *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the projection throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_lat_lng_bounds;shape=value;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_lat_lng_bounds")
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
-  mln_map map, const mln_camera_options* camera MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_camera_options* camera,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -457,20 +416,19 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when applying the constraints throws on the map
  *   worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_bounds(
-  mln_map map, const mln_bound_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_bound_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -481,20 +439,19 @@ MLN_API mln_status mln_map_set_bounds(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, options is null,
  *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when applying the options throws on the map
  *   worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_free_camera_options(
-  mln_map map, const mln_free_camera_options* options MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_free_camera_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -506,19 +463,18 @@ MLN_API mln_status mln_map_set_free_camera_options(
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, mode is null,
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, mode is null,
  *   undersized, or carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when applying the mode throws on the map worker.
  */
-MLN_BINDING("execution=command;result=void;shape=none;ownership=value")
+MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_set_projection_mode(
-  mln_map map, const mln_projection_mode* mode MLN_BINDING("length=1"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_map map, const mln_projection_mode* mode,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -530,20 +486,17 @@ MLN_API mln_status mln_map_set_projection_mode(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, coordinate is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, coordinate is
  *   out of range, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_screen_point;shape=value;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_screen_point")
 MLN_API mln_status mln_map_pixel_for_lat_lng(
-  mln_map map, mln_lat_lng coordinate,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_lat_lng coordinate, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -557,18 +510,17 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, point is not
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, point is not
  *   finite, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
  */
-MLN_BINDING("execution=query;result=mln_lat_lng;shape=value;ownership=borrowed")
+MLN_BINDING("execution=query;result=mln_lat_lng")
 MLN_API mln_status mln_map_lat_lng_for_pixel(
-  mln_map map, mln_screen_point point,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_screen_point point, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -581,18 +533,17 @@ MLN_API mln_status mln_map_lat_lng_for_pixel(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, point is not
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, point is not
  *   finite, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
  */
-MLN_BINDING("execution=query;result=mln_lat_lng;shape=value;ownership=borrowed")
+MLN_BINDING("execution=query;result=mln_lat_lng")
 MLN_API mln_status mln_map_lat_lng_for_pixel_unwrapped(
-  mln_map map, mln_screen_point point,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, mln_screen_point point, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -603,24 +554,20 @@ MLN_API mln_status mln_map_lat_lng_for_pixel_unwrapped(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, coordinates is
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, coordinates is
  *   null with a nonzero coordinate_count, or a coordinate is out of range, or
  *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
  */
-MLN_BINDING(
-  "execution=query;result=mln_screen_point;shape=array;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_screen_point;shape=array")
 MLN_API mln_status mln_map_pixels_for_lat_lngs(
   mln_map map,
-  const mln_lat_lng* coordinates
-    MLN_BINDING("length=coordinate_count;ownership=borrowed"),
-  size_t coordinate_count,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  const mln_lat_lng* coordinates MLN_BINDING("length=coordinate_count"),
+  size_t coordinate_count, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -632,21 +579,19 @@ MLN_API mln_status mln_map_pixels_for_lat_lngs(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, points is null
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, points is null
  *   with a nonzero point_count, or a point is not finite, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
  */
-MLN_BINDING("execution=query;result=mln_lat_lng;shape=array;ownership=borrowed")
+MLN_BINDING("execution=query;result=mln_lat_lng;shape=array")
 MLN_API mln_status mln_map_lat_lngs_for_pixels(
-  mln_map map,
-  const mln_screen_point* points
-    MLN_BINDING("length=point_count;ownership=borrowed"),
-  size_t point_count, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, const mln_screen_point* points MLN_BINDING("length=point_count"),
+  size_t point_count, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -659,21 +604,19 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, points is null
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, points is null
  *   with a nonzero point_count, or a point is not finite, or completion is
  *   invalid.
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
  * - MLN_STATUS_NATIVE_ERROR when the conversion throws on the map worker.
  */
-MLN_BINDING("execution=query;result=mln_lat_lng;shape=array;ownership=borrowed")
+MLN_BINDING("execution=query;result=mln_lat_lng;shape=array")
 MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
-  mln_map map,
-  const mln_screen_point* points
-    MLN_BINDING("length=point_count;ownership=borrowed"),
-  size_t point_count, const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, const mln_screen_point* points MLN_BINDING("length=point_count"),
+  size_t point_count, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -685,15 +628,14 @@ MLN_API mln_status mln_map_lat_lngs_for_pixels_unwrapped(
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is not live, completion is invalid,
- *   or latitude is not finite or outside [-90, 90].
- * - MLN_STATUS_INVALID_STATE when the map is closing.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, completion is
+ *   invalid, or latitude is not finite or outside [-90, 90].
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=query;result=double;shape=value;ownership=borrowed")
+MLN_BINDING("execution=query;result=double")
 MLN_API mln_status mln_map_meters_per_pixel_at_latitude(
-  mln_map map, double latitude,
-  const mln_completion* completion MLN_BINDING("length=1"),
+  mln_map map, double latitude, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

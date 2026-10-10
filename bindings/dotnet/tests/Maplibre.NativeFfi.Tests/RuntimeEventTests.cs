@@ -1,9 +1,6 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Render;
-using Maplibre.NativeFfi.Runtime;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

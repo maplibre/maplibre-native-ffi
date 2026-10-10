@@ -1,6 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-namespace Maplibre.NativeFfi.Runtime;
+namespace Maplibre.NativeFfi;
 
 public sealed unsafe partial class HttpHeaderTransformResponse
 {

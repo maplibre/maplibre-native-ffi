@@ -3,10 +3,10 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 pub mod abi;
 pub mod callback;
+pub mod decision;
 pub mod error;
 pub mod handle;
 pub mod ptr;
-pub mod resource;
 pub mod string;
 #[cfg(feature = "abi-version-override")]
 pub use abi::set_abi_version_override;

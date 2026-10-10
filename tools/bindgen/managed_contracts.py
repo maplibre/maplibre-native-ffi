@@ -2,6 +2,81 @@
 
 from .names import camel, pascal, type_name
 
+# Words that no Dart declaration can use as a name.
+DART_RESERVED = {
+    "assert",
+    "break",
+    "case",
+    "catch",
+    "class",
+    "const",
+    "continue",
+    "default",
+    "do",
+    "else",
+    "enum",
+    "extends",
+    "false",
+    "final",
+    "finally",
+    "for",
+    "if",
+    "in",
+    "is",
+    "new",
+    "null",
+    "rethrow",
+    "return",
+    "super",
+    "switch",
+    "this",
+    "throw",
+    "true",
+    "try",
+    "var",
+    "void",
+    "while",
+    "with",
+}
+
+# Dart built-in and contextual identifiers, which some declarations cannot use.
+DART_BUILTIN = {
+    "Function",
+    "abstract",
+    "as",
+    "async",
+    "await",
+    "base",
+    "covariant",
+    "deferred",
+    "dynamic",
+    "export",
+    "extension",
+    "external",
+    "factory",
+    "get",
+    "hide",
+    "implements",
+    "import",
+    "interface",
+    "late",
+    "library",
+    "mixin",
+    "of",
+    "on",
+    "operator",
+    "part",
+    "required",
+    "sealed",
+    "set",
+    "show",
+    "static",
+    "sync",
+    "typedef",
+    "when",
+    "yield",
+}
+
 # Reserved words of .NET and Dart. Each emitter escapes, renames, or rejects a
 # public name that matches one.
 KEYWORDS = {
@@ -84,75 +159,7 @@ KEYWORDS = {
         "volatile",
         "while",
     },
-    "dart": {
-        "abstract",
-        "as",
-        "assert",
-        "async",
-        "await",
-        "base",
-        "break",
-        "case",
-        "catch",
-        "class",
-        "const",
-        "continue",
-        "covariant",
-        "default",
-        "deferred",
-        "do",
-        "dynamic",
-        "else",
-        "enum",
-        "export",
-        "extends",
-        "extension",
-        "external",
-        "factory",
-        "false",
-        "final",
-        "finally",
-        "for",
-        "Function",
-        "get",
-        "hide",
-        "if",
-        "implements",
-        "import",
-        "in",
-        "interface",
-        "is",
-        "late",
-        "library",
-        "mixin",
-        "new",
-        "null",
-        "of",
-        "on",
-        "operator",
-        "part",
-        "required",
-        "rethrow",
-        "return",
-        "sealed",
-        "set",
-        "show",
-        "static",
-        "super",
-        "switch",
-        "sync",
-        "this",
-        "throw",
-        "true",
-        "try",
-        "typedef",
-        "var",
-        "void",
-        "when",
-        "while",
-        "with",
-        "yield",
-    },
+    "dart": DART_RESERVED | DART_BUILTIN,
 }
 LOCALS = {
     "completion",
@@ -171,16 +178,22 @@ LOCALS = {
 }
 
 
-def conflicting_functions(api, language: str) -> set[str]:
-    """Reject ambiguous transformed public names instead of emitting overloads."""
+def conflicting_functions(bound, language: str) -> set[str]:
+    """Reject ambiguous public method names instead of emitting overloads.
+
+    Two operations collide when they share a receiver and their members
+    convert to the same name in the target language.
+    """
+    convert = pascal if language == "dotnet" else camel
     owners = {}
-    for function in api.functions:
-        if not function.parameters:
-            continue
-        receiver = type_name(function.parameters[0].type)
-        suffix = function.name.removeprefix(receiver + "_")
-        if language == "dotnet":
-            suffix = suffix.removeprefix("list_")
-        name = pascal(suffix) if language == "dotnet" else camel(suffix)
-        owners.setdefault((receiver, name), []).append(function.name)
+    for plan in bound.operations:
+        receiver = plan.receiver or plan.scoped_receiver
+        owner = (
+            type_name(
+                next(p for p in plan.function.parameters if p.name == receiver).type
+            )
+            if receiver
+            else None
+        )
+        owners.setdefault((owner, convert(plan.member)), []).append(plan.name)
     return {name for names in owners.values() if len(names) > 1 for name in names}

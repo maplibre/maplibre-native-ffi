@@ -20,7 +20,7 @@ class ResourceRequestHandleJvmTest {
     val provider = denyingProvider { request, handle ->
       if (request.requestedUrl != STYLE_URL) return@denyingProvider null
       // Only the request's own cancel callback references it once the provider returns.
-      handle.resourceRequestSetCancelCallback { handle.close() }
+      handle.setCancelCallback { handle.close() }
       claimed.complete(handle.binding.issued() to TestWeakReference(handle))
       ResourceProviderDecision.HANDLE
     }

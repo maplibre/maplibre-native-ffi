@@ -16,7 +16,7 @@ class NativeEmitterTests(unittest.TestCase):
 
     def test_keyword_parameters_generate_for_commands(self):
         api = self.parse("""
-BIND("execution=command;result=void;shape=none;ownership=value")
+BIND("execution=command")
 mln_status mln_map_defer(mln_map map, double defer, double self, double raw,
                        double bindingArg0, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
@@ -30,10 +30,10 @@ mln_status mln_map_defer(mln_map map, double defer, double self, double raw,
     def test_keyword_fields_generate_for_borrowed_arrays(self):
         api = self.parse("""
 typedef struct mln_entry {
-  mln_buffer_view type BIND("encoding=utf8");
-  mln_buffer_view defer BIND("encoding=utf8");
+  mln_buffer_view type;
+  mln_buffer_view defer;
 } mln_entry;
-BIND("execution=query;result=mln_entry;shape=array;ownership=borrowed")
+BIND("execution=query;result=mln_entry;shape=array")
 mln_status mln_map_entries(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in (go, swift, zig):
@@ -45,7 +45,7 @@ mln_status mln_map_entries(mln_map map, const mln_completion *completion, mln_di
 
     def test_runtime_method_collisions_have_explicit_coverage_failures(self):
         api = self.parse("""
-BIND("execution=command;result=void;shape=none;ownership=value")
+BIND("execution=command")
 mln_status mln_map_close(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         for emitter in (go, swift):
@@ -67,14 +67,14 @@ mln_status mln_map_close(mln_map map, const mln_completion *completion, mln_diag
 typedef enum mln_probe_field { MLN_PROBE_POINT = 1, MLN_PROBE_GAIN = 2 } mln_probe_field;
 typedef struct mln_probe_point { double x; double y; } mln_probe_point;
 typedef struct mln_probe_options {
-  unsigned fields BIND("kind=presence_mask;enum=mln_probe_field");
+  unsigned fields BIND("enum=mln_probe_field");
   mln_probe_point point BIND("mask=fields;bit=MLN_PROBE_POINT");
   double gain BIND("mask=fields;bit=MLN_PROBE_GAIN");
 } mln_probe_options;
-BIND("execution=query;result=mln_probe_options;shape=value;ownership=borrowed")
+BIND("execution=query;result=mln_probe_options")
 mln_status mln_map_probe(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_set_probe(mln_map map, const mln_probe_options *options BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
+BIND("execution=command")
+mln_status mln_map_set_probe(mln_map map, const mln_probe_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
         for emitter in (rust, swift, zig):
             sources = []
@@ -96,10 +96,10 @@ mln_status mln_map_set_probe(mln_map map, const mln_probe_options *options BIND(
     def test_zig_nested_retained_inputs_fail_closed(self):
         api = self.parse("""
 typedef struct mln_store_options {
-  mln_buffer_view view BIND("encoding=utf8;lifetime=owner");
+  mln_buffer_view view BIND("lifetime=owner");
 } mln_store_options;
-BIND("execution=command;result=void;shape=none;ownership=value")
-mln_status mln_map_store(mln_map map, const mln_store_options *options BIND("length=1"), const mln_completion *completion, mln_diagnostic *out_diagnostic);
+BIND("execution=command")
+mln_status mln_map_store(mln_map map, const mln_store_options *options, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         report = zig.coverage(api)
         self.assertIn("retained input requires", report["unsupported"]["mln_map_store"])

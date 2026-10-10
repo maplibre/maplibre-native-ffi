@@ -27,9 +27,9 @@ PROBE = FIXTURES / "probes/rust"
 # whose names collide with Rust keywords and the generated operations' locals.
 COLLISIONS = """
 typedef struct mln_new_point { double type; double self; double str; } mln_new_point;
-BIND("execution=query;result=mln_new_point;shape=value;ownership=borrowed")
+BIND("execution=query;result=mln_new_point")
 mln_status mln_map_match(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("execution=command;result=void;shape=none;ownership=value")
+BIND("execution=command")
 mln_status mln_map_move(mln_map map, mln_new_point call, mln_new_point value, mln_new_point future, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """
 
@@ -82,7 +82,6 @@ class RustEmitterTests(unittest.TestCase):
             safe_crate = root / "crates/maplibre-native-ffi/src"
             shutil.copy(SYS / "lib.rs", sys_crate / "lib.rs")
             shutil.copytree(CRATES / "maplibre-native-ffi-core/src", core_crate)
-            (core_crate / "resource.rs").unlink()
             shutil.copy(PROBE / "core.rs", core_crate / "lib.rs")
             for source in (CRATES / "maplibre-native-ffi/src").glob("*.rs"):
                 shutil.copy(source, safe_crate / source.name)

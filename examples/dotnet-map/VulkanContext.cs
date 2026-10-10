@@ -1,7 +1,5 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Render;
 using Silk.NET.Core.Native;
 using Silk.NET.GLFW;
 using Silk.NET.Vulkan;

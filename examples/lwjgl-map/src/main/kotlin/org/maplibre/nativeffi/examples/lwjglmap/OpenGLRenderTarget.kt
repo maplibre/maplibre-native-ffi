@@ -130,11 +130,11 @@ internal object OpenGLRenderTarget {
     private val compositor: OpenGLTextureCompositor,
   ) : OwnedTextureTarget(attached) {
     override fun draw(frame: AcquiredFrameHandle): Boolean {
-      frame.withGetProducerSync { sync ->
+      frame.withProducerSync { sync ->
         check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
           "OpenGL compositor requires CPU-complete producer work"
         }
-        frame.withGetOpenglTexture { view ->
+        frame.withOpenglTexture { view ->
           check(view.width > 0u && view.height > 0u) {
             "MapLibre returned an empty OpenGL owned texture frame"
           }

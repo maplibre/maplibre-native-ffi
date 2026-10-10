@@ -1558,22 +1558,16 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
         maplibre_core::handle::NativeHandle::to_raw(handle),
     );
     let decision_state = match unsafe {
-        maplibre_core::resource::ResourceRequestHandleState::new(
-            handle,
-            maplibre_core::resource::ResourceRequestHandleFns::new(
-                sys::mln_resource_request_complete,
-                sys::mln_resource_request_release,
-            ),
-        )
+        maplibre_core::decision::DecisionHandleState::new(handle, RESOURCE_REQUEST_DECISION)
     } {
         Ok(state) => state,
         Err(_) => return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
     };
     generated_invoke(
-        || decision_state.finish_provider_decision(false),
+        || decision_state.finish_decision(false),
         |py| {
             let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
-                return Ok(decision_state.finish_provider_decision(false));
+                return Ok(decision_state.finish_decision(false));
             };
             let result = callback.bind(py).call1((
                 {
@@ -1595,7 +1589,7 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
             ))?;
             let decision = result.extract::<u32>()?;
             Ok(decision_state
-                .finish_provider_decision(decision == sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE))
+                .finish_decision(decision == sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE))
         },
     )
 }
@@ -8929,7 +8923,7 @@ impl ResourceRequestHandle {
         let weak = root.downgrade();
         let cancelled = self
             .state
-            .set_cancel_callback(Box::new(move || {
+            .register_cancel(Box::new(move || {
                 Python::try_attach(|py| {
                     if let Some(callback) = root.get(py, 0)
                         && let Err(error) = callback.bind(py).call0()
@@ -9530,6 +9524,7 @@ generated_owner!(
     "_AcquiredFrameHandle",
     mln_acquired_frame,
     Some(generated_dispose_mln_acquired_frame),
+    None,
     |py, owner| GeneratedReadScope::with_native::<sys::mln_acquired_frame, _>(
         py,
         Arc::clone(&owner.state),
@@ -9542,6 +9537,7 @@ generated_owner!(
     "_BufferHandle",
     mln_buffer,
     Some(generated_dispose_mln_buffer),
+    None,
     |_, owner| GeneratedReadScope::new::<sys::mln_buffer, _>(Arc::clone(&owner.state))
 );
 generated_owner!(
@@ -9549,6 +9545,7 @@ generated_owner!(
     "_EventBatchHandle",
     mln_event_batch,
     Some(generated_dispose_mln_event_batch),
+    None,
     |_, owner| GeneratedReadScope::new::<sys::mln_event_batch, _>(Arc::clone(&owner.state))
 );
 generated_owner!(
@@ -9556,6 +9553,7 @@ generated_owner!(
     "_GeojsonSourceDataHandle",
     mln_geojson_source_data,
     Some(generated_dispose_mln_geojson_source_data),
+    None,
     |_, owner| GeneratedReadScope::new::<sys::mln_geojson_source_data, _>(Arc::clone(&owner.state))
 );
 generated_owner!(
@@ -9563,6 +9561,7 @@ generated_owner!(
     "_MapHandle",
     mln_map,
     Some(generated_dispose_mln_map),
+    None,
     |_, owner| GeneratedReadScope::new::<sys::mln_map, _>(Arc::clone(&owner.state))
 );
 generated_owner!(
@@ -9570,6 +9569,7 @@ generated_owner!(
     "_MapProjectionHandle",
     mln_map_projection,
     Some(generated_dispose_mln_map_projection),
+    None,
     |_, owner| GeneratedReadScope::new::<sys::mln_map_projection, _>(Arc::clone(&owner.state))
 );
 generated_owner!(
@@ -9577,6 +9577,7 @@ generated_owner!(
     "_RenderFrameBatchHandle",
     mln_render_frame_batch,
     Some(generated_dispose_mln_render_frame_batch),
+    None,
     |_, owner| GeneratedReadScope::new::<sys::mln_render_frame_batch, _>(Arc::clone(&owner.state))
 );
 generated_owner!(
@@ -9584,6 +9585,7 @@ generated_owner!(
     "_RenderSessionHandle",
     mln_render_session,
     Some(generated_dispose_mln_render_session),
+    None,
     |_, owner| GeneratedReadScope::new::<sys::mln_render_session, _>(Arc::clone(&owner.state))
 );
 
@@ -9592,7 +9594,9 @@ struct ResourceRequestHandle {
     // The accepted cancel callback, which native owns until it retires.
     cancel_root: Mutex<std::sync::Weak<GeneratedCallbackRoot>>,
     // Dropped by hand, with the GIL released; see the Drop impl below.
-    state: ManuallyDrop<Arc<maplibre_core::resource::ResourceRequestHandleState>>,
+    state: ManuallyDrop<
+        Arc<maplibre_core::decision::DecisionHandleState<sys::mln_resource_request_handle>>,
+    >,
 }
 impl Drop for ResourceRequestHandle {
     fn drop(&mut self) {
@@ -9640,11 +9644,35 @@ impl ResourceRequestHandle {
         }
     }
 }
+pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
+    sys::mln_resource_request_handle,
+> = unsafe {
+    maplibre_core::decision::DecisionHandleFns::new(
+        "ResourceRequestHandle",
+        sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
+        sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
+        sys::mln_resource_request_release,
+        sys::mln_resource_request_set_cancel_callback,
+        &[
+            "mln_resource_request_complete",
+            "mln_resource_request_cancelled",
+            "mln_resource_request_set_cancel_callback",
+            "mln_resource_request_release",
+        ],
+    )
+};
+unsafe extern "C" fn generated_exit_release_mln_runtime(
+    handle: sys::mln_runtime,
+    completion: *const sys::mln_completion,
+) -> sys::mln_status {
+    unsafe { sys::mln_runtime_release(handle, completion, std::ptr::null_mut()) }
+}
 generated_owner!(
     RuntimeHandle,
     "_RuntimeHandle",
     mln_runtime,
     Some(generated_dispose_mln_runtime),
+    Some(generated_exit_release_mln_runtime),
     |_, owner| GeneratedReadScope::new::<sys::mln_runtime, _>(Arc::clone(&owner.state))
 );
 #[pyfunction]

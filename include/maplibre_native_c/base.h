@@ -105,43 +105,45 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
  * Handles are opaque 64-bit generational ids.
  *
  * Each id packs the handle's type, a slot index, and a reuse generation, so a
- * released handle stays distinguishable from every later handle. Passing a
- * released id, an id of the wrong type, or a value this library never issued
- * reports MLN_STATUS_INVALID_ARGUMENT and leaves the call without effect;
- * the call's diagnostic distinguishes the cases. Handle values are
- * safe to copy, compare, hash, and move between threads, and carry no
- * ownership on their own.
+ * released handle stays distinguishable from every later handle. A handle is
+ * released once the call that ends it, such as a release, close, destroy, or
+ * dispose, accepts it. Passing a released handle reports
+ * MLN_STATUS_INVALID_STATE. Passing an invalid handle, which is the null
+ * handle, a handle of another type, or a value this library never issued,
+ * reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no effect, and
+ * its diagnostic names the case. Handle values are safe to copy, compare,
+ * hash, and move between threads, and carry no ownership on their own.
  *
  * The bit layout is internal. Hosts pass handles back as issued rather than
  * decoding or synthesizing them.
  */
 typedef uint64_t mln_runtime MLN_BINDING(
-  "kind=handle;release=mln_runtime_release;parent=none;dispose=mln_runtime_"
-  "dispose"
+  "kind=handle;release=mln_runtime_release;"
+  "dispose=mln_runtime_dispose"
 );
 typedef uint64_t mln_map MLN_BINDING(
   "kind=handle;release=mln_map_release;parent=mln_runtime;dispose=mln_map_"
   "dispose"
 );
 typedef uint64_t mln_map_projection MLN_BINDING(
-  "kind=handle;release=mln_map_projection_close;parent=none;dispose=mln_map_"
-  "projection_close"
+  "kind=handle;release=mln_map_projection_close;"
+  "dispose=mln_map_projection_close"
 );
 typedef uint64_t mln_buffer MLN_BINDING(
-  "kind=handle;release=mln_buffer_destroy;parent=none;dispose=mln_buffer_"
-  "destroy"
+  "kind=handle;release=mln_buffer_destroy;"
+  "dispose=mln_buffer_destroy"
 );
 typedef uint64_t mln_resource_request_handle MLN_BINDING(
-  "kind=handle;release=mln_resource_request_release;parent=none;dispose=mln_"
-  "resource_request_release"
+  "kind=handle;release=mln_resource_request_release;"
+  "dispose=mln_resource_request_release;prefix=mln_resource_request"
 );
 typedef uint64_t mln_render_session MLN_BINDING(
   "kind=handle;release=mln_render_session_destroy;parent=mln_map;"
   "abandon=mln_render_session_abandon;dispose=mln_render_session_dispose"
 );
 typedef uint64_t mln_event_batch MLN_BINDING(
-  "kind=handle;release=mln_event_batch_release;parent=none;dispose=mln_event_"
-  "batch_release"
+  "kind=handle;release=mln_event_batch_release;"
+  "dispose=mln_event_batch_release"
 );
 typedef uint64_t mln_acquired_frame MLN_BINDING(
   "kind=handle;release=mln_acquired_frame_release;parent=mln_render_session;"
@@ -150,9 +152,8 @@ typedef uint64_t mln_acquired_frame MLN_BINDING(
   "view_end=mln_adapter_acquired_frame_view_end"
 );
 typedef uint64_t mln_render_frame_batch MLN_BINDING(
-  "kind=handle;release=mln_render_frame_"
-  "batch_release;parent=none;dispose=mln_"
-  "render_frame_batch_release"
+  "kind=handle;release=mln_render_frame_batch_release;"
+  "dispose=mln_render_frame_batch_release"
 );
 
 /**
@@ -163,7 +164,7 @@ typedef uint64_t mln_render_frame_batch MLN_BINDING(
  * trailing null byte.
  */
 typedef struct mln_buffer_view {
-  const void* data MLN_BINDING("kind=native_pointer;ownership=borrowed");
+  const void* data;
   size_t size MLN_BINDING("kind=count");
 } mln_buffer_view;
 
@@ -175,25 +176,24 @@ typedef struct mln_buffer_view {
  *
  * Returns:
  * - MLN_STATUS_OK when out_view receives the borrowed view.
- * - MLN_STATUS_INVALID_ARGUMENT when buffer is null or not live, buffer has the
- *   wrong handle type, or out_view is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when buffer is an invalid handle, or out_view
+ *   is null.
+ * - MLN_STATUS_INVALID_STATE when buffer has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_buffer_get(
-  mln_buffer buffer, mln_buffer_view* out_view MLN_BINDING("direction=out"),
+  mln_buffer buffer,
+  mln_buffer_view* out_view MLN_BINDING("direction=out;encoding=bytes"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Destroys an owned buffer. A null handle is a no-op. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_buffer_destroy(mln_buffer buffer) MLN_NOEXCEPT;
 
 /**
  * Reports the C ABI contract version. The value is 0 while the ABI is unstable,
  * and will increment on each SemVer major release.
  */
-MLN_BINDING("execution=immediate")
 MLN_API uint32_t mln_c_version(void) MLN_NOEXCEPT;
 
 /**
@@ -201,7 +201,7 @@ MLN_API uint32_t mln_c_version(void) MLN_NOEXCEPT;
  *
  * The return value is a mask of mln_render_backend_flag values.
  */
-MLN_BINDING("execution=immediate;enum=mln_render_backend_flag")
+MLN_BINDING("enum=mln_render_backend_flag")
 MLN_API uint32_t mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

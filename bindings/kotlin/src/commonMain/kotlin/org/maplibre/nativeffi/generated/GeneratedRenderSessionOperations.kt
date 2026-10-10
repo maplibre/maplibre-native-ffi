@@ -75,7 +75,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 
   public fun acquireFrame(): AcquiredFrameHandle =
     nativeCall(this, binding, "mln_render_session_acquire_frame") {
-      val out = allocate(8)
+      val out = allocate(8, 8)
       check(C.mln_render_session_acquire_frame(handle, out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
         AcquiredFrameHandle(it, this@GeneratedRenderSessionOperations as RenderSessionHandle)
@@ -109,7 +109,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 
   public fun drainFrameResults(): RenderFrameBatchHandle =
     nativeCall(this, binding, "mln_render_session_drain_frame_results") {
-      val out = allocate(8)
+      val out = allocate(8, 8)
       check(C.mln_render_session_drain_frame_results(handle, out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::renderFrameBatch) { RenderFrameBatchHandle(it) }
     }
@@ -135,7 +135,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 
   public fun projectionCreate(): MapProjectionHandle =
     nativeCall(this, binding, "mln_render_session_projection_create") {
-      val out = allocate(8)
+      val out = allocate(8, 8)
       check(C.mln_render_session_projection_create(handle, out, diagnostic))
       adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
     }
@@ -244,7 +244,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
 
   public fun serviceDriverWork(maxWork: ULong): ULong =
     nativeCall(this, binding, "mln_render_session_service_driver_work") {
-      val out = allocate(8)
+      val out = allocate(w(4, 8), w(4, 8))
       check(C.mln_render_session_service_driver_work(handle, maxWork.toLong(), out, diagnostic))
       readSize(out)
     }

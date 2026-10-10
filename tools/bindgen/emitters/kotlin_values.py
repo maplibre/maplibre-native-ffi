@@ -104,13 +104,13 @@ def identifier(native):
     return "`" + value + "`" if value in KEYWORDS else value
 
 
-def owner_name(native):
-    """Name a handle's generated owner class; a `_handle` suffix is not repeated."""
-    return name(native.removesuffix("_handle")) + "Handle"
+def owner_name(handle):
+    """Name a handle plan's generated owner class after its stem."""
+    return pascal(handle.stem) + "Handle"
 
 
-def owner_class(native):
-    return owner_name(native)
+def owner_class(handle):
+    return owner_name(handle)
 
 
 def literal(number, typ):
@@ -263,7 +263,7 @@ class Values:
         if value.kind == "native_pointer":
             result = "NativePointer"
         elif value.kind == "handle":
-            result = owner_class(value.native)
+            result = owner_class(value.handle)
         elif value.kind in {"record", "enum"}:
             result = name(value.native)
         elif value.kind == "array":
@@ -275,21 +275,6 @@ class Values:
         else:
             result = self.scalar(value)[0]
         return result + ("?" if value.nullable or value.optional else "")
-
-    def group_prefix(self, group):
-        enum = next(
-            (
-                e
-                for e in self.bound.source.enums
-                if any(v.name == group.bit for v in e.values)
-            ),
-            None,
-        )
-        return (
-            commonprefix([v.name for v in enum.values]).rsplit("_", 1)[0] + "_"
-            if enum
-            else "has_"
-        )
 
     def members(self, value):
         """The public members of a record: (name, type, fields, presence group)."""
@@ -308,11 +293,7 @@ class Values:
                 if key in seen:
                     continue
                 seen.add(key)
-                member = identifier(
-                    (group.bit or group.mask)
-                    .removeprefix(self.group_prefix(group))
-                    .lower()
-                )
+                member = identifier(group.member)
                 group_name = (
                     name(group.type)
                     if group.type
@@ -342,9 +323,7 @@ class Values:
         return result
 
     def flag_name(self, value, flag):
-        enum = next(f.value for f in value.fields if f.name == flag.mask)
-        prefix = commonprefix([n for n, _ in enum.enum_values]).rsplit("_", 1)[0] + "_"
-        return identifier(flag.name.removeprefix(prefix).lower())
+        return identifier(flag.member)
 
     def default(self, value):
         if value.nullable or value.optional:
@@ -508,6 +487,13 @@ class Values:
         return "\n".join(result) + "\n" + kotlin_callbacks.common(self)
 
     # Layout facts.
+
+    def storage(self, ctype):
+        """Allocate one value of a C type with that type's size and alignment."""
+        return (
+            f"allocate({width_expression(self.abi.size(ctype))}, "
+            f"{width_expression(self.abi.align(ctype))})"
+        )
 
     def size(self, native):
         return width_expression(

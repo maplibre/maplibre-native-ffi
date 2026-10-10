@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Render;
-
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal readonly record struct Viewport(

@@ -3090,7 +3090,7 @@ impl RenderedQueryGeometry {
             data: RenderedQueryGeometryData::Point(value),
         }
     }
-    pub fn box_(value: ScreenBox) -> Self {
+    pub fn r#box(value: ScreenBox) -> Self {
         Self {
             data: RenderedQueryGeometryData::Box(value),
         }
@@ -3295,12 +3295,9 @@ impl ResourceProvider {
             ],
             handle.0,
         )));
-        // SAFETY: native lends the provider this live request handle.
+        // SAFETY: native lends the callback this live decision handle.
         let Ok(request_state) = (unsafe {
-            maplibre_core::resource::ResourceRequestHandleState::new(
-                handle,
-                RESOURCE_REQUEST_HANDLE_FUNCTIONS,
-            )
+            maplibre_core::decision::DecisionHandleState::new(handle, RESOURCE_REQUEST_DECISION)
         }) else {
             return sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
         };
@@ -3319,13 +3316,11 @@ impl ResourceProvider {
                 .to_native(),
             ))
         }) {
-            Some(sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE) => {
-                request_state.finish_provider_decision(true)
-            }
+            Some(sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE) => request_state.finish_decision(true),
             Some(sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) => {
-                request_state.finish_provider_decision(false)
+                request_state.finish_decision(false)
             }
-            _ => request_state.finish_provider_exception(),
+            _ => request_state.finish_exception(),
         }
     }
 }
@@ -3412,7 +3407,9 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
 
 #[derive(Debug)]
 pub struct ResourceRequestHandle {
-    state: std::sync::Arc<maplibre_core::resource::ResourceRequestHandleState>,
+    state: std::sync::Arc<
+        maplibre_core::decision::DecisionHandleState<sys::mln_resource_request_handle>,
+    >,
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }
 impl ResourceRequestHandle {
@@ -3439,7 +3436,7 @@ impl ResourceRequestHandle {
     pub fn set_cancel_callback(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("mln_resource_request_set_cancel_callback", native.0)?;
-        self.state.set_cancel_callback(Box::new(callback))
+        self.state.register_cancel(Box::new(callback))
     }
     pub fn wait_until_retired(&self) -> Result<()> {
         let native = self.state.issued_handle();
@@ -5574,11 +5571,21 @@ impl FromNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
     }
 }
 
-pub(crate) const RESOURCE_REQUEST_HANDLE_FUNCTIONS:
-    maplibre_core::resource::ResourceRequestHandleFns = unsafe {
-    maplibre_core::resource::ResourceRequestHandleFns::new(
-        sys::mln_resource_request_complete,
+pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
+    sys::mln_resource_request_handle,
+> = unsafe {
+    maplibre_core::decision::DecisionHandleFns::new(
+        "ResourceRequestHandle",
+        sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
+        sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
         sys::mln_resource_request_release,
+        sys::mln_resource_request_set_cancel_callback,
+        &[
+            "mln_resource_request_complete",
+            "mln_resource_request_cancelled",
+            "mln_resource_request_set_cancel_callback",
+            "mln_resource_request_release",
+        ],
     )
 };
 

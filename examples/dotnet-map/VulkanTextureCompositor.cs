@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Maplibre.NativeFfi.Render;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using VulkanSemaphore = Silk.NET.Vulkan.Semaphore;

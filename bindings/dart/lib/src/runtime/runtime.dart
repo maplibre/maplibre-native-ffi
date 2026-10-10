@@ -45,13 +45,16 @@ final class CallbackPortLifecycleProbe {
   Future<void> get released => _port._released.future;
 }
 
+/// An owner that roots the ports of its callback registrations.
+abstract interface class _CallbackPortOwner {
+  _NativeCallbackPorts get _callbackPorts;
+}
+
 /// Returns an owner's single pending port, or null after its release.
 CallbackPortLifecycleProbe? singleCallbackPortProbeForTesting(Object owner) {
-  final pending = switch (owner) {
-    MapHandle() => owner._callbackPorts.pending,
-    ResourceRequestHandle() => owner._callbackPorts.pending,
-    _ => throw ArgumentError.value(owner, 'owner', 'has no callback ports'),
-  };
+  final pending = owner is _CallbackPortOwner
+      ? owner._callbackPorts.pending
+      : throw ArgumentError.value(owner, 'owner', 'has no callback ports');
   return pending.isEmpty ? null : CallbackPortLifecycleProbe._(pending.single);
 }
 

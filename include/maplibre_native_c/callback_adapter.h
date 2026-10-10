@@ -47,7 +47,7 @@ extern "C" {
 
 /** Native-owned completion copy delivered to an asynchronous host listener. */
 typedef struct mln_adapter_completion_record {
-  void* owner MLN_BINDING("kind=context;lifetime=owner");
+  void* owner MLN_BINDING("kind=context");
   mln_completion_result result;
 } mln_adapter_completion_record;
 
@@ -60,11 +60,11 @@ typedef struct mln_adapter_completion_record {
  * owned result when capture fails. Otherwise the listener owns the record and
  * releases it with mln_adapter_completion_record_destroy().
  */
+MLN_BINDING("thread=host")
 typedef void (*mln_adapter_completion_listener)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  mln_adapter_completion_record* record
-    MLN_BINDING("ownership=owned;lifetime=owner;length=1")
-) MLN_BINDING("thread=host;failure=contain");
+  void* user_data, mln_adapter_completion_record* record
+                     MLN_BINDING("ownership=owned;lifetime=owner")
+);
 
 /**
  * Creates a completion descriptor that copies its borrowed result before
@@ -87,19 +87,17 @@ typedef void (*mln_adapter_completion_listener)(
  *   mln_adapter_completion_copy_kind value.
  * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_completion_create(
   uint32_t copy_kind, size_t element_size,
   mln_adapter_completion_listener listener,
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
+  void* user_data MLN_BINDING("kind=context"),
   mln_completion* out_completion MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Releases adapter state after the submitting C API rejected a completion. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_completion_reject(
-  mln_completion* completion MLN_BINDING("length=1")
+  mln_completion* completion
 ) MLN_NOEXCEPT;
 
 /**
@@ -108,9 +106,8 @@ MLN_API void mln_adapter_completion_reject(
  * Call this after constructing the host owner and before destroying the record.
  * A borrowed result requires no adoption; adopting its record has no effect.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_completion_record_adopt(
-  mln_adapter_completion_record* record MLN_BINDING("length=1")
+  mln_adapter_completion_record* record
 ) MLN_NOEXCEPT;
 
 /**
@@ -119,9 +116,8 @@ MLN_API void mln_adapter_completion_record_adopt(
  * A host that discards a delivery or fails to construct its result owner calls
  * this directly. Native handle disposal requires no completion allocation.
  */
-MLN_BINDING("execution=immediate;kind=native_pointer;ownership=owned")
 MLN_API void mln_adapter_completion_record_destroy(
-  mln_adapter_completion_record* record MLN_BINDING("length=1")
+  mln_adapter_completion_record* record
 ) MLN_NOEXCEPT;
 
 /**
@@ -135,11 +131,11 @@ MLN_API void mln_adapter_completion_record_destroy(
  * mln_adapter_deferred_call_record_adopt().
  */
 typedef struct mln_adapter_deferred_call_record {
-  void* owner MLN_BINDING("kind=context;lifetime=owner");
+  void* owner MLN_BINDING("kind=context");
   /** The mln_adapter_deferred_callback value naming the callback typedef. */
   uint32_t callback;
   /** Copied arguments, one generated mln_adapter_*_arguments record. */
-  const void* arguments MLN_BINDING("kind=native_pointer;lifetime=owner");
+  const void* arguments MLN_BINDING("lifetime=owner");
 } mln_adapter_deferred_call_record;
 
 /**
@@ -154,10 +150,9 @@ typedef struct mln_adapter_deferred_call_record {
  * into MapLibre.
  */
 typedef void (*mln_adapter_deferred_call_listener)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  mln_adapter_deferred_call_record* record
-    MLN_BINDING("ownership=owned;lifetime=owner;length=1;nullable=true")
-) MLN_BINDING("thread=native;failure=contain");
+  void* user_data, mln_adapter_deferred_call_record* record
+                     MLN_BINDING("ownership=owned;lifetime=owner;nullable=true")
+);
 
 /**
  * Creates a context that defers one callback typedef to a listener.
@@ -175,11 +170,10 @@ typedef void (*mln_adapter_deferred_call_listener)(
  *   null or does not point to null.
  * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_deferred_callback_create(
   uint32_t callback, mln_adapter_deferred_call_listener listener,
-  void* listener_user_data MLN_BINDING("kind=context;lifetime=owner"),
-  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner"),
+  void* listener_user_data MLN_BINDING("kind=context"),
+  void** out_context MLN_BINDING("direction=out;kind=context"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -191,12 +185,9 @@ MLN_API mln_status mln_adapter_deferred_callback_create(
  * pointer whose finalizer destroys an undelivered record. Release posts 0.
  * Other behavior matches mln_adapter_deferred_callback_create().
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_dart_deferred_callback_create(
-  uint32_t callback,
-  void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
-  int64_t port,
-  void** out_context MLN_BINDING("direction=out;kind=context;lifetime=owner"),
+  uint32_t callback, void* post_cobject MLN_BINDING("lifetime=process"),
+  int64_t port, void** out_context MLN_BINDING("direction=out;kind=context"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -206,7 +197,6 @@ MLN_API mln_status mln_adapter_dart_deferred_callback_create(
  * The function has the C signature of the callback typedef that callback
  * names. It returns the typedef's deferred result after delivering a copy.
  */
-MLN_BINDING("execution=immediate;kind=native_pointer;ownership=borrowed")
 MLN_API void* mln_adapter_deferred_callback_function(
   uint32_t callback
 ) MLN_NOEXCEPT;
@@ -218,9 +208,8 @@ MLN_API void* mln_adapter_deferred_callback_function(
  * mln_log_callback_release, so a registration passes it as its release
  * callback. Call it directly when the registering call rejects the context.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_deferred_callback_release(
-  void* context MLN_BINDING("kind=context;lifetime=owner")
+  void* context MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /**
@@ -229,9 +218,8 @@ MLN_API void mln_adapter_deferred_callback_release(
  * Call this after constructing the host owner and before destroying the
  * record. A record without a decision handle is unchanged.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_deferred_call_record_adopt(
-  mln_adapter_deferred_call_record* record MLN_BINDING("length=1")
+  mln_adapter_deferred_call_record* record
 ) MLN_NOEXCEPT;
 
 /**
@@ -241,9 +229,8 @@ MLN_API void mln_adapter_deferred_call_record_adopt(
  * a zeroed response to the decision's completion function, which the C API
  * converts to a provider error, and releases the handle. Null is a no-op.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_deferred_call_record_destroy(
-  mln_adapter_deferred_call_record* record MLN_BINDING("length=1")
+  mln_adapter_deferred_call_record* record
 ) MLN_NOEXCEPT;
 
 // This block uses line comments because its examples contain URL patterns that
@@ -290,14 +277,8 @@ typedef enum MLN_BINDING(
 typedef struct mln_adapter_resource_rewrite_rule {
   uint32_t kind;
   uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
-  const char* url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
-  const char* replacement_url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
+  const char* url MLN_BINDING("lifetime=owner;nullable=true");
+  const char* replacement_url MLN_BINDING("lifetime=owner;nullable=true");
 } mln_adapter_resource_rewrite_rule;
 
 /**
@@ -308,20 +289,14 @@ typedef struct mln_adapter_resource_rewrite_rule {
  */
 typedef struct mln_adapter_resource_rewrite_rules {
   const mln_adapter_resource_rewrite_rule* rules
-    MLN_BINDING("length=count;ownership=borrowed;lifetime=owner");
+    MLN_BINDING("length=count;lifetime=owner");
   size_t count;
 } mln_adapter_resource_rewrite_rules;
 
 /** One borrowed header supplied by an HTTP header transform rule. */
 typedef struct mln_adapter_http_header {
-  const char* name MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
-  const char* value MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
+  const char* name MLN_BINDING("lifetime=owner;nullable=true");
+  const char* value MLN_BINDING("lifetime=owner;nullable=true");
 } mln_adapter_http_header;
 
 /**
@@ -339,19 +314,16 @@ typedef struct mln_adapter_http_header {
 typedef struct mln_adapter_http_header_transform_rule {
   uint32_t kind;
   uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
-  const char* url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
+  const char* url MLN_BINDING("lifetime=owner;nullable=true");
   const mln_adapter_http_header* headers
-    MLN_BINDING("length=header_count;ownership=borrowed;lifetime=owner");
+    MLN_BINDING("length=header_count;lifetime=owner");
   size_t header_count;
 } mln_adapter_http_header_transform_rule;
 
 /** A borrowed table of HTTP header transform rules. */
 typedef struct mln_adapter_http_header_transform_rules {
   const mln_adapter_http_header_transform_rule* rules
-    MLN_BINDING("length=count;ownership=borrowed;lifetime=owner");
+    MLN_BINDING("length=count;lifetime=owner");
   size_t count;
 } mln_adapter_http_header_transform_rules;
 
@@ -371,10 +343,7 @@ typedef struct mln_adapter_http_header_transform_rules {
 typedef struct mln_adapter_resource_provider_rule {
   uint32_t kind;
   uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
-  const char* requested_url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
+  const char* requested_url MLN_BINDING("lifetime=owner;nullable=true");
   mln_resource_response response;
 } mln_adapter_resource_provider_rule;
 
@@ -386,7 +355,7 @@ typedef struct mln_adapter_resource_provider_rule {
  */
 typedef struct mln_adapter_resource_provider_rules {
   const mln_adapter_resource_provider_rule* rules
-    MLN_BINDING("length=count;ownership=borrowed;lifetime=owner");
+    MLN_BINDING("length=count;lifetime=owner");
   size_t count;
 } mln_adapter_resource_provider_rules;
 
@@ -423,10 +392,7 @@ typedef enum MLN_BINDING(
 typedef struct mln_adapter_resource_route {
   uint32_t kind;
   uint32_t flags MLN_BINDING("enum=mln_adapter_resource_route_flags");
-  const char* url MLN_BINDING(
-    "length=nul;encoding=utf8;ownership=borrowed;"
-    "lifetime=owner;nullable=true"
-  );
+  const char* url MLN_BINDING("lifetime=owner;nullable=true");
 } mln_adapter_resource_route;
 
 /**
@@ -441,10 +407,10 @@ typedef struct mln_adapter_resource_route {
  */
 typedef struct mln_adapter_routed_resource_provider {
   const mln_adapter_resource_route* routes
-    MLN_BINDING("length=route_count;ownership=borrowed;lifetime=owner");
+    MLN_BINDING("length=route_count;lifetime=owner");
   size_t route_count;
   mln_resource_provider_callback callback;
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+  void* user_data MLN_BINDING("kind=context");
 } mln_adapter_routed_resource_provider;
 
 /**
@@ -456,10 +422,9 @@ typedef struct mln_adapter_routed_resource_provider {
  * descriptor context after posting. A rejected owning call invokes that release
  * callback directly to release the context.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_dart_wake_create(
-  void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
-  int64_t port, mln_wake* out_wake MLN_BINDING("direction=out"),
+  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port,
+  mln_wake* out_wake MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -470,53 +435,44 @@ MLN_API mln_status mln_adapter_dart_wake_create(
  * finalizer. Delivered results transfer to the binding's completion decoder.
  * Rejection uses mln_adapter_completion_reject.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_dart_completion_create(
   uint32_t copy_kind, size_t element_size,
-  void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
-  int64_t port, int64_t token,
-  mln_completion* out_completion MLN_BINDING("direction=out"),
+  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port,
+  int64_t token, mln_completion* out_completion MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Creates a native notification port context for generated void callbacks. */
-MLN_BINDING("execution=immediate;kind=native_pointer;ownership=owned")
+MLN_BINDING("ownership=owned")
 MLN_API void* mln_adapter_dart_port_create(
-  void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
-  int64_t port
+  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port
 ) MLN_NOEXCEPT;
 
 /** Returns the generated callback address for a descriptor field identifier. */
-MLN_BINDING("execution=immediate;kind=native_pointer;ownership=borrowed")
 MLN_API void* mln_adapter_dart_port_function(uint32_t id) MLN_NOEXCEPT;
 
 /** Retires the context once and posts zero after its queued notifications. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_dart_port_release(
-  void* context MLN_BINDING("kind=context;lifetime=owner")
+  void* context MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /** Creates a zero-initialized native allocation arena, or returns null. */
-MLN_BINDING("execution=immediate;kind=native_pointer;ownership=owned")
+MLN_BINDING("ownership=owned")
 MLN_API void* mln_adapter_arena_create(void) MLN_NOEXCEPT;
 
 /** Allocates aligned zeroed memory that belongs to the arena. */
-MLN_BINDING("execution=immediate;kind=native_pointer;ownership=borrowed")
 MLN_API void* mln_adapter_arena_allocate(
-  void* arena MLN_BINDING("kind=context;lifetime=owner"), size_t size,
-  size_t alignment
+  void* arena MLN_BINDING("kind=context"), size_t size, size_t alignment
 ) MLN_NOEXCEPT;
 
 /** Releases the arena's allocations and disposes its adopted handles. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_arena_destroy(
-  void* arena MLN_BINDING("kind=context;lifetime=owner")
+  void* arena MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /** Transfers a handle on entry; failure disposes the handle immediately. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_arena_adopt_handle(
-  void* arena MLN_BINDING("kind=context;lifetime=owner"), uint64_t handle,
+  void* arena MLN_BINDING("kind=context"), uint64_t handle,
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -526,12 +482,9 @@ MLN_API mln_status mln_adapter_arena_adopt_handle(
  * The arena calls release with context once when it is destroyed, before it
  * frees its allocations.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_arena_adopt_release(
-  void* arena MLN_BINDING("kind=context;lifetime=owner"),
-  mln_runtime_callback_release release,
-  void* context MLN_BINDING("kind=context;lifetime=owner"),
-  mln_diagnostic* out_diagnostic
+  void* arena MLN_BINDING("kind=context"), mln_runtime_callback_release release,
+  void* context MLN_BINDING("kind=context"), mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -541,20 +494,18 @@ MLN_API mln_status mln_adapter_arena_adopt_release(
  * The release message contains a unique registration identifier. Identifiers
  * remain distinct when a later arena reuses the same context address.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_dart_release_register(
-  void* post_cobject MLN_BINDING("kind=native_pointer;lifetime=process"),
-  int64_t port, void* context MLN_BINDING("kind=context;lifetime=owner"),
-  void* arena MLN_BINDING("kind=context;lifetime=owner;nullable=true"),
+  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port,
+  void* context MLN_BINDING("kind=context"),
+  void* arena MLN_BINDING("kind=context;nullable=true"),
   uint64_t* out_registration MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Removes a registration, posts its identifier and releases its native arena.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_dart_release(
-  void* context MLN_BINDING("kind=context;lifetime=owner")
+  void* context MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /**
@@ -564,19 +515,17 @@ MLN_API void mln_adapter_dart_release(
  * token; finalization disposes the native owner. Allocation failure disposes
  * the owner and returns null.
  */
-MLN_BINDING("execution=immediate;kind=native_pointer;ownership=owned")
+MLN_BINDING("ownership=owned")
 MLN_API void* mln_adapter_owner_token_create(uint64_t handle) MLN_NOEXCEPT;
 
 /** Releases a finalizer token after explicit owner release. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_owner_token_destroy(
-  void* token MLN_BINDING("kind=context;lifetime=owner")
+  void* token MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /** Disposes the token's native owner and releases the token on any thread. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_owner_finalize(
-  void* token MLN_BINDING("kind=context;lifetime=owner")
+  void* token MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /**
@@ -593,14 +542,11 @@ MLN_API void mln_adapter_owner_finalize(
  *   replacement URL fails.
  */
 MLN_BINDING(
-  "execution=immediate;callback_adapter=mln_resource_transform_"
-  "callback;context_type=mln_adapter_resource_rewrite_rules;invokes="
-  "mln_resource_transform_response_set_url"
+  "callback_adapter=mln_resource_transform_callback;"
+  "context_type=mln_adapter_resource_rewrite_rules"
 )
 MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"), uint32_t kind,
-  const char* url
-    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
+  void* user_data MLN_BINDING("kind=context"), uint32_t kind, const char* url,
   mln_resource_transform_response* out_response MLN_BINDING("direction=out")
 ) MLN_NOEXCEPT;
 
@@ -618,14 +564,11 @@ MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
  * - the first non-OK status from mln_http_header_transform_response_set().
  */
 MLN_BINDING(
-  "execution=immediate;callback_adapter=mln_http_header_transform_"
-  "callback;context_type=mln_adapter_http_header_transform_rules;"
-  "invokes=mln_http_header_transform_response_set"
+  "callback_adapter=mln_http_header_transform_callback;"
+  "context_type=mln_adapter_http_header_transform_rules"
 )
 MLN_API mln_status mln_adapter_http_header_transform_callback(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"), uint32_t kind,
-  const char* url
-    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
+  void* user_data MLN_BINDING("kind=context"), uint32_t kind, const char* url,
   mln_http_header_transform_response* out_response MLN_BINDING("direction=out")
 ) MLN_NOEXCEPT;
 
@@ -642,13 +585,8 @@ MLN_API mln_status mln_adapter_http_header_transform_callback(
  *   rules.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_http_header_validate(
-  const char* name
-    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
-  const char* value
-    MLN_BINDING("encoding=utf8;lifetime=call;length=nul;ownership=borrowed"),
-  mln_diagnostic* out_diagnostic
+  const char* name, const char* value, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -659,14 +597,12 @@ MLN_API mln_status mln_adapter_http_header_validate(
  * MLN_RESOURCE_PROVIDER_DECISION_HANDLE. Other requests pass through.
  */
 MLN_BINDING(
-  "execution=immediate;callback_adapter=mln_resource_provider_"
-  "callback;context_type=mln_adapter_resource_provider_rules;invokes="
-  "mln_resource_request_complete,mln_resource_request_release"
+  "callback_adapter=mln_resource_provider_callback;"
+  "context_type=mln_adapter_resource_provider_rules"
 )
 MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  const mln_resource_request* request MLN_BINDING("length=1"),
-  mln_resource_request_handle handle
+  void* user_data MLN_BINDING("kind=context"),
+  const mln_resource_request* request, mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
 /**
@@ -678,13 +614,12 @@ MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
  * callback, report MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.
  */
 MLN_BINDING(
-  "execution=immediate;callback_adapter=mln_resource_provider_callback;"
+  "callback_adapter=mln_resource_provider_callback;"
   "context_type=mln_adapter_routed_resource_provider"
 )
 MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  const mln_resource_request* request MLN_BINDING("length=1"),
-  mln_resource_request_handle handle
+  void* user_data MLN_BINDING("kind=context"),
+  const mln_resource_request* request, mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
 /**
@@ -693,11 +628,10 @@ MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
  * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
  * listener recognizes it and releases the state behind the callbacks.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_custom_geometry_callbacks_retire(
   mln_custom_geometry_source_tile_callback fetch_tile,
   mln_custom_geometry_source_tile_callback cancel_tile,
-  void* user_data MLN_BINDING("kind=context;lifetime=owner")
+  void* user_data MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /**
@@ -706,11 +640,10 @@ MLN_API void mln_adapter_custom_geometry_callbacks_retire(
  * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
  * listener recognizes it and releases the state behind the callbacks.
  */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
   mln_custom_mvt_vector_source_tile_callback fetch_tile,
   mln_custom_mvt_vector_source_tile_callback cancel_tile,
-  void* user_data MLN_BINDING("kind=context;lifetime=owner")
+  void* user_data MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 /**
@@ -721,17 +654,15 @@ MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
  * graphics resources. Explicit frame release and session abandon report BUSY
  * while a scope is active. Every successful begin requires exactly one end.
  */
-MLN_BINDING("execution=immediate")
 MLN_API mln_status mln_adapter_acquired_frame_view_begin(
   mln_acquired_frame frame,
-  void** out_scope MLN_BINDING("direction=out;kind=context;lifetime=owner"),
+  void** out_scope MLN_BINDING("direction=out;kind=context"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /** Ends one borrowed-frame scope. Null is a no-op. */
-MLN_BINDING("execution=immediate")
 MLN_API void mln_adapter_acquired_frame_view_end(
-  void* scope MLN_BINDING("kind=context;lifetime=owner")
+  void* scope MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)

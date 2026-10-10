@@ -6,12 +6,14 @@ these plans and keep allocation, callback roots, and scheduling in their runtime
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field, replace
 from typing import TypedDict
 
 from .model import Api, CType, Function, ModelError
 from .names import type_name
-from .schema import is_completion, validate
+from .protocol import BUFFER_VIEW, is_completion, is_status
+from .schema import validate
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,17 @@ class HandlePlan:
     dispose_invalidates: str = "self"
     view_begin: str | None = None
     view_end: str | None = None
+    # The name that the handle's operations begin with: its `prefix=` metadata,
+    # or the handle's own name.
+    prefix: str = ""
+    # Whether the handle is a root whose release is a lifecycle operation that
+    # reports retirement through its completion, so a host can wait for it.
+    observable_root_release: bool = False
+
+    @property
+    def stem(self) -> str:
+        """The handle's public name: its operation prefix without `mln_`."""
+        return public_stem(self.prefix or self.native)
 
 
 @dataclass(frozen=True)
@@ -82,6 +95,9 @@ class PresenceGroup:
     bit: str | None
     fields: tuple[str, ...]
     type: str | None = None
+    # The group's public member name, from what its presence bit or boolean
+    # mask guards; see `presence_member`.
+    member: str = ""
 
 
 @dataclass(frozen=True)
@@ -89,6 +105,8 @@ class MaskFlag:
     mask: str
     name: str
     value: int
+    # The flag's public member name: the constant without its enum's prefix.
+    member: str = ""
 
 
 @dataclass(frozen=True)
@@ -150,6 +168,27 @@ class ValuePlan:
     # For kind="buffer": "view" for the mln_buffer_view struct, "pointer" for a
     # character or byte pointer with a separate length or NUL terminator.
     buffer_form: str | None = None
+    # For a record annotated `fields=ordered`: its field order is part of its
+    # meaning, as with coordinates, so a binding may construct it positionally.
+    ordered: bool = False
+
+
+# Field roles that hold control state: a struct's size, reserved space, an
+# array's count or stride, an item arena, a presence mask, a union tag, a
+# callback context, and a registration's release callback.
+CONTROL_ROLES = frozenset(
+    {
+        "size",
+        "reserved",
+        "count",
+        "stride",
+        "arena",
+        "presence_mask",
+        "tag",
+        "context",
+        "release",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -158,7 +197,13 @@ class FieldPlan:
     value: ValuePlan
     presence: Presence | None = None
     default: str | None = None
+    # The field's `kind`, or "value". A role in CONTROL_ROLES marks state that
+    # a binding writes or derives rather than a member a host sets or reads.
     role: str = "value"
+
+    @property
+    def public(self) -> bool:
+        return self.role not in CONTROL_ROLES
 
 
 @dataclass(frozen=True)
@@ -191,6 +236,8 @@ class CallbackPlan:
     # The C result an adapter may return at once for a host that receives a
     # copy of the call later.
     deferred: str | None = None
+    # Whether the callback returns the status enum.
+    status: bool = False
 
 
 @dataclass(frozen=True)
@@ -219,7 +266,28 @@ class BorrowedViewPlan:
     owner_parameter: str
     owner: HandlePlan
     invalidated_by: tuple[str, ...]
+    # The one output that the view borrows, and the owner's scope operations.
+    output: ParameterPlan
+    begin: str
+    end: str
+    # The accessor's name without its verb: the operation member without a
+    # leading `get_`, so a scoped accessor reads as `with_<stem>`.
+    stem: str
     retention: str = "strong"
+
+
+@dataclass(frozen=True)
+class DefaultSupport:
+    """The operation returns the default value of this record."""
+
+    value: str
+
+
+@dataclass(frozen=True)
+class DisposeSupport:
+    """The operation disposes this handle when its owner is abandoned."""
+
+    handle: HandlePlan
 
 
 @dataclass(frozen=True)
@@ -232,18 +300,27 @@ class OperationPlan:
     result: ValuePlan | None
     registrations: tuple[RegistrationPlan, ...] = ()
     consumes: str | None = None
-    role: str = "public"
-    support_for: str | None = None
+    support: DefaultSupport | DisposeSupport | None = None
     completion: CompletionPlan | None = None
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
     direct_registrations: tuple[DirectRegistrationPlan, ...] = ()
     view: BorrowedViewPlan | None = None
     scoped_receiver: str | None = None
     receiver_access: str = "live"
+    # Whether the function returns the status enum, which a binding checks
+    # rather than returns.
+    status: bool = False
+    # The operation's language-neutral member name, which every binding only
+    # case-converts and escapes; see `Binder.member`.
+    member: str = ""
 
     @property
     def name(self) -> str:
         return self.function.name
+
+    @property
+    def role(self) -> str:
+        return "support" if self.support else "public"
 
 
 @dataclass(frozen=True)
@@ -251,7 +328,6 @@ class CallbackAdapterPlan:
     function: str
     callback: str
     context: str
-    invokes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -287,6 +363,86 @@ class BoundApi:
     @property
     def operations_by_name(self) -> dict[str, OperationPlan]:
         return {operation.name: operation for operation in self.operations}
+
+    @property
+    def decisions(self) -> dict[str, DecisionPlan]:
+        """The decision protocol of each decision handle, by handle name."""
+        return {
+            callback.decision.handle.native: callback.decision
+            for callback in self.callbacks.values()
+            if callback.decision
+        }
+
+    def adapter_operations(
+        self, adapter: CallbackAdapterPlan
+    ) -> tuple[OperationPlan, ...]:
+        """The operations that a callback adapter can call for its host.
+
+        A callback answers through the response records it writes, so its
+        adapter calls the operations scoped to those records.
+        """
+        callback = self.callbacks[adapter.callback]
+        responses = {
+            parameter.value.element.native
+            for parameter in callback.parameters
+            if parameter.direction in {"out", "inout"} and parameter.value.element
+        }
+        return tuple(
+            plan
+            for plan in self.operations
+            if plan.scoped_receiver
+            and next(
+                p.value.element.native
+                for p in (*plan.inputs, *plan.outputs)
+                if p.name == plan.scoped_receiver
+            )
+            in responses
+        )
+
+    @property
+    def defaults(self) -> dict[str, OperationPlan]:
+        """The operation that returns each record's default value."""
+        return {
+            plan.support.value: plan
+            for plan in (*self.operations, *self.runtime_operations)
+            if isinstance(plan.support, DefaultSupport)
+        }
+
+
+def support_relation(plan: OperationPlan) -> dict[str, str] | None:
+    """The support relation of an operation, as coverage reports record it."""
+    if isinstance(plan.support, DefaultSupport):
+        return {"default": plan.support.value}
+    if isinstance(plan.support, DisposeSupport):
+        return {"dispose": plan.support.handle.native}
+    return None
+
+
+def output_member(name: str) -> str:
+    """An output parameter's public member name: its name without `out_`."""
+    return name.removeprefix("out_")
+
+
+def public_stem(native: str) -> str:
+    """A declaration's name without the C API's `mln_` namespace."""
+    return native.removeprefix("mln_")
+
+
+def enum_member_prefix(constants) -> str:
+    """The prefix that an enum's constants share, cut back to a whole word."""
+    names = list(constants)
+    return os.path.commonprefix(names).rsplit("_", 1)[0] + "_" if names else ""
+
+
+def presence_member(group_bit: str | None, mask: str, enum_constants) -> str:
+    """Name a presence group after what its mask guards.
+
+    A bit group takes its bit constant without the prefix that its enum's
+    constants share; a boolean mask names its group `has_<member>`.
+    """
+    if group_bit:
+        return group_bit.removeprefix(enum_member_prefix(enum_constants)).lower()
+    return mask.rsplit(".", 1)[-1].removeprefix("has_")
 
 
 SCALAR_CANONICAL_TYPES = frozenset(
@@ -374,11 +530,30 @@ class Binder:
                 dispose_invalidates=typedef.metadata.get("dispose_invalidates", "self"),
                 view_begin=typedef.metadata.get("view_begin"),
                 view_end=typedef.metadata.get("view_end"),
+                prefix=typedef.metadata.get("prefix", name),
+                observable_root_release=self.observable_root_release(typedef),
             )
             for name, typedef in self.typedefs.items()
             if typedef.metadata.get("kind") == "handle"
             and "release" in typedef.metadata
         }
+
+    def observable_root_release(self, typedef) -> bool:
+        release = self.api.functions_by_name[typedef.metadata["release"]]
+        return (
+            typedef.metadata.get("parent", "none") == "none"
+            and release.metadata.get("execution") == "lifecycle"
+            and release.diagnostic
+            and len(release.parameters) == 2
+            and is_completion(release.parameters[1].type)
+        )
+
+    def enum_constants(self, constant: str | None) -> tuple[str, ...]:
+        """The constants of the enum that declares `constant`."""
+        for enum in self.api.enums:
+            if any(item.name == constant for item in enum.values):
+                return tuple(item.name for item in enum.values)
+        return ()
 
     def scalar_carrier(self, type_: CType) -> str:
         """Preserve portable integer typedefs before Clang's host ABI expansion."""
@@ -452,7 +627,7 @@ class Binder:
             )
         if name in self.handles:
             return ValuePlan(kind="handle", handle=self.handles[name], **common)
-        if name == "mln_buffer_view":
+        if name == BUFFER_VIEW:
             record = self.records.get(name)
             if (
                 record is None
@@ -474,8 +649,12 @@ class Binder:
             pointee = resolved.pointee
             if pointee is None:
                 raise ModelError([f"{context}: pointer has no pointee"])
-            if pointee.kind == "function":
-                if name in self.typedefs and name not in self.callbacks:
+            if pointee.kind == "function" and metadata.get("kind") != "native_pointer":
+                if name not in self.typedefs:
+                    raise ModelError(
+                        [f"{context}: a callback requires a named function typedef"]
+                    )
+                if name not in self.callbacks:
                     self.callbacks[name] = self.callback(name)
                 return ValuePlan(kind="callback", **common)
             if metadata.get("kind") in {"native_pointer", "context", "erased"}:
@@ -582,6 +761,8 @@ class Binder:
                         )
                     )
                 storage_roles = {}
+                if record_metadata.get("kind") == "callback_registration":
+                    storage_roles[record_metadata["release"]] = "release"
                 for member in fields:
                     if member.value.stride:
                         storage_roles[member.value.stride] = "stride"
@@ -627,6 +808,7 @@ class Binder:
                         ),
                         None,
                     ),
+                    ordered=record_metadata.get("fields") == "ordered",
                     presence_groups=tuple(
                         PresenceGroup(
                             mask,
@@ -647,6 +829,7 @@ class Binder:
                                 ),
                                 None,
                             ),
+                            presence_member(bit, mask, self.enum_constants(bit)),
                         )
                         for mask, bit in dict.fromkeys(
                             (member.presence.mask, member.presence.bit)
@@ -670,7 +853,16 @@ class Binder:
                     if record_metadata.get("kind") == "callback_registration"
                     else None,
                     mask_flags=tuple(
-                        MaskFlag(control.name, flag, flag_value)
+                        MaskFlag(
+                            control.name,
+                            flag,
+                            flag_value,
+                            flag.removeprefix(
+                                enum_member_prefix(
+                                    name for name, _ in control.value.enum_values
+                                )
+                            ).lower(),
+                        )
                         for control in fields
                         if control.role == "presence_mask"
                         for flag, flag_value in control.value.enum_values
@@ -764,6 +956,29 @@ class Binder:
                 parameter.name, value, direction, metadata.get("consumes")
             )
 
+            def validate_input_lifetime(item, parameter_name=parameter.name):
+                """An input that a binding marshals lasts for the call.
+
+                A binding copies a buffer, array, or record into storage that
+                it frees when the call returns, so no input value may claim a
+                longer lifetime. Opaque pointers, handles, callbacks, and
+                registrations carry their own retention contracts.
+                """
+                if item.kind in {"native_pointer", "handle", "callback"} or (
+                    item.registration
+                ):
+                    return
+                if item.lifetime != "call":
+                    raise ModelError(
+                        [
+                            f"{context} parameter {parameter_name}: retained input requires a lifetime contract"
+                        ]
+                    )
+                if item.element:
+                    validate_input_lifetime(item.element)
+                for member in item.fields:
+                    validate_input_lifetime(member.value)
+
             def validate_input_layout(item, parameter_name=parameter.name):
                 if (
                     item.stride
@@ -782,6 +997,7 @@ class Binder:
 
             if direction != "out":
                 validate_input_layout(value)
+                validate_input_lifetime(value)
             (outputs if direction == "out" else inputs).append(plan)
 
             def collect_registrations(
@@ -842,12 +1058,14 @@ class Binder:
                     element=replace(result, nullable=False),
                 )
         elif not any(is_completion(p.type) for p in function.parameters):
-            if type_name(function.return_type) not in {"void", "mln_status"}:
+            if function.return_type.kind != "void" and not is_status(
+                function.return_type
+            ):
                 result = self.value(function.return_type, metadata, context + " return")
-        support = metadata.get("support")
+        support: DefaultSupport | DisposeSupport | None = None
         for name, typedef in self.typedefs.items():
             if typedef.metadata.get("default") == function.name:
-                support = "default:" + name
+                support = DefaultSupport(name)
                 break
         completion_parameter = next(
             (
@@ -966,7 +1184,7 @@ class Binder:
             if function.name in {handle.release, handle.dispose}:
                 consumes = handle.release_consumes
                 if function.name == handle.dispose and function.name != handle.release:
-                    support = "dispose:" + handle.native
+                    support = DisposeSupport(handle)
                 break
         for parameter in inputs:
             if parameter.consumes:
@@ -988,6 +1206,19 @@ class Binder:
             raise ModelError(
                 [f"{context}: consumption requires a managed handle receiver"]
             )
+        # A callback response's operations take the response record first.
+        scoped_receiver = next(
+            (
+                parameter.name
+                for parameter in (*inputs, *outputs)
+                if function.parameters
+                and parameter.name == function.parameters[0].name
+                and parameter.value.element
+                and parameter.value.element.response
+            ),
+            None,
+        )
+        member = self.member(function, receiver or scoped_receiver)
         view = None
         if "view_owner" in metadata:
             parameter = next(
@@ -1003,8 +1234,24 @@ class Binder:
                     if operation
                 )
                 current = self.handles.get(current.parent) if current.parent else None
+            if (
+                handle.view_begin is None
+                or handle.view_end is None
+                or len(outputs) != 1
+            ):
+                raise ModelError(
+                    [
+                        f"{context}: a borrowed view requires its owner's view scope and one output"
+                    ]
+                )
             view = BorrowedViewPlan(
-                parameter.name, handle, tuple(dict.fromkeys(invalidated_by))
+                parameter.name,
+                handle,
+                tuple(dict.fromkeys(invalidated_by)),
+                outputs[0],
+                handle.view_begin,
+                handle.view_end,
+                member.removeprefix("get_"),
             )
         return OperationPlan(
             function,
@@ -1015,7 +1262,6 @@ class Binder:
             result,
             tuple(registrations),
             consumes,
-            "support" if support else "public",
             support,
             completion,
             tuple(owners),
@@ -1030,17 +1276,7 @@ class Binder:
             if "registration" in metadata
             else (),
             view,
-            next(
-                (
-                    parameter.name
-                    for parameter in (*inputs, *outputs)
-                    if function.parameters
-                    and parameter.name == function.parameters[0].name
-                    and parameter.value.element
-                    and parameter.value.element.response
-                ),
-                None,
-            ),
+            scoped_receiver,
             next(
                 (
                     parameter.metadata.get("handle_access", "live")
@@ -1049,7 +1285,26 @@ class Binder:
                 ),
                 "live",
             ),
+            is_status(function.return_type),
+            member,
         )
+
+    def member(self, function: Function, receiver: str | None) -> str:
+        """Name an operation once for every binding.
+
+        An explicit `name=` wins. An operation on a handle, or on a callback
+        response, drops its receiver's prefix when its name starts with it;
+        every other name drops `mln_`.
+        """
+        if "name" in function.metadata:
+            return function.metadata["name"]
+        if receiver is not None:
+            parameter = next(p for p in function.parameters if p.name == receiver)
+            owner = type_name(parameter.type.pointee or parameter.type)
+            prefix = self.handles[owner].prefix if owner in self.handles else owner
+            if function.name.startswith(prefix + "_"):
+                return function.name.removeprefix(prefix + "_")
+        return public_stem(function.name)
 
     def response(self, name: str) -> CallbackResponsePlan:
         record = self.records[name]
@@ -1132,6 +1387,7 @@ class Binder:
             typedef.metadata.get("reentry", "allow"),
             self.callback_reentry(typedef),
             typedef.metadata.get("deferred"),
+            is_status(function.result),
         )
 
     def callback_reentry(self, typedef) -> CallbackReentryPlan | None:
@@ -1252,7 +1508,6 @@ class Binder:
                     f.name,
                     f.metadata["callback_adapter"],
                     f.metadata["context_type"],
-                    tuple(filter(None, f.metadata.get("invokes", "").split(","))),
                 )
                 for f in self.api.functions
                 if "callback_adapter" in f.metadata

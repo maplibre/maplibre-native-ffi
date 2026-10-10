@@ -1,5 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
-namespace Maplibre.NativeFfi.Map;
+namespace Maplibre.NativeFfi;
 
 public enum ViewportMode : uint
 {

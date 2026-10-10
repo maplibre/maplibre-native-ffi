@@ -3,8 +3,6 @@ using Maplibre.NativeFfi.Internal.C;
 using Maplibre.NativeFfi.Internal.Callback;
 using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Struct;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Style;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;

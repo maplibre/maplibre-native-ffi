@@ -1,5 +1,5 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
-namespace Maplibre.NativeFfi.Style;
+namespace Maplibre.NativeFfi;
 
 public enum StyleSourceType : uint
 {

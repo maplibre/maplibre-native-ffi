@@ -16,18 +16,12 @@ from tools.bindgen.model import CType, Function, Record
 from tools.bindgen.names import pascal
 from tools.bindgen.semantic import BoundApi
 
-from .dotnet_values import SCALARS, typed_mask
+from .dotnet_values import SCALARS, raw_handle, typed_mask
 
 # C's long is 32 bits on Windows and pointer-sized elsewhere.
 C_LONG = {"long": "CLong", "unsigned long": "CULong"}
 
 HEADER = "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-
-
-def raw_handle(native: str) -> str:
-    """The raw struct that carries one handle typedef's issued id."""
-    name = pascal(native.removeprefix("mln_").removesuffix("_handle"))
-    return "Mln" + name.replace("Geojson", "GeoJson")
 
 
 def identifier(name: str) -> str:
@@ -66,14 +60,14 @@ class Declarations:
         if ctype.kind == "array" and ctype.element is not None:
             if field:
                 # A parameter array decays to a pointer, but a field array
-                # sits inline, and a pointer would change the struct layout.
-                raise ValueError(f"{ctype.spelling}: no C# field layout")
+                # sits inline as the record's nested inline array type.
+                raise ValueError(f"{ctype.spelling}: an inline array needs its field")
             return self.pointer(ctype.element)
         if ctype.kind == "void":
             return "void"
         name = ctype.declaration or ctype.spelling.removeprefix("const ")
         if name in self.bound.handles:
-            return raw_handle(name)
+            return raw_handle(self.bound.handles[name])
         if name in self.records:
             self.use_record(name)
             return name
@@ -126,7 +120,23 @@ class Declarations:
             return
         self.used_records.add(name)
         for field in self.records[name].fields:
-            self.type(field.type, field=True)
+            self.field_type(field)
+
+    def inline_array(self, ctype: CType) -> CType | None:
+        """The fixed-size array that a field type names, through typedefs."""
+        while ctype.kind == "typedef" and ctype.declaration in self.typedefs:
+            ctype = self.typedefs[ctype.declaration].type
+        return ctype if ctype.kind == "array" and ctype.element is not None else None
+
+    def field_type(self, field) -> str:
+        """A field's C# type; a fixed-size array is a nested inline array."""
+        ctype = self.inline_array(field.type) or field.type
+        if ctype.kind == "array" and ctype.element is not None:
+            if ctype.length is None:
+                raise ValueError(f"{ctype.spelling}: a flexible array has no layout")
+            self.type(ctype.element, field=True)
+            return pascal(field.name) + "Array"
+        return self.type(ctype, field=True)
 
     def function(self, function: Function) -> str:
         parameters = [
@@ -146,11 +156,19 @@ class Declarations:
         plan = self.bound.values.get(record.name)
         masks = {field.name: typed_mask(field) for field in plan.fields} if plan else {}
         fields = "".join(
-            f"    {'[FieldOffset(0)] ' if explicit else ''}public {masks.get(field.name) or self.type(field.type, field=True)} {identifier(field.name)};\n"
+            f"    {'[FieldOffset(0)] ' if explicit else ''}public {masks.get(field.name) or self.field_type(field)} {identifier(field.name)};\n"
             for field in record.fields
         )
+        # A fixed-size array field sits inline as an InlineArray of its length.
+        arrays = "".join(
+            f"\n    [System.Runtime.CompilerServices.InlineArray({array.length})]\n"
+            f"    public struct {pascal(field.name)}Array\n    {{\n"
+            f"        private {self.type(array.element, field=True)} element;\n    }}\n"
+            for field in record.fields
+            if (array := self.inline_array(field.type))
+        )
         layout = "[StructLayout(LayoutKind.Explicit)]\n" if explicit else ""
-        return f"{layout}internal unsafe struct {record.name}\n{{\n{fields}}}\n"
+        return f"{layout}internal unsafe struct {record.name}\n{{\n{fields}{arrays}}}\n"
 
     def enum(self, name: str) -> str:
         enum = self.enums[name]
@@ -186,8 +204,8 @@ def generate(bound: BoundApi) -> dict[str, str]:
         declarations.enum(name) for name in sorted(declarations.used_enums)
     )
     handles = "".join(
-        f"internal readonly record struct {raw_handle(native)}(ulong Value) : IMlnHandle;\n"
-        for native in sorted(bound.handles)
+        f"internal readonly record struct {raw_handle(handle)}(ulong Value) : IMlnHandle;\n"
+        for _, handle in sorted(bound.handles.items())
     )
     return {
         "Internal/C/NativeMethods.g.cs": (

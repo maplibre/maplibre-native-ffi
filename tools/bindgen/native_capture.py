@@ -10,8 +10,8 @@ from __future__ import annotations
 import zlib
 
 from .compiler import compile_api
-from .model import Api, CType, Function, ModelError
-from .schema import has_diagnostic
+from .model import Api, CType, Field, Function, ModelError, Record
+from .schema import FIELD_KEYS, IMPLICIT, Conventions, has_diagnostic
 from .semantic import BoundApi, FieldPlan, ValuePlan
 
 
@@ -67,19 +67,38 @@ def arguments_plan(callback) -> ValuePlan:
     )
 
 
-def _field_metadata(parameter) -> str:
-    """Parameter metadata restated for a field whose copy the record owns."""
-    metadata = {
-        key: value
-        for key, value in parameter.metadata.items()
-        if key not in {"direction", "consumes", "kind", "lifetime", "ownership"}
-    }
-    if parameter.type.kind == "pointer":
-        metadata.update(ownership="borrowed", lifetime="owner")
-    if not metadata:
-        return ""
-    items = ";".join(f"{key}={value}" for key, value in metadata.items())
-    return f' MLN_BINDING("{items}")'
+def _field_metadata(record: Record, index: int, conventions: Conventions) -> str:
+    """Parameter metadata restated for a field whose copy the record owns.
+
+    The annotation omits what the field's conventions already imply, as a
+    handwritten header does.
+    """
+    metadata = record.fields[index].metadata
+    defaults = conventions.field(record, index, metadata)
+    items = ";".join(
+        f"{key}={value}"
+        for key, value in metadata.items()
+        if defaults.get(key, IMPLICIT.get(key)) != value
+    )
+    return f' MLN_BINDING("{items}")' if items else ""
+
+
+def _arguments_record(name: str, typedef, context: str) -> Record:
+    """The record of a deferred call's copied arguments, with field metadata."""
+    fields = []
+    for parameter in typedef.parameters:
+        if parameter.name == context:
+            continue
+        metadata = {
+            key: value
+            for key, value in parameter.metadata.items()
+            if key in FIELD_KEYS
+            and key not in {"direction", "consumes", "kind", "lifetime", "ownership"}
+        }
+        if parameter.type.kind == "pointer":
+            metadata.update(ownership="borrowed", lifetime="owner")
+        fields.append(Field(parameter.name, parameter.type, metadata, typedef.location))
+    return Record(name, "struct", tuple(fields), {}, typedef.location)
 
 
 def _declaration(type_: CType, name: str) -> str:
@@ -99,6 +118,7 @@ def _deferred(bound: BoundApi) -> tuple[list[str], list[str]]:
     if not entries:
         return [], []
     source = bound.source
+    conventions = Conventions(source)
     identities = {0: "released"}
     for callback, _ in entries:
         identity = deferred_id(callback.native)
@@ -122,14 +142,15 @@ def _deferred(bound: BoundApi) -> tuple[list[str], list[str]]:
         plan = arguments_plan(callback)
         _validate_capture_ownership(plan)
         record = plan.native
+        fields = _arguments_record(record, typedef, callback.context)
         header.extend(
             [
                 f"/** Copied arguments of one deferred {callback.native} call. */",
                 f"typedef struct {record} {{",
                 *(
-                    f"  {_declaration(parameter.type, parameter.name)}{_field_metadata(parameter)};"
-                    for parameter in typedef.parameters
-                    if parameter.name != callback.context
+                    f"  {_declaration(field.type, field.name)}"
+                    f"{_field_metadata(fields, index, conventions)};"
+                    for index, field in enumerate(fields.fields)
                 ),
                 f"}} {record};",
             ]

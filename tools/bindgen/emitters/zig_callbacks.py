@@ -12,10 +12,7 @@ def add(values, value):
             for parameter in callback.parameters:
                 if parameter.name != callback.context:
                     values.add(parameter.value)
-            if (
-                callback.result.ctype.kind != "void"
-                and callback.result.native != "mln_status"
-            ):
+            if callback.result.ctype.kind != "void" and not callback.status:
                 values.add(callback.result)
         elif (
             field.name not in {value.registration.user_data, value.registration.release}
@@ -46,7 +43,7 @@ def parts(values, value):
         parameters = [p for p in plan.parameters if p.name != plan.context]
         result = (
             "void"
-            if plan.result.ctype.kind == "void" or plan.result.native == "mln_status"
+            if plan.result.ctype.kind == "void" or plan.status
             else values.public(plan.result)
         )
         fields.append(
@@ -106,7 +103,7 @@ def parts(values, value):
         call = f"host(state.value.context{''.join(', ' + expression for expression in converted)})"
         if plan.result.ctype.kind == "void":
             action = f"{call} catch return;"
-        elif plan.result.native == "mln_status":
+        elif plan.status:
             action = f"{call} catch |err| return status.rawStatus(err); return c.MLN_STATUS_OK;"
         else:
             action = f"const result = {call} catch {{ {fallback} }}; return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"

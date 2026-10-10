@@ -34,13 +34,9 @@ final class _NativeDiagnostic implements Finalizable {
 
 /// Copies the message of the last status-returning call from this isolate.
 String nativeDiagnosticMessage() {
-  final message = _diagnostic.pointer.ref.message;
+  final message = _diagnostic.pointer.ref.message.elements;
   final bytes = <int>[];
-  for (
-    var index = 0;
-    index < generated.MLN_DIAGNOSTIC_MESSAGE_CAPACITY;
-    index++
-  ) {
+  for (var index = 0; index < message.length; index++) {
     final byte = message[index] & 0xff;
     if (byte == 0) {
       break;

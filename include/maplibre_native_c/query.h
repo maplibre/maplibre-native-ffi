@@ -38,9 +38,8 @@ typedef struct mln_screen_box {
 /** Screen-space line string in logical map pixels. */
 typedef struct mln_screen_line_string {
   /** Points. Null only when point_count is 0. */
-  const mln_screen_point* points
-    MLN_BINDING("length=point_count;ownership=borrowed");
-  size_t point_count MLN_BINDING("kind=count");
+  const mln_screen_point* points MLN_BINDING("length=point_count");
+  size_t point_count;
 } mln_screen_line_string;
 
 /** Screen-space query geometry data. */
@@ -55,9 +54,9 @@ typedef union mln_rendered_query_geometry_data {
 
 /** Rendered feature query geometry descriptor. */
 typedef struct mln_rendered_query_geometry {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** One of mln_rendered_query_geometry_type. */
-  uint32_t type MLN_BINDING("kind=tag;enum=mln_rendered_query_geometry_type");
+  uint32_t type MLN_BINDING("enum=mln_rendered_query_geometry_type");
   mln_rendered_query_geometry_data data MLN_BINDING("tag=type");
 } mln_rendered_query_geometry;
 
@@ -70,22 +69,17 @@ typedef enum MLN_BINDING(
 
 /** Options for rendered feature queries. */
 typedef struct mln_rendered_feature_query_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields MLN_BINDING(
-    "kind=presence_mask;enum=mln_rendered_feature_query_option_field"
-  );
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_rendered_feature_query_option_field");
   /** Optional style layer IDs. When absent, all rendered layers are queried. */
   const mln_buffer_view* layer_ids MLN_BINDING(
-    "length=layer_id_count;ownership=borrowed;encoding=utf8;mask=fields;bit="
-    "MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS"
+    "length=layer_id_count;mask=fields;"
+    "bit=MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS"
   );
-  size_t layer_id_count MLN_BINDING("kind=count");
+  size_t layer_id_count;
   /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
-  const mln_buffer_view* filter
-    MLN_BINDING("nullable=true;encoding=json;ownership=borrowed;length=1");
-} mln_rendered_feature_query_options MLN_BINDING(
-  "default=mln_rendered_feature_query_options_default"
-);
+  const mln_buffer_view* filter MLN_BINDING("nullable=true;encoding=json");
+} mln_rendered_feature_query_options;
 
 /** Optional fields for mln_source_feature_query_options. */
 typedef enum MLN_BINDING(
@@ -96,23 +90,18 @@ typedef enum MLN_BINDING(
 
 /** Options for source feature queries. */
 typedef struct mln_source_feature_query_options {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields MLN_BINDING(
-    "kind=presence_mask;enum=mln_source_feature_query_option_field"
-  );
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_source_feature_query_option_field");
   /** Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
    */
   const mln_buffer_view* source_layer_ids MLN_BINDING(
-    "length=source_layer_id_count;ownership=borrowed;encoding=utf8;mask=fields;"
+    "length=source_layer_id_count;mask=fields;"
     "bit=MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS"
   );
-  size_t source_layer_id_count MLN_BINDING("kind=count");
+  size_t source_layer_id_count;
   /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
-  const mln_buffer_view* filter
-    MLN_BINDING("nullable=true;encoding=json;ownership=borrowed;length=1");
-} mln_source_feature_query_options MLN_BINDING(
-  "default=mln_source_feature_query_options_default"
-);
+  const mln_buffer_view* filter MLN_BINDING("nullable=true;encoding=json");
+} mln_source_feature_query_options;
 
 /** Optional fields for mln_queried_feature. */
 typedef enum MLN_BINDING("kind=bitmask") mln_queried_feature_field : uint32_t {
@@ -130,44 +119,36 @@ typedef enum MLN_BINDING("kind=bitmask") mln_queried_feature_field : uint32_t {
  * object.
  */
 typedef struct mln_queried_feature {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
-  uint32_t fields
-    MLN_BINDING("kind=presence_mask;enum=mln_queried_feature_field");
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_queried_feature_field");
   mln_buffer_view feature MLN_BINDING("encoding=json");
   mln_buffer_view source_id
-    MLN_BINDING("encoding=utf8;mask=fields;bit=MLN_QUERIED_FEATURE_SOURCE_ID");
-  mln_buffer_view source_layer_id MLN_BINDING(
-    "encoding=utf8;mask=fields;bit=MLN_QUERIED_FEATURE_SOURCE_LAYER_ID"
-  );
+    MLN_BINDING("mask=fields;bit=MLN_QUERIED_FEATURE_SOURCE_ID");
+  mln_buffer_view source_layer_id
+    MLN_BINDING("mask=fields;bit=MLN_QUERIED_FEATURE_SOURCE_LAYER_ID");
   mln_buffer_view state
     MLN_BINDING("encoding=json;mask=fields;bit=MLN_QUERIED_FEATURE_STATE");
 } mln_queried_feature;
 
 /** Returns default rendered feature query options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_rendered_feature_query_options
 mln_rendered_feature_query_options_default(void) MLN_NOEXCEPT;
 
 /** Returns default source feature query options. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_source_feature_query_options
 mln_source_feature_query_options_default(void) MLN_NOEXCEPT;
 
 /** Returns a rendered point query geometry descriptor. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_rendered_query_geometry
 mln_rendered_query_geometry_point(mln_screen_point point) MLN_NOEXCEPT;
 
 /** Returns a rendered box query geometry descriptor. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_rendered_query_geometry
 mln_rendered_query_geometry_box(mln_screen_box box) MLN_NOEXCEPT;
 
 /** Returns a rendered line-string query geometry descriptor. */
-MLN_BINDING("execution=immediate")
 MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
-  const mln_screen_point* points
-    MLN_BINDING("length=point_count;ownership=borrowed"),
+  const mln_screen_point* points MLN_BINDING("length=point_count"),
   size_t point_count
 ) MLN_NOEXCEPT;
 
@@ -187,10 +168,10 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, geometry is
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, geometry is
  *   null, undersized, or names an unknown kind, options is undersized or
  *   carries an invalid field, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -198,16 +179,12 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  *   before the query runs.
  * - MLN_STATUS_NATIVE_ERROR when the query throws on the driver.
  */
-MLN_BINDING(
-  "execution=query;result=mln_queried_feature;shape=array;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_queried_feature;shape=array")
 MLN_API mln_status mln_render_session_query_rendered_features(
-  mln_render_session session,
-  const mln_rendered_query_geometry* geometry MLN_BINDING("length=1"),
+  mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+    MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -217,10 +194,10 @@ MLN_API mln_status mln_render_session_query_rendered_features(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, source_id is
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, source_id is
  *   invalid or empty, options is undersized or carries an invalid field, or
  *   completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -228,16 +205,11 @@ MLN_API mln_status mln_render_session_query_rendered_features(
  *   before the query runs.
  * - MLN_STATUS_NATIVE_ERROR when the query throws on the driver.
  */
-MLN_BINDING(
-  "execution=query;result=mln_queried_feature;shape=array;ownership=borrowed"
-)
+MLN_BINDING("execution=query;result=mln_queried_feature;shape=array")
 MLN_API mln_status mln_render_session_query_source_features(
-  mln_render_session session,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_source_feature_query_options* options
-    MLN_BINDING("length=1;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, mln_buffer_view source_id,
+  const mln_source_feature_query_options* options MLN_BINDING("nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -247,10 +219,10 @@ MLN_API mln_status mln_render_session_query_source_features(
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, any of
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, any of
  *   source_id, feature, extension, or extension_field is invalid or empty,
  *   arguments is invalid, or completion is invalid.
- * - MLN_STATUS_INVALID_STATE when the session is not attached.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -258,20 +230,13 @@ MLN_API mln_status mln_render_session_query_source_features(
  *   before the query runs.
  * - MLN_STATUS_NATIVE_ERROR when the query throws on the driver.
  */
-MLN_BINDING(
-  "execution=query;result=mln_buffer_view;shape=value;ownership=borrowed;"
-  "encoding=json"
-)
+MLN_BINDING("execution=query;result=mln_buffer_view;encoding=json")
 MLN_API mln_status mln_render_session_query_feature_extensions(
-  mln_render_session session,
-  mln_buffer_view source_id MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view feature MLN_BINDING("encoding=json;lifetime=call"),
-  mln_buffer_view extension MLN_BINDING("encoding=utf8;lifetime=call"),
-  mln_buffer_view extension_field MLN_BINDING("encoding=utf8;lifetime=call"),
-  const mln_buffer_view* arguments
-    MLN_BINDING("length=1;encoding=json;nullable=true"),
-  const mln_completion* completion MLN_BINDING("length=1"),
-  mln_diagnostic* out_diagnostic
+  mln_render_session session, mln_buffer_view source_id,
+  mln_buffer_view feature MLN_BINDING("encoding=json"),
+  mln_buffer_view extension, mln_buffer_view extension_field,
+  const mln_buffer_view* arguments MLN_BINDING("encoding=json;nullable=true"),
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

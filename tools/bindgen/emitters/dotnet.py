@@ -16,50 +16,53 @@ from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api, Function
 from tools.bindgen.names import camel, pascal, type_name
-from tools.bindgen.semantic import BoundApi, OperationPlan
+from tools.bindgen.semantic import (
+    BoundApi,
+    DefaultSupport,
+    HandlePlan,
+    OperationPlan,
+    output_member,
+    public_stem,
+)
 
 from . import dotnet_native
-from .dotnet_values import Unsupported, Values, typed_mask
+from .dotnet_values import Unsupported, Values, member, raw_handle, typed_mask
 
 
 def operation_contract(plan: OperationPlan) -> str | None:
     """Reject contracts that the .NET operation skeleton does not implement."""
     function = plan.function
-    metadata = function.metadata
-    execution = metadata.get("execution")
-    if metadata.get("name"):
-        return "explicit name metadata needs a naming rule"
-    if metadata.get("receiver") and (
-        not function.parameters or metadata["receiver"] != function.parameters[0].name
-    ):
-        return "explicit receiver requires a different owner skeleton"
-    if execution == "query" and metadata.get("ownership") != "borrowed":
+    execution = plan.execution
+    result = plan.result
+    # An array result's elements carry the value attributes.
+    value = result.element if result and result.kind == "array" else result
+    if execution == "query" and (result is None or result.ownership != "borrowed"):
         return "query requires borrowed result storage"
-    if metadata.get("optional") == "null":
+    if value and value.optional == "null":
         return "null optional result needs a presence rule"
-    if metadata.get("lifetime") not in {None, "call"} and not (
-        metadata.get("kind") == "native_pointer"
-        and metadata.get("lifetime") == "process"
+    if (
+        value
+        and value.lifetime != "call"
+        and not (value.kind == "native_pointer" and value.lifetime == "process")
     ):
         return "result lifetime requires a retention rule"
     if (
-        metadata.get("shape") == "array"
-        and (metadata.get("nullable") == "true" or "optional" in metadata)
-        and plan.result is not None
-        and plan.result.element is not None
-        and plan.result.element.buffer_form == "view"
+        result
+        and result.kind == "array"
+        and (result.nullable or value.optional)
+        and value.buffer_form == "view"
     ):
         return "optional array result needs a presence rule"
-    if metadata.get("optional") == "empty" and metadata.get("encoding") != "utf8":
+    if value and value.optional == "empty" and value.encoding != "utf8":
         return "optional binary result needs an empty-value conversion"
-    receiver = type_name(function.parameters[0].type) if function.parameters else ""
-    method = pascal(function.name.removeprefix(receiver + "_"))
+    method = pascal(plan.member)
     if (
         not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", method)
         or method in KEYWORDS["dotnet"]
     ):
         return f"method {method!r} requires identifier escaping"
     seen = set()
+    planned_parameters = {p.name: p for p in (*plan.inputs, *plan.outputs)}
     for parameter in function.parameters[1:]:
         if plan.completion and parameter.name == plan.completion.parameter:
             continue
@@ -79,22 +82,17 @@ def operation_contract(plan: OperationPlan) -> str | None:
         seen.add(name)
         if name.startswith("native"):
             return f"parameter {parameter.name!r} collides with generated allocation identifiers"
-        if (
-            parameter.metadata.get("nullable") == "true"
-            or parameter.metadata.get("optional") == "null"
-        ) and not (
+        planned = planned_parameters[parameter.name]
+        value = planned.value
+        # A null pointer argument needs a pointer that is not a C string.
+        if (value.nullable or value.optional == "null") and not (
             parameter.type.pointee and type_name(parameter.type.pointee) != "char"
         ):
             return f"parameter {parameter.name} needs a nullable input conversion"
         if (
-            parameter.metadata.get("length") not in (None, "1")
-            and not (
-                parameter.metadata["length"] == "nul"
-                and parameter.metadata.get("encoding") == "utf8"
-                and parameter.type.pointee
-                and type_name(parameter.type.pointee) == "char"
-            )
-            and parameter.metadata.get("direction", "in") != "in"
+            value.length not in (None, "1")
+            and not (value.length == "nul" and value.encoding == "utf8")
+            and planned.direction != "in"
         ):
             return f"parameter {parameter.name} requires counted-buffer conversion"
     return None
@@ -126,30 +124,21 @@ PRIMITIVES = {
 }
 
 
-def owner_name(native: str) -> str:
-    return (
-        pascal(native.removeprefix("mln_").removesuffix("_handle")).replace(
-            "Geojson", "GeoJson"
-        )
-        + "Handle"
-    )
+def owner_name(handle: HandlePlan | str) -> str:
+    """The public owner class of a handle plan, or of a receiver type that
+    declares no handle contract."""
+    stem = handle.stem if isinstance(handle, HandlePlan) else public_stem(handle)
+    return pascal(stem) + "Handle"
 
 
-def raw_handle(native: str) -> str:
-    return "Mln" + owner_name(native).removesuffix("Handle")
+# Every generated public type shares the binding's root namespace, as each
+# other binding exposes one flat module. Files stay grouped by their header.
+NAMESPACE = "Maplibre.NativeFfi"
 
 
-def namespace_for(path: str) -> str:
-    domain = path.rsplit("/", 1)[-1].removesuffix(".h")
-    return (
-        "Render"
-        if domain in {"render_session", "render_target", "texture", "surface"}
-        else "Runtime"
-        if domain in {"completion", "wake"}
-        else "Map"
-        if domain == "projection"
-        else pascal(domain)
-    )
+def directory_for(path: str) -> str:
+    """The source directory of a header's declarations, named after the header."""
+    return pascal(path.rsplit("/", 1)[-1].removesuffix(".h"))
 
 
 def public_type(name: str) -> str:
@@ -195,14 +184,6 @@ def submission(function: Function, arguments: str) -> str:
     )
 
 
-def operation_name(function: Function, receiver: str) -> str:
-    suffix = function.name.removeprefix(receiver.removesuffix("_handle") + "_")
-    # A collection-returning .NET query names the collection directly.
-    if suffix.startswith("list_"):
-        suffix = suffix.removeprefix("list_")
-    return pascal(suffix.removeprefix("mln_"))
-
-
 def method(signature: str, body: list[str]) -> str:
     return (
         f"    {signature}\n    {{\n"
@@ -215,23 +196,18 @@ def completion_query(
     plan: OperationPlan, values: Values, records: set[str], api
 ) -> tuple[str, str, str]:
     """The result type, submission helper, and copy of a completion's value."""
-    function = plan.function
-    native = function.metadata.get("result")
-    shape = function.metadata.get("shape", "value")
-    nullable = function.metadata.get("nullable") == "true"
-    if native == "void" and shape == "none":
+    result = plan.result
+    if result is None:
         return "Task", "Run", ""
-    if (
-        plan.result is not None
-        and "view"
-        in {
-            plan.result.buffer_form,
-            plan.result.element and plan.result.element.buffer_form,
-        }
-    ) and function.metadata.get("encoding") in {"utf8", "json", "bytes"}:
-        encoding = function.metadata["encoding"]
+    shape = "array" if result.kind == "array" else "value"
+    # An array result's elements carry the value attributes.
+    value = result.element if shape == "array" else result
+    native = value.native
+    nullable = result.nullable
+    if value.buffer_form == "view" and value.encoding in {"utf8", "json", "bytes"}:
+        encoding = value.encoding
         public = "string" if encoding == "utf8" else "byte[]"
-        optional = function.metadata.get("optional") == "empty"
+        optional = value.optional == "empty"
         copy = (
             ("CopyOptionalUtf8View" if optional else "CopyUtf8View")
             if encoding == "utf8"
@@ -245,12 +221,12 @@ def completion_query(
                 return f"{public}?", f"QueryOptional<mln_buffer_view, {public}>", copy
             return public, f"Query<mln_buffer_view, {public}>", copy
         raise Unsupported(f"buffer result shape {shape!r} needs a conversion rule")
-    if native in PRIMITIVES and shape == "value":
+    if value.kind == "scalar" and native in PRIMITIVES and shape == "value":
         if nullable:
             raise Unsupported("nullable scalar completion needs a presence conversion")
         scalar = PRIMITIVES[native]
         return scalar, f"Query<{scalar}, {scalar}>", "static value => value"
-    if native in api.records_by_name and shape in {"array", "value"}:
+    if value.kind == "record":
         # Validate the whole record before emitting the operation.
         record = values.record(native)
         values.decoder(record)
@@ -279,7 +255,7 @@ def completion_query(
 
 def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[str]]:
     api = bound.source
-    owners = {name: owner_name(name) for name in bound.handles}
+    owners = {name: owner_name(handle) for name, handle in bound.handles.items()}
     if plan.receiver:
         parameter = next(
             item for item in plan.function.parameters if item.name == plan.receiver
@@ -366,7 +342,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         and plan.completion
         and not handle_plan.release_inputs
     ):
-        native_type = raw_handle(receiver)
+        native_type = raw_handle(bound.handles[receiver])
         return (
             owners[receiver],
             (
@@ -428,6 +404,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     direct_releases = {
         registration.release_callback for registration in plan.direct_registrations
     }
+    outputs_by_name = {parameter.name: parameter for parameter in plan.outputs}
     for parameter in function.parameters:
         if parameter.name == (plan.receiver or plan.scoped_receiver):
             continue
@@ -456,8 +433,6 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 f"{name} is null ? null : &Invoke{public_type(callback_value.native)}"
             )
             continue
-        if parameter.metadata.get("lifetime") in {"owner", "completion", "process"}:
-            raise Unsupported(f"parameter {parameter.name} requires retained storage")
         name = camel(parameter.name)
         if parameter.name in counts:
             counted = input_plans[counts[parameter.name]]
@@ -473,9 +448,12 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
             args.append(f"checked(({PRIMITIVES[type_name(parameter.type)]}){size})")
             continue
+        # The raw C type maps to its C# ABI carrier; the plan decides the rest.
         ctype = type_name(parameter.type)
-        pointee = parameter.type.pointee
-        is_output = parameter.metadata.get("direction") == "out"
+        value_plan = input_plans.get(parameter.name)
+        output = outputs_by_name.get(parameter.name)
+        output_plan = output.value.element if output else None
+        is_output = output is not None
         if (
             asynchronous
             and is_output
@@ -492,7 +470,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
             if owner.handle.native not in owners:
                 raise Unsupported("owned output requires its generated owner")
-            native = raw_handle(owner.handle.native)
+            native = raw_handle(owner.handle)
             if asynchronous:
                 args.append("output")
             else:
@@ -525,79 +503,50 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         ):
             parameters.append(f"NativePointer {name}")
             args.append(f"(void*){name}.Address")
-        elif ctype in owners:
-            parameters.append(f"{owners[ctype]} {name}")
+        elif value_plan and value_plan.kind == "handle" and value_plan.native in owners:
+            parameters.append(f"{owners[value_plan.native]} {name}")
             scoped = True
             args.append(f"scope.Use({name})")
-        elif ctype in PRIMITIVES:
-            enum = parameter.metadata.get("enum")
-            if enum:
-                if enum not in {item.name for item in api.enums}:
-                    raise Unsupported(f"enum {enum} is not declared")
-                definition = next(item for item in api.enums if item.name == enum)
-                prefix = (
-                    os.path.commonprefix(
-                        [value.name for value in definition.values]
-                    ).rsplit("_", 1)[0]
-                    + "_"
-                )
-                names = [
-                    pascal(value.name.removeprefix(prefix).lower())
-                    for value in definition.values
-                ]
-                if len(names) != len(set(names)) or any(
-                    not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", item) for item in names
-                ):
-                    raise Unsupported(
-                        "enum members require an identifier conversion rule"
-                    )
-                parameters.append(f"{public_type(enum)} {name}")
-                args.append(f"({PRIMITIVES[ctype]}){name}")
-            else:
-                parameters.append(
-                    f"{'ulong' if ctype == 'size_t' else PRIMITIVES[ctype]} {name}"
-                )
-                args.append(
-                    f"(byte)({name} ? 1 : 0)"
-                    if ctype in {"bool", "_Bool"}
-                    else f"checked((nuint){name})"
-                    if ctype == "size_t"
-                    else name
-                )
-        elif (
-            parameter.name in input_plans
-            and input_plans[parameter.name].kind == "scalar"
-        ):
-            value_plan = input_plans[parameter.name]
+        elif value_plan and value_plan.kind == "enum" and ctype in PRIMITIVES:
+            values.supported(value_plan)
+            parameters.append(f"{public_type(value_plan.native)} {name}")
+            args.append(f"({PRIMITIVES[ctype]}){name}")
+        elif value_plan and value_plan.kind == "scalar" and ctype in PRIMITIVES:
+            parameters.append(
+                f"{'ulong' if ctype == 'size_t' else PRIMITIVES[ctype]} {name}"
+            )
+            args.append(
+                f"(byte)({name} ? 1 : 0)"
+                if ctype in {"bool", "_Bool"}
+                else f"checked((nuint){name})"
+                if ctype == "size_t"
+                else name
+            )
+        elif value_plan and value_plan.kind == "scalar":
             values.supported(value_plan)
             parameters.append(f"{values.public_type(value_plan)} {name}")
             args.append(values.encode(value_plan, name))
+        elif value_plan and value_plan.kind == "record":
+            record_plan = values.record(value_plan.native)
+            values.encoder(record_plan)
+            scoped |= values.needs_scope(record_plan)
+            parameters.append(f"{public_type(value_plan.native)} {name}")
+            args.append(values.encode(record_plan, name))
+            records.add(value_plan.native)
         elif (
-            ctype in api.records_by_name
-            and getattr(input_plans.get(parameter.name), "buffer_form", None) != "view"
+            value_plan
+            and value_plan.buffer_form == "view"
+            and value_plan.encoding in {"bytes", "json", "utf8"}
         ):
-            value_plan = values.record(ctype)
-            values.encoder(value_plan)
-            scoped |= values.needs_scope(value_plan)
-            parameters.append(f"{public_type(ctype)} {name}")
-            args.append(values.encode(value_plan, name))
-            records.add(ctype)
-        elif (
-            input_plans.get(parameter.name) is not None
-            and input_plans[parameter.name].buffer_form == "view"
-        ) and parameter.metadata.get("encoding") in {
-            "bytes",
-            "json",
-            "utf8",
-        }:
-            utf8 = parameter.metadata["encoding"] == "utf8"
+            utf8 = value_plan.encoding == "utf8"
             parameters.append(f"{'string' if utf8 else 'byte[]'} {name}")
             scoped = True
             args.append(f"scope.{'Utf8' if utf8 else 'Buffer'}({name})")
         elif (
-            pointee
-            and type_name(pointee) == "char"
-            and parameter.metadata.get("encoding") == "utf8"
+            value_plan
+            and value_plan.buffer_form == "pointer"
+            and value_plan.length == "nul"
+            and value_plan.encoding == "utf8"
         ):
             parameters.append(f"string {name}")
             scoped = True
@@ -618,12 +567,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                     f'if ({name}.Length != {value_plan.length}) throw new ArgumentException("Expected {value_plan.length} elements.", nameof({name}));'
                 )
             args.append(values.encode(value_plan, name))
-        elif (
-            parameter.name in input_plans
-            and input_plans[parameter.name].kind == "reference"
-            and parameter.metadata.get("direction", "in") == "in"
-        ):
-            value_plan = input_plans[parameter.name]
+        elif value_plan and value_plan.kind == "reference":
             values.supported(value_plan)
             if not values.can_encode(value_plan):
                 raise Unsupported("reference element requires an input converter")
@@ -651,39 +595,36 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 if value_plan.nullable
                 else f"&{local}"
             )
-        elif pointee and is_output and type_name(pointee) in PRIMITIVES:
-            native = PRIMITIVES[type_name(pointee)]
+        elif (
+            output_plan
+            and output_plan.kind in {"scalar", "enum"}
+            and type_name(parameter.type.pointee) in PRIMITIVES
+        ):
+            native = PRIMITIVES[type_name(parameter.type.pointee)]
             prologue.append(f"{native} {name} = default;")
             args.append(f"&{name}")
-            output_plan = next(
-                item.value.element
-                for item in plan.outputs
-                if item.name == parameter.name
-            )
-            if output_plan and output_plan.kind == "enum":
+            if output_plan.kind == "enum":
                 output_type = public_type(output_plan.native)
                 outputs.append((output_type, f"({output_type}){name}"))
             else:
                 outputs.append(
                     ("ulong", f"(ulong){name}") if native == "nuint" else (native, name)
                 )
-        elif pointee and is_output and type_name(pointee) in api.records_by_name:
-            record = type_name(pointee)
-            output_plan = next(
-                item.value.element
-                for item in plan.outputs
-                if item.name == parameter.name
-            )
-            assert output_plan
+        elif output_plan and (
+            output_plan.kind in {"record", "union"} or output_plan.buffer_form == "view"
+        ):
+            record = output_plan.native
             values.supported(output_plan)
             if output_plan.kind == "record":
                 values.decoder(output_plan)
-            if any(
-                field.name == "size" for field in api.records_by_name[record].fields
-            ):
-                initial = f"new {record} {{ size = (uint)sizeof({record}) }}"
-            else:
-                initial = f"default({record})"
+            size_field = next(
+                (field for field in output_plan.fields if field.role == "size"), None
+            )
+            initial = (
+                f"new {record} {{ {member(size_field.name)} = (uint)sizeof({record}) }}"
+                if size_field
+                else f"default({record})"
+            )
             prologue.append(f"var {name} = {initial};")
             args.append(f"&{name}")
             copied = values.copy(output_plan, name)
@@ -699,8 +640,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 f"parameter {parameter.name}: {parameter.type.spelling} needs a conversion rule"
             )
     decision_completion = any(
-        callback.decision and callback.decision.complete == function.name
-        for callback in bound.callbacks.values()
+        decision.complete == function.name for decision in bound.decisions.values()
     )
     reads = bool(
         handle_plan
@@ -729,7 +669,14 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
     claim = ["using var claim = state.BeginClaim();"] if decision_completion else []
     prologue = entry + prologue + claim
     arguments = ", ".join(args)
-    name = operation_name(function, factory or receiver)
+    # A free function that creates one owner is that owner's static factory,
+    # named without the owner's prefix.
+    prefix = bound.handles[factory].prefix + "_" if factory else None
+    name = pascal(
+        function.name.removeprefix(prefix)
+        if prefix and function.name.startswith(prefix)
+        else plan.member
+    )
     modifiers = "public static" if static else "public"
     if plan.view:
         assert handle_plan and handle_plan.view_begin and handle_plan.view_end
@@ -810,16 +757,15 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         result_type = f"Task<{owners[result]}>"
         name += "Async"
         body = prologue + [
-            f"return scope.Query<{raw_handle(result)}, {owners[result]}>(",
+            f"return scope.Query<{raw_handle(bound.handles[result])}, {owners[result]}>(",
             f"    {submission(function, arguments)},",
             f"    handle => {owners[result]}.Adopt({parent}handle)",
             ");",
         ]
     elif not asynchronous:
-        definition = api.typedefs_by_name.get(receiver)
         if (
-            definition
-            and definition.metadata.get("release") == function.name
+            handle_plan
+            and handle_plan.release == function.name
             and len(function.parameters) == 1
         ):
             return (
@@ -827,7 +773,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 f"    public void Close() {{ {guard} state.Close(); }}\n",
                 records | values.plans.keys(),
             )
-        if type_name(function.return_type) not in {"mln_status", "void"}:
+        if function.return_type.kind != "void" and not plan.status:
             if plan.result is None:
                 raise Unsupported("direct return needs a resolved result")
             if function.diagnostic:
@@ -851,7 +797,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 if len(outputs) == 1
                 else "("
                 + ", ".join(
-                    f"{type_} {pascal(parameter.name.removeprefix('out_'))}"
+                    f"{type_} {pascal(output_member(parameter.name))}"
                     for (type_, _), parameter in zip(outputs, plan.outputs, strict=True)
                 )
                 + ")"
@@ -890,10 +836,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         parameters.append("CancellationToken cancellationToken = default")
         name += "Async"
         if execution == "command":
-            if (
-                function.metadata.get("result") != "void"
-                or function.metadata.get("shape") != "none"
-            ):
+            if plan.result is not None:
                 raise Unsupported(
                     "command carries a typed payload that needs its own conversion"
                 )
@@ -920,18 +863,19 @@ def emit(api: Api | BoundApi) -> Emission:
     supported = []
     bound = compile_api(api)
     api = bound.source
-    owners = {name: owner_name(name) for name in bound.handles}
+    owners = {name: owner_name(handle) for name, handle in bound.handles.items()}
     unsupported = {
         name: "\n".join(reasons) for name, reasons in bound.unsupported.items()
     }
     default_records: set[str] = set()
-    conflicts = conflicting_functions(api, "dotnet")
+    owner_headers: dict[str, str] = {}
+    conflicts = conflicting_functions(bound, "dotnet")
     for plan in bound.operations:
         function = plan.function
         try:
-            if plan.role == "support":
-                if plan.support_for and plan.support_for.startswith("default:"):
-                    value_name = plan.support_for.removeprefix("default:")
+            if plan.support:
+                if isinstance(plan.support, DefaultSupport):
+                    value_name = plan.support.value
                     values = Values(bound)
                     values.decoder(values.record(value_name))
                     default_records.update(values.plans)
@@ -947,6 +891,8 @@ def emit(api: Api | BoundApi) -> Emission:
         methods[owner].append(emitted)
         records[owner].update(used_records)
         supported.append(function.name)
+        # An owner without a declaration of its own lives with its first operation.
+        owner_headers.setdefault(owner, function.location.path)
     files = {}
     files.update(dotnet_native.generate(bound))
     created_handles = {
@@ -965,17 +911,13 @@ def emit(api: Api | BoundApi) -> Emission:
             )
         )
     }
-    decision_handles = {
-        callback.decision.handle.native
-        for callback in bound.callbacks.values()
-        if callback.decision
-    }
+    decision_handles = set(bound.decisions)
     created_handles.update(native for native in owners if owners[native] in methods)
     async_disposable: set[str] = set()
     for native in sorted(created_handles):
         handle = bound.handles[native]
         owner = owners[native]
-        native_type = raw_handle(native)
+        native_type = raw_handle(handle)
         parent = f"{owners[handle.parent]} parent, " if handle.parent else ""
         argument = "parent, " if handle.parent else ""
         release = next(
@@ -1010,7 +952,7 @@ def emit(api: Api | BoundApi) -> Emission:
         # Abandon disposes a handle that no owner can close any more.
         abandon = (
             f"=> {native_call(cleanup_function, 'live', 'diagnostic')};"
-            if type_name(cleanup_function.return_type) == "mln_status"
+            if cleanup_function.diagnostic
             else f"{{ NativeMethods.{cleanup}(live); return mln_status.MLN_STATUS_OK; }}"
         )
         destroy = (
@@ -1060,47 +1002,35 @@ def emit(api: Api | BoundApi) -> Emission:
         set().union(*records.values()) if records else set()
     )
     values = Values(bound)
-    enum_names = {
-        parameter.metadata["enum"]
-        for function in api.functions
-        if function.name in supported
-        for parameter in function.parameters
-        if "enum" in parameter.metadata
+    # Every public enum is a public type, as in the other bindings, whether or
+    # not a generated signature names it.
+    enum_names = set()
+    for value in bound.public_values.values():
+        if value.kind == "enum":
+            try:
+                values.supported(value)
+            except Unsupported:
+                # The operations that use the enum report it unsupported.
+                continue
+            enum_names.add(value.native)
+    # A handle owner's file sits with its release, a callback response scope's
+    # with its record, and an owner without a declaration with its first
+    # operation.
+    declared_owners = {
+        owner_name(handle): api.functions_by_name[handle.release].location.path
+        for handle in bound.handles.values()
+    } | {
+        public_type(value.native): api.records_by_name[value.native].location.path
+        for value in bound.public_values.values()
+        if value.response
     }
-    enum_names.update(
-        plan.result.native
-        for plan in bound.operations
-        if plan.function.name in supported
-        and plan.result
-        and plan.result.kind == "enum"
-    )
-    for record_name in used_records:
-        enum_names.update(
-            field.value.native
-            for field in values.record(record_name).fields
-            if field.role == "value" and field.value.kind == "enum"
-        )
-    for plan in bound.operations:
-        if plan.function.name in supported:
-            for parameter in plan.inputs:
-                if any(
-                    parameter.name == item.callback
-                    for item in plan.direct_registrations
-                ):
-                    values.supported(parameter.value)
-    enum_names.update(values.enum_names)
-    namespaces = {
-        namespace_for(item.location.path)
-        for item in (*api.records, *api.enums)
-        if item.name in used_records or item.name in enum_names
+    owner_directories = {
+        owner: directory_for(declared_owners.get(owner, owner_headers[owner]))
+        for owner in methods
     }
     # Every generated file shares one set of imports.
     files["GlobalUsings.g.cs"] = (
         "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-        + "".join(
-            f"global using Maplibre.NativeFfi.{namespace};\n"
-            for namespace in sorted(namespaces | {"Map", "Runtime", "Style"})
-        )
         + "global using Maplibre.NativeFfi.Internal;\n"
         + "".join(
             f"global using Maplibre.NativeFfi.Internal.{namespace};\n"
@@ -1121,26 +1051,10 @@ def emit(api: Api | BoundApi) -> Emission:
     )
     values = Values(bound)
     for owner, body in sorted(methods.items()):
-        namespace = (
-            "Runtime"
-            if owner
-            in {
-                public_type(value.native)
-                for value in bound.public_values.values()
-                if value.response
-            }
-            else {
-                **{
-                    owner_name(handle.native): namespace_for(
-                        api.functions_by_name[handle.release].location.path
-                    )
-                    for handle in bound.handles.values()
-                },
-                "Maplibre": "Base",
-            }.get(owner, "Map")
-        )
+        directory = owner_directories[owner]
         handle_types = {
-            owners[native]: raw_handle(native) for native in created_handles
+            owners[native]: raw_handle(bound.handles[native])
+            for native in created_handles
         }
         interfaces = [
             *(["IDisposable"] if owner in handle_types else []),
@@ -1152,10 +1066,8 @@ def emit(api: Api | BoundApi) -> Emission:
             ),
         ]
         bases = f" : {', '.join(interfaces)}" if interfaces else ""
-        files[f"{namespace}/{owner}.Operations.g.cs"] = (
-            HEADER
-            + OPERATION_HELPERS
-            + f"namespace Maplibre.NativeFfi{'.' + namespace if owner != 'Maplibre' else ''};\n\n"
+        files[f"{directory}/{owner}.Operations.g.cs"] = (
+            HEADER + OPERATION_HELPERS + f"namespace {NAMESPACE};\n\n"
             f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
             + "\n".join(body)
             + "}\n"
@@ -1198,7 +1110,7 @@ def emit(api: Api | BoundApi) -> Emission:
     )
     for name in sorted(used_records):
         record = api.records_by_name[name]
-        namespace = namespace_for(record.location.path)
+        directory = directory_for(record.location.path)
         plan = values.record(name)
         declaration = values.declaration(plan)
         if plan.default:
@@ -1213,29 +1125,13 @@ def emit(api: Api | BoundApi) -> Emission:
                 declaration = declaration.rstrip()[:-1] + "\n{\n" + default + "}\n"
             else:
                 declaration = declaration.rstrip()[:-1] + default + "}\n"
-        files[f"{namespace}/{public_type(name)}.g.cs"] = (
-            HEADER + f"namespace Maplibre.NativeFfi.{namespace};\n\n" + declaration
+        files[f"{directory}/{public_type(name)}.g.cs"] = (
+            HEADER + f"namespace {NAMESPACE};\n\n" + declaration
         )
-    # The completion runtime reads results through the completion record's
-    # callbacks, so the enums those results carry, such as a command
-    # disposition, are public without appearing in an operation signature.
-    completion_records = {
-        parameter.type.pointee.declaration
-        for plan in bound.operations
-        if plan.function.name in supported and plan.completion
-        for parameter in plan.function.parameters
-        if parameter.name == plan.completion.parameter and parameter.type.pointee
-    }
-    completion_values = Values(bound)
-    for record_name in sorted(completion_records & bound.values.keys()):
-        for field in bound.values[record_name].fields:
-            if field.value.kind == "callback":
-                completion_values.supported(field.value)
-    enum_names.update(completion_values.enum_names)
     for enum in api.enums:
         if enum.name not in enum_names:
             continue
-        namespace = namespace_for(enum.location.path)
+        directory = directory_for(enum.location.path)
         prefix = (
             os.path.commonprefix([value.name for value in enum.values]).rsplit("_", 1)[
                 0
@@ -1255,9 +1151,9 @@ def emit(api: Api | BoundApi) -> Emission:
             f"    {pascal(value.name.removeprefix(prefix).lower())} = {value.value},"
             for value in enum.values
         ]
-        files[f"{namespace}/{public_type(enum.name)}.g.cs"] = (
+        files[f"{directory}/{public_type(enum.name)}.g.cs"] = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            f"namespace Maplibre.NativeFfi.{namespace};\n\n{flags}"
+            f"namespace {NAMESPACE};\n\n{flags}"
             f"public enum {public_type(enum.name)} : {underlying}\n{{\n"
             + "\n".join(fields)
             + "\n}\n"
@@ -1277,14 +1173,13 @@ def emit(api: Api | BoundApi) -> Emission:
     for native in sorted(views):
         value = values.record(native)
         name = public_type(native)
-        namespace = namespace_for(api.records_by_name[native].location.path)
+        directory = directory_for(api.records_by_name[native].location.path)
         properties = "".join(
             f"    public {values.member_type(value, member, fields)} {member} => scope.Active(value).{member};\n"
             for member, fields in values.members(value)
         )
-        files[f"{namespace}/{name}View.g.cs"] = (
-            HEADER
-            + f"namespace Maplibre.NativeFfi.{namespace};\n\npublic sealed class {name}View\n{{\n"
+        files[f"{directory}/{name}View.g.cs"] = (
+            HEADER + f"namespace {NAMESPACE};\n\npublic sealed class {name}View\n{{\n"
             f"    private readonly {name} value;\n    private readonly NativeViewScope scope;\n"
             f"    internal {name}View({name} value, NativeViewScope scope) {{ this.value = value; this.scope = scope; }}\n"
             + properties

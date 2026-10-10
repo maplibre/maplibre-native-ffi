@@ -8,6 +8,7 @@ retains callback roots, and decodes outputs and completion results.
 
 from dataclasses import replace
 
+from ..semantic import output_member
 from .zig import (
     DIAGNOSTIC_PARAMETER,
     DIAGNOSTIC_PREAMBLE,
@@ -45,10 +46,6 @@ def element(value):
 def validate_input(function, name, value):
     if value.kind == "handle" or value.registration:
         return
-    if value.lifetime != "call":
-        raise failure(
-            function, f"parameter {name}: retained input requires a lifetime adapter"
-        )
     if value.item_buffer:
         raise failure(
             function,
@@ -57,7 +54,7 @@ def validate_input(function, name, value):
     if value.element:
         validate_input(function, name, value.element)
     for field in value.fields:
-        if field.role not in {"reserved", "count", "size", "presence_mask", "tag"}:
+        if field.public:
             validate_input(function, name + "." + field.name, field.value)
 
 
@@ -190,7 +187,7 @@ def operation(plan, values):
         if name in outputs and not (name == plan.receiver and plan.consumes):
             value = element(outputs[name])
             values.add(value)
-            label = identifier(name.removeprefix("out_"))
+            label = identifier(output_member(name))
             if name in owned_outputs:
                 results.append((label, values.public(value)))
                 where = parent_of(plan, owned_outputs[name])
@@ -267,9 +264,7 @@ def operation(plan, values):
         else:
             return_type = future
             body = [f"return {submit};"]
-    elif function.return_type.kind == "void" or (
-        plan.result and function.return_type.spelling != "mln_status"
-    ):
+    elif function.return_type.kind == "void" or (plan.result and not plan.status):
         result_type = "void"
         if plan.result:
             values.add(plan.result)
@@ -318,10 +313,10 @@ def operation(plan, values):
 def view_operation(plan, values):
     view = plan.view
     functions = values.bound.source.functions_by_name
-    begin = status_call(functions[view.owner.view_begin], ["lease.native", "&token"])
+    begin = status_call(functions[view.begin], ["lease.native", "&token"])
     get = status_call(plan.function, ["lease.native", "&raw"])
     preamble = "\n    ".join(DIAGNOSTIC_PREAMBLE)
-    value = plan.outputs[0].value.element
+    value = view.output.value.element
     values.add(value)
     handle_type = values.public(
         next(p.value for p in plan.inputs if p.name == plan.receiver)
@@ -334,7 +329,7 @@ def view_operation(plan, values):
     defer lease.release();
     var token: ?*anyopaque = null;
     {begin}
-    defer c.{view.owner.view_end}(token);
+    defer c.{view.end}(token);
     var raw: c.{value.native} = std.mem.zeroes(c.{value.native});
     raw.size = @sizeOf(c.{value.native});
     {get}

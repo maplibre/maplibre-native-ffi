@@ -1,7 +1,3 @@
-using Maplibre.NativeFfi.Camera;
-using Maplibre.NativeFfi.Map;
-using Maplibre.NativeFfi.Runtime;
-
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 /// <summary>The runtime and its map. Commands go straight to the runtime's own thread.</summary>

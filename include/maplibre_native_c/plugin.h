@@ -56,9 +56,7 @@ extern "C" {
  * shared library, which registers its layer types through the pointer. See
  * the file-top comment for the loading pattern.
  */
-MLN_BINDING(
-  "execution=immediate;kind=native_pointer;ownership=borrowed;lifetime=process"
-)
+MLN_BINDING("kind=native_pointer;ownership=borrowed;lifetime=process")
 MLN_API mln_plugin_register_function_v1
 mln_plugin_get_register_function_v1(void) MLN_NOEXCEPT;
 

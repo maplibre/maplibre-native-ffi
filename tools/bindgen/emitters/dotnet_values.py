@@ -38,6 +38,11 @@ SCALARS = {
 }
 
 
+def raw_handle(handle) -> str:
+    """The raw struct that carries one handle plan's issued id."""
+    return "Mln" + pascal(handle.stem)
+
+
 class Unsupported(ValueError):
     pass
 
@@ -195,32 +200,11 @@ class Values:
         self.plans[plan.native] = plan
 
     def fields(self, plan: ValuePlan) -> tuple[FieldPlan, ...]:
-        controls = (
-            (
-                {plan.registration.user_data, plan.registration.release}
-                if plan.registration
-                else set()
-            )
-            | {
-                field.name
-                for field in plan.fields
-                if field.role
-                in {
-                    "size",
-                    "reserved",
-                    "presence_mask",
-                    "count",
-                    "tag",
-                    "stride",
-                    "arena",
-                }
-            }
-            | {
-                field.presence.mask
-                for field in plan.fields
-                if field.presence and field.presence.mask
-            }
-        )
+        controls = {field.name for field in plan.fields if not field.public} | {
+            field.presence.mask
+            for field in plan.fields
+            if field.presence and field.presence.mask
+        }
         item_buffer = self.item_buffers.get(plan.native)
         if item_buffer:
             controls.update((item_buffer.offset, item_buffer.length))
@@ -263,10 +247,13 @@ class Values:
                 if key in emitted:
                     continue
                 emitted.add(key)
-                if key[1]:
-                    name = self.flag_name(key[1])
-                else:
-                    name = pascal(key[0].removeprefix("has_"))
+                name = pascal(
+                    next(
+                        group.member
+                        for group in plan.presence_groups
+                        if (group.mask, group.bit) == key
+                    )
+                )
                 members.append(
                     (name, tuple(item for item in fields if item.name in groups[key]))
                 )
@@ -301,7 +288,7 @@ class Values:
 
     def public_type(self, plan: ValuePlan) -> str:
         if plan.kind == "handle":
-            return public_name(plan.native).removesuffix("Handle") + "Handle"
+            return pascal(plan.handle.stem) + "Handle"
         if plan.kind == "callback":
             callback = self.bound.callbacks[plan.native]
             arguments = [
@@ -309,7 +296,7 @@ class Values:
                 for parameter in callback.parameters
                 if parameter.name != callback.context
             ]
-            if callback.result.native not in {"void", "mln_status"}:
+            if callback.result.ctype.kind != "void" and not callback.status:
                 arguments.append(self.public_type(callback.result))
                 return "Func<" + ", ".join(arguments) + ">?"
             return (
@@ -468,9 +455,7 @@ class Values:
         if plan.kind == "enum":
             return self.native_type(plan)
         if plan.kind == "handle":
-            return "Mln" + public_name(plan.native).removesuffix("Handle").replace(
-                "Geojson", "GeoJson"
-            )
+            return raw_handle(plan.handle)
         if plan.kind == "buffer" and plan.ctype.pointee:
             return "sbyte*" if plan.encoding == "utf8" else "byte*"
         if plan.kind == "native_pointer":
@@ -559,16 +544,8 @@ class Values:
                 return f"{enum.name}.{name}"
         raise Unsupported(f"unknown enum constant {name}")
 
-    def flag_name(self, constant: str) -> str:
-        values = next(
-            enum.values
-            for enum in self.api.enums
-            if any(item.name == constant for item in enum.values)
-        )
-        prefix = (
-            os.path.commonprefix([item.name for item in values]).rsplit("_", 1)[0] + "_"
-        )
-        return pascal(constant.removeprefix(prefix).lower())
+    def flag_name(self, flag) -> str:
+        return pascal(flag.member)
 
     def decoder(self, plan: ValuePlan) -> str:
         if plan.response:
@@ -653,7 +630,7 @@ class Values:
                     for (name, fields), value in zip(members, values, strict=True)
                 )
                 + "".join(
-                    f", {self.flag_name(flag.name)} = {self.has_bit(plan, flag.mask, flag.name)}"
+                    f", {self.flag_name(flag)} = {self.has_bit(plan, flag.mask, flag.name)}"
                     for flag in plan.mask_flags
                 )
                 + " }"
@@ -877,7 +854,7 @@ class Values:
                 lines.append("        }")
         for flag in plan.mask_flags:
             lines.append(
-                f"        if (value.{self.flag_name(flag.name)}) native.{member(flag.mask)} |= {self.bit(plan, flag.mask, flag.name)};"
+                f"        if (value.{self.flag_name(flag)}) native.{member(flag.mask)} |= {self.bit(plan, flag.mask, flag.name)};"
             )
         return "\n".join([*lines, "        return native;", "    }", ""])
 
@@ -988,7 +965,11 @@ class Values:
             invoke = f"(({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted});"
             if responses:
                 invoke = f"try {{ {invoke} }} finally {{ {cleanup} }}"
-            result_type = "void" if callback.result.native == "void" else "mln_status"
+            result_type = (
+                "void"
+                if callback.result.ctype.kind == "void"
+                else callback.result.native
+            )
             success = (
                 ""
                 if result_type == "void"
@@ -1262,7 +1243,7 @@ class Values:
                     f"    public {required}{type_} {name} {{ get; set; }}"
                 )
             properties.extend(
-                f"    public bool {self.flag_name(flag.name)} {{ get; set; }}"
+                f"    public bool {self.flag_name(flag)} {{ get; set; }}"
                 for flag in plan.mask_flags
             )
             return (

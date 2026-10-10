@@ -101,11 +101,11 @@ internal object MetalRenderTarget {
     private val context: MetalContext,
     private val compositor: MetalTextureCompositor,
   ) : OwnedTextureTarget(attached) {
-    override fun draw(frame: AcquiredFrameHandle): Boolean = frame.withGetProducerSync { sync ->
+    override fun draw(frame: AcquiredFrameHandle): Boolean = frame.withProducerSync { sync ->
       check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
         "Metal compositor requires CPU-complete producer work"
       }
-      frame.withGetMetalTexture { view ->
+      frame.withMetalTexture { view ->
         check(view.width != 0u && view.height != 0u && !view.texture.isNull) {
           "owned Metal frame has an empty extent or null texture"
         }

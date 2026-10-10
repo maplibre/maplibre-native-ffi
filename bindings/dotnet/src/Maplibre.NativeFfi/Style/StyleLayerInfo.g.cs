@@ -1,6 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-namespace Maplibre.NativeFfi.Style;
+namespace Maplibre.NativeFfi;
 
 public readonly partial record struct StyleLayerInfo(
     string Type,

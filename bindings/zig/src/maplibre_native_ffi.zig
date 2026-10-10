@@ -26,52 +26,52 @@ pub const BindingError = status.BindingError;
 pub const Diagnostic = diagnostics.Diagnostic;
 pub const validateAbiVersion = status.validateAbiVersion;
 
-pub const AcquiredFrame = owner.Handle("mln_acquired_frame", struct {
+pub const AcquiredFrame = owner.Handle("mln_acquired_frame", "AcquiredFrame", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_acquired_frame_dispose, .{raw}, null);
     }
 }.dispose);
-pub const Buffer = owner.Handle("mln_buffer", struct {
+pub const Buffer = owner.Handle("mln_buffer", "Buffer", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_buffer_destroy(raw);
     }
 }.dispose);
-pub const EventBatch = owner.Handle("mln_event_batch", struct {
+pub const EventBatch = owner.Handle("mln_event_batch", "EventBatch", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_event_batch_release(raw);
     }
 }.dispose);
-pub const GeojsonSourceData = owner.Handle("mln_geojson_source_data", struct {
+pub const GeojsonSourceData = owner.Handle("mln_geojson_source_data", "GeojsonSourceData", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_geojson_source_data_destroy(raw);
     }
 }.dispose);
-pub const Map = owner.Handle("mln_map", struct {
+pub const Map = owner.Handle("mln_map", "Map", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_map_dispose, .{raw}, null);
     }
 }.dispose);
-pub const MapProjection = owner.Handle("mln_map_projection", struct {
+pub const MapProjection = owner.Handle("mln_map_projection", "MapProjection", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_map_projection_close, .{raw}, null);
     }
 }.dispose);
-pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", struct {
+pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", "RenderFrameBatch", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_render_frame_batch_release(raw);
     }
 }.dispose);
-pub const RenderSession = owner.Handle("mln_render_session", struct {
+pub const RenderSession = owner.Handle("mln_render_session", "RenderSession", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_render_session_dispose, .{raw}, null);
     }
 }.dispose);
-pub const ResourceRequestHandle = owner.Handle("mln_resource_request_handle", struct {
+pub const ResourceRequestHandle = owner.Handle("mln_resource_request_handle", "ResourceRequestHandle", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_resource_request_release(raw);
     }
 }.dispose);
-pub const Runtime = owner.Handle("mln_runtime", struct {
+pub const Runtime = owner.Handle("mln_runtime", "Runtime", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_runtime_dispose, .{raw}, null);
     }

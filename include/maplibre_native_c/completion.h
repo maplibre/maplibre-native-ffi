@@ -37,33 +37,29 @@ typedef enum mln_command_disposition : uint32_t {
  * generation to zero.
  */
 typedef struct mln_completion_result {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   /** Terminal status. */
   mln_status status;
   /** One of mln_command_disposition. */
   uint32_t disposition MLN_BINDING("enum=mln_command_disposition");
-  uint32_t reserved MLN_BINDING("kind=reserved;default=0");
+  uint32_t reserved MLN_BINDING("kind=reserved");
   /** Map snapshot generation published by a committed command, or zero. */
   uint64_t generation;
   /** Borrowed diagnostic bytes, empty on success. */
-  mln_buffer_view diagnostic MLN_BINDING("encoding=utf8");
+  mln_buffer_view diagnostic;
   /** Borrowed function-specific result, or null when the function has none. */
-  const void* value MLN_BINDING("kind=erased;ownership=borrowed");
+  const void* value MLN_BINDING("kind=erased");
   /** Function-specific element or byte count for value. */
   size_t value_count;
 } mln_completion_result;
 
 /** Receives one terminal result for an accepted asynchronous submission. */
 typedef void (*mln_completion_callback)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner"),
-  const mln_completion_result* result
-    MLN_BINDING("ownership=borrowed;lifetime=call;direction=in;length=1")
-) MLN_BINDING("thread=native;failure=contain");
+  void* user_data, const mln_completion_result* result
+);
 
 /** Releases user_data after its completion can no longer run. */
-typedef void (*mln_completion_release)(
-  void* user_data MLN_BINDING("kind=context;lifetime=owner")
-) MLN_BINDING("thread=native;failure=contain");
+typedef void (*mln_completion_release)(void* user_data);
 
 /**
  * Callback state for one asynchronous submission.
@@ -80,12 +76,12 @@ typedef void (*mln_completion_release)(
  * that can only progress on its current thread.
  */
 typedef struct mln_completion {
-  uint32_t size MLN_BINDING("kind=size;default=sizeof");
+  uint32_t size;
   mln_completion_callback callback;
-  void* user_data MLN_BINDING("kind=context;ownership=borrowed");
+  void* user_data MLN_BINDING("kind=context");
   mln_completion_release release_user_data;
 } mln_completion MLN_BINDING(
-  "kind=callback_registration;user_data=user_data;release=release_user_data"
+  "kind=callback_registration;release=release_user_data"
 );
 
 #ifdef __cplusplus

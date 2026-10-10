@@ -1,6 +1,6 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 #nullable enable
-namespace Maplibre.NativeFfi.Query;
+namespace Maplibre.NativeFfi;
 
 public readonly record struct ScreenLineString
 {

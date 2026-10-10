@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..model import CType, Function
+from ..protocol import COMPLETION, COMPLETION_RESULT, DIAGNOSTIC
 from .kotlin_abi import (
     POINTER,
     Abi,
@@ -162,13 +163,11 @@ class Signature:
         return self.result.carrier
 
 
-DIAGNOSTIC = CType(
+DIAGNOSTIC_POINTER = CType(
     "pointer",
-    "mln_diagnostic *",
-    "struct mln_diagnostic *",
-    pointee=CType(
-        "record", "mln_diagnostic", "struct mln_diagnostic", "mln_diagnostic"
-    ),
+    f"{DIAGNOSTIC} *",
+    f"struct {DIAGNOSTIC} *",
+    pointee=CType("record", DIAGNOSTIC, f"struct {DIAGNOSTIC}", DIAGNOSTIC),
 )
 
 
@@ -192,7 +191,9 @@ class NativeShims:
         ]
         if function.diagnostic:
             parameters.append(
-                Parameter("outDiagnostic", "out_diagnostic", DIAGNOSTIC, POINTER)
+                Parameter(
+                    "outDiagnostic", "out_diagnostic", DIAGNOSTIC_POINTER, POINTER
+                )
             )
         result = self.classify(function.return_type)
         if isinstance(result, Record):
@@ -234,11 +235,12 @@ class NativeShims:
         )
 
     def runtime_layouts(self):
-        """Offsets of the records the handwritten completion runtime reads."""
+        """Offsets of the records the handwritten completion and status runtime reads."""
         objects = []
         for record, public in (
-            ("mln_completion", "CompletionLayout"),
-            ("mln_completion_result", "CompletionResultLayout"),
+            (COMPLETION, "CompletionLayout"),
+            (COMPLETION_RESULT, "CompletionResultLayout"),
+            (DIAGNOSTIC, "DiagnosticLayout"),
         ):
             if record not in self.bound.source.records_by_name:
                 continue

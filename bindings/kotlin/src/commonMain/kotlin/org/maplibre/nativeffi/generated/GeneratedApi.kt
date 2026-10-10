@@ -100,7 +100,7 @@ public object GeneratedApi {
     options: GeojsonSourceOptions? = null,
   ): GeojsonSourceDataHandle =
     nativeCall(null, null, "mln_geojson_source_data_create") {
-      val out = allocate(8)
+      val out = allocate(8, 8)
       check(
         C.mln_geojson_source_data_create(
           view(data),
@@ -218,7 +218,7 @@ public object GeneratedApi {
 
   public fun networkStatusGet(): NetworkStatus =
     nativeCall(null, null, "mln_network_status_get") {
-      val out = allocate(8)
+      val out = allocate(4, 4)
       check(C.mln_network_status_get(out, diagnostic))
       NetworkStatus(readU32(out))
     }
@@ -293,8 +293,8 @@ public object GeneratedApi {
     extent: RenderTargetExtent
   ): RenderTargetExtentPhysicalSizeResult =
     nativeCall(null, null, "mln_render_target_extent_physical_size") {
-      val out0 = allocate(8)
-      val out1 = allocate(8)
+      val out0 = allocate(4, 4)
+      val out1 = allocate(4, 4)
       check(
         C.mln_render_target_extent_physical_size(
           writeRenderTargetExtent(extent),
@@ -360,7 +360,7 @@ public object GeneratedApi {
 
   public fun runtimeCreate(options: RuntimeOptions): RuntimeHandle =
     nativeCall(null, null, "mln_runtime_create") {
-      val out = allocate(8)
+      val out = allocate(8, 8)
       check(C.mln_runtime_create(writeRuntimeOptions(options), out, diagnostic))
       adoptRegistered(
         out,

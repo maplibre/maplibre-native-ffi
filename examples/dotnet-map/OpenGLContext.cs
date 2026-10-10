@@ -1,6 +1,4 @@
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Base;
-using Maplibre.NativeFfi.Render;
 using Silk.NET.GLFW;
 using DesktopGL = Silk.NET.OpenGL.GL;
 using Gles = Silk.NET.OpenGLES.GL;

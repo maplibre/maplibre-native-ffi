@@ -138,11 +138,19 @@ fn kind_for_status(status: i32) -> ErrorKind {
     }
 }
 
+/// The capacity of a diagnostic's message, including its null byte, which the
+/// generated record declares.
+pub const DIAGNOSTIC_MESSAGE_CAPACITY: usize = {
+    // SAFETY: all zeroes is a valid diagnostic, and only its length is read.
+    let diagnostic: sys::mln_diagnostic = unsafe { std::mem::zeroed() };
+    diagnostic.message.len()
+};
+
 /// Copies a diagnostic's message, which is initialized through its null byte.
 unsafe fn diagnostic_message(diagnostic: *const sys::mln_diagnostic) -> String {
     // SAFETY: the caller promises the diagnostic outlives this call.
     let message = unsafe { &raw const (*diagnostic).message }.cast::<u8>();
-    let capacity = sys::MLN_DIAGNOSTIC_MESSAGE_CAPACITY as usize;
+    let capacity = DIAGNOSTIC_MESSAGE_CAPACITY;
     let mut length = 0;
     // SAFETY: the caller promises a null byte within the message capacity, and
     // every byte before it is initialized.
@@ -204,7 +212,7 @@ mod tests {
     #[test]
     fn a_diagnostic_is_bounded_by_its_capacity_and_empty_when_none_was_written() {
         // A message that fills the buffer with no terminator ends at capacity.
-        let capacity = sys::MLN_DIAGNOSTIC_MESSAGE_CAPACITY as usize;
+        let capacity = DIAGNOSTIC_MESSAGE_CAPACITY;
         let error = failing_call(sys::MLN_STATUS_INVALID_STATE, &vec![b'x'; capacity]);
         assert_eq!(error.diagnostic(), "x".repeat(capacity));
 

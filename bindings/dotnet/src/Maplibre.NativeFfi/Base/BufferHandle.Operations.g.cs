@@ -3,7 +3,7 @@
 using static Maplibre.NativeFfi.Internal.NativeCall;
 using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
-namespace Maplibre.NativeFfi.Base;
+namespace Maplibre.NativeFfi;
 
 public sealed unsafe partial class BufferHandle : IDisposable, INativeOwner<MlnBuffer>
 {
@@ -46,7 +46,7 @@ public sealed unsafe partial class BufferHandle : IDisposable, INativeOwner<MlnB
     public byte[] Get()
     {
         using var read = state.Read(this, "mln_buffer_get");
-        var outView = new mln_buffer_view { size = (uint)sizeof(mln_buffer_view) };
+        var outView = default(mln_buffer_view);
         Check(NativeMethods.mln_buffer_get(read.Handle, &outView, Diagnostic));
         return ValueStructs.CopyBufferView(outView);
     }

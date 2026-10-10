@@ -401,7 +401,7 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun cameraSnapshotGet(): MapCameraSnapshotGetResult =
     nativeCall(this, binding, "mln_map_camera_snapshot_get") {
       val out0 = sized(120, 8)
-      val out1 = allocate(8)
+      val out1 = allocate(8, 8)
       check(C.mln_map_camera_snapshot_get(handle, out0, out1, diagnostic))
       MapCameraSnapshotGetResult(camera = readCameraOptions(out0), generation = readU64(out1))
     }

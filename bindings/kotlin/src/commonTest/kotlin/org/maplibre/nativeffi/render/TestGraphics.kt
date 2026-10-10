@@ -181,10 +181,10 @@ internal object TestGraphics {
   /** Reads the size of the backend texture behind [frame] through its typed view. */
   fun frameTextureSize(frame: AcquiredFrameHandle): Pair<UInt, UInt> =
     when (backend) {
-      TestBackend.METAL -> frame.withGetMetalTexture { it.width to it.height }
-      TestBackend.VULKAN -> frame.withGetVulkanTexture { it.width to it.height }
+      TestBackend.METAL -> frame.withMetalTexture { it.width to it.height }
+      TestBackend.VULKAN -> frame.withVulkanTexture { it.width to it.height }
       TestBackend.EGL,
-      TestBackend.WGL -> frame.withGetOpenglTexture { it.width to it.height }
+      TestBackend.WGL -> frame.withOpenglTexture { it.width to it.height }
     }
 
   private fun pointer(address: Long): NativePointer = NativePointer.ofAddress(address)

@@ -5,7 +5,6 @@ library;
 
 import 'dart:ffi';
 
-import 'native_abi.dart';
 import 'native_asset.dart';
 
 export 'native_abi.dart';
@@ -397,6 +396,13 @@ final class mln_custom_mvt_vector_source_options extends Struct {
   @Double()
   external double max_zoom;
   external mln_custom_mvt_vector_source_release_callback release_user_data;
+}
+
+final class mln_diagnostic extends Struct {
+  @Uint32()
+  external int size;
+  @Array(4096)
+  external Array<Char> message;
 }
 
 final class mln_edge_insets extends Struct {

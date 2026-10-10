@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from .python_values import public_name, rust_field, scalar_type
 from .rust import native_call
+from .rust_callbacks import decision_table_name
 
 
 def plain_fields(plan):
@@ -34,7 +35,7 @@ def validate(values, plan):
     descriptor = plan.registration
     plain = plain_fields(plan)
     for field in plain.fields:
-        if field.role not in {"size", "reserved", "count", "presence_mask"}:
+        if field.public:
             values.supported(field.value, input=True)
     for group in plain.presence_groups:
         if len(group.fields) > 1:
@@ -177,10 +178,10 @@ def sources(values, plan):
         decision_setup = ""
         if callback.decision:
             decision = callback.decision
-            functions = f"maplibre_core::resource::ResourceRequestHandleFns::new(sys::{decision.complete}, sys::{decision.handle.release})"
-            decision_setup = f"let decision_state = match unsafe {{ maplibre_core::resource::ResourceRequestHandleState::new({decision.parameter}, {functions}) }} {{ Ok(state) => state, Err(_) => return sys::{decision.pass_through} }};"
-            failure = "decision_state.finish_provider_decision(false)"
-            result = f"let decision = result.extract::<u32>()?; Ok(decision_state.finish_provider_decision(decision == sys::{decision.accept}))"
+            functions = decision_table_name(decision)
+            decision_setup = f"let decision_state = match unsafe {{ maplibre_core::decision::DecisionHandleState::new({decision.parameter}, {functions}) }} {{ Ok(state) => state, Err(_) => return sys::{decision.pass_through} }};"
+            failure = "decision_state.finish_decision(false)"
+            result = f"let decision = result.extract::<u32>()?; Ok(decision_state.finish_decision(decision == sys::{decision.accept}))"
         policy_guard = ""
         if callback.reentry_policy:
             policy = callback.reentry_policy
@@ -227,13 +228,13 @@ def sources(values, plan):
 
 def direct_operation(plan, values):
     from ..semantic import FieldPlan, RegistrationDescriptorPlan, ValuePlan
-    from .python import DECISIONS, OWNERS, unsupported
+    from .python import OWNERS, owned_decision, unsupported
 
     registration = plan.direct_registrations[0]
     parameter = next(p for p in plan.inputs if p.name == registration.callback)
     callback = values.api.callbacks[parameter.value.native]
     receiver = next((p for p in plan.inputs if p.name == plan.receiver), None)
-    decision = DECISIONS.get(receiver.value.native) if receiver else None
+    decision = owned_decision(values.api, receiver.value.native) if receiver else None
     if decision and decision.cancel_registration == plan.name:
         if (
             not registration.release_callback
@@ -246,9 +247,7 @@ def direct_operation(plan, values):
                 "cancel registration needs a native release and a notification callback",
             )
         owner = OWNERS[receiver.value.native]
-        name = plan.name.removeprefix(
-            receiver.value.native.removesuffix("_handle") + "_"
-        )
+        name = plan.member
         # The core registration enters the callback's reentry policy and
         # contains panics; this root only keeps the callback visible to the
         # owner's garbage collection.
@@ -258,7 +257,7 @@ def direct_operation(plan, values):
         if !callback.bind(py).is_callable() {{ return Err(invalid_argument_error("callback must be callable")); }}
         let root = GeneratedCallbackRootOwner::new(vec![callback]);
         let weak = root.downgrade();
-        let cancelled = self.state.{name}(Box::new(move || {{
+        let cancelled = self.state.register_cancel(Box::new(move || {{
             Python::try_attach(|py| {{
                 if let Some(callback) = root.get(py, 0)
                     && let Err(error) = callback.bind(py).call0()
@@ -300,7 +299,7 @@ def direct_operation(plan, values):
     )
     validate(values, descriptor)
     values.records[descriptor.native] = descriptor
-    name = plan.name.removeprefix("mln_")
+    name = plan.member
     arguments = {
         registration.callback: "native_callback",
         registration.user_data: "context",

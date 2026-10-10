@@ -1,8 +1,8 @@
-//! The core runtime as the probe builds it: every module but the resource
-//! request protocol, which the fixture headers do not declare.
+//! The core runtime as the probe builds it.
 #![deny(unsafe_op_in_unsafe_fn)]
 pub mod abi;
 pub mod callback;
+pub mod decision;
 pub mod error;
 pub mod handle;
 pub mod ptr;
