@@ -77,7 +77,7 @@ void receive_completion(
   if (probe == nullptr || result == nullptr) return;
   {
     const auto lock = std::scoped_lock{probe->mutex};
-    probe->status = result->status;
+    probe->status = static_cast<mln_status>(result->status);
     probe->disposition = result->disposition;
     probe->generation = result->generation;
     probe->diagnostic.assign(

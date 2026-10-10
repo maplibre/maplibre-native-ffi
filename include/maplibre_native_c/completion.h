@@ -38,8 +38,8 @@ typedef enum mln_command_disposition : uint32_t {
  */
 typedef struct mln_completion_result {
   uint32_t size;
-  /** Terminal status. */
-  mln_status status;
+  /** Terminal status, one of mln_status. */
+  int32_t status MLN_BINDING("enum=mln_status");
   /** One of mln_command_disposition. */
   uint32_t disposition MLN_BINDING("enum=mln_command_disposition");
   uint32_t reserved MLN_BINDING("kind=reserved");

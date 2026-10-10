@@ -56,7 +56,7 @@ public sealed class CompletionTests
         var result = new mln_completion_result
         {
             size = (uint)sizeof(mln_completion_result),
-            status = mln_status.MLN_STATUS_OK,
+            status = (int)mln_status.MLN_STATUS_OK,
             value = value,
             value_count = count,
         };

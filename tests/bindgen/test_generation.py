@@ -81,7 +81,7 @@ typedef mln_counter mln_counter_alias;
 typedef int64_t mln_offset;
 typedef size_t mln_count;
 typedef enum mln_flags : uint64_t { MLN_FLAGS_HIGH = 0x100000000ULL } mln_flags;
-typedef struct mln_values { mln_counter_alias counter; mln_offset offset; mln_count count; mln_flags flags; } mln_values;
+typedef struct mln_values { mln_counter_alias counter; mln_offset offset; mln_count count; uint64_t flags BIND("enum=mln_flags"); } mln_values;
 mln_status mln_roundtrip(mln_values input, mln_values *out_value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         before = self.parse(source.replace("UNDERLYING", "long"))

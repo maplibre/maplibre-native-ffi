@@ -244,6 +244,19 @@ void mln_broken_submission(mln_map map, const mln_completion *completion);
 """)
             )
 
+    def test_enum_record_fields_require_an_integer_type(self):
+        with self.assertRaisesRegex(
+            ModelError, "an enum member requires an integer type and enum=<enum>"
+        ):
+            validate(
+                self.parse("""
+typedef enum mln_kind : unsigned { MLN_KIND_ONE = 1 } mln_kind;
+typedef struct mln_record {
+  mln_kind kind;
+} mln_record;
+""")
+            )
+
     def test_owned_record_fields_require_a_release_contract(self):
         with self.assertRaisesRegex(
             ModelError, "owned field requires a declared handle release contract"

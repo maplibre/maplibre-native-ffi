@@ -51,7 +51,7 @@ internal static unsafe class NativeCompletion
             static result => new CommandCompletion(
                 (CommandDisposition)result->disposition,
                 result->generation,
-                (int)result->status,
+                result->status,
                 ValueStructs.CopyUtf8View(result->diagnostic)
             ),
             true
@@ -130,9 +130,9 @@ internal static unsafe class NativeCompletion
         {
             try
             {
-                if (!acceptErrorStatus && result->status != mln_status.MLN_STATUS_OK)
+                if (!acceptErrorStatus && result->status != (int)mln_status.MLN_STATUS_OK)
                     NativeStatus.Check(
-                        (int)result->status,
+                        result->status,
                         ValueStructs.CopyUtf8View(result->diagnostic)
                     );
                 source.TrySetResult(convert(result));

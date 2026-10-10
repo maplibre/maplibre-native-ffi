@@ -123,7 +123,7 @@ internal unsafe struct mln_completion
 internal unsafe struct mln_completion_result
 {
     public uint size;
-    public mln_status status;
+    public int status;
     public uint disposition;
     public uint reserved;
     public ulong generation;
@@ -187,7 +187,7 @@ internal unsafe struct mln_egl_context_descriptor
     public void* display;
     public void* config;
     public void* share_context;
-    public mln_opengl_client_api client_api;
+    public uint client_api;
     public void* get_proc_address;
 }
 
@@ -466,8 +466,8 @@ internal unsafe struct mln_opengl_borrowed_texture_descriptor
 internal unsafe struct mln_opengl_context_descriptor
 {
     public uint size;
-    public mln_opengl_context_platform platform;
-    public mln_opengl_context_ownership ownership;
+    public uint platform;
+    public uint ownership;
     public mln_opengl_context_descriptor_data data;
 }
 

@@ -1298,7 +1298,7 @@ func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena)
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
 	raw.config = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Config)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
-	raw.client_api = C.mln_opengl_client_api(input.ClientApi)
+	raw.client_api = C.uint32_t(input.ClientApi)
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))
 	return raw
 }
@@ -2061,11 +2061,11 @@ func copyOpenglContextDescriptor(raw C.mln_opengl_context_descriptor) OpenglCont
 func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
 	raw := C.mln_opengl_context_descriptor{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.ownership = C.mln_opengl_context_ownership(input.Ownership)
+	raw.ownership = C.uint32_t(input.Ownership)
 	if input.Data == nil {
 		arena.fail("missing union variant")
 	}
-	raw.platform = C.mln_opengl_context_platform(input.Data.bindingTag())
+	raw.platform = C.uint32_t(input.Data.bindingTag())
 	switch variant := input.Data.(type) {
 	case OpenglContextDescriptorDataWglVariant:
 		*(*C.mln_wgl_context_descriptor)(unsafe.Pointer(&raw.data)) = nativeWglContextDescriptor(variant.Value, arena)

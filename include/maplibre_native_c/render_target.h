@@ -266,7 +266,7 @@ typedef struct mln_egl_context_descriptor {
    * ownership. A shared session queries share_context for it, so this is
    * ignored there.
    */
-  mln_opengl_client_api client_api;
+  uint32_t client_api MLN_BINDING("enum=mln_opengl_client_api");
   /** Optional eglGetProcAddress-compatible function for the host loader. */
   void* get_proc_address;
 } mln_egl_context_descriptor;
@@ -311,13 +311,13 @@ typedef union mln_opengl_context_descriptor_data {
 typedef struct mln_opengl_context_descriptor {
   uint32_t size;
   /** WGL, EGL, or WebGL context provider. */
-  mln_opengl_context_platform platform;
+  uint32_t platform MLN_BINDING("enum=mln_opengl_context_platform");
   /**
    * Whether the session shares its driver thread and graphics objects with the
    * host. A private EGL owned texture and a transferred WebGL canvas are
    * dedicated to their core worker.
    */
-  mln_opengl_context_ownership ownership;
+  uint32_t ownership MLN_BINDING("enum=mln_opengl_context_ownership");
   mln_opengl_context_descriptor_data data MLN_BINDING("tag=platform");
 } mln_opengl_context_descriptor;
 

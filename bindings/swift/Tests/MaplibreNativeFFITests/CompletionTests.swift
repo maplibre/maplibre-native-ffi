@@ -20,7 +20,7 @@ private final class HeldCompletion: @unchecked Sendable {
     withUnsafePointer(to: value) { value in
       var result = mln_completion_result()
       result.size = UInt32(MemoryLayout<mln_completion_result>.size)
-      result.status = status
+      result.status = status.rawValue
       result.value = UnsafeRawPointer(value)
       result.value_count = 1
       descriptor.callback?(descriptor.user_data, &result)
