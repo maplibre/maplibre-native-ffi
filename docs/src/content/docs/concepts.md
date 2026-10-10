@@ -232,11 +232,11 @@ Each binding surfaces these channels in its own idiom: an exception, a result
 type, an asynchronous result, or an event stream. Render-driver calls report
 their graphics-thread failures in their returned status.
 
-A style entity that doesn't exist, such as a source, layer, or image ID, is
-reported through the completion. A command that targets it completes with
-`MLN_STATUS_NOT_FOUND`. A query that reads a whole entity succeeds with no
-value. A query that reads one attribute of a missing layer completes with
-`MLN_STATUS_NOT_FOUND`.
+A call that names an object that doesn't exist, such as a style source, layer,
+or image, or an offline region, reports it through the completion. A query that
+reads the whole object succeeds with no value. A command on it, or a query that
+reads one of its members, completes with `MLN_STATUS_NOT_FOUND`; such a query
+succeeds with no value only when the object exists and lacks that member.
 
 ## Layer plugins
 

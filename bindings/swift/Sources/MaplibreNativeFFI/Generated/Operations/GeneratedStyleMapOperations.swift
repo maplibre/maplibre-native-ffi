@@ -392,18 +392,14 @@ public extension MapHandle {
   /// See `mln_map_get_image_source_coordinates` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getImageSourceCoordinates(sourceId bindingArg0: String) async throws
-    -> [LatLng]?
+    -> [LatLng]
   {
     try await nativeStart(
       "mln_map_get_image_source_coordinates",
-      convert: { result in
-        if result.pointee
-          .value == nil { return nil }; return try NativeCompletion
-                  .values(
-                    result,
-                    as: mln_lat_lng.self
-                  ).map { LatLng(raw: $0) }
-      }
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_lat_lng.self
+      ).map { LatLng(raw: $0) } }
     ) { raw, arena, completion, diagnostic in
       mln_map_get_image_source_coordinates(
         raw,

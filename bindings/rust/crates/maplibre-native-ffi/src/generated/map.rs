@@ -1083,7 +1083,7 @@ impl MapHandle {
     pub fn get_image_source_coordinates(
         &self,
         source_id: &str,
-    ) -> Result<NativeFuture<Option<Vec<LatLng>>>> {
+    ) -> Result<NativeFuture<Vec<LatLng>>> {
         let mut call = self.inner.call("mln_map_get_image_source_coordinates")?;
         let source_id = call.input(&source_id)?;
         call.complete(
@@ -1095,7 +1095,7 @@ impl MapHandle {
                     out_diagnostic,
                 )
             },
-            completion::optional_list::<sys::mln_lat_lng, _>,
+            completion::list::<sys::mln_lat_lng, _>,
         )
     }
 

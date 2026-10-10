@@ -5780,8 +5780,8 @@ pub fn mapGetGlobalState(allocator: std.mem.Allocator, map: Map, diagnostic: ?*d
 ///
 /// See `mln_map_get_image_source_coordinates` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(?OwnedValue([]const LatLng)) {
-    return call.submit("mln_map_get_image_source_coordinates", .lease, map, call.orNull(call.slice(LatLng, c.mln_lat_lng)), allocator, diagnostic, .{source_id});
+pub fn mapGetImageSourceCoordinates(allocator: std.mem.Allocator, map: Map, source_id: []const u8, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const LatLng)) {
+    return call.submit("mln_map_get_image_source_coordinates", .lease, map, call.slice(LatLng, c.mln_lat_lng), allocator, diagnostic, .{source_id});
 }
 
 /// Starts an ordered copy of the last successfully parsed style document.

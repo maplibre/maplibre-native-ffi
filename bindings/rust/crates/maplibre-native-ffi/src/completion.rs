@@ -333,6 +333,10 @@ pub(crate) fn list<N: Copy, T: FromNative<N>>(
 }
 
 /// Copies every value of a completion, or `None` for a null array.
+#[allow(
+    dead_code,
+    reason = "a generator shape that the current headers do not use"
+)]
 pub(crate) fn optional_list<N: Copy, T: FromNative<N>>(
     result: &sys::mln_completion_result,
 ) -> Result<Option<Vec<T>>> {

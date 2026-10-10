@@ -1,6 +1,6 @@
 // Style sources: tile source options and the effective values a source reports,
 // its URL, attribution, and inline tile URLs, source listing, volatility,
-// removal, and image sources.
+// removal, and image sources and their corners.
 //
 // URL sources start loading as soon as they are added, so every case that adds
 // one serves the suite's resources through a provider that fails the rest.
@@ -709,24 +709,19 @@ static void an_in_use_source_removal_fails_and_leaves_the_source(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Reads an image source's corners into `out`, and reports whether the source
-// had any: a missing one completes with no value.
-static bool read_corners(mln_map map, const char* id, mln_lat_lng out[4]) {
+// Reads an image source's four corners into `out`.
+static void read_corners(mln_map map, const char* id, mln_lat_lng out[4]) {
   mln_test_completion completion =
     mln_test_completion_default(4 * sizeof(mln_lat_lng));
   MLN_TEST_OK(mln_map_get_image_source_coordinates(
     map, mln_test_view_of(id), &completion.descriptor, NULL
   ));
   MLN_TEST_OK(mln_test_completion_finish(&completion));
-  const size_t count = mln_test_completion_value_count(&completion);
-  if (count != 0) {
-    TEST_ASSERT_EQUAL_size_t(4, count);
-    TEST_ASSERT_TRUE(
-      mln_test_completion_copy_value(&completion, out, 4 * sizeof(*out))
-    );
-  }
+  TEST_ASSERT_EQUAL_size_t(4, mln_test_completion_value_count(&completion));
+  TEST_ASSERT_TRUE(
+    mln_test_completion_copy_value(&completion, out, 4 * sizeof(*out))
+  );
   mln_test_completion_destroy(&completion);
-  return count != 0;
 }
 
 static const mln_lat_lng corners[4] = {{1, 2}, {1, 3}, {0, 3}, {0, 2}};
@@ -762,14 +757,14 @@ static void image_sources_hold_corners_and_pixels(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_IMAGE, probe.info.type);
 
   mln_lat_lng read[4];
-  TEST_ASSERT_TRUE(read_corners(map, "remote-image", read));
+  read_corners(map, "remote-image", read);
   TEST_ASSERT_EQUAL_MEMORY(corners, read, sizeof(corners));
 
   const mln_lat_lng moved[4] = {{5, 6}, {5, 7}, {4, 7}, {4, 6}};
   MLN_TEST_AWAIT_OK(mln_map_set_image_source_coordinates(
     map, inline_image, moved, 4, &completion.descriptor, NULL
   ));
-  TEST_ASSERT_TRUE(read_corners(map, "inline-image", read));
+  read_corners(map, "inline-image", read);
   TEST_ASSERT_EQUAL_MEMORY(moved, read, sizeof(moved));
   // A URL source takes inline pixels, and an inline one takes a URL.
   MLN_TEST_AWAIT_OK(mln_map_set_image_source_image(
@@ -821,8 +816,13 @@ static void image_sources_hold_corners_and_pixels(void) {
                                    map, geojson, &completion.descriptor, NULL
                                  )
   );
-  // A missing source has no coordinates to report, which is not a failure.
-  TEST_ASSERT_FALSE(read_corners(map, "missing", read));
+  // Corners are a member of the source, so reading a missing one fails.
+  MLN_TEST_AWAIT_COMMAND(
+    MLN_STATUS_NOT_FOUND,
+    mln_map_get_image_source_coordinates(
+      map, MLN_BUFFER_LITERAL("missing"), &completion.descriptor, NULL
+    )
+  );
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

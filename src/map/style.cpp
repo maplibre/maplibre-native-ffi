@@ -2470,19 +2470,14 @@ auto map_set_image_source_coordinates(
 
 auto map_get_image_source_coordinates(
   MapObject& live, mln_buffer_view source_id,
-  std::vector<mln_lat_lng>& out_coordinates, bool* out_found
+  std::vector<mln_lat_lng>& out_coordinates
 ) -> mln_status {
-  if (out_found == nullptr) {
-    set_thread_error("out_found must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+  out_coordinates.clear();
   auto* source =
     map_native(live).getStyle().getSource(string_from_view(source_id));
-  *out_found = source != nullptr;
-  out_coordinates.clear();
   if (source == nullptr) {
-    return MLN_STATUS_OK;
+    set_thread_error("source does not exist");
+    return MLN_STATUS_NOT_FOUND;
   }
   auto* image_source = source->as<mln::style::ImageSource>();
   if (image_source == nullptr) {
@@ -2940,8 +2935,10 @@ auto map_set_style_light_property(
 
   auto* light = map_native(live).getStyle().getLight();
   if (light == nullptr) {
-    set_thread_error("style light does not exist");
-    return MLN_STATUS_INVALID_STATE;
+    // MapLibre Native's style always holds a light, so this is an internal
+    // invariant rather than a documented outcome.
+    set_thread_error("style has no light");
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
   auto error = light->setProperty(
@@ -2969,8 +2966,10 @@ auto map_get_style_light_property(
 
   auto* light = map_native(live).getStyle().getLight();
   if (light == nullptr) {
-    set_thread_error("style light does not exist");
-    return MLN_STATUS_INVALID_STATE;
+    // MapLibre Native's style always holds a light, so this is an internal
+    // invariant rather than a documented outcome.
+    set_thread_error("style has no light");
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
   const auto property = light->getProperty(string_from_view(property_name));

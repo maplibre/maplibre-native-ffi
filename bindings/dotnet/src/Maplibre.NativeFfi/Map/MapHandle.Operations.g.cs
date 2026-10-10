@@ -1167,13 +1167,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_get_image_source_coordinates</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<LatLng[]?> GetImageSourceCoordinatesAsync(
+    public Task<LatLng[]> GetImageSourceCoordinatesAsync(
         string sourceId,
         CancellationToken cancellationToken = default
     )
     {
         using var scope = new NativeCallScope(this, "mln_map_get_image_source_coordinates");
-        return scope.QueryOptionalArray<mln_lat_lng, LatLng>(
+        return scope.QueryArray<mln_lat_lng, LatLng>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_get_image_source_coordinates(
                     Handle,

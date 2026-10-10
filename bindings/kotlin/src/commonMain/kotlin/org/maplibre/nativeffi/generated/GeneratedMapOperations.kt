@@ -1021,21 +1021,19 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_image_source_coordinates` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getImageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> =
+  public fun getImageSourceCoordinates(sourceId: String): Deferred<List<LatLng>> =
     nativeSubmit(
       this,
       binding,
       "mln_map_get_image_source_coordinates",
       { result ->
-        if (CompletionBridge.valuePointer(result) == 0L) null
-        else
-          readArray(
-            CompletionBridge.valuePointer(result),
-            CompletionBridge.valueCount(result),
-            16.toLong(),
-          ) {
-            readLatLng(it)
-          }
+        readArray(
+          CompletionBridge.valuePointer(result),
+          CompletionBridge.valueCount(result),
+          16.toLong(),
+        ) {
+          readLatLng(it)
+        }
       },
     ) {
       check(C.mln_map_get_image_source_coordinates(handle, view(sourceId), completion, diagnostic))

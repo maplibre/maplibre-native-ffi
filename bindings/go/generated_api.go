@@ -6436,7 +6436,7 @@ func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
 func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[]LatLng], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_image_source_coordinates), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullableListOf(copyLatLng))
+	}, completionListOf(copyLatLng))
 }
 
 // GetLoadedStyleJson starts an ordered copy of the last successfully parsed

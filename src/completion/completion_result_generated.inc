@@ -101,7 +101,7 @@ struct CompletionResult<&mln_map_get_image_source_coordinates> {
   static constexpr bool has_value = true;
   using type = mln_lat_lng;
   static constexpr bool array = true;
-  static constexpr bool nullable = true;
+  static constexpr bool nullable = false;
 };
 template <>
 struct CompletionResult<&mln_map_get_loaded_style_json> {

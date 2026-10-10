@@ -863,7 +863,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def get_image_source_coordinates(
         self, source_id: str
-    ) -> Future[tuple[LatLng, ...] | None]:
+    ) -> Future[tuple[LatLng, ...]]:
         """Copies image source coordinates.
 
         See `mln_map_get_image_source_coordinates` in the
@@ -871,11 +871,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return map_future(
             self._native.get_image_source_coordinates(source_id),
-            lambda value: (
-                None
-                if value is None
-                else (tuple(LatLng._from_native(item) for item in value))
-            ),
+            lambda value: tuple(LatLng._from_native(item) for item in value),
         )
 
     def get_loaded_style_json(self) -> Future[bytes]:

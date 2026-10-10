@@ -404,7 +404,7 @@ auto map_set_image_source_coordinates(
 ) -> mln_status;
 auto map_get_image_source_coordinates(
   MapObject& live, mln_buffer_view source_id,
-  std::vector<mln_lat_lng>& out_coordinates, bool* out_found
+  std::vector<mln_lat_lng>& out_coordinates
 ) -> mln_status;
 auto map_add_hillshade_layer(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view source_id,

@@ -570,8 +570,9 @@ MLN_API mln_status mln_runtime_create_offline_region(
  *
  * A successful completion borrows zero or one mln_offline_region_info value,
  * depending on whether the region exists, valid only for the duration of the
- * callback. Unlike the other region operations, a missing region completes
- * MLN_STATUS_OK with no value rather than MLN_STATUS_NOT_FOUND.
+ * callback. A missing region completes successfully with no value, as every
+ * read of a whole object does; operations on one region complete with
+ * MLN_STATUS_NOT_FOUND instead.
  *
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.

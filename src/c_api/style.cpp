@@ -1109,7 +1109,7 @@ auto mln_map_get_image_source_coordinates(
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
         return mln::core::map_get_image_source_coordinates(
-          live, id.view(), result.coordinates, &result.found
+          live, id.view(), result.coordinates
         );
       },
       completion

@@ -6003,9 +6003,6 @@ impl MapHandle {
         let source_id_value = storage.buffer(source_id.clone(), true)?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
-            if result.value.is_null() {
-                return Ok(py.None());
-            }
             let list = PyList::empty(py);
             for value in generated_completion_slice::<sys::mln_lat_lng>(result)? {
                 list.append(generated_copy_mln_lat_lng(py, value)?)?;

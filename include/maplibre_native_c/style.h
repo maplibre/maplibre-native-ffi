@@ -13,6 +13,12 @@
  * all commands accepted earlier by the runtime. Its completion borrows the
  * typed result for the duration of the callback.
  *
+ * A query that reads a whole source, layer, or image by ID completes
+ * successfully with no value when no object has that ID. A query that reads one
+ * member of an object completes with MLN_STATUS_NOT_FOUND when the object is
+ * missing, as a command on it does, and completes with no value only when the
+ * object exists and lacks that member, such as a layer without a filter.
+ *
  * All declarations in this header are callable from any thread. A per-function
  * Returns list gives the statuses this call returns; a Completes with list
  * gives the statuses that reach the caller through the completion.
@@ -1638,8 +1644,8 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
 /**
  * Copies image source coordinates.
  *
- * A found image source completes with four borrowed mln_lat_lng values. A
- * missing source completes successfully with no value.
+ * The completion borrows four mln_lat_lng values in top-left, top-right,
+ * bottom-right, bottom-left order.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -1649,10 +1655,10 @@ MLN_API mln_status mln_map_set_image_source_coordinates(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_ARGUMENT when the source exists and is not an image
- *   source.
+ * - MLN_STATUS_NOT_FOUND when no style source has that ID.
+ * - MLN_STATUS_INVALID_ARGUMENT when the source is not an image source.
  */
-MLN_BINDING("execution=query;result=mln_lat_lng;shape=array;nullable=true")
+MLN_BINDING("execution=query;result=mln_lat_lng;shape=array")
 MLN_API mln_status mln_map_get_image_source_coordinates(
   mln_map map, mln_buffer_view source_id, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
@@ -2014,7 +2020,6 @@ MLN_API mln_status mln_map_set_style_light_json(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_INVALID_STATE when the style has no light.
  * - MLN_STATUS_INVALID_ARGUMENT when the property name is unknown, or the
  *   value cannot be converted for that property.
  */

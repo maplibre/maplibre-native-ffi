@@ -5009,16 +5009,15 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_map_get_image_source_coordinates` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<List<LatLng>?> getImageSourceCoordinates(String sourceId) =>
-      _queryOptionalList(
-        _resultLatLng,
-        (arena, completion) => raw.mln_map_get_image_source_coordinates(
-          _handle.raw,
-          nativeStringView(sourceId, arena).value,
-          completion,
-          nativeDiagnostic,
-        ),
-      );
+  Future<List<LatLng>> getImageSourceCoordinates(String sourceId) => _queryList(
+    _resultLatLng,
+    (arena, completion) => raw.mln_map_get_image_source_coordinates(
+      _handle.raw,
+      nativeStringView(sourceId, arena).value,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
 
   /// Starts an ordered copy of the last successfully parsed style document.
   ///
