@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use maplibre_native_ffi::RenderBackendMask;
+use maplibre_native_ffi::RenderBackendFlag;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 use winit::window::WindowAttributes;
@@ -9,7 +9,6 @@ use winit::window::WindowAttributes;
 use crate::metal::MetalContext;
 #[cfg(maplibre_render_backend = "opengl")]
 use crate::opengl::OpenGLContext;
-use crate::viewport::Viewport;
 #[cfg(maplibre_render_backend = "vulkan")]
 use crate::vulkan::VulkanContext;
 
@@ -20,18 +19,18 @@ pub struct GraphicsContext(Box<OpenGLContext>);
 #[cfg(maplibre_render_backend = "vulkan")]
 pub struct GraphicsContext(Box<VulkanContext>);
 
-pub fn required_backend() -> RenderBackendMask {
+pub fn required_backend() -> RenderBackendFlag {
     #[cfg(maplibre_render_backend = "metal")]
     {
-        RenderBackendMask::METAL
+        RenderBackendFlag::METAL
     }
     #[cfg(maplibre_render_backend = "opengl")]
     {
-        RenderBackendMask::OPENGL
+        RenderBackendFlag::OPENGL
     }
     #[cfg(maplibre_render_backend = "vulkan")]
     {
-        RenderBackendMask::VULKAN
+        RenderBackendFlag::VULKAN
     }
 }
 
@@ -40,7 +39,7 @@ impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
-        backends: RenderBackendMask,
+        backends: RenderBackendFlag,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         if !backends.contains(required_backend()) {
             return Err(
@@ -61,11 +60,6 @@ impl GraphicsContext {
         Ok(())
     }
 
-    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.0.resize(viewport);
-        Ok(())
-    }
-
     pub fn metal(&self) -> &MetalContext {
         &self.0
     }
@@ -76,7 +70,7 @@ impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
-        backends: RenderBackendMask,
+        backends: RenderBackendFlag,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         if !backends.contains(required_backend()) {
             return Err(
@@ -96,10 +90,6 @@ impl GraphicsContext {
         Ok(())
     }
 
-    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.0.resize(viewport)
-    }
-
     pub fn opengl(&self) -> &OpenGLContext {
         &self.0
     }
@@ -110,7 +100,7 @@ impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
-        backends: RenderBackendMask,
+        backends: RenderBackendFlag,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         if !backends.contains(required_backend()) {
             return Err(
@@ -128,11 +118,6 @@ impl GraphicsContext {
 
     pub fn wait_idle(&self) -> Result<(), Box<dyn Error>> {
         self.0.wait_idle().map_err(Into::into)
-    }
-
-    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        let _ = viewport;
-        Ok(())
     }
 
     pub fn vulkan(&self) -> &VulkanContext {

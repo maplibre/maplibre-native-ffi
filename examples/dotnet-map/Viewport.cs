@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Render;
-
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal readonly record struct Viewport(
@@ -11,7 +9,7 @@ internal readonly record struct Viewport(
     bool IsEmpty
 )
 {
-    public RenderTargetExtent RenderTargetExtent => new(LogicalWidth, LogicalHeight, ScaleFactor);
+    public LogicalExtent LogicalExtent => new(LogicalWidth, LogicalHeight, ScaleFactor);
 
     public static Viewport FromWindowMetrics(
         int logicalWidth,

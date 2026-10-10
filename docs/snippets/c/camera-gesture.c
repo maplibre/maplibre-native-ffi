@@ -1,36 +1,71 @@
-// Applying drag and pinch input within one gesture.
+// Applying relative drag, pinch, and rotate input within one gesture.
 
 #include <maplibre_native_c.h>
 
-void begin_gesture(mln_map map) {
+void begin_gesture(mln_map map, const mln_completion* completion) {
   // #region bracket
-  mln_map_cancel_transitions(map);
-  mln_map_set_gesture_in_progress(map, true);
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
+  mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion bracket
 }
 
-void drag_by(mln_map map, double delta_x, double delta_y) {
+void drag_by(
+  mln_map map, mln_screen_point offset, const mln_completion* completion
+) {
   // #region drag
-  // Screen-space deltas in logical pixels, measured since the last call rather
-  // than from the start of the gesture.
-  mln_map_move_by(map, delta_x, delta_y);
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields = MLN_CAMERA_DELTA_OFFSET;
+  delta.offset = offset;
+  delta.gesture_phase = MLN_GESTURE_PHASE_UPDATE;
+  mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion drag
 }
 
-void pinch_by(mln_map map, double scale, mln_screen_point focus) {
+void pinch_by(
+  mln_map map, mln_screen_point centroid_movement, double scale,
+  mln_screen_point centroid, const mln_completion* completion
+) {
   // #region pinch
-  // The focus point stays fixed on screen while the map scales around it.
-  mln_map_scale_by(map, scale, &focus);
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields =
+    MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR;
+  delta.offset = centroid_movement;
+  delta.scale = scale;
+  delta.anchor = centroid;
+  delta.gesture_phase = MLN_GESTURE_PHASE_UPDATE;
+  mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion pinch
 }
 
-void end_gesture(mln_map map, double residual_scale, mln_screen_point focus) {
-  // #region release
-  mln_map_set_gesture_in_progress(map, false);
+void rotate_by(
+  mln_map map, double bearing, double pitch, mln_screen_point centroid,
+  const mln_completion* completion
+) {
+  // #region rotate
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields =
+    MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_PITCH | MLN_CAMERA_DELTA_ANCHOR;
+  delta.bearing = bearing;
+  delta.pitch = pitch;
+  delta.anchor = centroid;
+  delta.gesture_phase = MLN_GESTURE_PHASE_UPDATE;
+  mln_map_apply_camera_delta(map, &delta, completion, NULL);
+  // #endregion rotate
+}
 
-  mln_animation_options animation = mln_animation_options_default();
-  animation.fields |= MLN_ANIMATION_OPTION_DURATION;
-  animation.duration_ms = 250.0;
-  mln_map_scale_by_animated(map, residual_scale, &focus, &animation);
+void end_gesture(
+  mln_map map, const mln_screen_point* inertia, const mln_completion* completion
+) {
+  // #region release
+  mln_camera_delta delta = mln_camera_delta_default();
+  if (inertia != NULL) {
+    delta.fields = MLN_CAMERA_DELTA_OFFSET;
+    delta.offset = *inertia;
+    delta.animation.fields = MLN_ANIMATION_OPTION_DURATION;
+    delta.animation.duration_ms = 250.0;
+  }
+  delta.gesture_phase = MLN_GESTURE_PHASE_END;
+  mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion release
 }

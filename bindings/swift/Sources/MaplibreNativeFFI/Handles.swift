@@ -1,64 +1,53 @@
-
-/// Its only stored property is the lock-guarded `NativeHandleState`, so the box
-/// itself is safe to share. The public handles that hold a box stay
-/// non-`Sendable`.
+/// Holds a public handle's native handle and reports its lifecycle and close
+/// failures as ``MaplibreError``. Its only stored property is the lock-guarded
+/// `NativeHandleState`, so the box itself is safe to share. Each public handle
+/// chooses whether its API contract permits sharing.
 class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
   private let state: NativeHandleState<Handle>
 
-  init(typeName: String, handle: Handle) throws {
-    do {
-      state = try NativeHandleState(typeName: typeName, handle: handle)
-    } catch let failure as NativeStatusFailure {
-      throw MaplibreError.invalidArgument(failure.diagnostic)
-    }
+  init(
+    typeName: String,
+    handle: Handle,
+    parent: AnyObject? = nil,
+    pendingDecision: Bool = false
+  ) throws {
+    state = try NativeHandleState(
+      typeName: typeName,
+      handle: handle,
+      parent: parent,
+      pendingDecision: pendingDecision
+    )
   }
 
   var isClosed: Bool {
     state.isClosed
   }
 
-  /// Runs `use` with release held off. See `NativeHandleState.withLive`.
-  /// Only the box's own liveness failure translates to an invalid-state
-  /// error; a native status thrown inside `use` keeps its own status.
-  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
-    do {
-      return try state.withLive(use)
-    } catch let failure as NativeStatusFailure {
-      if failure.rawStatus == 0 {
-        throw MaplibreError(
-          kind: .invalidState,
-          rawStatus: nil,
-          diagnostic: failure.diagnostic
-        )
-      }
-      throw failure
-    }
+  var issued: Handle {
+    state.issued
+  }
+
+  func borrow() throws -> NativeHandleRead<Handle> {
+    try state.borrow()
   }
 
   func requireLive() throws -> Handle {
-    do {
-      return try state.requireLive()
-    } catch let failure as NativeStatusFailure {
-      throw MaplibreError(
-        kind: .invalidState,
-        rawStatus: nil,
-        diagnostic: failure.diagnostic
-      )
-    }
+    try state.requireLive()
   }
 
-  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
-    do {
-      try state.closeOnce(destroy)
-    } catch let failure as NativeStatusFailure {
-      if failure.rawStatus == 0 {
-        throw MaplibreError(
-          kind: .invalidState,
-          rawStatus: nil,
-          diagnostic: failure.diagnostic
-        )
-      }
-      throw MaplibreError.fromNativeFailure(failure)
-    }
+  func closeOnce(_ destroy: @escaping (Handle) throws -> Void) throws {
+    try mapNativeFailure { try state.closeOnce(destroy) }
+  }
+
+  func beginClaim() throws -> NativeClaim {
+    try state.beginClaim()
+  }
+
+  func finishDecision(accepted: Bool) -> Bool {
+    state.finishDecision(accepted: accepted)
+  }
+
+  func retire() {
+    state.retire()
   }
 }

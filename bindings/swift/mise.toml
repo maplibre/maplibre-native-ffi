@@ -1,9 +1,9 @@
 [tools]
-"core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+"core:swift" = { version = "{{vars.swift_version}}", os = ["linux"] }
 # Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
 # libxml2.so.16. .mise/bin/swift-libxml2-env.sh puts it on the loader path and
 # explains why; the tasks below source it.
-"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
+"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux"] }
 
 # The manifest lives at the repository root, so SwiftPM runs from there.
 [tasks.api]
@@ -68,6 +68,17 @@ esac
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build --target MaplibreNativeFFI "${swift_args[@]}"
+'''
+
+[tasks.resolve]
+description = "Fetch the Swift package dependencies into the shared SwiftPM cache."
+dir = "../.."
+# Each build and test task resolves into its own scratch path. After this task,
+# those resolutions copy from the shared cache without reaching the network, so
+# CI can tell a fetch failure from a build or test failure.
+run = '''
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
+swift package resolve
 '''
 
 [tasks.test]

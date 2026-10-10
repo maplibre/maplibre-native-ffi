@@ -6,6 +6,8 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 
 // The WebGPU backend builds only against the emdawnwebgpu port, which supplies
 // webgpu.h.
@@ -43,43 +45,48 @@ constexpr uint32_t readback_bytes_per_pixel = 4;
 constexpr uint32_t readback_yield_milliseconds = 1;
 constexpr uint32_t readback_yield_attempts = 5000;
 
-auto validate_webgpu_texture(
-  const mln_webgpu_borrowed_texture_descriptor& descriptor,
-  mln::Size physical_size
+using mln::core::WebGPUBorrowedTarget;
+
+// Checks each texture of a borrowed ring against the descriptor. Runs on the
+// driver, where the browser's WebGPU objects can be read.
+auto validate_webgpu_textures(
+  const WebGPUBorrowedTarget& target, mln::Size physical_size
 ) -> mln_status {
-  auto* const texture = static_cast<WGPUTexture>(descriptor.texture);
-  const auto format = static_cast<WGPUTextureFormat>(descriptor.format);
-
-  if (
-    wgpuTextureGetWidth(texture) != physical_size.width ||
-    wgpuTextureGetHeight(texture) != physical_size.height ||
-    wgpuTextureGetDepthOrArrayLayers(texture) != 1 ||
-    wgpuTextureGetDimension(texture) != WGPUTextureDimension_2D ||
-    wgpuTextureGetMipLevelCount(texture) != 1 ||
-    wgpuTextureGetSampleCount(texture) != 1
-  ) {
-    mln::core::set_thread_error(
-      "WebGPU texture must be 2D, single-sample, one-layer, one-mip, and match "
-      "the descriptor physical dimensions"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto format = static_cast<WGPUTextureFormat>(target.descriptor.format);
+  for (const auto& entry : target.textures) {
+    auto* const texture = static_cast<WGPUTexture>(entry.texture);
+    if (
+      wgpuTextureGetWidth(texture) != physical_size.width ||
+      wgpuTextureGetHeight(texture) != physical_size.height ||
+      wgpuTextureGetDepthOrArrayLayers(texture) != 1 ||
+      wgpuTextureGetDimension(texture) != WGPUTextureDimension_2D ||
+      wgpuTextureGetMipLevelCount(texture) != 1 ||
+      wgpuTextureGetSampleCount(texture) != 1
+    ) {
+      mln::core::set_thread_error(
+        "WebGPU texture must be 2D, single-sample, one-layer, one-mip, and "
+        "match the descriptor physical dimensions"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (
+      format == WGPUTextureFormat_Undefined ||
+      wgpuTextureGetFormat(texture) != format
+    ) {
+      mln::core::set_thread_error(
+        "WebGPU texture format must be specified and match descriptor"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (
+      (wgpuTextureGetUsage(texture) & WGPUTextureUsage_RenderAttachment) == 0
+    ) {
+      mln::core::set_thread_error(
+        "WebGPU texture must include RenderAttachment usage"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
-  if (
-    format == WGPUTextureFormat_Undefined ||
-    wgpuTextureGetFormat(texture) != format
-  ) {
-    mln::core::set_thread_error(
-      "WebGPU texture format must be specified and match descriptor"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if ((wgpuTextureGetUsage(texture) & WGPUTextureUsage_RenderAttachment) == 0) {
-    mln::core::set_thread_error(
-      "WebGPU texture must include RenderAttachment usage"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   return MLN_STATUS_OK;
 }
 
@@ -130,12 +137,14 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   };
 
   WebGPUTextureBackend(
-    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size
+    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size,
+    std::size_t ring_depth
   )
       : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::gfx::HeadlessBackend(size),
         owns_color_texture_(true),
-        color_format_(webgpu_owned_color_format) {
+        color_format_(webgpu_owned_color_format),
+        slots_(ring_depth) {
     try {
       initializeContext(descriptor.context);
       setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
@@ -147,19 +156,17 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     }
   }
 
-  WebGPUTextureBackend(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor, mln::Size size
-  )
+  // Renders slot i into the target's textures[i].
+  WebGPUTextureBackend(const WebGPUBorrowedTarget& target, mln::Size size)
       : mln::webgpu::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::gfx::HeadlessBackend(size),
         owns_color_texture_(false),
-        texture_(static_cast<WGPUTexture>(descriptor.texture)),
-        color_view_(static_cast<WGPUTextureView>(descriptor.texture_view)),
-        color_format_(static_cast<WGPUTextureFormat>(descriptor.format)) {
-    wgpuTextureAddRef(texture_);
-    wgpuTextureViewAddRef(color_view_);
+        color_format_(
+          static_cast<WGPUTextureFormat>(target.descriptor.format)
+        ) {
+    take_borrowed_textures(target);
     try {
-      initializeContext(descriptor.context);
+      initializeContext(target.descriptor.context);
       setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
       setDepthStencilFormat(wgpu::TextureFormat::Depth24PlusStencil8);
     } catch (...) {
@@ -242,6 +249,34 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     return static_cast<wgpu::TextureFormat>(color_format_);
   }
 
+  auto select_slot(std::size_t slot) -> bool {
+    if (slot >= slots_.size()) return false;
+    // A borrowed texture always has the backend's size, which only a
+    // replacement changes, and nothing here could recreate it.
+    const auto stale = [this] {
+      return owns_color_texture_ && texture_ != nullptr &&
+             color_texture_size_ != getSize();
+    };
+    if (slot == selected_slot_) {
+      if (stale()) releaseColorTexture();
+      return true;
+    }
+    slots_[selected_slot_] =
+      ColorSlot{texture_, color_view_, color_texture_size_};
+    texture_ = nullptr;
+    color_view_ = nullptr;
+    color_texture_size_ = {};
+    selected_slot_ = slot;
+    texture_ = slots_[slot].texture;
+    color_view_ = slots_[slot].view;
+    color_texture_size_ = slots_[slot].size;
+    slots_[slot] = {};
+    if (stale()) releaseColorTexture();
+    return true;
+  }
+
+  void set_ring_size(mln::Size new_size) { setRenderableSize(new_size); }
+
   // Whether a replacement target names the context this session attached with.
   // A null queue names the device's default queue, as it does at attach. The
   // instance is excluded: a texture session never uses it.
@@ -259,7 +294,7 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     return matches;
   }
 
-  // Whether a replacement texture can be drawn by the pipelines already built.
+  // Whether replacement textures can be drawn by the pipelines already built.
   // mbgl reads the color format off the target when it builds a render pipeline
   // but does not key its cache on it, so a texture in another format would be
   // drawn with pipelines built for this one.
@@ -269,22 +304,23 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     return static_cast<WGPUTextureFormat>(descriptor.format) == color_format_;
   }
 
-  // Renders into a different caller-owned texture from here on. The caller has
-  // already established that it matches this session's context and format.
-  void set_borrowed_target(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor
-  ) {
-    auto* const texture = static_cast<WGPUTexture>(descriptor.texture);
-    auto* const view = static_cast<WGPUTextureView>(descriptor.texture_view);
-    // Reference the replacement before releasing the outgoing pair, so a
-    // descriptor naming the texture this session already holds cannot drop its
+  // Renders slot i into the target's textures[i] from here on. The caller has
+  // already established that they match this session's context and format.
+  void set_borrowed_target(const WebGPUBorrowedTarget& target) {
+    // Reference the replacements before releasing the outgoing textures, so a
+    // descriptor naming a texture this session already holds cannot drop its
     // last reference partway through.
-    wgpuTextureAddRef(texture);
-    wgpuTextureViewAddRef(view);
-    releaseColorTexture();
-    texture_ = texture;
-    color_view_ = view;
-    setSize(mln::Size{descriptor.physical_width, descriptor.physical_height});
+    auto outgoing = std::move(slots_);
+    outgoing.push_back(ColorSlot{texture_, color_view_, color_texture_size_});
+    texture_ = nullptr;
+    color_view_ = nullptr;
+    setSize(
+      mln::Size{
+        target.descriptor.physical_width, target.descriptor.physical_height
+      }
+    );
+    take_borrowed_textures(target);
+    release_slots(outgoing);
   }
 
  protected:
@@ -296,6 +332,13 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   void deactivate() override {}
 
  private:
+  // One texture of the ring and its view, or empty.
+  struct ColorSlot {
+    WGPUTexture texture = nullptr;
+    WGPUTextureView view = nullptr;
+    mln::Size size{};
+  };
+
   // Submits the texture-to-buffer copy on the session's queue, ordered behind
   // the render commands already there, so it needs no fence of its own.
   auto copy_texture_into(
@@ -546,7 +589,44 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     color_texture_size_ = {0, 0};
   }
 
+  // References each of the target's textures for its slot, and selects slot
+  // zero.
+  void take_borrowed_textures(const WebGPUBorrowedTarget& target) {
+    const auto size = mln::Size{
+      target.descriptor.physical_width, target.descriptor.physical_height
+    };
+    slots_.assign(target.textures.size(), ColorSlot{});
+    for (size_t index = 0; index < target.textures.size(); ++index) {
+      auto* const texture =
+        static_cast<WGPUTexture>(target.textures[index].texture);
+      auto* const view =
+        static_cast<WGPUTextureView>(target.textures[index].texture_view);
+      wgpuTextureAddRef(texture);
+      wgpuTextureViewAddRef(view);
+      slots_[index] = ColorSlot{texture, view, size};
+    }
+    selected_slot_ = 0;
+    texture_ = slots_.front().texture;
+    color_view_ = slots_.front().view;
+    color_texture_size_ = size;
+    slots_.front() = {};
+  }
+
+  // Drops the session's references to the textures of `slots`, destroying
+  // only the ones the session made.
+  void release_slots(std::vector<ColorSlot>& slots) {
+    for (auto& slot : slots) {
+      if (slot.view != nullptr) wgpuTextureViewRelease(slot.view);
+      if (slot.texture != nullptr) {
+        if (owns_color_texture_) wgpuTextureDestroy(slot.texture);
+        wgpuTextureRelease(slot.texture);
+      }
+    }
+    slots.clear();
+  }
+
   void shutdown() {
+    release_slots(slots_);
     releaseDepthStencilTexture();
     releaseColorTexture();
     if (queue_ != nullptr) {
@@ -574,6 +654,8 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   WGPUTexture depth_stencil_texture_ = nullptr;
   WGPUTextureView depth_stencil_view_ = nullptr;
   mln::Size depth_stencil_size_{0, 0};
+  std::vector<ColorSlot> slots_;
+  std::size_t selected_slot_ = 0;
 };
 
 // Renders into a surface the host presents, which in a browser is a canvas. A
@@ -987,59 +1069,72 @@ class WebGPUTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   WebGPUTextureSessionBackend(
-    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size
+    const mln_webgpu_owned_texture_descriptor& descriptor, mln::Size size,
+    std::size_t ring_depth
   )
-      : backend_(descriptor, size) {}
+      : backend_(descriptor, size, ring_depth) {}
 
   WebGPUTextureSessionBackend(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor, mln::Size size
+    const WebGPUBorrowedTarget& target, mln::Size size
   )
-      : backend_(descriptor, size) {}
+      : backend_(target, size) {}
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
+  void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
-  auto set_webgpu_borrowed_target(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor
-  ) -> mln_status override {
-    if (!backend_.matches_context(descriptor.context)) {
+  auto set_webgpu_borrowed_target(const WebGPUBorrowedTarget& target)
+    -> mln_status override {
+    const auto texture_status = validate_webgpu_textures(
+      target,
+      mln::Size{
+        target.descriptor.physical_width, target.descriptor.physical_height
+      }
+    );
+    if (texture_status != MLN_STATUS_OK) {
+      return texture_status;
+    }
+    if (!backend_.matches_context(target.descriptor.context)) {
       mln::core::set_thread_error(
         "WebGPU texture target must name the device and queue this session "
         "attached with"
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    if (!backend_.matches_borrowed_target(descriptor)) {
+    if (!backend_.matches_borrowed_target(target.descriptor)) {
       return mln::core::unsupported_retarget(
         "WebGPU texture target must have the format this session's render "
         "pipelines were built for; destroy the session and attach again to "
         "change it"
       );
     }
-    backend_.set_borrowed_target(descriptor);
+    backend_.set_borrowed_target(target);
     return MLN_STATUS_OK;
   }
 
-  auto after_render(mln_render_session_object& session, bool& out_rendered)
-    -> mln_status override {
-    session.texture.rendered_native_texture = backend_.rendered_texture();
-    out_rendered = true;
-    return MLN_STATUS_OK;
+  auto select_render_slot(std::size_t slot) -> mln_status override {
+    return backend_.select_slot(slot) ? MLN_STATUS_OK
+                                      : MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto acquire_webgpu_owned_frame(
-    const mln_render_session_object& texture,
-    mln_webgpu_owned_texture_frame& out_frame
+  auto record_frame_metadata(
+    const mln::core::RenderFrameMetadata& frame, std::any& out_metadata
   ) -> mln_status override {
-    out_frame = mln_webgpu_owned_texture_frame{
-      .size = sizeof(mln_webgpu_owned_texture_frame),
-      .generation = texture.generation,
-      .width = texture.physical_width,
-      .height = texture.physical_height,
-      .scale_factor = texture.scale_factor,
-      .frame_id = texture.texture.next_frame_id,
-      .texture = backend_.rendered_texture(),
+    auto* const texture = backend_.rendered_texture();
+    if (texture == nullptr) {
+      mln::core::set_thread_error("rendered WebGPU texture is not available");
+      return MLN_STATUS_NOT_READY;
+    }
+    out_metadata = mln_webgpu_texture_frame{
+      .size = sizeof(mln_webgpu_texture_frame),
+      .generation = frame.generation,
+      .width = frame.physical_width,
+      .height = frame.physical_height,
+      .scale_factor = frame.scale_factor,
+      .frame_id = frame.frame_id,
+      .slot = frame.slot,
+      .texture = texture,
       .texture_view = backend_.rendered_texture_view(),
       .device = backend_.device(),
       .format = static_cast<uint32_t>(backend_.color_format()),
@@ -1063,9 +1158,10 @@ auto supported_render_backend_mask() noexcept -> uint32_t {
 #endif
 }
 
-auto webgpu_owned_texture_attach(
+auto webgpu_owned_texture_attach_start(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
   set_thread_error("WebGPU texture sessions are not supported by this build");
@@ -1081,12 +1177,12 @@ auto webgpu_owned_texture_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
+  const auto driver_status = require_render_driver(
+    options, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    "WebGPU targets require the caller graphics thread driver"
   );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
+  if (driver_status != MLN_STATUS_OK) {
+    return driver_status;
   }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
@@ -1095,34 +1191,40 @@ auto webgpu_owned_texture_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-
-  try {
-    auto session = std::make_shared<mln_render_session_object>();
-    session->map = map;
-    set_session_extent(*session, descriptor->extent);
-    session->texture.api_kind = TextureSessionApi::WebGPU;
-    session->texture.mode = TextureSessionMode::Owned;
-    session->texture.backend = std::make_unique<WebGPUTextureSessionBackend>(
-      *descriptor, mln::Size{session->physical_width, session->physical_height}
-    );
-    return attach_render_session(
-      std::move(session), out_session, RenderSessionKind::Texture,
-      RenderSessionAttachMessages{
-        .null_session = "texture session must not be null",
-        .null_output = "out_session must not be null",
-        .non_null_output = "out_session must point to a null handle",
-      }
-    );
-  } catch (const std::exception& exception) {
-    set_thread_error(exception.what());
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  auto session = std::make_shared<mln_render_session_object>();
+  session->map = map;
+  set_session_extent(*session, descriptor->extent);
+  session->texture.mode = TextureSessionMode::Owned;
+  const auto copied = *descriptor;
+  const auto ring_depth = attach_ring_depth(options);
+  session->initialize_backend =
+    [copied, ring_depth](mln_render_session_object& target) {
+      target.texture.backend = std::make_unique<WebGPUTextureSessionBackend>(
+        copied, mln::Size{target.physical_width, target.physical_height},
+        ring_depth
+      );
+      return MLN_STATUS_OK;
+    };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = ring_depth,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+             MLN_RENDER_SESSION_CAPABILITY_READBACK |
+             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, completion,
+    valueless_completion<&mln_map_attach_webgpu_owned_texture>()
+  );
 #endif
 }
 
-auto webgpu_borrowed_texture_attach(
+auto webgpu_borrowed_texture_attach_start(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
   set_thread_error(
@@ -1140,12 +1242,12 @@ auto webgpu_borrowed_texture_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
+  const auto driver_status = require_render_driver(
+    options, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    "WebGPU targets require the caller graphics thread driver"
   );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
+  if (driver_status != MLN_STATUS_OK) {
+    return driver_status;
   }
   const auto physical_status = validate_borrowed_physical_size(
     descriptor->physical_width, descriptor->physical_height
@@ -1153,51 +1255,51 @@ auto webgpu_borrowed_texture_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-
-  const auto physical_size =
-    mln::Size{descriptor->physical_width, descriptor->physical_height};
-  const auto texture_status =
-    validate_webgpu_texture(*descriptor, physical_size);
-  if (texture_status != MLN_STATUS_OK) {
-    return texture_status;
-  }
-
-  try {
-    auto session = std::make_shared<mln_render_session_object>();
-    session->map = map;
-    set_borrowed_session_extent(
-      *session, descriptor->extent, descriptor->physical_width,
-      descriptor->physical_height
-    );
-    session->texture.api_kind = TextureSessionApi::WebGPU;
-    session->texture.mode = TextureSessionMode::Borrowed;
-    session->texture.backend =
-      std::make_unique<WebGPUTextureSessionBackend>(*descriptor, physical_size);
-    return attach_render_session(
-      std::move(session), out_session, RenderSessionKind::Texture,
-      RenderSessionAttachMessages{
-        .null_session = "texture session must not be null",
-        .null_output = "out_session must not be null",
-        .non_null_output = "out_session must point to a null handle",
-      }
-    );
-  } catch (const std::exception& exception) {
-    set_thread_error(exception.what());
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+  auto session = std::make_shared<mln_render_session_object>();
+  session->map = map;
+  set_borrowed_session_extent(
+    *session, descriptor->extent, descriptor->physical_width,
+    descriptor->physical_height
+  );
+  session->texture.mode = TextureSessionMode::Borrowed;
+  session->initialize_backend = [target = WebGPUBorrowedTarget{*descriptor}](
+                                  mln_render_session_object& live
+                                ) {
+    const auto physical_size =
+      mln::Size{live.physical_width, live.physical_height};
+    const auto texture_status = validate_webgpu_textures(target, physical_size);
+    if (texture_status != MLN_STATUS_OK) {
+      return texture_status;
+    }
+    live.texture.backend =
+      std::make_unique<WebGPUTextureSessionBackend>(target, physical_size);
+    return MLN_STATUS_OK;
+  };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Texture, options, capabilities,
+    out_session, completion,
+    valueless_completion<&mln_map_attach_webgpu_borrowed_texture>()
+  );
 #endif
 }
 
-auto webgpu_borrowed_texture_set_target(
+auto webgpu_borrowed_texture_set_target_start(
   mln_render_session session,
-  const mln_webgpu_borrowed_texture_descriptor* descriptor
+  const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  const mln_completion* completion
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::BorrowedTexture, live
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::BorrowedTexture, completion
   );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
   }
   const auto descriptor_status =
     validate_webgpu_borrowed_texture_descriptor(descriptor);
@@ -1210,30 +1312,23 @@ auto webgpu_borrowed_texture_set_target(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  // The same probe attach makes. Without it a texture of the wrong shape, size,
-  // format, or usage fails only on the next render, once the outgoing target is
-  // already released.
-  const auto texture_status = validate_webgpu_texture(
-    *descriptor,
-    mln::Size{descriptor->physical_width, descriptor->physical_height}
-  );
-  if (texture_status != MLN_STATUS_OK) {
-    return texture_status;
-  }
-  return render_session_set_target(
-    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
+  return enqueue_borrowed_texture_retarget(
+    session, descriptor->texture_count, descriptor->extent,
     descriptor->physical_width, descriptor->physical_height,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.texture.backend->set_webgpu_borrowed_target(
-        *descriptor
-      );
-    }
+    [target =
+       WebGPUBorrowedTarget{*descriptor}](mln_render_session_object& live) {
+      return live.texture.backend->set_webgpu_borrowed_target(target);
+    },
+    completion,
+    valueless_completion<
+      &mln_render_session_set_webgpu_borrowed_texture_target>()
   );
 }
 
-auto webgpu_surface_attach(
+auto webgpu_surface_attach_start(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
 #if !defined(MLN_RENDER_BACKEND_WEBGPU)
   set_thread_error("WebGPU surface sessions are not supported by this build");
@@ -1248,12 +1343,12 @@ auto webgpu_surface_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
+  const auto driver_status = require_render_driver(
+    options, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
+    "WebGPU targets require the caller graphics thread driver"
   );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
+  if (driver_status != MLN_STATUS_OK) {
+    return driver_status;
   }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
@@ -1262,129 +1357,57 @@ auto webgpu_surface_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-
-  try {
-    auto session = std::make_shared<mln_render_session_object>();
-    session->map = map;
-    set_session_extent(*session, descriptor->extent);
-    session->surface.backend = std::make_unique<WebGPUSurfaceSessionBackend>(
-      *descriptor, mln::Size{session->physical_width, session->physical_height}
+  auto session = std::make_shared<mln_render_session_object>();
+  session->map = map;
+  set_session_extent(*session, descriptor->extent);
+  const auto copied = *descriptor;
+  session->initialize_backend = [copied](mln_render_session_object& target) {
+    target.surface.backend = std::make_unique<WebGPUSurfaceSessionBackend>(
+      copied, mln::Size{target.physical_width, target.physical_height}
     );
-    return attach_render_session(
-      std::move(session), out_session, RenderSessionKind::Surface,
-      RenderSessionAttachMessages{
-        .null_session = "surface session must not be null",
-        .null_output = "out_session must not be null",
-        .non_null_output = "out_session must point to a null handle",
-      }
-    );
-  } catch (const std::exception& exception) {
-    set_thread_error(exception.what());
-    return MLN_STATUS_NATIVE_ERROR;
-  }
+    return MLN_STATUS_OK;
+  };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Surface, options, capabilities,
+    out_session, completion,
+    valueless_completion<&mln_map_attach_webgpu_surface>()
+  );
 #endif
 }
 
-auto webgpu_surface_set_target(
-  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor
+auto webgpu_surface_set_target_start(
+  mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::Surface, completion
   );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
   }
   const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  return surface_session_set_target(
-    session, descriptor->extent,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.surface.backend->set_webgpu_target(*descriptor);
-    }
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session,
+    [copied](mln_render_session_object& target) {
+      return surface_session_set_target(
+        target.self, copied.extent, [&copied](mln_render_session_object& live) {
+          return live.surface.backend->set_webgpu_target(copied);
+        }
+      );
+    },
+    completion,
+    valueless_completion<&mln_render_session_set_webgpu_surface_target>()
   );
-}
-
-auto webgpu_owned_texture_acquire_frame(
-  mln_render_session texture, mln_webgpu_owned_texture_frame* out_frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_live_attached_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_webgpu_owned_texture_frame)
-  ) {
-    set_thread_error("out_frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (live->texture.acquired) {
-    set_thread_error("a texture frame is already acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (live->rendered_generation != live->generation) {
-    set_thread_error("no rendered frame is available for this generation");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (
-    live->texture.mode != TextureSessionMode::Owned ||
-    live->texture.api_kind != TextureSessionApi::WebGPU
-  ) {
-    set_thread_error("texture session cannot expose a WebGPU texture frame");
-    return MLN_STATUS_UNSUPPORTED;
-  }
-
-  const auto acquire_status =
-    live->texture.backend->acquire_webgpu_owned_frame(*live, *out_frame);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
-  }
-  live->texture.acquired_native_texture = out_frame->texture;
-  live->texture.acquired = true;
-  live->texture.acquired_frame_id = out_frame->frame_id;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::WebGPUOwned;
-  ++live->texture.next_frame_id;
-  return MLN_STATUS_OK;
-}
-
-auto webgpu_owned_texture_release_frame(
-  mln_render_session texture, const mln_webgpu_owned_texture_frame* frame
-) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto status = validate_texture(texture, live);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  if (
-    frame == nullptr || frame->size < sizeof(mln_webgpu_owned_texture_frame)
-  ) {
-    set_thread_error("frame must not be null and must have a valid size");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (
-    !live->texture.acquired ||
-    live->texture.acquired_frame_kind != TextureSessionFrameKind::WebGPUOwned
-  ) {
-    set_thread_error("no texture frame is currently acquired");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  if (frame->generation != live->generation) {
-    set_thread_error("frame generation does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (frame->frame_id != live->texture.acquired_frame_id) {
-    set_thread_error("frame identity does not match acquired frame");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  live->texture.acquired = false;
-  live->texture.acquired_frame_id = 0;
-  live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
-  live->texture.acquired_native_texture = nullptr;
-  return MLN_STATUS_OK;
 }
 
 }  // namespace mln::core

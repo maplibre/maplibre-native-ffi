@@ -28,11 +28,9 @@ internal sealed unsafe class VulkanBorrowedImage : IDisposable
         }
     }
 
-    public VulkanHandle ImageHandle => new(image.Handle);
+    public ulong ImageHandle => image.Handle;
 
-    public VulkanHandle ViewHandle => new(view.Handle);
-
-    public ImageView View => view;
+    public ulong ViewHandle => view.Handle;
 
     public void Dispose()
     {

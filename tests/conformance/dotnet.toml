@@ -1,0 +1,45 @@
+# Maps each case in cases.toml to the dotnet test that covers it:
+#   "ID" = "path/to/test_file::test_name"
+# or to why it does not apply:
+#   "ID" = { na = "reason" }
+
+[cases]
+"ERR-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeStatusTests.cs::NativeStatusesMapToPublicExceptionCategories"
+"ERR-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeLibraryLoaderTests.cs::ALibraryWithAnotherAbiVersionIsRejected"
+"ERR-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ADrainBeforeAnyDemandReturnsNull"
+"LIFE-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ClosingAHandleTwiceClosesItOnce"
+"LIFE-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds"
+"LIFE-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeHandleStateTests.cs::ABorrowHoldsOffACloseFromAnotherThreadUntilItEnds"
+"LIFE-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::AnAbandonedHandleIsDisposedAndReportedAsALeak"
+"LIFE-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::AChildKeepsItsParentAlive"
+"COMP-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ACompletionDeliversOnceAndAFailedConversionFaultsItsTask"
+"COMP-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ARejectedSubmissionFreesItsCompletionState"
+"COMP-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ADroppedCreationTaskRetiresTheMapItCreates"
+"COMP-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::AFailedCommandArrivesAsItsDisposition"
+"COMP-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::AWaitCanTimeOutOrBeCancelled"
+"CB-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CallbackLifetimeTests.cs::ACallbackIsRootedUntilNativeReleasesIt"
+"CB-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CallbackLifetimeTests.cs::ACallbackDoesNotKeepItsReceiverAlive"
+"CB-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderMayAnswerButNotReenterTheRuntime"
+"CB-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderExceptionIsContainedAndPassesTheRequestThrough"
+"CB-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::AProviderCanAnswerLaterThroughItsDecisionHandle"
+"CB-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceTransformTests.cs::AScopedResponseExpiresWithItsCallbackAndRejectsOtherThreads"
+"CB-07" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LoggingTests.cs::ReplacingTheLogCallbackReleasesThePreviousOne"
+"CB-08" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ResourceProviderTests.cs::ARegistrationOnACancelledRequestIsNotRooted"
+"CB-09" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CallbackLifetimeTests.cs::ACameraEndHandlerIsRootedUntilItRuns"
+"VAL-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::StringsCrossAsTerminatedAndAsExplicitLengthViews"
+"VAL-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::PresenceFieldsSendOnlyTheValuesTheCallerSet"
+"VAL-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTests.cs::UnknownEventDomainsKeepRawValuesAndCopyThePayloadWindow"
+"VAL-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTests.cs::NumbersAreCheckedWhenNarrowedAndKeptWhenOpen"
+"VAL-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::AnArrayIsCopiedWhenTheCallIsSubmitted"
+"VAL-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault"
+"VAL-07" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::AnArrayResultIsReadAtItsValueSize"
+"VIEW-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ABorrowedFrameViewExpiresWithItsScope"
+"REND-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::AnOwnedTextureSessionRendersPixelsTheBindingReadsBack"
+"REND-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ACallerDrivenSessionIsServicedFromAManagedThread"
+# The package smoke restores the packed NuGet packages and loads the library
+# through their runtime assets; ci/dotnet_snapshot.py runs it.
+"PLAT-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.PackageSmoke/Program.cs::LoadNativeLibrary"
+"PLAT-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ProcessExitTests.cs::AProcessExitsCleanlyWithLiveHandlesAndCallbacks"
+"PLAT-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::UnreachableHandlesAreReclaimedAndReported"
+# `mise run //examples/dotnet-map:smoke [preset]` runs this path.
+"EX-01" = "examples/dotnet-map/Shell.cs::smoke: rendered a frame"

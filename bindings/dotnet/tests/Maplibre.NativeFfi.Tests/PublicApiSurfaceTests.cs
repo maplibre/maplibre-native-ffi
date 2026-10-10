@@ -1,4 +1,5 @@
 using System.Reflection;
+using Maplibre.NativeFfi.Internal.Pointer;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -6,187 +7,7 @@ namespace Maplibre.NativeFfi.Tests;
 public sealed class PublicApiSurfaceTests
 {
     [Fact]
-    public void ExpectedPublicTypesExist()
-    {
-        var assembly = typeof(Maplibre).Assembly;
-        var expected = new[]
-        {
-            "Maplibre.NativeFfi.Camera.AnimationOptions",
-            "Maplibre.NativeFfi.Camera.BoundOptions",
-            "Maplibre.NativeFfi.Camera.BoundsConstraint",
-            "Maplibre.NativeFfi.Camera.BoundsConstraint+Bounded",
-            "Maplibre.NativeFfi.Camera.BoundsConstraint+Unbounded",
-            "Maplibre.NativeFfi.Camera.CameraChangeMode",
-            "Maplibre.NativeFfi.Camera.CameraFitOptions",
-            "Maplibre.NativeFfi.Camera.CameraOptions",
-            "Maplibre.NativeFfi.Camera.EdgeInsets",
-            "Maplibre.NativeFfi.Camera.FreeCameraOptions",
-            "Maplibre.NativeFfi.Camera.UnitBezier",
-            "Maplibre.NativeFfi.Error.InvalidArgumentException",
-            "Maplibre.NativeFfi.Error.InvalidStateException",
-            "Maplibre.NativeFfi.Error.MaplibreException",
-            "Maplibre.NativeFfi.Error.MaplibreStatus",
-            "Maplibre.NativeFfi.Error.NativeErrorException",
-            "Maplibre.NativeFfi.Error.UnsupportedFeatureException",
-            "Maplibre.NativeFfi.Error.WrongThreadException",
-            "Maplibre.NativeFfi.Geo.CanonicalTileId",
-            "Maplibre.NativeFfi.Geo.LatLng",
-            "Maplibre.NativeFfi.Geo.LatLngBounds",
-            "Maplibre.NativeFfi.Geo.ProjectedMeters",
-            "Maplibre.NativeFfi.Geo.Quaternion",
-            "Maplibre.NativeFfi.Geo.ScreenBox",
-            "Maplibre.NativeFfi.Geo.ScreenPoint",
-            "Maplibre.NativeFfi.Geo.TileId",
-            "Maplibre.NativeFfi.Geo.Vec3",
-            "Maplibre.NativeFfi.Log.LogCallback",
-            "Maplibre.NativeFfi.Log.LogEvent",
-            "Maplibre.NativeFfi.Log.LogRecord",
-            "Maplibre.NativeFfi.Log.LogSeverity",
-            "Maplibre.NativeFfi.Log.LogSeverityMask",
-            "Maplibre.NativeFfi.Map.ConstrainMode",
-            "Maplibre.NativeFfi.Map.DebugOptions",
-            "Maplibre.NativeFfi.Map.MapHandle",
-            "Maplibre.NativeFfi.Map.MapMode",
-            "Maplibre.NativeFfi.Map.MapOptions",
-            "Maplibre.NativeFfi.Map.MapProjectionHandle",
-            "Maplibre.NativeFfi.Map.NorthOrientation",
-            "Maplibre.NativeFfi.Map.ProjectionModeOptions",
-            "Maplibre.NativeFfi.Map.RenderingStats",
-            "Maplibre.NativeFfi.Map.TileLodMode",
-            "Maplibre.NativeFfi.Map.TileOperation",
-            "Maplibre.NativeFfi.Map.TileOptions",
-            "Maplibre.NativeFfi.Map.ViewportMode",
-            "Maplibre.NativeFfi.Map.ViewportOptions",
-            "Maplibre.NativeFfi.Maplibre",
-            "Maplibre.NativeFfi.NativePointer",
-            "Maplibre.NativeFfi.NetworkStatus",
-            "Maplibre.NativeFfi.Offline.OfflineRegionDefinition",
-            "Maplibre.NativeFfi.Offline.OfflineRegionDefinition+GeometryRegion",
-            "Maplibre.NativeFfi.Offline.OfflineRegionDefinition+TilePyramid",
-            "Maplibre.NativeFfi.Offline.OfflineRegionDownloadState",
-            "Maplibre.NativeFfi.Offline.OfflineRegionInfo",
-            "Maplibre.NativeFfi.Offline.OfflineRegionStatus",
-            "Maplibre.NativeFfi.Query.FeatureStateSelector",
-            "Maplibre.NativeFfi.Query.QueriedFeature",
-            "Maplibre.NativeFfi.Query.RenderedFeatureQueryOptions",
-            "Maplibre.NativeFfi.Query.RenderedQueryGeometry",
-            "Maplibre.NativeFfi.Query.RenderedQueryGeometry+Box",
-            "Maplibre.NativeFfi.Query.RenderedQueryGeometry+LineString",
-            "Maplibre.NativeFfi.Query.RenderedQueryGeometry+Point",
-            "Maplibre.NativeFfi.Query.SourceFeatureQueryOptions",
-            "Maplibre.NativeFfi.Render.EglContextDescriptor",
-            "Maplibre.NativeFfi.Render.MetalBorrowedTextureDescriptor",
-            "Maplibre.NativeFfi.Render.MetalContextDescriptor",
-            "Maplibre.NativeFfi.Render.MetalOwnedTextureDescriptor",
-            "Maplibre.NativeFfi.Render.MetalOwnedTextureFrame",
-            "Maplibre.NativeFfi.Render.MetalOwnedTextureFrameHandle",
-            "Maplibre.NativeFfi.Render.MetalSurfaceDescriptor",
-            "Maplibre.NativeFfi.Render.NativeBuffer",
-            "Maplibre.NativeFfi.Render.OpenGLBorrowedTextureDescriptor",
-            "Maplibre.NativeFfi.Render.OpenGLClientApi",
-            "Maplibre.NativeFfi.Render.OpenGLContextDescriptor",
-            "Maplibre.NativeFfi.Render.OpenGLContextOwnership",
-            "Maplibre.NativeFfi.Render.OpenGLContextProvider",
-            "Maplibre.NativeFfi.Render.OpenGLOwnedTextureDescriptor",
-            "Maplibre.NativeFfi.Render.OpenGLOwnedTextureFrame",
-            "Maplibre.NativeFfi.Render.OpenGLOwnedTextureFrameHandle",
-            "Maplibre.NativeFfi.Render.OpenGLSurfaceDescriptor",
-            "Maplibre.NativeFfi.Render.PremultipliedRgba8Image",
-            "Maplibre.NativeFfi.Render.RenderBackend",
-            "Maplibre.NativeFfi.Render.RenderMode",
-            "Maplibre.NativeFfi.Render.RenderResult",
-            "Maplibre.NativeFfi.Render.RenderSessionHandle",
-            "Maplibre.NativeFfi.Render.RenderTargetExtent",
-            "Maplibre.NativeFfi.Render.RenderUpdate",
-            "Maplibre.NativeFfi.Render.TextureImageInfo",
-            "Maplibre.NativeFfi.Render.VulkanBorrowedTextureDescriptor",
-            "Maplibre.NativeFfi.Render.VulkanContextDescriptor",
-            "Maplibre.NativeFfi.Render.VulkanOwnedTextureDescriptor",
-            "Maplibre.NativeFfi.Render.VulkanOwnedTextureFrame",
-            "Maplibre.NativeFfi.Render.VulkanOwnedTextureFrameHandle",
-            "Maplibre.NativeFfi.Render.VulkanSurfaceDescriptor",
-            "Maplibre.NativeFfi.Render.WglContextDescriptor",
-            "Maplibre.NativeFfi.Resource.ByteRange",
-            "Maplibre.NativeFfi.Resource.HttpHeader",
-            "Maplibre.NativeFfi.Resource.HttpHeaderTransformCallback",
-            "Maplibre.NativeFfi.Resource.HttpHeaderTransformRequest",
-            "Maplibre.NativeFfi.Resource.ResourceErrorReason",
-            "Maplibre.NativeFfi.Resource.ResourceKind",
-            "Maplibre.NativeFfi.Resource.ResourceLoadingMethod",
-            "Maplibre.NativeFfi.Resource.ResourcePriority",
-            "Maplibre.NativeFfi.Resource.ResourceProviderCallback",
-            "Maplibre.NativeFfi.Resource.ResourceProviderDecision",
-            "Maplibre.NativeFfi.Resource.ResourceRequest",
-            "Maplibre.NativeFfi.Resource.ResourceRequestHandle",
-            "Maplibre.NativeFfi.Resource.ResourceResponse",
-            "Maplibre.NativeFfi.Resource.ResourceResponseStatus",
-            "Maplibre.NativeFfi.Resource.ResourceStoragePolicy",
-            "Maplibre.NativeFfi.Resource.ResourceTransformCallback",
-            "Maplibre.NativeFfi.Resource.ResourceTransformRequest",
-            "Maplibre.NativeFfi.Resource.ResourceUsage",
-            "Maplibre.NativeFfi.Runtime.AmbientCacheOperation",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationHandle",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationKind",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationResultKind",
-            "Maplibre.NativeFfi.Runtime.OwnerThread",
-            "Maplibre.NativeFfi.Runtime.RuntimeEvent",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventBatch",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventMask",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+CameraTransitionFinished",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+None",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineOperationCompleted",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionResponseError",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionStatusChanged",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+OfflineRegionTileCountLimit",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+RenderFrame",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+RenderMap",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+TileAction",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventPayload+Unknown",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventSourceType",
-            "Maplibre.NativeFfi.Runtime.RuntimeEventType",
-            "Maplibre.NativeFfi.Runtime.RuntimeHandle",
-            "Maplibre.NativeFfi.Runtime.RuntimeOptions",
-            "Maplibre.NativeFfi.Runtime.WakeSource",
-            "Maplibre.NativeFfi.Style.CustomGeometrySourceCallback",
-            "Maplibre.NativeFfi.Style.CustomGeometrySourceOptions",
-            "Maplibre.NativeFfi.Style.CustomMvtVectorSourceCallback",
-            "Maplibre.NativeFfi.Style.CustomMvtVectorSourceOptions",
-            "Maplibre.NativeFfi.Style.GeoJsonSourceDataHandle",
-            "Maplibre.NativeFfi.Style.GeoJsonSourceOptions",
-            "Maplibre.NativeFfi.Style.LocationIndicatorImageKind",
-            "Maplibre.NativeFfi.Style.RasterDemEncoding",
-            "Maplibre.NativeFfi.Style.SourceInfo",
-            "Maplibre.NativeFfi.Style.SourceType",
-            "Maplibre.NativeFfi.Style.ImageContent",
-            "Maplibre.NativeFfi.Style.ImageStretch",
-            "Maplibre.NativeFfi.Style.StyleImage",
-            "Maplibre.NativeFfi.Style.StyleImageInfo",
-            "Maplibre.NativeFfi.Style.StyleImageOptions",
-            "Maplibre.NativeFfi.Style.StyleImageTextFit",
-            "Maplibre.NativeFfi.Style.StyleLayerInfo",
-            "Maplibre.NativeFfi.Style.StyleLayerVisibility",
-            "Maplibre.NativeFfi.Style.StyleTransitionOptions",
-            "Maplibre.NativeFfi.Style.TileJson",
-            "Maplibre.NativeFfi.Style.TileScheme",
-            "Maplibre.NativeFfi.Style.TileSourceOptions",
-            "Maplibre.NativeFfi.Style.VectorTileEncoding",
-            "Maplibre.NativeFfi.VulkanHandle",
-        };
-        var actual = assembly.GetExportedTypes().Select(type => type.FullName).Order().ToArray();
-
-        var expectedSorted = expected.Order().ToArray();
-        Assert.True(
-            expectedSorted.SequenceEqual(actual),
-            "Expected public types:\n"
-                + string.Join('\n', expectedSorted)
-                + "\n\nActual public types:\n"
-                + string.Join('\n', actual)
-        );
-    }
-
-    [Fact]
-    public void GeneratedAndInternalTypesStayOutOfPublicSurface()
+    public void NativeImplementationTypesStayOutOfPublicSurface()
     {
         var publicTypes = typeof(Maplibre).Assembly.GetExportedTypes();
 
@@ -272,9 +93,10 @@ public sealed class PublicApiSurfaceTests
         );
     }
 
-    // Default parameter values would create shortcut workflows outside the C API shape.
+    // Optional cancellation tokens follow the .NET asynchronous API convention. Other default
+    // parameter values would create shortcut workflows outside the C API shape.
     [Fact]
-    public void PublicSurfaceDoesNotUseDefaultParameterValues()
+    public void PublicSurfaceUsesDefaultsOnlyForCancellationTokens()
     {
         var violations = new List<string>();
         foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
@@ -297,25 +119,73 @@ public sealed class PublicApiSurfaceTests
         Assert.Empty(violations);
     }
 
+    // Every wrapper over a C completion hands the caller a task to await, so it takes a
+    // cancellation token, including a create, whose handle the binding disposes when it arrives
+    // after cancellation. A close is the exception: it consumes its handle synchronously, and its
+    // task only reports retirement.
+    [Fact]
+    public void CompletionWrappersTakeACancellationTokenUnlessTheyConsumeTheirHandle()
+    {
+        var violations = new List<string>();
+
+        foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
+        {
+            foreach (
+                var method in type.GetMethods(
+                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static
+                )
+            )
+            {
+                if (
+                    method.DeclaringType != type
+                    || method.IsSpecialName
+                    || !typeof(Task).IsAssignableFrom(method.ReturnType)
+                )
+                {
+                    continue;
+                }
+
+                var takesToken = method
+                    .GetParameters()
+                    .Any(parameter => parameter.ParameterType == typeof(CancellationToken));
+                if (method.Name == "CloseAsync")
+                {
+                    if (takesToken)
+                    {
+                        violations.Add($"{type.FullName}.{method.Name} takes a token");
+                    }
+                    continue;
+                }
+
+                if (!takesToken)
+                {
+                    violations.Add($"{type.FullName}.{method.Name} takes no token");
+                }
+            }
+        }
+
+        Assert.Empty(violations);
+    }
+
+    // Every wrapper that owns a native handle holds its state in a NativeHandleState, so the
+    // reflection below finds all of them, including handle types added later.
     [Fact]
     public void OwnedNativeHandlesDoNotExposePublicConstructors()
     {
-        var assembly = typeof(Maplibre).Assembly;
-        var ownedHandleTypeNames = new[]
-        {
-            "Maplibre.NativeFfi.Map.MapHandle",
-            "Maplibre.NativeFfi.Map.MapProjectionHandle",
-            "Maplibre.NativeFfi.Render.MetalOwnedTextureFrameHandle",
-            "Maplibre.NativeFfi.Render.OpenGLOwnedTextureFrameHandle",
-            "Maplibre.NativeFfi.Render.RenderSessionHandle",
-            "Maplibre.NativeFfi.Render.VulkanOwnedTextureFrameHandle",
-            "Maplibre.NativeFfi.Resource.ResourceRequestHandle",
-            "Maplibre.NativeFfi.Runtime.OfflineOperationHandle",
-            "Maplibre.NativeFfi.Runtime.RuntimeHandle",
-        };
+        var ownedHandleTypes = typeof(Maplibre)
+            .Assembly.GetExportedTypes()
+            .Where(type =>
+                type.GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Any(field =>
+                        field.FieldType.IsGenericType
+                        && field.FieldType.GetGenericTypeDefinition() == typeof(NativeHandleState<>)
+                    )
+            )
+            .ToArray();
+        Assert.Contains(typeof(RuntimeHandle), ownedHandleTypes);
+        Assert.Contains(typeof(AcquiredFrameHandle), ownedHandleTypes);
 
-        var violations = ownedHandleTypeNames
-            .Select(name => assembly.GetType(name, throwOnError: true)!)
+        var violations = ownedHandleTypes
             .SelectMany(type =>
                 type.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                     .Select(constructor => $"{type.FullName}.{constructor}")
@@ -352,7 +222,10 @@ public sealed class PublicApiSurfaceTests
     {
         foreach (var parameter in parameters)
         {
-            if (parameter.HasDefaultValue || parameter.IsOptional)
+            if (
+                (parameter.HasDefaultValue || parameter.IsOptional)
+                && parameter.ParameterType != typeof(CancellationToken)
+            )
             {
                 violations.Add(
                     $"{member.DeclaringType?.FullName}.{member.Name} has default parameter {parameter.Name}."

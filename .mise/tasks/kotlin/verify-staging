@@ -280,7 +280,7 @@ def aar_keep_rules(aar: zipfile.ZipFile) -> str:
 
 
 def verify_android(root: pathlib.Path) -> None:
-    # The binding AAR carries the Kotlin API and its private JavaCPP bridge. An
+    # The binding AAR carries the Kotlin API and its private JNI shim. An
     # Android host of any language takes the C library and the TLS component from
     # a runtime AAR alone, so neither may appear here.
     core = one(
@@ -290,7 +290,7 @@ def verify_android(root: pathlib.Path) -> None:
     with zipfile.ZipFile(core) as aar:
         names = set(aar.namelist())
         for abi in ("armeabi-v7a", "arm64-v8a", "x86_64"):
-            expected = f"jni/{abi}/libjniMaplibreNativeC.so"
+            expected = f"jni/{abi}/libmaplibre-native-ffi-jni.so"
             if expected not in names:
                 raise SystemExit(f"the core Android AAR is missing {expected}")
             if not aar.read(expected).startswith(b"\x7fELF"):
@@ -301,23 +301,22 @@ def verify_android(root: pathlib.Path) -> None:
             name
             for name in names
             if name.startswith("jni/")
-            and not name.endswith(("/", "libjniMaplibreNativeC.so"))
+            and not name.endswith(("/", "libmaplibre-native-ffi-jni.so"))
         ]
         if unexpected:
             raise SystemExit(
                 f"the core Android AAR contains runtime native libraries: {unexpected}"
             )
-        # The bridge links the NDK C++ runtime statically, so this AAR
-        # redistributes NDK-licensed code and carries its own notice.
+        # The shim is built with the NDK, so this AAR carries the NDK notice.
         if "META-INF/licenses/android-ndk/NOTICE" not in names:
             raise SystemExit(
                 "the core Android AAR is missing META-INF/licenses/android-ndk/NOTICE"
             )
         if any("rustls" in name for name in names):
             raise SystemExit("the core Android AAR still carries the Rustls helper")
-        if "org.bytedeco.javacpp" not in aar_keep_rules(aar):
+        if "org.maplibre.nativeffi.internal.c.Upcalls" not in aar_keep_rules(aar):
             raise SystemExit(
-                "the core Android AAR is missing the JavaCPP consumer keep rule"
+                "the core Android AAR is missing the JNI shim's consumer keep rule"
             )
 
     for backend in ("opengl", "vulkan"):

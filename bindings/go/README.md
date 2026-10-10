@@ -1,18 +1,47 @@
-# MapLibre Native Go Binding Status
+# MapLibre Native Go binding
 
-These bindings are draft low-level Go wrappers over the MapLibre Native C API.
+The Go API is generated from the C headers. Commands return a future with their
+terminal disposition and snapshot generation; queries return a future with a
+copied result. Published snapshots return their result immediately.
 
-## Known draft deviations
+Create a runtime with `RuntimeCreate` and a map with `RuntimeHandle.CreateMap`.
+Closing either handle returns a future for native teardown. Keep servicing a
+caller-driver render session while its attachment or detachment is pending.
 
-The owner-thread helper described by the binding specification is deferred.
-Until that helper lands, Go callers are responsible for pinning runtime/map
-lifecycles to one OS thread.
+`DrainEvents` and `DrainFrameResults` return batch owners. Read their copied
+values, then close the batch. `DrainEvents`, `DrainFrameResults`, and
+`AcquireFrame` return nil and no error when nothing is ready. Acquired GPU
+frames expose callback-scoped views: use the texture inside `WithOpenglTexture`
+or the corresponding backend method, then close the frame with the host's
+completion synchronization. View methods reject access after the callback
+returns or from another OS thread.
 
-Call `runtime.LockOSThread()` before creating a `RuntimeHandle`, keep the
-runtime and its child handles on that locked goroutine, and close those handles
-before unlocking the thread. Owner-thread-affine methods called from another OS
-thread return `ErrWrongThread` with the native diagnostic when the C API reports
-that status.
+Callbacks receive copied values and scoped response objects. Their generated
+registration code retains Go closures until native retirement and enforces the
+callback operations declared in the headers. Explicit `Close` orders teardown.
+Go cleanup also retires abandoned owners and callback cycles, and logs each
+owner that it disposes with `slog.Warn` on the default logger, with the handle
+type and the handle as attributes.
 
-TODO: add a binding-owned owner-thread helper that serializes create, pump,
-event draining, operations, and close on one native owner thread.
+Callback admission is per OS thread. While a callback runs, its goroutine is
+locked to the native thread and can make only the calls that the callback's
+declaration admits. Any other call returns `ErrInvalidState` before it reaches
+native. A goroutine that the callback starts runs on another thread and has no
+such restriction. The callback can wait for work that does not need it to
+return, such as a submission's acceptance, but must not wait for work that does,
+such as a submission's completion, because native work can depend on the
+callback's return.
+
+A resource provider that returns `ResourceProviderDecisionHandle` keeps its
+`ResourceRequestHandle`, and any goroutine can complete and close that handle
+after the provider returns. A scoped response such as
+`ResourceTransformResponseScope` works only during its callback and on the
+callback's thread.
+
+Native cannot receive a panic, so the binding recovers a callback's panic and
+returns the callback's declared failure value to native. The binding logs the
+panic with `slog.Error` on the default logger, with the C callback type, the
+panic value, and the stack as attributes. Install a handler with
+`slog.SetDefault` to route these records. The handler runs on the native
+callback's stack, where the binding refuses every native call with
+`ErrInvalidState`.

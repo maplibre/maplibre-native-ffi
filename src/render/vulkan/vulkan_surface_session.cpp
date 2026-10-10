@@ -12,6 +12,7 @@
 #include <mln/vulkan/context.hpp>
 #include <mln/vulkan/renderable_resource.hpp>
 #include <mln/vulkan/renderer_backend.hpp>
+
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -23,6 +24,7 @@
 #include "render/surface_session.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_handle.hpp"
+#include "render/vulkan/vulkan_queue_access.hpp"
 
 namespace {
 
@@ -160,7 +162,9 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
   return MLN_STATUS_OK;
 }
 
-class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
+// VulkanQueueAccess comes first so that it outlives mbgl's teardown.
+class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
+                                   public mln::vulkan::RendererBackend,
                                    public mln::vulkan::Renderable {
  private:
   class VulkanSurfaceRenderableResource final
@@ -319,9 +323,11 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
 
  public:
   VulkanSurfaceBackend(
-    const mln_vulkan_surface_descriptor& descriptor, mln::Size size
+    const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
   )
-      : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+      : mln::core::VulkanQueueAccess(std::move(queue_lock)),
+        mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
         mln::vulkan::Renderable(size, nullptr),
         descriptor_(descriptor) {
     initSharedDevice();
@@ -340,6 +346,9 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
     resource.reset();
     getThreadPool().runRenderJobs(true);
   }
+
+  using mln::core::VulkanQueueAccess::drain_for_teardown;
+  using mln::core::VulkanQueueAccess::release_queue_access;
 
   auto getDefaultRenderable() -> mln::gfx::Renderable& override {
     if (!resource) {
@@ -471,6 +480,9 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
     presentQueueIndex = graphicsQueueIndex;
     graphicsQueue = static_cast<VkQueue>(descriptor_.context.graphics_queue);
     presentQueue = graphicsQueue;
+    install_queue_access(
+      dispatcher, device.get(), static_cast<VkQueue>(graphicsQueue)
+    );
     physicalDeviceFeatures = physicalDevice.getFeatures(dispatcher);
   }
 
@@ -495,9 +507,10 @@ class VulkanSurfaceSessionBackend final
     : public mln::core::SurfaceSessionBackend {
  public:
   VulkanSurfaceSessionBackend(
-    const mln_vulkan_surface_descriptor& descriptor, mln::Size size
+    const mln_vulkan_surface_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
   )
-      : backend_(descriptor, size) {}
+      : backend_(descriptor, size, std::move(queue_lock)) {}
 
   auto renderer_backend() -> mln::gfx::RendererBackend& override {
     return backend_;
@@ -506,6 +519,17 @@ class VulkanSurfaceSessionBackend final
   void resize(uint32_t physical_width, uint32_t physical_height) override {
     backend_.resize(mln::Size{physical_width, physical_height});
   }
+
+  [[nodiscard]] auto allows_off_thread_teardown() const noexcept
+    -> bool override {
+    return true;
+  }
+
+  auto prepare_off_thread_teardown() noexcept -> bool override {
+    return backend_.drain_for_teardown();
+  }
+
+  void quarantine() noexcept override { backend_.release_queue_access(); }
 
   auto set_vulkan_target(const mln_vulkan_surface_descriptor& descriptor)
     -> mln_status override {
@@ -551,9 +575,10 @@ class VulkanSurfaceSessionBackend final
 
 namespace mln::core {
 
-auto vulkan_surface_attach(
+auto vulkan_surface_attach_start(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session* out_session
+  const mln_render_session_attach_options* options,
+  mln_render_session* out_session, const mln_completion* completion
 ) -> mln_status {
   MapObject* live_map = nullptr;
   const auto map_status = validate_map_live(map, live_map);
@@ -564,13 +589,6 @@ auto vulkan_surface_attach(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
   const auto physical_status = validate_physical_size(
     descriptor->extent.width, descriptor->extent.height,
     descriptor->extent.scale_factor, "scaled surface dimensions are too large"
@@ -578,46 +596,63 @@ auto vulkan_surface_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  const auto vulkan_status = validate_vulkan_handles(*descriptor);
-  if (vulkan_status != MLN_STATUS_OK) {
-    return vulkan_status;
-  }
 
   auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
-  session->surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
-    *descriptor, mln::Size{session->physical_width, session->physical_height}
-  );
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Surface,
-    RenderSessionAttachMessages{
-      .null_session = "surface session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
+  session->accepts_queue_lock = true;
+  const auto copied = *descriptor;
+  session->initialize_backend = [copied](mln_render_session_object& target) {
+    const auto handles_status = validate_vulkan_handles(copied);
+    if (handles_status != MLN_STATUS_OK) {
+      return handles_status;
     }
+    target.surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
+      copied, mln::Size{target.physical_width, target.physical_height},
+      target.queue_lock
+    );
+    return MLN_STATUS_OK;
+  };
+  const auto capabilities = mln_render_session_capabilities{
+    .size = sizeof(mln_render_session_capabilities),
+    .driver = 0,
+    .texture_ring_depth = 0,
+    .flags = MLN_RENDER_SESSION_CAPABILITY_PRESENTATION
+  };
+  return start_attach_render_session(
+    std::move(session), RenderSessionKind::Surface, options, capabilities,
+    out_session, completion,
+    valueless_completion<&mln_map_attach_vulkan_surface>()
   );
 }
 
-auto vulkan_surface_set_target(
-  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+auto vulkan_surface_set_target_start(
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
+  const mln_completion* completion
 ) -> mln_status {
-  mln_render_session_object* live = nullptr;
-  const auto session_status = validate_render_session_retarget(
-    session, RetargetTargetKind::Surface, live
+  const auto submission_status = validate_render_session_retarget_submission(
+    session, RetargetTargetKind::Surface, completion
   );
-  if (session_status != MLN_STATUS_OK) {
-    return session_status;
+  if (submission_status != MLN_STATUS_OK) {
+    return submission_status;
   }
   const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  return surface_session_set_target(
-    session, descriptor->extent,
-    [descriptor](mln_render_session_object& target_session) -> mln_status {
-      return target_session.surface.backend->set_vulkan_target(*descriptor);
-    }
+  const auto copied = *descriptor;
+  return enqueue_driver_operation(
+    session,
+    [copied](mln_render_session_object& target) {
+      // set_vulkan_target() runs the handle checks itself.
+      return surface_session_set_target(
+        target.self, copied.extent, [&copied](mln_render_session_object& live) {
+          return live.surface.backend->set_vulkan_target(copied);
+        }
+      );
+    },
+    completion,
+    valueless_completion<&mln_render_session_set_vulkan_surface_target>()
   );
 }
 

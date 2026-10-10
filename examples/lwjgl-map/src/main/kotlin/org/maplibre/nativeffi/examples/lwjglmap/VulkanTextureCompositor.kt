@@ -88,7 +88,8 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
           imageIndex,
         )
       if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
-        // The surface outgrew this swapchain, so nothing reaches the screen until it is replaced.
+        // The surface outgrew this swapchain, so nothing reaches the screen until it is
+        // replaced.
         swapchainStale = true
         return@use false
       }
@@ -115,7 +116,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
    * MoltenVK presents succeed but reach no drawable the window shows.
    */
   private fun recreateSwapchain() {
-    context.waitIdle()
+    context.waitQueueIdle()
     val retiredSwapchain = swapchain
     val retiredImageViews = imageViews
     val retiredFramebuffers = framebuffers
@@ -660,7 +661,10 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         .pWaitDstStageMask(waitStages)
         .pCommandBuffers(stack.pointers(commandBuffer()))
         .pSignalSemaphores(stack.longs(renderFinished[imageIndex]))
-    check(vkQueueSubmit(context.graphicsQueue(), submitInfo, inFlight), "vkQueueSubmit")
+    check(
+      context.withQueue { vkQueueSubmit(context.graphicsQueue(), submitInfo, inFlight) },
+      "vkQueueSubmit",
+    )
   }
 
   /** Presents the acquired image, reporting whether it reached the screen. */
@@ -673,7 +677,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
         .swapchainCount(1)
         .pSwapchains(stack.longs(swapchain))
         .pImageIndices(indices)
-    val status = vkQueuePresentKHR(context.graphicsQueue(), presentInfo)
+    val status = context.withQueue { vkQueuePresentKHR(context.graphicsQueue(), presentInfo) }
     if (status == VK_SUBOPTIMAL_KHR || status == VK_ERROR_OUT_OF_DATE_KHR) {
       // A suboptimal frame reached the screen and an out-of-date one did not; either way the
       // surface has moved on.
@@ -682,7 +686,6 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
     if (status != VK_SUCCESS && status != VK_SUBOPTIMAL_KHR && status != VK_ERROR_OUT_OF_DATE_KHR) {
       error("vkQueuePresentKHR failed with Vulkan status $status")
     }
-    check(vkQueueWaitIdle(context.graphicsQueue()), "vkQueueWaitIdle")
     return status != VK_ERROR_OUT_OF_DATE_KHR
   }
 
@@ -715,7 +718,7 @@ internal class VulkanTextureCompositor(private val context: VulkanContext, viewp
   }
 
   override fun close() {
-    context.waitIdle()
+    context.waitQueueIdle()
     if (inFlight != NULL) {
       vkDestroyFence(context.device(), inFlight, null)
       inFlight = NULL

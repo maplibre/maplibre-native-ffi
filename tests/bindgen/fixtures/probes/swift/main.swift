@@ -1,0 +1,113 @@
+import Foundation
+
+func check(
+  _ condition: Bool,
+  _ message: @autoclosure () -> String,
+  line: Int = #line
+) {
+  if !condition {
+    FileHandle.standardError.write(Data("line \(line): \(message())\n".utf8))
+    exit(1)
+  }
+}
+
+// A library that reports another C ABI version fails the program's first call
+// before it reaches C. The call takes only scalars, so no value's default reads
+// a native struct first.
+if ProcessInfo.processInfo.environment["MLN_PROBE_C_VERSION"] != nil {
+  do {
+    _ = try Maplibre.keywordCombine(defer: 1, self: 1, raw: 1, bindingArg0: 1)
+    check(false, "a mismatched C ABI version was not reported")
+  } catch let error as MaplibreError {
+    check(error.kind == .abiVersionMismatch, "ABI mismatch: \(error)")
+  }
+  exit(0)
+}
+
+// A record built from its initializer defaults equals the native default,
+// including a nested record that has no default function of its own.
+try Maplibre.probeSettingsCheck(settings: ProbeSettings())
+try Maplibre.probeSettingsCheck(settings: ProbeSettings(extent: ProbeExtent()))
+
+let point = ProbePoint(type: 9.5, gain: 3.25)
+let input = ProbeOptions(
+  title: "",
+  point: point,
+  left: [point],
+  right: [point, point]
+)
+let output = try Maplibre.probeRoundtrip(input: input)
+check(output == input, "round trip: \(output)")
+try check(
+  Maplibre.probeRoundtrip(input: ProbeOptions(left: [])).left == [],
+  "present empty array"
+)
+try check(
+  Maplibre.probeRoundtrip(input: ProbeOptions()) == ProbeOptions(),
+  "absent fields"
+)
+for text in [nil, "", "text"] as [String?] {
+  let result = try Maplibre.probeNullableText(text: text)
+  check(
+    result.text == text,
+    "nullable text \(String(describing: text)): \(result)"
+  )
+}
+
+let entry = try Maplibre.keywordCombine(
+  defer: 5,
+  self: 2,
+  raw: 7,
+  bindingArg0: 11
+)
+check(
+  entry == KeywordEntry(type: 3, defer: 7, raw: 11),
+  "keyword parameters: \(entry)"
+)
+/// A copy of a native default keeps its values and leaves a registration unset.
+let hooks = ProbeHooks.default
+check(
+  hooks.limit == 4 && hooks.signal.callback == nil,
+  "hooks default: \(hooks)"
+)
+do {
+  _ = try Maplibre.probeRoundtrip(input: ProbeOptions(right: Array(
+    repeating: point,
+    count: 9
+  )))
+  check(false, "native failure was not reported")
+} catch let error as MaplibreError {
+  check(
+    error.kind == .invalidArgument && error.rawStatus == -1,
+    "status: \(error)"
+  )
+  check(
+    error.diagnostic == "right holds more than 8 points",
+    "diagnostic: \(error)"
+  )
+}
+
+// A status that the C API declares as absence returns nil, and any other
+// failure still reports its diagnostic.
+try check(Maplibre.probeTakeParcel() == nil, "absent parcel")
+let parcel = try Maplibre.probeTakeParcel()
+check(parcel?.id == 42, "published parcel: \(String(describing: parcel))")
+try parcel?.close()
+do {
+  _ = try Maplibre.probeTakeParcel()
+  check(false, "an exhausted parcel was not reported")
+} catch let error as MaplibreError {
+  check(
+    error.kind == .invalidArgument && error.diagnostic == "exhausted",
+    "exhausted parcel: \(error)"
+  )
+}
+
+// A strided view decodes each plain record at the stride native reports.
+let ledger = try Maplibre.probeLedgerOpen()
+let readings = try ledger.get().readings.map(\.value)
+check(readings == [7, 9], "strided readings: \(readings)")
+try ledger.close()
+
+try check(Maplibre.probeReadLevel() == nil, "absent level")
+try check(Maplibre.probeReadLevel() == 0.5, "published level")

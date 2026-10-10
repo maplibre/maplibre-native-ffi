@@ -1,4 +1,4 @@
 #include "../../../../../include/maplibre_native_c.h"
-// Layer plugin registration stays outside the umbrella header; the raw C
-// layer exposes it here. See include/maplibre_native_c/plugin.h.
+// The layer plugin header sits outside the umbrella header, and the generated
+// code calls it.
 #include "../../../../../include/maplibre_native_c/plugin.h"

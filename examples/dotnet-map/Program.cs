@@ -1,6 +1,4 @@
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Log;
-using Maplibre.NativeFfi.Render;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
@@ -22,7 +20,7 @@ internal static class Program
         try
         {
             Maplibre.LoadNativeLibrary();
-            var backends = Maplibre.SupportedRenderBackends();
+            var backends = Maplibre.SupportedRenderBackendMask();
             Console.WriteLine($"native render backends: {backends}");
             if (!SupportsUsableBackend(backends))
             {
@@ -32,19 +30,17 @@ internal static class Program
                 return 1;
             }
 
-            Maplibre.SetAsyncLogSeverities(LogSeverityMask.All);
-            Maplibre.SetLogCallback(PrintNativeLog);
+            Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.All);
+            Maplibre.LogSetCallback(new LogHandler(PrintNativeLog));
             try
             {
-                Shell.Run(parseResult.Mode.Value, backends);
+                return Shell.Run(parseResult.Mode.Value, backends, parseResult.Smoke) ? 0 : 1;
             }
             finally
             {
-                Maplibre.ClearLogCallback();
-                Maplibre.RestoreDefaultAsyncLogSeverities();
+                Maplibre.LogClearCallback();
+                Maplibre.LogSetAsyncSeverityMask(LogSeverityMask.Default);
             }
-
-            return 0;
         }
         catch (Exception error)
         {
@@ -58,23 +54,23 @@ internal static class Program
         if (args is ["--help"])
         {
             PrintUsage(Console.Out);
-            return new ParseResult(null, ShowedHelp: true);
+            return new ParseResult(null, ShowedHelp: true, Smoke: false);
         }
 
         if (args.Length != 1 || args[0].StartsWith("-", StringComparison.Ordinal))
         {
             PrintUsage(Console.Error);
-            return new ParseResult(null, ShowedHelp: false);
+            return new ParseResult(null, ShowedHelp: false, Smoke: false);
         }
 
         if (RenderTargetMode.TryParse(args[0], out var mode))
         {
-            return new ParseResult(mode, ShowedHelp: false);
+            return new ParseResult(mode, ShowedHelp: false, SmokeMode());
         }
 
         Console.Error.WriteLine($"Unknown render target mode: {args[0]}");
         PrintUsage(Console.Error);
-        return new ParseResult(null, ShowedHelp: false);
+        return new ParseResult(null, ShowedHelp: false, Smoke: false);
     }
 
     private static void PrintUsage(TextWriter writer)
@@ -87,20 +83,30 @@ internal static class Program
         writer.WriteLine("  native-surface    native surface render target");
     }
 
-    private static bool SupportsUsableBackend(RenderBackend backends)
+    /// <summary>
+    /// Whether <c>MLN_EXAMPLE_SMOKE=1</c> selects a smoke run, which renders one frame in a
+    /// hidden window and exits.
+    /// </summary>
+    private static bool SmokeMode() =>
+        Environment.GetEnvironmentVariable("MLN_EXAMPLE_SMOKE") == "1";
+
+    private static bool SupportsUsableBackend(RenderBackendFlag backends)
     {
-        return backends.HasFlag(RenderBackend.Metal)
-            || backends.HasFlag(RenderBackend.OpenGL)
-            || backends.HasFlag(RenderBackend.Vulkan);
+        return backends.HasFlag(RenderBackendFlag.Metal)
+            || backends.HasFlag(RenderBackendFlag.Opengl)
+            || backends.HasFlag(RenderBackendFlag.Vulkan);
     }
 
-    private static bool PrintNativeLog(LogRecord record)
+    private static uint PrintNativeLog(
+        LogSeverity severity,
+        LogEvent logEvent,
+        long code,
+        string message
+    )
     {
-        Console.Error.WriteLine(
-            $"MapLibre {record.Severity} {record.Event} {record.Code}: {record.Message}"
-        );
-        return true;
+        Console.Error.WriteLine($"MapLibre {severity} {logEvent} {code}: {message}");
+        return 1;
     }
 
-    private sealed record ParseResult(RenderTargetMode? Mode, bool ShowedHelp);
+    private sealed record ParseResult(RenderTargetMode? Mode, bool ShowedHelp, bool Smoke);
 }

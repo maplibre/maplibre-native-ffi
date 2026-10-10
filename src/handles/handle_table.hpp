@@ -1,11 +1,14 @@
 #pragma once
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <utility>
 #include <vector>
+
+#include "maplibre_native_c/base.h"
 
 namespace mln::core {
 
@@ -23,16 +26,11 @@ enum class HandleKind : std::uint8_t {
   Map = 2,
   MapProjection = 3,
   RenderSession = 4,
-  OfflineRegionSnapshot = 5,
-  OfflineRegionList = 6,
-  Buffer = 7,
-  StyleIdList = 8,
-  WakeSource = 11,
   ResourceRequest = 12,
-  StyleStringList = 13,
-  GeoJsonSourceData = 14,
-  QueriedFeatureList = 15,
-  StyleLayerList = 16,
+  EventBatch = 16,
+  AcquiredFrame = 20,
+  RenderFrameBatch = 21,
+  GeoJsonSourceData = 22,
 };
 
 inline constexpr auto handle_generation_bits = std::uint32_t{36};
@@ -68,28 +66,49 @@ inline constexpr auto handle_max_index =
   return handle & handle_max_generation;
 }
 
-// Why a handle did not resolve. Every fault reports
-// MLN_STATUS_INVALID_ARGUMENT; the distinction appears only in the message.
+// Why a handle did not resolve.
 enum class HandleFault : std::uint8_t {
+  // The null handle.
   Null,
+  // A value whose kind bits name no handle type.
   NotAHandle,
+  // A handle of another type.
   WrongKind,
+  // A value of the right type that this process never issued.
   Unknown,
+  // A handle this process issued whose object has since been released.
   Stale,
 };
+
+// The status a fault reports. A stale handle once named a live object, so the
+// call is out of order with that object's lifetime and reports
+// MLN_STATUS_INVALID_STATE. Every other fault is a bad argument and reports
+// MLN_STATUS_INVALID_ARGUMENT.
+[[nodiscard]] constexpr auto handle_fault_status(HandleFault fault) noexcept
+  -> mln_status {
+  return fault == HandleFault::Stale ? MLN_STATUS_INVALID_STATE
+                                     : MLN_STATUS_INVALID_ARGUMENT;
+}
 
 // Returns the C typedef name for a kind, or nullptr for an unregistered kind.
 [[nodiscard]] auto handle_kind_name(std::uint8_t kind) noexcept -> const char*;
 
-// Records the thread-local diagnostic for a handle that failed to resolve.
-auto set_handle_fault_error(
+// Records the thread-local diagnostic and status for a handle that failed to
+// resolve, and returns that status. An owner that retires a handle's object
+// before the table does, such as a disposal in progress, reports the handle
+// through this with HandleFault::Stale.
+auto report_handle_fault(
   HandleKind expected, std::uint64_t handle, HandleFault fault
-) noexcept -> void;
+) noexcept -> mln_status;
 
-// `index_in_range` reports whether the handle's index fell within the table's
-// high-water mark.
+// Returns the status of the handle fault this thread recorded last. A caller
+// returns it straight after resolve(), lease(), or report_handle_fault()
+// fails, so the status matches the diagnostic that failure recorded.
+[[nodiscard]] auto recorded_handle_fault_status() noexcept -> mln_status;
+
+// `issued` reports whether the table issued this handle's value at some point.
 [[nodiscard]] auto classify_handle_fault(
-  HandleKind expected, std::uint64_t handle, bool index_in_range
+  HandleKind expected, std::uint64_t handle, bool issued
 ) noexcept -> HandleFault;
 
 // Declared once per handle object type, next to that type's definition.
@@ -139,13 +158,20 @@ class HandleTable {
     if (slots_.size() > handle_max_index) {
       throw HandleTableExhausted{"handle table is full"};
     }
+    // Reserve recycling capacity before publishing ownership. Retiring any
+    // existing handle can then return its slot without allocating.
+    if (free_indices_.capacity() < slots_.size() + 1) {
+      free_indices_.reserve(
+        std::max(slots_.size() + 1, free_indices_.capacity() * 2)
+      );
+    }
     const auto index = static_cast<std::uint64_t>(slots_.size());
     slots_.push_back(Slot{.generation = 1, .object = std::move(object)});
     return encode_handle(Traits::kind, index, 1);
   }
 
   // Borrows the object a handle names, or returns nullptr after recording the
-  // thread-local diagnostic.
+  // thread-local diagnostic and status.
   //
   // The returned pointer outlives this call's lock, so the caller must be on a
   // thread that cannot concurrently retire the handle. A foreign thread holds
@@ -158,7 +184,9 @@ class HandleTable {
   [[nodiscard]] auto resolve_locked(std::uint64_t handle) const -> Object* {
     auto* object = try_resolve_locked(handle);
     if (object == nullptr) {
-      set_handle_fault_error(Traits::kind, handle, fault_for(handle));
+      static_cast<void>(
+        report_handle_fault(Traits::kind, handle, fault_for(handle))
+      );
     }
     return object;
   }
@@ -185,9 +213,19 @@ class HandleTable {
     requires(Traits::leasable)
   {
     const std::scoped_lock lock(mutex_);
+    return lease_locked(handle);
+  }
+
+  // The same lease for a caller that already holds mutex().
+  [[nodiscard]] auto lease_locked(std::uint64_t handle) const
+    -> std::shared_ptr<Object>
+    requires(Traits::leasable)
+  {
     const auto* slot = find_slot(handle);
     if (slot == nullptr) {
-      set_handle_fault_error(Traits::kind, handle, fault_for(handle));
+      static_cast<void>(
+        report_handle_fault(Traits::kind, handle, fault_for(handle))
+      );
       return nullptr;
     }
     return slot->object;
@@ -218,16 +256,19 @@ class HandleTable {
     auto& slot = slots_[index];
     auto object = std::move(slot.object);
     slot.object.reset();
-    if (slot.generation < handle_max_generation) {
-      ++slot.generation;
-      free_indices_.push_back(static_cast<std::uint32_t>(index));
-    }
+    ++slot.generation;
     // A slot whose generation is exhausted is retired instead of recycled, so
     // a handle value is never reused.
+    if (slot.generation <= handle_max_generation) {
+      free_indices_.push_back(static_cast<std::uint32_t>(index));
+    }
     return object;
   }
 
  private:
+  // `generation` is the one the slot issues next, or the one it issued last
+  // while `object` is set. Every lower generation was issued and retired. A
+  // retired slot's generation exceeds handle_max_generation.
   struct Slot {
     std::uint64_t generation = 1;
     std::shared_ptr<Object> object;
@@ -253,9 +294,11 @@ class HandleTable {
 
   [[nodiscard]] auto fault_for(std::uint64_t handle) const noexcept
     -> HandleFault {
-    return classify_handle_fault(
-      Traits::kind, handle, handle_index_of(handle) < slots_.size()
-    );
+    const auto index = handle_index_of(handle);
+    const auto generation = handle_generation_of(handle);
+    const auto issued = index < slots_.size() && generation != 0 &&
+                        generation < slots_[index].generation;
+    return classify_handle_fault(Traits::kind, handle, issued);
   }
 
   mutable std::mutex mutex_;

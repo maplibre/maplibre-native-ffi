@@ -1,0 +1,54 @@
+# Maps each case in cases.toml to the zig test that covers it:
+#   "ID" = "path/to/test_file::test_name"
+# or to why it does not apply:
+#   "ID" = { na = "reason" }
+
+[cases]
+"ERR-01" = "bindings/zig/src/status.zig::statuses map both ways, keep an unknown code, and carry the diagnostic"
+"ERR-02" = "bindings/zig/src/status.zig::ABI version validation reports mismatch diagnostics"
+"ERR-03" = "bindings/zig/tests/rendering.zig::a drain before any demand returns no batch"
+"LIFE-01" = "bindings/zig/tests/lifecycle.zig::copied handles share one close and close twice safely"
+"LIFE-02" = "bindings/zig/tests/lifecycle.zig::a refused close leaves the handle usable and a later close succeeds"
+"LIFE-03" = "bindings/zig/src/owner.zig::a borrow on another thread holds off disposal until it ends"
+# Zig has no garbage collector, so `deinit` is an explicit abandonment rather
+# than a leak, and the binding has no leak to report. The test covers the
+# disposal off the callback stack.
+"LIFE-04" = "bindings/zig/src/owner.zig::an owner abandoned inside a callback scope disposes off the callback stack"
+"LIFE-05" = "bindings/zig/tests/lifecycle.zig::a child map keeps its disposed runtime's callbacks alive"
+# A Zig conversion runs in the completion callback and disposes what it built,
+# so a value that fails to convert never reaches the future; the test covers
+# the error it reports instead.
+"COMP-01" = "bindings/zig/src/completion.zig::a completion delivers once, and a value that fails to convert reports the error once"
+"COMP-02" = "bindings/zig/src/completion.zig::a refused submission frees the future and its copy context"
+"COMP-03" = "bindings/zig/tests/lifecycle.zig::discarding a creation future retires the map it creates"
+"COMP-04" = "bindings/zig/tests/diagnostics.zig::a failed command arrives as data and fills the wait's diagnostic"
+"COMP-05" = "bindings/zig/src/completion.zig::a pending future polls without blocking and deinit abandons it"
+"CB-01" = "bindings/zig/tests/callbacks.zig::a callback registration is rooted until native releases it"
+"CB-02" = { na = "Zig has no garbage collector: a callback's context is a caller-owned pointer that the binding never retains, so no registration can keep a receiver alive" }
+"CB-03" = "bindings/zig/tests/generated_workflows.zig::generated provider inline completion and close retain decision ownership"
+"CB-04" = "bindings/zig/tests/callbacks.zig::an error returned by a resource provider is contained and reported"
+"CB-05" = "bindings/zig/tests/callbacks.zig::a decision handle answers its request later from another thread"
+"CB-06" = "bindings/zig/tests/callbacks.zig::a scoped response rejects use after its callback and from another thread"
+"CB-07" = "bindings/zig/tests/callbacks.zig::replacing the process-global log callback releases the previous one"
+"CB-08" = "bindings/zig/tests/callbacks.zig::a registration that reports cancellation is never rooted"
+"CB-09" = "bindings/zig/tests/callbacks.zig::a camera end handler inside a command is released after it runs"
+"VAL-01" = "bindings/zig/tests/values.zig::strings cross as terminated and explicit-length views"
+"VAL-02" = "bindings/zig/tests/values.zig::optional fields and masks round-trip through presence bits"
+"VAL-03" = "bindings/zig/tests/values.zig::a strided event batch with an unknown payload arm decodes without loss"
+"VAL-04" = "bindings/zig/tests/values.zig::open enums keep unknown values and 64-bit carriers round-trip"
+"VAL-05" = "bindings/zig/tests/values.zig::an array input is copied at submission"
+"VAL-06" = "bindings/zig/tests/values.zig::a record built from its field defaults equals the native default"
+"VAL-07" = "bindings/zig/src/call.zig::an array completion is read at its value_size"
+"VIEW-01" = "bindings/zig/tests/rendering.zig::a scoped frame view holds its frame until the scope returns"
+"REND-01" = "bindings/zig/tests/rendering.zig::an owned-texture session renders a frame that reads back as pixels"
+"REND-02" = "bindings/zig/tests/rendering.zig::a caller-driven session is serviced from a thread the test spawns"
+"PLAT-01" = "bindings/zig/tests/main.zig::package validates the supported C ABI version"
+# build.zig runs the probe with the suite, on every target that runs it, and
+# fails the step on a nonzero exit.
+"PLAT-02" = "bindings/zig/tests/shutdown_probe.zig::pub fn main"
+"PLAT-03" = { na = "Zig has no garbage collector or cycle collector; a handle is released by an explicit close or deinit, which LIFE-01 and LIFE-04 cover" }
+# `mise run //examples/zig-map:smoke [preset]` renders one frame in each render
+# target mode in a hidden window, and `mise run //examples/zig-readback:smoke
+# [preset]` renders and reads back one still image; both load an inline style
+# when MLN_EXAMPLE_SMOKE=1 and exit 0.
+"EX-01" = "examples/zig-map/main.zig::isSmokeRun"

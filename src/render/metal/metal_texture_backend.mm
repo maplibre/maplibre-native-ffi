@@ -1,15 +1,18 @@
 #include <memory>
+#include <utility>
+#include <vector>
+
+#include <mln/gfx/backend_scope.hpp>
+#include <mln/gfx/offscreen_texture.hpp>
+#include <mln/mtl/context.hpp>
+#include <mln/mtl/renderable_resource.hpp>
+#include <mln/mtl/texture2d.hpp>
 
 #include <Metal/MTLBlitPass.hpp>
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLRenderPass.hpp>
 #include <TargetConditionals.h>
-#include <mln/gfx/backend_scope.hpp>
-#include <mln/gfx/offscreen_texture.hpp>
-#include <mln/mtl/context.hpp>
-#include <mln/mtl/renderable_resource.hpp>
-#include <mln/mtl/texture2d.hpp>
 
 #include "render/metal/metal_texture_backend.inc"
 
@@ -205,28 +208,31 @@ class MetalTextureBackend::MetalTextureRenderableResource final
 };
 
 MetalTextureBackend::MetalTextureBackend(
-  MTL::Device* host_device, mln::Size size
+  MTL::Device* host_device, mln::Size size, std::size_t ring_depth
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
-      mln::gfx::HeadlessBackend(size) {
+      mln::gfx::HeadlessBackend(size),
+      ring_(ring_depth) {
   device = NS::RetainPtr(host_device);
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
 
 MetalTextureBackend::MetalTextureBackend(
-  MTL::Texture* borrowed_texture, mln::Size size
+  std::vector<MTL::Texture*> borrowed_textures, mln::Size size
 )
     : mln::mtl::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
-      borrowed_texture_(borrowed_texture),
-      borrowed_pixel_format_(borrowed_texture->pixelFormat()) {
-  device = NS::RetainPtr(borrowed_texture->device());
+      borrowed_textures_(std::move(borrowed_textures)),
+      borrowed_pixel_format_(borrowed_textures_.front()->pixelFormat()),
+      ring_(borrowed_textures_.size()) {
+  device = NS::RetainPtr(borrowed_textures_.front()->device());
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
 
 MetalTextureBackend::~MetalTextureBackend() {
   auto guard = mln::gfx::BackendScope{*this};
   resource.reset();
+  ring_.clear();
   context.reset();
 }
 
@@ -236,13 +242,20 @@ auto MetalTextureBackend::getDefaultRenderable() -> mln::gfx::Renderable& {
       // MetalTextureBackend always creates a Metal context.
       // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
       *this, static_cast<mln::mtl::Context&>(getContext()), getSize(),
-      borrowed_texture_
+      borrowed_textures_.empty() ? nullptr
+                                 : borrowed_textures_[ring_.selected()]
     );
+    // Recorded with the resource it describes, so a slot that keeps an older
+    // resource keeps the size that resource was built for.
+    ring_.record_size(getSize());
   }
   return *this;
 }
 
 auto MetalTextureBackend::readStillImage() -> mln::PremultipliedImage {
+  // A render that aborted before it asked for the renderable leaves no
+  // resource behind, so build it here rather than dereference nothing.
+  getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().readStillImage();
 }
 
@@ -257,6 +270,14 @@ void MetalTextureBackend::deactivate() {}
 auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   getDefaultRenderable();
   return getResource<MetalTextureRenderableResource>().metal_texture();
+}
+
+auto MetalTextureBackend::select_slot(std::size_t slot) -> bool {
+  return ring_.select(slot, getSize(), resource);
+}
+
+void MetalTextureBackend::set_ring_size(mln::Size new_size) {
+  setRenderableSize(new_size);
 }
 
 auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
@@ -275,17 +296,19 @@ auto MetalTextureBackend::has_borrowed_pixel_format(
   return format == borrowed_pixel_format_;
 }
 
-void MetalTextureBackend::set_borrowed_texture(
-  MTL::Texture* texture, mln::Size new_size
+void MetalTextureBackend::set_borrowed_textures(
+  std::vector<MTL::Texture*> textures, mln::Size new_size
 ) {
-  borrowed_texture_ = texture;
+  borrowed_textures_ = std::move(textures);
   setRenderableSize(new_size);
-  // Drop the renderable rather than patch it: its depth and stencil textures
-  // are sized with the color attachment, and any command buffer in hand was
-  // opened against the texture being replaced.
+  // Drop every slot's renderable rather than patch it: its depth and stencil
+  // textures are sized with the color attachment, and any command buffer in
+  // hand was opened against the texture being replaced. Each slot rebuilds
+  // over its new texture when it is next selected.
   {
     auto guard = mln::gfx::BackendScope{*this};
     resource.reset();
+    ring_.reset(borrowed_textures_.size());
   }
 }
 

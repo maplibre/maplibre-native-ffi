@@ -422,8 +422,10 @@ class HTTPRequest : public AsyncRequest {
   std::unique_ptr<RustHttpRequestHandle> handle;
 };
 
-thread_local std::vector<std::pair<std::string, std::string>>
-  HTTPRequest::header_storage;
+// Each thread's storage is freed when the thread ends; see
+// mln_ffi_no_static_destructors_option.
+[[clang::always_destroy]] thread_local std::vector<
+  std::pair<std::string, std::string>> HTTPRequest::header_storage;
 
 HTTPFileSource::HTTPFileSource(
   const ResourceOptions& resourceOptions, const ClientOptions& clientOptions

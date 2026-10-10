@@ -14,9 +14,11 @@ A rendered feature query finds features in the last frame at a screen position.
 Use it for hit testing. To read source features that no layer draws, use
 [Query a source](/maplibre-native-ffi/guides/query-a-source/).
 
-A rendered query belongs to the render session and runs on the session's owner
-thread. It reads the last frame that the session drew. A query before the first
-render update reports an invalid-state status.
+A rendered query belongs to the render session and is an asynchronous call that
+may start from any thread. The selected driver executes it after preceding
+render work. A caller driver therefore needs graphics-thread service while the
+completion is pending. A query before the first rendered frame reports invalid
+state.
 
 The query uses the last frame that the session drew. Render after a camera move
 or style change when the result must match the new state. A query finds features

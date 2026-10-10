@@ -2,6 +2,8 @@
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 
+#include <cstdint>
+
 #include <EGL/egl.h>
 
 #include "maplibre_native_c/render_target.h"
@@ -10,8 +12,9 @@ namespace mln::core::opengl {
 
 class EglSharedContext final {
  public:
+  // ownership holds one mln_opengl_context_ownership value.
   EglSharedContext(
-    mln_egl_context_descriptor descriptor, mln_opengl_context_ownership
+    mln_egl_context_descriptor descriptor, std::uint32_t ownership
   );
   EglSharedContext(const EglSharedContext&) = delete;
   auto operator=(const EglSharedContext&) -> EglSharedContext& = delete;
@@ -43,7 +46,7 @@ class EglSharedContext final {
   void destroy();
 
   mln_egl_context_descriptor descriptor_{};
-  mln_opengl_context_ownership ownership_ = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED;
+  std::uint32_t ownership_ = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED;
   EGLContext context_ = EGL_NO_CONTEXT;
   EGLSurface pbuffer_surface_ = EGL_NO_SURFACE;
   EGLDisplay previous_display_ = EGL_NO_DISPLAY;

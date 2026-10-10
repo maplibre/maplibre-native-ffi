@@ -34,7 +34,7 @@ description = "Generate pdoc HTML API reference for the Python binding."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":_install-extension", args = ["{{usage.preset}}"] }]
 # Pass public submodules explicitly: package __all__ is a reexport list, so
-# pdoc's walker would otherwise omit camera/geo/style/offline/etc. pages.
+# pdoc's walker would otherwise omit the generated API page.
 run = '''
 rm -rf build/pdoc
 mkdir -p build/pdoc

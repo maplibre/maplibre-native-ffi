@@ -1,5 +1,3 @@
-using Maplibre.NativeFfi.Render;
-
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal sealed class MetalTextureCompositor : ITextureCompositor
@@ -12,9 +10,10 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
     private nint commandQueue;
     private nint pipeline;
 
-    public MetalTextureCompositor(MetalContext context)
+    public MetalTextureCompositor(MetalContext context, Viewport viewport)
     {
         this.context = context;
+        context.SetDrawableSize(viewport);
         commandQueue = context.CreateCommandQueue();
         try
         {
@@ -28,12 +27,9 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
         }
     }
 
-    public void Resize(Viewport viewport)
-    {
-        _ = viewport;
-    }
+    public void Resize(Viewport viewport) => context.SetDrawableSize(viewport);
 
-    public bool Draw(MetalOwnedTextureFrame frame)
+    public bool Draw(MetalTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0 || frame.Texture.IsNull)
         {
@@ -49,7 +45,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
     /// Samples the texture into the layer's next drawable. Returns false without presenting while
     /// the layer has no drawable, as a minimized or occluded window does.
     /// </summary>
-    public bool DrawTexture(nint texture)
+    private bool DrawTexture(nint texture)
     {
         nint passDescriptor = 0;
         try

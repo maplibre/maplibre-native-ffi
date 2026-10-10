@@ -15,8 +15,6 @@ internal sealed class MetalBorrowedTexture : IDisposable
 
     public NativePointer Pointer => NativePointer.FromBorrowedAddress(texture);
 
-    public nint Texture => texture;
-
     public void Dispose()
     {
         if (texture == 0)

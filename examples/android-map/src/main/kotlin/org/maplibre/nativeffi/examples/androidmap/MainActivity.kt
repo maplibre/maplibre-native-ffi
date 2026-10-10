@@ -4,9 +4,9 @@ import android.app.Activity
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
-import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.MaplibreAndroid
-import org.maplibre.nativeffi.log.LogRecord
+import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogHandler
 
 class MainActivity : Activity() {
   private lateinit var mapView: AndroidMapView
@@ -16,7 +16,11 @@ class MainActivity : Activity() {
     window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     installMaplibreLogging()
     MaplibreAndroid.initialize(this)
-    mapView = AndroidMapView(this)
+    Log.i(TAG, "native render backends: ${GeneratedApi.supportedRenderBackendMask()}")
+    // A smoke launch renders an inline style, so it needs no network, logs its first rendered
+    // frame, and finishes.
+    val smoke = intent.getBooleanExtra(SMOKE_EXTRA, false)
+    mapView = if (smoke) AndroidMapView(this, SMOKE_STYLE, ::finishSmoke) else AndroidMapView(this)
     setContentView(mapView)
   }
 
@@ -32,21 +36,33 @@ class MainActivity : Activity() {
 
   override fun onDestroy() {
     mapView.close()
-    Maplibre.clearLogCallback()
+    GeneratedApi.logClearCallback()
     super.onDestroy()
   }
 
   private fun installMaplibreLogging() {
-    Maplibre.setLogCallback { record: LogRecord ->
-      Log.i(
-        "MapLibre",
-        "severity=${record.severity} event=${record.event} code=${record.code}: ${record.message}",
-      )
-      true
-    }
+    GeneratedApi.logSetCallback(
+      LogHandler { severity, event, code, message ->
+        Log.i("MapLibre", "severity=${severity} event=${event} code=${code}: ${message}")
+        1u
+      }
+    )
+  }
+
+  private var smokeReported = false
+
+  private fun finishSmoke() {
+    if (smokeReported) return
+    smokeReported = true
+    Log.i(TAG, SMOKE_RENDERED)
+    finish()
   }
 
   private companion object {
     private const val TAG = "MapLibreAndroidMap"
+    private const val SMOKE_EXTRA = "smoke"
+    private const val SMOKE_RENDERED = "smoke: rendered a frame"
+    private const val SMOKE_STYLE =
+      """{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#2a6f97"}}]}"""
   }
 }

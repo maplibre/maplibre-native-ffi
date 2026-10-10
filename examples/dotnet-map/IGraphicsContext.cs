@@ -1,10 +1,8 @@
-using Maplibre.NativeFfi.Render;
-
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
 internal interface IGraphicsContext : IDisposable
 {
-    RenderBackend Backend { get; }
+    RenderBackendFlag Backend { get; }
 
     nint WindowHandle { get; }
 
@@ -16,10 +14,6 @@ internal interface IGraphicsContext : IDisposable
 
     Viewport ReadViewport();
 
-    void Resize(Viewport viewport);
-
-    void PollEvents();
-
     void FinishFrame();
 }
 
@@ -29,22 +23,23 @@ internal static class GraphicsContext
         string title,
         int width,
         int height,
-        RenderBackend backends
+        RenderBackendFlag backends,
+        bool visible
     )
     {
-        if (backends.HasFlag(RenderBackend.Metal))
+        if (backends.HasFlag(RenderBackendFlag.Metal))
         {
-            return MetalContext.Create(title, width, height);
+            return MetalContext.Create(title, width, height, visible);
         }
 
-        if (backends.HasFlag(RenderBackend.OpenGL))
+        if (backends.HasFlag(RenderBackendFlag.Opengl))
         {
-            return OpenGLContext.Create(title, width, height);
+            return OpenGLContext.Create(title, width, height, visible);
         }
 
-        if (backends.HasFlag(RenderBackend.Vulkan))
+        if (backends.HasFlag(RenderBackendFlag.Vulkan))
         {
-            return VulkanContext.Create(title, width, height);
+            return VulkanContext.Create(title, width, height, visible);
         }
 
         throw new InvalidOperationException(

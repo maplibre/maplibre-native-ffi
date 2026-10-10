@@ -21,9 +21,12 @@ logger as well. Forward records while validating a new host logger.
 
 <Code code={region(logCallback, "callback")} lang="c" title="log-callback.c" />
 
-One callback serves the whole process rather than one runtime, and MapLibre
-stores it by reference. Install it before the first runtime exists to catch
-setup records, and keep it valid until you replace or clear it.
+One callback serves the whole process rather than one runtime. Install it
+before the first runtime exists to catch setup records. MapLibre copies the
+handler's callback and user data when you install it, so the handler struct is
+needed only for the call. Keep the user data valid until you replace or clear
+the handler. A handler that sets a release function hands the user data to
+MapLibre, which calls that release once the handler is replaced or cleared.
 
 <Code code={region(logCallback, "install")} lang="c" title="log-callback.c" />
 

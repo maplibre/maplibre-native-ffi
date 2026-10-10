@@ -28,21 +28,33 @@ zig build --build-file ../../build.zig \
 
 [tasks.test]
 extends = "ffi:preset"
-# The preset selects the runner: an iOS or tvOS simulator preset spawns the
-# suite on a simulator, and host presets run in process.
+# The preset selects the runner: Android presets use their matching emulator,
+# an iOS or tvOS simulator preset spawns the suite on a simulator, and host
+# presets run in process. Each test gets 30 seconds times MLN_TEST_TIMEOUT_SCALE,
+# which defaults to 3 on emulators and simulators and to 1 on the host; the
+# fixture scales its waits by the same value.
 run = '''
 case "$usage_preset" in
-  android-x64-*)
+  android-* | ios-simulator-* | tvos-simulator-*)
+    export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-3}"
+    ;;
+  *)
+    export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-1}"
+    ;;
+esac
+test_timeout="$((30 * MLN_TEST_TIMEOUT_SCALE))s"
+case "$usage_preset" in
+  android-arm64-* | android-x64-*)
     source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
     exec zig build test --build-file ../../build.zig \
       -Doptimize=ReleaseSafe \
       -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
       -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
       ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
-      --test-timeout 180s --summary all --verbose
+      --test-timeout "$test_timeout" --summary all --verbose
     ;;
   android-*)
-    echo "The Android emulator runs x64 guests only; check $usage_preset with //bindings/zig:build and test an Android x64 preset instead." >&2
+    echo "The Android emulator runs arm64 and x64 guests; check $usage_preset with //bindings/zig:build and test an android-arm64 or android-x64 preset instead." >&2
     exit 2
     ;;
   ios-simulator-*)
@@ -53,7 +65,7 @@ case "$usage_preset" in
       -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
       -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
       ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
-      --test-timeout 120s --summary all --verbose
+      --test-timeout "$test_timeout" --summary all --verbose
     ;;
   tvos-simulator-*)
     source "$MISE_MONOREPO_ROOT/scripts/zig-cross-env.sh" "$usage_preset"
@@ -63,7 +75,7 @@ case "$usage_preset" in
       -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
       -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
       ${zig_cross_args[@]+"${zig_cross_args[@]}"} \
-      --test-timeout 120s --summary all --verbose
+      --test-timeout "$test_timeout" --summary all --verbose
     ;;
   ios-* | tvos-*)
     echo "The Zig binding tests need a runnable target; test an ios-simulator or tvos-simulator preset instead of $usage_preset." >&2
@@ -74,18 +86,19 @@ zig build test --build-file ../../build.zig \
   -Doptimize=ReleaseSafe \
   -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-  --test-timeout 30s \
+  --test-timeout "$test_timeout" \
   --summary all \
   --verbose
 '''
 run_windows = '''
+export MLN_TEST_TIMEOUT_SCALE="${MLN_TEST_TIMEOUT_SCALE:-1}"
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 zig build test --build-file ../../build.zig \
   -Doptimize=ReleaseSafe \
   -Dnative-install-dir="$native_install_dir" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
-  --test-timeout 30s \
+  --test-timeout "$((30 * MLN_TEST_TIMEOUT_SCALE))s" \
   --summary all \
   --verbose
 '''

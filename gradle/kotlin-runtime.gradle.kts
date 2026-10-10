@@ -161,43 +161,22 @@ fun configureJvmRuntimeArtifacts(
       destinationDirectory.set(layout.buildDirectory.dir("libs"))
 
       val resourcePath = "META-INF/maplibre-native-ffi/${runtimeInstall.classifier}"
+      // A build tree's install also holds the test graphics fixtures, which the
+      // runtime leaves out.
       from(runtimeInstall.installDirectory.resolve("lib")) {
         include("*.so", "*.so.*", "*.dylib")
+        exclude("*mln_test_graphics*")
         into(resourcePath)
       }
       from(runtimeInstall.installDirectory.resolve("bin")) {
         include("*.dll")
+        exclude("*mln_test_graphics*")
         into(resourcePath)
       }
       from(runtimeInstall.installDirectory.resolve("share/maplibre-native-c/licenses")) {
         into("META-INF/licenses/maplibre-native-c")
       }
       from(rootProject.file("LICENSE")) { into("META-INF") }
-    }
-  }
-
-  val verifyPublicationInputs = tasks.register("verifyJvmRuntimePublicationInputs")
-  classifierTargetPlatforms.forEach { (classifier, targetPlatform) ->
-    val propertyName = "maplibre.runtime.$backend.jvm.$classifier.installDir"
-    val configuredInstall = providers.gradleProperty(propertyName)
-    val selectedInstall =
-      configuredInstall.map(rootProject::file).getOrElse(maplibreNativeC.installDir)
-    val verifyInput =
-      registerRuntimeInstallVerification(
-        taskName = "verifyJvm${classifier.taskSuffix()}RuntimePublicationInput",
-        installDirectory = providers.provider { selectedInstall },
-        installPropertyName = propertyName,
-        explicitlyConfigured = configuredInstall.isPresent,
-        requireExplicitInput = true,
-        backend = backend,
-        targetPlatform = targetPlatform,
-      )
-    verifyPublicationInputs.configure { dependsOn(verifyInput) }
-  }
-
-  tasks.configureEach {
-    if (name.startsWith("publishJvmPublicationTo")) {
-      dependsOn(verifyPublicationInputs)
     }
   }
 

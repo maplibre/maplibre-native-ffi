@@ -13,31 +13,31 @@ import cameraSnippet from "../../../../snippets/c/camera.c?raw";
 import fitBoundsSnippet from "../../../../snippets/c/camera-fit-bounds.c?raw";
 import gestureSnippet from "../../../../snippets/c/camera-gesture.c?raw";
 
-The camera belongs to the map. A camera call needs a live map and the map's
-owner thread, and it works before any render session exists.
-
-Every command takes the same camera options. Set the fields that you want to
-change, and MapLibre leaves every other field at its current value.
+The camera belongs to the map. Any host thread can submit a camera command while
+the map is live, including before a render session exists. Every command copies
+one atomic camera update: set the fields to change, and MapLibre leaves every
+other field at its committed value.
 
 <Code code={region(cameraSnippet, "camera")} lang="c" title="camera.c" />
 
 ## Choose how the camera moves
 
-Three commands apply that camera, and they differ only in timing.
+One command, `mln_map_update_camera`, applies that camera, and its update mode
+selects the timing.
 
-`mln_map_jump_to` applies the camera immediately. Use it for the first position
+Jump mode applies the camera immediately. Use it for the first position
 of a session, a position restored from saved state, or a camera that the host
 recomputes every frame during a gesture.
 
 <Code code={region(cameraSnippet, "jump")} lang="c" title="camera.c" />
 
-`mln_map_ease_to` interpolates every field that you set along a cubic easing
+Ease mode interpolates every field that you set along a cubic easing
 curve. Use it for a short move that remains easy to follow. A duration of zero,
 the default, applies the camera immediately.
 
 <Code code={region(cameraSnippet, "ease")} lang="c" title="camera.c" />
 
-`mln_map_fly_to` takes the same animation options and follows a curved path. Use
+Fly mode takes the same animation options and follows a curved path. Use
 it for a long move. The zoom decreases through the middle of the transition to
 cross the distance without loading every high-zoom tile between the positions.
 When the duration is absent, MapLibre derives one from the distance and a
@@ -45,45 +45,56 @@ velocity of 1.2 screenfuls per second.
 
 <CameraPaths />
 
-An animated transition advances while the host pumps the runtime and draws
-frames. Its duration uses wall-clock time, but pausing the pump also pauses the
-transition. A host that pumps on demand continues until the transition ends.
-The repaint flag in
+An animated transition advances on the native scheduler while the host draws
+frames. Its duration uses wall-clock time. The repaint flag in
 [Run the render loop](/maplibre-native-ffi/guides/run-the-render-loop/)
 signals that more frames are required.
 
 ## Move by a gesture
 
-The three commands above take a destination. Gestures instead provide relative
+A camera update takes a destination. Gestures instead provide relative
 input: a drag provides a distance, and a pinch provides a scale factor and a
-screen position. Relative moves apply those values to the current camera.
+screen position. A camera delta applies those values to the current camera,
+and one delta can pan, scale, rotate, and tilt in one atomic command.
 
-Set the gesture flag when the interaction starts, and clear it when the
-interaction ends. While the flag is set, a drag across the antimeridian
-continues in the same direction. Cancel a running transition when the gesture
-starts to give the gesture sole control of the camera.
+Submit the begin phase when the interaction starts and the end phase when it
+finishes. While a gesture is open, a drag across the antimeridian continues in
+the same direction, and the map snapshot reports the gesture as in progress.
 
 <Code code={region(gestureSnippet, "bracket")} lang="c" title="camera-gesture.c" />
 
-A drag applies screen-space deltas in logical pixels. Send the movement since
-the last frame rather than a running total, because each call composes with the
-camera it finds.
+A drag applies screen-space deltas in logical pixels, and the map content moves
+with the pointer. Send the movement since the last frame rather than a running
+total, because each delta composes with the camera it finds.
 
 <Code code={region(gestureSnippet, "drag")} lang="c" title="camera-gesture.c" />
 
-A pinch scales about an anchor. The anchor stays under the fingers while the map
-moves around it.
+A pinch pans by the movement of the centroid between the fingers and scales
+about the new centroid. One immediate delta carries both, so the coordinate under
+the fingers follows them and no frame shows the pan without the zoom.
 
 <Code code={region(gestureSnippet, "pinch")} lang="c" title="camera-gesture.c" />
 
-Clear the flag for both completed and cancelled gestures. The animated variants
-continue the gesture's momentum and take the same animation options as an ease.
+A two-finger rotation or tilt changes the bearing and the pitch about the same
+anchor. One delta carries both changes, so no frame shows one without the other.
+
+<Code code={region(gestureSnippet, "rotate")} lang="c" title="camera-gesture.c" />
+
+A delta also carries a gesture phase, so the last delta of a gesture can end it.
+Submit the end phase for a completed gesture and the cancel phase for a
+cancelled one; the cancel phase also stops a running transition. An animated
+delta continues the gesture's momentum and takes the same animation options as
+an ease. A release without momentum submits a delta that selects no fields and
+changes only the phase.
 
 <Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
 
-Call each camera operation on the map's owner thread. When another thread reads
-gestures, send relative deltas to the owner thread. An absolute camera computed
-from an earlier frame can be stale when the owner thread applies it.
+Submit relative gesture deltas instead of a camera computed from an earlier
+snapshot. The scheduler applies each delta atomically to the camera as it stands
+when the delta runs, in runtime submission order. Immediate deltas compose
+exactly, however many are queued. An animated delta replaces the running
+animation of each component that it changes, so submit the next animated delta
+after the previous one finishes.
 
 ## Fit the camera to bounds
 
@@ -94,21 +105,27 @@ viewport, inset by the padding that you pass in logical pixels.
 <Code code={region(fitBoundsSnippet, "padding")} lang="c" title="camera-fit-bounds.c" />
 
 The query reports a camera and leaves the map unchanged. Apply the result with
-the command that provides the required timing.
+the update mode that provides the required timing.
 
 <Code code={region(fitBoundsSnippet, "fit")} lang="c" title="camera-fit-bounds.c" />
 
 ## Know when a transition ends
 
-Set a transition ID on the animation options to identify its completion event.
-The runtime queues one transition-finished event with that value while the map's
-subscription selects that type. The event arrives after completion, replacement
-by another camera command, or cancellation. Drain
-it from the runtime that owns the map, as described in
+Set an end handler on the animation options to learn how the transition ended.
+The handler runs once for each accepted command, on the runtime that owns the
+map, and reports whether the transition completed, was cancelled, or ended
+because the map closed. A transition completes when it reaches its target or
+when a later camera command replaces it.
+
+<Code code={region(cameraSnippet, "end")} lang="c" title="camera.c" />
+
+The handler also reports the generation of the published snapshot that shows
+where the transition left the camera. The map events of that change are queued
+before the handler runs, as described in
 [Handle events](/maplibre-native-ffi/guides/handle-events/).
 
-<Code code={region(cameraSnippet, "finished")} lang="c" title="camera.c" />
+`mln_map_cancel_transitions` stops every running transition. To stop one
+command and leave the others running, give its animation options a transition
+ID and cancel that ID.
 
-The event identifies the transition but has no completion reason. To distinguish
-completion from cancellation, compare the resulting camera with the requested
-camera.
+<Code code={region(cameraSnippet, "cancel")} lang="c" title="camera.c" />

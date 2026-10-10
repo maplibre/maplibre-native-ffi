@@ -1,22 +1,36 @@
 #!/usr/bin/env bash
-# Runs native test executables in the Android emulator, booting it when needed.
+# Runs native test executables on ANDROID_SERIAL or on the emulator that
+# boot-android-emulator.sh starts.
 # Every executable runs and reports its own exit status; the first failure
 # stops the batch.
 set -euo pipefail
 
-if [[ $# -lt 3 ]]; then
-  echo "usage: $0 <timeout-seconds> <native-library> [--api <api>] [test-argument ...] -- <test-executable ...>" >&2
+if [[ $# -lt 4 ]]; then
+  echo "usage: $0 <timeout-seconds> <abi> <native-library> [--api <api>] [--library <shared-library>]... [test-argument ...] -- <test-executable ...>" >&2
   exit 2
 fi
 
 timeout_seconds=$1
-native_library=$2
-shift 2
+abi=$2
+native_library=$3
+shift 3
 emulator_api=
-if [[ ${1:-} == --api ]]; then
-  emulator_api=${2:?--api requires an Android API level}
-  shift 2
-fi
+# Further shared libraries a test executable loads, such as a plugin, travel
+# beside the C API library.
+extra_libraries=()
+while (($#)); do
+  case $1 in
+    --api)
+      emulator_api=${2:?--api requires an Android API level}
+      shift 2
+      ;;
+    --library)
+      extra_libraries+=("${2:?--library requires a shared library}")
+      shift 2
+      ;;
+    *) break ;;
+  esac
+done
 test_arguments=()
 while (($#)) && [[ $1 != -- ]]; do
   test_arguments+=("$1")
@@ -31,14 +45,14 @@ if (($# == 0)); then
 fi
 test_executables=("$@")
 
-serial=emulator-5554
+timeout_scale=${MLN_TEST_TIMEOUT_SCALE:-3}
 remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
 adb="${ANDROID_HOME:?ANDROID_HOME must point at an Android SDK}/platform-tools/adb"
 
-for local_file in "$native_library" "${test_executables[@]}"; do
+for local_file in "$native_library" ${extra_libraries[@]+"${extra_libraries[@]}"} "${test_executables[@]}"; do
   if [[ ! -f "$local_file" ]]; then
-    echo "Android emulator test input does not exist: $local_file" >&2
+    echo "Android test input does not exist: $local_file" >&2
     exit 2
   fi
 done
@@ -51,20 +65,31 @@ if [[ -n "$emulator_api" && ! "$emulator_api" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
-  echo "Android emulator fixture directory does not exist: $fixture_dir" >&2
+  echo "Android fixture directory does not exist: $fixture_dir" >&2
   exit 2
 fi
 
-# platform-tools arrives with the first boot, so a missing adb means boot, not
-# failure.
-if [[ -n "$emulator_api" ]] || [[ ! -x "$adb" ]] ||
-  ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-  tr -d '\r' | grep -qx 1; then
-  emulator_args=(x86_64)
+# An explicit serial selects a connected device; only this checkout's emulator
+# can be booted automatically.
+serial_script="$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh"
+serial=$("$serial_script") || serial=
+if [[ -n "${ANDROID_SERIAL:-}" ]]; then
+  device_abi=$("$adb" -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\r')
+  device_api=$("$adb" -s "$serial" shell getprop ro.build.version.sdk | tr -d '\r')
+  if [[ "$device_abi" != "$abi" ]] ||
+    [[ -n "$emulator_api" && "$device_api" != "$emulator_api" ]]; then
+    echo "Android device $serial has ABI $device_abi and API $device_api; expected $abi ${emulator_api:+at API $emulator_api}." >&2
+    exit 2
+  fi
+elif [[ -n "$emulator_api" || -z "$serial" ]] ||
+  ! "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
+  tr -d '\r' | grep -qx "$abi"; then
+  emulator_args=("$abi")
   if [[ -n "$emulator_api" ]]; then
     emulator_args+=(--api "$emulator_api")
   fi
   mise run //:android-emulator:boot "${emulator_args[@]}"
+  serial=$("$serial_script")
 fi
 
 # The shell user may execute what it owns under /data/local/tmp. The Android
@@ -72,6 +97,9 @@ fi
 # executable is the only one it loads from here.
 "$adb" -s "$serial" shell "rm -rf '$remote_dir' && mkdir -p '$remote_dir/tmp'"
 "$adb" -s "$serial" push "$native_library" "$remote_dir/libmaplibre-native-c.so" >/dev/null
+for library in ${extra_libraries[@]+"${extra_libraries[@]}"}; do
+  "$adb" -s "$serial" push "$library" "$remote_dir/$(basename "$library")" >/dev/null
+done
 
 fixture_environment=
 if [[ -n "$fixture_dir" ]]; then
@@ -80,12 +108,14 @@ if [[ -n "$fixture_dir" ]]; then
 fi
 
 for test_executable in "${test_executables[@]}"; do
-  echo "Running $(basename "$test_executable") in the Android emulator."
+  echo "Running $(basename "$test_executable") on Android device $serial."
   "$adb" -s "$serial" push "$test_executable" "$remote_dir/test-executable" >/dev/null
 
   # Android has no /tmp, which is where a runtime library falls back to when
   # TMPDIR is unset, so a test that asks for a temporary directory gets one here.
-  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
+  # The emulator renders in software, so waits and the native hang watchdog
+  # stretch by the timeout scale.
+  remote_command="cd '$remote_dir' && chmod 755 test-executable && ${fixture_environment}MLN_TEST_TIMEOUT_SCALE='$timeout_scale' TMPDIR='$remote_dir/tmp' LD_LIBRARY_PATH='$remote_dir' ./test-executable"
   for argument in ${test_arguments[@]+"${test_arguments[@]}"}; do
     printf -v quoted_argument '%q' "$argument"
     remote_command+=" $quoted_argument"
@@ -106,7 +136,7 @@ for test_executable in "${test_executables[@]}"; do
     exit "$transport_status"
   fi
   if [[ ! "$test_status" =~ ^[0-9]+$ ]]; then
-    echo "Android emulator test returned no exit status." >&2
+    echo "Android test returned no exit status." >&2
     exit 1
   fi
   if ((test_status != 0)); then

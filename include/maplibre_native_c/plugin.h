@@ -27,6 +27,11 @@
  * The plugin must be built against the same MapLibre Native revision as the
  * library; upstream does not yet promise ABI stability for this API.
  *
+ * Plugin code runs on tile workers and the render thread as part of native
+ * work, so the library's exit gate for host callbacks does not cover it: it
+ * may run while the process exits, after host exit handlers and static
+ * destructors have run. A plugin must not use state that those destroy.
+ *
  * The plugin API declares shaders for the OpenGL, Vulkan, and Metal backends.
  * A WebGPU build registers plugins but has no shader path for their layers.
  */
@@ -51,6 +56,7 @@ extern "C" {
  * shared library, which registers its layer types through the pointer. See
  * the file-top comment for the loading pattern.
  */
+MLN_BINDING("kind=native_pointer;ownership=borrowed;lifetime=process")
 MLN_API mln_plugin_register_function_v1
 mln_plugin_get_register_function_v1(void) MLN_NOEXCEPT;
 

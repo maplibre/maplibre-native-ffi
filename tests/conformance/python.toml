@@ -1,0 +1,45 @@
+# Maps each case in cases.toml to the python test that covers it:
+#   "ID" = "path/to/test_file::test_name"
+# or to why it does not apply:
+#   "ID" = { na = "reason" }
+
+[cases]
+"ERR-01" = "bindings/python/tests/test_errors.py::test_native_statuses_raise_their_exception_with_code_and_diagnostic"
+"ERR-02" = { na = "The extension links the native archive in when the wheel is built, so no other library can load in its place; the import checks the version it linked against" }
+"ERR-03" = "bindings/python/tests/test_render.py::test_a_drain_before_any_demand_returns_none"
+"LIFE-01" = "bindings/python/tests/test_lifecycle.py::test_closing_twice_is_safe_and_a_closed_handle_refuses_use"
+"LIFE-02" = "bindings/python/tests/test_lifecycle.py::test_a_refused_close_leaves_the_handle_usable"
+"LIFE-03" = "bindings/python/tests/test_render.py::test_a_borrow_on_another_thread_holds_off_close"
+"LIFE-04" = "bindings/python/tests/test_lifecycle.py::test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed"
+"LIFE-05" = "bindings/python/tests/test_lifecycle.py::test_a_child_keeps_its_parent_alive"
+"COMP-01" = "bindings/python/tests/test_future.py::test_callbacks_run_once_in_order_and_a_failed_conversion_releases_its_value"
+"COMP-02" = "bindings/python/tests/test_completions.py::test_a_rejected_submission_frees_its_future"
+"COMP-03" = "bindings/python/tests/test_completions.py::test_a_dropped_creation_result_retires_the_map_it_created"
+"COMP-04" = "bindings/python/tests/test_completions.py::test_a_failed_command_resolves_with_its_status"
+"COMP-05" = "bindings/python/tests/test_completions.py::test_cancelling_a_wait_abandons_it_and_releases_the_late_map"
+"CB-01" = "bindings/python/tests/test_callbacks.py::test_a_registration_is_rooted_until_native_releases_it"
+"CB-02" = "bindings/python/tests/test_callbacks.py::test_a_registered_callback_does_not_keep_its_receiver_alive"
+"CB-03" = "bindings/python/tests/test_callbacks.py::test_a_callback_can_make_only_the_calls_its_policy_allows"
+"CB-04" = "bindings/python/tests/test_callbacks.py::test_an_exception_in_a_callback_is_reported_and_contained"
+"CB-05" = "bindings/python/tests/test_callbacks.py::test_a_provider_can_answer_a_request_later_from_another_thread"
+"CB-06" = "bindings/python/tests/test_callbacks.py::test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread"
+"CB-07" = "bindings/python/tests/test_callbacks.py::test_replacing_the_log_callback_releases_the_previous_one"
+"CB-08" = "bindings/python/tests/test_callbacks.py::test_a_registration_reported_as_rejected_is_not_rooted"
+"CB-09" = "bindings/python/tests/test_callbacks.py::test_a_camera_end_handler_is_rooted_until_it_runs"
+"VAL-01" = "bindings/python/tests/test_values.py::test_strings_cross_as_c_strings_and_as_sized_views"
+"VAL-02" = "bindings/python/tests/test_values.py::test_absent_fields_stay_distinct_from_present_values"
+"VAL-03" = "bindings/python/tests/test_values.py::test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native"
+"VAL-04" = "bindings/python/tests/test_values.py::test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip"
+"VAL-05" = "bindings/python/tests/test_values.py::test_an_array_input_is_copied_when_it_is_submitted"
+"VAL-06" = { na = "A value's constructor takes every field, and MapOptions.default() returns a copy of the native default" }
+# The extension reads every strided array, array completions included, through
+# the reader it shares with the Rust binding, so the shared reader's test
+# covers it. The installed wheel offers no seam to deliver a synthetic result.
+"VAL-07" = "bindings/rust/crates/maplibre-native-ffi-core/src/ptr.rs::strided_records_are_read_at_their_stride_and_a_narrower_one_fails"
+"VIEW-01" = "bindings/python/tests/test_render.py::test_a_frame_view_holds_its_owners_until_its_scope_ends"
+"REND-01" = "bindings/python/tests/test_render.py::test_an_owned_texture_renders_pixels_the_binding_reads_back"
+"REND-02" = "bindings/python/tests/test_render.py::test_a_caller_driven_session_is_serviced_from_a_python_thread"
+"PLAT-01" = "bindings/python/tests/test_loader.py::test_the_package_loads_its_extension_and_finds_native_directories_once"
+"PLAT-02" = "bindings/python/tests/test_lifecycle.py::test_interpreter_shutdown_with_live_handles_and_callbacks_exits_cleanly"
+"PLAT-03" = "bindings/python/tests/test_lifecycle.py::test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it"
+"EX-01" = { na = "No example is written in Python" }

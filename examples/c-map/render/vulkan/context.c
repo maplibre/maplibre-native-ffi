@@ -4,6 +4,7 @@
 
 #include "context.h"
 
+#include "../../render_target.h"
 #include "util.h"
 
 static app_error has_instance_extension(const char* name, bool* out_found) {
@@ -198,6 +199,10 @@ static app_error create_device(vulkan_context* context) {
 }
 
 static app_error context_create(vulkan_context* context, SDL_Window* window) {
+  context->queue_mutex = SDL_CreateMutex();
+  if (context->queue_mutex == nullptr) {
+    return APP_ERROR_BACKEND_SETUP_FAILED;
+  }
   MAP_TRY(create_instance(context));
   MAP_TRY(expect_sdl(SDL_Vulkan_CreateSurface(
     window, context->instance, nullptr, &context->surface
@@ -216,20 +221,41 @@ app_error vulkan_context_init(vulkan_context* context, SDL_Window* window) {
 }
 
 void vulkan_context_deinit(vulkan_context* context) {
-  if (context->device != VK_NULL_HANDLE) {
-    vkDestroyDevice(context->device, nullptr);
+  // Objects that an abandoned session kept are children of the device and the
+  // surface, which then stay until the process exits, as does their instance.
+  if (!render_session_graphics_kept()) {
+    if (context->device != VK_NULL_HANDLE) {
+      vkDestroyDevice(context->device, nullptr);
+    }
+    if (context->surface != VK_NULL_HANDLE) {
+      SDL_Vulkan_DestroySurface(context->instance, context->surface, nullptr);
+    }
+    if (context->instance != VK_NULL_HANDLE) {
+      vkDestroyInstance(context->instance, nullptr);
+    }
   }
-  if (context->surface != VK_NULL_HANDLE) {
-    SDL_Vulkan_DestroySurface(context->instance, context->surface, nullptr);
-  }
-  if (context->instance != VK_NULL_HANDLE) {
-    vkDestroyInstance(context->instance, nullptr);
+  if (context->queue_mutex != nullptr) {
+    SDL_DestroyMutex(context->queue_mutex);
   }
   *context = (vulkan_context){};
 }
 
 void vulkan_context_wait_idle(vulkan_context* context) {
   if (context->device != VK_NULL_HANDLE) {
+    SDL_LockMutex(context->queue_mutex);
     vkDeviceWaitIdle(context->device);
+    SDL_UnlockMutex(context->queue_mutex);
   }
+}
+
+static void lock_queue(void* user_data) { SDL_LockMutex(user_data); }
+
+static void unlock_queue(void* user_data) { SDL_UnlockMutex(user_data); }
+
+mln_queue_lock vulkan_context_queue_lock(const vulkan_context* context) {
+  return (mln_queue_lock){
+    .lock = lock_queue,
+    .unlock = unlock_queue,
+    .user_data = context->queue_mutex,
+  };
 }

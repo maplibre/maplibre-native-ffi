@@ -1,109 +1,44 @@
 package org.maplibre.nativeffi.resource
 
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.concurrent.thread
 import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreStatus
-import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import kotlinx.coroutines.CompletableDeferred
+import org.maplibre.nativeffi.TestWeakReference
+import org.maplibre.nativeffi.awaitCollected
+import org.maplibre.nativeffi.awaitWithin
+import org.maplibre.nativeffi.denyingProvider
+import org.maplibre.nativeffi.generated.ResourceProviderDecision
+import org.maplibre.nativeffi.generated.ResourceRequestCancelHandler
+import org.maplibre.nativeffi.generated.RuntimeEventType
+import org.maplibre.nativeffi.runSuspendTest
+import org.maplibre.nativeffi.withMap
 
+/**
+ * Android's phantom-reference reclamation of a request handle that became unreachable unreleased.
+ * The JVM binding reclaims through a Cleaner instead; see ResourceRequestHandleJvmTest.
+ */
 class ResourceRequestHandleAndroidTest {
   @Test
-  fun unreachableProviderOwnedHandleReleasesNativeRequest() {
-    val released = CountDownLatch(1)
-
-    registerUnreachableProviderOwnedHandle(released)
-
-    assertTrue(awaitRelease(released), "expected unreachable request cleanup to release native")
-  }
-
-  @Test
-  fun completionFailureIsTerminalAndCopiesDiagnosticBeforeReleaseCleanup() {
-    val releases = AtomicInteger(0)
-    val handle =
-      ResourceRequestHandle(
-        1L,
-        completer = { _, _ -> MaplibreNativeC.mln_network_status_set(999_999) },
-        releaser = {
-          releases.incrementAndGet()
-          MaplibreNativeC.mln_runtime_destroy(0L)
-        },
-      )
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-
-    val failure =
-      assertFailsWith<InvalidArgumentException> {
-        handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
-      }
-    assertTrue(failure.diagnostic.contains("network status"))
-    assertFalse(failure.diagnostic.contains("runtime"))
-    assertEquals(1, releases.get())
-    assertFailsWith<InvalidStateException> {
-      handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT))
+  fun anUnreachableRequestIsReleasedNatively(): Unit = runSuspendTest {
+    val claimed = CompletableDeferred<Pair<Long, TestWeakReference>>()
+    val provider = denyingProvider { request, handle ->
+      if (request.requestedUrl != STYLE_URL) return@denyingProvider null
+      // Only the request's own cancel callback references it once the provider returns.
+      handle.setCancelCallback(ResourceRequestCancelHandler { handle.close() })
+      claimed.complete(handle.binding.issued() to TestWeakReference(handle))
+      ResourceProviderDecision.HANDLE
     }
-  }
-
-  @Test
-  fun concurrentCloseDefersReleaseUntilCompletionAndCancellationUsesInjectedCheck() {
-    val entered = CountDownLatch(1)
-    val continueCompletion = CountDownLatch(1)
-    val releases = AtomicInteger(0)
-    val handle =
-      ResourceRequestHandle(
-        1L,
-        completer = { _, _ ->
-          entered.countDown()
-          continueCompletion.await(5, TimeUnit.SECONDS)
-          MaplibreStatus.OK.nativeCode
-        },
-        cancellationChecker = { true },
-        releaser = { releases.incrementAndGet() },
-      )
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-    assertTrue(handle.isCancelled())
-    val completion = thread { handle.complete(ResourceResponse(ResourceResponseStatus.NO_CONTENT)) }
-    assertTrue(entered.await(5, TimeUnit.SECONDS))
-    handle.close()
-    assertEquals(0, releases.get())
-    continueCompletion.countDown()
-    completion.join()
-    assertEquals(1, releases.get())
-    assertFailsWith<InvalidStateException> { handle.isCancelled() }
-  }
-
-  private fun registerUnreachableProviderOwnedHandle(released: CountDownLatch) {
-    val handle = ResourceRequestHandle(1L, releaser = { released.countDown() })
-    assertEquals(
-      ResourceProviderDecision.HANDLE.nativeValue,
-      handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
-    )
-  }
-
-  private fun awaitRelease(released: CountDownLatch): Boolean {
-    val runtime = Runtime.getRuntime()
-    repeat(ATTEMPTS) {
-      runtime.gc()
-      runtime.runFinalization()
-      if (released.await(POLL_MILLIS, TimeUnit.MILLISECONDS)) return true
+    withMap(provider = provider) {
+      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+      val (raw, reference) = claimed.awaitWithin("the provider to claim the request")
+      assertTrue(awaitCollected(reference), "the request never became unreachable")
+      // Reclamation releases the unanswered request, which fails the style it was loading.
+      awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
+      assertTrue(requestIsReleased(raw), "the collected request is still live in native")
     }
-    return released.count == 0L
   }
 
   private companion object {
-    private const val ATTEMPTS = 100
-    private const val POLL_MILLIS = 20L
+    const val STYLE_URL = "custom://unreachable-style.json"
   }
 }

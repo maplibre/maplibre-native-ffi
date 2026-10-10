@@ -19,10 +19,12 @@ jobs:
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -31,9 +33,10 @@ jobs:
       - run: mise run ci:generate-workflow --check
       - run: mise run ci:generate-devcontainer-tools --check
       - run: mise run ci:test
-      - run: mise run --force //bindings/dart:ffigen
-      - run: mise run --force //bindings/dotnet:generate
-      - run: mise run --force //bindings/kotlin:generate
+      - env:
+          MLN_BINDGEN_REQUIRE_TOOLCHAINS: '1'
+        run: mise run bindings:test-generator
+      - run: mise run bindings:check
       - run: dprint output-resolved-config > /dev/null
       - run: mise run fix
       - name: Check generated and formatted files
@@ -48,10 +51,12 @@ jobs:
     timeout-minutes: 60
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -67,10 +72,12 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
@@ -78,57 +85,115 @@ jobs:
           target: linux-gnu-x64-egl
           zig: true
           save-toolchains: true
-      - run: mise run test linux-gnu-x64-egl
-      - run: mise run check-glibc-floor linux-gnu-x64-egl
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build linux-gnu-x64-egl
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-gnu-x64-egl
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-glibc-floor linux-gnu-x64-egl
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-gnu-x64-egl
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-x64-egl build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-x64-egl
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-x64-egl
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-x64-egl
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-x64-egl
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-map:build linux-gnu-x64-egl
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-x64-egl
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-readback:run linux-gnu-x64-egl
-      - env:
+        run: mise run //examples/zig-readback:smoke linux-gnu-x64-egl
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-x64-egl
-      - env:
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:build linux-gnu-x64-egl
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/compose-map:smoke linux-gnu-x64-egl
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/lwjgl-map:build linux-gnu-x64-egl
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/lwjgl-map:smoke linux-gnu-x64-egl
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-x64-egl
-      - env:
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-x64-egl
-      - env:
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-x64-egl
+      - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-x64-egl
-      - env:
+      - id: suite-16
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/go-map:check linux-gnu-x64-egl
-      - env:
+      - id: suite-17
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/c-map:build linux-gnu-x64-egl
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/go-map:smoke linux-gnu-x64-egl
+      - id: suite-18
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-x64-egl
+      - id: suite-19
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-x64-egl
-      - env:
+      - id: suite-20
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dart:build linux-gnu-x64-egl
+        run: mise run //bindings/dart:test linux-gnu-x64-egl
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -144,6 +209,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-egl.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure' || steps.suite-20.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-x64-egl')
   target-linux-gnu-x64-vulkan:
     name: target / linux-gnu-x64-vulkan
@@ -151,70 +220,127 @@ jobs:
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
+      - name: Set up CI dependencies
+        uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
           target: linux-gnu-x64-vulkan
           zig: true
-      - run: mise run test linux-gnu-x64-vulkan
-      - run: mise run check-glibc-floor linux-gnu-x64-vulkan
+      - name: Resolve Swift packages
+        id: resolve
+        run: mise run //bindings/swift:resolve
+      - id: build
+        run: mise run build linux-gnu-x64-vulkan
+      - id: suite-1
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run test linux-gnu-x64-vulkan
+      - id: suite-2
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: mise run check-glibc-floor linux-gnu-x64-vulkan
       - name: Archive native artifact
+        id: archive
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: mise run archive-native linux-gnu-x64-vulkan
       - name: Install packaged native artifact
+        id: install
+        if: ${{ !cancelled() && steps.archive.outcome == 'success' }}
         run: mise run install-native-package linux-gnu-x64-vulkan build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
-      - env:
+      - id: suite-3
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test linux-gnu-x64-vulkan release
-      - env:
+      - id: suite-4
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //examples/rust-map:check linux-gnu-x64-vulkan
-      - env:
+      - id: suite-5
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/rust-map:smoke linux-gnu-x64-vulkan
+      - id: suite-6
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/rust:test:download linux-gnu-x64-vulkan
-      - env:
+      - id: suite-7
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dart:test:download linux-gnu-x64-vulkan
-      - env:
+      - id: suite-8
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/zig:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-9
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-map:build linux-gnu-x64-vulkan
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/zig-map:smoke linux-gnu-x64-vulkan
+      - id: suite-10
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/zig-readback:run linux-gnu-x64-vulkan
-      - env:
+        run: mise run //examples/zig-readback:smoke linux-gnu-x64-vulkan
+      - id: suite-11
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/kotlin:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-12
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/compose-map:build linux-gnu-x64-vulkan
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/compose-map:smoke linux-gnu-x64-vulkan
+      - id: suite-13
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/lwjgl-map:build linux-gnu-x64-vulkan
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/lwjgl-map:smoke linux-gnu-x64-vulkan
+      - id: suite-14
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/swift:test linux-gnu-x64-vulkan release
-      - env:
+      - id: suite-15
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/dotnet:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-16
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          MISE_TASK_SKIP: //:build
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/dotnet-map:smoke linux-gnu-x64-vulkan
+      - id: suite-17
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/go:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-18
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //examples/c-map:build linux-gnu-x64-vulkan
-      - env:
+        run: env -u EGL_PLATFORM xvfb-run --auto-servernum mise run //examples/c-map:smoke linux-gnu-x64-vulkan
+      - id: suite-19
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
         run: mise run //bindings/python:test linux-gnu-x64-vulkan
-      - env:
+      - id: suite-20
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
           MISE_TASK_SKIP: //:build
-        run: mise run //bindings/dart:build linux-gnu-x64-vulkan
+        run: mise run //bindings/dart:test linux-gnu-x64-vulkan
       - name: Save Zig packages
         if: steps.setup.outputs.zig-cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -230,6 +356,10 @@ jobs:
           path: build/packages/native/dist/maplibre-native-c-linux-gnu-x64-vulkan.tar.gz
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 1 || 30 }}
+      - name: Fail if any suite failed
+        shell: bash
+        if: ${{ !cancelled() && (steps.suite-1.outcome == 'failure' || steps.suite-2.outcome == 'failure' || steps.suite-3.outcome == 'failure' || steps.suite-4.outcome == 'failure' || steps.suite-5.outcome == 'failure' || steps.suite-6.outcome == 'failure' || steps.suite-7.outcome == 'failure' || steps.suite-8.outcome == 'failure' || steps.suite-9.outcome == 'failure' || steps.suite-10.outcome == 'failure' || steps.suite-11.outcome == 'failure' || steps.suite-12.outcome == 'failure' || steps.suite-13.outcome == 'failure' || steps.suite-14.outcome == 'failure' || steps.suite-15.outcome == 'failure' || steps.suite-16.outcome == 'failure' || steps.suite-17.outcome == 'failure' || steps.suite-18.outcome == 'failure' || steps.suite-19.outcome == 'failure' || steps.suite-20.outcome == 'failure') }}
+        run: exit 1
     if: contains(fromJSON(inputs.jobs), 'target-linux-gnu-x64-vulkan')
   verified:
     name: verified (${{ github.sha }} / ${{ inputs.scope }})

@@ -1,0 +1,297 @@
+"""Compile callback descriptors and their quiescent Python roots."""
+
+from dataclasses import replace
+
+from .. import docs
+from .python_values import public_name, rust_field, scalar_type
+from .rust_callbacks import decision_table_name
+
+
+def plain_fields(plan):
+    descriptor = plan.registration
+    callbacks = {*descriptor.callbacks, descriptor.user_data, descriptor.release}
+    return replace(
+        plan,
+        registration=None,
+        fields=tuple(f for f in plan.fields if f.name not in callbacks),
+    )
+
+
+def ffi_type(value):
+    if value.kind == "reference" and value.element:
+        return ("*const " if value.ctype.pointee.const else "*mut ") + ffi_type(
+            value.element
+        )
+    if value.kind == "scalar":
+        return "()" if value.native == "void" else scalar_type(value)
+    if value.kind == "native_pointer":
+        return "*mut std::ffi::c_void"
+    if value.kind == "buffer" and value.ctype.pointee:
+        return "*const std::ffi::c_char"
+    return "sys::" + value.native
+
+
+def validate(values, plan):
+    descriptor = plan.registration
+    plain = plain_fields(plan)
+    for field in plain.fields:
+        if field.public:
+            values.supported(field.value, input=True)
+    for name in descriptor.callbacks:
+        field = next(f for f in plan.fields if f.name == name)
+        callback = values.api.callbacks[field.value.native]
+        if not callback.context:
+            values.fail(plan, "callback requires an explicit context parameter")
+        for parameter in callback.parameters:
+            if parameter.name == callback.context:
+                continue
+            if callback.decision and parameter.name == callback.decision.parameter:
+                continue
+            response = (
+                parameter.value.element
+                if parameter.value.kind == "reference"
+                else parameter.value
+            )
+            if parameter.direction != "in" and not response.response:
+                values.fail(plan, "callback output requires a scoped response")
+            values.supported(parameter.value)
+        if callback.result.native != "void":
+            values.supported(callback.result, input=True)
+
+
+def input_source(plan, values):
+    descriptor = plan.registration
+    lines = values.input_lines(plain_fields(plan))
+    for name in descriptor.callbacks:
+        lines.append(f'let {name}_enabled = !value.getattr("{name}")?.is_none();')
+    lines.append(
+        "if " + " || ".join(name + "_enabled" for name in descriptor.callbacks) + " {"
+    )
+    methods = ", ".join(
+        f'value.getattr("_invoke_{name}")?.unbind()' for name in descriptor.callbacks
+    )
+    lines.append(
+        f"raw.{descriptor.user_data} = storage.register_callbacks(vec![{methods}]);"
+    )
+    release_fn = (
+        "generated_release_callbacks_no_reentry"
+        if descriptor.release_reentry == "forbid"
+        else "generated_release_callbacks"
+    )
+    lines.append(f"raw.{descriptor.release} = Some({release_fn});")
+    for name in descriptor.callbacks:
+        lines.append(
+            f"raw.{name} = if {name}_enabled {{ Some(generated_callback_{plan.native}_{name}) }} else {{ None }};"
+        )
+    lines.append("}")
+    return (
+        f"fn generated_input_{plan.native}<'py>(value: &Bound<'py, PyAny>, storage: &mut GeneratedInputStorage<'py>) -> PyResult<sys::{plan.native}> {{\n    "
+        + "\n    ".join(lines)
+        + "\n    Ok(raw)\n}\n"
+    )
+
+
+def sources(values, plan):
+    from .python import OWNERS
+    from .rust_callbacks import cancel_notification
+
+    for decision in values.api.decisions.values():
+        _, registration, record, _ = cancel_notification(values.api, decision)
+        if record.native == plan.native:
+            return cancel_sources(values, plan, registration)
+    rust, python = [], []
+    descriptor = plan.registration
+    fields, methods = [], []
+    for index, name in enumerate(descriptor.callbacks):
+        field = next(f for f in plan.fields if f.name == name)
+        callback = values.api.callbacks[field.value.native]
+        parameters = [p for p in callback.parameters if p.name != callback.context]
+        decision_owner = (
+            OWNERS[callback.decision.handle.native] if callback.decision else None
+        )
+        types = ", ".join(
+            decision_owner
+            if callback.decision and p.name == callback.decision.parameter
+            else values.type(p.value)
+            for p in parameters
+        )
+        result_type = (
+            "None" if callback.result.native == "void" else values.type(callback.result)
+        )
+        fields.append(f"    {name}: Callable[[{types}], {result_type}] | None = None")
+        signature = ", ".join(["self"] + [p.name for p in parameters])
+        arguments = ", ".join(
+            f"_wrap_response({p.name}, {decision_owner!r})"
+            if callback.decision and p.name == callback.decision.parameter
+            else values.facade_copy(p.value, p.name)
+            for p in parameters
+        )
+        methods.append(
+            f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n        assert callback is not None\n        return callback({arguments})\n"
+        )
+        native_parameters = ", ".join(
+            f"{rust_field(p.name)}: {ffi_type(p.value)}" for p in callback.parameters
+        )
+
+        def copy_parameter(parameter, callback=callback, owner=decision_owner):
+            if callback.decision and parameter.name == callback.decision.parameter:
+                return f"Py::new(py, {owner} {{ state: ManuallyDrop::new(Arc::clone(&decision_state)), cancel_root: Mutex::new(std::sync::Weak::new()) }})?"
+            value = (
+                parameter.value.element
+                if parameter.value.kind == "reference"
+                else parameter.value
+            )
+            if value.response:
+                return f"Py::new(py, {public_name(value.native)}Scope {{ native: {rust_field(parameter.name)} as usize, scope: callback_scope.scope() }})?"
+            return values.copy(parameter.value, rust_field(parameter.name))
+
+        copied = ", ".join(copy_parameter(p) for p in parameters)
+        scope = (
+            "let callback_scope = GeneratedCallbackGuard::new();"
+            if any(
+                (p.value.element if p.value.kind == "reference" else p.value).response
+                for p in parameters
+            )
+            else ""
+        )
+        if len(parameters) == 1:
+            copied += ","
+        result = (
+            "Ok(())"
+            if callback.result.native == "void"
+            else f"result.extract::<{ffi_type(callback.result)}>()"
+        )
+        failure = (
+            "()"
+            if callback.result.native == "void"
+            else (
+                "sys::" + callback.failure
+                if callback.failure.startswith("MLN_")
+                else callback.failure
+            )
+        )
+        decision_setup = ""
+        if callback.decision:
+            decision = callback.decision
+            functions = decision_table_name(decision)
+            decision_setup = f"let decision_state = match unsafe {{ maplibre_core::decision::DecisionHandleState::new({decision.parameter}, {functions}) }} {{ Ok(state) => state, Err(_) => return sys::{decision.pass_through} }};"
+            failure = "decision_state.finish_decision(false)"
+            result = f"let decision = result.extract::<u32>()?; Ok(decision_state.finish_decision(decision == sys::{decision.accept}))"
+        policy_guard = ""
+        if callback.reentry_policy:
+            policy = callback.reentry_policy
+            owner = next(
+                p.value for p in callback.parameters if p.name == policy.owner_parameter
+            )
+            identity = (
+                f"{policy.owner_parameter} as usize as u64"
+                if owner.kind == "reference"
+                else f"maplibre_core::handle::NativeHandle::to_raw({policy.owner_parameter})"
+            )
+            operations = ", ".join(
+                '"' + operation + '"' for operation in policy.operations
+            )
+            policy_guard = f"let _policy = GeneratedCallbackPolicy::enter(&[{operations}], {identity});"
+        returns = (
+            ""
+            if callback.result.native == "void"
+            else f" -> {ffi_type(callback.result)}"
+        )
+        rust.append(f"""unsafe extern "C" fn generated_callback_{plan.native}_{name}({native_parameters}){returns} {{
+    {"let _reentry = GeneratedCallbackPolicy::enter(&[], 0);" if callback.reentry == "forbid" else ""}
+    {policy_guard}
+    {decision_setup}
+    generated_invoke(|| {failure}, |py| {{
+        {scope}
+        let Some(callback) = (unsafe {{ generated_get_callback(py, {callback.context}, {index}) }}) else {{ return Ok({failure}); }};
+        let {"_result" if callback.result.native == "void" else "result"} = callback.bind(py).call1(({copied}))?;
+        {result}
+    }})
+}}
+""")
+    record_rust, record_python = values.record_sources(
+        plain_fields(plan),
+        extra_fields=fields,
+        extra_methods="\n" + "\n".join(methods),
+        # Native never returns callbacks, so a copy of a registration's
+        # default leaves them at None.
+        copied=plan.native in values.api.returned,
+    )
+    rust.append(record_rust)
+    python.append(record_python)
+    return "\n".join(rust), "\n".join(python)
+
+
+def cancel_operation(plan, values, receiver):
+    """A decision handle's cancel registration, which the core runtime
+    registers through the protocol's record."""
+    from .python import OWNERS, unsupported
+    from .rust import Unsupported
+    from .rust_callbacks import cancel_notification
+
+    try:
+        _, registration, record, _ = cancel_notification(
+            values.api, values.api.decisions[receiver.value.native]
+        )
+    except Unsupported as error:
+        raise unsupported(plan.function, str(error)) from error
+    values.records[record.native] = record
+    owner = OWNERS[receiver.value.native]
+    name = plan.member
+    parameter = registration.parameter
+    field = registration.callbacks[0]
+    record_type = public_name(record.native)
+    # The core registration enters the callback's reentry policy and
+    # contains panics; this root only keeps the callback visible to the
+    # owner's garbage collection. Without a callback, native rejects the
+    # registration.
+    native = f"""    fn {name}(&self, {parameter}: &Bound<'_, PyAny>) -> PyResult<bool> {{
+        let callback_owner = maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle());
+        generated_check_operation("{plan.name}", callback_owner)?;
+        let callback = {parameter}.getattr("{field}")?;
+        let mut weak = std::sync::Weak::new();
+        let registration: Option<Box<dyn FnOnce() + Send + 'static>> = if callback.is_none() {{
+            None
+        }} else {{
+            if !callback.is_callable() {{ return Err(invalid_argument_error("{field} must be callable")); }}
+            let root = GeneratedCallbackRootOwner::new(vec![callback.unbind()]);
+            weak = root.downgrade();
+            Some(Box::new(move || {{
+                Python::try_attach(|py| {{
+                    if let Some(callback) = root.get(py, 0)
+                        && let Err(error) = callback.bind(py).call0()
+                    {{
+                        generated_report_unraisable(py, error);
+                    }}
+                }});
+            }}))
+        }};
+        let cancelled = self.state.register_cancel(registration).map_err(map_error)?;
+        if !cancelled {{
+            *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
+        }}
+        Ok(cancelled)
+    }}
+"""
+    facade = f"""    def {name}(self, {parameter}: {record_type}) -> bool:
+{docs.docstring(values.api.doc(plan.name), "        ")}        return self._native.{name}({parameter})
+"""
+    return (
+        owner,
+        native,
+        facade,
+        f"    def {name}(self, {parameter}: {record_type}) -> bool: ...\n",
+        None,
+    )
+
+
+def cancel_sources(values, plan, registration):
+    """The Python class of a decision handle's cancel notification record,
+    whose callback the core runtime registers, so it needs no trampoline."""
+    field = registration.callbacks[0]
+    _, python = values.record_sources(
+        plain_fields(plan),
+        extra_fields=[f"    {field}: Callable[[], None] | None = None"],
+        copied=False,
+    )
+    return "", python

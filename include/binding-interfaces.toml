@@ -1,0 +1,4 @@
+# Header entrypoints define separate interfaces over the same native library.
+# Public declarations take precedence when the runtime header includes them.
+public = ["maplibre_native_c.h", "maplibre_native_c/plugin.h"]
+runtime = ["maplibre_native_c/callback_adapter.h"]

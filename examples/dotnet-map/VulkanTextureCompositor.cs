@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Maplibre.NativeFfi.Render;
 using Silk.NET.Core;
 using Silk.NET.Vulkan;
 using VulkanSemaphore = Silk.NET.Vulkan.Semaphore;
@@ -65,7 +64,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     public void Resize(Viewport viewport)
     {
         this.viewport = viewport;
-        context.WaitIdle();
+        context.WaitQueueIdle();
         DestroySwapchainDependents();
         var oldSwapchain = swapchain;
         var oldFormat = swapchainFormat;
@@ -95,31 +94,29 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         swapchainStale = false;
     }
 
-    public bool Draw(VulkanOwnedTextureFrame frame)
+    public bool Draw(VulkanTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0)
         {
-            throw new InvalidOperationException(
-                "MapLibre returned an empty Vulkan owned texture frame."
-            );
+            throw new InvalidOperationException("MapLibre returned an empty Vulkan texture frame.");
         }
 
         if (frame.Layout != (uint)ImageLayout.ShaderReadOnlyOptimal)
         {
             throw new InvalidOperationException(
-                $"MapLibre owned texture frame is not shader-readable: layout={frame.Layout}."
+                $"MapLibre texture frame is not shader-readable: layout={frame.Layout}."
             );
         }
 
-        if (frame.ImageView.IsNull)
+        if (frame.ImageView == 0)
         {
             throw new InvalidOperationException("MapLibre returned a null Vulkan image view.");
         }
 
-        return DrawImageView(new ImageView(frame.ImageView.Bits));
+        return DrawImageView(new ImageView(frame.ImageView));
     }
 
-    public bool DrawImageView(ImageView imageView)
+    private bool DrawImageView(ImageView imageView)
     {
         var fence = inFlight;
         VulkanContext.Check(
@@ -168,7 +165,6 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             "vkWaitForFences"
         );
         var present = Present(imageIndex);
-        VulkanContext.Check(vk.QueueWaitIdle(context.GraphicsQueue), "vkQueueWaitIdle");
         if (present == Result.ErrorOutOfDateKhr)
         {
             RecreateSwapchain();
@@ -187,7 +183,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     {
         if (context.Device.Handle != 0)
         {
-            context.WaitIdle();
+            context.WaitQueueIdle();
         }
 
         if (inFlight.Handle != 0)
@@ -756,10 +752,18 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             SignalSemaphoreCount = 1,
             PSignalSemaphores = &signalSemaphore,
         };
-        VulkanContext.Check(
-            vk.QueueSubmit(context.GraphicsQueue, 1, &submitInfo, inFlight),
-            "vkQueueSubmit"
-        );
+        context.LockQueue();
+        try
+        {
+            VulkanContext.Check(
+                vk.QueueSubmit(context.GraphicsQueue, 1, &submitInfo, inFlight),
+                "vkQueueSubmit"
+            );
+        }
+        finally
+        {
+            context.UnlockQueue();
+        }
     }
 
     private void RecreateSwapchain()
@@ -780,7 +784,16 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             PSwapchains = &swapchainHandle,
             PImageIndices = &imageIndex,
         };
-        var result = vkQueuePresentKHR(context.GraphicsQueue.Handle, &presentInfo);
+        context.LockQueue();
+        Result result;
+        try
+        {
+            result = vkQueuePresentKHR(context.GraphicsQueue.Handle, &presentInfo);
+        }
+        finally
+        {
+            context.UnlockQueue();
+        }
         if (
             result != Result.Success
             && result != Result.SuboptimalKhr

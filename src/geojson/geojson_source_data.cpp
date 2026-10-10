@@ -25,6 +25,7 @@
 #include "geojson/geojson.hpp"
 #include "map/map.hpp"
 #include "style/style_value.hpp"
+#include "testing/sync_point.hpp"
 
 namespace {
 
@@ -140,6 +141,7 @@ class SerializedGeoJsonData final : public mln::style::GeoJSONData {
         if (!locked) {
           return features;
         }
+        mln::testing::hit(mln::testing::SyncPoint::GeoJsonTileSlice);
         const std::scoped_lock lock(*mutex);
         locked->getTile(
           id,

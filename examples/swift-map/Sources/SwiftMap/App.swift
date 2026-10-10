@@ -1,7 +1,30 @@
 import AppKit
 import SwiftUI
 
+/// Runs the app, or with `MLN_EXAMPLE_SMOKE=1` set, renders one frame headless
+/// in the requested render-target mode and exits.
 @main
+enum SwiftMapMain {
+  static func main() {
+    guard ProcessInfo.processInfo.environment["MLN_EXAMPLE_SMOKE"] == "1" else {
+      SwiftMapApp.main()
+      return
+    }
+    // The configuration parses the same command line as the app does.
+    let mode = swiftMapConfiguration.mode
+    Task { @MainActor in
+      installCAPILogging()
+      let status = await runSmoke(mode: mode)
+      clearCAPILogging()
+      exit(status)
+    }
+    // The run loop drains the main queue, and with it the main actor, on the
+    // main thread, as the app's AppKit run loop does. dispatchMain() would
+    // drain it on pool threads instead.
+    RunLoop.main.run()
+  }
+}
+
 struct SwiftMapApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
@@ -14,9 +37,8 @@ struct SwiftMapApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-  static let willTerminateMapViews = Notification
-    .Name("SwiftMapWillTerminateMapViews")
   private var window: NSWindow?
+  private var mapView: MetalMapView?
 
   func applicationDidFinishLaunching(_: Notification) {
     NSApp.setActivationPolicy(.regular)
@@ -31,15 +53,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     true
   }
 
+  /// Native teardown is asynchronous, so the reply waits for it before the app
+  /// tears down state that the callbacks use.
   func applicationShouldTerminate(_: NSApplication) -> NSApplication
     .TerminateReply
   {
-    NotificationCenter.default.post(
-      name: Self.willTerminateMapViews,
-      object: nil
-    )
-    clearCAPILogging()
-    return .terminateNow
+    guard let mapView else {
+      clearCAPILogging()
+      return .terminateNow
+    }
+    Task { @MainActor in
+      await mapView.shutdown()
+      clearCAPILogging()
+      NSApp.reply(toApplicationShouldTerminate: true)
+    }
+    return .terminateLater
   }
 
   private func createWindow() {
@@ -51,7 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       defer: false
     )
     window.title = "MapLibre Swift Map"
-    window.contentView = MetalMapView(mode: swiftMapConfiguration.mode)
+    let mapView = MetalMapView(mode: swiftMapConfiguration.mode)
+    self.mapView = mapView
+    window.contentView = mapView
     window.center()
     window.makeKeyAndOrderFront(nil)
     self.window = window

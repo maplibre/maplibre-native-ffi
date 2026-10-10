@@ -156,9 +156,7 @@ static void metal_view_deinit(metal_view* view) {
   }
 }
 
-static app_error metal_view_init(
-  metal_view* view, SDL_Window* window, viewport current_viewport
-) {
+static app_error metal_view_init(metal_view* view, SDL_Window* window) {
   *view = (metal_view){};
   view->view = SDL_Metal_CreateView(window);
   if (view->view == nullptr) {
@@ -173,7 +171,6 @@ static app_error metal_view_init(
   view->layer = (id)layer;
   msg_set_id(view->layer, "setDevice:", view->device);
   msg_set_ulong(view->layer, "setPixelFormat:", mtl_pixel_format_bgra8_unorm);
-  metal_view_resize(view, current_viewport);
   return APP_OK;
 }
 
@@ -248,7 +245,10 @@ static app_error metal_compositor_init(
   metal_compositor* compositor, SDL_Window* window, viewport current_viewport
 ) {
   *compositor = (metal_compositor){};
-  MAP_TRY(metal_view_init(&compositor->view, window, current_viewport));
+  MAP_TRY(metal_view_init(&compositor->view, window));
+  // A texture mode's compositor sizes the layer's drawable. A surface session
+  // sizes it itself.
+  metal_view_resize(&compositor->view, current_viewport);
   compositor->queue = msg_id(compositor->view.device, "newCommandQueue");
   app_error error = APP_OK;
   if (compositor->queue == nullptr) {
@@ -351,16 +351,49 @@ static app_error borrowed_texture_create(
   return APP_OK;
 }
 
+/// The textures of a borrowed ring, one per slot.
+typedef struct metal_ring {
+  id textures[RING_DEPTH];
+} metal_ring;
+
+static void metal_ring_release(metal_ring* ring) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    release_object(&ring->textures[index]);
+  }
+}
+
+static app_error metal_ring_create(
+  id device, viewport current_viewport, metal_ring* out_ring
+) {
+  *out_ring = (metal_ring){};
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    const app_error error = borrowed_texture_create(
+      device, current_viewport, &out_ring->textures[index]
+    );
+    if (error != APP_OK) {
+      metal_ring_release(out_ring);
+      return error;
+    }
+  }
+  return APP_OK;
+}
+
 struct render_target {
   render_target_mode mode;
   render_session session;
   union {
     struct {
       metal_compositor compositor;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
     } owned;
     struct {
       metal_compositor compositor;
-      id texture;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
+      /// The ring the session renders into.
+      metal_ring ring;
+      texture_replacements replacements;
     } borrowed;
     struct {
       metal_view view;
@@ -386,6 +419,10 @@ void render_target_frame_scope_close(void* scope) {
   objc_autoreleasePoolPop(scope);
 }
 
+render_session* render_target_session(render_target* target) {
+  return &target->session;
+}
+
 app_error render_target_init(
   render_target** out_target, SDL_Window* window, viewport current_viewport,
   render_target_mode mode
@@ -408,9 +445,9 @@ app_error render_target_init(
         &target->as.borrowed.compositor, window, current_viewport
       );
       if (error == APP_OK) {
-        error = borrowed_texture_create(
+        error = metal_ring_create(
           target->as.borrowed.compositor.view.device, current_viewport,
-          &target->as.borrowed.texture
+          &target->as.borrowed.ring
         );
         if (error != APP_OK) {
           metal_compositor_deinit(&target->as.borrowed.compositor);
@@ -418,8 +455,7 @@ app_error render_target_init(
       }
       break;
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      error =
-        metal_view_init(&target->as.surface.view, window, current_viewport);
+      error = metal_view_init(&target->as.surface.view, window);
       break;
   }
   if (error != APP_OK) {
@@ -432,27 +468,41 @@ app_error render_target_init(
 
 static mln_metal_context_descriptor metal_context_descriptor(id device) {
   return (mln_metal_context_descriptor){
-    .size = sizeof(mln_metal_context_descriptor),
     .device = device,
   };
 }
 
-static mln_metal_borrowed_texture_descriptor borrowed_texture_descriptor(
-  render_target* target, viewport current_viewport
+/// Describes ring, whose entries the caller provides storage for.
+static mln_metal_borrowed_texture_descriptor borrowed_ring_descriptor(
+  const metal_ring* ring, viewport current_viewport,
+  mln_metal_borrowed_texture entries[RING_DEPTH]
 ) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    entries[index] =
+      (mln_metal_borrowed_texture){.texture = ring->textures[index]};
+  }
   mln_metal_borrowed_texture_descriptor descriptor =
     mln_metal_borrowed_texture_descriptor_default();
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.physical_width = current_viewport.physical_width;
   descriptor.physical_height = current_viewport.physical_height;
-  descriptor.texture = target->as.borrowed.texture;
+  descriptor.textures = entries;
+  descriptor.texture_count = RING_DEPTH;
   return descriptor;
 }
 
 app_error render_target_attach(
   render_target* target, mln_map map, viewport current_viewport
 ) {
+  awaited_completion attached;
+  mln_completion completion;
+  MAP_TRY(awaited_completion_init(&attached, &completion));
+  // Every Metal target accepts a core worker, which renders on its own thread.
+  const mln_render_session_attach_options options =
+    render_session_attach_options(target->mode, MLN_RENDER_DRIVER_CORE_WORKER);
   mln_render_session session = MLN_HANDLE_NULL;
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  mln_status status = MLN_STATUS_INVALID_STATE;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE: {
       mln_metal_owned_texture_descriptor descriptor =
@@ -460,28 +510,21 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         metal_context_descriptor(target->as.owned.compositor.view.device);
-      const mln_status status =
-        mln_metal_owned_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Metal texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+      status = mln_map_attach_metal_owned_texture(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
+      mln_metal_borrowed_texture entries[RING_DEPTH];
       const mln_metal_borrowed_texture_descriptor descriptor =
-        borrowed_texture_descriptor(target, current_viewport);
-      const mln_status status =
-        mln_metal_borrowed_texture_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Metal borrowed texture attach failed", status);
-        return APP_ERROR_TEXTURE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_TEXTURE, .handle = session};
-      return APP_OK;
+        borrowed_ring_descriptor(
+          &target->as.borrowed.ring, current_viewport, entries
+        );
+      status = mln_map_attach_metal_borrowed_texture(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
     case RENDER_TARGET_MODE_NATIVE_SURFACE: {
       mln_metal_surface_descriptor descriptor =
@@ -490,33 +533,46 @@ app_error render_target_attach(
       descriptor.context =
         metal_context_descriptor(target->as.surface.view.device);
       descriptor.layer = target->as.surface.view.layer;
-      const mln_status status =
-        mln_metal_surface_attach(map, &descriptor, &session);
-      if (status != MLN_STATUS_OK) {
-        diagnostics_log_status("Metal surface attach failed", status);
-        return APP_ERROR_SURFACE_ATTACH_FAILED;
-      }
-      target->session =
-        (render_session){.kind = RENDER_SESSION_SURFACE, .handle = session};
-      return APP_OK;
+      status = mln_map_attach_metal_surface(
+        map, &descriptor, &options, &session, &completion, &diagnostic
+      );
+      break;
     }
   }
-  return APP_ERROR_BACKEND_SETUP_FAILED;
+  return render_session_finish_attach(
+    &target->session, session, map, &options, target->mode, &attached, status,
+    &diagnostic
+  );
 }
 
 void render_target_deinit(render_target* target) {
   if (target == nullptr) {
     return;
   }
+  if (target->mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
+    render_session_release_frame(&target->as.owned.held);
+  } else if (target->mode == RENDER_TARGET_MODE_BORROWED_TEXTURE) {
+    render_session_release_frame(&target->as.borrowed.held);
+  }
   render_session_close(&target->session);
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       metal_compositor_deinit(&target->as.owned.compositor);
       break;
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      release_object(&target->as.borrowed.texture);
+    case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
+      while (true) {
+        metal_ring* retired = nullptr;
+        texture_replacements_take_any(
+          &target->as.borrowed.replacements, (void**)&retired
+        );
+        if (retired == nullptr) break;
+        metal_ring_release(retired);
+        free(retired);
+      }
+      metal_ring_release(&target->as.borrowed.ring);
       metal_compositor_deinit(&target->as.borrowed.compositor);
       break;
+    }
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
       metal_view_deinit(&target->as.surface.view);
       break;
@@ -524,38 +580,52 @@ void render_target_deinit(render_target* target) {
   free(target);
 }
 
-/// Follows a resized window in borrowed-texture mode: allocates a texture at
-/// the new size and hands it to the live session, which stays attached.
+/// Follows a resized window in borrowed-texture mode: allocates a ring at the
+/// new size and hands it to the live session, which stays attached. A
+/// replacement is refused while the host holds a frame, so the held one goes
+/// first; the window keeps showing what it last presented.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
-  if (target->session.kind != RENDER_SESSION_TEXTURE) {
-    return APP_ERROR_TEXTURE_RESIZE_FAILED;
-  }
   metal_compositor_resize(&target->as.borrowed.compositor, current_viewport);
-
-  id previous = target->as.borrowed.texture;
-  id replacement = nullptr;
-  MAP_TRY(borrowed_texture_create(
+  render_session_release_frame(&target->as.borrowed.held);
+  metal_ring* retired = malloc(sizeof(metal_ring));
+  if (retired == nullptr) return APP_ERROR_RESIZE_FAILED;
+  metal_ring replacement;
+  const app_error error = metal_ring_create(
     target->as.borrowed.compositor.view.device, current_viewport, &replacement
-  ));
-  target->as.borrowed.texture = replacement;
-  const mln_metal_borrowed_texture_descriptor descriptor =
-    borrowed_texture_descriptor(target, current_viewport);
-  const mln_status status =
-    mln_metal_borrowed_texture_set_target(target->session.handle, &descriptor);
-  if (status != MLN_STATUS_OK) {
-    // The session may have taken the replacement before failing, so detach
-    // before either texture is released.
-    mln_render_session_detach(target->session.handle);
-    diagnostics_log_status("Metal borrowed texture set target failed", status);
-    target->as.borrowed.texture = previous;
-    release_object(&replacement);
-    return APP_ERROR_TEXTURE_RESIZE_FAILED;
+  );
+  if (error != APP_OK) {
+    free(retired);
+    return error;
   }
-  // Released only once the session has taken the replacement.
-  release_object(&previous);
-  return APP_OK;
+  *retired = target->as.borrowed.ring;
+  mln_completion completion;
+  texture_replacement* entry = texture_replacement_begin(retired, &completion);
+  if (entry == nullptr) {
+    metal_ring_release(&replacement);
+    free(retired);
+    return APP_ERROR_RESIZE_FAILED;
+  }
+  mln_metal_borrowed_texture entries[RING_DEPTH];
+  const mln_metal_borrowed_texture_descriptor descriptor =
+    borrowed_ring_descriptor(&replacement, current_viewport, entries);
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+  const mln_status status =
+    mln_render_session_set_metal_borrowed_texture_target(
+      target->session.handle, &descriptor, &completion, &diagnostic
+    );
+  texture_replacements_queue(&target->as.borrowed.replacements, entry, status);
+  if (status != MLN_STATUS_OK) {
+    metal_ring_release(&replacement);
+    free(retired);
+    diagnostics_log_status(
+      "Metal borrowed texture set target failed", status, &diagnostic
+    );
+    return APP_ERROR_RESIZE_FAILED;
+  }
+  target->as.borrowed.ring = replacement;
+  return render_session_resize_map(&target->session, current_viewport);
 }
 
 app_error render_target_resize(
@@ -564,83 +634,79 @@ app_error render_target_resize(
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
       metal_compositor_resize(&target->as.owned.compositor, current_viewport);
+      // A session resizes only while the host holds none of its frames.
+      render_session_release_frame(&target->as.owned.held);
       return render_session_resize(&target->session, current_viewport);
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       return resize_borrowed(target, current_viewport);
     case RENDER_TARGET_MODE_NATIVE_SURFACE:
-      metal_view_resize(&target->as.surface.view, current_viewport);
+      // The session sets the layer's drawable size.
       return render_session_resize(&target->session, current_viewport);
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-app_error render_target_finish_frame(render_target* target) {
-  (void)target;
-  return APP_OK;
+app_error render_target_retire_replaced(render_target* target) {
+  if (target->mode != RENDER_TARGET_MODE_BORROWED_TEXTURE) return APP_OK;
+  while (true) {
+    metal_ring* retired = nullptr;
+    MAP_TRY(texture_replacements_take_completed(
+      &target->as.borrowed.replacements, &target->session, (void**)&retired
+    ));
+    if (retired == nullptr) return APP_OK;
+    metal_ring_release(retired);
+    free(retired);
+  }
 }
 
-static app_error render_update_owned(
-  render_target* target, bool* out_completed
+/// Acquires the newest frame into *held and samples its texture into the
+/// window. Both texture modes hand their frames over this way.
+static app_error present_acquired(
+  render_target* target, metal_compositor* compositor, mln_acquired_frame* held,
+  bool* out_presented
 ) {
-  mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-  MAP_TRY(render_session_render_update(&target->session, &result));
-  if (result != MLN_RENDER_RESULT_RENDERED) {
-    *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
+  bool acquired = false;
+  MAP_TRY(render_session_acquire_newest(&target->session, held, &acquired));
+  if (!acquired) {
+    // The window keeps the frame it already shows.
+    *out_presented = true;
     return APP_OK;
   }
-
-  mln_metal_owned_texture_frame frame = {.size = sizeof(frame)};
+  MAP_TRY(render_session_require_cpu_complete_producer(
+    *held, "Metal texture acquire failed"
+  ));
+  mln_metal_texture_frame frame = {.size = sizeof(frame)};
+  mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
-    mln_metal_owned_texture_acquire_frame(target->session.handle, &frame);
-  if (status == MLN_STATUS_INVALID_STATE) {
-    return APP_OK;
-  }
+    mln_acquired_frame_get_metal_texture(*held, &frame, &diagnostic);
   if (status != MLN_STATUS_OK) {
-    diagnostics_log_status("Metal texture acquire failed", status);
+    diagnostics_log_status("Metal texture access failed", status, &diagnostic);
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
-
-  bool presented = false;
-  const app_error error = metal_compositor_draw_texture(
-    &target->as.owned.compositor, (id)frame.texture, &presented
+  return metal_compositor_draw_texture(
+    compositor, (id)frame.texture, out_presented
   );
-  const mln_status release_status =
-    mln_metal_owned_texture_release_frame(target->session.handle, &frame);
-  if (release_status != MLN_STATUS_OK) {
-    diagnostics_log_status("Metal texture release failed", release_status);
-  }
-  MAP_TRY(error);
-  *out_completed = presented;
-  return APP_OK;
 }
 
-app_error render_target_render_update(
-  render_target* target, viewport current_viewport, bool* out_completed
+app_error render_target_present(
+  render_target* target, [[maybe_unused]] viewport current_viewport,
+  bool* out_presented
 ) {
-  (void)current_viewport;
-  *out_completed = false;
+  *out_presented = false;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      return render_update_owned(target, out_completed);
-    case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-      MAP_TRY(render_session_render_update(&target->session, &result));
-      if (result != MLN_RENDER_RESULT_RENDERED) {
-        *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-        return APP_OK;
-      }
-      MAP_TRY(metal_compositor_draw_texture(
-        &target->as.borrowed.compositor, target->as.borrowed.texture,
-        out_completed
-      ));
+      return present_acquired(
+        target, &target->as.owned.compositor, &target->as.owned.held,
+        out_presented
+      );
+    case RENDER_TARGET_MODE_BORROWED_TEXTURE:
+      return present_acquired(
+        target, &target->as.borrowed.compositor, &target->as.borrowed.held,
+        out_presented
+      );
+    case RENDER_TARGET_MODE_NATIVE_SURFACE:
+      *out_presented = true;
       return APP_OK;
-    }
-    case RENDER_TARGET_MODE_NATIVE_SURFACE: {
-      mln_render_result result = MLN_RENDER_RESULT_NO_UPDATE;
-      MAP_TRY(render_session_render_update(&target->session, &result));
-      *out_completed = result != MLN_RENDER_RESULT_TARGET_NOT_READY;
-      return APP_OK;
-    }
   }
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }

@@ -23,7 +23,7 @@ const String _snapshotTag = 'unstable-native-snapshot';
 const String _releaseBaseUrl =
     'https://github.com/maplibre/maplibre-native-ffi/releases/download';
 
-void main(List<String> arguments) async {
+Future<void> main(List<String> arguments) async {
   await build(arguments, (input, output) async {
     if (!input.config.buildCodeAssets) {
       return;
@@ -39,7 +39,7 @@ void main(List<String> arguments) async {
         package: input.packageName,
         name: nativeAssetName,
         linkMode: DynamicLoadingBundled(),
-        file: library.absolute.uri,
+        file: await _bundleLibrary(library, input),
       ),
     );
 
@@ -56,11 +56,20 @@ void main(List<String> arguments) async {
           package: input.packageName,
           name: 'native/${sibling.uri.pathSegments.last}',
           linkMode: DynamicLoadingBundled(),
-          file: sibling.absolute.uri,
+          file: await _bundleLibrary(sibling, input),
         ),
       );
     }
   });
+}
+
+// Flutter treats declared assets as generated outputs and deletes stale ones.
+// Keep those outputs separate from shared installs and downloaded artifacts.
+Future<Uri> _bundleLibrary(File library, BuildInput input) async {
+  final destination = input.outputDirectory.resolve(
+    library.uri.pathSegments.last,
+  );
+  return (await library.copy(destination.toFilePath())).uri;
 }
 
 /// Rejects an install prefix that does not match what this build asked for.
@@ -126,7 +135,8 @@ String _targetPlatform(CodeConfig code) {
   };
 }
 
-/// Lists the other shared libraries installed beside [library].
+/// Lists the other shared libraries installed beside [library], leaving out the
+/// test graphics fixtures that a build tree's install also holds.
 Iterable<File> _siblingLibraries(File library, OS targetOS) {
   final extension = switch (targetOS) {
     OS.macOS || OS.iOS => '.dylib',
@@ -134,7 +144,10 @@ Iterable<File> _siblingLibraries(File library, OS targetOS) {
     _ => '.so',
   };
   return library.parent.listSync().whereType<File>().where(
-    (file) => file.path != library.path && file.path.endsWith(extension),
+    (file) =>
+        file.path != library.path &&
+        file.path.endsWith(extension) &&
+        !file.uri.pathSegments.last.contains('mln_test_graphics'),
   );
 }
 
@@ -515,9 +528,18 @@ void _warnOnHeaderSkew(
   );
 }
 
+/// Headers in the checkout's domain directory that the install leaves out.
+/// Keep in sync with the `EXCLUDE` patterns in `cmake/mln_ffi_install.cmake`
+/// and `UNINSTALLED_HEADERS` in the Rust sys crate's `build.rs`.
+const _uninstalledHeaders = {
+  'maplibre_native_c/callback_adapter.h',
+  'maplibre_native_c/callback_capture_generated.h',
+};
+
 /// Digests the public C headers, keyed by their path under `include/`. Render
 /// backend dependencies install their own headers alongside ours, so this
-/// covers only the umbrella header and its domain directory.
+/// covers only the umbrella header and its domain directory, less the
+/// binding-internal headers that the install leaves out.
 Map<String, String>? _publicHeaders(Uri includeDirectory) {
   final umbrella = File.fromUri(
     includeDirectory.resolve('maplibre_native_c.h'),
@@ -539,6 +561,9 @@ Map<String, String>? _publicHeaders(Uri includeDirectory) {
         continue;
       }
       final name = entry.uri.path.substring(includeDirectory.path.length);
+      if (_uninstalledHeaders.contains(name)) {
+        continue;
+      }
       headers[name] = sha256.convert(entry.readAsBytesSync()).toString();
     }
   }

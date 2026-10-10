@@ -1,11 +1,12 @@
 use std::io::Cursor;
+use std::sync::Arc;
 
 use ash::vk;
 use ash::vk::Handle;
-use maplibre_native_ffi::{Error, ErrorKind, VulkanOwnedTextureFrameHandle};
+use maplibre_native_ffi::{AcquiredFrameHandle, Error, ErrorKind};
 
 use crate::viewport::Viewport;
-use crate::vulkan::VulkanContext;
+use crate::vulkan::{QueueMutex, VulkanContext};
 
 const VERT_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/fullscreen.vert.spv"));
 const FRAG_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sample.frag.spv"));
@@ -16,6 +17,8 @@ pub struct VulkanTextureCompositor {
     physical_device: vk::PhysicalDevice,
     device: ash::Device,
     graphics_queue: vk::Queue,
+    /// Shared with the session, which submits to the same queue.
+    queue_mutex: Arc<QueueMutex>,
     graphics_queue_family_index: u32,
     swapchain_loader: ash::khr::swapchain::Device,
     swapchain: vk::SwapchainKHR,
@@ -56,6 +59,7 @@ impl VulkanTextureCompositor {
             physical_device: context.physical_device(),
             device,
             graphics_queue: context.graphics_queue(),
+            queue_mutex: context.queue_mutex().clone(),
             graphics_queue_family_index: context.graphics_queue_family_index(),
             swapchain_loader,
             swapchain: vk::SwapchainKHR::null(),
@@ -108,27 +112,25 @@ impl VulkanTextureCompositor {
         Ok(())
     }
 
-    pub fn draw(
-        &mut self,
-        frame: &VulkanOwnedTextureFrameHandle,
-    ) -> maplibre_native_ffi::Result<bool> {
-        let metadata = frame.frame()?;
-        if metadata.width == 0 || metadata.height == 0 {
-            return Err(compositor_error("owned Vulkan frame has an empty extent"));
-        }
-        if metadata.layout != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32 {
-            return Err(compositor_error(format!(
-                "owned Vulkan frame has layout {}, expected SHADER_READ_ONLY_OPTIMAL",
-                metadata.layout
-            )));
-        }
-        let image_view = unsafe { vk::ImageView::from_raw(frame.image_view()?.bits()) };
-        if image_view == vk::ImageView::null() {
-            return Err(compositor_error("owned Vulkan frame has a null image view"));
-        }
-        self.draw_image_view(image_view).map_err(|error| {
-            compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
-        })
+    pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
+        frame.get_vulkan_texture(|metadata| {
+            if metadata.width == 0 || metadata.height == 0 {
+                return Err(compositor_error("Vulkan frame has an empty extent"));
+            }
+            if metadata.layout != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32 {
+                return Err(compositor_error(format!(
+                    "Vulkan frame has layout {}, expected SHADER_READ_ONLY_OPTIMAL",
+                    metadata.layout
+                )));
+            }
+            let image_view = vk::ImageView::from_raw(metadata.image_view);
+            if image_view == vk::ImageView::null() {
+                return Err(compositor_error("Vulkan frame has a null image view"));
+            }
+            self.draw_image_view(image_view).map_err(|error| {
+                compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
+            })
+        })?
     }
 
     pub fn close(&mut self) -> Result<(), vk::Result> {
@@ -194,10 +196,7 @@ impl VulkanTextureCompositor {
     /// Samples the image view into the swapchain, reporting whether the frame
     /// reached the screen. A swapchain the surface has outgrown presents
     /// nothing, so the caller keeps its redraw pending.
-    pub(crate) fn draw_image_view(
-        &mut self,
-        image_view: vk::ImageView,
-    ) -> Result<bool, vk::Result> {
+    fn draw_image_view(&mut self, image_view: vk::ImageView) -> Result<bool, vk::Result> {
         // SAFETY: the fence belongs to this live device.
         unsafe {
             self.device
@@ -241,7 +240,10 @@ impl VulkanTextureCompositor {
                 .wait_dst_stage_mask(&wait_stages)
                 .command_buffers(&command_buffers)
                 .signal_semaphores(&signal_semaphores)];
-            device.queue_submit(self.graphics_queue, &submit_info, self.in_flight)?;
+            {
+                let _queue = self.queue_mutex.hold();
+                device.queue_submit(self.graphics_queue, &submit_info, self.in_flight)?;
+            }
             device.wait_for_fences(&[self.in_flight], true, u64::MAX)?;
 
             let swapchains = [self.swapchain];
@@ -250,10 +252,12 @@ impl VulkanTextureCompositor {
                 .wait_semaphores(&signal_semaphores)
                 .swapchains(&swapchains)
                 .image_indices(&image_indices);
-            match self
-                .swapchain_loader
-                .queue_present(self.graphics_queue, &present_info)
-            {
+            let presented = {
+                let _queue = self.queue_mutex.hold();
+                self.swapchain_loader
+                    .queue_present(self.graphics_queue, &present_info)
+            };
+            match presented {
                 Ok(present_suboptimal) => {
                     if present_suboptimal {
                         self.swapchain_stale = true;
@@ -603,8 +607,10 @@ impl VulkanTextureCompositor {
         }
     }
 
-    fn wait_idle(&self) -> Result<(), vk::Result> {
-        unsafe { self.device.device_wait_idle() }
+    /// Waits for the queue that reads the swapchain and the sampled map image.
+    pub fn wait_idle(&self) -> Result<(), vk::Result> {
+        let _queue = self.queue_mutex.hold();
+        unsafe { self.device.queue_wait_idle(self.graphics_queue) }
     }
 
     fn destroy_swapchain_dependents(&mut self) {

@@ -1,104 +1,46 @@
-"""Low-level Python bindings for MapLibre Native FFI."""
+"""Low-level Python bindings generated from the MapLibre C API.
+
+Commands and ordered queries return ``concurrent.futures.Future`` objects.
+Their results are copied before native completion returns. User done callbacks
+run on host worker threads in registration order for each future; a callback can
+submit another operation and wait for its result. Use ``asyncio.wrap_future`` to
+await a binding future from an asyncio task.
+"""
 
 from . import _loader as _loader
-from ._global import (
-    EXPECTED_C_ABI_VERSION,
-    c_version,
-    network_status,
-    plugin_register_function_v1,
-    set_network_status,
-    supported_opengl_context_providers,
-    supported_render_backends,
-)
+from ._completion import CommandCompletion, CommandDisposition
+from .api import *
+from .api import __all__ as _api_exports
 from .errors import (
+    BusyError,
+    CancelledError,
     InvalidArgumentError,
     InvalidStateError,
     MaplibreError,
-    MaplibreStatus,
     NativeError,
+    NotFoundError,
+    NotReadyError,
+    TargetLostError,
     UnknownStatusError,
     UnsupportedFeatureError,
     WrongThreadError,
 )
-from .map import MapHandle, MapMode, MapOptions
-from .render import (
-    FrameOpenGLTextureName,
-    NativePointer,
-    OpenGLContextProvider,
-    RenderBackend,
-    RenderResult,
-    RenderUpdate,
-    VulkanHandle,
-)
-from .runtime import (
-    CameraChangeMode,
-    CameraTransitionFinishedPayload,
-    NetworkStatus,
-    RenderFramePayload,
-    RenderingStats,
-    RenderMapPayload,
-    RenderMode,
-    RuntimeEvent,
-    RuntimeEventBatch,
-    RuntimeEventMask,
-    RuntimeEventPayload,
-    RuntimeEventSource,
-    RuntimeEventSourceType,
-    RuntimeEventType,
-    RuntimeHandle,
-    RuntimeOptions,
-    TileActionPayload,
-    TileId,
-    TileOperation,
-    UnknownRuntimeEventPayload,
-    WakeSource,
-)
 
 __all__ = [
-    "EXPECTED_C_ABI_VERSION",
-    "CameraChangeMode",
-    "CameraTransitionFinishedPayload",
-    "FrameOpenGLTextureName",
+    "BusyError",
+    "CancelledError",
+    "CommandCompletion",
+    "CommandDisposition",
     "InvalidArgumentError",
     "InvalidStateError",
-    "MapHandle",
-    "MapMode",
-    "MapOptions",
     "MaplibreError",
-    "MaplibreStatus",
     "NativeError",
-    "NativePointer",
-    "NetworkStatus",
-    "OpenGLContextProvider",
-    "RenderBackend",
-    "RenderFramePayload",
-    "RenderMapPayload",
-    "RenderMode",
-    "RenderResult",
-    "RenderUpdate",
-    "RenderingStats",
-    "RuntimeEvent",
-    "RuntimeEventBatch",
-    "RuntimeEventMask",
-    "RuntimeEventPayload",
-    "RuntimeEventSource",
-    "RuntimeEventSourceType",
-    "RuntimeEventType",
-    "RuntimeHandle",
-    "RuntimeOptions",
-    "TileActionPayload",
-    "TileId",
-    "TileOperation",
-    "UnknownRuntimeEventPayload",
+    "NotFoundError",
+    "NotReadyError",
+    "TargetLostError",
     "UnknownStatusError",
     "UnsupportedFeatureError",
-    "VulkanHandle",
-    "WakeSource",
     "WrongThreadError",
-    "c_version",
-    "network_status",
-    "plugin_register_function_v1",
-    "set_network_status",
-    "supported_opengl_context_providers",
-    "supported_render_backends",
 ]
+
+__all__.extend(_api_exports)

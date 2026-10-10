@@ -9,9 +9,6 @@ const int nativeStatusInvalidArgument = -1;
 /// Native C status code for invalid state.
 const int nativeStatusInvalidState = -2;
 
-/// Native C status code for wrong-thread access.
-const int nativeStatusWrongThread = -3;
-
 /// Native C status code for unsupported behavior.
 const int nativeStatusUnsupported = -4;
 
@@ -34,12 +31,4 @@ Never throwInvalidArgument(String diagnostic) {
 /// Reports a Dart-side invalid state before calling native code.
 Never throwInvalidState(String diagnostic) {
   throw MaplibreException.invalidState(diagnostic);
-}
-
-/// Reports Dart-side owner-isolate misuse before calling native code.
-Never throwWrongThread(String diagnostic) {
-  throw MaplibreException.forNativeStatusCode(
-    nativeStatusWrongThread,
-    diagnostic,
-  );
 }

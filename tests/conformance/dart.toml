@@ -1,0 +1,65 @@
+# Maps each case in cases.toml to the dart test that covers it:
+#   "ID" = "path/to/test_file::test_name"
+# or to why it does not apply:
+#   "ID" = { na = "reason" }
+
+[cases]
+"ERR-01" = "bindings/dart/test/internal_support_test.dart::native statuses map to their exceptions and keep unknown codes"
+# The test covers the mismatch error only. That the check runs before any
+# other call rests on the generated entry points, each of which calls
+# ensureAbiVersion() first; no library with another ABI version is at hand to
+# load in its place.
+"ERR-02" = "bindings/dart/test/internal_support_test.dart::ABI mismatch has a stable public error category"
+"ERR-03" = "bindings/dart/test/render_test.dart::a drain before any demand returns no batch"
+"LIFE-01" = "bindings/dart/test/lifecycle_test.dart::closing a handle twice is safe and the second close does nothing"
+"LIFE-02" = "bindings/dart/test/lifecycle_test.dart::a refused close leaves the handle usable for a later close"
+"LIFE-03" = { na = "An isolate runs on one thread at a time and shares no objects with another isolate, so no borrow of a handle can be in progress on another thread; the borrow within an isolate is VIEW-01" }
+# A native finalizer disposes an abandoned owner at collection, with no Dart
+# code on the stack, and a Dart finalizer then writes the leak to standard
+# error. The test observes both: native has disposed the runtime, and the
+# warning reaches stderr through IOOverrides.
+"LIFE-04" = "bindings/dart/test/collection_test.dart::an abandoned runtime is disposed and reported when collected"
+"LIFE-05" = "bindings/dart/test/collection_test.dart::a map keeps its runtime reachable"
+"COMP-01" = "bindings/dart/test/completion_test.dart::a completion delivers once and disposes a value that fails to convert"
+"COMP-02" = "bindings/dart/test/completion_test.dart::a submission native rejects frees its completion state"
+"COMP-03" = "bindings/dart/test/collection_test.dart::a dropped creation is disposed once its owner is collected"
+"COMP-04" = "bindings/dart/test/completion_test.dart::a failed command reports its disposition as data"
+"COMP-05" = "bindings/dart/test/completion_test.dart::a wait that times out leaves its completion to arrive later"
+"CB-01" = "bindings/dart/test/callback_ports_test.dart::a callback root is released by a removal, a map close, or a refusal"
+"CB-02" = "bindings/dart/test/collection_test.dart::callback registrations do not keep their owners reachable"
+"CB-03" = { na = "Every Dart callback reaches its isolate through a native port after the native callback has returned, so no binding call can run inside one and the binding has no admission policy" }
+"CB-04" = "bindings/dart/test/resource_provider_test.dart::a provider callback error reaches its zone and fails the request"
+"CB-05" = "bindings/dart/test/resource_provider_test.dart::a provider answers a request after its callback returns"
+"CB-06" = { na = "The Dart binding exposes no scoped response object: resource and header transforms are native rule tables, and a provider answers through the transferable ResourceRequestHandle of CB-05" }
+"CB-07" = "bindings/dart/test/log_test.dart::replacing the log callback releases the previous registration"
+"CB-08" = "bindings/dart/test/resource_provider_test.dart::a cancel registration on a cancelled request is refused and not rooted"
+"CB-09" = "bindings/dart/test/callback_ports_test.dart::a camera end handler root is released after the handler runs"
+"VAL-01" = "bindings/dart/test/values_test.dart::strings cross as NUL-terminated and explicit-length views"
+"VAL-02" = "bindings/dart/test/values_test.dart::presence fields keep a present zero apart from an absent one"
+"VAL-03" = "bindings/dart/test/internal_support_test.dart::a drained batch is indexed by its stride and copied field by field"
+# The open-enum half of this case is in the VAL-03 test, which decodes unknown
+# event types, source types, and payload tags without losing them.
+"VAL-04" = "bindings/dart/test/values_test.dart::integer narrowing is checked and 64-bit carriers round-trip"
+"VAL-05" = "bindings/dart/test/values_test.dart::an array input is copied when the call submits it"
+"VAL-06" = "bindings/dart/test/values_test.dart::a record built from its constructor defaults equals the native default"
+"VAL-07" = "bindings/dart/test/internal_support_test.dart::an array completion is read at its value_size"
+# An OpenGL session exposes frames only from a context that it shares with the
+# host, which only a caller-driven session can drive, so the test skips on EGL
+# and WGL builds; Metal and Vulkan builds cover it.
+"VIEW-01" = "bindings/dart/test/render_test.dart::a frame view expires with its scope and holds off release inside it"
+# A WGL texture shares the host's context, which only a caller-driven session
+# can drive, so the test skips on WGL builds.
+"REND-01" = "bindings/dart/test/render_test.dart::an owned texture renders a frame that reads back as pixels"
+"REND-02" = { na = "An isolate has no thread affinity: Dart can resume it on another native thread after any await, so it cannot service a caller-driven session from the thread that the session belongs to. Dart hosts, including a Flutter integration, render through core-worker sessions on Metal, Vulkan, or a dedicated EGL context" }
+"PLAT-01" = "bindings/dart/test/native_library_test.dart::loads the native library"
+# The test runs both endings: an isolate that runs out of work with a runtime
+# and a map open, and exit() with an event wake, a resource provider, and the
+# log callback registered. A callback registration leaves its isolate free to
+# finish, so the exit() fixture keeps its isolate alive with a port until the
+# provider runs; isolate_liveness_test.dart covers an isolate that runs out of
+# work with only registrations live.
+"PLAT-02" = "bindings/dart/test/runtime_shutdown_test.dart::shutdown with live handles and callbacks exits cleanly"
+# Each runtime is held only by a callback that captures it, a cycle through
+# its registration, and the test checks that native disposed both.
+"PLAT-03" = "bindings/dart/test/collection_test.dart::callback registrations do not keep their owners reachable"
+"EX-01" = { na = "No example app is written in Dart; bindings/dart/example/example.dart is the package's API snippet and renders nothing" }

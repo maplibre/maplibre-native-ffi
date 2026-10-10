@@ -1,7 +1,7 @@
 /**
  * @file maplibre_native_c/callback_adapter.h
- * Public C API declarations for adapting native callbacks to host runtimes
- * that cannot run user code on a native callback thread.
+ * Binding-internal C declarations for adapting native callbacks to host
+ * runtimes that cannot run user code on a native callback thread.
  *
  * MapLibre callback contracts are synchronous: logging and resource providers
  * return an immediate decision, and borrowed request payloads expire when the
@@ -12,8 +12,10 @@
  * so host user code runs on its own execution context rather than on MapLibre
  * worker, network, logging, or render threads.
  *
- * This header is not part of the maplibre_native_c.h umbrella. Include it
- * directly when a binding needs it.
+ * This header is not installed and carries no compatibility promise. The Dart
+ * binding and the native tests read it from the source tree, and its symbols
+ * stay exported because Dart and the Python extension resolve them from the
+ * shipped library.
  *
  * This header targets C23.
  */
@@ -28,9 +30,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "maplibre_native_c/base.h"     // IWYU pragma: export
-#include "maplibre_native_c/runtime.h"  // IWYU pragma: export
-#include "maplibre_native_c/style.h"    // IWYU pragma: export
+#include "maplibre_native_c/base.h"            // IWYU pragma: export
+#include "maplibre_native_c/logging.h"         // IWYU pragma: export
+#include "maplibre_native_c/render_session.h"  // IWYU pragma: export
+#include "maplibre_native_c/runtime.h"         // IWYU pragma: export
+#include "maplibre_native_c/wake.h"            // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +44,195 @@ extern "C" {
 
 /** Rule kind that matches every resource kind. */
 #define MLN_ADAPTER_RESOURCE_KIND_ANY UINT32_MAX
+
+#include "maplibre_native_c/callback_capture_generated.h"
+
+/** Native-owned completion copy delivered to an asynchronous host listener. */
+typedef struct mln_adapter_completion_record {
+  void* owner MLN_BINDING("kind=context");
+  mln_completion_result result;
+} mln_adapter_completion_record;
+
+/**
+ * Receives one native-owned completion record on the host listener context.
+ *
+ * The listener runs exactly once for each accepted submission. record is null
+ * when the adapter could not copy the completion result; the listener treats
+ * that as a failed completion and destroys nothing. The adapter disposes any
+ * owned result when capture fails. Otherwise the listener owns the record and
+ * releases it with mln_adapter_completion_record_destroy().
+ */
+typedef void (*mln_adapter_completion_listener)(
+  void* user_data, mln_adapter_completion_record* record
+                     MLN_BINDING("ownership=owned;lifetime=owner")
+);
+
+/**
+ * Creates a completion descriptor that copies its borrowed result before
+ * notifying an asynchronous host listener.
+ *
+ * out_completion must point to a zeroed descriptor.
+ * MLN_ADAPTER_COMPLETION_COPY_FLAT copies value_count elements of
+ * mln_completion_result.value_size bytes each, and the copy keeps that stride.
+ * The caller passes the descriptor to exactly one asynchronous C API call. If
+ * that call rejects the submission, the caller must pass the descriptor to
+ * mln_adapter_completion_reject().
+ *
+ * The host owns user_data for the life of the descriptor and frees it after the
+ * listener returns, or after mln_adapter_completion_reject() returns for a
+ * rejected submission. Neither path invokes the listener twice.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_completion receives the descriptor.
+ * - MLN_STATUS_INVALID_ARGUMENT when out_completion is null or not zeroed,
+ *   listener is null, or copy_kind is not an
+ *   mln_adapter_completion_copy_kind value.
+ * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
+ */
+MLN_API mln_status mln_adapter_completion_create(
+  uint32_t copy_kind, mln_adapter_completion_listener listener,
+  void* user_data MLN_BINDING("kind=context"),
+  mln_completion* out_completion MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/** Releases adapter state after the submitting C API rejected a completion. */
+MLN_API void mln_adapter_completion_reject(
+  mln_completion* completion
+) MLN_NOEXCEPT;
+
+/**
+ * Transfers an owned completion result to the host after successful decoding.
+ *
+ * Call this after constructing the host owner and before destroying the record.
+ * A borrowed result requires no adoption; adopting its record has no effect.
+ */
+MLN_API void mln_adapter_completion_record_adopt(
+  mln_adapter_completion_record* record MLN_BINDING("kind=native_pointer")
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a completion record and disposes any owned result not yet adopted.
+ *
+ * A host that discards a delivery or fails to construct its result owner calls
+ * this directly. Native handle disposal requires no completion allocation.
+ */
+MLN_API void mln_adapter_completion_record_destroy(
+  mln_adapter_completion_record* record MLN_BINDING("kind=native_pointer")
+) MLN_NOEXCEPT;
+
+/**
+ * Native-owned copy of one deferred callback call.
+ *
+ * A deferred callback typedef declares the result an adapter may return at
+ * once. The adapter copies the call's arguments into arguments, laid out as the
+ * generated arguments record for callback, and returns that result to
+ * MapLibre. When the result accepts a decision, the record owns the decision
+ * handle until the host adopts it with
+ * mln_adapter_deferred_call_record_adopt().
+ */
+typedef struct mln_adapter_deferred_call_record {
+  void* owner MLN_BINDING("kind=context");
+  /** The mln_adapter_deferred_callback value naming the callback typedef. */
+  uint32_t callback;
+  /** Copied arguments, one generated mln_adapter_*_arguments record. */
+  const void* arguments MLN_BINDING("lifetime=owner");
+} mln_adapter_deferred_call_record;
+
+/**
+ * Receives deferred calls on the thread that made them.
+ *
+ * Calls can arrive concurrently from several MapLibre threads. The listener
+ * owns each non-null record and releases it with
+ * mln_adapter_deferred_call_record_destroy(). It runs once more with a null
+ * record when the context is released, after the final call, and frees
+ * user_data then. A listener hands each record to the host's own execution
+ * context, such as a queue it wakes, returns promptly, and never calls back
+ * into MapLibre.
+ */
+typedef void (*mln_adapter_deferred_call_listener)(
+  void* user_data, mln_adapter_deferred_call_record* record
+                     MLN_BINDING("ownership=owned;lifetime=owner;nullable=true")
+);
+
+/**
+ * Creates a context that defers one callback typedef to a listener.
+ *
+ * Register mln_adapter_deferred_callback_function(callback) with the returned
+ * context as its user_data and mln_adapter_deferred_callback_release() as its
+ * release callback. The context calls listener for every call it defers. A
+ * call the adapter cannot copy returns the callback's failure result and never
+ * reaches the listener.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when out_context receives the context.
+ * - MLN_STATUS_INVALID_ARGUMENT when callback is not an
+ *   mln_adapter_deferred_callback value, listener is null, or out_context is
+ *   null or does not point to null.
+ * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
+ */
+MLN_API mln_status mln_adapter_deferred_callback_create(
+  uint32_t callback, mln_adapter_deferred_call_listener listener,
+  void* listener_user_data MLN_BINDING("kind=context"),
+  void** out_context MLN_BINDING("direction=out;kind=context"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Creates a deferred callback context that posts records to a Dart port.
+ *
+ * post_cobject is NativeApi.postCObject and port is a Dart SendPort.nativePort.
+ * Each call posts an array of the callback value and the record as a native
+ * pointer whose finalizer destroys an undelivered record. Release posts 0.
+ * Other behavior matches mln_adapter_deferred_callback_create().
+ */
+MLN_API mln_status mln_adapter_dart_deferred_callback_create(
+  uint32_t callback, void* post_cobject MLN_BINDING("lifetime=process"),
+  int64_t port, void** out_context MLN_BINDING("direction=out;kind=context"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Returns the generated function that defers callback, or null.
+ *
+ * The function has the C signature of the callback typedef that callback
+ * names. It returns the typedef's deferred result after delivering a copy.
+ */
+MLN_API void* mln_adapter_deferred_callback_function(
+  uint32_t callback
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a deferred callback context exactly once.
+ *
+ * This function has the signature of mln_user_data_release, so a registration
+ * passes it as its release callback. Call it directly when the registering call
+ * rejects the context.
+ */
+MLN_API void mln_adapter_deferred_callback_release(
+  void* context MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/**
+ * Transfers the record's decision handle to the host.
+ *
+ * Call this after constructing the host owner and before destroying the
+ * record. A record without a decision handle is unchanged.
+ */
+MLN_API void mln_adapter_deferred_call_record_adopt(
+  mln_adapter_deferred_call_record* record
+) MLN_NOEXCEPT;
+
+/**
+ * Releases a deferred call record.
+ *
+ * A decision handle the host did not adopt fails its call: the adapter passes
+ * a zeroed response to the decision's completion function, which the C API
+ * converts to a provider error, and releases the handle. Null is a no-op.
+ */
+MLN_API void mln_adapter_deferred_call_record_destroy(
+  mln_adapter_deferred_call_record* record
+) MLN_NOEXCEPT;
 
 // This block uses line comments because its examples contain URL patterns that
 // a block comment cannot carry.
@@ -64,7 +257,9 @@ extern "C" {
 /// `https://*.example.com/**` matches every subdomain of example.com and never
 /// `https://attacker.example/x.example.com/tile`. Use `**` wherever a pattern
 /// spans path segments, as in `https://tiles.example.com/**` for one host.
-typedef enum mln_adapter_url_match_flags : uint32_t {
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_adapter_url_match_flags : uint32_t {
   MLN_ADAPTER_URL_MATCH_FLAGS_NONE = 0U,
   MLN_ADAPTER_URL_MATCH_GLOB = 1U << 0U,
 } mln_adapter_url_match_flags;
@@ -82,26 +277,27 @@ typedef enum mln_adapter_url_match_flags : uint32_t {
  */
 typedef struct mln_adapter_resource_rewrite_rule {
   uint32_t kind;
-  uint32_t flags;
-  const char* url;
-  const char* replacement_url;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
+  const char* url MLN_BINDING("lifetime=owner;nullable=true");
+  const char* replacement_url MLN_BINDING("lifetime=owner;nullable=true");
 } mln_adapter_resource_rewrite_rule;
 
 /**
  * A borrowed table of rewrite rules.
  *
- * The rules pointer is borrowed and must stay valid while the table is
- * registered as resource transform user data.
+ * The rules pointer and every rule string stay valid through the terminal event
+ * of the command that replaces or clears this transform.
  */
 typedef struct mln_adapter_resource_rewrite_rules {
-  const mln_adapter_resource_rewrite_rule* rules;
+  const mln_adapter_resource_rewrite_rule* rules
+    MLN_BINDING("length=count;lifetime=owner");
   size_t count;
 } mln_adapter_resource_rewrite_rules;
 
 /** One borrowed header supplied by an HTTP header transform rule. */
 typedef struct mln_adapter_http_header {
-  const char* name;
-  const char* value;
+  const char* name MLN_BINDING("lifetime=owner;nullable=true");
+  const char* value MLN_BINDING("lifetime=owner;nullable=true");
 } mln_adapter_http_header;
 
 /**
@@ -112,20 +308,23 @@ typedef struct mln_adapter_http_header {
  * how url compares against the complete transformed URL. A null url or an
  * unknown flag bit makes the rule match nothing.
  *
- * The first matching rule supplies its complete header list. Every pointer is
- * borrowed and must outlive the registration.
+ * The first matching rule supplies its complete header list. Every pointer
+ * stays valid through the terminal event of the command that replaces or
+ * clears this transform.
  */
 typedef struct mln_adapter_http_header_transform_rule {
   uint32_t kind;
-  uint32_t flags;
-  const char* url;
-  const mln_adapter_http_header* headers;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
+  const char* url MLN_BINDING("lifetime=owner;nullable=true");
+  const mln_adapter_http_header* headers
+    MLN_BINDING("length=header_count;lifetime=owner");
   size_t header_count;
 } mln_adapter_http_header_transform_rule;
 
 /** A borrowed table of HTTP header transform rules. */
 typedef struct mln_adapter_http_header_transform_rules {
-  const mln_adapter_http_header_transform_rule* rules;
+  const mln_adapter_http_header_transform_rule* rules
+    MLN_BINDING("length=count;lifetime=owner");
   size_t count;
 } mln_adapter_http_header_transform_rules;
 
@@ -144,24 +343,25 @@ typedef struct mln_adapter_http_header_transform_rules {
  */
 typedef struct mln_adapter_resource_provider_rule {
   uint32_t kind;
-  uint32_t flags;
-  const char* requested_url;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_url_match_flags");
+  const char* requested_url MLN_BINDING("lifetime=owner;nullable=true");
   mln_resource_response response;
 } mln_adapter_resource_provider_rule;
 
 /**
  * A borrowed table of provider rules.
  *
- * The rules pointer is borrowed and must stay valid while the table is
- * registered as resource provider user data.
+ * The rules pointer, response buffers, and rule strings stay valid through the
+ * terminal event of the command that replaces or clears this provider.
  */
 typedef struct mln_adapter_resource_provider_rules {
-  const mln_adapter_resource_provider_rule* rules;
+  const mln_adapter_resource_provider_rule* rules
+    MLN_BINDING("length=count;lifetime=owner");
   size_t count;
 } mln_adapter_resource_provider_rules;
 
 /**
- * How a queued provider route compares its url against a request.
+ * How a resource route compares its url against a request.
  *
  * MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB reads the url as a glob pattern, in the
  * language mln_adapter_url_match_flags describes.
@@ -169,14 +369,16 @@ typedef struct mln_adapter_resource_provider_rules {
  * mln_resource_request.requested_url as the compared URL instead of
  * mln_resource_request.resolved_url. Setting both matches a requested-URL glob.
  */
-typedef enum mln_adapter_resource_route_flags : uint32_t {
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_adapter_resource_route_flags : uint32_t {
   MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0U,
   MLN_ADAPTER_RESOURCE_ROUTE_MATCH_GLOB = 1U << 0U,
   MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 1U << 1U,
 } mln_adapter_resource_route_flags;
 
 /**
- * One route a queued provider claims.
+ * One route a routed resource provider claims.
  *
  * The kind field matches mln_resource_kind values, or
  * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. The flags field is a bitwise OR
@@ -186,159 +388,175 @@ typedef enum mln_adapter_resource_route_flags : uint32_t {
  *
  * The url field is a comparison value, read literally or as a glob pattern
  * according to flags. A null url or an unknown flag bit makes the route match
- * nothing. The url pointer is borrowed and must outlive the provider.
+ * nothing. The url pointer has the lifetime of its routed provider.
  */
-typedef struct mln_adapter_queued_resource_provider_route {
+typedef struct mln_adapter_resource_route {
   uint32_t kind;
-  uint32_t flags;
-  const char* url;
-} mln_adapter_queued_resource_provider_route;
+  uint32_t flags MLN_BINDING("enum=mln_adapter_resource_route_flags");
+  const char* url MLN_BINDING("lifetime=owner;nullable=true");
+} mln_adapter_resource_route;
 
 /**
- * Receives a queued request as a native-owned
- * mln_adapter_queued_resource_request, or null when the provider retires.
+ * A provider that forwards the requests its routes claim to another provider.
  *
- * The listener returns void and may be invoked from any MapLibre thread. It
- * takes ownership of the record and releases it with
- * mln_adapter_resource_provider_request_destroy() once the host has read it.
+ * A request that matches a route reaches callback with user_data, and the
+ * routed provider returns that callback's decision. Every other request passes
+ * through to native loading. The routes, their URLs, and user_data stay valid
+ * through the terminal event of the command that replaces or clears this
+ * provider. The routed provider never releases user_data; the owner of this
+ * record releases both together.
  */
-typedef void (*mln_adapter_queued_resource_request_listener)(void* request);
-
-/**
- * A provider that hands matching requests to a host listener.
- *
- * The routes pointer is borrowed and must stay valid while the provider is
- * registered.
- */
-typedef struct mln_adapter_queued_resource_provider {
-  const mln_adapter_queued_resource_provider_route* routes;
+typedef struct mln_adapter_routed_resource_provider {
+  const mln_adapter_resource_route* routes
+    MLN_BINDING("length=route_count;lifetime=owner");
   size_t route_count;
-  mln_adapter_queued_resource_request_listener listener;
-} mln_adapter_queued_resource_provider;
+  mln_resource_provider_callback callback;
+  void* user_data MLN_BINDING("kind=context");
+} mln_adapter_routed_resource_provider;
 
 /**
- * A native-owned copy of a resource request.
+ * Creates a wake that posts integer messages through Dart native API version 2.
  *
- * Every pointer field is owned by this record and stays valid until
- * mln_adapter_resource_provider_request_destroy(). The handle field carries the
- * request handle the host completes; it is an ordinary handle value the host
- * moves between execution contexts and passes to mln_resource_request_*().
+ * post_cobject is NativeApi.postCObject and port is a Dart SendPort.nativePort.
+ * Callback messages contain 0; release messages contain 1. Posting to a closed
+ * port safely discards the message. The native release callback frees the
+ * descriptor context after posting. A rejected owning call invokes that release
+ * callback directly to release the context.
  */
-typedef struct mln_adapter_queued_resource_request {
-  void* owner;
-  mln_resource_request_handle handle;
-  /**
-   * Copy of mln_resource_request.requested_url, or the empty string when the
-   * request carried none. Never null, unlike prior_etag.
-   */
-  const char* requested_url;
-  /**
-   * Copy of mln_resource_request.resolved_url, or the empty string when the
-   * request carried none. Never null, unlike prior_etag.
-   */
-  const char* resolved_url;
-  uint32_t kind;
-  uint32_t loading_method;
-  uint32_t priority;
-  uint32_t usage;
-  uint32_t storage_policy;
-  bool has_range;
-  uint64_t range_start;
-  uint64_t range_end;
-  bool has_prior_modified;
-  int64_t prior_modified_unix_ms;
-  bool has_prior_expires;
-  int64_t prior_expires_unix_ms;
-  const char* prior_etag;
-  const uint8_t* prior_data;
-  size_t prior_data_size;
-} mln_adapter_queued_resource_request;
-
-/**
- * Receives a log record as a native-owned mln_adapter_log_record, or null when
- * the callback retires.
- *
- * The listener returns void and may be invoked from any MapLibre logging or
- * worker thread. It takes ownership of the record and releases it with
- * mln_adapter_log_record_destroy() once the host has read it.
- */
-typedef void (*mln_adapter_log_record_listener)(void* record);
-
-/**
- * Registration state for an adapted log callback.
- *
- * The consume field is the value reported to MapLibre for every dispatched
- * record. The address of this struct identifies the registration; it is
- * borrowed and must stay valid until the callback is replaced or cleared.
- */
-typedef struct mln_adapter_log_callback_state {
-  mln_adapter_log_record_listener listener;
-  uint32_t consume;
-} mln_adapter_log_callback_state;
-
-/**
- * A native-owned copy of a log record.
- *
- * The message pointer is owned by this record and stays valid until
- * mln_adapter_log_record_destroy().
- */
-typedef struct mln_adapter_log_record {
-  void* owner;
-  bool retire_callback;
-  uint32_t severity;
-  uint32_t event;
-  int64_t code;
-  const char* message;
-} mln_adapter_log_record;
-
-/**
- * Creates a token describing a handle the host has not closed yet.
- *
- * The token copies type_name and records handle so the report can name them.
- * Hosts attach the token to a finalizer, which can no longer touch the handle
- * itself.
- *
- * Returns null when the token cannot be allocated.
- */
-MLN_API void* mln_adapter_handle_leak_token_create(
-  const char* type_name, uint64_t handle
-) MLN_NOEXCEPT;
-
-/** Releases a leak token without reporting it. */
-MLN_API void mln_adapter_handle_leak_token_destroy(void* token) MLN_NOEXCEPT;
-
-/** Reports a leaked handle on stderr and releases the token. */
-MLN_API void mln_adapter_handle_leak_report(void* token) MLN_NOEXCEPT;
-
-/**
- * The mln_log_callback implementation this layer registers.
- *
- * Copies the record, hands it to the registered listener, and reports the
- * registration's fixed consume value. The user_data pointer is the
- * mln_adapter_log_callback_state passed to mln_adapter_log_set_callback().
- */
-MLN_API uint32_t mln_adapter_log_callback(
-  void* user_data, uint32_t severity, uint32_t event, int64_t code,
-  const char* message
+MLN_API mln_status mln_adapter_dart_wake_create(
+  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port,
+  mln_wake* out_wake MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
- * Installs state as the process-global log callback, or clears the current
- * callback when state is null.
+ * Captures a completion and posts its token and copied result to a Dart port.
  *
- * A registration this call replaces receives one final null record through its
- * listener once its in-flight dispatches finish.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - The status reported by mln_log_set_callback() or mln_log_clear_callback().
+ * The copy keeps the result's value_size, so the binding's completion decoder
+ * indexes an array with the stride of the native build. The VM releases an
+ * undelivered result through its native-pointer message finalizer. Delivered
+ * results transfer to the binding's completion decoder. Rejection uses
+ * mln_adapter_completion_reject.
  */
-MLN_API mln_status mln_adapter_log_set_callback(
-  mln_adapter_log_callback_state* state
+MLN_API mln_status mln_adapter_dart_completion_create(
+  uint32_t copy_kind, void* post_cobject MLN_BINDING("lifetime=process"),
+  int64_t port, int64_t token,
+  mln_completion* out_completion MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
-/** Releases a log record delivered to a listener. */
-MLN_API void mln_adapter_log_record_destroy(void* record) MLN_NOEXCEPT;
+/** Creates a native notification port context for generated void callbacks. */
+MLN_BINDING("ownership=owned")
+MLN_API void* mln_adapter_dart_port_create(
+  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port
+) MLN_NOEXCEPT;
+
+/** Returns the generated callback address for a descriptor field identifier. */
+MLN_API void* mln_adapter_dart_port_function(uint32_t id) MLN_NOEXCEPT;
+
+/** Retires the context once and posts zero after its queued notifications. */
+MLN_API void mln_adapter_dart_port_release(
+  void* context MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/** Creates a zero-initialized native allocation arena, or returns null. */
+MLN_BINDING("ownership=owned")
+MLN_API void* mln_adapter_arena_create(void) MLN_NOEXCEPT;
+
+/** Allocates aligned zeroed memory that belongs to the arena. */
+MLN_API void* mln_adapter_arena_allocate(
+  void* arena MLN_BINDING("kind=context"), size_t size, size_t alignment
+) MLN_NOEXCEPT;
+
+/** Releases the arena's allocations and disposes its adopted handles. */
+MLN_API void mln_adapter_arena_destroy(
+  void* arena MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/** Transfers a handle on entry; failure disposes the handle immediately. */
+MLN_API mln_status mln_adapter_arena_adopt_handle(
+  void* arena MLN_BINDING("kind=context"), uint64_t handle,
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Transfers a context release on entry; failure runs the release immediately.
+ *
+ * The arena calls release with context once when it is destroyed, before it
+ * frees its allocations.
+ */
+MLN_API mln_status mln_adapter_arena_adopt_release(
+  void* arena MLN_BINDING("kind=context"), mln_user_data_release release,
+  void* context MLN_BINDING("kind=context"), mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Registers a retained callback context and consumes its arena on entry.
+ *
+ * Native release destroys the arena even if the Dart isolate has closed.
+ * The release message contains a unique registration identifier. Identifiers
+ * remain distinct when a later arena reuses the same context address.
+ */
+MLN_API mln_status mln_adapter_dart_release_register(
+  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port,
+  void* context MLN_BINDING("kind=context"),
+  void* arena MLN_BINDING("kind=context;nullable=true"),
+  uint64_t* out_registration MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/** Removes a registration, posts its identifier and releases its native arena.
+ */
+MLN_API void mln_adapter_dart_release(
+  void* context MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/**
+ * Creates a finalizer token for one owned native handle.
+ *
+ * Ownership transfers to the token on entry. Explicit release destroys the
+ * token; finalization disposes the native owner. Allocation failure disposes
+ * the owner and returns null.
+ */
+MLN_BINDING("ownership=owned")
+MLN_API void* mln_adapter_owner_token_create(uint64_t handle) MLN_NOEXCEPT;
+
+/** Releases a finalizer token after explicit owner release. */
+MLN_API void mln_adapter_owner_token_destroy(
+  void* token MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/**
+ * Disposes the token's native owner and releases the token on any thread.
+ *
+ * A render session is disposed as mln_render_session_dispose() disposes it,
+ * except that retirement always quarantines its graphics resources and never
+ * detaches it. An isolate's shutdown runs this finalizer while the process
+ * exits, when nothing waits for the session's wake releases, so retirement
+ * makes no graphics call after the one in flight.
+ */
+MLN_API void mln_adapter_owner_finalize(
+  void* token MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/**
+ * Abandons a render session during a host runtime's shutdown, keeping its
+ * graphics objects.
+ *
+ * Does what mln_render_session_abandon() does, including the wait for a core
+ * worker's in-flight driver call, except that it makes no graphics call: it
+ * keeps every graphics object of the session until the process exits, as
+ * mln_adapter_owner_finalize() does. A shutdown hook that ends a session's
+ * graphics calls before the process exits uses this, because the host's own
+ * shutdown may already have destroyed the graphics objects behind the session.
+ *
+ * Returns the statuses that mln_render_session_abandon() returns.
+ */
+MLN_API mln_status mln_adapter_render_session_abandon_at_exit(
+  mln_render_session session,
+  mln_render_abandon_result* out_result MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
 
 /**
  * The mln_resource_transform_callback implementation for rewrite rules.
@@ -346,22 +564,43 @@ MLN_API void mln_adapter_log_record_destroy(void* record) MLN_NOEXCEPT;
  * The user_data pointer is an mln_adapter_resource_rewrite_rules table. The
  * first matching rule replaces the URL, and a request that matches no rule
  * passes through unchanged.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the URL was rewritten or left unchanged, including for
+ *   null arguments.
+ * - the status of mln_resource_transform_response_set_url() when the copy of a
+ *   replacement URL fails.
  */
+MLN_BINDING(
+  "callback_adapter=mln_resource_transform_callback;"
+  "context_type=mln_adapter_resource_rewrite_rules"
+)
 MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
-  void* user_data, uint32_t kind, const char* url,
-  mln_resource_transform_response* out_response
+  void* user_data MLN_BINDING("kind=context"), uint32_t kind, const char* url,
+  mln_resource_transform_response* out_response MLN_BINDING("direction=out")
 ) MLN_NOEXCEPT;
 
 /**
  * The mln_http_header_transform_callback implementation for native rules.
  *
  * The first rule whose kind and transformed URL match supplies all its headers.
- * A request with no matching rule proceeds unchanged. The callback returns the
- * first non-OK status from mln_http_header_transform_response_set().
+ * A request with no matching rule proceeds unchanged.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the matching rule's headers were recorded, or no rule
+ *   matched, including for null arguments.
+ * - MLN_STATUS_INVALID_ARGUMENT when a rule table or header array is null with
+ *   a non-zero count.
+ * - the first non-OK status from
+ *   mln_http_header_transform_response_set_header().
  */
+MLN_BINDING(
+  "callback_adapter=mln_http_header_transform_callback;"
+  "context_type=mln_adapter_http_header_transform_rules"
+)
 MLN_API mln_status mln_adapter_http_header_transform_callback(
-  void* user_data, uint32_t kind, const char* url,
-  mln_http_header_transform_response* out_response
+  void* user_data MLN_BINDING("kind=context"), uint32_t kind, const char* url,
+  mln_http_header_transform_response* out_response MLN_BINDING("direction=out")
 ) MLN_NOEXCEPT;
 
 /**
@@ -370,9 +609,15 @@ MLN_API mln_status mln_adapter_http_header_transform_callback(
  * This applies the C API's field-name, UTF-8 field-value, control-byte, and
  * transport-managed-name rules without requiring an active transform callback.
  * A diagnostic for a rejected header never includes its value.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the header is valid.
+ * - MLN_STATUS_INVALID_ARGUMENT when the name or value breaks one of those
+ *   rules.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_adapter_http_header_validate(
-  const char* name, const char* value
+  const char* name, const char* value, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
@@ -382,61 +627,30 @@ MLN_API mln_status mln_adapter_http_header_validate(
  * matching request is completed inline with the rule's response and reports
  * MLN_RESOURCE_PROVIDER_DECISION_HANDLE. Other requests pass through.
  */
+MLN_BINDING(
+  "callback_adapter=mln_resource_provider_callback;"
+  "context_type=mln_adapter_resource_provider_rules"
+)
 MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
+  void* user_data MLN_BINDING("kind=context"),
+  const mln_resource_request* request, mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
 /**
- * The mln_resource_provider_callback implementation for queued providers.
+ * The mln_resource_provider_callback implementation for routed providers.
  *
- * The user_data pointer is an mln_adapter_queued_resource_provider. A request
- * matching one of the provider's routes is copied and handed to the listener,
- * and reports MLN_RESOURCE_PROVIDER_DECISION_HANDLE. Other requests pass
- * through unchanged and continue through the native loader. A request that
- * cannot be copied is completed with an error response rather than left
- * outstanding.
+ * user_data points to an mln_adapter_routed_resource_provider. A request that
+ * matches one route reaches the provider's callback, and this function returns
+ * its decision. Other requests, and every request of a provider without a
+ * callback, report MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.
  */
-MLN_API uint32_t mln_adapter_queued_resource_provider_callback(
-  void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle handle
-) MLN_NOEXCEPT;
-
-/** Releases a queued request record delivered to a listener. */
-MLN_API void mln_adapter_resource_provider_request_destroy(
-  void* request
-) MLN_NOEXCEPT;
-
-/**
- * Delivers one null record to a queued provider's listener.
- *
- * Hosts call this after the provider is no longer registered so the listener
- * can release the host-side state that backed it.
- */
-MLN_API void mln_adapter_queued_resource_provider_retire(
-  mln_adapter_queued_resource_provider* provider
-) MLN_NOEXCEPT;
-
-/**
- * Invokes custom geometry tile callbacks once with a retirement tile id.
- *
- * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
- * listener recognizes it and releases the state behind the callbacks.
- */
-MLN_API void mln_adapter_custom_geometry_callbacks_retire(
-  mln_custom_geometry_source_tile_callback fetch_tile,
-  mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
-) MLN_NOEXCEPT;
-
-/**
- * Invokes custom MVT vector tile callbacks once with a retirement tile id.
- *
- * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
- * listener recognizes it and releases the state behind the callbacks.
- */
-MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
-  mln_custom_mvt_vector_source_tile_callback fetch_tile,
-  mln_custom_mvt_vector_source_tile_callback cancel_tile, void* user_data
+MLN_BINDING(
+  "callback_adapter=mln_resource_provider_callback;"
+  "context_type=mln_adapter_routed_resource_provider"
+)
+MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
+  void* user_data MLN_BINDING("kind=context"),
+  const mln_resource_request* request, mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)

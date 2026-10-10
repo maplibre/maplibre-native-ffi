@@ -31,6 +31,35 @@ local lintSteps = new Mapping<String, Step> {
   ["snapshot-scopes"] {
     check = "mise run ci:check-snapshot-scopes"
   }
+  // Whole-suite check: a header change can export a function that no C test
+  // calls, and a test change can call one that tests/uncalled-exports.txt
+  // still lists.
+  ["export-calls"] {
+    glob = List(
+      "include/**/*.h",
+      "tests/native/**",
+      "tests/uncalled-exports.txt",
+      "scripts/check-export-calls.py",
+    )
+    check = "mise run check-export-calls"
+  }
+  // Every binding maps every conformance case to a test that exists or to a
+  // reason it does not apply, so it reruns when any binding test changes. No
+  // case is left as todo, so a new one fails until a binding maps it.
+  ["conformance"] {
+    glob = List(
+      "tests/conformance/**",
+      "bindings/**",
+      "examples/**",
+      "scripts/check-conformance.py",
+    )
+    check = "uv run --no-sync python scripts/check-conformance.py --strict"
+  }
+  // Whole-repository check: the baseline counts violations per file, so a
+  // count that falls in one file has to fail the check until it is lowered.
+  ["test-hygiene"] {
+    check = "uv run --no-sync python scripts/check-test-hygiene.py"
+  }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")
     check = "jvl check {{files}}"

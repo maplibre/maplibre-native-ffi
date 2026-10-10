@@ -1,6 +1,5 @@
 using System.Runtime.InteropServices;
 using Maplibre.NativeFfi;
-using Maplibre.NativeFfi.Render;
 using Silk.NET.Core.Native;
 using Silk.NET.GLFW;
 using Silk.NET.Vulkan;
@@ -22,7 +21,17 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     private SurfaceKHR surface;
     private PhysicalDevice physicalDevice;
     private Device device;
+
+    /// <summary>The one queue that the host and a core-worker session both submit to.</summary>
     private Queue graphicsQueue;
+
+    /// <summary>
+    /// Held around every call on <see cref="graphicsQueue" />. A core worker submits from its own
+    /// thread, and Vulkan requires the calls on one queue to be externally synchronized, so the
+    /// session takes it too. A semaphore has no owner thread, so the session's lock and unlock
+    /// callbacks may run as separate upcalls.
+    /// </summary>
+    private readonly SemaphoreSlim queueMutex = new(1, 1);
     private uint graphicsQueueFamilyIndex;
     private bool closed;
 
@@ -37,7 +46,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         this.vk = vk;
     }
 
-    public RenderBackend Backend => RenderBackend.Vulkan;
+    public RenderBackendFlag Backend => RenderBackendFlag.Vulkan;
 
     public nint WindowHandle => window.NativeHandle;
 
@@ -61,7 +70,15 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public uint GraphicsQueueFamilyIndex => graphicsQueueFamilyIndex;
 
-    public static VulkanContext Create(string title, int width, int height)
+    /// <summary>The session's lock on <see cref="GraphicsQueue" />.</summary>
+    public QueueLock QueueLock => new(() => queueMutex.Wait(), () => queueMutex.Release());
+
+    /// <summary>Holds the graphics queue for one call on it.</summary>
+    public void LockQueue() => queueMutex.Wait();
+
+    public void UnlockQueue() => queueMutex.Release();
+
+    public static VulkanContext Create(string title, int width, int height, bool visible)
     {
         SelectWaylandOnLinux();
         var vk = new Vk(Vk.CreateDefaultContext(NativeLibraryResolver.VulkanLibraryCandidates()));
@@ -74,6 +91,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
                 title,
                 width,
                 height,
+                visible,
                 glfw =>
                 {
                     if (!glfw.VulkanSupported())
@@ -147,13 +165,14 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     private string PlatformStatus() =>
         OperatingSystem.IsLinux() ? $", platform {GlfwNativeAccess.GetPlatform()}" : "";
 
+    /// <summary>The session's view of the device.</summary>
     public VulkanContextDescriptor Descriptor() =>
         new()
         {
             Instance = NativePointer.FromBorrowedAddress(instance.Handle),
             PhysicalDevice = NativePointer.FromBorrowedAddress(physicalDevice.Handle),
             Device = NativePointer.FromBorrowedAddress(device.Handle),
-            Queue = NativePointer.FromBorrowedAddress(graphicsQueue.Handle),
+            GraphicsQueue = NativePointer.FromBorrowedAddress(graphicsQueue.Handle),
             GraphicsQueueFamilyIndex = graphicsQueueFamilyIndex,
             GetInstanceProcAddr = NativePointer.FromBorrowedAddress(
                 (nint)vk.GetInstanceProcAddr(instance, "vkGetInstanceProcAddr")
@@ -163,27 +182,28 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
             ),
         };
 
-    public VulkanHandle SurfaceHandle() => new(surface.Handle);
+    public ulong SurfaceHandle() => surface.Handle;
 
     public Viewport ReadViewport() => window.ReadViewport();
 
-    public void Resize(Viewport viewport)
-    {
-        _ = viewport;
-    }
-
-    public void PollEvents()
-    {
-        window.PollEvents();
-    }
-
     public void FinishFrame() { }
 
-    public void WaitIdle()
+    /// <summary>Waits for every submission to the queue, the session's included.</summary>
+    public void WaitQueueIdle()
     {
-        if (device.Handle != 0)
+        if (graphicsQueue.Handle == 0)
         {
-            Check(vk.DeviceWaitIdle(device), "vkDeviceWaitIdle");
+            return;
+        }
+
+        LockQueue();
+        try
+        {
+            Check(vk.QueueWaitIdle(graphicsQueue), "vkQueueWaitIdle");
+        }
+        finally
+        {
+            UnlockQueue();
         }
     }
 
@@ -195,22 +215,36 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         }
 
         closed = true;
+        // Objects that an abandoned session kept are children of the device and the surface, which
+        // then stay until the process exits, as does their instance.
+        var destroy = !RenderTarget.GraphicsKept;
         if (device.Handle != 0)
         {
+            LockQueue();
             vk.DeviceWaitIdle(device);
-            vk.DestroyDevice(device, null);
+            UnlockQueue();
+            if (destroy)
+            {
+                vk.DestroyDevice(device, null);
+            }
             device = default;
         }
 
         if (surface.Handle != 0)
         {
-            vkDestroySurfaceKHR(instance.Handle, surface.Handle, 0);
+            if (destroy)
+            {
+                vkDestroySurfaceKHR(instance.Handle, surface.Handle, 0);
+            }
             surface = default;
         }
 
         if (instance.Handle != 0)
         {
-            vk.DestroyInstance(instance, null);
+            if (destroy)
+            {
+                vk.DestroyInstance(instance, null);
+            }
             instance = default;
         }
 
