@@ -433,12 +433,12 @@ pub const OwnedTexture = struct {
         if (self.caller_driven) _ = try maplibre.renderSessionServiceDriverWork(self.session, 0, null);
     }
 
-    /// Requests one frame and returns its result, blocking on the session's
-    /// frame wake.
+    /// Requests one forced frame, which renders whether or not the map
+    /// changed, and returns its result, blocking on the session's frame wake.
     pub fn renderFrame(self: *OwnedTexture) !maplibre.RenderFrameResult {
         const token = self.next_token;
         self.next_token += 1;
-        try maplibre.renderSessionRequestFrame(testing.allocator, self.session, .{ .token = token }, null);
+        try maplibre.renderSessionRequestFrame(testing.allocator, self.session, .{ .flags = .{}, .token = token }, null);
         const Context = struct { owner: *OwnedTexture, token: u64, result: ?maplibre.RenderFrameResult = null };
         var context = Context{ .owner = self, .token = token };
         try self.wakes.waitUntil(&context, struct {

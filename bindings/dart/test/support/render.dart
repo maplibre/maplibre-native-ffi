@@ -95,10 +95,12 @@ void _release(RenderSessionHandle session) {
   session.close();
 }
 
+/// Demands a forced frame, which renders whether or not the map changed.
 BigInt _requestFrame(RenderSessionHandle session, int value) {
   final token = BigInt.from(value);
   session.requestFrame(
     FrameDemand(
+      flags: const FrameDemandFlag.fromRawValue(0),
       token: token,
       coalescingBoundary: BigInt.zero,
       timeoutNs: BigInt.zero,
