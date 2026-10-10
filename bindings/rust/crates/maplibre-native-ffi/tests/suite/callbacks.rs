@@ -273,10 +273,10 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
     // the binding drops the callback unrun before returning.
     let (probe, released) = release_probe();
     let already_cancelled = handle
-        .set_cancel_callback(move || {
+        .set_cancel_callback(ResourceRequestCancelHandler::new(move || {
             let _ = &probe;
             panic!("a cancelled request ran its cancel callback");
-        })
+        }))
         .unwrap();
     assert!(already_cancelled);
     released

@@ -72,6 +72,7 @@ from ._generated_values import (
     RenderSessionSnapshot,
     RenderTargetExtent,
     ResourceProvider,
+    ResourceRequestCancelHandler,
     ResourceResponse,
     ResourceTransform,
     RuntimeEventMask,
@@ -2067,14 +2068,14 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
     def close(self) -> None:
         return self._native.close()
 
-    def set_cancel_callback(self, callback: Callable[[], None]) -> bool:
+    def set_cancel_callback(self, handler: ResourceRequestCancelHandler) -> bool:
         """Registers a callback that runs when MapLibre cancels a C API resource
         provider request.
 
         See `mln_resource_request_set_cancel_callback` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.set_cancel_callback(callback)
+        return self._native.set_cancel_callback(handler)
 
     def wait_until_retired(self) -> None:
         """Blocks until a resource request is released and its cancel callback

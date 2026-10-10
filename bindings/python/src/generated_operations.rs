@@ -8930,18 +8930,21 @@ impl ResourceRequestHandle {
         unsafe { call.run(|| self.state.close()) };
         Ok(py.None())
     }
-    fn set_cancel_callback(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<bool> {
+    fn set_cancel_callback(&self, handler: &Bound<'_, PyAny>) -> PyResult<bool> {
         let callback_owner =
             maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle());
         generated_check_operation("mln_resource_request_set_cancel_callback", callback_owner)?;
-        if !callback.bind(py).is_callable() {
-            return Err(invalid_argument_error("callback must be callable"));
-        }
-        let root = GeneratedCallbackRootOwner::new(vec![callback]);
-        let weak = root.downgrade();
-        let cancelled = self
-            .state
-            .register_cancel(Box::new(move || {
+        let callback = handler.getattr("callback")?;
+        let mut weak = std::sync::Weak::new();
+        let registration: Option<Box<dyn FnOnce() + Send + 'static>> = if callback.is_none() {
+            None
+        } else {
+            if !callback.is_callable() {
+                return Err(invalid_argument_error("callback must be callable"));
+            }
+            let root = GeneratedCallbackRootOwner::new(vec![callback.unbind()]);
+            weak = root.downgrade();
+            Some(Box::new(move || {
                 Python::try_attach(|py| {
                     if let Some(callback) = root.get(py, 0)
                         && let Err(error) = callback.bind(py).call0()
@@ -8950,6 +8953,10 @@ impl ResourceRequestHandle {
                     }
                 });
             }))
+        };
+        let cancelled = self
+            .state
+            .register_cancel(registration)
             .map_err(map_error)?;
         if !cancelled {
             *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;

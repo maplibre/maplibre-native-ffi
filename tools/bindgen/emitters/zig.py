@@ -190,6 +190,10 @@ pub const Diagnostic = diagnostics.Diagnostic;
 pub const validateAbiVersion = status.validateAbiVersion;
 pub const CallbackErrorReporter = callback.ErrorReporter;
 pub const setCallbackErrorReporter = callback.setErrorReporter;
+/// Test builds only: the callback registrations that the binding holds.
+pub const testing = if (@import("builtin").is_test) struct {
+    pub const liveCallbackRegistrations = callback.liveRegistrations;
+} else struct {};
 
 """
     source = docs + prefix + runtime + "\n".join([*owners, *chunks])

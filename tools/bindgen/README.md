@@ -173,7 +173,6 @@ Eight keys state what a C shape cannot:
   required fields. The cases skip optional fields, unions, union tags, buffer
   views, and arrays, so those fields take no `default=`, and neither does a
   record that only those fields reach.
-
 - `accepted_unless=` on a function names a boolean output that, when set on
   success, reports that native kept nothing from the function's one callback
   registration, as `out_cancelled` does for

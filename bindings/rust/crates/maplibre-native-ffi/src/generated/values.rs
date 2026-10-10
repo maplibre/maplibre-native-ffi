@@ -4246,6 +4246,36 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
     }
 }
 
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Default)]
+pub struct ResourceRequestCancelHandler {
+    pub callback: Option<Box<dyn FnOnce() + Send + 'static>>,
+}
+impl std::fmt::Debug for ResourceRequestCancelHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResourceRequestCancelHandler")
+            .finish_non_exhaustive()
+    }
+}
+impl ResourceRequestCancelHandler {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.callback = Some(Box::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        Self::default().with_callback(callback)
+    }
+}
+
 native_flags! {
 /// Field mask values for `mln_resource_request`.
 ///
@@ -4307,10 +4337,10 @@ impl ResourceRequestHandle {
     ///
     /// See `mln_resource_request_set_cancel_callback` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    pub fn set_cancel_callback(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {
+    pub fn set_cancel_callback(&self, handler: ResourceRequestCancelHandler) -> Result<bool> {
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("mln_resource_request_set_cancel_callback", native.0)?;
-        self.state.register_cancel(Box::new(callback))
+        self.state.register_cancel(handler.callback)
     }
     /// Blocks until a resource request is released and its cancel callback
     /// registration has retired: the callback, if it ran, and release_user_data

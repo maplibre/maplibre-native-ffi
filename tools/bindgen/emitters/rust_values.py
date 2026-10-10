@@ -86,6 +86,10 @@ class Values:
                 for parameter in complete.inputs:
                     if parameter.name != complete.receiver:
                         self.add(parameter.value, "in")
+                from .rust_callbacks import cancel_notification
+
+                record = cancel_notification(self.bound, decision)[2]
+                self.used[record.native] = record
             return self.public(value)
         if value.response:
             self.used[value.native] = value
@@ -158,8 +162,11 @@ class Values:
 
             return response_declaration(self, value)
         if value.registration:
+            from .rust_callbacks import cancel_declaration, cancel_records
             from .rust_callbacks import declaration as registration
 
+            if value.native in cancel_records(self.bound):
+                return cancel_declaration(self, value)
             return registration(self, value)
         if value.kind == "union":
             members = ", ".join(

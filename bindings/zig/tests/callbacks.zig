@@ -249,8 +249,9 @@ const CancelProbe = struct {
 };
 
 // Registering a cancel callback after cancellation returns true, and native
-// takes no ownership of the registration. The binding then leaves the context
-// unrooted, so neither the callback nor release_context ever runs.
+// takes no ownership of the registration. The binding then frees the
+// registration before returning and leaves the context unrooted, so neither
+// the callback nor release_context ever runs.
 test "a registration that reports cancellation is never rooted" {
     const fixture = try support.Fixture.create(.{});
     defer fixture.destroy();
@@ -268,11 +269,13 @@ test "a registration that reports cancellation is never rooted" {
     }.ready);
 
     var probe = CancelProbe{};
+    const live = maplibre.testing.liveCallbackRegistrations();
     try testing.expect(try maplibre.resourceRequestSetCancelCallback(testing.allocator, handle, .{
         .callback = CancelProbe.cancelled,
         .context = &probe,
         .release_context = CancelProbe.released,
     }, null));
+    try testing.expectEqual(live, maplibre.testing.liveCallbackRegistrations());
     try maplibre.resourceRequestRelease(handle);
     try fixture.releaseRuntimeWhenChildless();
     try testing.expectEqual(@as(usize, 0), probe.cancels.get());

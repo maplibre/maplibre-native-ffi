@@ -2825,6 +2825,17 @@ class ResourceRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class ResourceRequestCancelHandler:
+    """Cancel callback state for one handled resource request.
+
+    See `mln_resource_request_cancel_handler` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    callback: Callable[[], None] | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ResourceResponse:
     """A resource provider's answer to one request.
 

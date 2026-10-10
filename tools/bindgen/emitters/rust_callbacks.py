@@ -437,6 +437,43 @@ def cancel_notification(bound, decision):
     return plan, registration, record, callback
 
 
+def cancel_records(bound) -> set[str]:
+    """The records that register a decision handle's cancel notification."""
+    return {
+        cancel_notification(bound, decision)[2].native
+        for decision in bound.decisions.values()
+    }
+
+
+def cancel_declaration(values, value) -> str:
+    """The record of a decision handle's cancel notification, whose callback
+    runs at most once, so it holds an `FnOnce` that the core runtime registers.
+    """
+    registration = next(
+        registration
+        for _, registration, record, _ in (
+            cancel_notification(values.bound, decision)
+            for decision in values.bound.decisions.values()
+        )
+        if record.native == value.native
+    )
+    name = values.name(value)
+    field = identifier(registration.callbacks[0])
+    function = "FnOnce() + Send + 'static"
+    return (
+        doc(values.bound, value.native) + "#[derive(Default)]\n"
+        f"pub struct {name} {{\n"
+        f"{doc(values.bound, f'{value.native}.{registration.callbacks[0]}', '    ')}"
+        f"    pub {field}: Option<Box<dyn {function}>>,\n"
+        "}\n"
+        f'impl std::fmt::Debug for {name} {{ fn fmt(&self, f: &mut std::fmt::Formatter<\'_>) -> std::fmt::Result {{ f.debug_struct("{name}").finish_non_exhaustive() }} }}\n'
+        f"impl {name} {{\n"
+        f"    pub fn with_{registration.callbacks[0]}<F>(mut self, callback: F) -> Self where F: {function} {{ self.{field} = Some(Box::new(callback)); self }}\n"
+        f"    pub fn new<F>(callback: F) -> Self where F: {function} {{ Self::default().with_{registration.callbacks[0]}(callback) }}\n"
+        "}\n"
+    )
+
+
 def decision_table(bound, decision, owner: str) -> str:
     """Declare the function table that one decision protocol's state uses, and
     the function that registers its cancel notification through the record."""
@@ -503,7 +540,7 @@ def decision_declaration(values, value):
     def documented(operation):
         return doc(values.bound, operation, "    ").rstrip("\n")
 
-    cancel_notification(values.bound, decision)
+    _, cancel, cancel_record, _ = cancel_notification(values.bound, decision)
     return f'''{doc(values.bound, value.native)}#[derive(Debug)]
 pub struct {name} {{
     state: std::sync::Arc<maplibre_core::decision::DecisionHandleState<sys::{decision.handle.native}>>,
@@ -527,10 +564,10 @@ impl {name} {{
         Ok(cancelled)
     }}
 {documented(decision.cancel_registration)}
-    pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {{
+    pub fn {method(decision.cancel_registration)}(&self, {identifier(cancel.parameter)}: {values.name(cancel_record)}) -> Result<bool> {{
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("{decision.cancel_registration}", native.0)?;
-        self.state.register_cancel(Box::new(callback))
+        self.state.register_cancel({identifier(cancel.parameter)}.{identifier(cancel.callbacks[0])})
     }}
 {documented(decision.wait_retired)}
     pub fn {method(decision.wait_retired)}(&self) -> Result<()> {{

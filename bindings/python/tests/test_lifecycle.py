@@ -60,7 +60,7 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
         request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
     ) -> None:
         handles.append(handle)
-        handle.set_cancel_callback(cancelled.set)
+        handle.set_cancel_callback(mln.ResourceRequestCancelHandler(cancelled.set))
         # The last reference goes on the provider's stack, where the map
         # cannot be disposed without reentering native.
         assert submitted.wait(TIMEOUT)
@@ -114,7 +114,7 @@ def test_cyclic_gc_reclaims_a_request_and_the_callback_that_closes_it(
     assert provided.wait(TIMEOUT)
     handle = handles.pop()
     callback = CloseOnCancel(handle)
-    handle.set_cancel_callback(callback)
+    handle.set_cancel_callback(mln.ResourceRequestCancelHandler(callback))
     owner, root = weakref.ref(handle), weakref.ref(callback)
     del callback, handle
     gc.collect()

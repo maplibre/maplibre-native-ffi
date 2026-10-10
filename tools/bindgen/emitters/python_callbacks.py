@@ -93,7 +93,12 @@ def input_source(plan, values):
 
 def sources(values, plan):
     from .python import OWNERS
+    from .rust_callbacks import cancel_notification
 
+    for decision in values.api.decisions.values():
+        _, registration, record, _ = cancel_notification(values.api, decision)
+        if record.native == plan.native:
+            return cancel_sources(values, plan, registration)
     rust, python = [], []
     descriptor = plan.registration
     fields, methods = [], []
@@ -225,42 +230,68 @@ def cancel_operation(plan, values, receiver):
     from .rust_callbacks import cancel_notification
 
     try:
-        cancel_notification(values.api, values.api.decisions[receiver.value.native])
+        _, registration, record, _ = cancel_notification(
+            values.api, values.api.decisions[receiver.value.native]
+        )
     except Unsupported as error:
         raise unsupported(plan.function, str(error)) from error
+    values.records[record.native] = record
     owner = OWNERS[receiver.value.native]
     name = plan.member
+    parameter = registration.parameter
+    field = registration.callbacks[0]
+    record_type = public_name(record.native)
     # The core registration enters the callback's reentry policy and
     # contains panics; this root only keeps the callback visible to the
-    # owner's garbage collection.
-    native = f"""    fn {name}(&self, py: Python<'_>, callback: Py<PyAny>) -> PyResult<bool> {{
+    # owner's garbage collection. Without a callback, native rejects the
+    # registration.
+    native = f"""    fn {name}(&self, {parameter}: &Bound<'_, PyAny>) -> PyResult<bool> {{
         let callback_owner = maplibre_core::handle::NativeHandle::to_raw(self.state.issued_handle());
         generated_check_operation("{plan.name}", callback_owner)?;
-        if !callback.bind(py).is_callable() {{ return Err(invalid_argument_error("callback must be callable")); }}
-        let root = GeneratedCallbackRootOwner::new(vec![callback]);
-        let weak = root.downgrade();
-        let cancelled = self.state.register_cancel(Box::new(move || {{
-            Python::try_attach(|py| {{
-                if let Some(callback) = root.get(py, 0)
-                    && let Err(error) = callback.bind(py).call0()
-                {{
-                    generated_report_unraisable(py, error);
-                }}
-            }});
-        }})).map_err(map_error)?;
+        let callback = {parameter}.getattr("{field}")?;
+        let mut weak = std::sync::Weak::new();
+        let registration: Option<Box<dyn FnOnce() + Send + 'static>> = if callback.is_none() {{
+            None
+        }} else {{
+            if !callback.is_callable() {{ return Err(invalid_argument_error("{field} must be callable")); }}
+            let root = GeneratedCallbackRootOwner::new(vec![callback.unbind()]);
+            weak = root.downgrade();
+            Some(Box::new(move || {{
+                Python::try_attach(|py| {{
+                    if let Some(callback) = root.get(py, 0)
+                        && let Err(error) = callback.bind(py).call0()
+                    {{
+                        generated_report_unraisable(py, error);
+                    }}
+                }});
+            }}))
+        }};
+        let cancelled = self.state.register_cancel(registration).map_err(map_error)?;
         if !cancelled {{
             *self.cancel_root.lock().unwrap_or_else(|p| p.into_inner()) = weak;
         }}
         Ok(cancelled)
     }}
 """
-    facade = f"""    def {name}(self, callback: Callable[[], None]) -> bool:
-{docs.docstring(values.api.doc(plan.name), "        ")}        return self._native.{name}(callback)
+    facade = f"""    def {name}(self, {parameter}: {record_type}) -> bool:
+{docs.docstring(values.api.doc(plan.name), "        ")}        return self._native.{name}({parameter})
 """
     return (
         owner,
         native,
         facade,
-        f"    def {name}(self, callback: Callable[[], None]) -> bool: ...\n",
+        f"    def {name}(self, {parameter}: {record_type}) -> bool: ...\n",
         None,
     )
+
+
+def cancel_sources(values, plan, registration):
+    """The Python class of a decision handle's cancel notification record,
+    whose callback the core runtime registers, so it needs no trampoline."""
+    field = registration.callbacks[0]
+    _, python = values.record_sources(
+        plain_fields(plan),
+        extra_fields=[f"    {field}: Callable[[], None] | None = None"],
+        copied=False,
+    )
+    return "", python

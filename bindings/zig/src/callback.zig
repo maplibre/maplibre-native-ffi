@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const std = @import("std");
 const status = @import("status.zig");
 
@@ -65,6 +66,16 @@ pub fn check(operation: []const u8, owner: u64) status.Error!void {
     }
 }
 
+// A test build counts the registrations that the binding holds, so a test can
+// check that a registration native declined is freed when its call returns.
+var live_registrations: std.atomic.Value(usize) = .init(0);
+
+/// The registrations that the binding holds in a test build, or zero in any
+/// other build.
+pub fn liveRegistrations() usize {
+    return live_registrations.load(.acquire);
+}
+
 pub const Roots = struct {
     items: std.ArrayList(Entry) = .empty,
     accepted: bool = false,
@@ -86,6 +97,7 @@ pub const Roots = struct {
         errdefer std.heap.smp_allocator.destroy(state);
         state.* = .{ .value = value, .owner = self.owner };
         try self.items.append(std.heap.smp_allocator, .{ .context = state, .accept = RegistrationType.accept, .release = RegistrationType.releaseErased, .native_release = RegistrationType.releaseNativeErased });
+        if (builtin.is_test) _ = live_registrations.fetchAdd(1, .acq_rel);
         return state;
     }
     pub fn accept(self: *Roots) void {
@@ -122,6 +134,7 @@ pub fn Registration(comptime T: type) type {
                 defer scope.leave();
                 release_context(self.value.context);
             };
+            if (builtin.is_test) _ = live_registrations.fetchSub(1, .acq_rel);
             std.heap.smp_allocator.destroy(self);
         }
         pub fn releaseNativeErased(context: *anyopaque) void {

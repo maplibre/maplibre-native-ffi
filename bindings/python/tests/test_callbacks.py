@@ -316,7 +316,9 @@ def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> 
 
     callback = _Retiring()
     retired = callback.retired
-    assert handle.set_cancel_callback(callback) is True
+    assert (
+        handle.set_cancel_callback(mln.ResourceRequestCancelHandler(callback)) is True
+    )
     del callback
     assert retired.is_set()
     handle.close()
