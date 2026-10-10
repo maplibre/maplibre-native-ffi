@@ -210,7 +210,7 @@ def descriptor(values, plan):
         declarations += f"""private func invoke{public}{name(field.name)}({parameters}) -> {result} {{
   guard let {identifier(callback.context)} else {{ {"return " + callback.failure + suffix if result != "Void" else "return"} }}
   let box = Unmanaged<GeneratedCallbackBox<{public}>>.fromOpaque({identifier(callback.context)}).takeUnretainedValue()
-{setup}{guard}  do {{ {invoke} }} catch {{ {fail} }}
+{setup}{guard}  do {{ {invoke} }} catch {{ NativeDiagnostics.report(.callbackError(callback: "{callback.native}", error: error)); {fail} }}
 }}
 """
     return declarations
@@ -336,7 +336,7 @@ private func {thunk}({params}) -> {result} {{
   {lookup}
   {guard}
   defer {{ admission.end() }}
-  do {{ {invoke} }} catch {{ {fail} }}
+  do {{ {invoke} }} catch {{ NativeDiagnostics.report(.callbackError(callback: "{callback.native}", error: error)); {fail} }}
 }}
 """,
         None,

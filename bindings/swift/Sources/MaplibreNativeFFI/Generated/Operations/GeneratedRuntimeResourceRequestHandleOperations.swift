@@ -94,5 +94,8 @@ private func invokeMlnResourceRequestSetCancelCallback(
     ]
   )
   defer { admission.end() }
-  do { try box.value.value() } catch { return }
+  do { try box.value.value() } catch { NativeDiagnostics.report(.callbackError(
+    callback: "mln_resource_request_cancel_callback",
+    error: error
+  )); return }
 }

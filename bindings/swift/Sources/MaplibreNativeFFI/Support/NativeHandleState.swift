@@ -50,9 +50,10 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     } else {
       defer { withExtendedLifetime(parent) {} }
       if !handle.disposeAbandoned() {
-        NativeHandleLeakReporter.report(NativeHandleLeak(
+        NativeDiagnostics.report(.leakedHandle(
           typeName: typeName,
-          handle: handle.raw
+          handle: handle.raw,
+          detail: ""
         ))
       }
     }
@@ -161,7 +162,7 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     guard let pending else { return }
     do { try closeOnce(pending) }
     catch {
-      NativeHandleLeakReporter.report(NativeHandleLeak(
+      NativeDiagnostics.report(.leakedHandle(
         typeName: typeName,
         handle: issued.raw,
         detail: "deferred release failed: \(error)"
@@ -228,9 +229,10 @@ private final class NativeRetirement<Handle: NativeHandle>: @unchecked Sendable 
   func run() {
     defer { withExtendedLifetime(parent) {} }
     if !handle.disposeAbandoned() {
-      NativeHandleLeakReporter.report(NativeHandleLeak(
+      NativeDiagnostics.report(.leakedHandle(
         typeName: typeName,
-        handle: handle.raw
+        handle: handle.raw,
+        detail: ""
       ))
     }
   }

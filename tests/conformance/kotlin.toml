@@ -12,6 +12,11 @@
 #   disposal half runs on every platform in commonTest AbandonedHandleTest.
 # - Unreachable-request reclamation, which each garbage collector drives
 #   (ResourceRequestHandleJvmTest, ResourceRequestHandleAndroidTest).
+# CB-04's report goes to the thread's uncaught exception handler on the JVM and
+# to the unhandled exception hook on Kotlin/Native, which its commonTest test
+# intercepts. Android writes the report to the log, since its default handler
+# ends the process, and a test cannot read the log back, so the Android run
+# checks the containment alone.
 # The strided event batch with an unknown payload arm needs a batch laid out the
 # way the C compiler does, which cinterop provides, so it runs in nativeTest
 # RuntimeEventNativeTest. It also covers the checked narrowing of a native count

@@ -25,7 +25,7 @@
 "CB-01" = "bindings/zig/tests/callbacks.zig::a callback registration is rooted until native releases it"
 "CB-02" = { na = "Zig has no garbage collector: a callback's context is a caller-owned pointer that the binding never retains, so no registration can keep a receiver alive" }
 "CB-03" = "bindings/zig/tests/generated_workflows.zig::generated provider inline completion and close retain decision ownership"
-"CB-04" = "bindings/zig/tests/callbacks.zig::an error returned by a resource provider is contained"
+"CB-04" = "bindings/zig/tests/callbacks.zig::an error returned by a resource provider is contained and reported"
 "CB-05" = "bindings/zig/tests/callbacks.zig::a decision handle answers its request later from another thread"
 "CB-06" = "bindings/zig/tests/callbacks.zig::a scoped response rejects use after its callback and from another thread"
 "CB-07" = "bindings/zig/tests/callbacks.zig::replacing the process-global log callback releases the previous one"

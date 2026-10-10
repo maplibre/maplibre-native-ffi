@@ -293,7 +293,10 @@ internal static unsafe class GeneratedValues
                 CopyCanonicalTileId(tile_id)
             );
         }
-        catch { }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_custom_geometry_source_tile_callback", error);
+        }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -308,7 +311,10 @@ internal static unsafe class GeneratedValues
                 CopyCanonicalTileId(tile_id)
             );
         }
-        catch { }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_custom_geometry_source_tile_callback", error);
+        }
     }
 
     internal static mln_custom_geometry_source_options NativeCustomGeometrySourceOptions(
@@ -407,7 +413,10 @@ internal static unsafe class GeneratedValues
                 CopyCanonicalTileId(tile_id)
             );
         }
-        catch { }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_custom_mvt_vector_source_tile_callback", error);
+        }
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -422,7 +431,10 @@ internal static unsafe class GeneratedValues
                 CopyCanonicalTileId(tile_id)
             );
         }
-        catch { }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_custom_mvt_vector_source_tile_callback", error);
+        }
     }
 
     internal static mln_custom_mvt_vector_source_options NativeCustomMvtVectorSourceOptions(
@@ -761,8 +773,9 @@ internal static unsafe class GeneratedValues
             }
             return mln_status.MLN_STATUS_OK;
         }
-        catch
+        catch (Exception error)
         {
+            NativeCallbackFailure.Report("mln_http_header_transform_callback", error);
             return mln_status.MLN_STATUS_NATIVE_ERROR;
         }
     }
@@ -1861,8 +1874,9 @@ internal static unsafe class GeneratedValues
                 ? (uint)mln_resource_provider_decision.MLN_RESOURCE_PROVIDER_DECISION_HANDLE
                 : (uint)decision;
         }
-        catch
+        catch (Exception error)
         {
+            NativeCallbackFailure.Report("mln_resource_provider_callback", error);
             try
             {
                 return owned is not null && owned.FinishDecision(false)
@@ -2066,8 +2080,9 @@ internal static unsafe class GeneratedValues
             }
             return mln_status.MLN_STATUS_OK;
         }
-        catch
+        catch (Exception error)
         {
+            NativeCallbackFailure.Report("mln_resource_transform_callback", error);
             return mln_status.MLN_STATUS_NATIVE_ERROR;
         }
     }
@@ -3255,7 +3270,10 @@ internal static unsafe class GeneratedValues
         {
             ((Wake)NativeCallbackRoot.Value(user_data)).Callback?.Invoke();
         }
-        catch { }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_wake_callback", error);
+        }
     }
 
     internal static mln_wake NativeWake(Wake value, NativeCallScope scope)
@@ -3452,8 +3470,9 @@ internal static unsafe class GeneratedValues
                 (Func<LogSeverity, LogEvent, long, string, uint>)NativeCallbackRoot.Value(user_data)
             )((LogSeverity)severity, (LogEvent)@event, code, NativeCallScope.CopyCString(message));
         }
-        catch
+        catch (Exception error)
         {
+            NativeCallbackFailure.Report("mln_log_callback", error);
             return 0;
         }
     }
@@ -3478,6 +3497,9 @@ internal static unsafe class GeneratedValues
             );
             ((Action)owned.Callback)();
         }
-        catch { }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_resource_request_cancel_callback", error);
+        }
     }
 }

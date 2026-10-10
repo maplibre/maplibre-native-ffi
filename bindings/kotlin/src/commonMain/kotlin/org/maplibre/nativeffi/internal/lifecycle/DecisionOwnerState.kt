@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import org.maplibre.nativeffi.internal.callback.CallbackAdmission
+import org.maplibre.nativeffi.internal.callback.reportCallbackFailure
 import org.maplibre.nativeffi.internal.status.Status
 
 /**
@@ -75,13 +76,14 @@ internal class DecisionOwnerState(
     }
 
   /**
-   * Settles the provider callback's [decision], or its exception, and returns the value native
-   * receives. [owner] stays reachable until then.
+   * Settles the [decision] of a provider callback of the C [callback] type, or reports its
+   * exception, and returns the value native receives. [owner] stays reachable until then.
    */
-  inline fun decide(owner: Any, decision: () -> UInt): UInt =
+  inline fun decide(owner: Any, callback: String, decision: () -> UInt): UInt =
     try {
       finishDecision(decision())
-    } catch (_: Throwable) {
+    } catch (error: Throwable) {
+      reportCallbackFailure(callback, error)
       finishException()
     } finally {
       bindingKeepAlive(owner)

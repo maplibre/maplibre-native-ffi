@@ -1,8 +1,10 @@
 package maplibre
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	stdruntime "runtime"
 	"strings"
 	"sync"
@@ -206,11 +208,10 @@ func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 
 // A panic in a callback stays in the binding, which returns the callback's
 // declared failure value to native: a transform's rewrite is dropped, and a
-// provider's request passes through to the built-in sources. The binding
-// reports the panic nowhere else. A callback runs on a native thread with no
-// caller to return an error to, so the host sees the panic only as that
-// failure value's outcome, which this test observes.
+// provider's request passes through to the built-in sources. The binding logs
+// each panic through the default slog logger.
 func TestCallbackPanicIsContained(t *testing.T) {
+	panics := capturePanicLogs(t)
 	f := newFixture(t)
 	base := f.serveLoopback(t, map[string]string{"/original.json": emptyStyle})
 	panicked := make(chan struct{}, 1)
@@ -224,6 +225,9 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 	f.awaitEvent(t, "the style load from the original URL", isStyleLoaded)
 	receive(t, panicked, "the transform's panic")
+	if got := receive(t, panics, "the transform's panic log"); got != (callbackPanic{"mln_resource_transform_callback", "transform failed"}) {
+		t.Fatalf("logged %+v", got)
+	}
 
 	await(t, submitted(f.runtime.ClearResourceTransform()))
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
@@ -233,6 +237,51 @@ func TestCallbackPanicIsContained(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the pass-through's loading failure", isLoadingFailure("custom://unserved.json"))
+	if got := receive(t, panics, "the provider's panic log"); got != (callbackPanic{"mln_resource_provider_callback", "provider failed"}) {
+		t.Fatalf("logged %+v", got)
+	}
+	select {
+	case extra := <-panics:
+		t.Fatalf("logged another panic: %+v", extra)
+	default:
+	}
+}
+
+// callbackPanic is one panic that the binding logged.
+type callbackPanic struct{ callback, panic string }
+
+// capturePanicLogs routes the default slog logger's callback panics to the
+// returned channel until the test ends.
+func capturePanicLogs(t *testing.T) <-chan callbackPanic {
+	panics := make(chan callbackPanic, 16)
+	previous := slog.Default()
+	slog.SetDefault(slog.New(panicLogHandler(panics)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return panics
+}
+
+type panicLogHandler chan<- callbackPanic
+
+func (panicLogHandler) Enabled(context.Context, slog.Level) bool   { return true }
+func (handler panicLogHandler) WithAttrs([]slog.Attr) slog.Handler { return handler }
+func (handler panicLogHandler) WithGroup(string) slog.Handler      { return handler }
+
+func (handler panicLogHandler) Handle(_ context.Context, record slog.Record) error {
+	if record.Level != slog.LevelError || record.Message != "maplibre: callback panicked" {
+		return nil
+	}
+	var logged callbackPanic
+	record.Attrs(func(attr slog.Attr) bool {
+		switch attr.Key {
+		case "callback":
+			logged.callback = attr.Value.String()
+		case "panic":
+			logged.panic = fmt.Sprint(attr.Value.Any())
+		}
+		return true
+	})
+	offer(handler, logged)
+	return nil
 }
 
 // A provider can take a request and answer it later from another goroutine.

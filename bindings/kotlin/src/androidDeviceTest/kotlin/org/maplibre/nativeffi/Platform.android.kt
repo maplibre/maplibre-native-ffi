@@ -2,6 +2,7 @@ package org.maplibre.nativeffi
 
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
+import org.maplibre.nativeffi.error.CallbackException
 
 internal actual class TestThread actual constructor(block: () -> Unit) {
   @Volatile private var failure: Throwable? = null
@@ -51,3 +52,6 @@ internal actual fun requestCollection() {
 
 private const val GC_WAIT_NANOS = 30_000_000_000L
 private const val GC_ROUND_MILLIS = 100L
+
+internal actual fun interceptCallbackFailures(sink: (CallbackException) -> Unit): (() -> Unit)? =
+  null

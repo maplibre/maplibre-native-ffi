@@ -156,6 +156,8 @@ pub const OwnedValue = marshal.OwnedValue;
         "//! copies releases the native value twice.\n"
         "//! Callback contexts stay valid until release_context runs after native retirement.\n"
         "//! GPU descriptors are borrowed only inside the scoped getter callback.\n"
+        "//! A callback's error goes to the reporter that setCallbackErrorReporter installs,\n"
+        "//! and native receives the callback's failure value.\n"
     )
     runtime = """
 /// This whole API under one name, for callers that walk its declarations.
@@ -166,6 +168,8 @@ pub const Error = status.Error;
 pub const BindingError = status.BindingError;
 pub const Diagnostic = diagnostics.Diagnostic;
 pub const validateAbiVersion = status.validateAbiVersion;
+pub const CallbackErrorReporter = callback.ErrorReporter;
+pub const setCallbackErrorReporter = callback.setErrorReporter;
 
 """
     source = docs + prefix + runtime + "\n".join([*owners, *chunks])

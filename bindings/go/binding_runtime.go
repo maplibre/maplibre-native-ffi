@@ -8,8 +8,10 @@ import "C"
 
 import (
 	"fmt"
+	"log/slog"
 	"runtime"
 	"runtime/cgo"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -417,6 +419,16 @@ func bindingCallbackValue[T any](pointer unsafe.Pointer) (T, bool) {
 		ticket.value = nil
 	}
 	return value, ok
+}
+
+// bindingReportCallbackPanic reports a panic that the trampoline of the C
+// callback type named callback recovered, through the default slog logger,
+// which a host replaces with slog.SetDefault. Native receives the callback's
+// declared failure value instead.
+func bindingReportCallbackPanic(callback string, failure any) {
+	// A panicking handler must not escape the trampoline either.
+	defer func() { _ = recover() }()
+	slog.Error("maplibre: callback panicked", "callback", callback, "panic", failure, "stack", string(debug.Stack()))
 }
 
 // Native threads enter the two exports below, so a panic must not cross cgo:

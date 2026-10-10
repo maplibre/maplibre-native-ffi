@@ -167,7 +167,12 @@ private func invokeCustomGeometrySourceOptionsFetchTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {}
+  do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_custom_geometry_source_tile_callback",
+      error: error
+    ))
+  }
 }
 
 private func invokeCustomGeometrySourceOptionsCancelTile(
@@ -177,7 +182,12 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomGeometrySourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {}
+  do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_custom_geometry_source_tile_callback",
+      error: error
+    ))
+  }
 }
 
 public struct CustomMvtVectorSourceOptionField: OptionSet, NativeOpenValue,
@@ -258,7 +268,12 @@ private func invokeCustomMvtVectorSourceOptionsFetchTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {}
+  do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_custom_mvt_vector_source_tile_callback",
+      error: error
+    ))
+  }
 }
 
 private func invokeCustomMvtVectorSourceOptionsCancelTile(
@@ -268,7 +283,12 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
   guard let user_data else { return }
   let box = Unmanaged<GeneratedCallbackBox<CustomMvtVectorSourceOptions>>
     .fromOpaque(user_data).takeUnretainedValue()
-  do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {}
+  do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_custom_mvt_vector_source_tile_callback",
+      error: error
+    ))
+  }
 }
 
 public struct GeojsonSourceOptionField: OptionSet, NativeOpenValue, Equatable,

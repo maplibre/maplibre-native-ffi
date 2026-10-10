@@ -33,3 +33,9 @@ A resource provider that returns `ResourceProviderDecisionHandle` keeps its
 after the provider returns. A scoped response such as
 `ResourceTransformResponseScope` works only during its callback and on the
 callback's thread.
+
+Native cannot receive a panic, so the binding recovers a callback's panic and
+returns the callback's declared failure value to native. The binding logs the
+panic with `slog.Error` on the default logger, with the C callback type, the
+panic value, and the stack as attributes. Install a handler with
+`slog.SetDefault` to route these records.

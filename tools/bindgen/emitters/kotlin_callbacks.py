@@ -164,21 +164,21 @@ def sites(values):
                 (context, ("result", result, "Long")),
                 VOID,
                 "Unit",
-                "contain(Unit) { CompletionBridge.complete(userData, result) }",
+                'contain("mln_completion_callback", Unit) { CompletionBridge.complete(userData, result) }',
             ),
             Site(
                 "completionRelease",
                 (context,),
                 VOID,
                 "Unit",
-                "contain(Unit) { CompletionBridge.release(userData) }",
+                'contain("mln_completion_release", Unit) { CompletionBridge.release(userData) }',
             ),
             Site(
                 "releaseRoot",
                 (context,),
                 VOID,
                 "Unit",
-                "contain(Unit) { CallbackRoots.release(userData) }",
+                'contain("release_user_data", Unit) { CallbackRoots.release(userData) }',
             ),
         ):
             values.sites[site.name] = site
@@ -305,7 +305,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
     invocation = f"{invoke}({', '.join(arguments)})"
     if decision:
         lines.append(
-            f"decisionOwner.binding.decide(decisionOwner) {{ {invocation}.rawValue }}"
+            f'decisionOwner.binding.decide(decisionOwner, "{callback.native}") {{ {invocation}.rawValue }}'
             + (".toInt()" if result == "Int" else "")
         )
     elif callback.result.native == "void":
@@ -318,7 +318,7 @@ def callback_site(site_name, callback_value, member, root_type, values):
     context = identifier(callback.context)
     owner_argument = f", {owner}" if owner else ""
     body = (
-        f"upcall<{root_type}, {result}>({context}, {failure}, {allowed}{owner_argument}) "
+        f'upcall<{root_type}, {result}>("{callback.native}", {context}, {failure}, {allowed}{owner_argument}) '
         f"{{ value, scope -> {'; '.join(lines)} }}"
     )
     sites(values)[site_name] = Site(

@@ -1,8 +1,9 @@
 //! The host side of native callbacks: the registration state a trampoline
-//! reads, the reentry contract host code runs under, and panic containment.
+//! reads, the reentry contract host code runs under, and failure containment.
 //!
 //! Each generated trampoline reads its registration with [`state`] and runs
-//! host code through [`invoke`] or [`invoke_status`]. Native releases a
+//! host code through [`invoke`] or [`invoke_status`], which name the C
+//! callback type that a contained error is reported against. Native releases a
 //! registration through [`release`] once it can no longer call it.
 
 use std::ffi::c_void;
@@ -10,6 +11,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use maplibre_native_ffi_core::callback::PolicyScope;
 use maplibre_native_ffi_core::error::status_for_error;
+use maplibre_native_ffi_core::report::{Report, report};
 use maplibre_native_ffi_sys as sys;
 
 use crate::{Error, Result};
@@ -48,25 +50,49 @@ fn run<R>(reentry: Reentry, body: impl FnOnce() -> Result<R>) -> std::thread::Re
     }))
 }
 
-/// Runs host code for a callback, returning `fallback` when it fails or
-/// panics.
-pub(crate) fn invoke<R>(reentry: Reentry, fallback: R, body: impl FnOnce() -> Result<R>) -> R {
+/// Reports an error that the `callback` trampoline contained. The reporter
+/// admits no native call, since it runs on the native callback's stack.
+fn report_error(callback: &'static str, error: Error) {
+    let _policy = PolicyScope::enter(&[], 0);
+    report(Report::CallbackError { callback, error });
+}
+
+/// Runs host code for the `callback` trampoline, returning `fallback` when it
+/// fails or panics. An error is reported; a panic has already reached the
+/// panic hook.
+pub(crate) fn invoke<R>(
+    callback: &'static str,
+    reentry: Reentry,
+    fallback: R,
+    body: impl FnOnce() -> Result<R>,
+) -> R {
     match run(reentry, body) {
         Ok(Ok(value)) => value,
-        _ => fallback,
+        Ok(Err(error)) => {
+            report_error(callback, error);
+            fallback
+        }
+        Err(_) => fallback,
     }
 }
 
-/// Runs host code for a callback that reports a status: an error's status
-/// when host code fails, and `failure` when it panics.
+/// Runs host code for the `callback` trampoline, which returns a status: an
+/// error's status when host code fails, and `failure` when it panics. Native
+/// treats any failure status as the callback's fallback, so an error is
+/// reported too.
 pub(crate) fn invoke_status(
+    callback: &'static str,
     reentry: Reentry,
     failure: sys::mln_status,
     body: impl FnOnce() -> Result<()>,
 ) -> sys::mln_status {
     match run(reentry, body) {
         Ok(Ok(())) => sys::MLN_STATUS_OK,
-        Ok(Err(error)) => status_for_error(&error),
+        Ok(Err(error)) => {
+            let status = status_for_error(&error);
+            report_error(callback, error);
+            status
+        }
         Err(_) => failure,
     }
 }

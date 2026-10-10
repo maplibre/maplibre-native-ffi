@@ -448,8 +448,10 @@ mod tests {
     #[test]
     fn a_handle_dropped_in_a_callback_disposes_off_its_stack_and_reports_a_failure() {
         let (sender, leaks) = mpsc::channel();
-        crate::set_leak_reporter(Some(Box::new(move |leak| {
-            let _ = sender.send((leak, std::thread::current().id()));
+        crate::set_reporter(Some(Box::new(move |report| {
+            if let crate::Report::LeakedHandle(leak) = report {
+                let _ = sender.send((leak, std::thread::current().id()));
+            }
         })));
         let id = 0x0d00_0000_0000_0007;
         let mut handle = unsafe {
@@ -464,7 +466,7 @@ mod tests {
             handle.finalize_with(|_| Err(Error::invalid_argument("dispose refused")));
         }
         let received = leaks.recv_timeout(Duration::from_secs(10));
-        crate::set_leak_reporter(None);
+        crate::set_reporter(None);
 
         let (leak, thread) = received.expect("the failed disposal was never reported");
         assert_eq!(

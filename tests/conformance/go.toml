@@ -12,9 +12,9 @@
 # preset, since go-map drives OpenGL directly. Its smoke run renders one frame
 # in a hidden window.
 #
-# CB-04: the Go binding contains a callback's panic and reports it nowhere
-# else. The callback returns its declared failure value to native, and the
-# test observes that value's outcome.
+# CB-04: the Go binding contains a callback's panic and logs it through the
+# default slog logger. The callback returns its declared failure value to
+# native, and the test observes both that value's outcome and the log record.
 
 [cases]
 "ERR-01" = "bindings/go/errors_test.go::TestNativeStatusMapsToTypedErrors"

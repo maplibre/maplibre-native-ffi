@@ -7,8 +7,9 @@ import Foundation
 @testable import MaplibreNativeFFI
 import Testing
 
-/// The log callback and the leak report's standard error belong to the
-/// process, so the tests that touch them run one at a time.
+/// The log callback, the diagnostic handler, and the leak report's standard
+/// error belong to the process, so the tests that touch them run one at a
+/// time.
 @Suite(.serialized)
 struct GlobalStateTests {
   /// Replacing the log callback releases the registration it replaces, and
@@ -59,7 +60,44 @@ struct GlobalStateTests {
     capture.finish()
     #expect(UnretirableHandle.disposedInsideACallback.value == [false])
   }
+
+  /// A provider that throws is contained: the binding passes the request
+  /// through, so the map reports the load failure it would have without a
+  /// provider, and the request the callback saw is closed. The diagnostic
+  /// handler receives the error.
+  @Test func aThrowingProviderPassesTheRequestThroughAndIsReported(
+  ) async throws {
+    let reports = LockedBox([String]())
+    Maplibre.setDiagnosticHandler { diagnostic in
+      // Tests in other suites run concurrently, so only this error counts.
+      if case let .callbackError(callback, error) = diagnostic,
+         error is ProviderFailure
+      {
+        reports.update { $0.append(callback) }
+      }
+    }
+    defer { Maplibre.setDiagnosticHandler(nil) }
+    try await withMapFixture { fixture in
+      let seen = LockedBox<ResourceRequestHandle?>(nil)
+      try await installProvider(
+        on: fixture.runtime,
+        for: "custom://throwing.json"
+      ) { handle in
+        seen.update { $0 = handle }
+        throw ProviderFailure()
+      }
+      try await fixture.map.setStyleUrl(url: "custom://throwing.json")
+      let failure = try await fixture.awaitEvent("the pass-through failure") {
+        $0.type == .mapLoadingFailed && $0.message.contains("custom")
+      }
+      #expect(failure != nil)
+      #expect(try #require(seen.value).isClosed)
+    }
+    #expect(reports.value == ["mln_resource_provider_callback"])
+  }
 }
+
+private struct ProviderFailure: Error {}
 
 private func recordingCallback(
   into records: LockedBox<[LogSeverity]>,

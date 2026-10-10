@@ -80,11 +80,22 @@ public sealed class ResourceProviderTests
         handle.WaitUntilRetired();
     }
 
+    // A provider's exception is contained: native receives a pass-through, and the exception goes
+    // to the CallbackException handlers.
     [Fact]
     public unsafe void AProviderExceptionIsContainedAndPassesTheRequestThrough()
     {
         ResourceRequest? copied = null;
         ResourceRequestHandle? escaped = null;
+        var thrown = new FormatException("Host callback failed.");
+        var reports = new List<CallbackExceptionEventArgs>();
+        // Other tests' callbacks may throw concurrently, so only this exception counts.
+        EventHandler<CallbackExceptionEventArgs> record = (_, report) =>
+        {
+            if (ReferenceEquals(report.Exception, thrown))
+                lock (reports)
+                    reports.Add(report);
+        };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeResourceProvider(
             new ResourceProvider(
@@ -92,7 +103,7 @@ public sealed class ResourceProviderTests
                 {
                     copied = request;
                     escaped = handle;
-                    throw new FormatException("Host callback failed.");
+                    throw thrown;
                 }
             ),
             scope
@@ -110,11 +121,21 @@ public sealed class ResourceProviderTests
             prior_data_size = bytes.size,
         };
 
-        Assert.Equal(
-            (uint)ResourceProviderDecision.PassThrough,
-            native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1))
-        );
+        Maplibre.CallbackException += record;
+        try
+        {
+            Assert.Equal(
+                (uint)ResourceProviderDecision.PassThrough,
+                native.callback(native.user_data, &request, SyntheticHandles.ResourceRequest(1))
+            );
+        }
+        finally
+        {
+            Maplibre.CallbackException -= record;
+        }
 
+        var report = Assert.Single(reports);
+        Assert.Equal("mln_resource_provider_callback", report.Callback);
         // The request is copied before the callback runs, so native reusing its memory afterwards
         // leaves the copy intact.
         ((byte*)bytes.data)[0] = 99;

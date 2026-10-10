@@ -53,7 +53,7 @@ private func addCustomSource(
 
 /// Installs a provider for `url` that hands each of its requests to `body`
 /// and returns `body`'s decision, and denies every other request.
-private func installProvider(
+func installProvider(
   on runtime: RuntimeHandle,
   for url: String,
   _ body: @escaping @Sendable (ResourceRequestHandle) throws
@@ -132,30 +132,6 @@ private func installProvider(
     #expect(result.cancelled == false)
     // Outside the callback, the same call is admitted again.
     #expect(try runtime.getEventMask() == .all)
-  }
-}
-
-private struct ProviderFailure: Error {}
-
-/// A provider that throws is contained: the binding passes the request
-/// through, so the map reports the load failure it would have without a
-/// provider, and the request the callback saw is closed.
-@Test func aThrowingProviderPassesTheRequestThrough() async throws {
-  try await withMapFixture { fixture in
-    let seen = LockedBox<ResourceRequestHandle?>(nil)
-    try await installProvider(
-      on: fixture.runtime,
-      for: "custom://throwing.json"
-    ) { handle in
-      seen.update { $0 = handle }
-      throw ProviderFailure()
-    }
-    try await fixture.map.setStyleUrl(url: "custom://throwing.json")
-    let failure = try await fixture.awaitEvent("the pass-through failure") {
-      $0.type == .mapLoadingFailed && $0.message.contains("custom")
-    }
-    #expect(failure != nil)
-    #expect(try #require(seen.value).isClosed)
   }
 }
 

@@ -23,7 +23,7 @@
 "CB-01" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aRegistrationIsRootedUntilNativeReleasesIt"
 "CB-02" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aCancelCallbackDoesNotKeepItsRequestAlive"
 "CB-03" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderCallbackAdmitsOnlyItsRequestsCalls"
-"CB-04" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aThrowingProviderPassesTheRequestThrough"
+"CB-04" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::aThrowingProviderPassesTheRequestThroughAndIsReported"
 "CB-05" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aProviderAnswersATakenRequestLater"
 "CB-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aTransformResponseExpiresWithItsCallback"
 "CB-07" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::replacingTheLogCallbackReleasesThePreviousOne"

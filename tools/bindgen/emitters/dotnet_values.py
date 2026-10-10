@@ -938,7 +938,7 @@ class Values:
                     f"{restriction}"
                     f"            var decision = (({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted}) ?? ({self.public_type(callback.result)}){failure};\n"
                     f"            return owned.FinishDecision(decision == ({self.public_type(callback.result)}){accept}) ? ({raw}){accept} : ({raw})decision;\n"
-                    f"        }}\n        catch {{ try {{ return owned is not null && owned.FinishDecision(false) ? ({raw}){accept} : ({raw}){failure}; }} catch {{ return ({raw}){accept}; }} }}\n    }}\n"
+                    f'        }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); try {{ return owned is not null && owned.FinishDecision(false) ? ({raw}){accept} : ({raw}){failure}; }} catch {{ return ({raw}){accept}; }} }}\n    }}\n'
                 )
                 continue
             responses = [
@@ -984,7 +984,7 @@ class Values:
                 "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
                 f"    private static {result_type} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
                 f"        try\n        {{\n{setup}{restriction}            {invoke}\n{success}        }}\n"
-                f"        catch {{ {failure} }}\n    }}\n"
+                f'        catch (Exception error)\n        {{\n            NativeCallbackFailure.Report("{callback.native}", error);\n            {failure}\n        }}\n    }}\n'
             )
         return "\n".join(methods)
 
@@ -1043,7 +1043,7 @@ class Values:
             table_declaration
             + "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
             f"    internal static {result} Invoke{public_name(plan.native)}({parameters})\n    {{\n"
-            f"        try {{ {guard}{statement} }}\n        catch {{ {failure} }}\n    }}\n"
+            f'        try {{ {guard}{statement} }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); {failure} }}\n    }}\n'
         )
 
     def array_member(

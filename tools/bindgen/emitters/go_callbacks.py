@@ -128,7 +128,12 @@ def sources(values, plan):
             setup.append(
                 f"request := adopt{owner}(uint64(native_{decision.parameter}), nil); request.state.beginDecision(); defer func() {{ result = {values.c_type(callback.result)}(request.state.finishDecision(uint32(result), uint32(C.{decision.accept}), uint32(C.{decision.pass_through}))); runtime.KeepAlive(request) }}()"
             )
-        setup.append("defer func() { if recover() != nil { " + failure + " } }()")
+        setup.append(
+            "defer func() { if failure := recover(); failure != nil { "
+            + f'bindingReportCallbackPanic("{callback.native}", failure); '
+            + failure
+            + " } }()"
+        )
         if any(
             (p.value.element if p.value.kind == "reference" else p.value).response
             for p in parameters

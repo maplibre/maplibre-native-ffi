@@ -88,7 +88,10 @@ private func invokeHttpHeaderTransformCallback(
     ResourceKind(rawValue: kind),
     NativeString.copyCString(url),
     responseOutResponse
-  ); return MLN_STATUS_OK } catch { return MLN_STATUS_NATIVE_ERROR }
+  ); return MLN_STATUS_OK } catch { NativeDiagnostics.report(.callbackError(
+    callback: "mln_http_header_transform_callback",
+    error: error
+  )); return MLN_STATUS_NATIVE_ERROR }
 }
 
 public final class HttpHeaderTransformResponse: @unchecked Sendable {
@@ -392,7 +395,10 @@ private func invokeResourceProviderCallback(
     .finishDecision(accepted: accepted) ? MLN_RESOURCE_PROVIDER_DECISION_HANDLE
     .rawValue : MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
   } catch {
-    return decisionOwner.handle
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_resource_provider_callback",
+      error: error
+    )); return decisionOwner.handle
       .finishDecision(accepted: false) ? MLN_RESOURCE_PROVIDER_DECISION_HANDLE
       .rawValue : MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
   }
@@ -687,7 +693,10 @@ private func invokeResourceTransformCallback(
     ResourceKind(rawValue: kind),
     NativeString.copyCString(url),
     responseOutResponse
-  ); return MLN_STATUS_OK } catch { return MLN_STATUS_NATIVE_ERROR }
+  ); return MLN_STATUS_OK } catch { NativeDiagnostics.report(.callbackError(
+    callback: "mln_resource_transform_callback",
+    error: error
+  )); return MLN_STATUS_NATIVE_ERROR }
 }
 
 public final class ResourceTransformResponse: @unchecked Sendable {
