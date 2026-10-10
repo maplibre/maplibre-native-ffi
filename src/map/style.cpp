@@ -1535,7 +1535,8 @@ namespace {
 // Builds the one record that both the get and the list queries deliver.
 auto style_source_record(const mln::style::Source& source)
   -> StyleSourceRecord {
-  auto record = StyleSourceRecord{.id = source.getID()};
+  auto record = StyleSourceRecord{};
+  record.id = source.getID();
   auto& info = record.info;
   info.type = to_c_source_type(source.getType());
   info.is_volatile = source.isVolatile();
