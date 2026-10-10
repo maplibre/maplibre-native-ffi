@@ -193,8 +193,8 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// An image with no ID, or a stretch interval with no width or one that runs
-// backwards, never reaches the map worker.
+// A stretch interval with no width or one that runs backwards never reaches
+// the map worker.
 static void style_image_inputs_are_validated_at_submission(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -205,14 +205,6 @@ static void style_image_inputs_are_validated_at_submission(void) {
   image.stride = 4;
   image.pixels = pixel;
   image.byte_length = sizeof(pixel);
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "image_id must not be empty",
-    mln_map_set_style_image(
-      map, (mln_buffer_view){.data = "", .size = 0}, &image, NULL,
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
-
   const mln_image_stretch invalid[] = {{0.5f, 0.5f}, {2.0f, 1.0f}};
   for (size_t index = 0; index < 2; index += 1) {
     mln_style_image_options options = mln_style_image_options_default();

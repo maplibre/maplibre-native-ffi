@@ -1198,8 +1198,8 @@ MLN_API mln_status mln_map_set_style_url(
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, json is invalid,
- *   or completion is invalid.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, json is invalid
+ *   or empty, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released, or the runtime is
  *   closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.

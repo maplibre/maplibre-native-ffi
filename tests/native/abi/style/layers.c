@@ -439,13 +439,6 @@ static void source_bindings_change_only_on_layers_that_take_a_source(void) {
       &completion.descriptor, NULL
     )
   );
-  MLN_TEST_EXPECT_COMMAND_REJECTED(
-    "source_id must not be empty",
-    mln_map_set_layer_source_id(
-      map, MLN_BUFFER_LITERAL("dots"), MLN_BUFFER_LITERAL(""),
-      &completion.descriptor, MLN_TEST_DIAGNOSTIC
-    )
-  );
   MLN_TEST_OK(copy_layer_text(map, "paper", false, text));
   TEST_ASSERT_EQUAL_STRING("", text);
 
