@@ -39,10 +39,13 @@ typedef void* (*mln_test_vulkan_device_proc_addr_wrap)(
 
 // mln_test_render_fixture_create_borrowed_texture() for a session whose
 // context names `wrap`'s vkGetDeviceProcAddr, so that a case can observe the
-// device functions the session calls.
+// device functions the session calls. With a non-null `share`, the session
+// attaches on the device and queue of that fixture, which must outlive this
+// one.
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   mln_map map, mln_test_render_fixture* fixture,
-  mln_test_vulkan_device_proc_addr_wrap wrap
+  mln_test_vulkan_device_proc_addr_wrap wrap,
+  const mln_test_render_fixture* share
 );
 #endif
 

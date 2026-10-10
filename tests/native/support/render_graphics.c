@@ -30,6 +30,8 @@
 
 typedef struct host_state {
   mln_test_graphics* graphics;
+  // False when the graphics object belongs to another fixture.
+  bool owns_graphics;
   mln_test_graphics_context context;
   mln_test_graphics_texture* texture;
   mln_test_graphics_surface* surface;
@@ -41,6 +43,17 @@ static void report(const char* what) {
   fprintf(stderr, "%s: %s\n", what, mln_test_graphics_last_error());
 }
 
+// Set only while mln_test_render_fixture_create_vulkan_borrowed_texture()
+// attaches a fixture on the graphics object of another.
+static mln_test_graphics* shared_graphics = NULL;
+
+static void host_state_free(host_state* state) {
+  if (state->owns_graphics) {
+    mln_test_graphics_destroy(state->graphics);
+  }
+  free(state);
+}
+
 // An OpenGL host drives its sessions from its own graphics thread with its
 // context current, which is the thread that creates the fixture.
 static host_state* host_state_create(void) {
@@ -48,21 +61,22 @@ static host_state* host_state_create(void) {
   if (state == NULL) {
     return NULL;
   }
-  state->graphics = mln_test_graphics_create(HOST_BACKEND);
+  state->owns_graphics = shared_graphics == NULL;
+  state->graphics = state->owns_graphics
+                      ? mln_test_graphics_create(HOST_BACKEND)
+                      : shared_graphics;
   if (
     state->graphics == NULL ||
     !mln_test_graphics_get_context(state->graphics, &state->context)
   ) {
     report("the render fixture could not create a graphics context");
-    mln_test_graphics_destroy(state->graphics);
-    free(state);
+    host_state_free(state);
     return NULL;
   }
 #if defined(HOST_OPENGL)
   if (!mln_test_graphics_make_current(state->graphics)) {
     report("the render fixture could not make its context current");
-    mln_test_graphics_destroy(state->graphics);
-    free(state);
+    host_state_free(state);
     return NULL;
   }
 #endif
@@ -80,8 +94,7 @@ void mln_test_backend_destroy(void* opaque_state) {
   }
   mln_test_graphics_surface_destroy(state->surface);
   mln_test_graphics_texture_destroy(state->texture);
-  mln_test_graphics_destroy(state->graphics);
-  free(state);
+  host_state_free(state);
 }
 
 uint32_t mln_test_backend_driver(void) {
@@ -366,12 +379,16 @@ bool mln_test_render_fixture_create_borrowed_texture(
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   mln_map map, mln_test_render_fixture* fixture,
-  mln_test_vulkan_device_proc_addr_wrap wrap
+  mln_test_vulkan_device_proc_addr_wrap wrap,
+  const mln_test_render_fixture* share
 ) {
   wrap_device_proc_addr = wrap;
+  shared_graphics =
+    share == NULL ? NULL : mln_test_render_fixture_graphics(share);
   const bool attached =
     mln_test_render_fixture_create_with(map, fixture, attach_borrowed_texture);
   wrap_device_proc_addr = NULL;
+  shared_graphics = NULL;
   return attached;
 }
 #endif

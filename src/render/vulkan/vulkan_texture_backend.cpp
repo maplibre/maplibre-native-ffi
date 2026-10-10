@@ -450,8 +450,9 @@ void VulkanTextureBackend::set_borrowed_target(
   // Once this wait returns, the session is done with the outgoing image, and
   // the host may destroy it when set_target completes. With one frame in
   // flight, the frame fence covers the session's last frame, and every other
-  // submission waits on its own fence before returning. A device wait would
-  // also need the host's queues, which the session must not touch.
+  // submission waits on its own fence before returning. swap() already waits
+  // on the frame fence, so this wait only keeps the guarantee local. A device
+  // wait would also need the host's queues, which the session must not touch.
   if (context) {
     // VulkanTextureBackend always constructs a Vulkan renderer context.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)

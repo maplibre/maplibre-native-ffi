@@ -78,80 +78,151 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// The device functions a session resolves through observing_proc_addr(). It
-// counts device waits and remembers the fence of the latest submission. A
-// fence signals only once everything submitted before it has completed, and
-// may be destroyed only after that, so the session is done with every image
-// once that fence has signaled or been destroyed. The case reads this state
-// only after a completion orders it after the driver's writes.
-static PFN_vkGetDeviceProcAddr real_get_device_proc_addr;
-static PFN_vkDeviceWaitIdle real_device_wait_idle;
-static PFN_vkQueueSubmit real_queue_submit;
-static PFN_vkDestroyFence real_destroy_fence;
-static PFN_vkGetFenceStatus real_get_fence_status;
-static VkDevice observed_device;
-static atomic_uint device_wait_count;
-static atomic_uint submission_count;
-static _Atomic(VkFence) latest_fence;
-static atomic_bool latest_fence_destroyed;
+// Watches the device functions a session resolves through its context's
+// vkGetDeviceProcAddr. A case reads the counts only after a completion orders
+// them after the driver's calls.
+typedef struct vulkan_observer {
+  PFN_vkGetDeviceProcAddr real_get_device_proc_addr;
+  PFN_vkDeviceWaitIdle real_device_wait_idle;
+  PFN_vkQueueSubmit real_queue_submit;
+  PFN_vkDestroyFence real_destroy_fence;
+  PFN_vkGetFenceStatus real_get_fence_status;
+  atomic_uint device_waits;
+  // Submissions with at least one batch.
+  atomic_uint submissions;
+  // Empty submissions with a fence, which drain the queue: the fence signals
+  // once everything submitted to the queue before it has completed.
+  atomic_uint drains;
+  // Drain fences destroyed before they signaled, so the drain did not wait.
+  atomic_uint unfinished_drains;
+  // A session drains from one thread at a time, so one fence is pending.
+  _Atomic(VkFence) drain_fence;
+} vulkan_observer;
 
-static VKAPI_ATTR VkResult VKAPI_CALL
-observed_device_wait_idle(VkDevice device) {
-  atomic_fetch_add(&device_wait_count, 1);
-  return real_device_wait_idle(device);
+// One observer's own entry points, which route to it.
+typedef struct vulkan_observer_entry_points {
+  PFN_vkGetDeviceProcAddr get_device_proc_addr;
+  PFN_vkDeviceWaitIdle device_wait_idle;
+  PFN_vkQueueSubmit queue_submit;
+  PFN_vkDestroyFence destroy_fence;
+} vulkan_observer_entry_points;
+
+static void observer_reset(vulkan_observer* observer) {
+  atomic_store(&observer->device_waits, 0);
+  atomic_store(&observer->submissions, 0);
+  atomic_store(&observer->drains, 0);
+  atomic_store(&observer->unfinished_drains, 0);
+  atomic_store(&observer->drain_fence, VK_NULL_HANDLE);
 }
 
-static VKAPI_ATTR VkResult VKAPI_CALL observed_queue_submit(
-  VkQueue queue, uint32_t submit_count, const VkSubmitInfo* submits,
-  VkFence fence
+static VkResult observe_device_wait_idle(
+  vulkan_observer* observer, VkDevice device
 ) {
-  atomic_fetch_add(&submission_count, 1);
-  atomic_store(&latest_fence, fence);
-  atomic_store(&latest_fence_destroyed, false);
-  return real_queue_submit(queue, submit_count, submits, fence);
+  atomic_fetch_add(&observer->device_waits, 1);
+  return observer->real_device_wait_idle(device);
 }
 
-static VKAPI_ATTR void VKAPI_CALL observed_destroy_fence(
-  VkDevice device, VkFence fence, const VkAllocationCallbacks* allocator
+static VkResult observe_queue_submit(
+  vulkan_observer* observer, VkQueue queue, uint32_t submit_count,
+  const VkSubmitInfo* submits, VkFence fence
 ) {
-  if (fence != VK_NULL_HANDLE && fence == atomic_load(&latest_fence)) {
-    atomic_store(&latest_fence_destroyed, true);
+  if (submit_count == 0 && fence != VK_NULL_HANDLE) {
+    atomic_fetch_add(&observer->drains, 1);
+    atomic_store(&observer->drain_fence, fence);
+  } else if (submit_count > 0) {
+    atomic_fetch_add(&observer->submissions, 1);
   }
-  real_destroy_fence(device, fence, allocator);
+  return observer->real_queue_submit(queue, submit_count, submits, fence);
 }
 
-static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
-observed_get_device_proc_addr(VkDevice device, const char* name) {
+static void observe_destroy_fence(
+  vulkan_observer* observer, VkDevice device, VkFence fence,
+  const VkAllocationCallbacks* allocator
+) {
+  VkFence drain_fence = fence;
+  if (
+    fence != VK_NULL_HANDLE &&
+    atomic_compare_exchange_strong(
+      &observer->drain_fence, &drain_fence, VK_NULL_HANDLE
+    ) &&
+    observer->real_get_fence_status(device, fence) != VK_SUCCESS
+  ) {
+    atomic_fetch_add(&observer->unfinished_drains, 1);
+  }
+  observer->real_destroy_fence(device, fence, allocator);
+}
+
+static PFN_vkVoidFunction observe_get_device_proc_addr(
+  vulkan_observer* observer, const vulkan_observer_entry_points* entry_points,
+  VkDevice device, const char* name
+) {
   // Like a layer, it answers for itself, because a dispatch table looks
   // vkGetDeviceProcAddr up through the one it was given.
   if (strcmp(name, "vkGetDeviceProcAddr") == 0) {
-    return (PFN_vkVoidFunction)observed_get_device_proc_addr;
+    return (PFN_vkVoidFunction)entry_points->get_device_proc_addr;
   }
-  const PFN_vkVoidFunction real = real_get_device_proc_addr(device, name);
+  const PFN_vkVoidFunction real =
+    observer->real_get_device_proc_addr(device, name);
   if (strcmp(name, "vkDeviceWaitIdle") == 0) {
-    real_device_wait_idle = (PFN_vkDeviceWaitIdle)real;
-    return (PFN_vkVoidFunction)observed_device_wait_idle;
+    observer->real_device_wait_idle = (PFN_vkDeviceWaitIdle)real;
+    return (PFN_vkVoidFunction)entry_points->device_wait_idle;
   }
   if (strcmp(name, "vkQueueSubmit") == 0) {
-    real_queue_submit = (PFN_vkQueueSubmit)real;
-    return (PFN_vkVoidFunction)observed_queue_submit;
+    observer->real_queue_submit = (PFN_vkQueueSubmit)real;
+    return (PFN_vkVoidFunction)entry_points->queue_submit;
   }
   if (strcmp(name, "vkDestroyFence") == 0) {
-    observed_device = device;
-    real_destroy_fence = (PFN_vkDestroyFence)real;
-    real_get_fence_status = (PFN_vkGetFenceStatus)real_get_device_proc_addr(
-      device, "vkGetFenceStatus"
-    );
-    return (PFN_vkVoidFunction)observed_destroy_fence;
+    observer->real_destroy_fence = (PFN_vkDestroyFence)real;
+    observer->real_get_fence_status =
+      (PFN_vkGetFenceStatus)observer->real_get_device_proc_addr(
+        device, "vkGetFenceStatus"
+      );
+    return (PFN_vkVoidFunction)entry_points->destroy_fence;
   }
   return real;
 }
 
-static void* observing_proc_addr(void* get_device_proc_addr) {
-  real_get_device_proc_addr =
-    (PFN_vkGetDeviceProcAddr)(uintptr_t)get_device_proc_addr;
-  return (void*)(uintptr_t)observed_get_device_proc_addr;
-}
+// Defines an observer `name` and its entry points. `name##_wrap` is the
+// mln_test_vulkan_device_proc_addr_wrap that installs it.
+#define VULKAN_OBSERVER(name)                                                  \
+  static vulkan_observer name;                                                 \
+  static VKAPI_ATTR VkResult VKAPI_CALL name##_device_wait_idle(               \
+    VkDevice device                                                            \
+  ) {                                                                          \
+    return observe_device_wait_idle(&(name), device);                          \
+  }                                                                            \
+  static VKAPI_ATTR VkResult VKAPI_CALL name##_queue_submit(                   \
+    VkQueue queue, uint32_t submit_count, const VkSubmitInfo* submits,         \
+    VkFence fence                                                              \
+  ) {                                                                          \
+    return observe_queue_submit(&(name), queue, submit_count, submits, fence); \
+  }                                                                            \
+  static VKAPI_ATTR void VKAPI_CALL name##_destroy_fence(                      \
+    VkDevice device, VkFence fence, const VkAllocationCallbacks* allocator     \
+  ) {                                                                          \
+    observe_destroy_fence(&(name), device, fence, allocator);                  \
+  }                                                                            \
+  static VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL name##_get_device_proc_addr( \
+    VkDevice device, const char* function                                      \
+  ) {                                                                          \
+    const vulkan_observer_entry_points entry_points = {                        \
+      .get_device_proc_addr = name##_get_device_proc_addr,                     \
+      .device_wait_idle = name##_device_wait_idle,                             \
+      .queue_submit = name##_queue_submit,                                     \
+      .destroy_fence = name##_destroy_fence,                                   \
+    };                                                                         \
+    return observe_get_device_proc_addr(                                       \
+      &(name), &entry_points, device, function                                 \
+    );                                                                         \
+  }                                                                            \
+  static void* name##_wrap(void* get_device_proc_addr) {                       \
+    (name).real_get_device_proc_addr =                                         \
+      (PFN_vkGetDeviceProcAddr)(uintptr_t)get_device_proc_addr;                \
+    return (void*)(uintptr_t)name##_get_device_proc_addr;                      \
+  }
+
+VULKAN_OBSERVER(first_observer)
+VULKAN_OBSERVER(second_observer)
 
 static void render_one_frame(
   const mln_test_render_fixture* fixture, uint64_t token
@@ -165,59 +236,93 @@ static void render_one_frame(
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
 }
 
+static void detach(const mln_test_render_fixture* fixture) {
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, fixture,
+    mln_render_session_detach(fixture->session, &completion.descriptor, NULL)
+  );
+}
+
+// Asserts that teardown drained the session's queue through its own device
+// functions, waiting for each drain to finish, and never waited on the device.
+static void assert_drained_own_queue(vulkan_observer* observer) {
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&observer->drains));
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&observer->unfinished_drains));
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&observer->device_waits));
+}
+
 // A host compositor may submit on its own queue while a session renders, so a
-// session never waits on the whole device, which would need every queue. A
-// texture replacement still leaves the outgoing image free once it completes,
-// because the session has waited for all of its own work by then.
-static void a_session_waits_on_its_own_work_and_never_on_the_device(void) {
-  atomic_store(&device_wait_count, 0);
-  atomic_store(&submission_count, 0);
+// session never waits on the whole device, which would need every queue. Its
+// teardown waits for its own work by draining its own queue instead.
+static void a_session_drains_its_own_queue_and_never_waits_on_the_device(void) {
+  observer_reset(&first_observer);
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_prepare_map(runtime, map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      map, &fixture, observing_proc_addr
+      map, &fixture, first_observer_wrap, NULL
     ),
     mln_test_graphics_last_error()
   );
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_DRIVER_CORE_WORKER, fixture.driver);
   render_one_frame(&fixture, 1);
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&first_observer.submissions));
 
-  mln_test_graphics_texture* replacement =
-    mln_test_render_fixture_new_texture(&fixture);
-  TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, &fixture,
-    mln_test_render_fixture_set_texture(
-      &fixture, mln_test_render_fixture_graphics(&fixture), replacement,
-      &completion.descriptor
-    )
-  );
-  // The latest submission covers every earlier one on the queue.
-  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&submission_count));
-  const VkFence fence = atomic_load(&latest_fence);
-  TEST_ASSERT_TRUE(fence != VK_NULL_HANDLE);
-  TEST_ASSERT_TRUE_MESSAGE(
-    atomic_load(&latest_fence_destroyed) ||
-      real_get_fence_status(observed_device, fence) == VK_SUCCESS,
-    "the session's work on the replaced texture is still pending"
-  );
-
-  render_one_frame(&fixture, 2);
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, &fixture,
-    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&device_wait_count));
+  detach(&fixture);
+  assert_drained_own_queue(&first_observer);
 
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
+// Two sessions given one queue each call through the device functions their
+// own context resolved, so a host that interposes on those functions sees only
+// its own session, even while another session shares the queue.
+static void sessions_sharing_a_queue_call_their_own_device_functions(void) {
+  observer_reset(&first_observer);
+  observer_reset(&second_observer);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map first_map = mln_test_create_map(runtime);
+  mln_map second_map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, first_map);
+  mln_test_render_prepare_map(runtime, second_map);
+  mln_test_render_fixture first = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_vulkan_borrowed_texture(
+      first_map, &first, first_observer_wrap, NULL
+    ),
+    mln_test_graphics_last_error()
+  );
+  mln_test_render_fixture second = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_vulkan_borrowed_texture(
+      second_map, &second, second_observer_wrap, &first
+    ),
+    mln_test_graphics_last_error()
+  );
+  render_one_frame(&first, 1);
+  render_one_frame(&second, 1);
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&second_observer.submissions));
+
+  // The second session leaves first, while the first still holds the queue.
+  detach(&second);
+  assert_drained_own_queue(&second_observer);
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&first_observer.drains));
+  mln_test_render_fixture_destroy(&second);
+
+  detach(&first);
+  assert_drained_own_queue(&first_observer);
+  mln_test_render_fixture_destroy(&first);
+  mln_test_destroy_map(second_map);
+  mln_test_destroy_map(first_map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_attach_still_owns_the_session_it_published);
-  RUN_TEST(a_session_waits_on_its_own_work_and_never_on_the_device);
+  RUN_TEST(a_session_drains_its_own_queue_and_never_waits_on_the_device);
+  RUN_TEST(sessions_sharing_a_queue_call_their_own_device_functions);
 }
