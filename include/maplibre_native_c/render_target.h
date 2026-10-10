@@ -77,8 +77,8 @@ typedef struct mln_render_session_attach_options {
    * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
    */
   uint32_t driver MLN_BINDING(
-    "enum=mln_render_driver_kind;default=MLN_RENDER_DRIVER_CALLER_GRAPHICS_"
-    "THREAD"
+    "enum=mln_render_driver_kind;"
+    "default=MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD"
   );
   /**
    * Requested host-acquirable owned-texture slot count. Private targets grant
