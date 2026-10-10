@@ -1076,9 +1076,10 @@ def emit(api: Api | BoundApi) -> Emission:
     converters = []
     for record_name in sorted(used_records):
         plan = values.record(record_name)
-        converters.append(
-            values.decoder(plan).replace("private static", "internal static")
-        )
+        if record_name in bound.returned:
+            converters.append(
+                values.decoder(plan).replace("private static", "internal static")
+            )
         converters.append(values.callback_methods(plan))
         if values.can_encode(plan):
             converters.append(

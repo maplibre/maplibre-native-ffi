@@ -903,15 +903,6 @@ pub const HttpHeaderTransform = struct {
             return c.MLN_STATUS_NATIVE_ERROR;
         };
     }
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_http_header_transform) status.Error!HttpHeaderTransform {
-        _ = allocator;
-        _ = raw;
-        return .{
-            .context = null,
-            .release_context = null,
-            .callback = null,
-        };
-    }
 };
 
 pub const HttpHeaderTransformResponse = struct { native: *c.mln_http_header_transform_response };
@@ -2036,11 +2027,12 @@ pub const RenderSessionAttachOptions = struct {
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_render_session_attach_options) status.Error!RenderSessionAttachOptions {
+        _ = allocator;
         return .{
             .driver = RenderDriverKind.fromNative(raw.driver),
             .requested_texture_ring_depth = raw.requested_texture_ring_depth,
-            .frame_wake = try Wake.fromNative(allocator, raw.frame_wake),
-            .driver_work_wake = try Wake.fromNative(allocator, raw.driver_work_wake),
+            .frame_wake = .{},
+            .driver_work_wake = .{},
         };
     }
 };
@@ -2373,15 +2365,6 @@ pub const ResourceProvider = struct {
             return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
         };
     }
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_provider) status.Error!ResourceProvider {
-        _ = allocator;
-        _ = raw;
-        return .{
-            .context = null,
-            .release_context = null,
-            .callback = null,
-        };
-    }
 };
 
 pub const ResourceProviderDecision = enum(u32) {
@@ -2548,15 +2531,6 @@ pub const ResourceTransform = struct {
             }
         }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3) catch {
             return c.MLN_STATUS_NATIVE_ERROR;
-        };
-    }
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_transform) status.Error!ResourceTransform {
-        _ = allocator;
-        _ = raw;
-        return .{
-            .context = null,
-            .release_context = null,
-            .callback = null,
         };
     }
 };
@@ -2919,7 +2893,7 @@ pub const RuntimeOptions = struct {
             .asset_path = if (raw.asset_path == null) null else try allocator.dupe(u8, std.mem.span(raw.asset_path orelse return error.NativeError)),
             .cache_path = if (raw.cache_path == null) null else try allocator.dupe(u8, std.mem.span(raw.cache_path orelse return error.NativeError)),
             .event_mask = RuntimeEventMask.fromNative(raw.event_mask),
-            .event_wake = try Wake.fromNative(allocator, raw.event_wake),
+            .event_wake = .{},
         };
     }
 };
@@ -3963,15 +3937,6 @@ pub const Wake = struct {
             }
         }.invoke(native_arg_0) catch {
             return;
-        };
-    }
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_wake) status.Error!Wake {
-        _ = allocator;
-        _ = raw;
-        return .{
-            .context = null,
-            .release_context = null,
-            .callback = null,
         };
     }
 };

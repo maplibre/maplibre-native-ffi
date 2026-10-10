@@ -271,10 +271,14 @@ def declaration(values, value):
         masked = field.presence and field.presence.mask
         fields.append(f"    pub {local}: {'Option<' + typ + '>' if masked else typ},")
         copied = decode(values, field.value, place)
+        if field.value.registration:
+            # Native never returns callbacks, so a copy leaves a registration
+            # unset.
+            copied = "None" if masked else "Default::default()"
         if masked:
             write, copy = masked_field(values, field, place, local)
             writes.append(write)
-            copies.append(copy)
+            copies.append(f"{local}: None," if field.value.registration else copy)
         else:
             writes.append(f"{place} = {encode(values, field.value, 'self.' + local)};")
             copies.append(f"{local}: {copied},")

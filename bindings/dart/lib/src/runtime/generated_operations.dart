@@ -506,25 +506,17 @@ _prepareCustomGeometrySourceOptions(
 
 CustomGeometrySourceOptions _readCustomGeometrySourceOptions(
   raw.mln_custom_geometry_source_options source,
-) {
-  if (source.fetch_tile != nullptr) {
-    throwInvalidState('cannot copy a registered native callback');
-  }
-  if (source.cancel_tile != nullptr) {
-    throwInvalidState('cannot copy a registered native callback');
-  }
-  return CustomGeometrySourceOptions(
-    fetchTile: null,
-    cancelTile: null,
-    minZoom: source.min_zoom,
-    maxZoom: source.max_zoom,
-    tolerance: source.tolerance,
-    tileSize: source.tile_size,
-    buffer: source.buffer,
-    clip: source.clip,
-    wrap: source.wrap,
-  );
-}
+) => CustomGeometrySourceOptions(
+  fetchTile: null,
+  cancelTile: null,
+  minZoom: source.min_zoom,
+  maxZoom: source.max_zoom,
+  tolerance: source.tolerance,
+  tileSize: source.tile_size,
+  buffer: source.buffer,
+  clip: source.clip,
+  wrap: source.wrap,
+);
 
 _NativeRegistration<raw.mln_custom_mvt_vector_source_options>
 _prepareCustomMvtVectorSourceOptions(
@@ -599,20 +591,12 @@ _prepareCustomMvtVectorSourceOptions(
 
 CustomMvtVectorSourceOptions _readCustomMvtVectorSourceOptions(
   raw.mln_custom_mvt_vector_source_options source,
-) {
-  if (source.fetch_tile != nullptr) {
-    throwInvalidState('cannot copy a registered native callback');
-  }
-  if (source.cancel_tile != nullptr) {
-    throwInvalidState('cannot copy a registered native callback');
-  }
-  return CustomMvtVectorSourceOptions(
-    fetchTile: null,
-    cancelTile: null,
-    minZoom: source.min_zoom,
-    maxZoom: source.max_zoom,
-  );
-}
+) => CustomMvtVectorSourceOptions(
+  fetchTile: null,
+  cancelTile: null,
+  minZoom: source.min_zoom,
+  maxZoom: source.max_zoom,
+);
 
 RenderingStats _readRenderingStats(raw.mln_rendering_stats source) =>
     RenderingStats(
@@ -1738,13 +1722,6 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
   }
 }
 
-Wake _readWake(raw.mln_wake source) {
-  if (source.callback != nullptr) {
-    throwInvalidState('cannot copy a registered native callback');
-  }
-  return Wake(callback: null);
-}
-
 Pointer<raw.mln_render_session_attach_options> _writeRenderSessionAttachOptions(
   RenderSessionAttachOptions value,
   Arena arena,
@@ -1772,8 +1749,8 @@ RenderSessionAttachOptions _readRenderSessionAttachOptions(
 ) => RenderSessionAttachOptions(
   driver: RenderDriverKind.fromRawValue(source.driver),
   requestedTextureRingDepth: source.requested_texture_ring_depth,
-  frameWake: _readWake(source.frame_wake),
-  driverWorkWake: _readWake(source.driver_work_wake),
+  frameWake: const Wake(),
+  driverWorkWake: const Wake(),
 );
 
 Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
@@ -2312,7 +2289,7 @@ RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
           ? null
           : source.cache_path.cast<Utf8>().toDartString(),
       eventMask: RuntimeEventMask.fromRawValue(source.event_mask),
-      eventWake: _readWake(source.event_wake),
+      eventWake: const Wake(),
     );
 
 Pointer<raw.mln_offline_tile_pyramid_region_definition>

@@ -1216,7 +1216,7 @@ public struct RuntimeOptions: Sendable {
     cachePath = raw.cache_path == nil ? nil : try NativeString
       .copyCString(raw.cache_path)
     eventMask = RuntimeEventMask(rawValue: raw.event_mask)
-    eventWake = try Wake(raw: raw.event_wake)
+    eventWake = Wake()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {

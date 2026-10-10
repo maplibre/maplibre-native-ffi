@@ -419,7 +419,16 @@ class Values:
 
     def copy(self, value, expression, count=None):
         if value.registration:
-            return f"_read{public_name(value.native)}({expression})"
+            public = public_name(value.native)
+            # Native never returns callbacks. A registration's own default
+            # copies its other fields, and any other copy leaves it unset.
+            if value.native in self.bound.returned:
+                return f"_read{public}({expression})"
+            if value.nullable:
+                return "null"
+            if self.port_callbacks(value):
+                return f"const {public}()"
+            return f"const {public}.empty()"
         if value.kind == "native_pointer":
             result = f"NativePointer({expression}.address)"
         elif value.kind == "scalar":
@@ -743,13 +752,8 @@ class Values:
             for name, _, children, _ in self.members(value)
         )
         reader = (
-            f"{public} _read{public}(raw.{value.native} source) {{\n"
-            + "\n".join(
-                f"  if (source.{name} != nullptr) {{ throwInvalidState('cannot copy a registered native callback'); }}"
-                for name in ports
-            )
-            + f"\n  return {public}({read_args});\n}}\n"
-            if disabled
+            f"{public} _read{public}(raw.{value.native} source) => {public}({read_args});\n"
+            if disabled and value.native in self.bound.returned
             else ""
         )
         declaration = (
@@ -815,12 +819,9 @@ class Values:
             + "\n    }\n  } catch (_) { if (!transferred) { arena.releaseAll(); } rethrow; }\n}\n"
         )
         reader = (
-            f"{public} _read{public}(raw.{value.native} source) {{\n"
-            + "\n".join(
-                f"  if (source.{name} != nullptr) {{ throwInvalidState('cannot copy a registered native callback'); }}"
-                for name in value.registration.callbacks
-            )
-            + f"\n  return const {public}.empty();\n}}\n"
+            f"{public} _read{public}(raw.{value.native} source) => const {public}.empty();\n"
+            if value.native in self.bound.returned
+            else ""
         )
         return "\n".join(declarations), conversion + reader
 

@@ -314,6 +314,45 @@ mln_status write_range(const range_value *value, mln_diagnostic *out_diagnostic)
                 require_complete=True,
             )
 
+    def test_copied_values_hold_registrations_only_in_defaults(self):
+        source = """
+typedef void (*notify)(void *state);
+typedef void (*release)(void *state);
+typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct hook { notify fire; void *state BIND("kind=context"); release retire; double scale; } hook BIND("kind=callback_registration;release=retire");
+typedef struct extent { double width; } extent;
+typedef struct settings { extent extent; signals wake; } settings;
+typedef struct request { double zoom; } request;
+typedef struct reading { double zoom; } reading;
+settings settings_default(void);
+hook hook_default(void);
+mln_status configure(const settings *options, const hook *events, const request *input, reading *out_reading BIND("direction=out"), mln_diagnostic *out_diagnostic);
+"""
+        model = bind(self.parse(source), require_complete=True)
+        self.assertEqual(
+            model.defaults.keys() & {"settings", "hook"}, {"settings", "hook"}
+        )
+        # A default's registration field is left unset rather than copied, and
+        # a registration's own default copies its other fields.
+        records = {"signals", "hook", "extent", "settings", "request", "reading"}
+        self.assertEqual(
+            model.returned & records, {"hook", "extent", "settings", "reading"}
+        )
+        for rejected in (
+            'mln_status inspect(settings *out_settings BIND("direction=out"), mln_diagnostic *out_diagnostic);',
+            (
+                "typedef void (*observe)(void *state, settings current);\n"
+                'mln_status watch(observe callback, void *state BIND("kind=context"), mln_diagnostic *out_diagnostic);'
+            ),
+        ):
+            with (
+                self.subTest(rejected=rejected),
+                self.assertRaisesRegex(
+                    ModelError, "native cannot return a callback registration"
+                ),
+            ):
+                bind(self.parse(source + rejected), require_complete=True)
+
     def test_nested_registration_and_callback_context_are_resolved(self):
         api = bind(
             self.parse("""

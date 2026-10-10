@@ -102,7 +102,7 @@ def sources(values, plan):
 
     rust, python = [], []
     descriptor = plan.registration
-    fields, methods, copies = [], [], []
+    fields, methods = [], []
     for index, name in enumerate(descriptor.callbacks):
         field = next(f for f in plan.fields if f.name == name)
         callback = values.api.callbacks[field.value.native]
@@ -129,10 +129,6 @@ def sources(values, plan):
         )
         methods.append(
             f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n        assert callback is not None\n        return callback({arguments})\n"
-        )
-        copies.append(f'dict.set_item("{name}", py.None())?;')
-        copies.append(
-            f'if value.{rust_field(name)}.is_some() {{ return Err(native_error("native callback cannot be copied into a Python closure")); }}'
         )
         native_parameters = ", ".join(
             f"{rust_field(p.name)}: {ffi_type(p.value)}" for p in callback.parameters
@@ -217,9 +213,10 @@ def sources(values, plan):
     record_rust, record_python = values.record_sources(
         plain_fields(plan),
         extra_fields=fields,
-        extra_copies=copies,
-        extra_public_copies=[f"{name}=raw[{name!r}]" for name in descriptor.callbacks],
         extra_methods="\n" + "\n".join(methods),
+        # Native never returns callbacks, so a copy of a registration's
+        # default leaves them at None.
+        copied=plan.native in values.api.returned,
     )
     rust.append(record_rust)
     python.append(record_python)

@@ -563,6 +563,12 @@ class Values:
                     copied.append(
                         f"Copy{public_name(plan.native)}{pascal(field.name)}(value)"
                     )
+                elif field.value.registration or (
+                    plan.registration and field.value.kind == "callback"
+                ):
+                    # Native never returns callbacks, so a copy leaves them
+                    # unset.
+                    copied.append("default")
                 elif field.value.kind == "union":
                     union = field.value
                     tag = next(item for item in plan.fields if item.name == union.tag)

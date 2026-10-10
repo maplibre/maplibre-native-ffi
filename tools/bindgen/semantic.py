@@ -342,6 +342,10 @@ class BoundApi:
     unsupported: dict[str, tuple[str, ...]] = field(default_factory=dict)
     runtime_operations: tuple[OperationPlan, ...] = ()
     callback_adapters: tuple[CallbackAdapterPlan, ...] = ()
+    # The records and unions that a binding copies from native: those that an
+    # operation's output or result, a callback's argument, or a record default
+    # reaches. A copy leaves a callback registration field unset.
+    returned: frozenset[str] = frozenset()
 
     @property
     def public_values(self) -> dict[str, ValuePlan]:
@@ -511,6 +515,7 @@ class Binder:
         self.values: dict[str, ValuePlan] = {}
         self.callbacks: dict[str, CallbackPlan] = {}
         self.resolving: set[str] = set()
+        self.returned: set[str] = set()
         self.handles = {
             name: HandlePlan(
                 name,
@@ -1210,6 +1215,20 @@ class Binder:
                 handle.view_end,
                 member.removeprefix("get_"),
             )
+        # A runtime export's caller reads its outputs itself, so only a
+        # generated operation and a default copy what native writes.
+        if function.name not in self.api.runtime_exports or isinstance(
+            support, DefaultSupport
+        ):
+            self.returned |= self.copied(
+                (
+                    *outputs,
+                    *(p for p in inputs if p.direction == "inout"),
+                ),
+                result,
+                context,
+                isinstance(support, DefaultSupport),
+            )
         return OperationPlan(
             function,
             metadata["execution"],
@@ -1245,6 +1264,48 @@ class Binder:
             is_status(function.return_type),
             member,
         )
+
+    def copied(
+        self,
+        parameters,
+        result: ValuePlan | None,
+        context: str,
+        default: bool = False,
+    ) -> set[str]:
+        """The records and unions that a binding copies from these values.
+
+        A binding builds a callback registration from host callbacks and never
+        adopts one from native. Only a record default holds one, with null
+        callbacks. A copy of the default leaves a registration field unset, and
+        the copy of a registration's own default copies only its other fields.
+        """
+        found: set[str] = set()
+
+        def visit(value: ValuePlan, path: str, root: bool = False) -> None:
+            if value.registration and not (default and root):
+                if default:
+                    return
+                raise ModelError(
+                    [f"{path}: native cannot return a callback registration"]
+                )
+            if value.response:
+                return
+            if value.element:
+                visit(value.element, path)
+            if value.kind not in {"record", "union"} or value.native in found:
+                return
+            found.add(value.native)
+            for member in value.fields:
+                visit(member.value, f"{path}.{member.name}")
+            for group in value.presence_groups:
+                if group.type:
+                    visit(self.values[group.type], path)
+
+        for parameter in parameters:
+            visit(parameter.value, f"{context} parameter {parameter.name}")
+        if result is not None:
+            visit(result, f"{context} result", root=True)
+        return found
 
     def member(self, function: Function, receiver: str | None) -> str:
         """Name an operation once for every binding.
@@ -1311,21 +1372,26 @@ class Binder:
             raise ModelError(
                 [f"{context}: callback requires at most one context parameter"]
             )
+        parameters = tuple(
+            ParameterPlan(
+                parameter.name,
+                self.value(
+                    parameter.type,
+                    parameter.metadata,
+                    context + " parameter " + parameter.name,
+                ),
+                parameter.metadata.get("direction", "in"),
+                parameter.metadata.get("consumes"),
+            )
+            for parameter in typedef.parameters
+        )
+        # Native passes the arguments that a callback does not write.
+        self.returned |= self.copied(
+            tuple(p for p in parameters if p.direction != "out"), None, context
+        )
         return CallbackPlan(
             name,
-            tuple(
-                ParameterPlan(
-                    parameter.name,
-                    self.value(
-                        parameter.type,
-                        parameter.metadata,
-                        context + " parameter " + parameter.name,
-                    ),
-                    parameter.metadata.get("direction", "in"),
-                    parameter.metadata.get("consumes"),
-                )
-                for parameter in typedef.parameters
-            ),
+            parameters,
             self.value(
                 function.result,
                 {"enum": typedef.metadata["enum"]}
@@ -1449,6 +1515,7 @@ class Binder:
                 for f in self.api.functions
                 if "callback_adapter" in f.metadata
             ),
+            frozenset(self.returned),
         )
 
 

@@ -834,6 +834,10 @@ class Values:
         if value.kind == "scalar":
             suffix, _typ = self.accessor(value)
             return f"read{suffix}({address})"
+        if value.registration and value.native not in self.bound.returned:
+            # Native never returns callbacks, so a copy leaves a registration
+            # unset.
+            return "null" if value.nullable else f"{name(value.native)}()"
         if value.kind == "record":
             reader = self.read(value)
             return (

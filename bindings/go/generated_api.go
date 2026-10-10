@@ -1470,11 +1470,6 @@ type HttpHeaderTransform struct {
 	Callback func(ResourceKind, string, *HttpHeaderTransformResponseScope) Status
 }
 
-func copyHttpHeaderTransform(raw C.mln_http_header_transform) HttpHeaderTransform {
-	var result HttpHeaderTransform
-	return result
-}
-
 func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C.mln_http_header_transform {
 	raw := C.mln_http_header_transform{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
@@ -2320,8 +2315,6 @@ func copyRenderSessionAttachOptions(raw C.mln_render_session_attach_options) Ren
 	var result RenderSessionAttachOptions
 	result.Driver = RenderDriverKind(raw.driver)
 	result.RequestedTextureRingDepth = uint32(raw.requested_texture_ring_depth)
-	result.FrameWake = copyWake(raw.frame_wake)
-	result.DriverWorkWake = copyWake(raw.driver_work_wake)
 	return result
 }
 
@@ -2527,11 +2520,6 @@ type ResourceProvider struct {
 	Callback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 }
 
-func copyResourceProvider(raw C.mln_resource_provider) ResourceProvider {
-	var result ResourceProvider
-	return result
-}
-
 func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_resource_provider {
 	raw := C.mln_resource_provider{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
@@ -2646,11 +2634,6 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 
 type ResourceTransform struct {
 	Callback func(ResourceKind, string, *ResourceTransformResponseScope) Status
-}
-
-func copyResourceTransform(raw C.mln_resource_transform) ResourceTransform {
-	var result ResourceTransform
-	return result
 }
 
 func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln_resource_transform {
@@ -2840,7 +2823,6 @@ func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 		return &value
 	}()
 	result.EventMask = RuntimeEventMask(raw.event_mask)
-	result.EventWake = copyWake(raw.event_wake)
 	return result
 }
 
@@ -3685,8 +3667,6 @@ func DefaultVulkanSurfaceDescriptor() VulkanSurfaceDescriptor {
 }
 
 type Wake struct{ Callback func() }
-
-func copyWake(raw C.mln_wake) Wake { var result Wake; ; return result }
 
 func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	raw := C.mln_wake{}

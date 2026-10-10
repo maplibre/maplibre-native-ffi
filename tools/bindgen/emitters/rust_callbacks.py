@@ -75,7 +75,9 @@ def add(values, value):
             }
             and field.role == "value"
         ):
-            values.add(field.value, "in")
+            values.add(
+                field.value, "both" if value.native in values.bound.returned else "in"
+            )
 
 
 def reentry(callback, locals_by_name):
@@ -258,13 +260,16 @@ def declaration(values, value):
         + f"            raw.{user_data} = unsafe {{ arena.registration(self.clone(), callback::release::<Self>) }};\n"
         + f"            raw.{release} = Some(callback::release::<Self>);\n"
         + "        }\n        Ok(raw)\n    }\n}\n"
-        + f"impl FromNative<{raw}> for {name} {{\n"
-        + "    /// Copies a descriptor whose callbacks are unset, such as a native default.\n"
-        + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
-        + f'        if !({empty}) {{ return Err(Error::invalid_argument("foreign callbacks cannot be adopted")); }}\n'
-        + "        Ok(Self {\n"
-        + "".join(f"            {line}\n" for line in copies)
-        + "        })\n    }\n}\n"
+        + (
+            f"impl FromNative<{raw}> for {name} {{\n"
+            + "    /// Copies a native default, whose callbacks are unset.\n"
+            + f"    unsafe fn from_native(raw: {raw}) -> Result<Self> {{\n"
+            + "        Ok(Self {\n"
+            + "".join(f"            {line}\n" for line in copies)
+            + "        })\n    }\n}\n"
+            if value.native in values.bound.returned
+            else ""
+        )
     )
 
 

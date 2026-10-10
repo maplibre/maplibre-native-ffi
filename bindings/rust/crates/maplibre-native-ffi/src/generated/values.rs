@@ -621,13 +621,8 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
     }
 }
 impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceOptions {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
+    /// Copies a native default, whose callbacks are unset.
     unsafe fn from_native(raw: sys::mln_custom_geometry_source_options) -> Result<Self> {
-        if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
         Ok(Self {
             fetch_tile: None,
             cancel_tile: None,
@@ -754,13 +749,8 @@ impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSour
     }
 }
 impl FromNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSourceOptions {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
+    /// Copies a native default, whose callbacks are unset.
     unsafe fn from_native(raw: sys::mln_custom_mvt_vector_source_options) -> Result<Self> {
-        if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
         Ok(Self {
             fetch_tile: None,
             cancel_tile: None,
@@ -1274,17 +1264,6 @@ impl ToNative<sys::mln_http_header_transform> for HttpHeaderTransform {
             raw.release_user_data = Some(callback::release::<Self>);
         }
         Ok(raw)
-    }
-}
-impl FromNative<sys::mln_http_header_transform> for HttpHeaderTransform {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_http_header_transform) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
     }
 }
 
@@ -2872,8 +2851,8 @@ impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachO
         Ok(Self {
             driver: unsafe { from_native(raw.driver) }?,
             requested_texture_ring_depth: raw.requested_texture_ring_depth,
-            frame_wake: unsafe { from_native(raw.frame_wake) }?,
-            driver_work_wake: unsafe { from_native(raw.driver_work_wake) }?,
+            frame_wake: Default::default(),
+            driver_work_wake: Default::default(),
         })
     }
 }
@@ -3340,17 +3319,6 @@ impl ToNative<sys::mln_resource_provider> for ResourceProvider {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_resource_provider> for ResourceProvider {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_resource_provider) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
-    }
-}
 
 native_enum! {
 pub enum ResourceProviderDecision: u32 {
@@ -3588,17 +3556,6 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
             raw.release_user_data = Some(callback::release::<Self>);
         }
         Ok(raw)
-    }
-}
-impl FromNative<sys::mln_resource_transform> for ResourceTransform {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_resource_transform) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
     }
 }
 
@@ -4006,7 +3963,7 @@ impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
             asset_path: unsafe { from_native(raw.asset_path) }?,
             cache_path: unsafe { from_native(raw.cache_path) }?,
             event_mask: unsafe { from_native(raw.event_mask) }?,
-            event_wake: unsafe { from_native(raw.event_wake) }?,
+            event_wake: Default::default(),
         })
     }
 }
@@ -5238,17 +5195,6 @@ impl ToNative<sys::mln_wake> for Wake {
             raw.release_user_data = Some(callback::release::<Self>);
         }
         Ok(raw)
-    }
-}
-impl FromNative<sys::mln_wake> for Wake {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_wake) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
     }
 }
 

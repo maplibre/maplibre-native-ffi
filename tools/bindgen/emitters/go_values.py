@@ -60,7 +60,6 @@ class Values:
         self.records = {}
         self.enums = {}
         self.inputs = set()
-        self.outputs = set()
         self.unions = {}
         self.arenas = {}
         self.views = {}
@@ -77,7 +76,6 @@ class Values:
 
             self.records[value.native] = value
             self.inputs.add(value.native)
-            self.outputs.add(value.native)
             validate(self, value)
             return
         if value.kind == "scalar":
@@ -99,12 +97,11 @@ class Values:
             if len(names) != len(set(names)):
                 self.fail(value, "public field names collide")
             self.records[value.native] = value
-            (self.inputs if input else self.outputs).add(value.native)
+            if input:
+                self.inputs.add(value.native)
             for f in value.fields:
                 if f.public:
                     self.require(f.value, input)
-            if input and value.default and value.native not in self.outputs:
-                self.require(value, input=False)
             for group in value.presence_groups:
                 if len(group.fields) > 1:
                     self.require(self.group(value, group), input)
@@ -434,9 +431,12 @@ class Values:
             chunks.append(f"type {typename} struct {{ {'; '.join(fields)} }}")
             if native not in self.api.values:
                 continue
-            if native in self.outputs or value.default:
+            if native in self.api.returned:
                 lines = []
                 for member, v, f, group in members:
+                    if v and v.registration:
+                        # A copy leaves a registration unset.
+                        continue
                     if v is None:
                         lines.append(
                             f"result.{member} = raw.{field(f.mask)} & C.{f.name} != 0"

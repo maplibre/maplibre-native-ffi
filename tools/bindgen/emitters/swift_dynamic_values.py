@@ -111,6 +111,10 @@ def encode(values, value, source):
 
 
 def decode(values, value, source, context="raw"):
+    if value.registration and value.native not in values.bound.returned:
+        # Native never returns callbacks, so a copy leaves a registration
+        # unset.
+        return "nil" if value.nullable else f"{values.public(value)}()"
     if value.kind == "enum":
         return f"{values.public(value)}(rawValue: {source}{'.rawValue' if value.ctype.canonical.startswith('enum ') else ''})"
     if value.kind == "native_pointer":

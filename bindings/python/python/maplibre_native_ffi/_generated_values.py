@@ -946,8 +946,6 @@ class CustomGeometrySourceOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            fetch_tile=raw["fetch_tile"],
-            cancel_tile=raw["cancel_tile"],
             min_zoom=raw["min_zoom"],
             max_zoom=raw["max_zoom"],
             tolerance=raw["tolerance"],
@@ -983,12 +981,7 @@ class CustomMvtVectorSourceOptions:
 
     @classmethod
     def _from_native(cls, raw):
-        return cls(
-            fetch_tile=raw["fetch_tile"],
-            cancel_tile=raw["cancel_tile"],
-            min_zoom=raw["min_zoom"],
-            max_zoom=raw["max_zoom"],
-        )
+        return cls(min_zoom=raw["min_zoom"], max_zoom=raw["max_zoom"])
 
     def _invoke_fetch_tile(self, tile_id):
         callback = self.fetch_tile
@@ -1163,10 +1156,6 @@ class HttpHeaderTransform:
         Callable[[ResourceKind, str, HttpHeaderTransformResponseScope], Status] | None
     ) = None
 
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(callback=raw["callback"])
-
     def _invoke_callback(self, kind, url, out_response):
         callback = self.callback
         assert callback is not None
@@ -1227,10 +1216,6 @@ class LatLngBounds:
 @dataclass(frozen=True, slots=True)
 class LogSetCallbackRegistration:
     callback: Callable[[LogSeverity, LogEvent, int, str], int] | None = None
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(callback=raw["callback"])
 
     def _invoke_callback(self, severity, event, code, message):
         callback = self.callback
@@ -1817,8 +1802,8 @@ class RenderSessionAttachOptions:
         return cls(
             driver=RenderDriverKind(raw["driver"]),
             requested_texture_ring_depth=raw["requested_texture_ring_depth"],
-            frame_wake=Wake._from_native(raw["frame_wake"]),
-            driver_work_wake=Wake._from_native(raw["driver_work_wake"]),
+            frame_wake=Wake(),
+            driver_work_wake=Wake(),
         )
 
     @classmethod
@@ -1964,10 +1949,6 @@ class ResourceProvider:
         | None
     ) = None
 
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(callback=raw["callback"])
-
     def _invoke_callback(self, request, handle):
         callback = self.callback
         assert callback is not None
@@ -2052,10 +2033,6 @@ class ResourceTransform:
     callback: (
         Callable[[ResourceKind, str, ResourceTransformResponseScope], Status] | None
     ) = None
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(callback=raw["callback"])
 
     def _invoke_callback(self, kind, url, out_response):
         callback = self.callback
@@ -2219,7 +2196,7 @@ class RuntimeOptions:
             asset_path=raw["asset_path"],
             cache_path=raw["cache_path"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
-            event_wake=Wake._from_native(raw["event_wake"]),
+            event_wake=Wake(),
         )
 
     @classmethod
@@ -2770,10 +2747,6 @@ class VulkanSurfaceDescriptor:
 @dataclass(frozen=True, slots=True)
 class Wake:
     callback: Callable[[], None] | None = None
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(callback=raw["callback"])
 
     def _invoke_callback(self):
         callback = self.callback

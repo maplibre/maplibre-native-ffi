@@ -294,8 +294,8 @@ public struct RenderSessionAttachOptions: Sendable {
   ) throws {
     driver = RenderDriverKind(rawValue: raw.driver)
     requestedTextureRingDepth = raw.requested_texture_ring_depth
-    frameWake = try Wake(raw: raw.frame_wake)
-    driverWorkWake = try Wake(raw: raw.driver_work_wake)
+    frameWake = Wake()
+    driverWorkWake = Wake()
   }
 
   func nativeValue(arena: NativeInputArena) throws

@@ -446,12 +446,9 @@ def put_function(value, values):
 
 
 def read_function(value, values):
-    """Copy a descriptor that holds no installed callback."""
+    """Copy a registration's native default, whose callbacks are unset."""
     public_name = name(value.native)
     callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
-    checks = " || ".join(
-        f"readAddress({values.at('source', value, f.name)}) != 0L" for f in callbacks
-    )
     arguments = []
     for member, _typ, children, _group in values.members(value):
         field = children[0]
@@ -463,9 +460,8 @@ def read_function(value, values):
             decoded = f"if ({values.present('source', value, field.presence.mask, field.presence.bit)}) {decoded} else null"
         arguments.append(f"{member} = {decoded}")
     return (
-        f"internal fun {values.read(value)}(source: Long): {public_name} {{ "
-        f'check(!({checks or "false"})) {{ "cannot copy an installed callback descriptor" }}; '
-        f"return {public_name}({', '.join(arguments)}) }}"
+        f"internal fun {values.read(value)}(source: Long): {public_name} = "
+        f"{public_name}({', '.join(arguments)})"
     )
 
 
