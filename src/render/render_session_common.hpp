@@ -77,6 +77,12 @@ class SurfaceSessionBackend {
   virtual auto renderer_backend() -> mln::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
 
+  // Abandon calls this on a backend it quarantines, once nothing can reach the
+  // backend again. A quarantined backend is never destroyed, so one that
+  // registered the host's graphics handles process-wide releases them here: the
+  // host may destroy its device and reuse those handles.
+  virtual void quarantine() noexcept {}
+
   // Whether the surface can take a frame right now. Not ready skips the frame
   // and reports nothing rendered, so a minimized or occluded window is a retry
   // rather than a failure.
@@ -150,6 +156,12 @@ class TextureSessionBackend {
   // rebuilds it lazily; a backend whose renderer keys cached GPU state on that
   // resource overrides this to rebuild only what the size changed.
   virtual void resize(mln::Size size) { headless_backend().setSize(size); }
+
+  // Abandon calls this on a backend it quarantines, once nothing can reach the
+  // backend again. A quarantined backend is never destroyed, so one that
+  // registered the host's graphics handles process-wide releases them here: the
+  // host may destroy its device and reuse those handles.
+  virtual void quarantine() noexcept {}
 
   // Renders into a new caller-owned texture, keeping the graphics context and
   // every resource the renderer holds against it. The descriptor must name the

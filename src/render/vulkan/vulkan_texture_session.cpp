@@ -128,6 +128,8 @@ class VulkanTextureSessionBackend final
 
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
+  void quarantine() noexcept override { backend_.release_queue_access(); }
+
   auto set_vulkan_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) -> mln_status override {

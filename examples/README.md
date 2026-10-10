@@ -78,9 +78,10 @@ These rules hold in every example, and the code alone does not show why:
   render-if-needed flag, because the attempt consumed the map update.
 - A Vulkan core worker in a texture mode submits on a second queue from the
   graphics family, because the host compositor submits on its own queue at the
-  same time. A device with one graphics queue, such as MoltenVK, uses the caller
-  driver for the texture modes. The host calls `vkDeviceWaitIdle` only after
-  detach completes.
+  same time. The session waits on its own queue and never on the device, so the
+  compositor's queue needs no lock against it. A device with one graphics queue,
+  such as MoltenVK, uses the caller driver for the texture modes. The host calls
+  `vkDeviceWaitIdle` only after detach completes.
 - OpenGL sessions use the caller driver. An OpenGL owned texture attaches on a
   context shared with the host, because one on a private EGL context offers CPU
   readback instead of frame acquisition.

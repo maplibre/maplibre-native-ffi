@@ -30,6 +30,22 @@ bool mln_test_render_fixture_create_borrowed_texture(
   mln_map map, mln_test_render_fixture* fixture
 );
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// Receives the context's PFN_vkGetDeviceProcAddr and returns the one the
+// session resolves its device functions through.
+typedef void* (*mln_test_vulkan_device_proc_addr_wrap)(
+  void* get_device_proc_addr
+);
+
+// mln_test_render_fixture_create_borrowed_texture() for a session whose
+// context names `wrap`'s vkGetDeviceProcAddr, so that a case can observe the
+// device functions the session calls.
+bool mln_test_render_fixture_create_vulkan_borrowed_texture(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_vulkan_device_proc_addr_wrap wrap
+);
+#endif
+
 // Attaches a session to a presentation surface that the fixture creates, with
 // the preset's driver.
 bool mln_test_render_fixture_create_surface(

@@ -13,6 +13,7 @@
 
 #include "maplibre_native_c/texture.h"
 #include "render/render_session_common.hpp"
+#include "render/vulkan/vulkan_queue_access.hpp"
 
 namespace mln::core {
 
@@ -23,7 +24,9 @@ struct VulkanTextureFrameResources {
   VkFormat format = VK_FORMAT_UNDEFINED;
 };
 
-class VulkanTextureBackend final : public mln::vulkan::RendererBackend,
+// VulkanQueueAccess comes first so that it outlives mbgl's teardown.
+class VulkanTextureBackend final : private VulkanQueueAccess,
+                                   public mln::vulkan::RendererBackend,
                                    public mln::gfx::HeadlessBackend {
  private:
   class VulkanTextureRenderableResource;
@@ -41,6 +44,8 @@ class VulkanTextureBackend final : public mln::vulkan::RendererBackend,
   VulkanTextureBackend(VulkanTextureBackend&&) = delete;
   auto operator=(VulkanTextureBackend&&) -> VulkanTextureBackend& = delete;
   ~VulkanTextureBackend() override;
+
+  using VulkanQueueAccess::release_queue_access;
 
   auto getDefaultRenderable() -> mln::gfx::Renderable& override;
   // Follows a new physical size. Each ring slot keeps its resource until the

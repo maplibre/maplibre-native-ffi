@@ -113,6 +113,10 @@ static mln_metal_context_descriptor host_context(
   };
 }
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// Set only while mln_test_render_fixture_create_vulkan_borrowed_texture()
+// attaches, to replace the context's PFN_vkGetDeviceProcAddr.
+static mln_test_vulkan_device_proc_addr_wrap wrap_device_proc_addr = NULL;
+
 static mln_vulkan_context_descriptor host_context(
   const mln_test_graphics_context* context
 ) {
@@ -124,7 +128,10 @@ static mln_vulkan_context_descriptor host_context(
     .graphics_queue = context->vulkan_queue,
     .graphics_queue_family_index = context->vulkan_queue_family_index,
     .get_instance_proc_addr = context->vulkan_get_instance_proc_addr,
-    .get_device_proc_addr = context->vulkan_get_device_proc_addr,
+    .get_device_proc_addr =
+      wrap_device_proc_addr == NULL
+        ? context->vulkan_get_device_proc_addr
+        : wrap_device_proc_addr(context->vulkan_get_device_proc_addr),
   };
 }
 #elif defined(MLN_FFI_TEST_OPENGL_WGL)
@@ -355,6 +362,19 @@ bool mln_test_render_fixture_create_borrowed_texture(
     map, fixture, attach_borrowed_texture
   );
 }
+
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+bool mln_test_render_fixture_create_vulkan_borrowed_texture(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_vulkan_device_proc_addr_wrap wrap
+) {
+  wrap_device_proc_addr = wrap;
+  const bool attached =
+    mln_test_render_fixture_create_with(map, fixture, attach_borrowed_texture);
+  wrap_device_proc_addr = NULL;
+  return attached;
+}
+#endif
 
 bool mln_test_render_fixture_create_surface(
   mln_map map, mln_test_render_fixture* fixture

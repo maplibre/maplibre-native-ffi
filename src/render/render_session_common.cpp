@@ -3483,6 +3483,8 @@ auto abandon_render_session(
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
   auto quarantined = uint32_t{0};
+  SurfaceSessionBackend* quarantined_surface = nullptr;
+  TextureSessionBackend* quarantined_texture = nullptr;
   {
     // Declared before the lock, so the wakes owed by the results published
     // below run after it is released and before the wakes are dropped.
@@ -3574,8 +3576,10 @@ auto abandon_render_session(
     // dropped after the lock, since releasing host user data can run arbitrary
     // host code.
     if (live->renderer.release() != nullptr) ++quarantined;
-    if (live->surface.backend.release() != nullptr) ++quarantined;
-    if (live->texture.backend.release() != nullptr) ++quarantined;
+    quarantined_surface = live->surface.backend.release();
+    quarantined_texture = live->texture.backend.release();
+    quarantined += static_cast<uint32_t>(quarantined_surface != nullptr) +
+                   static_cast<uint32_t>(quarantined_texture != nullptr);
     frame_wake = std::move(live->frame_wake);
     driver_wake = std::move(live->driver_wake);
     ++live->generation;
@@ -3598,6 +3602,8 @@ auto abandon_render_session(
   // contract — no graphics calls after abandon — covers worker threads and
   // the host may destroy its device immediately.
   map_quiesce_render_workers(live->map);
+  if (quarantined_surface != nullptr) quarantined_surface->quarantine();
+  if (quarantined_texture != nullptr) quarantined_texture->quarantine();
   static_cast<void>(map_detach_render_target_session(live->map, live.get()));
   {
     const auto lock = std::scoped_lock{live->control_mutex};

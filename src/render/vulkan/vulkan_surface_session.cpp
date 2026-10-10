@@ -24,6 +24,7 @@
 #include "render/surface_session.hpp"
 #include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_handle.hpp"
+#include "render/vulkan/vulkan_queue_access.hpp"
 
 namespace {
 
@@ -161,7 +162,9 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
   return MLN_STATUS_OK;
 }
 
-class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
+// VulkanQueueAccess comes first so that it outlives mbgl's teardown.
+class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
+                                   public mln::vulkan::RendererBackend,
                                    public mln::vulkan::Renderable {
  private:
   class VulkanSurfaceRenderableResource final
@@ -342,6 +345,8 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
     getThreadPool().runRenderJobs(true);
   }
 
+  using mln::core::VulkanQueueAccess::release_queue_access;
+
   auto getDefaultRenderable() -> mln::gfx::Renderable& override {
     if (!resource) {
       resource = std::make_unique<VulkanSurfaceRenderableResource>(
@@ -472,6 +477,9 @@ class VulkanSurfaceBackend final : public mln::vulkan::RendererBackend,
     presentQueueIndex = graphicsQueueIndex;
     graphicsQueue = static_cast<VkQueue>(descriptor_.context.graphics_queue);
     presentQueue = graphicsQueue;
+    install_queue_access(
+      dispatcher, device.get(), static_cast<VkQueue>(graphicsQueue)
+    );
     physicalDeviceFeatures = physicalDevice.getFeatures(dispatcher);
   }
 
@@ -507,6 +515,8 @@ class VulkanSurfaceSessionBackend final
   void resize(uint32_t physical_width, uint32_t physical_height) override {
     backend_.resize(mln::Size{physical_width, physical_height});
   }
+
+  void quarantine() noexcept override { backend_.release_queue_access(); }
 
   auto set_vulkan_target(const mln_vulkan_surface_descriptor& descriptor)
     -> mln_status override {
