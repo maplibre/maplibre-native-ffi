@@ -9,6 +9,11 @@
 
 namespace mln::core {
 
+// Whether the caller is the browser main thread. Once Emscripten's pre-spawned
+// pool is empty, a new thread starts only after that thread yields to the event
+// loop, so it must not wait for a thread that may not have started.
+[[nodiscard]] auto on_browser_main_thread() noexcept -> bool;
+
 // A joinable thread for native workers that run map, style, and render work.
 //
 // std::thread takes the platform default stack, which musl fixes at 128 KiB

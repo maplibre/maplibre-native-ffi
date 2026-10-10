@@ -11,13 +11,16 @@ endif()
 
 # Emscripten pre-spawns this many Web Workers while the page loads. The pool is
 # not a cap. Once it is empty, pthread_create() asks the browser main thread for
-# a new Worker, and the thread starts when the main thread next yields. The one
-# call that waits for a new thread to start, mln_runtime_create(), returns
-# MLN_STATUS_WRONG_THREAD on the browser main thread, so the size sets only how
-# soon threads start. The default covers one host thread that drives one runtime
-# with one map, one GeoJSON source, and one render session, so such a page
-# starts every thread without waiting for a Worker. A host that runs more
-# raises the size.
+# a new Worker, and the thread starts when the main thread next yields. A call
+# that holds the main thread until such a thread starts never returns, so
+# mln_runtime_create() returns MLN_STATUS_WRONG_THREAD there, and a render
+# session destroyed there detaches its core worker instead of joining it. Other
+# calls wait only for work on threads that earlier calls started, such as
+# mln_render_session_abandon() waiting for the tile work of the map's worker
+# pool; a main thread that has yielded since those calls finds them running.
+# The default covers one host thread that drives one runtime with one map, one
+# GeoJSON source, and one render session, so such a page starts every thread
+# without waiting for a Worker. A host that runs more raises the size.
 #
 # The thread that calls into the library, such as main() under
 # -sPROXY_TO_PTHREAD.

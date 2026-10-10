@@ -1084,6 +1084,23 @@ auto splice_work(
   }
 }
 
+// Releases the core worker after stop_worker is set. A session destroyed from
+// one of its detach completions runs on the core worker and would join itself.
+// On the browser main thread, a worker whose Web Worker has not started yet
+// starts only after that thread yields, so a join there would never return.
+// Both cases detach the worker instead; it holds its own session reference and
+// finds nothing left to run.
+auto reap_core_worker(mln_render_session_object& session) -> void {
+  if (session.join_worker) {
+    session.join_worker();
+  } else if (session.worker.joinable()) {
+    if (session.worker.is_current() || on_browser_main_thread())
+      session.worker.detach();
+    else
+      session.worker.join();
+  }
+}
+
 auto run_core_worker(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
@@ -1380,10 +1397,7 @@ auto start_attach_render_session(
         session->stop_worker = true;
         session->worker_condition.notify_all();
       }
-      if (session->join_worker)
-        session->join_worker();
-      else if (session->worker.joinable())
-        session->worker.join();
+      reap_core_worker(*session);
       static_cast<void>(
         map_set_render_session_publish_callback(session->map, {})
       );
@@ -2039,17 +2053,7 @@ auto destroy_render_session(
   static_cast<void>(
     handle_table<mln_render_session_object>().remove(live->self)
   );
-  // Detach completions run on the core worker, and the header allows destroy
-  // from any thread, so a host that destroys from one would otherwise join
-  // itself.
-  if (live->join_worker)
-    live->join_worker();
-  else if (live->worker.joinable()) {
-    if (live->worker.is_current())
-      live->worker.detach();
-    else
-      live->worker.join();
-  }
+  reap_core_worker(*live);
   frame_wake.reset();
   driver_wake.reset();
   return MLN_STATUS_OK;
