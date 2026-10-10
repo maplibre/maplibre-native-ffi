@@ -22,9 +22,10 @@ context.
 
 `mise run bindings:check` fails when the committed output is stale or when a
 public declaration has no generated operation. The coverage report lists each
-unsupported declaration with the emitter's reason. Never edit generated files by
-hand; change the header, the compiler rule, or the runtime helper, and
-regenerate.
+unsupported declaration with the emitter's reason. Its `files` list records
+every output, so the next run deletes a listed file that the generator no longer
+writes, and a check reports it. Never edit generated files by hand; change the
+header, the compiler rule, or the runtime helper, and regenerate.
 
 Pick the execution category that describes the native operation. The schema
 checks the signature that each category requires. A function without a
@@ -47,7 +48,11 @@ category.
 The frontend completes each declaration's metadata with the conventions that
 `Conventions` in `schema.py` derives from its C shape, so every later stage
 reads a complete contract. An annotation states a departure from convention, and
-the schema rejects one that restates a default.
+the schema rejects one that restates a default. An annotation writes only the
+values in `ANNOTATION_VALUES`. Conventions supply most of each key's other
+values, such as `direction=in` and `shape=none`, and the semantic layer supplies
+the rest: `lifetime=completion` for an array completion result, and
+`consumes=always` for a release that returns void.
 
 | Declaration                         | Default                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -63,7 +68,7 @@ the schema rejects one that restates a default.
 | First struct member `uint32_t size` | `kind=size;default=sizeof`                                                                 |
 | Member that a sibling names         | `kind=count` for `length`, `kind=presence_mask` for `mask`, `kind=tag` for `tag`           |
 | `kind=reserved` member              | `default=0`                                                                                |
-| Callback typedef                    | `thread=native;reentry=allow`; a void callback has `failure=contain`                       |
+| Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                     |
 | Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                  |
 | Callback registration               | `user_data` names its one `kind=context` member or parameter                               |
 | Record typedef                      | `default` names the one function that takes no arguments and returns the record            |
@@ -75,7 +80,7 @@ that every handwritten runtime is written against: the status enum, the
 diagnostic, the completion and its result, and the buffer view. No other rule
 reads a declaration's name.
 
-Three keys state what a C shape cannot:
+Five keys state what a C shape cannot:
 
 - `prefix=` on a handle names the prefix of its operations when that differs
   from the handle's type name, as `mln_resource_request` does for
@@ -89,16 +94,62 @@ Three keys state what a C shape cannot:
   callbacks. A binding runs the callback on the calling thread and never
   delivers it later through a port. Dart can only deliver later, so a record
   with a native default keeps such a registration at its disabled default.
+- `absent_on=` on a function names a failure status of `mln_status` that reports
+  its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
+  for a drain with nothing queued. A binding returns its language's empty form
+  for that status, such as `None`, `nil`, or `null`, and reads or adopts the
+  output only on success. The schema accepts the key only on a function that
+  returns a status, takes no completion, and has exactly one output. The
+  semantic plan also rejects it on a borrowed view, a consuming operation, and a
+  call that passes a callback registration, because an absent call publishes
+  nothing. Dart, Go, Rust, Swift, and Zig return any output as absent; .NET,
+  Kotlin, and Python return only an owned handle as absent.
+- `default=` on a field states the nonzero value that the field holds in its
+  record's native default: a decimal integer, a decimal with a point, `true`, or
+  a constant of the field's enum. Dart, Kotlin, and Zig build a record from
+  language defaults instead of calling its default function, so they read this
+  value, and an unannotated field defaults to zero. The generated cases in
+  `tests/native/abi/base/defaults.c` check every default function against these
+  values. The schema accepts the key only on a plain scalar or enum field of a
+  record that a default function returns, directly or nested by value through
+  required fields. The cases skip optional fields, unions, union tags, buffer
+  views, and arrays, so those fields take no `default=`, and neither does a
+  record that only those fields reach.
+
+No annotation names a callback's thread. Every generated binding treats a
+callback as able to run on any native thread, and each callback's header comment
+states the threads that it runs on.
 
 An annotation that names another declaration, such as `reentry_calls`,
 `complete`, `cancel_registration`, or `wait_retired`, must name one that exists;
 the schema reports the name that does not resolve.
+
+## Document a declaration
+
+Each generated declaration carries the first paragraph of its header comment and
+a link to its header's page in the C API reference. The paragraph ends at a
+blank line, a list item, or a heading such as `Returns:`, so write a first
+paragraph that stands alone as a summary. The C header remains the full
+contract: status lists, output parameters, and ownership rules name C concepts
+that each binding expresses differently, so the bindings repeat only the
+summary.
+
+A comment documents the declaration directly after it. Only whitespace,
+`MLN_BINDING` annotations, and the `typedef` before a tag may separate the two.
+A declaration without a comment has no generated comment, because the reference
+lists only documented declarations.
+
+The summary keeps C identifiers as written and marks each `mln_` and `MLN_` name
+as code. `docs.py` renders it in each language's comment syntax and escapes its
+prose for that language's documentation tool. A record field and an enum
+constant carry their summary without the link, which their type carries.
 
 ## Where each rule lives
 
 | Change                                              | Module              |
 | --------------------------------------------------- | ------------------- |
 | Header extraction and attribute parsing             | `frontend.py`       |
+| Summaries, reference links, and comment escaping    | `docs.py`           |
 | Conventions, accepted attributes, and signatures    | `schema.py`         |
 | Value shapes, presence, and ownership relationships | `semantic.py`       |
 | Native copies for deferred callbacks and results    | `native_capture.py` |
@@ -109,12 +160,22 @@ Resolve a new relationship once in `semantic.py` and let every emitter consume
 the plan. Emitters choose syntax and report the shapes that they cannot lower;
 they never invent ownership.
 
+`BoundApi.returned` holds the records and unions that a binding copies from
+native: those that an operation's output or result, a callback's argument, or a
+record default reaches. A binding builds a callback registration from host
+callbacks, so native returns one only in a record default, with null callbacks,
+in a field without presence. A copy of such a default leaves a registration
+field unset, and the copy of a registration's own default copies only its other
+fields. A copy of an optional or referenced registration would have to keep its
+presence, so the plan rejects one in a default, along with every other operation
+or callback that returns a registration.
+
 The plan also names each public member once, and an emitter only converts its
 case and escapes keywords:
 
 | Plan field              | Rule                                                                                        |
 | ----------------------- | ------------------------------------------------------------------------------------------- |
-| `OperationPlan.member`  | `name=` if declared; else the name without its receiver's prefix; else without `mln_`       |
+| `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                              |
 | `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                 |
 | `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                 |
 | `PresenceGroup.member`  | A bit without its enum's shared prefix, or a boolean mask without `has_`                    |
@@ -122,6 +183,8 @@ case and escapes keywords:
 | `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
 | `OperationPlan.status`  | Whether the function returns the status enum                                                |
 | `OperationPlan.support` | The record default, handle disposal, or borrowed view scope that the operation backs        |
+| `OperationPlan.absence` | The `absent_on=` status, its value, and the output that it reports absent                   |
+| `FieldPlan.initial`     | The field's `default=`, resolved to a typed value and enum member, or none for zero         |
 
 `native_results.py` writes `src/completion/completion_result_generated.inc`,
 which specializes `CompletionResult` for each completion function other than a

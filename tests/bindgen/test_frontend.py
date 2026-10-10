@@ -215,7 +215,7 @@ BIND("execution=immediate;execution=query") mln_status mln_duplicate(mln_diagnos
 
     def test_erased_results_reject_unsafe_ownership_and_absence_contracts(self):
         api = self.parse("""
-BIND("execution=query;result=double;ownership=owned;encoding=utf8;nullable=true;optional=empty")
+BIND("execution=query;result=double;ownership=owned;encoding=json;nullable=true;optional=empty")
 mln_status mln_unsafe_result(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         with self.assertRaises(ModelError) as raised:
@@ -228,7 +228,7 @@ mln_status mln_unsafe_result(mln_map map, const mln_completion *completion, mln_
     def test_bad_span_relation_and_scalar_encoding_are_rejected(self):
         api = self.parse("""
 mln_status mln_bad_span(const double *items BIND("length=missing"),
-                        double number BIND("encoding=utf8"), mln_diagnostic *out_diagnostic);
+                        double number BIND("encoding=json"), mln_diagnostic *out_diagnostic);
 """)
         with self.assertRaises(ModelError) as raised:
             validate(api)

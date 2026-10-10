@@ -3,6 +3,12 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.lifecycle.*
 
+/**
+ * A map, which holds map state independent of any render target.
+ *
+ * See `mln_map` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public class MapHandle
 internal constructor(
   handle: Long,

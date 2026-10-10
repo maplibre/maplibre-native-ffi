@@ -23,6 +23,7 @@
 [cases]
 "ERR-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/error/StatusMappingTest.kt::everyStatusMapsToItsExceptionAndAnUnknownCodeSurvives"
 "ERR-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/loader/AbiVersionTest.kt::abiVersionMismatchReportsActualAndExpectedVersions"
+"ERR-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aDrainBeforeAnyDemandReturnsNull"
 "LIFE-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::closingAHandleTwiceIsSafeAndLaterUseIsRefused"
 "LIFE-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds"
 "LIFE-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowOnAnotherThreadHoldsOffTheFramesReleaseUntilItEnds"
@@ -46,6 +47,7 @@
 "VAL-03" = "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventNativeTest.kt::aStridedBatchWithAnUnknownPayloadArmDecodesWithoutLoss"
 "VAL-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits"
 "VAL-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::arrayInputsAreCopiedAtSubmission"
+"VAL-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::aRecordBuiltFromItsConstructorDefaultsEqualsTheNativeDefault"
 "VIEW-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease"
 "REND-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::anOwnedTextureFrameReadsBackAsPixels"
 "REND-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aCallerDrivenSessionStaysOnTheGraphicsThreadItWasServicedFrom"

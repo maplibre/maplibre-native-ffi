@@ -149,3 +149,9 @@ import Testing
   #expect(empty.size == 0)
   withExtendedLifetime(arena) {}
 }
+
+/// Each initializer parameter defaults to the native default's field, so the
+/// record it builds matches what the native default function returns.
+@Test func aRecordBuiltFromItsInitializerDefaultsEqualsTheNativeDefault() {
+  #expect(MapOptions() == MapOptions.default)
+}

@@ -3,6 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// One query hit borrowed for a completion callback.
+///
+/// See `mln_queried_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct QueriedFeature: Equatable, Hashable, Sendable {
   public var feature: Data
   public var sourceId: String?
@@ -70,6 +74,10 @@ public struct QueriedFeature: Equatable, Hashable, Sendable {
   }
 }
 
+/// Optional fields for `mln_queried_feature`.
+///
+/// See `mln_queried_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct QueriedFeatureField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -83,6 +91,10 @@ public struct QueriedFeatureField: OptionSet, NativeOpenValue, Equatable,
   public static let state: QueriedFeatureField = .init(rawValue: 4)
 }
 
+/// Optional fields for `mln_rendered_feature_query_options`.
+///
+/// See `mln_rendered_feature_query_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedFeatureQueryOptionField: OptionSet, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -94,8 +106,14 @@ public struct RenderedFeatureQueryOptionField: OptionSet, NativeOpenValue,
   public static let ids: RenderedFeatureQueryOptionField = .init(rawValue: 1)
 }
 
+/// Options for rendered feature queries.
+///
+/// See `mln_rendered_feature_query_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
+  /// Optional style layer IDs. When absent, all rendered layers are queried.
   public var layerIds: [String]?
+  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
   public var filter: Data?
   public static var `default`: Self {
     try! Self(raw: mln_rendered_feature_query_options_default())
@@ -140,6 +158,10 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Rendered feature query geometry descriptor.
+///
+/// See `mln_rendered_query_geometry` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
   public var data: RenderedQueryGeometryData
   public static var `default`: Self {
@@ -215,6 +237,10 @@ public struct RenderedQueryGeometry: Equatable, Hashable, Sendable {
   }
 }
 
+/// Screen-space query geometry data.
+///
+/// See `mln_rendered_query_geometry_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public enum RenderedQueryGeometryData: Equatable, Hashable, Sendable {
   case point(ScreenPoint)
   case box(ScreenBox)
@@ -226,6 +252,10 @@ public enum RenderedQueryGeometryData: Equatable, Hashable, Sendable {
   }
 }
 
+/// Rendered feature query geometry variants.
+///
+/// See `mln_rendered_query_geometry_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct RenderedQueryGeometryType: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -239,6 +269,10 @@ public struct RenderedQueryGeometryType: RawRepresentable, NativeOpenValue,
   public static let lineString: RenderedQueryGeometryType = .init(rawValue: 3)
 }
 
+/// Screen-space box in logical map pixels.
+///
+/// See `mln_screen_box` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct ScreenBox: Equatable, Hashable, Sendable {
   public var min: ScreenPoint
   public var max: ScreenPoint
@@ -267,7 +301,12 @@ public struct ScreenBox: Equatable, Hashable, Sendable {
   }
 }
 
+/// Screen-space line string in logical map pixels.
+///
+/// See `mln_screen_line_string` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct ScreenLineString: Equatable, Hashable, Sendable {
+  /// Points. Null only when point_count is 0.
   public var points: [ScreenPoint]
   public static var `default`: Self {
     Self()
@@ -295,6 +334,10 @@ public struct ScreenLineString: Equatable, Hashable, Sendable {
   }
 }
 
+/// Optional fields for `mln_source_feature_query_options`.
+///
+/// See `mln_source_feature_query_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeatureQueryOptionField: OptionSet, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -306,8 +349,14 @@ public struct SourceFeatureQueryOptionField: OptionSet, NativeOpenValue,
   public static let ids: SourceFeatureQueryOptionField = .init(rawValue: 1)
 }
 
+/// Options for source feature queries.
+///
+/// See `mln_source_feature_query_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
+  /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   public var sourceLayerIds: [String]?
+  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
   public var filter: Data?
   public static var `default`: Self {
     try! Self(raw: mln_source_feature_query_options_default())

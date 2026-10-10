@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Calls `mln_map_apply_camera_delta`.
+  /// Submits one copied relative camera update.
+  ///
+  /// See `mln_map_apply_camera_delta` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func applyCameraDelta(delta bindingArg0: CameraDelta) async throws
     -> CommandCompletion
@@ -19,7 +22,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_camera_for_geometry`.
+  /// Starts an ordered query for a camera that fits a GeoJSON geometry.
+  ///
+  /// See `mln_map_camera_for_geometry` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraForGeometry(
     geometry bindingArg0: Data,
     fitOptions bindingArg1: CameraFitOptions? = nil
@@ -36,7 +42,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_camera_for_lat_lng_bounds`.
+  /// Starts an ordered query for a camera that fits geographic bounds.
+  ///
+  /// See `mln_map_camera_for_lat_lng_bounds` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraForLatLngBounds(
     bounds bindingArg0: LatLngBounds,
     fitOptions bindingArg1: CameraFitOptions? = nil
@@ -53,7 +62,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_camera_for_lat_lngs`.
+  /// Starts an ordered query for a camera that fits geographic coordinates.
+  ///
+  /// See `mln_map_camera_for_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraForLatLngs(
     coordinates bindingArg0: [LatLng],
     fitOptions bindingArg2: CameraFitOptions? = nil
@@ -71,7 +83,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_camera_query`.
+  /// Starts an ordered camera read.
+  ///
+  /// See `mln_map_camera_query` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraQuery() async throws -> CameraQueryResult {
     try await nativeStart(
       "mln_map_camera_query",
@@ -83,7 +98,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_camera_snapshot_get`.
+  /// Copies the camera from the latest immutable map snapshot.
+  ///
+  /// See `mln_map_camera_snapshot_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func cameraSnapshotGet() throws
     -> (camera: CameraOptions, generation: UInt64)
   {
@@ -99,7 +117,10 @@ public extension MapHandle {
     } result: { (CameraOptions(raw: value0), value1) }
   }
 
-  /// Calls `mln_map_cancel_transitions`.
+  /// Cancels the camera transitions running when this command commits.
+  ///
+  /// See `mln_map_cancel_transitions` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func cancelTransitions() async throws -> CommandCompletion {
     try await nativeCommand("mln_map_cancel_transitions") { raw, _, completion, diagnostic in
@@ -111,7 +132,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_dump_debug_logs`.
+  /// Submits an ordered debug-log command.
+  ///
+  /// See `mln_map_dump_debug_logs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func dumpDebugLogs() async throws -> CommandCompletion {
     try await nativeCommand("mln_map_dump_debug_logs") { raw, _, completion, diagnostic in
@@ -123,7 +147,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_lat_lng_bounds_for_camera`.
+  /// Starts an ordered wrapped-bounds query for a copied camera.
+  ///
+  /// See `mln_map_lat_lng_bounds_for_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func latLngBoundsForCamera(camera bindingArg0: CameraOptions) async throws
     -> LatLngBounds
   {
@@ -138,7 +165,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_lat_lng_bounds_for_camera_unwrapped`.
+  /// Starts an ordered unwrapped-bounds query for a copied camera.
+  ///
+  /// See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func latLngBoundsForCameraUnwrapped(
     camera bindingArg0: CameraOptions
   ) async throws
@@ -157,7 +187,11 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_lat_lng_for_pixel`.
+  /// Starts an ordered conversion from a screen point to a geographic
+  /// coordinate.
+  ///
+  /// See `mln_map_lat_lng_for_pixel` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func latLngForPixel(point bindingArg0: ScreenPoint) async throws -> LatLng {
     try await nativeStart(
       "mln_map_lat_lng_for_pixel",
@@ -170,7 +204,12 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_lat_lng_for_pixel_unwrapped`.
+  /// Starts an ordered conversion from a screen point to an unwrapped
+  /// geographic
+  /// coordinate.
+  ///
+  /// See `mln_map_lat_lng_for_pixel_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func latLngForPixelUnwrapped(point bindingArg0: ScreenPoint) async throws
     -> LatLng
   {
@@ -185,7 +224,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_lat_lngs_for_pixels`.
+  /// Starts an ordered conversion of copied screen points to coordinates.
+  ///
+  /// See `mln_map_lat_lngs_for_pixels` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func latLngsForPixels(points bindingArg0: [ScreenPoint]) async throws
     -> [LatLng]
   {
@@ -204,7 +246,11 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_lat_lngs_for_pixels_unwrapped`.
+  /// Starts an ordered conversion of copied screen points to unwrapped
+  /// coordinates.
+  ///
+  /// See `mln_map_lat_lngs_for_pixels_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func latLngsForPixelsUnwrapped(points bindingArg0: [ScreenPoint]) async throws
     -> [LatLng]
   {
@@ -225,7 +271,11 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_meters_per_pixel_at_latitude`.
+  /// Starts an ordered query of meters per logical pixel at a latitude and the
+  /// current map zoom. The completion borrows one double.
+  ///
+  /// See `mln_map_meters_per_pixel_at_latitude` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func metersPerPixelAtLatitude(latitude bindingArg0: Double) async throws
     -> Double
   {
@@ -240,7 +290,11 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_pixel_for_lat_lng`.
+  /// Starts an ordered conversion from a geographic coordinate to a screen
+  /// point.
+  ///
+  /// See `mln_map_pixel_for_lat_lng` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func pixelForLatLng(coordinate bindingArg0: LatLng) async throws
     -> ScreenPoint
   {
@@ -255,7 +309,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_pixels_for_lat_lngs`.
+  /// Starts an ordered conversion of copied coordinates to screen points.
+  ///
+  /// See `mln_map_pixels_for_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   func pixelsForLatLngs(coordinates bindingArg0: [LatLng]) async throws
     -> [ScreenPoint]
   {
@@ -274,7 +331,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_set_bounds`.
+  /// Submits a copied camera-constraint command.
+  ///
+  /// See `mln_map_set_bounds` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func setBounds(options bindingArg0: BoundOptions) async throws
     -> CommandCompletion
@@ -289,7 +349,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_debug_options`.
+  /// Submits a debug-overlay command.
+  ///
+  /// See `mln_map_set_debug_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func setDebugOptions(options bindingArg0: MapDebugOption) async throws
     -> CommandCompletion
@@ -304,7 +367,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_free_camera_options`.
+  /// Submits a copied free-camera command.
+  ///
+  /// See `mln_map_set_free_camera_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func setFreeCameraOptions(options bindingArg0: FreeCameraOptions) async throws
     -> CommandCompletion
@@ -319,7 +385,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_projection_mode`.
+  /// Submits copied axonometric rendering option fields.
+  ///
+  /// See `mln_map_set_projection_mode` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func setProjectionMode(mode bindingArg0: ProjectionMode) async throws
     -> CommandCompletion
@@ -334,7 +403,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_rendering_stats_view_enabled`.
+  /// Submits a rendering-stats visibility command.
+  ///
+  /// See `mln_map_set_rendering_stats_view_enabled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func setRenderingStatsViewEnabled(enabled bindingArg0: Bool) async throws
     -> CommandCompletion
@@ -349,7 +421,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_tile_options`.
+  /// Submits a copied tile-options command.
+  ///
+  /// See `mln_map_set_tile_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func setTileOptions(options bindingArg0: MapTileOptions) async throws
     -> CommandCompletion
@@ -364,7 +439,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_viewport_options`.
+  /// Submits a copied viewport-options command.
+  ///
+  /// See `mln_map_set_viewport_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func setViewportOptions(options bindingArg0: MapViewportOptions) async throws
     -> CommandCompletion
@@ -379,7 +457,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_update_camera`.
+  /// Submits one atomic camera update.
+  ///
+  /// See `mln_map_update_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   @discardableResult
   func updateCamera(update bindingArg0: CameraUpdate) async throws
     -> CommandCompletion

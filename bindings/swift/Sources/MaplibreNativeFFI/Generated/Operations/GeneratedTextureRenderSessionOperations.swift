@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  /// Calls `mln_metal_borrowed_texture_set_target`.
+  /// Starts an ordered caller-owned Metal texture replacement.
+  ///
+  /// See `mln_metal_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func metalBorrowedTextureSetTarget(
     descriptor bindingArg0: MetalBorrowedTextureDescriptor
   ) async throws {
@@ -18,7 +21,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_opengl_borrowed_texture_set_target`.
+  /// Starts an ordered caller-owned OpenGL texture replacement.
+  ///
+  /// See `mln_opengl_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func openglBorrowedTextureSetTarget(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor
   ) async throws {
@@ -32,7 +38,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_texture_read_premultiplied_rgba8`.
+  /// Starts readback of the latest rendered texture frame.
+  ///
+  /// See `mln_texture_read_premultiplied_rgba8` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func textureReadPremultipliedRgba8() async throws -> TextureReadbackResult {
     try await nativeStart(
       "mln_texture_read_premultiplied_rgba8",
@@ -44,7 +53,10 @@ public extension RenderSessionHandle {
     ) }
   }
 
-  /// Calls `mln_vulkan_borrowed_texture_set_target`.
+  /// Starts an ordered caller-owned Vulkan texture replacement.
+  ///
+  /// See `mln_vulkan_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func vulkanBorrowedTextureSetTarget(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor
   ) async throws {
@@ -58,7 +70,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_webgpu_borrowed_texture_set_target`.
+  /// Starts an ordered caller-owned WebGPU texture replacement.
+  ///
+  /// See `mln_webgpu_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func webgpuBorrowedTextureSetTarget(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor
   ) async throws {

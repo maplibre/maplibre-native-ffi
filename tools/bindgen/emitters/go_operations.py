@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from ..model import ModelError
 from ..semantic import output_member
-from .go import GO_KEYWORDS, name, native_call
+from .go import GO_KEYWORDS, documented_operation, name, native_call
 from .go_values import Values, absent, public
 
 
@@ -345,7 +345,19 @@ def operation(plan, values):
             invocation = f"_, err := bindingDirect({target}, func(arena *bindingArena, raw uint64) struct{{}} {{\n{closure_setup}{call}\nreturn struct{{}}{{}}\n}})\nreturn err"
     else:
         check = f"func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
-        if outputs:
+        if plan.absence:
+            # A handle is absent as nil; a value becomes a pointer that is.
+            if outputs[0][1].kind != "handle":
+                returned = "*" + returned
+                adoptions.append(f"value := {converted}")
+                converted = "&value"
+            result_closure = (
+                f"func(arena *bindingArena) {returned} {{\n"
+                + "".join(line + "\n" for line in adoptions)
+                + f"return {converted}\n}}"
+            )
+            invocation = f"return bindingGetUnless({target}, int32(C.{plan.absence.status}), {check}, {result_closure})"
+        elif outputs:
             result_closure = (
                 f"func(arena *bindingArena) {returned} {{\n"
                 + "".join(line + "\n" for line in adoptions)
@@ -379,7 +391,9 @@ def lower(bound):
     )
     for plan in bound.operations:
         try:
-            chunks.append(operation(plan, values))
+            chunks.append(
+                documented_operation(bound, plan.name, operation(plan, values))
+            )
             generated.append(plan.name)
         except ModelError as error:
             errors[plan.name] = str(error)

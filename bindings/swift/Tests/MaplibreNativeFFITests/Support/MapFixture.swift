@@ -121,11 +121,7 @@ func withMapFixture<Result>(
 extension RuntimeHandle {
   /// Drains the queued events into copies that outlive the batch.
   func drainEventCopies() throws -> [RuntimeEvent] {
-    let batch: EventBatchHandle
-    do { batch = try drainEvents() }
-    catch let error as MaplibreError where error.kind == .notReady {
-      return []
-    }
+    let batch = try drainEvents()
     defer { try? batch.close() }
     return try batch.get().events
   }

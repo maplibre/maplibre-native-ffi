@@ -8,6 +8,7 @@ from dataclasses import replace
 from keyword import iskeyword
 from textwrap import dedent
 
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.emitters.rust import RUST_KEYWORDS, native_call
 from tools.bindgen.emitters.rust_callbacks import decision_table
@@ -534,8 +535,11 @@ def operation(
                 None,
             )
         status = plan.status
+        absence = plan.absence
         body = setup + [
-            f"        let result = unsafe {{ call.status(|diagnostic| {call}) }};"
+            f"        let result = unsafe {{ call.status_unless(sys::{absence.status}, |diagnostic| {call}) }};"
+            if absence
+            else f"        let result = unsafe {{ call.status(|diagnostic| {call}) }};"
             if status
             else f"        let result = unsafe {{ call.run(|| {call}) }};"
         ]
@@ -546,7 +550,11 @@ def operation(
         if status:
             if plan.consumes == "always":
                 body.append("        reservation.commit();")
-            body.append("        result?;")
+            body.append(
+                "        if !result? { return Ok(py.None()); }"
+                if absence
+                else "        result?;"
+            )
             if abandon:
                 state = "self.state()"
                 body.append(f"        {state}.views_valid = false;")
@@ -574,8 +582,24 @@ def operation(
                     f"        {owned_native(value, output, bool(plan.registrations))}"
                 )
                 public_result = result_owner
-                expression = f"_adopt_value({expression}, {result_owner!r}, {'self' if receiver and value.handle and value.handle.parent else 'None'})"
+                parent = (
+                    "self"
+                    if receiver and value.handle and value.handle.parent
+                    else "None"
+                )
+                if absence:
+                    public_result += " | None"
+                    expression = f"_maybe(lambda raw: _adopt_value(raw, {result_owner!r}, {parent}), {expression})"
+                else:
+                    expression = (
+                        f"_adopt_value({expression}, {result_owner!r}, {parent})"
+                    )
             else:
+                # Only an owned handle has an executed absence probe.
+                if absence:
+                    raise unsupported(
+                        function, "absence requires an owned handle output"
+                    )
                 body.append(f"        {ok(values.copy(value, output))}")
                 public_result = values.type(value)
                 expression = values.facade_copy(value, expression)
@@ -666,13 +690,16 @@ def operation(
         if product
         else ""
     )
-    documentation = f"Call {function.name}."
-    if plan.view:
-        documentation += " Native resources remain valid only during the callback."
-    facade = f'''    def {name}({signature}) -> {public_result}:
-        """{documentation}"""
-{facade_setup}        return {expression}
-'''
+    documentation = docs.docstring(
+        values.api.doc(function.name),
+        "        ",
+        ("Native resources remain valid only during the callback.",)
+        if plan.view
+        else (),
+    )
+    facade = f"""    def {name}({signature}) -> {public_result}:
+{documentation}{facade_setup}        return {expression}
+"""
     stub = f"    def {name}({', '.join(['self', *native_stub_parameters])}) -> {native_result}: ...\n"
     if not receiver:
         rust = (
@@ -988,9 +1015,9 @@ struct {owner} {{ native: usize, scope: GeneratedCallbackScope }}
         value._native = native
         return value
 """)
-    for owner in OWNERS.values():
+    for native, owner in OWNERS.items():
         owner_classes.append(f'''class {owner}(_{owner}Operations, NativeHandleMixin):
-    _handle_name = "{owner}"
+{docs.docstring(bound.doc(native), "    ")}    _handle_name = "{owner}"
     _parent: NativeHandleMixin | None
 
     def __init__(self):

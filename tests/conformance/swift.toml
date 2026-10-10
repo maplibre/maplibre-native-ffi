@@ -10,6 +10,7 @@
 # generator's Swift probe checks against a stub that reports another version.
 # A value's generated default reads native defaults without the check.
 "ERR-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aLibraryWithAnotherCAbiVersionIsRejected"
+"ERR-03" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aDrainBeforeAnyDemandReturnsNil"
 "LIFE-01" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::closingAHandleTwiceDoesNothingTheSecondTime"
 "LIFE-02" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds"
 "LIFE-03" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aBorrowOnAnotherThreadHoldsOffAClose"
@@ -33,6 +34,7 @@
 "VAL-03" = "bindings/swift/Tests/MaplibreNativeFFITests/EventDecodeTests.swift::unknownEventSourceAndPayloadKindsSurviveAsRawValues"
 "VAL-04" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::valuesCheckNarrowingKeepUnknownEnumsAndCarryFullWidthHandles"
 "VAL-05" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::inputsAreCopiedAtSubmission"
+"VAL-06" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::aRecordBuiltFromItsInitializerDefaultsEqualsTheNativeDefault"
 "VIEW-01" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aFrameViewExpiresWithItsScopeAndHoldsOffAbandon"
 "REND-01" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::anOwnedTextureSessionRendersPixelsTheBindingReadsBack"
 "REND-02" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aCallerDrivenSessionIsServicedOnAHostThread"

@@ -3,6 +3,12 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.lifecycle.*
 
+/**
+ * An owned buffer of bytes.
+ *
+ * See `mln_buffer` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public class BufferHandle
 internal constructor(handle: Long, dispose: (Long) -> Unit = GeneratedOwnerDisposal::buffer) :
   GeneratedBufferOperations(), AutoCloseable {

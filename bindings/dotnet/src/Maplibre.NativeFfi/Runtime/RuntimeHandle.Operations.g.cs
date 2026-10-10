@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// A runtime: the native scheduler thread and event store for its maps.
+/// </summary>
+/// <remarks>
+/// See <c>mln_runtime</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class RuntimeHandle
     : IDisposable,
         IAsyncDisposable,
@@ -38,6 +45,13 @@ public sealed unsafe partial class RuntimeHandle
         state.Retire();
     }
 
+    /// <summary>
+    /// Creates a map on the runtime worker.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<MapHandle> MapCreateAsync(MapOptions options)
     {
         using var scope = new NativeCallScope(this, "mln_map_create");
@@ -53,6 +67,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Starts an ordered runtime barrier.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_barrier</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task BarrierAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_runtime_barrier");
@@ -63,6 +84,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Clears the runtime-scoped outgoing HTTP header transform.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_clear_http_header_transform</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task ClearHttpHeaderTransformAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_runtime_clear_http_header_transform");
@@ -77,6 +105,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Clears the runtime-scoped network resource provider.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_clear_resource_provider</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task ClearResourceProviderAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_runtime_clear_resource_provider");
@@ -87,6 +122,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Clears the runtime-scoped URL transform for network resources.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_clear_resource_transform</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task ClearResourceTransformAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_runtime_clear_resource_transform");
@@ -97,6 +139,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Creates a runtime with a new core-owned worker.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public static RuntimeHandle Create(RuntimeOptions options)
     {
         using var scope = new NativeCallScope(null, "mln_runtime_create");
@@ -108,6 +157,13 @@ public sealed unsafe partial class RuntimeHandle
         return owner;
     }
 
+    /// <summary>
+    /// Drains this runtime's queued events into a new owned batch.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_drain_events</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public EventBatchHandle DrainEvents()
     {
         using var call = Enter(this, "mln_runtime_drain_events");
@@ -116,6 +172,13 @@ public sealed unsafe partial class RuntimeHandle
         return EventBatchHandle.Adopt(outBatch);
     }
 
+    /// <summary>
+    /// Reports which runtime-scoped event types this runtime queues.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_get_event_mask</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public RuntimeEventMask GetEventMask()
     {
         using var read = state.Read(this, "mln_runtime_get_event_mask");
@@ -124,6 +187,13 @@ public sealed unsafe partial class RuntimeHandle
         return (RuntimeEventMask)outMask;
     }
 
+    /// <summary>
+    /// Starts creating an offline region.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<OfflineRegionInfo> OfflineRegionCreateAsync(
         OfflineRegionDefinition definition,
         byte[] metadata,
@@ -147,6 +217,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Deletes an offline region.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_delete</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task OfflineRegionDeleteAsync(
         long regionId,
         CancellationToken cancellationToken = default
@@ -165,6 +242,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Starts getting one offline region by ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_get</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<OfflineRegionInfo?> OfflineRegionGetAsync(
         long regionId,
         CancellationToken cancellationToken = default
@@ -184,6 +268,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Starts getting the current download status for an offline region.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_get_status</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<OfflineRegionStatus> OfflineRegionGetStatusAsync(
         long regionId,
         CancellationToken cancellationToken = default
@@ -203,6 +294,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Invalidates cached resources for an offline region.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_invalidate</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task OfflineRegionInvalidateAsync(
         long regionId,
         CancellationToken cancellationToken = default
@@ -221,6 +319,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Sets an offline region's native download state.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_set_download_state</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task OfflineRegionSetDownloadStateAsync(
         long regionId,
         OfflineRegionDownloadState state,
@@ -244,6 +349,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Enables or disables runtime events for an offline region.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_set_observed</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task OfflineRegionSetObservedAsync(
         long regionId,
         bool observed,
@@ -264,6 +376,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Starts updating opaque binary metadata for an offline region.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_region_update_metadata</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<OfflineRegionInfo> OfflineRegionUpdateMetadataAsync(
         long regionId,
         byte[] metadata,
@@ -287,6 +406,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Starts listing the offline regions in the runtime database.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_regions_list</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<OfflineRegionInfo[]> OfflineRegionsListAsync(
         CancellationToken cancellationToken = default
     )
@@ -300,6 +426,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Starts merging offline regions from another MapLibre offline database.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_offline_regions_merge_database</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<OfflineRegionInfo[]> OfflineRegionsMergeDatabaseAsync(
         string sideDatabasePath,
         CancellationToken cancellationToken = default
@@ -319,6 +452,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Releases a runtime after synchronous child preflight.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public void Close() => CloseAsync().GetAwaiter().GetResult();
 
     public Task CloseAsync()
@@ -339,6 +479,13 @@ public sealed unsafe partial class RuntimeHandle
         return mln_status.MLN_STATUS_OK;
     }
 
+    /// <summary>
+    /// Starts a MapLibre ambient cache maintenance operation for this runtime.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_run_ambient_cache_operation</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task RunAmbientCacheOperationAsync(
         AmbientCacheOperation operation,
         CancellationToken cancellationToken = default
@@ -357,12 +504,26 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Selects which runtime-scoped event types this runtime queues.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_set_event_mask</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public void SetEventMask(RuntimeEventMask mask)
     {
         using var call = Enter(this, "mln_runtime_set_event_mask");
         Check(NativeMethods.mln_runtime_set_event_mask(Handle, (ulong)mask, Diagnostic));
     }
 
+    /// <summary>
+    /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_set_http_header_transform</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task SetHttpHeaderTransformAsync(
         HttpHeaderTransform transform,
         CancellationToken cancellationToken = default
@@ -381,6 +542,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Starts a change to this runtime's maximum ambient cache size.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_set_maximum_ambient_cache_size</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task SetMaximumAmbientCacheSizeAsync(
         ulong size,
         CancellationToken cancellationToken = default
@@ -399,6 +567,13 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Registers or replaces a runtime-scoped network resource provider.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_set_resource_provider</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task SetResourceProviderAsync(
         ResourceProvider provider,
         CancellationToken cancellationToken = default
@@ -417,6 +592,14 @@ public sealed unsafe partial class RuntimeHandle
         );
     }
 
+    /// <summary>
+    /// Registers or updates a runtime-scoped URL transform for network
+    /// resources.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_runtime_set_resource_transform</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public Task SetResourceTransformAsync(
         ResourceTransform transform,
         CancellationToken cancellationToken = default

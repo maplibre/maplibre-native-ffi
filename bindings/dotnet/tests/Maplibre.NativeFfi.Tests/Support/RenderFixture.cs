@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
-using Maplibre.NativeFfi.Error;
 using Xunit;
 
 namespace Maplibre.NativeFfi.Tests;
@@ -223,18 +222,13 @@ internal sealed class RenderFixture : IDisposable
 
     private IReadOnlyList<RenderFrameResult> DrainFrames()
     {
-        try
-        {
-            using var batch = Session.DrainFrameResults();
-            var results = new RenderFrameResult[checked((int)batch.Count())];
-            for (var index = 0; index < results.Length; index++)
-                results[index] = batch.Get((ulong)index);
-            return results;
-        }
-        catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
-        {
+        using var batch = Session.DrainFrameResults();
+        if (batch is null)
             return [];
-        }
+        var results = new RenderFrameResult[checked((int)batch.Count())];
+        for (var index = 0; index < results.Length; index++)
+            results[index] = batch.Get((ulong)index);
+        return results;
     }
 
     private RenderSessionHandle Attach()

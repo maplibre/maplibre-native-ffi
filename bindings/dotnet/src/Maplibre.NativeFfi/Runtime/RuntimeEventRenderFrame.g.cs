@@ -2,6 +2,22 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Payload for <c>MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED</c>.
+/// </summary>
+/// <remarks>
+/// See <c>mln_runtime_event_render_frame</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+/// </remarks>
+/// <param name="Mode">
+/// One of <c>mln_render_mode</c>.
+/// </param>
+/// <param name="NeedsRepaint">
+/// Whether MapLibre needs another frame after this one.
+/// </param>
+/// <param name="PlacementChanged">
+/// Whether symbol placement changed during this frame.
+/// </param>
 public readonly partial record struct RuntimeEventRenderFrame(
     RenderMode Mode,
     bool NeedsRepaint,

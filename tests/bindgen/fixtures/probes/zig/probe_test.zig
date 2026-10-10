@@ -45,3 +45,26 @@ test "generated calls report native failures through the diagnostic" {
     try std.testing.expectEqual(@as(?i32, -1), diagnostic.raw_status);
     try std.testing.expectEqualStrings("right holds more than 8 points", diagnostic.message());
 }
+
+test "generated record defaults equal the native default" {
+    try api.probeSettingsCheck(.{}, null);
+}
+
+test "generated default copies keep values and leave registrations unset" {
+    var hooks = try api.probeHooksDefault(std.testing.allocator);
+    defer hooks.deinit();
+    try std.testing.expectEqual(@as(u32, 4), hooks.value.limit);
+    try std.testing.expect(hooks.value.signal.callback == null);
+}
+
+test "generated absence returns null and other failures still report" {
+    try std.testing.expect(try api.probeTakeParcel(null) == null);
+    var parcel = (try api.probeTakeParcel(null)).?;
+    try std.testing.expectEqual(@as(u64, 42), parcel.raw);
+    parcel.deinit();
+    var diagnostic: api.Diagnostic = .{};
+    try std.testing.expectError(error.InvalidArgument, api.probeTakeParcel(&diagnostic));
+    try std.testing.expectEqualStrings("exhausted", diagnostic.message());
+    try std.testing.expect(try api.probeReadLevel(null) == null);
+    try std.testing.expectEqual(@as(?f64, 0.5), try api.probeReadLevel(null));
+}

@@ -18,6 +18,7 @@ from .dart_values import (
     Unsupported,
     Values,
     deferred_key,
+    doc,
     owner_names,
     public_name,
 )
@@ -468,8 +469,12 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             if returns
             else None
         )
+        if plan.absence:
+            public += "?"
         body = setup + [
-            f"_check({call});"
+            f"if (!_present({call}, raw.{plan.absence.status})) return null;"
+            if plan.absence
+            else f"_check({call});"
             if status_return
             else f"final nativeResult = {call};"
             if plan.result
@@ -618,6 +623,9 @@ def lower(api: Api | BoundApi):
             # Failed attempts cannot leave unrenderable value fragments behind.
             local_values = Values(bound)
             owner, body = lower_function(plan, local_values)
+            if owner == "Globals":
+                body = abi_checked(body)
+            body = doc(bound, plan.name, "  ") + body
             local_values.render()
             values.used.update(local_values.used)
             values.results.update(local_values.results)
@@ -693,7 +701,8 @@ def render_owner(native, handle, bodies, bound, ports):
         f"/// Issued `{native}` handle id.\n"
         f"extension type const {native_type}(int raw) implements NativeHandle {{}}\n\n"
         f"/// Owner of one native `{native}` handle.\n"
-        f"final class {public} implements Finalizable{', _CallbackPortOwner' if ports else ''} {{\n"
+        + (f"///\n{summary}" if (summary := doc(bound, native)) else "")
+        + f"final class {public} implements Finalizable{', _CallbackPortOwner' if ports else ''} {{\n"
         f"  {public}._({', '.join(parameters)}) : _state = NativeHandleState(handle, '{public}');\n"
         + "\n".join(fields)
         + "\n\n  /// Whether this binding object has released its native handle.\n"
@@ -749,7 +758,6 @@ def generate(api: Api | BoundApi) -> str:
             + descriptors,
         )
     )
-    needed.update("_read" + public_name(value.native) for value in values.projections)
     while True:
         expanded = needed | set(
             re.findall(
@@ -768,7 +776,7 @@ def generate(api: Api | BoundApi) -> str:
         conversions,
         descriptors,
     ]
-    chunks.extend(abi_checked(body) for body in methods.get("Globals", []))
+    chunks.extend(methods.get("Globals", []))
     for native, handle in sorted(bound.public_handles.items()):
         chunks.append(
             render_owner(

@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_android_init`.
+  /// Initializes Android platform services.
+  ///
+  /// See `mln_android_init` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
   static func androidInit(
     jniEnv bindingArg0: NativePointer,
     jniClass bindingArg1: NativePointer,

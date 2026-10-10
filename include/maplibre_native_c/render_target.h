@@ -30,12 +30,12 @@ typedef uint64_t mln_vulkan_non_dispatchable_handle;
 /** Logical render target extent in UI pixels. */
 typedef struct mln_render_target_extent {
   uint32_t size;
-  /** Logical map width in UI pixels. */
-  uint32_t width;
-  /** Logical map height in UI pixels. */
-  uint32_t height;
-  /** UI-to-device pixel scale. Must be positive and finite. */
-  double scale_factor;
+  /** Logical map width in UI pixels. Defaults to 256. */
+  uint32_t width MLN_BINDING("default=256");
+  /** Logical map height in UI pixels. Defaults to 256. */
+  uint32_t height MLN_BINDING("default=256");
+  /** UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0. */
+  double scale_factor MLN_BINDING("default=1.0");
 } mln_render_target_extent;
 
 /** Execution placement for one render session. */
@@ -119,13 +119,19 @@ typedef struct mln_queue_lock {
  */
 typedef struct mln_render_session_attach_options {
   uint32_t size;
-  /** One mln_render_driver_kind value. */
-  uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
+  /**
+   * One mln_render_driver_kind value. Defaults to
+   * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
+   */
+  uint32_t driver MLN_BINDING(
+    "enum=mln_render_driver_kind;"
+    "default=MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD"
+  );
   /**
    * Requested host-acquirable owned-texture slot count. Private targets grant
-   * one slot regardless of this value. Ignored by other targets.
+   * one slot regardless of this value. Ignored by other targets. Defaults to 1.
    */
-  uint32_t requested_texture_ring_depth;
+  uint32_t requested_texture_ring_depth MLN_BINDING("default=1");
   uint32_t reserved MLN_BINDING("kind=reserved");
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   mln_wake frame_wake;
@@ -154,7 +160,7 @@ typedef struct mln_render_session_capabilities {
 typedef enum mln_gpu_sync_kind : uint32_t {
   /** The producer or consumer has completed before the API call returns. */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
-  /** id<MTLSharedEvent> plus a monotonically increasing signal value. */
+  /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,
   /** VkSemaphore plus a timeline value. */
   MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2U,
@@ -175,7 +181,7 @@ typedef struct mln_gpu_sync {
   /** One mln_gpu_sync_kind value. */
   uint32_t kind MLN_BINDING("enum=mln_gpu_sync_kind");
   /**
-   * Bit pattern of the backend object that kind names: the id<MTLSharedEvent>
+   * Bit pattern of the backend object that kind names: the `id<MTLSharedEvent>`
    * pointer, the VkSemaphore handle, the GLsync pointer, or the WebGPU token.
    *
    * A fixed-width carrier keeps a Vulkan non-dispatchable handle intact on
@@ -192,7 +198,7 @@ MLN_API mln_gpu_sync mln_gpu_sync_default(void) MLN_NOEXCEPT;
 /** Metal backend context fields shared by Metal render targets. */
 typedef struct mln_metal_context_descriptor {
   uint32_t size;
-  /** id<MTLDevice> / MTL::Device*. Retained when the target requires it. */
+  /** `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it. */
   void* device;
 } mln_metal_context_descriptor;
 

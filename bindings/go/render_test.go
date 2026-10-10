@@ -151,11 +151,11 @@ func (r *renderFixture) renderFrame(t *testing.T) {
 func (r *renderFixture) result(t *testing.T, token uint64) (RenderResult, bool) {
 	t.Helper()
 	batch, err := r.session.DrainFrameResults()
-	if errors.Is(err, ErrNotReady) {
-		return 0, false
-	}
 	if err != nil {
 		t.Fatalf("DrainFrameResults: %v", err)
+	}
+	if batch == nil {
+		return 0, false
 	}
 	defer batch.Close()
 	count, err := batch.Count()
@@ -195,6 +195,19 @@ func TestCallerDriverIsServicedFromAGoroutine(t *testing.T) {
 	r.renderFrame(t)
 }
 
+// Before any demand, no frame result is queued and no frame has rendered,
+// which native reports as not ready and the binding returns as nil.
+func TestDrainBeforeAnyDemandReturnsNoBatch(t *testing.T) {
+	r := newRenderFixture(t)
+	r.attach(t)
+	if batch, err := r.session.DrainFrameResults(); batch != nil || err != nil {
+		t.Fatalf("DrainFrameResults = %v, %v; want nil, nil", batch, err)
+	}
+	if frame, err := r.session.AcquireFrame(); frame != nil || err != nil {
+		t.Fatalf("AcquireFrame = %v, %v; want nil, nil", frame, err)
+	}
+}
+
 // The binding reads a rendered frame back as premultiplied RGBA8 pixels.
 func TestOwnedTextureFrameReadsBackAsPixels(t *testing.T) {
 	r := newRenderFixture(t)
@@ -226,8 +239,8 @@ func TestFrameViewIsScopedToItsCallback(t *testing.T) {
 	r.attach(t)
 	r.renderFrame(t)
 	frame, err := r.session.AcquireFrame()
-	if err != nil {
-		t.Fatalf("AcquireFrame: %v", err)
+	if err != nil || frame == nil {
+		t.Fatalf("AcquireFrame = %v, %v; want a rendered frame", frame, err)
 	}
 	var expired frameView
 	err = withFrameView(frame, func(view frameView) error {

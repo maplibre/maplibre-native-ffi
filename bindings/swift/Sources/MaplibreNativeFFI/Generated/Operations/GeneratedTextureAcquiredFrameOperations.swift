@@ -4,6 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension AcquiredFrameHandle {
+  /// Copies Metal-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_metal_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func withMetalTexture<Result>(_ body: (MetalOwnedTextureFrameView) throws
     -> Result) throws -> Result
   {
@@ -29,6 +33,10 @@ public extension AcquiredFrameHandle {
     )) }
   }
 
+  /// Copies OpenGL-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_opengl_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func withOpenglTexture<Result>(_ body: (OpenglOwnedTextureFrameView) throws
     -> Result) throws -> Result
   {
@@ -54,6 +62,10 @@ public extension AcquiredFrameHandle {
     )) }
   }
 
+  /// Copies Vulkan-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_vulkan_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func withVulkanTexture<Result>(_ body: (VulkanOwnedTextureFrameView) throws
     -> Result) throws -> Result
   {
@@ -79,6 +91,10 @@ public extension AcquiredFrameHandle {
     )) }
   }
 
+  /// Copies WebGPU-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_webgpu_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func withWebgpuTexture<Result>(_ body: (WebgpuOwnedTextureFrameView) throws
     -> Result) throws -> Result
   {

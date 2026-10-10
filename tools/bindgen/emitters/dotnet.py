@@ -12,6 +12,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api, Function
@@ -39,8 +40,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
     value = result.element if result and result.kind == "array" else result
     if execution == "query" and (result is None or result.ownership != "borrowed"):
         return "query requires borrowed result storage"
-    if value and value.optional == "null":
-        return "null optional result needs a presence rule"
     if (
         value
         and value.lifetime != "call"
@@ -86,7 +85,7 @@ def operation_contract(plan: OperationPlan) -> str | None:
         planned = planned_parameters[parameter.name]
         value = planned.value
         # A null pointer argument needs a pointer that is not a C string.
-        if (value.nullable or value.optional == "null") and not (
+        if value.nullable and not (
             parameter.type.pointee and type_name(parameter.type.pointee) != "char"
         ):
             return f"parameter {parameter.name} needs a nullable input conversion"
@@ -123,6 +122,11 @@ PRIMITIVES = {
     "uint8_t": "byte",
     "int8_t": "sbyte",
 }
+
+
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The XML doc comment of a declaration, or empty when it has none."""
+    return docs.xml_comment(bound.doc(native), indent)
 
 
 def owner_name(handle: HandlePlan | str) -> str:
@@ -176,6 +180,12 @@ def checked_call(function: Function, arguments: str) -> str:
     if not function.diagnostic:
         raise Unsupported(f"{function.name} returns a status without a diagnostic")
     return f"Check({native_call(function, arguments, 'Diagnostic')});"
+
+
+def present_call(plan: OperationPlan, arguments: str) -> str:
+    """Returns null for the absence status, and checks every other status."""
+    call = native_call(plan.function, arguments, "Diagnostic")
+    return f"if (!Present({call}, mln_status.{plan.absence.status})) return null;"
 
 
 def submission(function: Function, arguments: str) -> str:
@@ -730,6 +740,15 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 f"    (handle, attachment) => {result_type}.Adopt({parent}handle, attachment)",
                 ");",
             ]
+        elif plan.absence:
+            # The scope accepts its inputs only after a call that publishes.
+            if scoped:
+                raise Unsupported("absence requires a call without a native scope")
+            body = prologue + [
+                present_call(plan, arguments),
+                f"return {result_type}.Adopt({parent}{local});",
+            ]
+            result_type += "?"
         else:
             body = prologue + [checked_call(function, arguments)]
             constructor = f"{result_type}.Adopt({parent}{local})"
@@ -810,6 +829,9 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
         else:
             result_type, result = "void", None
+        if plan.absence:
+            # Only an owned handle has an executed absence probe.
+            raise Unsupported("absence requires an owned handle output")
         body = prologue + [checked_call(function, arguments)]
         if scoped:
             accept = (
@@ -889,7 +911,7 @@ def emit(api: Api | BoundApi) -> Emission:
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
             continue
-        methods[owner].append(emitted)
+        methods[owner].append(doc(bound, function.name, "    ") + emitted)
         records[owner].update(used_records)
         supported.append(function.name)
         # An owner without a declaration of its own lives with its first operation.
@@ -1067,9 +1089,20 @@ def emit(api: Api | BoundApi) -> Emission:
             ),
         ]
         bases = f" : {', '.join(interfaces)}" if interfaces else ""
+        handle_doc = next(
+            (
+                doc(bound, native)
+                for native in created_handles
+                if owners[native] == owner
+            ),
+            "",
+        )
         files[f"{directory}/{owner}.Operations.g.cs"] = (
-            HEADER + OPERATION_HELPERS + f"namespace {NAMESPACE};\n\n"
-            f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
+            HEADER
+            + OPERATION_HELPERS
+            + f"namespace {NAMESPACE};\n\n"
+            + handle_doc
+            + f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
             + "\n".join(body)
             + "}\n"
         )
@@ -1079,9 +1112,10 @@ def emit(api: Api | BoundApi) -> Emission:
     converters = []
     for record_name in sorted(used_records):
         plan = values.record(record_name)
-        converters.append(
-            values.decoder(plan).replace("private static", "internal static")
-        )
+        if record_name in bound.returned:
+            converters.append(
+                values.decoder(plan).replace("private static", "internal static")
+            )
         converters.append(values.callback_methods(plan))
         if values.can_encode(plan):
             converters.append(
@@ -1127,7 +1161,7 @@ def emit(api: Api | BoundApi) -> Emission:
             else:
                 declaration = declaration.rstrip()[:-1] + default + "}\n"
         files[f"{directory}/{public_type(name)}.g.cs"] = (
-            HEADER + f"namespace {NAMESPACE};\n\n" + declaration
+            HEADER + f"namespace {NAMESPACE};\n\n" + doc(bound, name) + declaration
         )
     for enum in api.enums:
         if enum.name not in enum_names:
@@ -1149,12 +1183,13 @@ def emit(api: Api | BoundApi) -> Emission:
             }[enum.underlying_type.canonical]
         flags = "[Flags]\n" if enum.metadata.get("kind") == "bitmask" else ""
         fields = [
-            f"    {pascal(value.name.removeprefix(prefix).lower())} = {value.value},"
+            doc(bound, value.name, "    ")
+            + f"    {pascal(value.name.removeprefix(prefix).lower())} = {value.value},"
             for value in enum.values
         ]
         files[f"{directory}/{public_type(enum.name)}.g.cs"] = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            f"namespace {NAMESPACE};\n\n{flags}"
+            f"namespace {NAMESPACE};\n\n{doc(bound, enum.name)}{flags}"
             f"public enum {public_type(enum.name)} : {underlying}\n{{\n"
             + "\n".join(fields)
             + "\n}\n"

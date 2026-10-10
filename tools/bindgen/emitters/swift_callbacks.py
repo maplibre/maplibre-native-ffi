@@ -1,7 +1,7 @@
 """Render Swift callback descriptors from registration metadata."""
 
 from ..model import ModelError
-from .swift import SCALARS, camel, checked, identifier, name, native_call
+from .swift import SCALARS, camel, checked, doc, identifier, name, native_call
 
 
 def contains_callback(value):
@@ -60,7 +60,7 @@ def raw_type(type_):
 
 
 def descriptor(values, plan):
-    from .swift_dynamic_values import decode, encode
+    from .swift_dynamic_values import decode, encode, zero
 
     registration = plan.registration
     public = values.public(plan)
@@ -87,7 +87,9 @@ def descriptor(values, plan):
         if field.name in callbacks:
             callback = values.bound.callbacks[field.value.native]
             typ = closure_type(values, callback)
-            fields.append(f"  public var {local}: ({typ})?")
+            fields.append(
+                f"{doc(values.bound, f'{plan.native}.{field.name}', '  ')}  public var {local}: ({typ})?"
+            )
             arguments.append(f"{local}: ({typ})? = nil")
             assignments.append(f"    self.{local} = {local}")
             defaults.append(f"    self.{local} = nil")
@@ -97,8 +99,17 @@ def descriptor(values, plan):
         else:
             optional = field.presence and field.presence.mask
             typ = values.public(field.value) + ("?" if optional else "")
-            fields.append(f"  public var {local}: {typ}")
-            arguments.append(f"{local}: {typ} = {public}.default.{local}")
+            fields.append(
+                f"{doc(values.bound, f'{plan.native}.{field.name}', '  ')}  public var {local}: {typ}"
+            )
+            arguments.append(
+                f"{local}: {typ} = "
+                + (
+                    f"{public}.default.{local}"
+                    if plan.default
+                    else zero(field.value, typ)
+                )
+            )
             assignments.append(f"    self.{local} = {local}")
             captured = decode(values, field.value, "raw." + identifier(field.name))
             if optional:
@@ -126,16 +137,23 @@ def descriptor(values, plan):
         if any(field.role == "size" for field in plan.fields)
         else ""
     )
-    declarations = f"""public struct {public}: Sendable {{
+    # Native returns a registration only as its own default, so a registration
+    # without one has no copy.
+    copy = (
+        f"""  public static var `default`: Self {{ try! Self(raw: {initial}) }}
+  init(raw: {plan.native}) throws {{
+{chr(10).join(defaults)}
+  }}
+"""
+        if plan.native in values.bound.returned
+        else "  public static var `default`: Self { Self() }\n"
+    )
+    declarations = f"""{doc(values.bound, plan.native)}public struct {public}: Sendable {{
 {chr(10).join(fields)}
   public init({", ".join(arguments)}) {{
 {chr(10).join(assignments)}
   }}
-  public static var `default`: Self {{ try! Self(raw: {initial}) }}
-  init(raw: {plan.native}) throws {{
-{chr(10).join(defaults)}
-  }}
-  func nativeValue(arena: NativeInputArena) throws -> {plan.native} {{
+{copy}  func nativeValue(arena: NativeInputArena) throws -> {plan.native} {{
     var raw = {initial}{sized}
 {chr(10).join(materialize)}
     if {root_needed} {{
@@ -322,7 +340,7 @@ def direct_operation(plan, values):
         lines.append(checked(f"arena.submit {{ {call} }}"))
         result_type = ""
     parameter_type = f"({typ})?" if optional else f"@escaping {typ}"
-    body = f"""  {"static " if optional else ""}func {method}(_ callback: {parameter_type}) throws{result_type} {{
+    body = f"""{doc(values.bound, function, "  ")}  {"static " if optional else ""}func {method}(_ callback: {parameter_type}) throws{result_type} {{
     {"try NativeAbi.ensureCompatible()" + chr(10) + "    " if optional else ""}try NativeCallbackGuard.check(owner: {"nil" if optional else "self"}, operation: "{function}")
     {"return " if result_type else ""}try mapNativeFailure {{
       {(chr(10) + "      ").join(lines)}

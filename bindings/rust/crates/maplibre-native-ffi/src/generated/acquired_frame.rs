@@ -3,12 +3,20 @@ use super::*;
 
 native_owner! {
     /// Owns one `mln_acquired_frame` native handle.
+    ///
+    /// A rendered frame that a render session lends until its release.
+    ///
+    /// See `mln_acquired_frame` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     #[must_use = "`AcquiredFrameHandle` must be released with `AcquiredFrameHandle::release`"]
     pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_dispose(raw, out_diagnostic) });
 }
 
 impl AcquiredFrameHandle {
-    /// Calls `mln_acquired_frame_dispose`.
+    /// Consumes an acquired frame and quarantines its slot of the texture ring.
+    ///
+    /// See `mln_acquired_frame_dispose` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dispose(&self) -> Result<()> {
         self.inner.close(|frame| {
             let mut call = Call::new(frame, None);
@@ -18,7 +26,10 @@ impl AcquiredFrameHandle {
         })
     }
 
-    /// Calls `mln_acquired_frame_get_metal_texture`.
+    /// Copies Metal-native metadata from an acquired frame.
+    ///
+    /// See `mln_acquired_frame_get_metal_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_metal_texture<R>(
         &self,
         callback: impl FnOnce(&MetalOwnedTextureFrame) -> R,
@@ -39,7 +50,10 @@ impl AcquiredFrameHandle {
         Ok(callback(&value))
     }
 
-    /// Calls `mln_acquired_frame_get_opengl_texture`.
+    /// Copies OpenGL-native metadata from an acquired frame.
+    ///
+    /// See `mln_acquired_frame_get_opengl_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_opengl_texture<R>(
         &self,
         callback: impl FnOnce(&OpenglOwnedTextureFrame) -> R,
@@ -60,7 +74,10 @@ impl AcquiredFrameHandle {
         Ok(callback(&value))
     }
 
-    /// Calls `mln_acquired_frame_get_producer_sync`.
+    /// Copies the producer synchronization for an acquired texture frame.
+    ///
+    /// See `mln_acquired_frame_get_producer_sync` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_producer_sync<R>(&self, callback: impl FnOnce(&GpuSync) -> R) -> Result<R> {
         let mut call = self.inner.read("mln_acquired_frame_get_producer_sync")?;
         unsafe {
@@ -78,7 +95,10 @@ impl AcquiredFrameHandle {
         Ok(callback(&value))
     }
 
-    /// Calls `mln_acquired_frame_get_result`.
+    /// Copies common metadata for an acquired frame.
+    ///
+    /// See `mln_acquired_frame_get_result` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_result(&self) -> Result<RenderFrameResult> {
         let mut call = self.inner.call("mln_acquired_frame_get_result")?;
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
@@ -89,7 +109,10 @@ impl AcquiredFrameHandle {
         Ok(unsafe { from_native(out_result) }?)
     }
 
-    /// Calls `mln_acquired_frame_get_vulkan_texture`.
+    /// Copies Vulkan-native metadata from an acquired frame.
+    ///
+    /// See `mln_acquired_frame_get_vulkan_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_vulkan_texture<R>(
         &self,
         callback: impl FnOnce(&VulkanOwnedTextureFrame) -> R,
@@ -110,7 +133,10 @@ impl AcquiredFrameHandle {
         Ok(callback(&value))
     }
 
-    /// Calls `mln_acquired_frame_get_webgpu_texture`.
+    /// Copies WebGPU-native metadata from an acquired frame.
+    ///
+    /// See `mln_acquired_frame_get_webgpu_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_webgpu_texture<R>(
         &self,
         callback: impl FnOnce(&WebgpuOwnedTextureFrame) -> R,
@@ -131,7 +157,10 @@ impl AcquiredFrameHandle {
         Ok(callback(&value))
     }
 
-    /// Calls `mln_acquired_frame_release`.
+    /// Releases an acquired frame after optional consumer GPU work.
+    ///
+    /// See `mln_acquired_frame_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn release(&self, consumer_completion: &GpuSync) -> Result<()> {
         self.inner.close(|frame| {
             let mut call = Call::new(frame, None);

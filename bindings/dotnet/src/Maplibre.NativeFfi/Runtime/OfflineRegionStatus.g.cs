@@ -2,6 +2,16 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Offline region status snapshot.
+/// </summary>
+/// <remarks>
+/// See <c>mln_offline_region_status</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+/// </remarks>
+/// <param name="DownloadState">
+/// One of <c>mln_offline_region_download_state</c>.
+/// </param>
 public readonly partial record struct OfflineRegionStatus(
     OfflineRegionDownloadState DownloadState,
     ulong CompletedResourceCount,

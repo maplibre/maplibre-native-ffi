@@ -160,13 +160,16 @@ typedef enum mln_map_mode : uint32_t {
 } mln_map_mode;
 /** Logical map extent in UI pixels and device-pixel scale. */
 typedef struct mln_logical_extent {
-  uint32_t width;
-  uint32_t height;
+  /** Width in UI pixels. Defaults to 256. */
+  uint32_t width MLN_BINDING("default=256");
+  /** Height in UI pixels. Defaults to 256. */
+  uint32_t height MLN_BINDING("default=256");
   /**
-   * Device pixels per UI pixel. The renderer takes it at map creation, so
-   * mln_map_resize() accepts only the value the map was created with.
+   * Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
+   * creation, so mln_map_resize() accepts only the value the map was created
+   * with.
    */
-  double scale_factor;
+  double scale_factor MLN_BINDING("default=1.0");
 } mln_logical_extent;
 
 /** Options used when creating a map. */
@@ -198,15 +201,16 @@ typedef struct mln_map_options {
    * Map-originated event types this map queues, as a bitwise OR of
    * mln_runtime_event_mask values.
    *
-   * This field is always read, so set it explicitly.
-   * MLN_RUNTIME_EVENT_MASK_ALL selects every event type this library reports
-   * and is the value mln_map_options_default() populates.
-   * MLN_RUNTIME_EVENT_MASK_NONE queues none.
+   * This field is always read. MLN_RUNTIME_EVENT_MASK_ALL selects every event
+   * type this library reports, and MLN_RUNTIME_EVENT_MASK_NONE queues none.
+   * Defaults to MLN_RUNTIME_EVENT_MASK_ALL.
    *
    * The mask applies throughout construction, including the camera events that
    * MapLibre reports while it initializes the map's size.
    */
-  uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
+  uint64_t event_mask MLN_BINDING(
+    "enum=mln_runtime_event_mask;default=MLN_RUNTIME_EVENT_MASK_ALL"
+  );
 } mln_map_options;
 
 /** Screen-space point in logical map pixels. */

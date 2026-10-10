@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Options for rendered feature queries.
+/// </summary>
+/// <remarks>
+/// See <c>mln_rendered_feature_query_options</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
+/// </remarks>
 public sealed record RenderedFeatureQueryOptions
 {
     public string[]? LayerIds

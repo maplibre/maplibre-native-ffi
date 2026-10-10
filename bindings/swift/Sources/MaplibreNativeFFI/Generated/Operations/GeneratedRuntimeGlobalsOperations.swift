@@ -4,7 +4,11 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension HttpHeaderTransformResponse {
-  /// Calls `mln_http_header_transform_response_set`.
+  /// Sets one outgoing HTTP request header for the current transform
+  /// invocation.
+  ///
+  /// See `mln_http_header_transform_response_set` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func set(name bindingArg0: String, value bindingArg2: String) throws {
     try nativeInvoke(owner: self,
                      "mln_http_header_transform_response_set")
@@ -22,7 +26,10 @@ public extension HttpHeaderTransformResponse {
 }
 
 public extension Maplibre {
-  /// Calls `mln_network_status_get`.
+  /// Reads MapLibre Native's process-global network status.
+  ///
+  /// See `mln_network_status_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func networkStatusGet() throws -> NetworkStatus {
     var value0: UInt32 = 0
     return try nativeInvoke("mln_network_status_get") { _, _, diagnostic in
@@ -33,7 +40,10 @@ public extension Maplibre {
     } result: { NetworkStatus(rawValue: value0) }
   }
 
-  /// Calls `mln_network_status_set`.
+  /// Sets MapLibre Native's process-global network status.
+  ///
+  /// See `mln_network_status_set` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func networkStatusSet(status bindingArg0: NetworkStatus) throws {
     try nativeInvoke("mln_network_status_set") { _, _, diagnostic in
       mln_network_status_set(
@@ -43,7 +53,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_runtime_create`.
+  /// Creates a runtime with a new core-owned worker.
+  ///
+  /// See `mln_runtime_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func runtimeCreate(options bindingArg0: RuntimeOptions) throws
     -> RuntimeHandle
   {
@@ -57,7 +70,10 @@ public extension Maplibre {
     } result: { try RuntimeHandle(adopting: value0) }
   }
 
-  /// Calls `mln_runtime_options_default`.
+  /// Returns runtime options initialized for this C API version.
+  ///
+  /// See `mln_runtime_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   static func runtimeOptionsDefault() throws -> RuntimeOptions {
     try nativeDirect("mln_runtime_options_default") { _ in
       try RuntimeOptions(raw: mln_runtime_options_default())
@@ -66,7 +82,11 @@ public extension Maplibre {
 }
 
 public extension ResourceTransformResponse {
-  /// Calls `mln_resource_transform_response_set_url`.
+  /// Copies a replacement URL into C API-managed storage for the current
+  /// callback.
+  ///
+  /// See `mln_resource_transform_response_set_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func setUrl(url bindingArg0: String) throws {
     try nativeInvoke(owner: self,
                      "mln_resource_transform_response_set_url")

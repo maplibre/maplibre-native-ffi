@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_plugin_get_register_function_v1`.
+  /// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
+  ///
+  /// See `mln_plugin_get_register_function_v1` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
   static func pluginGetRegisterFunctionV1() throws -> NativePointer {
     try nativeDirect("mln_plugin_get_register_function_v1") { _ in
       NativePointer(bitPattern: unsafeBitCast(

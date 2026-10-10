@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from .swift import camel, identifier, name
+from .swift import camel, doc, identifier, name
 
 
 def dynamic(value):
@@ -110,7 +110,32 @@ def encode(values, value, source):
     )
 
 
+def zero(value, typ):
+    """The initial value of a field of a record without a native default."""
+    if typ.endswith("?"):
+        return "nil"
+    if typ == "String":
+        return '""'
+    if typ == "Data":
+        return "Data()"
+    if typ.startswith("["):
+        return "[]"
+    if typ == "Bool":
+        return "false"
+    if value.kind == "scalar":
+        return "0"
+    if value.kind == "enum":
+        return ".init(rawValue: 0)"
+    if value.kind == "native_pointer":
+        return ".null"
+    return ".default"
+
+
 def decode(values, value, source, context="raw"):
+    if value.registration and value.native not in values.bound.returned:
+        # Native never returns callbacks, so a copy leaves a registration
+        # unset.
+        return "nil" if value.nullable else f"{values.public(value)}()"
     if value.kind == "enum":
         return f"{values.public(value)}(rawValue: {source}{'.rawValue' if value.ctype.canonical.startswith('enum ') else ''})"
     if value.kind == "native_pointer":
@@ -319,7 +344,9 @@ def declaration(values, value):
         if f.value.kind == "union":
             union = f.value
             union_type = values.public(union)
-            fields.append(f"  public var {local}: {union_type}")
+            fields.append(
+                f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {union_type}"
+            )
             args.append(
                 f"{local}: {union_type} = {typ}.default.{local}"
                 if value.default
@@ -349,26 +376,10 @@ def declaration(values, value):
             )
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")
-        default = (
-            "nil"
-            if optional or field_type.endswith("?")
-            else '""'
-            if field_type == "String"
-            else "Data()"
-            if field_type == "Data"
-            else "[]"
-            if field_type.startswith("[")
-            else "false"
-            if field_type == "Bool"
-            else "0"
-            if f.value.kind == "scalar"
-            else ".init(rawValue: 0)"
-            if f.value.kind == "enum"
-            else ".null"
-            if f.value.kind == "native_pointer"
-            else ".default"
+        default = zero(f.value, field_type)
+        fields.append(
+            f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {field_type}"
         )
-        fields.append(f"  public var {local}: {field_type}")
         args.append(
             f"{local}: {field_type} = {typ}.default.{local}"
             if value.default
@@ -405,7 +416,7 @@ def declaration(values, value):
         ]
     return (
         "\n".join(group_declarations)
-        + f"""public struct {typ}: {conformances} {{
+        + f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
   public static var `default`: Self {{ {f"try! Self(raw: {initial})" if value.default else "Self()"} }}
 {chr(10).join(constructors)}

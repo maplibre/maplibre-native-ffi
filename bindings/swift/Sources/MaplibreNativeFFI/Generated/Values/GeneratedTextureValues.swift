@@ -3,10 +3,21 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Metal attachment options for a borrowed texture target.
+///
+/// See `mln_metal_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent. The map viewport uses width and height and the
+  /// renderer uses scale_factor; the physical size is stated separately below.
   public var extent: RenderTargetExtent
+  /// Physical texture width in device pixels. Must be positive. Defaults to
+  /// 256.
   public var physicalWidth: UInt32
+  /// Physical texture height in device pixels. Must be positive. Defaults to
+  /// 256.
   public var physicalHeight: UInt32
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
   public var texture: NativePointer
   public static var `default`: Self {
     Self(raw: mln_metal_borrowed_texture_descriptor_default())
@@ -46,8 +57,14 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// Metal attachment options for an owned texture target.
+///
+/// See `mln_metal_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent.
   public var extent: RenderTargetExtent
+  /// Metal backend context. device is required.
   public var context: MetalContextDescriptor
   public static var `default`: Self {
     Self(raw: mln_metal_owned_texture_descriptor_default())
@@ -75,14 +92,26 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// Metal frame acquired from a session-owned texture target.
+///
+/// See `mln_metal_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
+  /// Session generation that produced this frame.
   public var generation: UInt64
+  /// Physical Metal texture width in device pixels.
   public var width: UInt32
+  /// Physical Metal texture height in device pixels.
   public var height: UInt32
+  /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
+  /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
   public var texture: NativePointer
+  /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
   public var device: NativePointer
+  /// Backend-native pixel format value. Metal uses MTLPixelFormat.
   public var pixelFormat: UInt64
   public static var `default`: Self {
     Self(raw: mln_metal_owned_texture_frame())
@@ -137,12 +166,26 @@ public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
   }
 }
 
+/// OpenGL attachment options for a borrowed texture target.
+///
+/// See `mln_opengl_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent. The map viewport uses width and height and the
+  /// renderer uses scale_factor; the physical size is stated separately below.
   public var extent: RenderTargetExtent
+  /// Physical texture width in device pixels. Must be positive. Defaults to
+  /// 256.
   public var physicalWidth: UInt32
+  /// Physical texture height in device pixels. Must be positive. Defaults to
+  /// 256.
   public var physicalHeight: UInt32
+  /// Borrowed OpenGL context provider data. The texture must belong to this
+  /// context or a context in the same share group.
   public var context: OpenglContextDescriptor
+  /// Borrowed OpenGL texture object name. Required.
   public var texture: UInt32
+  /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
   public var target: UInt32
   public static var `default`: Self {
     try! Self(raw: mln_opengl_borrowed_texture_descriptor_default())
@@ -194,8 +237,16 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// OpenGL attachment options for an owned texture target.
+///
+/// See `mln_opengl_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent.
   public var extent: RenderTargetExtent
+  /// Borrowed OpenGL context provider data. Shared ownership creates a context
+  /// whose texture frames the host can acquire. Dedicated EGL or transferred
+  /// WebGL ownership creates a private core-worker context for CPU readback.
   public var context: OpenglContextDescriptor
   public static var `default`: Self {
     try! Self(raw: mln_opengl_owned_texture_descriptor_default())
@@ -229,16 +280,30 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// OpenGL frame acquired from a session-owned texture target.
+///
+/// See `mln_opengl_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenglOwnedTextureFrame: Equatable, Hashable, Sendable {
+  /// Session generation that produced this frame.
   public var generation: UInt64
+  /// Physical OpenGL texture width in device pixels.
   public var width: UInt32
+  /// Physical OpenGL texture height in device pixels.
   public var height: UInt32
+  /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
+  /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Borrowed OpenGL texture object name. Valid until frame release.
   public var texture: UInt32
+  /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
   public var target: UInt32
+  /// OpenGL internal format, such as GL_RGBA8.
   public var internalFormat: UInt32
+  /// OpenGL pixel format, such as GL_RGBA.
   public var format: UInt32
+  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
   public var type: UInt32
   public static var `default`: Self {
     Self(raw: mln_opengl_owned_texture_frame())
@@ -298,10 +363,18 @@ public struct OpenglOwnedTextureFrame: Equatable, Hashable, Sendable {
   }
 }
 
+/// CPU image readback metadata for a texture target frame.
+///
+/// See `mln_texture_image_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct TextureImageInfo: Equatable, Hashable, Sendable {
+  /// Physical image width in device pixels.
   public var width: UInt32
+  /// Physical image height in device pixels.
   public var height: UInt32
+  /// Bytes per image row.
   public var stride: UInt32
+  /// Required output buffer byte length.
   public var byteLength: Int
   public static var `default`: Self {
     Self(raw: mln_texture_image_info_default())
@@ -336,7 +409,12 @@ public struct TextureImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
+/// Texture readback borrowed for a completion callback.
+///
+/// See `mln_texture_readback_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct TextureReadbackResult: Equatable, Hashable, Sendable {
+  /// Borrowed pixel bytes, valid only during the callback.
   public var data: Data
   public var info: TextureImageInfo
   public static var `default`: Self {
@@ -367,15 +445,30 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// Vulkan attachment options for a borrowed texture target.
+///
+/// See `mln_vulkan_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent. The map viewport uses width and height and the
+  /// renderer uses scale_factor; the physical size is stated separately below.
   public var extent: RenderTargetExtent
+  /// Physical image width in device pixels. Must be positive. Defaults to 256.
   public var physicalWidth: UInt32
+  /// Physical image height in device pixels. Must be positive. Defaults to 256.
   public var physicalHeight: UInt32
+  /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
+  /// Borrowed VkImage. Required.
   public var image: UInt64
+  /// Borrowed VkImageView for image. Required.
   public var imageView: UInt64
+  /// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
   public var format: UInt32
+  /// Backend-native VkImageLayout value expected at render-pass begin.
   public var initialLayout: UInt32
+  /// Backend-native VkImageLayout value left after rendering succeeds. Defaults
+  /// to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
   public var finalLayout: UInt32
   public static var `default`: Self {
     Self(raw: mln_vulkan_borrowed_texture_descriptor_default())
@@ -434,8 +527,14 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// Vulkan attachment options for an owned texture target.
+///
+/// See `mln_vulkan_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent.
   public var extent: RenderTargetExtent
+  /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
   public static var `default`: Self {
     Self(raw: mln_vulkan_owned_texture_descriptor_default())
@@ -463,16 +562,30 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// Vulkan frame acquired from a session-owned texture target.
+///
+/// See `mln_vulkan_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
+  /// Session generation that produced this frame.
   public var generation: UInt64
+  /// Physical Vulkan image width in device pixels.
   public var width: UInt32
+  /// Physical Vulkan image height in device pixels.
   public var height: UInt32
+  /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
+  /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Borrowed VkImage bit pattern. Valid until frame release.
   public var image: UInt64
+  /// Borrowed VkImageView bit pattern. Valid until frame release.
   public var imageView: UInt64
+  /// Borrowed VkDevice. Valid until frame release.
   public var device: NativePointer
+  /// Backend-native VkFormat value.
   public var format: UInt32
+  /// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
   public var layout: UInt32
   public static var `default`: Self {
     Self(raw: mln_vulkan_owned_texture_frame())
@@ -532,13 +645,24 @@ public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
   }
 }
 
+/// WebGPU attachment options for a borrowed texture target.
+///
+/// See `mln_webgpu_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent.
   public var extent: RenderTargetExtent
+  /// Physical texture width in device pixels. Defaults to 256.
   public var physicalWidth: UInt32
+  /// Physical texture height in device pixels. Defaults to 256.
   public var physicalHeight: UInt32
+  /// Borrowed WebGPU context. device is required.
   public var context: WebgpuContextDescriptor
+  /// Borrowed WGPUTexture. Required.
   public var texture: NativePointer
+  /// Borrowed WGPUTextureView for texture. Required.
   public var textureView: NativePointer
+  /// Backend-native WGPUTextureFormat value. Undefined is invalid.
   public var format: UInt32
   public static var `default`: Self {
     Self(raw: mln_webgpu_borrowed_texture_descriptor_default())
@@ -595,8 +719,14 @@ public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// WebGPU attachment options for an owned texture target.
+///
+/// See `mln_webgpu_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct WebgpuOwnedTextureDescriptor: Equatable, Hashable, Sendable {
+  /// Logical texture extent.
   public var extent: RenderTargetExtent
+  /// Borrowed WebGPU context. device is required.
   public var context: WebgpuContextDescriptor
   public static var `default`: Self {
     Self(raw: mln_webgpu_owned_texture_descriptor_default())
@@ -624,15 +754,28 @@ public struct WebgpuOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// WebGPU frame acquired from a session-owned texture target.
+///
+/// See `mln_webgpu_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct WebgpuOwnedTextureFrame: Equatable, Hashable, Sendable {
+  /// Session generation that produced this frame.
   public var generation: UInt64
+  /// Physical WebGPU texture width in device pixels.
   public var width: UInt32
+  /// Physical WebGPU texture height in device pixels.
   public var height: UInt32
+  /// UI-to-device pixel scale used for this frame.
   public var scaleFactor: Double
+  /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Borrowed WGPUTexture. Valid until frame release.
   public var texture: NativePointer
+  /// Borrowed WGPUTextureView. Valid until frame release.
   public var textureView: NativePointer
+  /// Borrowed WGPUDevice. Valid until frame release.
   public var device: NativePointer
+  /// Backend-native WGPUTextureFormat value.
   public var format: UInt32
   public static var `default`: Self {
     Self(raw: mln_webgpu_owned_texture_frame())

@@ -1,6 +1,6 @@
 """Native-retired direct callback registrations for Rust."""
 
-from .rust import Unsupported, pascal
+from .rust import Unsupported, doc, pascal
 from .rust_callbacks import callback_parameter_type, trampoline
 
 
@@ -31,7 +31,7 @@ def declaration(values, callback, plan, registration):
     release_type = next(
         p.value.native for p in plan.inputs if p.name == registration.release_callback
     )
-    return f"""pub type {name} = std::sync::Arc<dyn Fn({arguments}) -> {output} + Send + Sync + 'static>;
+    return f"""{doc(values.bound, callback.native)}pub type {name} = std::sync::Arc<dyn Fn({arguments}) -> {output} + Send + Sync + 'static>;
 pub(crate) fn {callback.native.removeprefix("mln_")}_registration(callback: Option<{name}>, arena: &mut InputArena) -> (sys::{callback.native}, *mut std::ffi::c_void, sys::{release_type}) {{
     {code}
     match callback {{

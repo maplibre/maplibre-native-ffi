@@ -145,3 +145,9 @@ test "an array input is copied at submission" {
     try testing.expectEqual(@as(usize, pixels.len), copy.value.len);
     for (copy.value) |byte| try testing.expectEqual(@as(u8, 0x80), byte);
 }
+
+// A struct's field defaults come from the header's field annotations, so the
+// record they build matches what the native default function returns.
+test "a record built from its field defaults equals the native default" {
+    try testing.expectEqual(try maplibre.mapOptionsDefault(), maplibre.MapOptions{});
+}

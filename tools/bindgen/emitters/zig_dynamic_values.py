@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from .rust_dynamic_values import dynamic
 from .zig import identifier, pascal
+from .zig_values import field_default
 
 
 def public(values, value):
@@ -63,6 +64,10 @@ def encode(values, value, source, depth=0):
 
 
 def decode(values, value, source, context="raw"):
+    if value.registration and value.native not in values.bound.returned:
+        # Native never returns callbacks, so a copy leaves a registration
+        # unset.
+        return "null" if value.nullable else ".{}"
     optional = value.nullable or value.optional == "empty"
     if value.kind in {"buffer", "array", "reference"} and optional:
         absent = (
@@ -235,9 +240,7 @@ def declaration(values, value):
             if optional or public_type.startswith("?")
             else "&.{}"
             if public_type.startswith("[]")
-            else ".{}"
-            if field.value.kind == "record"
-            else "std.mem.zeroes(" + public_type + ")"
+            else field_default(values, field)
         )
         fields.append(
             f"    {local}: {'?' if optional else ''}{public_type} = {default},"
@@ -281,6 +284,17 @@ def declaration(values, value):
     )
     if not any("raw." in line for line in captures):
         capture_use += "        _ = raw;\n"
+    # Native returns a registration only as its own default.
+    copy = (
+        f"""    pub fn fromNative(allocator: std.mem.Allocator, raw: c.{value.native}) status.Error!{typ} {{
+{capture_use}        return .{{
+{chr(10).join(captures)}
+        }};
+    }}
+"""
+        if not value.registration or value.native in values.bound.returned
+        else ""
+    )
     return (
         "".join(groups)
         + f"""pub const {typ} = struct {{
@@ -291,11 +305,6 @@ def declaration(values, value):
         return raw;
     }}
 {chr(10).join(trampolines)}
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.{value.native}) status.Error!{typ} {{
-{capture_use}        return .{{
-{chr(10).join(captures)}
-        }};
-    }}
-}};
+{copy}}};
 """
     )

@@ -11,6 +11,10 @@ pub enum AmbientCacheOperation: u32 {
 }
 
 native_flags! {
+/// Field mask values for `mln_animation_options`.
+///
+/// See `mln_animation_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct AnimationOptionField: u32 {
     const DURATION = 1;
     const VELOCITY = 2;
@@ -20,12 +24,22 @@ pub struct AnimationOptionField: u32 {
 }
 }
 
+/// Optional animation controls for camera transitions.
+///
+/// See `mln_animation_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AnimationOptions {
+    /// Duration in milliseconds. Must be finite and non-negative. Values that
+    /// would overflow MapLibre Native's internal duration are invalid.
     pub duration_ms: Option<f64>,
+    /// Average fly velocity in screenfuls per second. Must be positive and
+    /// defaults to 1.2 when omitted.
     pub velocity: Option<f64>,
+    /// Peak zoom for flyTo transitions.
     pub min_zoom: Option<f64>,
     pub easing: Option<UnitBezier>,
+    /// Caller-chosen identity for the transition this options struct starts.
     pub transition_id: Option<u64>,
 }
 impl Default for AnimationOptions {
@@ -80,19 +94,41 @@ impl FromNative<sys::mln_animation_options> for AnimationOptions {
 }
 
 native_flags! {
+/// Field mask values for `mln_bound_options`.
+///
+/// See `mln_bound_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct BoundOptionField: u32 {
+    /// Selects `mln_bound_options.bounds` as a geographic constraint that the
+    /// camera center stays inside. Mutually exclusive with
+    /// `MLN_BOUND_OPTION_UNBOUNDED`.
     const BOUNDS = 1;
     const MIN_ZOOM = 2;
     const MAX_ZOOM = 4;
     const MIN_PITCH = 8;
     const MAX_PITCH = 16;
+    /// Selects the unbounded geographic constraint, which leaves every camera
+    /// center unconstrained and lets the map pan freely across the
+    /// antimeridian. This differs from world bounds of -90/-180 to 90/180,
+    /// which clamp longitude to that range. Mutually exclusive with
+    /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
     const UNBOUNDED = 32;
 }
 }
 
+/// Optional map camera constraint fields.
+///
+/// See `mln_bound_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BoundOptions {
+    /// Selects the unbounded geographic constraint, which leaves every camera
+    /// center unconstrained and lets the map pan freely across the
+    /// antimeridian. This differs from world bounds of -90/-180 to 90/180,
+    /// which clamp longitude to that range. Mutually exclusive with
+    /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
     pub unbounded: bool,
+    /// Read when fields contains `MLN_BOUND_OPTION_BOUNDS`.
     pub bounds: Option<LatLngBounds>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -153,12 +189,22 @@ impl FromNative<sys::mln_bound_options> for BoundOptions {
 }
 
 native_enum! {
+/// Camera change kinds reported by camera will-change and did-change events.
+///
+/// See `mln_camera_change_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum CameraChangeMode: u32 {
+    /// The camera reached its new value without an animated transition.
     Immediate = 0,
+    /// The camera moved as part of an animated transition.
     Animated = 1,
 } Unknown
 }
 
+/// One relative camera operation.
+///
+/// See `mln_camera_delta` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CameraDelta {
     pub kind: CameraDeltaKind,
@@ -201,6 +247,10 @@ impl FromNative<sys::mln_camera_delta> for CameraDelta {
 }
 
 native_enum! {
+/// Relative camera operation carried by `mln_camera_delta`.
+///
+/// See `mln_camera_delta_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum CameraDeltaKind: u32 {
     Move = 0,
     Scale = 1,
@@ -210,6 +260,10 @@ pub enum CameraDeltaKind: u32 {
 }
 
 native_flags! {
+/// Field mask values for `mln_camera_fit_options`.
+///
+/// See `mln_camera_fit_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct CameraFitOptionField: u32 {
     const PADDING = 1;
     const BEARING = 2;
@@ -217,6 +271,10 @@ pub struct CameraFitOptionField: u32 {
 }
 }
 
+/// Optional fitting controls for camera-for-viewport queries.
+///
+/// See `mln_camera_fit_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CameraFitOptions {
     pub padding: Option<EdgeInsets>,
@@ -261,6 +319,10 @@ impl FromNative<sys::mln_camera_fit_options> for CameraFitOptions {
 }
 
 native_flags! {
+/// Field mask values for `mln_camera_options`.
+///
+/// See `mln_camera_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct CameraOptionField: u32 {
     const CENTER = 1;
     const ZOOM = 2;
@@ -274,11 +336,16 @@ pub struct CameraOptionField: u32 {
 }
 }
 
+/// Camera fields used by snapshots and camera updates.
+///
+/// See `mln_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CameraOptions {
     pub center: Option<LatLng>,
     pub center_altitude: Option<f64>,
     pub padding: Option<EdgeInsets>,
+    /// Optional screen-space focal point in logical map pixels.
     pub anchor: Option<ScreenPoint>,
     pub zoom: Option<f64>,
     pub bearing: Option<f64>,
@@ -365,6 +432,10 @@ impl FromNative<sys::mln_camera_options> for CameraOptions {
     }
 }
 
+/// Camera result borrowed for an ordered camera-query completion.
+///
+/// See `mln_camera_query_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CameraQueryResult {
     pub generation: u64,
@@ -384,6 +455,10 @@ impl FromNative<sys::mln_camera_query_result> for CameraQueryResult {
     }
 }
 
+/// One atomic absolute camera update.
+///
+/// See `mln_camera_update` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CameraUpdate {
     pub mode: CameraUpdateMode,
@@ -434,6 +509,10 @@ impl FromNative<sys::mln_camera_update> for CameraUpdate {
 }
 
 native_enum! {
+/// Camera transition behavior for `mln_camera_update`.
+///
+/// See `mln_camera_update_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum CameraUpdateMode: u32 {
     Jump = 0,
     Ease = 1,
@@ -441,6 +520,11 @@ pub enum CameraUpdateMode: u32 {
 } Unknown
 }
 
+/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// callbacks.
+///
+/// See `mln_canonical_tile_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct CanonicalTileId {
     pub z: u32,
@@ -472,6 +556,10 @@ impl FromNative<sys::mln_canonical_tile_id> for CanonicalTileId {
 }
 
 native_enum! {
+/// Terminal dispositions reported by command completions.
+///
+/// See `mln_command_disposition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
 pub enum CommandDisposition: u32 {
     Committed = 0,
     Superseded = 1,
@@ -481,6 +569,10 @@ pub enum CommandDisposition: u32 {
 }
 
 native_enum! {
+/// Map constraint modes used by `mln_map_viewport_options`.
+///
+/// See `mln_constrain_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum ConstrainMode: u32 {
     None = 0,
     HeightOnly = 1,
@@ -490,6 +582,10 @@ pub enum ConstrainMode: u32 {
 }
 
 native_flags! {
+/// Field mask values for `mln_custom_geometry_source_options`.
+///
+/// See `mln_custom_geometry_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub struct CustomGeometrySourceOptionField: u32 {
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 2;
@@ -501,9 +597,15 @@ pub struct CustomGeometrySourceOptionField: u32 {
 }
 }
 
+/// Options for custom geometry sources.
+///
+/// See `mln_custom_geometry_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Clone)]
 pub struct CustomGeometrySourceOptions {
+    /// Required tile fetch callback.
     pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
+    /// Optional best-effort tile cancel callback.
     pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -621,13 +723,8 @@ impl ToNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceO
     }
 }
 impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourceOptions {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
+    /// Copies a native default, whose callbacks are unset.
     unsafe fn from_native(raw: sys::mln_custom_geometry_source_options) -> Result<Self> {
-        if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
         Ok(Self {
             fetch_tile: None,
             cancel_tile: None,
@@ -650,15 +747,25 @@ impl FromNative<sys::mln_custom_geometry_source_options> for CustomGeometrySourc
 }
 
 native_flags! {
+/// Field mask values for `mln_custom_mvt_vector_source_options`.
+///
+/// See `mln_custom_mvt_vector_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub struct CustomMvtVectorSourceOptionField: u32 {
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 2;
 }
 }
 
+/// Options for custom MVT vector sources.
+///
+/// See `mln_custom_mvt_vector_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Clone)]
 pub struct CustomMvtVectorSourceOptions {
+    /// Required tile fetch callback.
     pub fetch_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
+    /// Optional best-effort tile cancel callback.
     pub cancel_tile: Option<std::sync::Arc<dyn Fn(CanonicalTileId) -> () + Send + Sync + 'static>>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -754,13 +861,8 @@ impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSour
     }
 }
 impl FromNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSourceOptions {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
+    /// Copies a native default, whose callbacks are unset.
     unsafe fn from_native(raw: sys::mln_custom_mvt_vector_source_options) -> Result<Self> {
-        if !(raw.fetch_tile.is_none() && raw.cancel_tile.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
         Ok(Self {
             fetch_tile: None,
             cancel_tile: None,
@@ -772,6 +874,10 @@ impl FromNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSo
     }
 }
 
+/// Screen-space inset in logical map pixels.
+///
+/// See `mln_edge_insets` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct EdgeInsets {
     pub top: f64,
@@ -810,12 +916,27 @@ impl FromNative<sys::mln_edge_insets> for EdgeInsets {
     }
 }
 
+/// EGL context fields shared by OpenGL render targets.
+///
+/// See `mln_egl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct EglContextDescriptor {
+    /// Borrowed EGLDisplay. Required and kept initialized through teardown.
     pub display: *mut std::ffi::c_void,
+    /// Borrowed EGLConfig used to create the session context. Required. OpenGL
+    /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
     pub config: *mut std::ffi::c_void,
+    /// Borrowed EGLContext whose share group the session context joins.
+    /// Required under shared ownership, where the session also takes its client
+    /// API from this context. A dedicated session joins no share group, so it
+    /// must be null there and names client_api instead.
     pub share_context: *mut std::ffi::c_void,
+    /// Client API the session creates its context for. Required under dedicated
+    /// ownership. A shared session queries share_context for it, so this is
+    /// ignored there.
     pub client_api: OpenglClientApi,
+    /// Optional eglGetProcAddress-compatible function for the host loader.
     pub get_proc_address: *mut std::ffi::c_void,
 }
 impl EglContextDescriptor {
@@ -859,11 +980,19 @@ impl FromNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     }
 }
 
+/// Feature-state source, feature, and key selector.
+///
+/// See `mln_feature_state_selector` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FeatureStateSelector {
+    /// Source ID. Required and borrowed for the duration of the call.
     pub source_id: String,
+    /// Optional source layer ID. Required for vector-source disambiguation.
     pub source_layer_id: Option<String>,
+    /// Optional feature ID string. Required by set/get and optional for remove.
     pub feature_id: Option<String>,
+    /// Optional state key. Used only by remove and requires feature_id.
     pub state_key: Option<String>,
 }
 impl ToNative<sys::mln_feature_state_selector> for FeatureStateSelector {
@@ -889,6 +1018,10 @@ impl ToNative<sys::mln_feature_state_selector> for FeatureStateSelector {
 }
 
 native_flags! {
+/// Optional fields for `mln_feature_state_selector`.
+///
+/// See `mln_feature_state_selector_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct FeatureStateSelectorField: u32 {
     const SOURCE_LAYER_ID = 1;
     const FEATURE_ID = 2;
@@ -896,11 +1029,21 @@ pub struct FeatureStateSelectorField: u32 {
 }
 }
 
+/// One nonblocking request for a frame.
+///
+/// See `mln_frame_demand` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FrameDemand {
+    /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
+    /// `MLN_FRAME_DEMAND_IF_NEEDED`.
     pub flags: FrameDemandFlag,
+    /// Host identity returned with the terminal frame result.
     pub token: u64,
+    /// Demands coalesce only when this value and their flags match.
     pub coalescing_boundary: u64,
+    /// Positive time allowed before driver work begins, in nanoseconds; zero
+    /// has no limit.
     pub timeout_ns: u64,
 }
 impl Default for FrameDemand {
@@ -946,19 +1089,35 @@ impl FromNative<sys::mln_frame_demand> for FrameDemand {
 }
 
 native_flags! {
+/// Frame-demand policy bits.
+///
+/// See `mln_frame_demand_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub struct FrameDemandFlag: u32 {
+    /// Render only when a newer map update exists.
     const IF_NEEDED = 1;
+    /// Present the rendered frame on a target that supports presentation. A
+    /// presenting target whose demand clears this bit still renders and keeps
+    /// whatever it presented last. Ignored by targets without presentation.
     const PRESENT = 2;
 }
 }
 
 native_flags! {
+/// Field mask values for `mln_free_camera_options`.
+///
+/// See `mln_free_camera_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct FreeCameraOptionField: u32 {
     const POSITION = 1;
     const ORIENTATION = 2;
 }
 }
 
+/// Free camera position and orientation in MapLibre Native camera space.
+///
+/// See `mln_free_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FreeCameraOptions {
     pub position: Option<Vec3>,
@@ -1008,6 +1167,10 @@ impl FromNative<sys::mln_free_camera_options> for FreeCameraOptions {
 }
 
 native_flags! {
+/// Field mask values for `mln_geojson_source_options`.
+///
+/// See `mln_geojson_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub struct GeojsonSourceOptionField: u32 {
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 2;
@@ -1024,19 +1187,37 @@ pub struct GeojsonSourceOptionField: u32 {
 }
 }
 
+/// Options for GeoJSON sources.
+///
+/// See `mln_geojson_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct GeojsonSourceOptions {
+    /// Minimum tiling zoom. Defaults to 0.
     pub min_zoom: Option<f64>,
+    /// Maximum tiling zoom. Defaults to 18.
     pub max_zoom: Option<f64>,
+    /// Douglas-Peucker simplification tolerance. Defaults to 0.375.
     pub tolerance: Option<f64>,
+    /// Highest zoom that clusters points. Defaults to 17.
     pub cluster_max_zoom: Option<f64>,
+    /// Cluster aggregation expressions keyed by property name, as a JSON object
+    /// whose members follow the MapLibre Style Spec clusterProperties form. The
+    /// UTF-8 bytes are borrowed for the call.
     pub cluster_properties: Option<Vec<u8>>,
+    /// Tile extent in pixels. Defaults to 512.
     pub tile_size: Option<u32>,
+    /// Tile buffer in pixels. Defaults to 128.
     pub buffer: Option<u32>,
+    /// Cluster radius in pixels. Defaults to 50.
     pub cluster_radius: Option<u32>,
+    /// Points required to form a cluster. Defaults to 2.
     pub cluster_min_points: Option<u32>,
+    /// Adds line distance metrics to line features. Defaults to false.
     pub line_metrics: Option<bool>,
+    /// Clusters point features. Defaults to false.
     pub cluster: Option<bool>,
+    /// Slices requested tiles inline during the update pass. Defaults to false.
     pub synchronous_tiling: Option<bool>,
 }
 impl Default for GeojsonSourceOptions {
@@ -1139,18 +1320,37 @@ impl FromNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
 }
 
 native_enum! {
+/// Gesture boundary carried atomically with a camera update.
+///
+/// See `mln_gesture_phase` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum GesturePhase: u32 {
+    /// The update carries no gesture boundary and leaves the flag as it is.
     None = 0,
+    /// Marks a gesture as in progress before the camera write. It does not
+    /// cancel running transitions; use `mln_map_cancel_transitions()` for that.
     Begin = 1,
+    /// Keeps the gesture marked as in progress before the camera write.
     Update = 2,
+    /// Clears the gesture flag after the camera write.
     End = 3,
+    /// Cancels transitions running after the camera write, then clears the
+    /// gesture flag.
     Cancel = 4,
 } Unknown
 }
 
+/// Backend synchronization copied by frame access and release calls.
+///
+/// See `mln_gpu_sync` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GpuSync {
+    /// One `mln_gpu_sync_kind` value.
     pub kind: GpuSyncKind,
+    /// Bit pattern of the backend object that kind names: the
+    /// `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync
+    /// pointer, or the WebGPU token.
     pub object: u64,
     pub value: u64,
 }
@@ -1189,11 +1389,20 @@ impl FromNative<sys::mln_gpu_sync> for GpuSync {
 }
 
 native_enum! {
+/// Synchronization payload kind for acquired texture frames.
+///
+/// See `mln_gpu_sync_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum GpuSyncKind: u32 {
+    /// The producer or consumer has completed before the API call returns.
     CpuComplete = 0,
+    /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
     MetalSharedEvent = 1,
+    /// VkSemaphore plus a timeline value.
     VulkanTimelineSemaphore = 2,
+    /// GLsync, used only by a caller-graphics-thread driver.
     OpenglFence = 3,
+    /// A backend-defined WebGPU completion token.
     WebgpuToken = 4,
 } Unknown
 }
@@ -1276,17 +1485,6 @@ impl ToNative<sys::mln_http_header_transform> for HttpHeaderTransform {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_http_header_transform> for HttpHeaderTransform {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_http_header_transform) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
-    }
-}
 
 /// A native response borrowed only for one host callback.
 #[derive(Debug)]
@@ -1303,6 +1501,11 @@ impl HttpHeaderTransformResponse<'_> {
             lifetime: std::marker::PhantomData,
         })
     }
+    /// Sets one outgoing HTTP request header for the current transform
+    /// invocation.
+    ///
+    /// See `mln_http_header_transform_response_set` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set(&mut self, name: &str, value: &str) -> Result<()> {
         maplibre_core::callback::check(
             "mln_http_header_transform_response_set",
@@ -1323,6 +1526,10 @@ impl HttpHeaderTransformResponse<'_> {
     }
 }
 
+/// Content-box insets in image pixels, measured from the image's top-left.
+///
+/// See `mln_image_content` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ImageContent {
     pub left: f32,
@@ -1361,6 +1568,10 @@ impl FromNative<sys::mln_image_content> for ImageContent {
     }
 }
 
+/// One stretchable interval along an image axis, in image pixels.
+///
+/// See `mln_image_stretch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ImageStretch {
     pub from: f32,
@@ -1388,9 +1599,16 @@ impl FromNative<sys::mln_image_stretch> for ImageStretch {
     }
 }
 
+/// Geographic coordinate in degrees used by map and projection APIs.
+///
+/// See `mln_lat_lng` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct LatLng {
+    /// Latitude in degrees. Input latitude must be finite and within \[-90,
+    /// 90\].
     pub latitude: f64,
+    /// Longitude in degrees. Input longitude must be finite.
     pub longitude: f64,
 }
 impl LatLng {
@@ -1418,6 +1636,10 @@ impl FromNative<sys::mln_lat_lng> for LatLng {
     }
 }
 
+/// Geographic bounds in degrees.
+///
+/// See `mln_lat_lng_bounds` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct LatLngBounds {
     pub southwest: LatLng,
@@ -1449,6 +1671,10 @@ impl FromNative<sys::mln_lat_lng_bounds> for LatLngBounds {
 }
 
 native_enum! {
+/// Location indicator image-name properties.
+///
+/// See `mln_location_indicator_image_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub enum LocationIndicatorImageKind: u32 {
     Top = 0,
     Bearing = 1,
@@ -1457,6 +1683,10 @@ pub enum LocationIndicatorImageKind: u32 {
 }
 
 native_enum! {
+/// Log event categories emitted by MapLibre Native.
+///
+/// See `mln_log_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub enum LogEvent: u32 {
     General = 0,
     Setup = 1,
@@ -1479,6 +1709,10 @@ pub enum LogEvent: u32 {
 }
 
 native_enum! {
+/// Log severity values emitted by MapLibre Native.
+///
+/// See `mln_log_severity` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub enum LogSeverity: u32 {
     Info = 1,
     Warning = 2,
@@ -1487,6 +1721,10 @@ pub enum LogSeverity: u32 {
 }
 
 native_flags! {
+/// Bitmask values for log severities dispatched asynchronously.
+///
+/// See `mln_log_severity_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub struct LogSeverityMask: u32 {
     const INFO = 2;
     const WARNING = 4;
@@ -1496,10 +1734,19 @@ pub struct LogSeverityMask: u32 {
 }
 }
 
+/// Logical map extent in UI pixels and device-pixel scale.
+///
+/// See `mln_logical_extent` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct LogicalExtent {
+    /// Width in UI pixels. Defaults to 256.
     pub width: u32,
+    /// Height in UI pixels. Defaults to 256.
     pub height: u32,
+    /// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at
+    /// map creation, so `mln_map_resize()` accepts only the value the map was
+    /// created with.
     pub scale_factor: f64,
 }
 impl LogicalExtent {
@@ -1531,6 +1778,10 @@ impl FromNative<sys::mln_logical_extent> for LogicalExtent {
 }
 
 native_flags! {
+/// Debug overlay mask values for `mln_map_set_debug_options()`.
+///
+/// See `mln_map_debug_option` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct MapDebugOption: u32 {
     const TILE_BORDERS = 2;
     const PARSE_STATUS = 4;
@@ -1543,18 +1794,37 @@ pub struct MapDebugOption: u32 {
 }
 
 native_enum! {
+/// Map rendering modes used when creating a map.
+///
+/// See `mln_map_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum MapMode: u32 {
+    /// Continuously updates as data arrives and map state changes.
     Continuous = 0,
+    /// Produces one-off still images of an arbitrary viewport.
     Static = 1,
+    /// Produces one-off still images for a single tile.
     Tile = 2,
 } Unknown
 }
 
+/// Options used when creating a map.
+///
+/// See `mln_map_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapOptions {
+    /// Initial logical extent. Width and height must be positive. The scale
+    /// factor must be positive and finite, and fixes the map's scale factor for
+    /// its lifetime.
     pub initial_extent: LogicalExtent,
+    /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
     pub map_mode: MapMode,
+    /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+    /// encodings. Defaults to false.
     pub fast_pfor_enabled: bool,
+    /// Map-originated event types this map queues, as a bitwise OR of
+    /// `mln_runtime_event_mask` values.
     pub event_mask: RuntimeEventMask,
 }
 impl Default for MapOptions {
@@ -1599,17 +1869,24 @@ impl FromNative<sys::mln_map_options> for MapOptions {
     }
 }
 
+/// Immutable map state copied from the latest published generation.
+///
+/// See `mln_map_snapshot` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MapSnapshot {
+    /// Debug overlay mask of `mln_map_debug_option` values.
     pub debug_options: MapDebugOption,
     pub generation: u64,
     pub camera: CameraOptions,
     pub logical_extent: LogicalExtent,
     pub projection_mode: ProjectionMode,
     pub viewport: MapViewportOptions,
+    /// True once every requested style and tile resource finished loading.
     pub fully_loaded: bool,
     pub rendering_stats_view_enabled: bool,
     pub repaint_demand: bool,
+    /// True while the map is inside a gesture.
     pub gesture_in_progress: bool,
     pub event_mask: RuntimeEventMask,
     pub latest_render_update_generation: u64,
@@ -1677,6 +1954,10 @@ impl FromNative<sys::mln_map_snapshot> for MapSnapshot {
 }
 
 native_flags! {
+/// Field mask values for `mln_map_tile_options`.
+///
+/// See `mln_map_tile_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct MapTileOptionField: u32 {
     const PREFETCH_ZOOM_DELTA = 1;
     const LOD_MIN_RADIUS = 2;
@@ -1687,13 +1968,19 @@ pub struct MapTileOptionField: u32 {
 }
 }
 
+/// Tile prefetch and LOD tuning controls.
+///
+/// See `mln_map_tile_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapTileOptions {
+    /// Native uint8_t prefetch zoom delta.
     pub prefetch_zoom_delta: Option<u32>,
     pub lod_min_radius: Option<f64>,
     pub lod_scale: Option<f64>,
     pub lod_pitch_threshold: Option<f64>,
     pub lod_zoom_shift: Option<f64>,
+    /// One of `mln_tile_lod_mode`.
     pub lod_mode: Option<TileLodMode>,
 }
 impl Default for MapTileOptions {
@@ -1754,6 +2041,10 @@ impl FromNative<sys::mln_map_tile_options> for MapTileOptions {
 }
 
 native_flags! {
+/// Field mask values for `mln_map_viewport_options`.
+///
+/// See `mln_map_viewport_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct MapViewportOptionField: u32 {
     const NORTH_ORIENTATION = 1;
     const CONSTRAIN_MODE = 2;
@@ -1762,10 +2053,17 @@ pub struct MapViewportOptionField: u32 {
 }
 }
 
+/// Live map viewport and render-transform controls.
+///
+/// See `mln_map_viewport_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapViewportOptions {
+    /// One of `mln_north_orientation`.
     pub north_orientation: Option<NorthOrientation>,
+    /// One of `mln_constrain_mode`.
     pub constrain_mode: Option<ConstrainMode>,
+    /// One of `mln_viewport_mode`.
     pub viewport_mode: Option<ViewportMode>,
     pub frustum_offset: Option<EdgeInsets>,
 }
@@ -1834,11 +2132,23 @@ impl FromNative<sys::mln_map_viewport_options> for MapViewportOptions {
     }
 }
 
+/// Metal attachment options for a borrowed texture target.
+///
+/// See `mln_metal_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalBorrowedTextureDescriptor {
+    /// Logical texture extent. The map viewport uses width and height and the
+    /// renderer uses scale_factor; the physical size is stated separately
+    /// below.
     pub extent: RenderTargetExtent,
+    /// Physical texture width in device pixels. Must be positive. Defaults to
+    /// 256.
     pub physical_width: u32,
+    /// Physical texture height in device pixels. Must be positive. Defaults to
+    /// 256.
     pub physical_height: u32,
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
     pub texture: *mut std::ffi::c_void,
 }
 impl Default for MetalBorrowedTextureDescriptor {
@@ -1887,8 +2197,13 @@ impl FromNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTex
     }
 }
 
+/// Metal backend context fields shared by Metal render targets.
+///
+/// See `mln_metal_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MetalContextDescriptor {
+    /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
     pub device: *mut std::ffi::c_void,
 }
 impl MetalContextDescriptor {
@@ -1910,9 +2225,15 @@ impl FromNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
     }
 }
 
+/// Metal attachment options for an owned texture target.
+///
+/// See `mln_metal_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalOwnedTextureDescriptor {
+    /// Logical texture extent.
     pub extent: RenderTargetExtent,
+    /// Metal backend context. device is required.
     pub context: MetalContextDescriptor,
 }
 impl Default for MetalOwnedTextureDescriptor {
@@ -1944,15 +2265,27 @@ impl FromNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDe
     }
 }
 
+/// Metal frame acquired from a session-owned texture target.
+///
+/// See `mln_metal_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MetalOwnedTextureFrame {
+    /// Session generation that produced this frame.
     pub generation: u64,
+    /// Physical Metal texture width in device pixels.
     pub width: u32,
+    /// Physical Metal texture height in device pixels.
     pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
     pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
     pub frame_id: u64,
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
     pub texture: *mut std::ffi::c_void,
+    /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
     pub device: *mut std::ffi::c_void,
+    /// Backend-native pixel format value. Metal uses MTLPixelFormat.
     pub pixel_format: u64,
 }
 impl MetalOwnedTextureFrame {
@@ -1993,10 +2326,17 @@ impl FromNative<sys::mln_metal_owned_texture_frame> for MetalOwnedTextureFrame {
     }
 }
 
+/// Metal attachment options for a native surface.
+///
+/// See `mln_metal_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalSurfaceDescriptor {
+    /// Logical surface extent.
     pub extent: RenderTargetExtent,
+    /// Metal backend context. device is optional for Metal surfaces.
     pub context: MetalContextDescriptor,
+    /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
     pub layer: *mut std::ffi::c_void,
 }
 impl Default for MetalSurfaceDescriptor {
@@ -2046,6 +2386,10 @@ pub enum NetworkStatus: u32 {
 }
 
 native_enum! {
+/// Map north orientation values used by `mln_map_viewport_options`.
+///
+/// See `mln_north_orientation` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum NorthOrientation: u32 {
     Up = 0,
     Right = 1,
@@ -2054,11 +2398,19 @@ pub enum NorthOrientation: u32 {
 } Unknown
 }
 
+/// Geometry offline region definition.
+///
+/// See `mln_offline_geometry_region_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OfflineGeometryRegionDefinition {
+    /// Style URL. Copied during region creation.
     pub style_url: String,
+    /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
     pub geometry: Vec<u8>,
     pub min_zoom: f64,
+    /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
+    /// lets each tile source use its own maximum zoom.
     pub max_zoom: f64,
     pub pixel_ratio: f32,
     pub include_ideographs: bool,
@@ -2092,6 +2444,10 @@ impl FromNative<sys::mln_offline_geometry_region_definition> for OfflineGeometry
     }
 }
 
+/// Tagged offline region definition.
+///
+/// See `mln_offline_region_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OfflineRegionDefinition {
     pub data: OfflineRegionDefinitionData,
@@ -2150,6 +2506,10 @@ impl FromNative<sys::mln_offline_region_definition> for OfflineRegionDefinition 
     }
 }
 
+/// Offline region definition data.
+///
+/// See `mln_offline_region_definition_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub enum OfflineRegionDefinitionData {
     TilePyramid(OfflineTilePyramidRegionDefinition),
@@ -2176,10 +2536,15 @@ pub enum OfflineRegionDownloadState: u32 {
 } Unknown
 }
 
+/// Region data delivered by an offline completion.
+///
+/// See `mln_offline_region_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OfflineRegionInfo {
     pub id: i64,
     pub definition: OfflineRegionDefinition,
+    /// Metadata bytes.
     pub metadata: Vec<u8>,
 }
 impl FromNative<sys::mln_offline_region_info> for OfflineRegionInfo {
@@ -2192,8 +2557,13 @@ impl FromNative<sys::mln_offline_region_info> for OfflineRegionInfo {
     }
 }
 
+/// Offline region status snapshot.
+///
+/// See `mln_offline_region_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct OfflineRegionStatus {
+    /// One of `mln_offline_region_download_state`.
     pub download_state: OfflineRegionDownloadState,
     pub completed_resource_count: u64,
     pub completed_resource_size: u64,
@@ -2245,11 +2615,18 @@ impl FromNative<sys::mln_offline_region_status> for OfflineRegionStatus {
     }
 }
 
+/// Tile-pyramid offline region definition.
+///
+/// See `mln_offline_tile_pyramid_region_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OfflineTilePyramidRegionDefinition {
+    /// Style URL. Copied during region creation.
     pub style_url: String,
     pub bounds: LatLngBounds,
     pub min_zoom: f64,
+    /// Maximum zoom. Positive infinity follows MapLibre Native behavior and
+    /// lets each tile source use its own maximum zoom.
     pub max_zoom: f64,
     pub pixel_ratio: f32,
     pub include_ideographs: bool,
@@ -2288,13 +2665,28 @@ impl FromNative<sys::mln_offline_tile_pyramid_region_definition>
     }
 }
 
+/// OpenGL attachment options for a borrowed texture target.
+///
+/// See `mln_opengl_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenglBorrowedTextureDescriptor {
+    /// Logical texture extent. The map viewport uses width and height and the
+    /// renderer uses scale_factor; the physical size is stated separately
+    /// below.
     pub extent: RenderTargetExtent,
+    /// Physical texture width in device pixels. Must be positive. Defaults to
+    /// 256.
     pub physical_width: u32,
+    /// Physical texture height in device pixels. Must be positive. Defaults to
+    /// 256.
     pub physical_height: u32,
+    /// Borrowed OpenGL context provider data. The texture must belong to this
+    /// context or a context in the same share group.
     pub context: OpenglContextDescriptor,
+    /// Borrowed OpenGL texture object name. Required.
     pub texture: u32,
+    /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
     pub target: u32,
 }
 impl Default for OpenglBorrowedTextureDescriptor {
@@ -2333,15 +2725,29 @@ impl FromNative<sys::mln_opengl_borrowed_texture_descriptor> for OpenglBorrowedT
 }
 
 native_enum! {
+/// OpenGL client API a dedicated EGL session creates its context for.
+///
+/// See `mln_opengl_client_api` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum OpenglClientApi: u32 {
+    /// No client API is named.
     Unspecified = 0,
+    /// Desktop OpenGL, as EGL_OPENGL_API names it.
     Gl = 1,
+    /// OpenGL ES, as EGL_OPENGL_ES_API names it.
     Gles = 2,
 } Unknown
 }
 
+/// OpenGL backend context fields shared by OpenGL render targets.
+///
+/// See `mln_opengl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct OpenglContextDescriptor {
+    /// Whether the session shares its driver thread and graphics objects with
+    /// the host. A private EGL owned texture and a transferred WebGL canvas are
+    /// dedicated to their core worker.
     pub ownership: OpenglContextOwnership,
     pub data: OpenglContextDescriptorData,
 }
@@ -2392,6 +2798,10 @@ impl FromNative<sys::mln_opengl_context_descriptor> for OpenglContextDescriptor 
     }
 }
 
+/// Backend-specific OpenGL context data.
+///
+/// See `mln_opengl_context_descriptor_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub enum OpenglContextDescriptorData {
     Wgl(WglContextDescriptor),
@@ -2406,32 +2816,59 @@ impl Default for OpenglContextDescriptorData {
 }
 
 native_enum! {
+/// How a session's OpenGL context relates to its driver thread and host
+/// graphics state.
+///
+/// See `mln_opengl_context_ownership` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum OpenglContextOwnership: u32 {
+    /// The session shares its thread with host graphics work.
     Shared = 0,
+    /// The session owns its thread's OpenGL context.
     Dedicated = 1,
 } Unknown
 }
 
 native_enum! {
+/// OpenGL platform context provider used by a context descriptor.
+///
+/// See `mln_opengl_context_platform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum OpenglContextPlatform: u32 {
+    /// No OpenGL context provider is selected.
     Unspecified = 0,
     Wgl = 1,
     Egl = 2,
+    /// Emscripten WebGL context handle.
     Webgl = 3,
 } Unknown
 }
 
 native_flags! {
+/// OpenGL context providers supported by this build.
+///
+/// See `mln_opengl_context_provider_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub struct OpenglContextProviderFlag: u32 {
     const WGL = 1;
     const EGL = 2;
+    /// Browser WebGL context imported into an Emscripten module.
     const WEBGL = 4;
 }
 }
 
+/// OpenGL attachment options for an owned texture target.
+///
+/// See `mln_opengl_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenglOwnedTextureDescriptor {
+    /// Logical texture extent.
     pub extent: RenderTargetExtent,
+    /// Borrowed OpenGL context provider data. Shared ownership creates a
+    /// context whose texture frames the host can acquire. Dedicated EGL or
+    /// transferred WebGL ownership creates a private core-worker context for
+    /// CPU readback.
     pub context: OpenglContextDescriptor,
 }
 impl Default for OpenglOwnedTextureDescriptor {
@@ -2461,17 +2898,31 @@ impl FromNative<sys::mln_opengl_owned_texture_descriptor> for OpenglOwnedTexture
     }
 }
 
+/// OpenGL frame acquired from a session-owned texture target.
+///
+/// See `mln_opengl_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct OpenglOwnedTextureFrame {
+    /// Session generation that produced this frame.
     pub generation: u64,
+    /// Physical OpenGL texture width in device pixels.
     pub width: u32,
+    /// Physical OpenGL texture height in device pixels.
     pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
     pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
     pub frame_id: u64,
+    /// Borrowed OpenGL texture object name. Valid until frame release.
     pub texture: u32,
+    /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
     pub target: u32,
+    /// OpenGL internal format, such as GL_RGBA8.
     pub internal_format: u32,
+    /// OpenGL pixel format, such as GL_RGBA.
     pub format: u32,
+    /// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
     pub r#type: u32,
 }
 impl OpenglOwnedTextureFrame {
@@ -2518,10 +2969,19 @@ impl FromNative<sys::mln_opengl_owned_texture_frame> for OpenglOwnedTextureFrame
     }
 }
 
+/// OpenGL attachment options for a native surface.
+///
+/// See `mln_opengl_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenglSurfaceDescriptor {
+    /// Logical surface extent.
     pub extent: RenderTargetExtent,
+    /// Borrowed OpenGL context provider data.
     pub context: OpenglContextDescriptor,
+    /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
+    /// EGL, both required. Null for WebGL, whose context carries its canvas
+    /// binding.
     pub surface: *mut std::ffi::c_void,
 }
 impl Default for OpenglSurfaceDescriptor {
@@ -2550,11 +3010,17 @@ impl FromNative<sys::mln_opengl_surface_descriptor> for OpenglSurfaceDescriptor 
     }
 }
 
+/// Caller-owned premultiplied RGBA8 image pixels.
+///
+/// See `mln_premultiplied_rgba8_image` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct PremultipliedRgba8Image {
     pub width: u32,
     pub height: u32,
+    /// Bytes per image row. Must be at least width \* 4.
     pub stride: u32,
+    /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
     pub pixels: Vec<u8>,
 }
 impl Default for PremultipliedRgba8Image {
@@ -2586,9 +3052,15 @@ impl FromNative<sys::mln_premultiplied_rgba8_image> for PremultipliedRgba8Image 
     }
 }
 
+/// Lower-level Spherical Mercator projected-meter coordinate.
+///
+/// See `mln_projected_meters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ProjectedMeters {
+    /// Distance measured northward from the equator, in meters.
     pub northing: f64,
+    /// Distance measured eastward from the prime meridian, in meters.
     pub easting: f64,
 }
 impl ProjectedMeters {
@@ -2613,10 +3085,17 @@ impl FromNative<sys::mln_projected_meters> for ProjectedMeters {
     }
 }
 
+/// MapLibre axonometric rendering options used for snapshots and commands.
+///
+/// See `mln_projection_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ProjectionMode {
+    /// Enables a non-perspective axonometric render transform.
     pub axonometric: Option<bool>,
+    /// Native x-skew factor used by the axonometric transform.
     pub x_skew: Option<f64>,
+    /// Native y-skew factor used by the axonometric transform.
     pub y_skew: Option<f64>,
 }
 impl Default for ProjectionMode {
@@ -2656,6 +3135,10 @@ impl FromNative<sys::mln_projection_mode> for ProjectionMode {
 }
 
 native_flags! {
+/// Field mask values for MapLibre axonometric rendering options.
+///
+/// See `mln_projection_mode_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub struct ProjectionModeField: u32 {
     const AXONOMETRIC = 1;
     const X_SKEW = 2;
@@ -2663,6 +3146,10 @@ pub struct ProjectionModeField: u32 {
 }
 }
 
+/// Quaternion stored as x, y, z, w components.
+///
+/// See `mln_quaternion` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Quaternion {
     pub x: f64,
@@ -2696,6 +3183,10 @@ impl FromNative<sys::mln_quaternion> for Quaternion {
     }
 }
 
+/// One query hit borrowed for a completion callback.
+///
+/// See `mln_queried_feature` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct QueriedFeature {
     pub feature: Vec<u8>,
@@ -2729,6 +3220,10 @@ impl FromNative<sys::mln_queried_feature> for QueriedFeature {
 }
 
 native_flags! {
+/// Optional fields for `mln_queried_feature`.
+///
+/// See `mln_queried_feature_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct QueriedFeatureField: u32 {
     const SOURCE_ID = 1;
     const SOURCE_LAYER_ID = 2;
@@ -2736,6 +3231,11 @@ pub struct QueriedFeatureField: u32 {
 }
 }
 
+/// Host lock on the graphics queue that a session shares with its host, copied
+/// by a successful attach.
+///
+/// See `mln_queue_lock` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Clone, Default)]
 pub struct QueueLock {
     pub lock: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
@@ -2800,31 +3300,25 @@ impl ToNative<sys::mln_queue_lock> for QueueLock {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_queue_lock> for QueueLock {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_queue_lock) -> Result<Self> {
-        if !(raw.lock.is_none() && raw.unlock.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self {
-            lock: None,
-            unlock: None,
-        })
-    }
-}
 
 native_enum! {
+/// Result of irreversible CPU-side target abandonment.
+///
+/// See `mln_render_abandon_disposition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub enum RenderAbandonDisposition: u32 {
+    /// No graphics resources remained when control was abandoned.
     Clean = 0,
+    /// Graphics resources could not be destroyed and were quarantined.
     Quarantined = 1,
 } Unknown
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderAbandonResult {
+    /// One `mln_render_abandon_disposition` value.
     pub disposition: RenderAbandonDisposition,
+    /// Backend resource groups intentionally retained until process exit.
     pub quarantined_resource_count: u32,
 }
 impl RenderAbandonResult {
@@ -2848,6 +3342,10 @@ impl FromNative<sys::mln_render_abandon_result> for RenderAbandonResult {
 }
 
 native_flags! {
+/// Render backend support flags reported by this native library build.
+///
+/// See `mln_render_backend_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub struct RenderBackendFlag: u32 {
     const METAL = 1;
     const VULKAN = 2;
@@ -2857,19 +3355,42 @@ pub struct RenderBackendFlag: u32 {
 }
 
 native_enum! {
+/// Execution placement for one render session.
+///
+/// See `mln_render_driver_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum RenderDriverKind: u32 {
+    /// Native code owns a serial worker that initializes, drives, and tears
+    /// down transferable graphics state.
     CoreWorker = 1,
+    /// The host explicitly calls the narrow driver API from the thread or realm
+    /// where its graphics context is current.
     CallerGraphicsThread = 2,
 } Unknown
 }
 
+/// Immutable result record copied into an owned frame-result batch.
+///
+/// See `mln_render_frame_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderFrameResult {
+    /// One `mln_render_result` value.
     pub disposition: RenderResult,
     pub token: u64,
     pub map_update_generation: u64,
     pub extent_generation: u64,
+    /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
     pub frame_generation: u64,
+    /// Whether the map asked for another frame while it rendered this one, as
+    /// during an ongoing paint transition. Set only when disposition is
+    /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
+    /// the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`
+    /// carries in its needs_repaint field, delivered with the frame result so a
+    /// host can re-arm its frame loop without the runtime event round trip. A
+    /// camera transition does not set it by itself: the map publishes a new
+    /// update after each of the transition's frames instead, which a
+    /// render-if-needed demand renders.
     pub needs_repaint: bool,
 }
 impl RenderFrameResult {
@@ -2905,6 +3426,10 @@ impl FromNative<sys::mln_render_frame_result> for RenderFrameResult {
 }
 
 native_enum! {
+/// Render modes reported by render observer events.
+///
+/// See `mln_render_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum RenderMode: u32 {
     Partial = 0,
     Full = 1,
@@ -2912,22 +3437,46 @@ pub enum RenderMode: u32 {
 }
 
 native_enum! {
+/// Terminal disposition of one accepted frame demand.
+///
+/// See `mln_render_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub enum RenderResult: u32 {
+    /// A frame was rendered for acquisition, presentation, or ordered readback.
     Rendered = 0,
+    /// No newer map update was available.
     NoUpdate = 1,
+    /// An ordered extent change had not reached the driver.
     SizePending = 2,
+    /// The target could not produce a frame.
     TargetNotReady = 3,
+    /// A newer demand in the same coalescing boundary replaced this demand.
     Superseded = 4,
+    /// The demand's timeout elapsed before driver work began.
     DeadlineMissed = 5,
 } Unknown
 }
 
+/// Common attachment policy copied before an attach call returns.
+///
+/// See `mln_render_session_attach_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone)]
 pub struct RenderSessionAttachOptions {
+    /// One `mln_render_driver_kind` value. Defaults to
+    /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
     pub driver: RenderDriverKind,
+    /// Requested host-acquirable owned-texture slot count. Private targets
+    /// grant one slot regardless of this value. Ignored by other targets.
+    /// Defaults to 1.
     pub requested_texture_ring_depth: u32,
+    /// Wakes the receiver when the frame-result queue becomes nonempty.
     pub frame_wake: Wake,
+    /// Wakes the graphics receiver when caller-driver work is available.
     pub driver_work_wake: Wake,
+    /// Host lock on the graphics queue, disabled by default. Only Vulkan
+    /// targets accept an enabled lock; other backends fail the attach with
+    /// `MLN_STATUS_UNSUPPORTED`.
     pub queue_lock: QueueLock,
 }
 impl Default for RenderSessionAttachOptions {
@@ -2953,17 +3502,24 @@ impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachO
         Ok(Self {
             driver: unsafe { from_native(raw.driver) }?,
             requested_texture_ring_depth: raw.requested_texture_ring_depth,
-            frame_wake: unsafe { from_native(raw.frame_wake) }?,
-            driver_work_wake: unsafe { from_native(raw.driver_work_wake) }?,
-            queue_lock: unsafe { from_native(raw.queue_lock) }?,
+            frame_wake: Default::default(),
+            driver_work_wake: Default::default(),
+            queue_lock: Default::default(),
         })
     }
 }
 
+/// Driver and target capabilities fixed for one attached render session.
+///
+/// See `mln_render_session_capabilities` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderSessionCapabilities {
+    /// One `mln_render_driver_kind` value.
     pub driver: RenderDriverKind,
+    /// Granted owned-texture slot count, or zero for a target without a ring.
     pub texture_ring_depth: u32,
+    /// A bitwise OR of `mln_render_session_capability_flag` values.
     pub flags: RenderSessionCapabilityFlag,
 }
 impl RenderSessionCapabilities {
@@ -2990,6 +3546,10 @@ impl FromNative<sys::mln_render_session_capabilities> for RenderSessionCapabilit
 }
 
 native_flags! {
+/// Optional render-session capabilities.
+///
+/// See `mln_render_session_capability_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub struct RenderSessionCapabilityFlag: u32 {
     const FRAME_ACQUISITION = 1;
     const READBACK = 2;
@@ -2998,10 +3558,17 @@ pub struct RenderSessionCapabilityFlag: u32 {
 }
 }
 
+/// Any-thread render-session snapshot.
+///
+/// See `mln_render_session_snapshot` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderSessionSnapshot {
+    /// One `mln_render_session_state` value.
     pub state: RenderSessionState,
+    /// One `mln_render_driver_kind` value.
     pub driver: RenderDriverKind,
+    /// Most recent terminal `mln_render_result` value.
     pub latest_result: RenderResult,
     pub extent: RenderTargetExtent,
     pub generation: u64,
@@ -3072,6 +3639,10 @@ impl FromNative<sys::mln_render_session_snapshot> for RenderSessionSnapshot {
 }
 
 native_enum! {
+/// Render-session lifecycle visible in snapshots.
+///
+/// See `mln_render_session_state` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub enum RenderSessionState: u32 {
     Attaching = 1,
     Attached = 2,
@@ -3082,10 +3653,17 @@ pub enum RenderSessionState: u32 {
 } Unknown
 }
 
+/// Logical render target extent in UI pixels.
+///
+/// See `mln_render_target_extent` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderTargetExtent {
+    /// Logical map width in UI pixels. Defaults to 256.
     pub width: u32,
+    /// Logical map height in UI pixels. Defaults to 256.
     pub height: u32,
+    /// UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0.
     pub scale_factor: f64,
 }
 impl RenderTargetExtent {
@@ -3118,14 +3696,24 @@ impl FromNative<sys::mln_render_target_extent> for RenderTargetExtent {
 }
 
 native_flags! {
+/// Optional fields for `mln_rendered_feature_query_options`.
+///
+/// See `mln_rendered_feature_query_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct RenderedFeatureQueryOptionField: u32 {
     const IDS = 1;
 }
 }
 
+/// Options for rendered feature queries.
+///
+/// See `mln_rendered_feature_query_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct RenderedFeatureQueryOptions {
+    /// Optional style layer IDs. When absent, all rendered layers are queried.
     pub layer_ids: Option<Vec<String>>,
+    /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for RenderedFeatureQueryOptions {
@@ -3162,6 +3750,10 @@ impl FromNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQuer
     }
 }
 
+/// Rendered feature query geometry descriptor.
+///
+/// See `mln_rendered_query_geometry` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RenderedQueryGeometry {
     pub data: RenderedQueryGeometryData,
@@ -3230,6 +3822,10 @@ impl FromNative<sys::mln_rendered_query_geometry> for RenderedQueryGeometry {
     }
 }
 
+/// Screen-space query geometry data.
+///
+/// See `mln_rendered_query_geometry_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub enum RenderedQueryGeometryData {
     Point(ScreenPoint),
@@ -3244,6 +3840,10 @@ impl Default for RenderedQueryGeometryData {
 }
 
 native_enum! {
+/// Rendered feature query geometry variants.
+///
+/// See `mln_rendered_query_geometry_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub enum RenderedQueryGeometryType: u32 {
     Point = 1,
     Box = 2,
@@ -3251,12 +3851,21 @@ pub enum RenderedQueryGeometryType: u32 {
 } Unknown
 }
 
+/// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+///
+/// See `mln_rendering_stats` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RenderingStats {
+    /// Frame CPU encoding time in seconds.
     pub encoding_time: f64,
+    /// Frame CPU rendering time in seconds.
     pub rendering_time: f64,
+    /// Number of frames rendered by the native renderer.
     pub frame_count: i64,
+    /// Draw calls executed during the most recent frame.
     pub draw_call_count: i64,
+    /// Total draw calls executed by the native renderer.
     pub total_draw_call_count: i64,
 }
 impl RenderingStats {
@@ -3422,17 +4031,6 @@ impl ToNative<sys::mln_resource_provider> for ResourceProvider {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_resource_provider> for ResourceProvider {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_resource_provider) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
-    }
-}
 
 native_enum! {
 pub enum ResourceProviderDecision: u32 {
@@ -3449,7 +4047,10 @@ pub struct ResourceRequestRange {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRequest {
     pub range: Option<ResourceRequestRange>,
+    /// URL entering the network layer, before tile server normalization.
     pub requested_url: Option<String>,
+    /// URL to fetch, after resource-kind normalization against the runtime's
+    /// tile server options and API key.
     pub resolved_url: Option<String>,
     pub kind: ResourceKind,
     pub loading_method: ResourceLoadingMethod,
@@ -3487,6 +4088,10 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
     }
 }
 
+/// A resource request that a resource provider handles.
+///
+/// See `mln_resource_request_handle` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 #[derive(Debug)]
 pub struct ResourceRequestHandle {
     state: std::sync::Arc<
@@ -3495,6 +4100,10 @@ pub struct ResourceRequestHandle {
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }
 impl ResourceRequestHandle {
+    /// Completes a C API resource provider request.
+    ///
+    /// See `mln_resource_request_complete` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("mln_resource_request_complete", native.0)?;
@@ -3506,6 +4115,11 @@ impl ResourceRequestHandle {
             })
         })
     }
+    /// Reports whether MapLibre has cancelled a C API resource provider
+    /// request.
+    ///
+    /// See `mln_resource_request_cancelled` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn cancelled(&self) -> Result<bool> {
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("mln_resource_request_cancelled", native.0)?;
@@ -3515,11 +4129,22 @@ impl ResourceRequestHandle {
         })?;
         Ok(cancelled)
     }
+    /// Registers a callback that runs when MapLibre cancels a C API resource
+    /// provider request.
+    ///
+    /// See `mln_resource_request_set_cancel_callback` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_cancel_callback(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("mln_resource_request_set_cancel_callback", native.0)?;
         self.state.register_cancel(Box::new(callback))
     }
+    /// Blocks until a resource request is released and its cancel callback
+    /// registration has retired: the callback, if it ran, and release_user_data
+    /// have both returned. Completing a request does not release its owner.
+    ///
+    /// See `mln_resource_request_wait_until_retired` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn wait_until_retired(&self) -> Result<()> {
         let native = self.state.issued_handle();
         maplibre_core::callback::check("mln_resource_request_wait_until_retired", native.0)?;
@@ -3541,6 +4166,7 @@ impl ResourceRequestHandle {
 pub struct ResourceResponse {
     pub status: ResourceResponseStatus,
     pub error_reason: ResourceErrorReason,
+    /// Response bytes. May be null only when byte_count is 0.
     pub bytes: Vec<u8>,
     pub error_message: Option<String>,
     pub must_revalidate: bool,
@@ -3580,6 +4206,10 @@ impl ToNative<sys::mln_resource_response> for ResourceResponse {
 }
 
 native_enum! {
+/// How a resource provider answered a request.
+///
+/// See `mln_resource_response_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum ResourceResponseStatus: u32 {
     Ok = 0,
     Error = 1,
@@ -3672,17 +4302,6 @@ impl ToNative<sys::mln_resource_transform> for ResourceTransform {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_resource_transform> for ResourceTransform {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_resource_transform) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
-    }
-}
 
 /// A native response borrowed only for one host callback.
 #[derive(Debug)]
@@ -3699,6 +4318,11 @@ impl ResourceTransformResponse<'_> {
             lifetime: std::marker::PhantomData,
         })
     }
+    /// Copies a replacement URL into C API-managed storage for the current
+    /// callback.
+    ///
+    /// See `mln_resource_transform_response_set_url` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn set_url(&mut self, url: &str) -> Result<()> {
         maplibre_core::callback::check(
             "mln_resource_transform_response_set_url",
@@ -3723,13 +4347,26 @@ pub enum ResourceUsage: u32 {
 } Unknown
 }
 
+/// One drained runtime event.
+///
+/// See `mln_runtime_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RuntimeEvent {
     pub message: String,
+    /// One of `mln_runtime_event_type`.
     pub r#type: RuntimeEventType,
+    /// One of `mln_runtime_event_source_type`.
     pub source_type: RuntimeEventSourceType,
+    /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
+    /// Every handle type is uint64_t, so this needs no cast.
     pub source: u64,
+    /// Secondary event detail whose meaning type selects. Depending on type it
+    /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
+    /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
+    /// meaning.
     pub code: i32,
+    /// Typed payload selected by payload_type.
     pub payload: RuntimeEventPayload,
 }
 impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
@@ -3781,8 +4418,13 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
     }
 }
 
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_runtime_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RuntimeEventBatchView {
+    /// Borrowed array of event_count events in queue order.
     pub events: Vec<RuntimeEvent>,
 }
 impl FromNative<sys::mln_runtime_event_batch_view> for RuntimeEventBatchView {
@@ -3807,8 +4449,14 @@ impl FromNative<sys::mln_runtime_event_batch_view> for RuntimeEventBatchView {
     }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
+///
+/// See `mln_runtime_event_camera_transition_finished` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventCameraTransitionFinished {
+    /// The transition_id the caller set on the `mln_animation_options` that
+    /// started this transition.
     pub transition_id: u64,
 }
 impl RuntimeEventCameraTransitionFinished {
@@ -3827,7 +4475,12 @@ impl FromNative<sys::mln_runtime_event_camera_transition_finished>
 }
 
 native_flags! {
+/// Bit values for the map and runtime event subscription masks.
+///
+/// See `mln_runtime_event_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub struct RuntimeEventMask: u64 {
+    /// Selects no event type.
     const NONE = 0;
     const MAP_CAMERA_WILL_CHANGE = 2;
     const MAP_CAMERA_IS_CHANGING = 4;
@@ -3851,15 +4504,23 @@ pub struct RuntimeEventMask: u64 {
     const OFFLINE_REGION_STATUS_CHANGED = 524288;
     const OFFLINE_REGION_RESPONSE_ERROR = 1048576;
     const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
+    /// Selects every map-originated event type this version defines.
     const ALL_MAP_EVENTS = 4718590;
+    /// Selects every runtime-originated event type this version defines.
     const ALL_RUNTIME_EVENTS = 3670016;
+    /// Selects every event type this version defines.
     const ALL = 8388606;
 }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+///
+/// See `mln_runtime_event_offline_region_response_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventOfflineRegionResponseError {
     pub region_id: i64,
+    /// One of `mln_resource_error_reason`.
     pub reason: ResourceErrorReason,
 }
 impl RuntimeEventOfflineRegionResponseError {
@@ -3880,9 +4541,15 @@ impl FromNative<sys::mln_runtime_event_offline_region_response_error>
     }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+///
+/// See `mln_runtime_event_offline_region_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventOfflineRegionStatus {
     pub region_id: i64,
+    /// Region status. This member keeps its own size field because the same
+    /// struct is also returned by `mln_runtime_offline_region_get_status()`.
     pub status: OfflineRegionStatus,
 }
 impl RuntimeEventOfflineRegionStatus {
@@ -3899,6 +4566,10 @@ impl FromNative<sys::mln_runtime_event_offline_region_status> for RuntimeEventOf
     }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+///
+/// See `mln_runtime_event_offline_region_tile_count_limit` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventOfflineRegionTileCountLimit {
     pub region_id: i64,
@@ -3922,6 +4593,10 @@ impl FromNative<sys::mln_runtime_event_offline_region_tile_count_limit>
     }
 }
 
+/// Typed event payload carried inline by every event.
+///
+/// See `mln_runtime_event_payload` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub enum RuntimeEventPayload {
     RenderFrame(RuntimeEventRenderFrame),
@@ -3941,6 +4616,10 @@ impl Default for RuntimeEventPayload {
 }
 
 native_enum! {
+/// Payload kinds used by `mln_runtime_event.payload_type`.
+///
+/// See `mln_runtime_event_payload_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum RuntimeEventPayloadType: u32 {
     None = 0,
     RenderFrame = 1,
@@ -3953,10 +4632,17 @@ pub enum RuntimeEventPayloadType: u32 {
 } Unknown
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+///
+/// See `mln_runtime_event_render_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventRenderFrame {
+    /// One of `mln_render_mode`.
     pub mode: RenderMode,
+    /// Whether MapLibre needs another frame after this one.
     pub needs_repaint: bool,
+    /// Whether symbol placement changed during this frame.
     pub placement_changed: bool,
     pub stats: RenderingStats,
 }
@@ -3986,8 +4672,13 @@ impl FromNative<sys::mln_runtime_event_render_frame> for RuntimeEventRenderFrame
     }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+///
+/// See `mln_runtime_event_render_map` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventRenderMap {
+    /// One of `mln_render_mode`.
     pub mode: RenderMode,
 }
 impl RuntimeEventRenderMap {
@@ -4004,14 +4695,23 @@ impl FromNative<sys::mln_runtime_event_render_map> for RuntimeEventRenderMap {
 }
 
 native_enum! {
+/// Source kinds used by `mln_runtime_event.source_type`.
+///
+/// See `mln_runtime_event_source_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum RuntimeEventSourceType: u32 {
     Runtime = 0,
     Map = 1,
 } Unknown
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+///
+/// See `mln_runtime_event_tile_action` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventTileAction {
+    /// One of `mln_tile_operation`.
     pub operation: TileOperation,
     pub tile_id: TileId,
 }
@@ -4030,6 +4730,10 @@ impl FromNative<sys::mln_runtime_event_tile_action> for RuntimeEventTileAction {
 }
 
 native_enum! {
+/// Runtime event types carried by `mln_runtime_event.type`.
+///
+/// See `mln_runtime_event_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum RuntimeEventType: u32 {
     MapCameraWillChange = 1,
     MapCameraIsChanging = 2,
@@ -4056,12 +4760,23 @@ pub enum RuntimeEventType: u32 {
 } Unknown
 }
 
+/// Options used when creating a runtime.
+///
+/// See `mln_runtime_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone)]
 pub struct RuntimeOptions {
+    /// No flags are currently defined. Must be zero.
     pub flags: u32,
+    /// Directory root for asset:// URLs. Copied during runtime creation. Null
+    /// or empty selects `/android_asset` on Android and `.` elsewhere.
     pub asset_path: Option<String>,
+    /// Cache database path. Copied during runtime creation.
     pub cache_path: Option<String>,
+    /// Runtime-scoped event types this runtime queues, as a bitwise OR of
+    /// `mln_runtime_event_mask` values.
     pub event_mask: RuntimeEventMask,
+    /// Wakes the receiver when the runtime event queue becomes nonempty.
     pub event_wake: Wake,
 }
 impl Default for RuntimeOptions {
@@ -4088,11 +4803,15 @@ impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
             asset_path: unsafe { from_native(raw.asset_path) }?,
             cache_path: unsafe { from_native(raw.cache_path) }?,
             event_mask: unsafe { from_native(raw.event_mask) }?,
-            event_wake: unsafe { from_native(raw.event_wake) }?,
+            event_wake: Default::default(),
         })
     }
 }
 
+/// Screen-space box in logical map pixels.
+///
+/// See `mln_screen_box` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ScreenBox {
     pub min: ScreenPoint,
@@ -4120,8 +4839,13 @@ impl FromNative<sys::mln_screen_box> for ScreenBox {
     }
 }
 
+/// Screen-space line string in logical map pixels.
+///
+/// See `mln_screen_line_string` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ScreenLineString {
+    /// Points. Null only when point_count is 0.
     pub points: Vec<ScreenPoint>,
 }
 impl ToNative<sys::mln_screen_line_string> for ScreenLineString {
@@ -4140,6 +4864,10 @@ impl FromNative<sys::mln_screen_line_string> for ScreenLineString {
     }
 }
 
+/// Screen-space point in logical map pixels.
+///
+/// See `mln_screen_point` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct ScreenPoint {
     pub x: f64,
@@ -4165,14 +4893,25 @@ impl FromNative<sys::mln_screen_point> for ScreenPoint {
 }
 
 native_flags! {
+/// Optional fields for `mln_source_feature_query_options`.
+///
+/// See `mln_source_feature_query_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct SourceFeatureQueryOptionField: u32 {
     const IDS = 1;
 }
 }
 
+/// Options for source feature queries.
+///
+/// See `mln_source_feature_query_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceFeatureQueryOptions {
+    /// Optional source-layer IDs. Required by vector sources; ignored by
+    /// GeoJSON.
     pub source_layer_ids: Option<Vec<String>>,
+    /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for SourceFeatureQueryOptions {
@@ -4217,32 +4956,58 @@ impl FromNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOpt
 }
 
 native_enum! {
+/// Status values returned by status-returning functions.
+///
+/// See `mln_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub enum Status: i32 {
     Ok = 0,
+    /// A pointer, size field, mask, or handle argument was invalid.
     InvalidArgument = -1,
+    /// The object is valid but not currently in a state that permits the call.
     InvalidState = -2,
+    /// The handle is thread-affine and the call was made from the wrong thread.
     WrongThread = -3,
+    /// The entry point or requested behavior is unavailable in this build.
     Unsupported = -4,
+    /// A native MapLibre error or C++ exception was converted to status.
     NativeError = -5,
+    /// The operation reached its terminal cancelled disposition.
     Cancelled = -6,
+    /// A conflicting driver call or lifecycle transition is in flight.
     Busy = -7,
+    /// The render target or graphics receiver was irreversibly lost.
     TargetLost = -8,
+    /// A nonblocking acquisition or service call has no result yet.
     NotReady = -9,
+    /// A command or operation named an ID with no live object behind it.
     NotFound = -10,
 } Unknown
 }
 
+/// Fixed metadata for one runtime style image.
+///
+/// See `mln_style_image_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StyleImageInfo {
     pub width: u32,
     pub height: u32,
+    /// Native copied images are exposed as tightly packed premultiplied RGBA8.
     pub stride: u32,
     pub byte_length: usize,
+    /// Interval counts for the stretchable axes.
     pub stretch_x_count: usize,
     pub stretch_y_count: usize,
+    /// Content box, meaningful only when has_content is true.
     pub content: Option<ImageContent>,
+    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
+    /// true.
     pub text_fit_width: Option<StyleImageTextFit>,
+    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
+    /// true.
     pub text_fit_height: Option<StyleImageTextFit>,
+    /// Sprite pixel ratio. Defaults to 1.0.
     pub pixel_ratio: f32,
     pub sdf: bool,
 }
@@ -4274,6 +5039,10 @@ impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
 }
 
 native_flags! {
+/// Field mask values for `mln_style_image_options`.
+///
+/// See `mln_style_image_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub struct StyleImageOptionField: u32 {
     const PIXEL_RATIO = 1;
     const SDF = 2;
@@ -4285,14 +5054,27 @@ pub struct StyleImageOptionField: u32 {
 }
 }
 
+/// Options for runtime style images.
+///
+/// See `mln_style_image_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct StyleImageOptions {
+    /// Horizontally stretchable intervals. Borrowed for the call and copied
+    /// before return. May be null only when stretch_x_count is 0.
     pub stretch_x: Option<Vec<ImageStretch>>,
+    /// Vertically stretchable intervals. Borrowed for the call and copied
+    /// before return. May be null only when stretch_y_count is 0.
     pub stretch_y: Option<Vec<ImageStretch>>,
+    /// Content box used when icon-text-fit applies.
     pub content: Option<ImageContent>,
+    /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
     pub text_fit_width: Option<StyleImageTextFit>,
+    /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
     pub text_fit_height: Option<StyleImageTextFit>,
+    /// Sprite pixel ratio. Defaults to 1.
     pub pixel_ratio: Option<f32>,
+    /// Whether the image is a signed distance field icon. Defaults to false.
     pub sdf: Option<bool>,
 }
 impl Default for StyleImageOptions {
@@ -4378,6 +5160,10 @@ impl FromNative<sys::mln_style_image_options> for StyleImageOptions {
     }
 }
 
+/// Complete style image borrowed for a completion callback.
+///
+/// See `mln_style_image_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleImageResult {
     pub info: StyleImageInfo,
@@ -4396,6 +5182,10 @@ impl FromNative<sys::mln_style_image_result> for StyleImageResult {
     }
 }
 
+/// Borrowed image-stretch arrays available during a completion callback.
+///
+/// See `mln_style_image_stretches_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleImageStretchesResult {
     pub stretch_x: Vec<ImageStretch>,
@@ -4411,6 +5201,10 @@ impl FromNative<sys::mln_style_image_stretches_result> for StyleImageStretchesRe
 }
 
 native_enum! {
+/// How a stretchable image fits text along one axis.
+///
+/// See `mln_style_image_text_fit` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub enum StyleImageTextFit: u32 {
     StretchOrShrink = 0,
     StretchOnly = 1,
@@ -4418,6 +5212,10 @@ pub enum StyleImageTextFit: u32 {
 } Unknown
 }
 
+/// One style layer borrowed for a list completion callback.
+///
+/// See `mln_style_layer_entry` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleLayerEntry {
     pub id: String,
@@ -4436,11 +5234,20 @@ impl FromNative<sys::mln_style_layer_entry> for StyleLayerEntry {
     }
 }
 
+/// Fixed layer metadata included in `mln_style_layer_result`.
+///
+/// See `mln_style_layer_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleLayerInfo {
+    /// View of a static style-spec layer type string. It stays valid for the
+    /// life of the process.
     pub r#type: String,
+    /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
     pub min_zoom: f64,
+    /// Highest zoom at which the layer draws; INFINITY with no upper bound.
     pub max_zoom: f64,
+    /// One of `mln_style_layer_visibility`.
     pub visibility: StyleLayerVisibility,
 }
 impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
@@ -4454,10 +5261,16 @@ impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
     }
 }
 
+/// Complete layer metadata borrowed for a completion callback.
+///
+/// See `mln_style_layer_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleLayerResult {
     pub info: StyleLayerInfo,
+    /// Source ID. Empty for a layer type that takes no source.
     pub source_id: Option<String>,
+    /// Source-layer ID. Empty when the layer sets none.
     pub source_layer: Option<String>,
 }
 impl FromNative<sys::mln_style_layer_result> for StyleLayerResult {
@@ -4471,6 +5284,10 @@ impl FromNative<sys::mln_style_layer_result> for StyleLayerResult {
 }
 
 native_enum! {
+/// Layer visibility values used by the visibility setter and layer info.
+///
+/// See `mln_style_layer_visibility` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub enum StyleLayerVisibility: u32 {
     Visible = 0,
     None = 1,
@@ -4478,23 +5295,40 @@ pub enum StyleLayerVisibility: u32 {
 }
 
 native_enum! {
+/// DEM raster encoding values used by `mln_style_tile_source_options`.
+///
+/// See `mln_style_raster_dem_encoding` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub enum StyleRasterDemEncoding: u32 {
     Mapbox = 0,
     Terrarium = 1,
 } Unknown
 }
 
+/// Fixed source metadata included in `mln_style_source_result`.
+///
+/// See `mln_style_source_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleSourceInfo {
     pub tilejson: Option<StyleSourceTileInfo>,
+    /// One of `mln_style_source_type`.
     pub r#type: StyleSourceType,
+    /// Source ID byte length, excluding any null terminator.
     pub id_size: usize,
+    /// Whether the source is marked volatile.
     pub is_volatile: bool,
+    /// Attribution byte length, excluding any null terminator.
     pub attribution_size: Option<usize>,
+    /// URL byte length, meaningful when fields contains URL.
     pub url_size: Option<usize>,
+    /// Geographic bounds, meaningful when fields contains BOUNDS.
     pub bounds: Option<LatLngBounds>,
+    /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
     pub tile_size: Option<u32>,
+    /// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
     pub vector_encoding: Option<StyleVectorTileEncoding>,
+    /// DEM encoding, meaningful when fields contains RASTER_ENCODING.
     pub raster_encoding: Option<StyleRasterDemEncoding>,
 }
 impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
@@ -4539,16 +5373,30 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
 }
 
 native_flags! {
+/// Fields available in `mln_style_source_info`.
+///
+/// See `mln_style_source_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub struct StyleSourceInfoField: u32 {
+    /// The source retains a URL.
     const URL = 1;
+    /// The tile source was defined with an inline TileJSON description.
     const TILEJSON = 2;
+    /// The inline TileJSON description contains geographic bounds.
     const BOUNDS = 4;
+    /// The source exposes a tile size.
     const TILE_SIZE = 8;
+    /// The source exposes a vector tile encoding.
     const VECTOR_ENCODING = 16;
+    /// The source exposes a DEM raster encoding.
     const RASTER_ENCODING = 32;
 }
 }
 
+/// Complete source metadata borrowed for a completion callback.
+///
+/// See `mln_style_source_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleSourceResult {
     pub info: StyleSourceInfo,
@@ -4575,6 +5423,10 @@ impl FromNative<sys::mln_style_source_result> for StyleSourceResult {
     }
 }
 
+/// Inline tile metadata selected as one value by the source-info field mask.
+///
+/// See `mln_style_source_tile_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleSourceTileInfo {
     pub tile_count: usize,
@@ -4608,6 +5460,10 @@ impl FromNative<sys::mln_style_source_tile_info> for StyleSourceTileInfo {
     }
 }
 
+/// Borrowed inline TileJSON tile URLs available during a completion callback.
+///
+/// See `mln_style_source_tile_urls_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleSourceTileUrlsResult {
     pub tile_urls: Vec<String>,
@@ -4621,6 +5477,10 @@ impl FromNative<sys::mln_style_source_tile_urls_result> for StyleSourceTileUrlsR
 }
 
 native_enum! {
+/// Style source type values returned by source metadata queries.
+///
+/// See `mln_style_source_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub enum StyleSourceType: u32 {
     Unknown = 0,
     Vector = 1,
@@ -4636,6 +5496,10 @@ pub enum StyleSourceType: u32 {
 }
 
 native_enum! {
+/// Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+///
+/// See `mln_style_tile_scheme` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub enum StyleTileScheme: u32 {
     Xyz = 0,
     Tms = 1,
@@ -4643,6 +5507,10 @@ pub enum StyleTileScheme: u32 {
 }
 
 native_flags! {
+/// Field mask values for `mln_style_tile_source_options`.
+///
+/// See `mln_style_tile_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub struct StyleTileSourceOptionField: u32 {
     const MIN_ZOOM = 1;
     const MAX_ZOOM = 2;
@@ -4655,15 +5523,23 @@ pub struct StyleTileSourceOptionField: u32 {
 }
 }
 
+/// Options for vector and raster tile sources.
+///
+/// See `mln_style_tile_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct StyleTileSourceOptions {
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     pub attribution: Option<String>,
+    /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
     pub scheme: Option<StyleTileScheme>,
     pub bounds: Option<LatLngBounds>,
+    /// Raster tile size in pixels. Defaults to 512.
     pub tile_size: Option<u32>,
+    /// One of `mln_style_vector_tile_encoding`. Defaults to MVT.
     pub vector_encoding: Option<StyleVectorTileEncoding>,
+    /// One of `mln_style_raster_dem_encoding`. Defaults to Mapbox.
     pub raster_encoding: Option<StyleRasterDemEncoding>,
 }
 impl Default for StyleTileSourceOptions {
@@ -4761,6 +5637,10 @@ impl FromNative<sys::mln_style_tile_source_options> for StyleTileSourceOptions {
 }
 
 native_flags! {
+/// Field mask values for `mln_style_transition_options`.
+///
+/// See `mln_style_transition_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub struct StyleTransitionOptionField: u32 {
     const DURATION = 1;
     const DELAY = 2;
@@ -4768,10 +5648,21 @@ pub struct StyleTransitionOptionField: u32 {
 }
 }
 
+/// Global style transition options.
+///
+/// See `mln_style_transition_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StyleTransitionOptions {
+    /// Transition duration in milliseconds. Must be finite and non-negative.
+    /// Values that would overflow MapLibre Native's internal duration are
+    /// invalid.
     pub duration_ms: Option<f64>,
+    /// Transition delay in milliseconds. Must be finite and non-negative.
+    /// Values that would overflow MapLibre Native's internal duration are
+    /// invalid.
     pub delay_ms: Option<f64>,
+    /// Whether symbol placement changes cross-fade.
     pub enable_placement_transitions: Option<bool>,
 }
 impl Default for StyleTransitionOptions {
@@ -4816,17 +5707,29 @@ impl FromNative<sys::mln_style_transition_options> for StyleTransitionOptions {
 }
 
 native_enum! {
+/// Vector tile encoding values used by `mln_style_tile_source_options`.
+///
+/// See `mln_style_vector_tile_encoding` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub enum StyleVectorTileEncoding: u32 {
     Mvt = 0,
     Mlt = 1,
 } Unknown
 }
 
+/// CPU image readback metadata for a texture target frame.
+///
+/// See `mln_texture_image_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TextureImageInfo {
+    /// Physical image width in device pixels.
     pub width: u32,
+    /// Physical image height in device pixels.
     pub height: u32,
+    /// Bytes per image row.
     pub stride: u32,
+    /// Required output buffer byte length.
     pub byte_length: usize,
 }
 impl Default for TextureImageInfo {
@@ -4855,8 +5758,13 @@ impl FromNative<sys::mln_texture_image_info> for TextureImageInfo {
     }
 }
 
+/// Texture readback borrowed for a completion callback.
+///
+/// See `mln_texture_readback_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TextureReadbackResult {
+    /// Borrowed pixel bytes, valid only during the callback.
     pub data: Vec<u8>,
     pub info: TextureImageInfo,
 }
@@ -4869,6 +5777,10 @@ impl FromNative<sys::mln_texture_readback_result> for TextureReadbackResult {
     }
 }
 
+/// Overscaled tile identity reported in tile observer events.
+///
+/// See `mln_tile_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct TileId {
     pub overscaled_z: u32,
@@ -4907,6 +5819,10 @@ impl FromNative<sys::mln_tile_id> for TileId {
 }
 
 native_enum! {
+/// Tile LOD algorithms used by `mln_map_tile_options`.
+///
+/// See `mln_tile_lod_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum TileLodMode: u32 {
     Default = 0,
     Distance = 1,
@@ -4914,6 +5830,10 @@ pub enum TileLodMode: u32 {
 }
 
 native_enum! {
+/// Tile operations reported by tile observer events.
+///
+/// See `mln_tile_operation` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub enum TileOperation: u32 {
     RequestedFromCache = 0,
     RequestedFromNetwork = 1,
@@ -4927,6 +5847,10 @@ pub enum TileOperation: u32 {
 } Unknown
 }
 
+/// Cubic easing curve for animated camera transitions.
+///
+/// See `mln_unit_bezier` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct UnitBezier {
     pub x1: f64,
@@ -4960,6 +5884,10 @@ impl FromNative<sys::mln_unit_bezier> for UnitBezier {
     }
 }
 
+/// Three-component vector used by free camera options.
+///
+/// See `mln_vec3` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Vec3 {
     pub x: f64,
@@ -4991,22 +5919,44 @@ impl FromNative<sys::mln_vec3> for Vec3 {
 }
 
 native_enum! {
+/// Viewport orientation modes used by `mln_map_viewport_options`.
+///
+/// See `mln_viewport_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub enum ViewportMode: u32 {
     Default = 0,
     FlippedY = 1,
 } Unknown
 }
 
+/// Vulkan attachment options for a borrowed texture target.
+///
+/// See `mln_vulkan_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VulkanBorrowedTextureDescriptor {
+    /// Logical texture extent. The map viewport uses width and height and the
+    /// renderer uses scale_factor; the physical size is stated separately
+    /// below.
     pub extent: RenderTargetExtent,
+    /// Physical image width in device pixels. Must be positive. Defaults to
+    /// 256.
     pub physical_width: u32,
+    /// Physical image height in device pixels. Must be positive. Defaults to
+    /// 256.
     pub physical_height: u32,
+    /// Borrowed Vulkan context. All handles are required.
     pub context: VulkanContextDescriptor,
+    /// Borrowed VkImage. Required.
     pub image: u64,
+    /// Borrowed VkImageView for image. Required.
     pub image_view: u64,
+    /// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
     pub format: u32,
+    /// Backend-native VkImageLayout value expected at render-pass begin.
     pub initial_layout: u32,
+    /// Backend-native VkImageLayout value left after rendering succeeds.
+    /// Defaults to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
     pub final_layout: u32,
 }
 impl Default for VulkanBorrowedTextureDescriptor {
@@ -5075,14 +6025,28 @@ impl FromNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedT
     }
 }
 
+/// Vulkan backend context fields shared by Vulkan render targets.
+///
+/// See `mln_vulkan_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct VulkanContextDescriptor {
+    /// Borrowed VkInstance. Required.
     pub instance: *mut std::ffi::c_void,
+    /// Borrowed VkPhysicalDevice. Required.
     pub physical_device: *mut std::ffi::c_void,
+    /// Borrowed VkDevice. Required.
     pub device: *mut std::ffi::c_void,
+    /// Borrowed graphics VkQueue. Required. The session's driver submits to it
+    /// from its own thread, so a host that uses the same queue passes
+    /// `mln_render_session_attach_options.queue_lock` at attach.
     pub graphics_queue: *mut std::ffi::c_void,
+    /// Queue family index for graphics_queue. Must support graphics commands.
     pub graphics_queue_family_index: u32,
+    /// PFN_vkGetInstanceProcAddr for the loader that created the Vulkan
+    /// handles.
     pub get_instance_proc_addr: *mut std::ffi::c_void,
+    /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
     pub get_device_proc_addr: *mut std::ffi::c_void,
 }
 impl VulkanContextDescriptor {
@@ -5134,9 +6098,15 @@ impl FromNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor 
     }
 }
 
+/// Vulkan attachment options for an owned texture target.
+///
+/// See `mln_vulkan_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VulkanOwnedTextureDescriptor {
+    /// Logical texture extent.
     pub extent: RenderTargetExtent,
+    /// Borrowed Vulkan context. All handles are required.
     pub context: VulkanContextDescriptor,
 }
 impl Default for VulkanOwnedTextureDescriptor {
@@ -5171,17 +6141,31 @@ impl FromNative<sys::mln_vulkan_owned_texture_descriptor> for VulkanOwnedTexture
     }
 }
 
+/// Vulkan frame acquired from a session-owned texture target.
+///
+/// See `mln_vulkan_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct VulkanOwnedTextureFrame {
+    /// Session generation that produced this frame.
     pub generation: u64,
+    /// Physical Vulkan image width in device pixels.
     pub width: u32,
+    /// Physical Vulkan image height in device pixels.
     pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
     pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
     pub frame_id: u64,
+    /// Borrowed VkImage bit pattern. Valid until frame release.
     pub image: u64,
+    /// Borrowed VkImageView bit pattern. Valid until frame release.
     pub image_view: u64,
+    /// Borrowed VkDevice. Valid until frame release.
     pub device: *mut std::ffi::c_void,
+    /// Backend-native VkFormat value.
     pub format: u32,
+    /// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
     pub layout: u32,
 }
 impl VulkanOwnedTextureFrame {
@@ -5228,10 +6212,19 @@ impl FromNative<sys::mln_vulkan_owned_texture_frame> for VulkanOwnedTextureFrame
     }
 }
 
+/// Vulkan attachment options for a native surface.
+///
+/// See `mln_vulkan_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VulkanSurfaceDescriptor {
+    /// Logical surface extent.
     pub extent: RenderTargetExtent,
+    /// Borrowed Vulkan context. All handles are required. The device must
+    /// support VK_KHR_swapchain, and the queue family must support graphics and
+    /// presentation to this descriptor's surface.
     pub context: VulkanContextDescriptor,
+    /// Borrowed VkSurfaceKHR bit pattern. Required.
     pub surface: u64,
 }
 impl Default for VulkanSurfaceDescriptor {
@@ -5273,6 +6266,10 @@ impl FromNative<sys::mln_vulkan_surface_descriptor> for VulkanSurfaceDescriptor 
     }
 }
 
+/// Receiver wake callback copied by a successful owning call.
+///
+/// See `mln_wake` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 #[derive(Clone, Default)]
 pub struct Wake {
     pub callback: Option<std::sync::Arc<dyn Fn() -> () + Send + Sync + 'static>>,
@@ -5322,22 +6319,19 @@ impl ToNative<sys::mln_wake> for Wake {
         Ok(raw)
     }
 }
-impl FromNative<sys::mln_wake> for Wake {
-    /// Copies a descriptor whose callbacks are unset, such as a native default.
-    unsafe fn from_native(raw: sys::mln_wake) -> Result<Self> {
-        if !(raw.callback.is_none()) {
-            return Err(Error::invalid_argument(
-                "foreign callbacks cannot be adopted",
-            ));
-        }
-        Ok(Self { callback: None })
-    }
-}
 
+/// WebGL context fields shared by OpenGL render targets in the browser.
+///
+/// See `mln_webgl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct WebglContextDescriptor {
+    /// One `mln_webgl_context_kind` value.
     pub kind: WebglContextKind,
+    /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
     pub context: i32,
+    /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
+    /// canvas must still be transferable when attachment starts.
     pub canvas_selector: String,
 }
 impl ToNative<sys::mln_webgl_context_descriptor> for WebglContextDescriptor {
@@ -5361,20 +6355,39 @@ impl FromNative<sys::mln_webgl_context_descriptor> for WebglContextDescriptor {
 }
 
 native_enum! {
+/// WebGL context placement.
+///
+/// See `mln_webgl_context_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum WebglContextKind: u32 {
+    /// Use a host-created context on its current browser agent.
     Existing = 0,
+    /// Create a WebGL 2 context on a native worker whose pthread creation
+    /// claims canvas_selector through Emscripten's transferred-canvases
+    /// attribute.
     TransferredCanvas = 1,
 } Unknown
 }
 
+/// WebGPU attachment options for a borrowed texture target.
+///
+/// See `mln_webgpu_borrowed_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebgpuBorrowedTextureDescriptor {
+    /// Logical texture extent.
     pub extent: RenderTargetExtent,
+    /// Physical texture width in device pixels. Defaults to 256.
     pub physical_width: u32,
+    /// Physical texture height in device pixels. Defaults to 256.
     pub physical_height: u32,
+    /// Borrowed WebGPU context. device is required.
     pub context: WebgpuContextDescriptor,
+    /// Borrowed WGPUTexture. Required.
     pub texture: *mut std::ffi::c_void,
+    /// Borrowed WGPUTextureView for texture. Required.
     pub texture_view: *mut std::ffi::c_void,
+    /// Backend-native WGPUTextureFormat value. Undefined is invalid.
     pub format: u32,
 }
 impl Default for WebgpuBorrowedTextureDescriptor {
@@ -5435,10 +6448,18 @@ impl FromNative<sys::mln_webgpu_borrowed_texture_descriptor> for WebgpuBorrowedT
     }
 }
 
+/// WebGPU backend context fields shared by WebGPU render targets.
+///
+/// See `mln_webgpu_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WebgpuContextDescriptor {
+    /// Borrowed WGPUInstance. Optional for texture targets.
     pub instance: *mut std::ffi::c_void,
+    /// Borrowed WGPUDevice. Required.
     pub device: *mut std::ffi::c_void,
+    /// Borrowed WGPUQueue. Optional; null uses the device default queue. A
+    /// non-null queue must belong to device.
     pub queue: *mut std::ffi::c_void,
 }
 impl WebgpuContextDescriptor {
@@ -5474,9 +6495,15 @@ impl FromNative<sys::mln_webgpu_context_descriptor> for WebgpuContextDescriptor 
     }
 }
 
+/// WebGPU attachment options for an owned texture target.
+///
+/// See `mln_webgpu_owned_texture_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebgpuOwnedTextureDescriptor {
+    /// Logical texture extent.
     pub extent: RenderTargetExtent,
+    /// Borrowed WebGPU context. device is required.
     pub context: WebgpuContextDescriptor,
 }
 impl Default for WebgpuOwnedTextureDescriptor {
@@ -5511,16 +6538,29 @@ impl FromNative<sys::mln_webgpu_owned_texture_descriptor> for WebgpuOwnedTexture
     }
 }
 
+/// WebGPU frame acquired from a session-owned texture target.
+///
+/// See `mln_webgpu_owned_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WebgpuOwnedTextureFrame {
+    /// Session generation that produced this frame.
     pub generation: u64,
+    /// Physical WebGPU texture width in device pixels.
     pub width: u32,
+    /// Physical WebGPU texture height in device pixels.
     pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
     pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
     pub frame_id: u64,
+    /// Borrowed WGPUTexture. Valid until frame release.
     pub texture: *mut std::ffi::c_void,
+    /// Borrowed WGPUTextureView. Valid until frame release.
     pub texture_view: *mut std::ffi::c_void,
+    /// Borrowed WGPUDevice. Valid until frame release.
     pub device: *mut std::ffi::c_void,
+    /// Backend-native WGPUTextureFormat value.
     pub format: u32,
 }
 impl WebgpuOwnedTextureFrame {
@@ -5564,11 +6604,22 @@ impl FromNative<sys::mln_webgpu_owned_texture_frame> for WebgpuOwnedTextureFrame
     }
 }
 
+/// WebGPU attachment options for a native surface.
+///
+/// See `mln_webgpu_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebgpuSurfaceDescriptor {
+    /// Logical surface extent.
     pub extent: RenderTargetExtent,
+    /// Borrowed WebGPU context. device is required.
     pub context: WebgpuContextDescriptor,
+    /// Borrowed WGPUSurface. Required, and must stay alive for the session. The
+    /// session configures it for this device and extent, and unconfigures it
+    /// when the session ends.
     pub surface: *mut std::ffi::c_void,
+    /// WGPUTextureFormat to configure the surface with. Required. A browser
+    /// host takes it from navigator.gpu.getPreferredCanvasFormat().
     pub format: u32,
 }
 impl Default for WebgpuSurfaceDescriptor {
@@ -5614,10 +6665,19 @@ impl FromNative<sys::mln_webgpu_surface_descriptor> for WebgpuSurfaceDescriptor 
     }
 }
 
+/// WGL context fields shared by OpenGL render targets on Windows.
+///
+/// See `mln_wgl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct WglContextDescriptor {
+    /// Borrowed HDC used to create the session context. Required.
     pub device_context: *mut std::ffi::c_void,
+    /// Borrowed HGLRC whose share group the session context joins. Required
+    /// under shared ownership. A dedicated session joins no share group, so it
+    /// must be null there.
     pub share_context: *mut std::ffi::c_void,
+    /// Optional wglGetProcAddress-compatible function for the host loader.
     pub get_proc_address: *mut std::ffi::c_void,
 }
 impl WglContextDescriptor {
@@ -5671,6 +6731,10 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
     )
 };
 
+/// Receives a MapLibre Native log record.
+///
+/// See `mln_log_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 pub type LogCallback =
     std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static>;
 pub(crate) fn log_callback_registration(

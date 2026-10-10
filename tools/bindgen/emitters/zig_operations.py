@@ -295,6 +295,12 @@ def operation(plan, values):
                 )
                 + " };",
             ]
+        elif plan.absence:
+            absent = f"c.{plan.absence.status}"
+            return_type = "?" + results[0][1]
+            body = [
+                f"return call.invokeUnless({head}, {allocator}, {diagnostic}, {absent}, {args});"
+            ]
         else:
             return_type = results[0][1] if results else "void"
             body = [f"return {invoke};"]

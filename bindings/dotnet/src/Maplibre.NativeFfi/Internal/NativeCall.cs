@@ -33,6 +33,19 @@ internal static unsafe class NativeCall
             NativeStatus.Check(status, NativeDiagnostic.Current);
     }
 
+    /// <summary>
+    /// Checks <paramref name="status"/> like <see cref="Check"/>, except that
+    /// <paramref name="absent"/> reports that native published no output.
+    /// Returns whether the output holds a value.
+    /// </summary>
+    internal static bool Present(mln_status status, mln_status absent)
+    {
+        if (status == absent)
+            return false;
+        Check(status);
+        return true;
+    }
+
     internal readonly ref struct Entry(object? owner)
     {
         public void Dispose() => GC.KeepAlive(owner);

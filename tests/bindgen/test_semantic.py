@@ -4,10 +4,16 @@ import unittest
 
 from support import parse
 
-from tools.bindgen import native_ports
+from tools.bindgen import default_cases, native_ports
 from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
-from tools.bindgen.semantic import DefaultSupport, DisposeSupport, ViewSupport, bind
+from tools.bindgen.semantic import (
+    DefaultSupport,
+    DisposeSupport,
+    FieldInitial,
+    ViewSupport,
+    bind,
+)
 
 
 class SemanticTests(unittest.TestCase):
@@ -44,28 +50,6 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
                         "mask": "uint64_t",
                     },
                 )
-
-    def test_adapter_projection_preserves_public_value_contract(self):
-        source = """
-typedef enum category : unsigned { CATEGORY_A = 1 } category;
-typedef struct request { unsigned size; unsigned kind BIND("enum=category"); const char *url BIND("nullable=true"); } request;
-typedef struct queued { void *context BIND("kind=context"); unsigned kind; const char *url BIND("nullable=true"); } queued BIND("projection=request");
-mln_status capture(queued *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
-"""
-        model = bind(self.parse(source), require_complete=True)
-        projection = model.values["queued"].projection
-        self.assertEqual(projection.native, "request")
-        self.assertEqual(projection.fields[1].value.kind, "enum")
-        self.assertTrue(projection.fields[2].value.nullable)
-        with self.assertRaisesRegex(ModelError, "must preserve its source C type"):
-            bind(
-                self.parse(source.replace("unsigned kind;", "double kind;")),
-                require_complete=True,
-            )
-        with self.assertRaisesRegex(ModelError, "must preserve its source C type"):
-            bind(
-                self.parse(source.replace("unsigned kind;", "")), require_complete=True
-            )
 
     def test_public_enums_and_retired_handle_access(self):
         source = """
@@ -163,6 +147,136 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
                 require_complete=True,
             )
 
+    def test_field_defaults_resolve_to_typed_initials(self):
+        bound = bind(parse(groups=("defaults",)), require_complete=True)
+        settings = bound.values["mln_probe_settings"]
+        initials = {
+            field.name: field.initial
+            for plan in (settings, bound.values["mln_probe_extent"])
+            for field in plan.fields
+        }
+        self.assertEqual(
+            initials,
+            {
+                "size": None,
+                "extent": None,
+                "width": FieldInitial("256", 256),
+                "scale": FieldInitial("1.5", 1.5),
+                "mode": FieldInitial(
+                    "MLN_PROBE_MODE_SECOND", 2, "MLN_PROBE_MODE_SECOND", "second"
+                ),
+                "flags": FieldInitial(
+                    "MLN_PROBE_FLAG_ALL", 3, "MLN_PROBE_FLAG_ALL", "all"
+                ),
+                "heading": FieldInitial(
+                    "MLN_PROBE_FLAG_SOUTH", 2, "MLN_PROBE_FLAG_SOUTH", "south"
+                ),
+                "ratio": FieldInitial("0.25", 0.25),
+                "offset": FieldInitial("-3", -3),
+                "enabled": FieldInitial("true", True),
+                "count": None,
+            },
+        )
+        # The generated C case checks every field against the same values.
+        self.assertEqual(
+            [
+                (item.path, item.form, item.expected)
+                for item in default_cases.record_expectations(
+                    settings, "value", "settings"
+                )
+            ],
+            [
+                ("settings.size", "unsigned", "sizeof(mln_probe_settings)"),
+                ("settings.extent.width", "unsigned", "256"),
+                ("settings.extent.scale", "float", "1.5"),
+                ("settings.mode", "unsigned", "MLN_PROBE_MODE_SECOND"),
+                ("settings.flags", "unsigned", "MLN_PROBE_FLAG_ALL"),
+                ("settings.heading", "unsigned", "MLN_PROBE_FLAG_SOUTH"),
+                ("settings.ratio", "float", "0.25"),
+                ("settings.offset", "signed", "-3"),
+                ("settings.enabled", "unsigned", "true"),
+                ("settings.count", "signed", "0"),
+            ],
+        )
+
+    def test_field_defaults_state_only_nonzero_values_that_a_default_returns(self):
+        source = """
+typedef enum mode : unsigned { MODE_OFF = 0, MODE_ON = 1 } mode;
+typedef struct extent { unsigned width; } extent;
+typedef struct turn { double w; } turn;
+typedef struct settings {
+  unsigned size;
+  bool has_zoom;
+  bool has_turn;
+  extent area;
+  turn orientation BIND("mask=has_turn");
+  unsigned level;
+  unsigned mode BIND("enum=mode");
+  double zoom BIND("mask=has_zoom");
+  unsigned reserved BIND("kind=reserved");
+} settings;
+settings settings_default(void);
+typedef struct loose { unsigned width; } loose;
+mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
+"""
+        self.assertEqual(
+            bind(self.parse(source), require_complete=True)
+            .values["settings"]
+            .fields[5]
+            .initial,
+            None,
+        )
+        for before, after, message in (
+            ("unsigned level;", 'unsigned level BIND("default=0");', "restates zero"),
+            (
+                'BIND("enum=mode")',
+                'BIND("enum=mode;default=MODE_OFF")',
+                "restates zero",
+            ),
+            ('BIND("enum=mode")', 'BIND("enum=mode;default=ON")', "names no mode"),
+            ("unsigned level;", 'unsigned level BIND("default=1.0");', "decimal"),
+            (
+                'BIND("mask=has_zoom")',
+                'BIND("mask=has_zoom;default=1.0")',
+                "plain value",
+            ),
+            ("extent area;", 'extent area BIND("default=1");', "plain value"),
+            (
+                'BIND("kind=reserved")',
+                'BIND("kind=reserved;default=1")',
+                "is fixed",
+            ),
+            (
+                "typedef struct loose { unsigned width; }",
+                'typedef struct loose { unsigned width BIND("default=1"); }',
+                "default function returns",
+            ),
+            # The default leaves an optional member absent, so no case checks
+            # the defaults of a record reached only through one.
+            (
+                "typedef struct turn { double w; }",
+                'typedef struct turn { double w BIND("default=1.0"); }',
+                "default function returns",
+            ),
+        ):
+            with (
+                self.subTest(after=after),
+                self.assertRaisesRegex(ModelError, message),
+            ):
+                bind(self.parse(source.replace(before, after)), require_complete=True)
+        # A record nested by value in a default may state its own defaults.
+        nested = source.replace(
+            "typedef struct extent { unsigned width; }",
+            'typedef struct extent { unsigned width BIND("default=256"); }',
+        )
+        self.assertEqual(
+            bind(self.parse(nested), require_complete=True)
+            .values["extent"]
+            .fields[0]
+            .initial,
+            FieldInitial("256", 256),
+        )
+
     def test_mask_group_preserves_joint_presence(self):
         source = """
 typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1, ZOOM = 2 } fields;
@@ -206,6 +320,74 @@ mln_status write_range(const range_value *value, mln_diagnostic *out_diagnostic)
                 self.parse(source.replace("bool has_range", "unsigned has_range")),
                 require_complete=True,
             )
+
+    def test_copied_values_hold_registrations_only_in_defaults(self):
+        source = """
+typedef void (*notify)(void *state);
+typedef void (*release)(void *state);
+typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct hook { notify fire; void *state BIND("kind=context"); release retire; double scale; } hook BIND("kind=callback_registration;release=retire");
+typedef struct extent { double width; } extent;
+typedef struct settings { extent extent; signals wake; } settings;
+typedef struct request { double zoom; } request;
+typedef struct reading { double zoom; } reading;
+settings settings_default(void);
+hook hook_default(void);
+mln_status configure(const settings *options, const hook *events, const request *input, reading *out_reading BIND("direction=out"), mln_diagnostic *out_diagnostic);
+"""
+        model = bind(self.parse(source), require_complete=True)
+        self.assertEqual(
+            model.defaults.keys() & {"settings", "hook"}, {"settings", "hook"}
+        )
+        # A default's registration field is left unset rather than copied, and
+        # a registration's own default copies its other fields.
+        records = {"signals", "hook", "extent", "settings", "request", "reading"}
+        self.assertEqual(
+            model.returned & records, {"hook", "extent", "settings", "reading"}
+        )
+        for rejected in (
+            'mln_status inspect(settings *out_settings BIND("direction=out"), mln_diagnostic *out_diagnostic);',
+            'mln_status refresh(settings *options BIND("direction=inout"), mln_diagnostic *out_diagnostic);',
+            (
+                'BIND("execution=query;result=settings")\n'
+                "mln_status mln_map_settings(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);"
+            ),
+            (
+                "typedef void (*observe)(void *state, settings current);\n"
+                'mln_status watch(observe callback, void *state BIND("kind=context"), mln_diagnostic *out_diagnostic);'
+            ),
+        ):
+            with (
+                self.subTest(rejected=rejected),
+                self.assertRaisesRegex(
+                    ModelError, "native cannot return a callback registration"
+                ),
+            ):
+                bind(self.parse(source + rejected), require_complete=True)
+
+    def test_defaults_hold_registrations_only_in_fields_without_presence(self):
+        # A copy would have to keep an optional registration's presence, so a
+        # default holds a registration only as a field without presence.
+        source = """
+typedef void (*notify)(void *state);
+typedef void (*release)(void *state);
+typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct settings { bool has_wake; FIELD } settings;
+settings settings_default(void);
+"""
+        for field in (
+            'signals wake BIND("mask=has_wake");',
+            'const signals *wake BIND("nullable=true");',
+        ):
+            with (
+                self.subTest(field=field),
+                self.assertRaisesRegex(
+                    ModelError,
+                    "settings_default result.wake: a record default holds a "
+                    "callback registration only in a field without presence",
+                ),
+            ):
+                bind(self.parse(source.replace("FIELD", field)), require_complete=True)
 
     def test_nested_registration_and_callback_context_are_resolved(self):
         api = bind(
@@ -482,7 +664,6 @@ mln_status install(const registration *value, mln_diagnostic *out_diagnostic);
             (plan.callbacks, plan.user_data, plan.release),
             (("callback",), "context", "release"),
         )
-        self.assertEqual(model.callbacks["notify"].thread, "native")
         with self.assertRaisesRegex(
             ModelError, "registration release requires a descriptor field"
         ):
@@ -571,12 +752,6 @@ BIND("execution=lifecycle") mln_status attach(
         self.assertEqual((owner.parameter, owner.parent_parameter), ("owner", "parent"))
         self.assertEqual(owner.handle.finalize, ("abandon_child", "close_child"))
         self.assertEqual(operation.owned_outputs, (owner,))
-        self.assertTrue(operation.completion.inline)
-        self.assertIn(
-            ("completion_failure", "retain_immediate_owner"),
-            [(step.phase, step.action) for step in operation.completion.transitions],
-        )
-        self.assertEqual(operation.completion.native_release, "quiescence")
         with self.assertRaisesRegex(ModelError, "requires its parent handle input"):
             bind(
                 self.parse(
@@ -634,10 +809,6 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
         )
         self.assertEqual(decision.wait_retired, "await_retirement")
         self.assertEqual(decision.handle.release_consumes, "always")
-        self.assertIn(
-            ("complete_enter", "force_accept_decision"),
-            [(step.phase, step.action) for step in decision.transitions],
-        )
         registration = model.operations_by_name["on_cancel"].direct_registrations[0]
         self.assertEqual(
             (registration.release_callback, registration.accepted_unless),
@@ -666,6 +837,63 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
+
+    def test_an_absence_status_names_the_one_output_it_reports_absent(self):
+        model = bind(
+            parse(groups=("absent_handle", "absent_value")), require_complete=True
+        )
+        self.assertEqual(
+            {
+                name: (
+                    plan.absence.status,
+                    plan.absence.value,
+                    plan.absence.output.name,
+                )
+                for name, plan in model.operations_by_name.items()
+                if plan.absence
+            },
+            {
+                "mln_probe_take_parcel": ("MLN_STATUS_NOT_READY", -9, "out_parcel"),
+                "mln_probe_read_level": ("MLN_STATUS_NOT_READY", -9, "out_level"),
+            },
+        )
+        one = 'double *value BIND("direction=out"), mln_diagnostic *out_diagnostic'
+        two = 'double *first BIND("direction=out"), ' + one
+        later = "mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic"
+        for annotation, parameters, error in (
+            ("absent_on=MLN_STATUS_NOT_READY", two, "exactly one output"),
+            (
+                "execution=query;result=double;absent_on=MLN_STATUS_NOT_READY",
+                later,
+                "without a completion",
+            ),
+            ("absent_on=MLN_STATUS_MISSING", one, "failure enumerator"),
+            ("absent_on=MLN_STATUS_OK", one, "failure enumerator"),
+        ):
+            source = f'BIND("{annotation}") mln_status read({parameters});'
+            with self.subTest(source=source), self.assertRaisesRegex(ModelError, error):
+                bind(self.parse(source), require_complete=True)
+        # An absent call publishes nothing, so no binding may root a
+        # registration that it passed.
+        callbacks = """
+typedef void (*notify)(void *state);
+typedef void (*release)(void *state);
+typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+"""
+        for annotation, parameters in (
+            ("absent_on=MLN_STATUS_NOT_READY", "const signals *events, " + one),
+            (
+                "registration=signal;release_callback=retire;absent_on=MLN_STATUS_NOT_READY",
+                'notify signal, void *state BIND("kind=context"), release retire, '
+                + one,
+            ),
+        ):
+            source = callbacks + f'BIND("{annotation}") mln_status read({parameters});'
+            with (
+                self.subTest(source=source),
+                self.assertRaisesRegex(ModelError, "without registrations"),
+            ):
+                bind(self.parse(source), require_complete=True)
 
     def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):
         source = """
@@ -778,12 +1006,8 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
         self.assertEqual(operation.receiver, "ticket")
         (registration,) = operation.direct_registrations
         self.assertEqual(
-            (
-                registration.release_callback,
-                registration.accepted_unless,
-                registration.transfer,
-            ),
-            ("release", "cancelled", "acceptance"),
+            (registration.release_callback, registration.accepted_unless),
+            ("release", "cancelled"),
         )
 
     def test_disposal_support_requires_a_handle_consumer(self):

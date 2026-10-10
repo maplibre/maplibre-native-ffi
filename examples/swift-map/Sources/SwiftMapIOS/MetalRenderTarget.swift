@@ -111,10 +111,9 @@ final class MetalRenderTarget {
 
   /// Drains every queued frame result.
   func drainResults() throws -> FrameResults {
-    let batch: RenderFrameBatchHandle
-    do { batch = try session.drainFrameResults() }
-    catch let error as MaplibreError
-      where error.kind == .notReady { return FrameResults() }
+    guard let batch = try session.drainFrameResults() else {
+      return FrameResults()
+    }
     defer { try? batch.close() }
     var results = FrameResults()
     // No update and size pending wait for the map's next update, superseded

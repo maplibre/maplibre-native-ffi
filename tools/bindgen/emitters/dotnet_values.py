@@ -6,6 +6,7 @@ import os
 import re
 from dataclasses import replace
 
+from .. import docs
 from ..compiler import compile_api
 from ..managed_contracts import KEYWORDS
 from ..model import Api, ModelError
@@ -563,6 +564,12 @@ class Values:
                     copied.append(
                         f"Copy{public_name(plan.native)}{pascal(field.name)}(value)"
                     )
+                elif field.value.registration or (
+                    plan.registration and field.value.kind == "callback"
+                ):
+                    # Native never returns callbacks, so a copy leaves them
+                    # unset.
+                    copied.append("default")
                 elif field.value.kind == "union":
                     union = field.value
                     tag = next(item for item in plan.fields if item.name == union.tag)
@@ -1092,12 +1099,18 @@ class Values:
                 else ""
             )
             properties.append(
-                f"    public {required}{type_} {member} {{ get; {accessor}; }}"
+                self.initialized(
+                    f"    public {required}{type_} {member} {{ get; {accessor}; }}",
+                    fields,
+                )
+                if masked
+                else f"    public {required}{type_} {member} {{ get; {accessor}; }}"
             )
         declaration = f"public {'sealed record' if masked else 'readonly record struct'} {name}\n{{\n"
         if not masked:
             declaration += (
-                f"    public {name}({', '.join(parameters)})\n    {{\n"
+                self.parameterless(plan)
+                + f"    public {name}({', '.join(parameters)})\n    {{\n"
                 + "\n".join(assignments)
                 + "\n    }\n"
             )
@@ -1207,6 +1220,70 @@ class Values:
             "        }\n"
         )
 
+    def member_initial(self, fields: tuple[FieldPlan, ...]) -> str | None:
+        """A member's annotated default, or None when its type's zero value is
+        the native default. A record member takes its type's own defaults."""
+        if len(fields) != 1 or fields[0].presence:
+            return None
+        field, value = fields[0], fields[0].value
+        initial = field.initial
+        if initial is None:
+            if value.kind == "record" and self.has_initials(value):
+                return f"new {self.public_type(value)}()"
+            return None
+        type_ = self.public_type(value)
+        if value.kind == "enum":
+            return f"{type_}.{pascal(initial.member)}"
+        if type_ == "float":
+            return f"{initial.literal}f"
+        if type_ == "bool":
+            return initial.literal
+        return initial.literal if type_ == "double" else str(initial.value)
+
+    def has_initials(self, plan: ValuePlan) -> bool:
+        """Whether a record's native default holds a nonzero member."""
+        return any(
+            self.member_initial(fields) is not None for _, fields in self.members(plan)
+        )
+
+    def initialized(self, property_: str, fields: tuple[FieldPlan, ...]) -> str:
+        """A property declaration that starts at the member's native default."""
+        initial = self.member_initial(fields)
+        return property_ if initial is None else f"{property_} = {initial};"
+
+    def parameterless(self, plan: ValuePlan) -> str:
+        """A constructor that starts every member at its native default.
+
+        A struct's implicit parameterless constructor zeroes every member, so
+        a record whose native default holds a nonzero member declares its own.
+        """
+        if not self.has_initials(plan):
+            return ""
+        arguments = []
+        for member, fields in self.members(plan):
+            initial = self.member_initial(fields)
+            type_ = self.member_type(plan, member, fields)
+            if initial is not None:
+                arguments.append(initial)
+            elif type_.endswith("?") or not (
+                type_ in {"string", "byte[]"} or self.is_reference_type(fields[0].value)
+            ):
+                arguments.append("default")
+            else:
+                arguments.append("default!")
+        return (
+            f"    public {public_name(plan.native)}()\n"
+            f"        : this({', '.join(arguments)}) {{ }}\n"
+        )
+
+    def member_doc(self, plan: ValuePlan, fields) -> str:
+        """The XML doc comment of a member that one field backs."""
+        if len(fields) != 1:
+            return ""
+        return docs.xml_comment(
+            self.bound.doc(f"{plan.native}.{fields[0].name}"), "    "
+        )
+
     def value_declaration(self, plan: ValuePlan) -> str:
         fields = self.fields(plan)
         if any(
@@ -1240,10 +1317,14 @@ class Values:
                     else ""
                 )
                 properties.append(
-                    f"    public {required}{type_} {name} {{ get; set; }}"
+                    self.member_doc(plan, members)
+                    + self.initialized(
+                        f"    public {required}{type_} {name} {{ get; set; }}", members
+                    )
                 )
             properties.extend(
-                f"    public bool {self.flag_name(flag)} {{ get; set; }}"
+                docs.xml_comment(self.bound.doc(flag.name), "    ")
+                + f"    public bool {self.flag_name(flag)} {{ get; set; }}"
                 for flag in plan.mask_flags
             )
             return (
@@ -1251,11 +1332,24 @@ class Values:
                 + "\n".join(properties)
                 + "\n}\n"
             )
-        return (
+        # A positional record documents each property as a parameter, in the
+        # comment that the record's own summary begins.
+        params = "".join(
+            docs.xml_param(self.bound.doc(f"{plan.native}.{members[0].name}"), name)
+            for name, members in self.members(plan)
+            if len(members) == 1
+        )
+        declaration = params + (
             f"public readonly partial record struct {public_name(plan.native)}("
             + ", ".join(
                 f"{self.member_type(plan, name, members)} {name}"
                 for name, members in self.members(plan)
             )
-            + ");\n"
+            + ")"
+        )
+        constructor = self.parameterless(plan)
+        return (
+            f"{declaration}\n{{\n{constructor}}}\n"
+            if constructor
+            else declaration + ";\n"
         )

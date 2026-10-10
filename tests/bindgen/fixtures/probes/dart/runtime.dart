@@ -73,6 +73,12 @@ void _check(int status) {
   throw NativeFailure(status, utf8.decode(message));
 }
 
+bool _present(int status, int absent) {
+  if (status == absent) return false;
+  _check(status);
+  return true;
+}
+
 final class NativeStringView {
   NativeStringView(this.value);
   final raw.mln_buffer_view value;
@@ -91,3 +97,10 @@ NativeStringView nativeStringView(String value, Allocator allocator) {
 Uint8List _copyBufferView(raw.mln_buffer_view view) => view.size == 0
     ? Uint8List(0)
     : Uint8List.fromList(view.data.cast<Uint8>().asTypedList(view.size));
+
+int _nativeInteger(int value, int minimum, int maximum) {
+  if (value < minimum || value > maximum) {
+    throw NativeFailure(-1, 'integer is outside its native range');
+  }
+  return value;
+}

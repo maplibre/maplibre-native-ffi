@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel
@@ -60,6 +61,11 @@ def unsupported(function: Function | Record, detail: str) -> ModelError:
     return ModelError([f"{function.location}: Swift: {function.name}: {detail}"])
 
 
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The DocC comment of a declaration, or empty when it has none."""
+    return docs.line_comment(bound.doc(native), indent)
+
+
 def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
     from .swift_dynamic_values import dynamic
     from .swift_ownership import owner_name
@@ -94,7 +100,8 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
     if plan.view:
         from .swift_views import operation as view_operation
 
-        return view_operation(plan, value_types)
+        code, view_owner = view_operation(plan, value_types)
+        return doc(value_types.bound, function.name) + code, view_owner
     if plan.consumes:
         from .swift_ownership import consumed
 
@@ -197,7 +204,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
     call = native_call(function, *args)
     if "try " in call:
         call = "try " + call
-    doc = f"/// Calls `{function.name}`.\n"
+    doc_comment = doc(value_types.bound, function.name)
     modifier = "" if receiver else "static "
     claim = any(
         callback.decision and callback.decision.complete == function.name
@@ -231,7 +238,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         )
         parent = ", parent: self" if owned.parent_parameter == plan.receiver else ""
         return (
-            f"""{doc}{signature} throws -> {result} {{
+            f"""{doc_comment}{signature} throws -> {result} {{
   var value0: {owned.handle.native} = 0
   return try nativeAttach({target}, as: {result}.init) {{ raw, arena, completion, diagnostic in {call} }} adopt: {{ try {public}(adopting: value0{parent}) }}
 }}
@@ -354,7 +361,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         attribute = "@discardableResult\n" if execution == "command" else ""
         returns = "" if result == "Void" else f" -> {result}"
         return (
-            f"""{doc}{attribute}{signature} async throws{returns} {{
+            f"""{doc_comment}{attribute}{signature} async throws{returns} {{
   try await native{start}({target}{conversion}) {{ raw, arena, completion, diagnostic in {call} }}
 }}
 """,
@@ -377,7 +384,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
             result = value_types.public(plan.result)
             copied = decode(value_types, plan.result, call)
             return (
-                f"""{doc}{signature} throws -> {result} {{
+                f"""{doc_comment}{signature} throws -> {result} {{
   try nativeDirect({target}) {{ arena in {copied} }}
 }}
 """,
@@ -426,10 +433,13 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                             f"  value{index}.{identifier(field.name)} = UInt32(MemoryLayout<{raw}>.size)"
                         )
             capture.append(value_types.copy(value, f"value{index}"))
-        invoke = f"nativeInvoke({target}) {{ raw, arena, diagnostic in {call} }}"
+        absent = f", absentOn: {plan.absence.status}" if plan.absence else ""
+        invoke = (
+            f"nativeInvoke({target}{absent}) {{ raw, arena, diagnostic in {call} }}"
+        )
         if not outputs:
             return (
-                f"""{doc}{signature} throws {{
+                f"""{doc_comment}{signature} throws {{
   try {invoke}
 }}
 """,
@@ -446,8 +456,10 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
             + ")"
         )
         copied = capture[0] if len(capture) == 1 else "(" + ", ".join(capture) + ")"
+        if plan.absence:
+            result += "?"
         return (
-            f"""{doc}{signature} throws -> {result} {{
+            f"""{doc_comment}{signature} throws -> {result} {{
 {chr(10).join(storage)}
   return try {invoke} result: {{ {copied} }}
 }}

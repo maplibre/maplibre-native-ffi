@@ -8,6 +8,7 @@ import re
 from dataclasses import replace
 from typing import NoReturn
 
+from .. import docs
 from ..model import ModelError
 from ..semantic import BoundApi, ValuePlan
 
@@ -142,7 +143,7 @@ class Values:
             self.records[plan.native] = plan
             if input:
                 self.inputs[plan.native] = plan
-            else:
+            elif plan.native in self.api.returned:
                 self.outputs.add(plan.native)
             return
         names = [field_name(f.name) for f in plan.fields if f.public]
@@ -580,7 +581,9 @@ class Values:
                 for key, value in plan.enum_values
             )
             python.append(
-                f"class {public_name(name)}({'IntFlag' if plan.enum_kind == 'bitmask' else 'UnknownIntEnum'}):\n{body or '    pass'}\n"
+                f"class {public_name(name)}({'IntFlag' if plan.enum_kind == 'bitmask' else 'UnknownIntEnum'}):\n"
+                + docs.docstring(self.api.doc(name), "    ")
+                + f"{body or '    pass'}\n"
             )
         for name, plan in sorted(self.records.items()):
             if plan.response:
@@ -602,17 +605,16 @@ class Values:
         plan,
         *,
         extra_fields=(),
-        extra_copies=(),
-        extra_public_copies=(),
         extra_methods="",
+        copied=True,
     ):
+        """The Rust copy and the Python class of one record.
+
+        A record that native never returns, `copied=False`, has neither copy.
+        """
         name = plan.native
         rust, python = [], []
-        fields, copies, public_copies = (
-            list(extra_fields),
-            list(extra_copies),
-            list(extra_public_copies),
-        )
+        fields, copies, public_copies = list(extra_fields), [], []
         for member, value, field, group in self.members(plan):
             arena = self.item_buffers.get(name)
             if arena and member in {arena.offset, arena.length}:
@@ -628,6 +630,11 @@ class Values:
             fields.append(
                 f"    {member}: {public_type}" + (" = None" if optional(value) else "")
             )
+            if value.registration:
+                # Native never returns callbacks, so a copy leaves them unset.
+                unset = "None" if optional(value) else public_name(value.native) + "()"
+                public_copies.append(f"{member}={unset}")
+                continue
             if group:
                 group_value = self.group_value(plan, group)
                 inner = " ".join(
@@ -657,17 +664,22 @@ class Values:
             public_copies.append(f"{arena.field}=raw[{arena.field!r}]")
         python.append(
             f"@dataclass(frozen=True, slots=True)\nclass {public_name(name)}:\n"
+            + docs.docstring(self.api.doc(name), "    ")
             + "\n".join(sorted(fields, key=lambda line: " = " in line) or ["    pass"])
-            + "\n\n    @classmethod\n    def _from_native(cls, raw):\n        return cls("
-            + ", ".join(public_copies)
-            + ")\n"
+            + "\n"
         )
+        if copied:
+            python[-1] += (
+                "\n    @classmethod\n    def _from_native(cls, raw):\n        return cls("
+                + ", ".join(public_copies)
+                + ")\n"
+            )
         python[-1] += extra_methods
         if name in self.defaults:
             python[-1] += (
                 f"\n    @classmethod\n    def default(cls):\n        from . import _native\n        return cls._from_native(_native._default_{name.removeprefix('mln_')}())\n"
             )
-        if name not in self.outputs:
+        if not copied or name not in self.outputs:
             return "", "\n".join(python)
         rust.append(
             f"fn generated_copy_{name}(py: Python<'_>, value: &sys::{name}) -> PyResult<Py<PyAny>> {{\n    let dict = PyDict::new(py);\n    "

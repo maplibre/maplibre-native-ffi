@@ -5,7 +5,6 @@ import unittest
 from support import parse
 
 from tools.bindgen.compiler import compile_api
-from tools.bindgen.managed_contracts import conflicting_functions
 from tools.bindgen.model import ModelError
 from tools.bindgen.schema import validate
 from tools.bindgen.semantic import bind
@@ -17,7 +16,7 @@ class PlanNameTests(unittest.TestCase):
         validate(api)
         return compile_api(api)
 
-    def test_members_strip_the_declared_handle_prefix_or_take_an_explicit_name(self):
+    def test_members_strip_the_declared_handle_prefix(self):
         bound = self.bind()
         operations = bound.operations_by_name
         self.assertEqual(bound.handles["mln_pass_handle"].stem, "pass")
@@ -28,21 +27,13 @@ class PlanNameTests(unittest.TestCase):
             },
             {
                 "mln_pass_redeem": "redeem",
-                "mln_pass_stamp": "punch",
+                "mln_pass_stamp": "stamp",
                 "mln_pass_close": "close",
             },
         )
         self.assertEqual(
             (operations["mln_pass_redeem"].status, operations["mln_pass_close"].status),
             (True, False),
-        )
-
-    def test_members_that_convert_to_one_name_collide(self):
-        bound = self.bind(
-            'BIND("name=redeem")\nmln_status mln_pass_cash(mln_pass_handle pass, mln_diagnostic *out_diagnostic);\n'
-        )
-        self.assertEqual(
-            conflicting_functions(bound, "kotlin"), {"mln_pass_redeem", "mln_pass_cash"}
         )
 
     def test_presence_members_come_from_the_bit_enum_and_the_boolean_mask(self):
@@ -78,14 +69,11 @@ class PlanNameTests(unittest.TestCase):
                 'typedef struct mln_box { double side; } mln_box BIND("prefix=mln_cube");\n'
             )
 
-    def test_an_explicit_receiver_names_the_first_parameter(self):
-        with self.assertRaisesRegex(
-            ModelError, "receiver must name the first parameter"
-        ):
-            self.bind(
-                'BIND("receiver=pass")\n'
-                "mln_status mln_pass_after(int count, mln_pass_handle pass, mln_diagnostic *out_diagnostic);\n"
-            )
+    def test_only_a_leading_handle_is_the_receiver(self):
+        operation = self.bind(
+            "mln_status mln_pass_after(int count, mln_pass_handle pass, mln_diagnostic *out_diagnostic);\n"
+        ).operations_by_name["mln_pass_after"]
+        self.assertEqual((operation.receiver, operation.member), (None, "pass_after"))
 
     def test_a_marshalled_input_lasts_for_the_call(self):
         source = "mln_status mln_pass_note(mln_pass_handle pass, const char *text{}, mln_diagnostic *out_diagnostic);\n"

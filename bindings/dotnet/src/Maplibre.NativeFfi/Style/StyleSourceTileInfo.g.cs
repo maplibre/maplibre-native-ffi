@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Inline tile metadata selected as one value by the source-info field mask.
+/// </summary>
+/// <remarks>
+/// See <c>mln_style_source_tile_info</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+/// </remarks>
 public readonly partial record struct StyleSourceTileInfo(
     ulong TileCount,
     double MinZoom,

@@ -6,14 +6,16 @@ these plans and keep allocation, callback roots, and scheduling in their runtime
 
 from __future__ import annotations
 
+import functools
 import os
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import TypedDict
 
+from . import docs
 from .model import Api, CType, Function, ModelError
 from .names import type_name
-from .protocol import BUFFER_VIEW, is_completion, is_status
+from .protocol import BUFFER_VIEW, STATUS, is_completion, is_status
 from .schema import validate
 
 
@@ -35,7 +37,6 @@ class HandlePlan:
     abandon: str | None = None
     release_inputs: tuple[str, ...] = ()
     finalize: tuple[str, ...] = ()
-    parent_retention: str = "strong"
     view_begin: str | None = None
     view_end: str | None = None
     # The name that the handle's operations begin with: its `prefix=` metadata,
@@ -52,13 +53,6 @@ class HandlePlan:
 
 
 @dataclass(frozen=True)
-class TransitionPlan:
-    phase: str
-    action: str
-    resource: str
-
-
-@dataclass(frozen=True)
 class OwnedOutputPlan:
     parameter: str
     handle: HandlePlan
@@ -70,9 +64,6 @@ class CompletionPlan:
     parameter: str
     immediate_owners: tuple[OwnedOutputPlan, ...]
     result_owned: bool
-    transitions: tuple[TransitionPlan, ...]
-    inline: bool = True
-    native_release: str = "quiescence"
     result_owner: OwnedOutputPlan | None = None
 
 
@@ -86,7 +77,6 @@ class DecisionPlan:
     cancelled: str
     cancel_registration: str
     wait_retired: str
-    transitions: tuple[TransitionPlan, ...]
 
 
 @dataclass(frozen=True)
@@ -114,8 +104,6 @@ class RegistrationDescriptorPlan:
     callbacks: tuple[str, ...]
     user_data: str
     release: str
-    transfer: str = "acceptance"
-    retire: str = "quiescence"
 
 
 @dataclass(frozen=True)
@@ -164,7 +152,6 @@ class ValuePlan:
     mask_flags: tuple[MaskFlag, ...] = ()
     registration: RegistrationDescriptorPlan | None = None
     response: CallbackResponsePlan | None = None
-    projection: ValuePlan | None = None
     # For kind="buffer": "view" for the mln_buffer_view struct, "pointer" for a
     # character or byte pointer with a separate length or NUL terminator.
     buffer_form: str | None = None
@@ -192,14 +179,35 @@ CONTROL_ROLES = frozenset(
 
 
 @dataclass(frozen=True)
+class FieldInitial:
+    """The nonzero value that a field holds in its record's native default.
+
+    `literal` is the annotation as written; `value` is the number it denotes.
+    For an enum field, `enumerator` names the constant and `member` is that
+    constant without its enum's shared prefix, in lower case.
+    """
+
+    literal: str
+    value: int | float | bool
+    enumerator: str | None = None
+    member: str | None = None
+
+
+@dataclass(frozen=True)
 class FieldPlan:
     name: str
     value: ValuePlan
     presence: Presence | None = None
+    # A control role's conventional value: `sizeof` for a size, `0` for
+    # reserved space.
     default: str | None = None
     # The field's `kind`, or "value". A role in CONTROL_ROLES marks state that
     # a binding writes or derives rather than a member a host sets or reads.
     role: str = "value"
+    # The field's annotated `default=`: its value in the record's native
+    # default, which a binding that builds the record from language defaults
+    # uses in place of zero.
+    initial: FieldInitial | None = None
 
     @property
     def public(self) -> bool:
@@ -228,7 +236,6 @@ class CallbackPlan:
     parameters: tuple[ParameterPlan, ...]
     result: ValuePlan
     failure: str | None = None
-    thread: str | None = None
     decision: DecisionPlan | None = None
     context: str | None = None
     reentry: str = "allow"
@@ -251,8 +258,6 @@ class RegistrationPlan:
     callbacks: tuple[str, ...]
     user_data: str
     release: str
-    transfer: str = "acceptance"
-    retire: str = "quiescence"
     path: tuple[str, ...] = ()
 
 
@@ -262,7 +267,6 @@ class DirectRegistrationPlan:
     user_data: str
     release_callback: str | None
     accepted_unless: str | None
-    transfer: str = "acceptance"
 
 
 @dataclass(frozen=True)
@@ -277,7 +281,6 @@ class BorrowedViewPlan:
     # The accessor's name without its verb: the operation member without a
     # leading `get_`, so a scoped accessor reads as `with_<stem>`.
     stem: str
-    retention: str = "strong"
 
 
 @dataclass(frozen=True)
@@ -306,6 +309,20 @@ class ViewSupport:
 
 
 @dataclass(frozen=True)
+class AbsencePlan:
+    """A failure status that reports the operation's one output as absent.
+
+    A binding returns its language's empty form for this status instead of an
+    error, and adopts or copies the output only on success.
+    """
+
+    # The status enumerator, and its value.
+    status: str
+    value: int
+    output: ParameterPlan
+
+
+@dataclass(frozen=True)
 class OperationPlan:
     function: Function
     execution: str
@@ -328,6 +345,7 @@ class OperationPlan:
     # The operation's language-neutral member name, which every binding only
     # case-converts and escapes; see `Binder.member`.
     member: str = ""
+    absence: AbsencePlan | None = None
 
     @property
     def name(self) -> str:
@@ -359,6 +377,19 @@ class BoundApi:
     # The scope operations of borrowed views, which bindings call from the
     # views they generate instead of exposing.
     view_scopes: tuple[OperationPlan, ...] = ()
+    # The records and unions that a binding copies from native: those that an
+    # operation's output or result, a callback's argument, or a record default
+    # reaches. A copy leaves a callback registration field unset.
+    returned: frozenset[str] = frozenset()
+
+    @functools.cached_property
+    def docs(self) -> dict[str, docs.Doc]:
+        """The documentation of each documented public declaration, by C name."""
+        return docs.index(self.source)
+
+    def doc(self, native: str) -> docs.Doc | None:
+        """The documentation of a declaration, or `record.field` member."""
+        return self.docs.get(native)
 
     @property
     def public_values(self) -> dict[str, ValuePlan]:
@@ -468,6 +499,23 @@ def public_stem(native: str) -> str:
     return native.removeprefix("mln_")
 
 
+def field_initial(value: ValuePlan, literal: str) -> FieldInitial:
+    """Resolve a field's `default=` annotation, which the schema checked."""
+    if value.kind == "enum":
+        constants = dict(value.enum_values)
+        return FieldInitial(
+            literal,
+            constants[literal],
+            literal,
+            literal.removeprefix(enum_member_prefix(constants)).lower(),
+        )
+    if literal == "true":
+        return FieldInitial(literal, True)
+    if "." in literal:
+        return FieldInitial(literal, float(literal))
+    return FieldInitial(literal, int(literal))
+
+
 def enum_member_prefix(constants) -> str:
     """The prefix that an enum's constants share, cut back to a whole word."""
     names = list(constants)
@@ -533,6 +581,7 @@ class Binder:
         self.values: dict[str, ValuePlan] = {}
         self.callbacks: dict[str, CallbackPlan] = {}
         self.resolving: set[str] = set()
+        self.returned: set[str] = set()
         self.handles = {
             name: HandlePlan(
                 name,
@@ -541,15 +590,11 @@ class Binder:
                 if typedef.metadata.get("parent", "none") == "none"
                 else typedef.metadata["parent"],
                 typedef.metadata.get("dispose"),
-                typedef.metadata.get(
-                    "release_consumes",
-                    "always"
-                    if api.functions_by_name[
-                        typedef.metadata["release"]
-                    ].return_type.kind
-                    == "void"
-                    else "success",
-                ),
+                # A release that cannot fail consumes its handle every time.
+                "always"
+                if api.functions_by_name[typedef.metadata["release"]].return_type.kind
+                == "void"
+                else "success",
                 typedef.metadata.get("abandon"),
                 tuple(
                     parameter.name
@@ -790,13 +835,19 @@ class Binder:
                                 for key in ("mask", "bit", "tag", "variant")
                             }
                         )
+                    role = item.metadata.get("kind", "value")
+                    member_value = self.value(item.type, item.metadata, field_context)
+                    control_default = role in {"size", "reserved"}
                     fields.append(
                         FieldPlan(
                             item.name,
-                            self.value(item.type, item.metadata, field_context),
+                            member_value,
                             presence,
-                            item.metadata.get("default"),
-                            item.metadata.get("kind", "value"),
+                            item.metadata.get("default") if control_default else None,
+                            role,
+                            None
+                            if control_default or "default" not in item.metadata
+                            else field_initial(member_value, item.metadata["default"]),
                         )
                     )
                 storage_roles = {}
@@ -824,18 +875,6 @@ class Binder:
                 value = ValuePlan(
                     kind="union" if record.kind == "union" else "record",
                     fields=tuple(fields),
-                    projection=self.value(
-                        CType(
-                            "record",
-                            record_metadata["projection"],
-                            "struct " + record_metadata["projection"],
-                            record_metadata["projection"],
-                        ),
-                        {},
-                        context + " projection",
-                    )
-                    if "projection" in record_metadata
-                    else None,
                     default=record_metadata.get("default"),
                     tag=record_metadata.get("tag"),
                     empty_variant=next(
@@ -971,8 +1010,8 @@ class Binder:
     def operation(self, function: Function) -> OperationPlan:
         context = f"{function.location}: {function.name}"
         inputs, outputs, registrations = [], [], []
-        receiver = function.metadata.get("receiver")
-        if receiver is None and function.parameters:
+        receiver = None
+        if function.parameters:
             first = function.parameters[0]
             first_type = (
                 first.type.pointee if first.type.kind == "pointer" else first.type
@@ -1054,8 +1093,6 @@ class Binder:
                                 registration.callbacks,
                                 registration.user_data,
                                 registration.release,
-                                registration.transfer,
-                                registration.retire,
                                 path,
                             )
                         )
@@ -1139,40 +1176,6 @@ class Binder:
                 owners.append(OwnedOutputPlan(output.name, value.handle, parent))
         completion = None
         if completion_parameter:
-            transitions = [
-                TransitionPlan(
-                    "prepare", "reserve_caller_and_native_roots", completion_parameter
-                ),
-                TransitionPlan("reject", "release_both_roots", completion_parameter),
-                TransitionPlan("capture", "copy_borrowed_payload", "result"),
-                TransitionPlan(
-                    "deliver", "adopt_owned_payload_transactionally", "result"
-                ),
-                TransitionPlan("abandon", "dispose_unadopted_payload", "result"),
-                TransitionPlan(
-                    "native_release", "release_native_root", completion_parameter
-                ),
-                TransitionPlan(
-                    "caller_release", "release_caller_root", completion_parameter
-                ),
-            ]
-            for owner in owners:
-                transitions.extend(
-                    (
-                        TransitionPlan("prepare", "reserve_parent", owner.parameter),
-                        TransitionPlan(
-                            "accept", "adopt_immediate_owner", owner.parameter
-                        ),
-                        TransitionPlan(
-                            "reject", "release_parent_reservation", owner.parameter
-                        ),
-                        TransitionPlan(
-                            "completion_failure",
-                            "retain_immediate_owner",
-                            owner.parameter,
-                        ),
-                    )
-                )
             result_value = (
                 result.element if result and result.kind == "array" else result
             )
@@ -1197,25 +1200,10 @@ class Binder:
                         ]
                     )
                 result_owner = OwnedOutputPlan("result", result_value.handle, parent)
-                transitions.extend(
-                    (
-                        TransitionPlan("prepare", "reserve_parent", "result"),
-                        TransitionPlan(
-                            "reject", "release_parent_reservation", "result"
-                        ),
-                        TransitionPlan(
-                            "deliver", "transfer_parent_to_result", "result"
-                        ),
-                        TransitionPlan(
-                            "abandon", "release_parent_after_disposal", "result"
-                        ),
-                    )
-                )
             completion = CompletionPlan(
                 completion_parameter,
                 tuple(owners),
                 bool(result and result.ownership == "owned"),
-                tuple(transitions),
                 result_owner=result_owner,
             )
         consumes = metadata.get("consumes")
@@ -1295,6 +1283,43 @@ class Binder:
                 handle.view_end,
                 member.removeprefix("get_"),
             )
+        absence = None
+        if "absent_on" in metadata:
+            # An absent call publishes nothing, so it neither consumes its
+            # receiver nor roots a registration.
+            if view or consumes:
+                raise ModelError(
+                    [f"{context}: absent_on requires an output that the caller owns"]
+                )
+            if registrations or "registration" in metadata:
+                raise ModelError(
+                    [f"{context}: absent_on requires a call without registrations"]
+                )
+            absence = AbsencePlan(
+                metadata["absent_on"],
+                next(
+                    value.value
+                    for enum in self.api.enums
+                    if enum.name == STATUS
+                    for value in enum.values
+                    if value.name == metadata["absent_on"]
+                ),
+                outputs[0],
+            )
+        # A runtime export's caller reads its outputs itself, so only a
+        # generated operation and a default copy what native writes.
+        if function.name not in self.api.runtime_exports or isinstance(
+            support, DefaultSupport
+        ):
+            self.returned |= self.copied(
+                (
+                    *outputs,
+                    *(p for p in inputs if p.direction == "inout"),
+                ),
+                result,
+                context,
+                isinstance(support, DefaultSupport),
+            )
         return OperationPlan(
             function,
             metadata["execution"],
@@ -1329,17 +1354,72 @@ class Binder:
             ),
             is_status(function.return_type),
             member,
+            absence,
         )
+
+    def copied(
+        self,
+        parameters,
+        result: ValuePlan | None,
+        context: str,
+        default: bool = False,
+    ) -> set[str]:
+        """The records and unions that a binding copies from these values.
+
+        A binding builds a callback registration from host callbacks and never
+        adopts one from native. Only a record default holds one, with null
+        callbacks, in a record field without presence. A copy of the default
+        leaves a registration field unset, and the copy of a registration's own
+        default copies only its other fields. A registration that is optional,
+        referenced, or a union variant would need a copy of its presence, so
+        the plan rejects one.
+        """
+        found: set[str] = set()
+
+        def visit(
+            value: ValuePlan, path: str, root: bool = False, field: bool = False
+        ) -> None:
+            if value.registration and not (default and root):
+                if default and field:
+                    return
+                raise ModelError(
+                    [
+                        f"{path}: a record default holds a callback registration "
+                        "only in a field without presence"
+                        if default
+                        else f"{path}: native cannot return a callback registration"
+                    ]
+                )
+            if value.response:
+                return
+            if value.element:
+                visit(value.element, path)
+            if value.kind not in {"record", "union"} or value.native in found:
+                return
+            found.add(value.native)
+            for member in value.fields:
+                visit(
+                    member.value,
+                    f"{path}.{member.name}",
+                    field=value.kind == "record" and member.presence is None,
+                )
+            for group in value.presence_groups:
+                if group.type:
+                    visit(self.values[group.type], path)
+
+        for parameter in parameters:
+            visit(parameter.value, f"{context} parameter {parameter.name}")
+        if result is not None:
+            visit(result, f"{context} result", root=True)
+        return found
 
     def member(self, function: Function, receiver: str | None) -> str:
         """Name an operation once for every binding.
 
-        An explicit `name=` wins. An operation on a handle, or on a callback
-        response, drops its receiver's prefix when its name starts with it;
-        every other name drops `mln_`.
+        An operation on a handle, or on a callback response, drops its
+        receiver's prefix when its name starts with it; every other name drops
+        `mln_`.
         """
-        if "name" in function.metadata:
-            return function.metadata["name"]
         if receiver is not None:
             parameter = next(p for p in function.parameters if p.name == receiver)
             owner = type_name(parameter.type.pointee or parameter.type)
@@ -1387,10 +1467,8 @@ class Binder:
         function = typedef.type.pointee
         assert function is not None and function.result is not None
         context = f"{typedef.location}: {name}"
-        if "failure" not in typedef.metadata or "thread" not in typedef.metadata:
-            raise ModelError(
-                [f"{context}: callback requires failure and thread contracts"]
-            )
+        if "failure" not in typedef.metadata:
+            raise ModelError([f"{context}: callback requires a failure contract"])
         contexts = [
             parameter.name
             for parameter in typedef.parameters
@@ -1400,21 +1478,26 @@ class Binder:
             raise ModelError(
                 [f"{context}: callback requires at most one context parameter"]
             )
+        parameters = tuple(
+            ParameterPlan(
+                parameter.name,
+                self.value(
+                    parameter.type,
+                    parameter.metadata,
+                    context + " parameter " + parameter.name,
+                ),
+                parameter.metadata.get("direction", "in"),
+                parameter.metadata.get("consumes"),
+            )
+            for parameter in typedef.parameters
+        )
+        # Native passes the arguments that a callback does not write.
+        self.returned |= self.copied(
+            tuple(p for p in parameters if p.direction != "out"), None, context
+        )
         return CallbackPlan(
             name,
-            tuple(
-                ParameterPlan(
-                    parameter.name,
-                    self.value(
-                        parameter.type,
-                        parameter.metadata,
-                        context + " parameter " + parameter.name,
-                    ),
-                    parameter.metadata.get("direction", "in"),
-                    parameter.metadata.get("consumes"),
-                )
-                for parameter in typedef.parameters
-            ),
+            parameters,
             self.value(
                 function.result,
                 {"enum": typedef.metadata["enum"]}
@@ -1423,7 +1506,6 @@ class Binder:
                 context + " return",
             ),
             typedef.metadata["failure"],
-            typedef.metadata["thread"],
             self.decision(typedef),
             contexts[0] if contexts else None,
             typedef.metadata.get("reentry", "allow"),
@@ -1467,30 +1549,15 @@ class Binder:
         parameter = next(
             p for p in typedef.parameters if p.name == metadata["decision_handle"]
         )
-        handle = self.handles[type_name(parameter.type)]
-        resource = parameter.name
         return DecisionPlan(
-            resource,
-            handle,
+            parameter.name,
+            self.handles[type_name(parameter.type)],
             metadata["decision_accept"],
             metadata["decision_pass"],
             metadata["complete"],
             metadata["cancelled"],
             metadata["cancel_registration"],
             metadata["wait_retired"],
-            (
-                TransitionPlan("enter", "borrow_provisional_owner", resource),
-                TransitionPlan("complete_enter", "mark_completion_terminal", resource),
-                TransitionPlan("complete_enter", "force_accept_decision", resource),
-                TransitionPlan("accept", "adopt_provisional_owner", resource),
-                TransitionPlan(
-                    "pass_through", "invalidate_provisional_owner", resource
-                ),
-                TransitionPlan("release_enter", "force_accept_decision", resource),
-                TransitionPlan("release", "wait_for_inflight_request_calls", resource),
-                TransitionPlan("release", "release_native_owner", resource),
-                TransitionPlan("release_return", "retire_cancel_callback", resource),
-            ),
         )
 
     def bind(self, *, require_complete: bool = False) -> BoundApi:
@@ -1562,6 +1629,7 @@ class Binder:
                 if operation.name not in self.api.runtime_exports
                 and isinstance(operation.support, ViewSupport)
             ),
+            frozenset(self.returned),
         )
 
 

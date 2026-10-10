@@ -19,7 +19,7 @@ from .kotlin_operations import (
     receiver_value,
 )
 from .kotlin_owners import state_type
-from .kotlin_values import Unsupported, Values, generated_owners
+from .kotlin_values import Unsupported, Values, doc, generated_owners
 from .kotlin_values import name as value_name
 
 COMMON = "src/commonMain/kotlin/org/maplibre/nativeffi"
@@ -95,7 +95,10 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
         groups.setdefault(owner, [])
     outputs = {}
     for receiver, plans in groups.items():
-        bodies = [operation(plan, values, native) for plan in plans]
+        bodies = [
+            doc(bound, plan.name, "  ") + operation(plan, values, native)
+            for plan in plans
+        ]
         header = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
             "package org.maplibre.nativeffi.generated\n\n" + OPERATION_IMPORTS + "\n"

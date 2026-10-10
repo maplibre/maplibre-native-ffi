@@ -6,6 +6,7 @@
 [cases]
 "ERR-01" = "bindings/rust/crates/maplibre-native-ffi-core/src/error.rs::a_failed_call_maps_its_status_and_keeps_an_unknown_code"
 "ERR-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::creation_checks_the_c_abi_version_before_it_reaches_native"
+"ERR-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_drain_before_any_demand_returns_no_batch"
 "LIFE-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::closing_a_handle_twice_does_nothing"
 "LIFE-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/lifecycle.rs::a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds"
 "LIFE-03" = "bindings/rust/crates/maplibre-native-ffi/src/handle.rs::a_read_on_another_thread_holds_off_close_until_it_ends"
@@ -31,6 +32,7 @@
 # slice length into a native count, which this test cannot allocate.
 "VAL-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::open_enums_keep_unknown_values_and_64_bit_masks_cross_whole"
 "VAL-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::array_inputs_are_copied_when_they_are_submitted"
+"VAL-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::a_record_built_from_its_default_equals_the_native_default"
 "VIEW-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it"
 # The browser build renders on WebGL and WebGPU in tests/suite/browser/mod.rs.
 "REND-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::an_owned_texture_session_renders_a_frame_the_binding_reads_back"

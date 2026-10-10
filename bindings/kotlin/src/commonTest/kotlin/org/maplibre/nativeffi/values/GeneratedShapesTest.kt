@@ -16,8 +16,10 @@ import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.EdgeInsets
 import org.maplibre.nativeffi.generated.FeatureStateSelector
+import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LatLng
 import org.maplibre.nativeffi.generated.MapMode
+import org.maplibre.nativeffi.generated.MapOptions
 import org.maplibre.nativeffi.generated.PremultipliedRgba8Image
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.StyleImageOptions
@@ -169,5 +171,12 @@ class GeneratedShapesTest {
       loading.awaitCommitted()
       awaitMapEvent(RuntimeEventType.MAP_STYLE_LOADED)
     }
+  }
+
+  // A constructor's defaults come from the header's field annotations, so the record they build
+  // matches what the native default function returns.
+  @Test
+  fun aRecordBuiltFromItsConstructorDefaultsEqualsTheNativeDefault() {
+    assertEquals(GeneratedApi.mapOptionsDefault(), MapOptions())
   }
 }

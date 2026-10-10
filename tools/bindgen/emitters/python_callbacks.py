@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from .. import docs
 from .python_values import public_name, rust_field, scalar_type
 from .rust import native_call
 from .rust_callbacks import decision_table_name
@@ -102,7 +103,7 @@ def sources(values, plan):
 
     rust, python = [], []
     descriptor = plan.registration
-    fields, methods, copies = [], [], []
+    fields, methods = [], []
     for index, name in enumerate(descriptor.callbacks):
         field = next(f for f in plan.fields if f.name == name)
         callback = values.api.callbacks[field.value.native]
@@ -129,10 +130,6 @@ def sources(values, plan):
         )
         methods.append(
             f"    def _invoke_{name}({signature}):\n        callback = self.{name}\n        assert callback is not None\n        return callback({arguments})\n"
-        )
-        copies.append(f'dict.set_item("{name}", py.None())?;')
-        copies.append(
-            f'if value.{rust_field(name)}.is_some() {{ return Err(native_error("native callback cannot be copied into a Python closure")); }}'
         )
         native_parameters = ", ".join(
             f"{rust_field(p.name)}: {ffi_type(p.value)}" for p in callback.parameters
@@ -217,9 +214,10 @@ def sources(values, plan):
     record_rust, record_python = values.record_sources(
         plain_fields(plan),
         extra_fields=fields,
-        extra_copies=copies,
-        extra_public_copies=[f"{name}=raw[{name!r}]" for name in descriptor.callbacks],
         extra_methods="\n" + "\n".join(methods),
+        # Native never returns callbacks, so a copy of a registration's
+        # default leaves them at None.
+        copied=plan.native in values.api.returned,
     )
     rust.append(record_rust)
     python.append(record_python)
@@ -273,7 +271,7 @@ def direct_operation(plan, values):
     }}
 """
         facade = f"""    def {name}(self, callback: Callable[[], None]) -> bool:
-        return self._native.{name}(callback)
+{docs.docstring(values.api.doc(plan.name), "        ")}        return self._native.{name}(callback)
 """
         return (
             owner,
@@ -329,7 +327,7 @@ fn {name}(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {{
     )
     public_type = f"Callable[[{parameter_types}], {result_type}] | None"
     facade = f"""def {name}(callback: {public_type} = None) -> None:
-    return _native.{name}({public_name(descriptor.native)}(callback))
+{docs.docstring(values.api.doc(plan.name), "    ")}    return _native.{name}({public_name(descriptor.native)}(callback))
 """
     return (
         "",

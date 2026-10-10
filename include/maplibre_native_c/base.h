@@ -1,6 +1,21 @@
 /**
  * @file maplibre_native_c/base.h
- * Public C API declarations for base ABI types and status values.
+ * Public C API declarations for base ABI types, status values, and handles.
+ *
+ * Handles are opaque 64-bit generational ids.
+ *
+ * Each id packs the handle's type, a slot index, and a reuse generation, so a
+ * released handle stays distinguishable from every later handle. A handle is
+ * released once the call that ends it, such as a release, close, destroy, or
+ * dispose, accepts it. Passing a released handle reports
+ * MLN_STATUS_INVALID_STATE. Passing an invalid handle, which is the null
+ * handle, a handle of another type, or a value this library never issued,
+ * reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no effect, and
+ * its diagnostic names the case. Handle values are safe to copy, compare,
+ * hash, and move between threads, and carry no ownership on their own.
+ *
+ * The bit layout is internal. Hosts pass handles back as issued rather than
+ * decoding or synthesizing them.
  */
 
 #ifndef MAPLIBRE_NATIVE_C_BASE_H
@@ -101,56 +116,49 @@ typedef enum MLN_BINDING("kind=bitmask") mln_render_backend_flag : uint32_t {
  */
 #define MLN_HANDLE_NULL ((uint64_t)0)
 
-/**
- * Handles are opaque 64-bit generational ids.
- *
- * Each id packs the handle's type, a slot index, and a reuse generation, so a
- * released handle stays distinguishable from every later handle. A handle is
- * released once the call that ends it, such as a release, close, destroy, or
- * dispose, accepts it. Passing a released handle reports
- * MLN_STATUS_INVALID_STATE. Passing an invalid handle, which is the null
- * handle, a handle of another type, or a value this library never issued,
- * reports MLN_STATUS_INVALID_ARGUMENT. Either way the call has no effect, and
- * its diagnostic names the case. Handle values are safe to copy, compare,
- * hash, and move between threads, and carry no ownership on their own.
- *
- * The bit layout is internal. Hosts pass handles back as issued rather than
- * decoding or synthesizing them.
- */
+/** A runtime: the native scheduler thread and event store for its maps. */
 typedef uint64_t mln_runtime MLN_BINDING(
   "kind=handle;release=mln_runtime_release;"
   "dispose=mln_runtime_dispose"
 );
+/** A map, which holds map state independent of any render target. */
 typedef uint64_t mln_map MLN_BINDING(
   "kind=handle;release=mln_map_release;parent=mln_runtime;dispose=mln_map_"
   "dispose"
 );
+/** A standalone projection of a map's transform state at its creation. */
 typedef uint64_t mln_map_projection MLN_BINDING(
   "kind=handle;release=mln_map_projection_close;"
   "dispose=mln_map_projection_close"
 );
+/** An owned buffer of bytes. */
 typedef uint64_t mln_buffer MLN_BINDING(
   "kind=handle;release=mln_buffer_destroy;"
   "dispose=mln_buffer_destroy"
 );
+/** A resource request that a resource provider handles. */
 typedef uint64_t mln_resource_request_handle MLN_BINDING(
   "kind=handle;release=mln_resource_request_release;"
   "dispose=mln_resource_request_release;prefix=mln_resource_request"
 );
+/** A render session, which renders one map to one render target. */
 typedef uint64_t mln_render_session MLN_BINDING(
   "kind=handle;release=mln_render_session_destroy;parent=mln_map;"
   "abandon=mln_render_session_abandon;dispose=mln_render_session_dispose"
 );
+/** An owned batch of runtime events from one drain. */
 typedef uint64_t mln_event_batch MLN_BINDING(
   "kind=handle;release=mln_event_batch_release;"
   "dispose=mln_event_batch_release"
 );
+/** A rendered frame that a render session lends until its release. */
 typedef uint64_t mln_acquired_frame MLN_BINDING(
   "kind=handle;release=mln_acquired_frame_release;parent=mln_render_session;"
   "dispose=mln_acquired_frame_dispose;"
   "view_begin=mln_acquired_frame_view_begin;"
   "view_end=mln_acquired_frame_view_end"
 );
+/** An owned batch of frame results from one drain. */
 typedef uint64_t mln_render_frame_batch MLN_BINDING(
   "kind=handle;release=mln_render_frame_batch_release;"
   "dispose=mln_render_frame_batch_release"

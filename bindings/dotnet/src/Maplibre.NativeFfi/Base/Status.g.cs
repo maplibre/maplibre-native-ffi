@@ -1,17 +1,64 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Status values returned by status-returning functions.
+/// </summary>
+/// <remarks>
+/// See <c>mln_status</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public enum Status : int
 {
     Ok = 0,
+
+    /// <summary>
+    /// A pointer, size field, mask, or handle argument was invalid.
+    /// </summary>
     InvalidArgument = -1,
+
+    /// <summary>
+    /// The object is valid but not currently in a state that permits the call.
+    /// </summary>
     InvalidState = -2,
+
+    /// <summary>
+    /// The handle is thread-affine and the call was made from the wrong thread.
+    /// </summary>
     WrongThread = -3,
+
+    /// <summary>
+    /// The entry point or requested behavior is unavailable in this build.
+    /// </summary>
     Unsupported = -4,
+
+    /// <summary>
+    /// A native MapLibre error or C++ exception was converted to status.
+    /// </summary>
     NativeError = -5,
+
+    /// <summary>
+    /// The operation reached its terminal cancelled disposition.
+    /// </summary>
     Cancelled = -6,
+
+    /// <summary>
+    /// A conflicting driver call or lifecycle transition is in flight.
+    /// </summary>
     Busy = -7,
+
+    /// <summary>
+    /// The render target or graphics receiver was irreversibly lost.
+    /// </summary>
     TargetLost = -8,
+
+    /// <summary>
+    /// A nonblocking acquisition or service call has no result yet.
+    /// </summary>
     NotReady = -9,
+
+    /// <summary>
+    /// A command or operation named an ID with no live object behind it.
+    /// </summary>
     NotFound = -10,
 }

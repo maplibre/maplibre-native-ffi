@@ -3,10 +3,20 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// One nonblocking request for a frame.
+///
+/// See `mln_frame_demand` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct FrameDemand: Equatable, Hashable, Sendable {
+  /// A bitwise OR of `mln_frame_demand_flag` values. Defaults to
+  /// `MLN_FRAME_DEMAND_IF_NEEDED`.
   public var flags: FrameDemandFlag
+  /// Host identity returned with the terminal frame result.
   public var token: UInt64
+  /// Demands coalesce only when this value and their flags match.
   public var coalescingBoundary: UInt64
+  /// Positive time allowed before driver work begins, in nanoseconds; zero has
+  /// no limit.
   public var timeoutNs: UInt64
   public static var `default`: Self {
     Self(raw: mln_frame_demand_default())
@@ -41,6 +51,10 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   }
 }
 
+/// Frame-demand policy bits.
+///
+/// See `mln_frame_demand_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
@@ -49,10 +63,18 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
+  /// Render only when a newer map update exists.
   public static let ifNeeded: FrameDemandFlag = .init(rawValue: 1)
+  /// Present the rendered frame on a target that supports presentation. A
+  /// presenting target whose demand clears this bit still renders and keeps
+  /// whatever it presented last. Ignored by targets without presentation.
   public static let present: FrameDemandFlag = .init(rawValue: 2)
 }
 
+/// Result of irreversible CPU-side target abandonment.
+///
+/// See `mln_render_abandon_disposition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderAbandonDisposition: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -61,12 +83,16 @@ public struct RenderAbandonDisposition: RawRepresentable, NativeOpenValue,
     self.rawValue = rawValue
   }
 
+  /// No graphics resources remained when control was abandoned.
   public static let clean: RenderAbandonDisposition = .init(rawValue: 0)
+  /// Graphics resources could not be destroyed and were quarantined.
   public static let quarantined: RenderAbandonDisposition = .init(rawValue: 1)
 }
 
 public struct RenderAbandonResult: Equatable, Hashable, Sendable {
+  /// One `mln_render_abandon_disposition` value.
   public var disposition: RenderAbandonDisposition
+  /// Backend resource groups intentionally retained until process exit.
   public var quarantinedResourceCount: UInt32
   public static var `default`: Self {
     Self(raw: mln_render_abandon_result())
@@ -96,12 +122,27 @@ public struct RenderAbandonResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// Immutable result record copied into an owned frame-result batch.
+///
+/// See `mln_render_frame_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderFrameResult: Equatable, Hashable, Sendable {
+  /// One `mln_render_result` value.
   public var disposition: RenderResult
   public var token: UInt64
   public var mapUpdateGeneration: UInt64
   public var extentGeneration: UInt64
+  /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
   public var frameGeneration: UInt64
+  /// Whether the map asked for another frame while it rendered this one, as
+  /// during an ongoing paint transition. Set only when disposition is
+  /// `MLN_RENDER_RESULT_RENDERED`, and false for every other outcome. This is
+  /// the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED` carries
+  /// in its needs_repaint field, delivered with the frame result so a host can
+  /// re-arm its frame loop without the runtime event round trip. A camera
+  /// transition does not set it by itself: the map publishes a new update after
+  /// each of the transition's frames instead, which a render-if-needed demand
+  /// renders.
   public var needsRepaint: Bool
   public static var `default`: Self {
     Self(raw: mln_render_frame_result())
@@ -145,6 +186,10 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// Terminal disposition of one accepted frame demand.
+///
+/// See `mln_render_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -153,17 +198,30 @@ public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// A frame was rendered for acquisition, presentation, or ordered readback.
   public static let rendered: RenderResult = .init(rawValue: 0)
+  /// No newer map update was available.
   public static let noUpdate: RenderResult = .init(rawValue: 1)
+  /// An ordered extent change had not reached the driver.
   public static let sizePending: RenderResult = .init(rawValue: 2)
+  /// The target could not produce a frame.
   public static let targetNotReady: RenderResult = .init(rawValue: 3)
+  /// A newer demand in the same coalescing boundary replaced this demand.
   public static let superseded: RenderResult = .init(rawValue: 4)
+  /// The demand's timeout elapsed before driver work began.
   public static let deadlineMissed: RenderResult = .init(rawValue: 5)
 }
 
+/// Any-thread render-session snapshot.
+///
+/// See `mln_render_session_snapshot` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
+  /// One `mln_render_session_state` value.
   public var state: RenderSessionState
+  /// One `mln_render_driver_kind` value.
   public var driver: RenderDriverKind
+  /// Most recent terminal `mln_render_result` value.
   public var latestResult: RenderResult
   public var extent: RenderTargetExtent
   public var generation: UInt64
@@ -254,6 +312,10 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   }
 }
 
+/// Render-session lifecycle visible in snapshots.
+///
+/// See `mln_render_session_state` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 public struct RenderSessionState: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {

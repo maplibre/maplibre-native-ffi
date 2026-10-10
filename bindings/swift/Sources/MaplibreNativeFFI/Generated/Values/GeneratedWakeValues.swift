@@ -3,6 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Receiver wake callback copied by a successful owning call.
+///
+/// See `mln_wake` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 public struct Wake: Sendable {
   public var callback: (@Sendable () throws -> Void)?
   public init(callback: (@Sendable () throws -> Void)? = nil) {
@@ -10,11 +14,7 @@ public struct Wake: Sendable {
   }
 
   public static var `default`: Self {
-    try! Self(raw: mln_wake())
-  }
-
-  init(raw _: mln_wake) throws {
-    callback = nil
+    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_wake {

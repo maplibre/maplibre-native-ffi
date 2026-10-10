@@ -7,6 +7,14 @@ namespace Maplibre.NativeFfi;
 
 public sealed unsafe partial class HttpHeaderTransformResponse
 {
+    /// <summary>
+    /// Sets one outgoing HTTP request header for the current transform
+    /// invocation.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_http_header_transform_response_set</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public void Set(string name, string value)
     {
         using var call = Enter(this, "mln_http_header_transform_response_set");

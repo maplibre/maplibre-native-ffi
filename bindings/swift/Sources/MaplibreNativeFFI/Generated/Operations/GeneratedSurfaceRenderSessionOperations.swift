@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  /// Calls `mln_metal_surface_set_target`.
+  /// Starts an ordered Metal surface replacement.
+  ///
+  /// See `mln_metal_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func metalSurfaceSetTarget(
     descriptor bindingArg0: MetalSurfaceDescriptor
   ) async throws {
@@ -18,7 +21,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_opengl_surface_set_target`.
+  /// Starts an ordered OpenGL surface replacement.
+  ///
+  /// See `mln_opengl_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func openglSurfaceSetTarget(
     descriptor bindingArg0: OpenglSurfaceDescriptor
   ) async throws {
@@ -32,7 +38,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_vulkan_surface_set_target`.
+  /// Starts an ordered Vulkan surface replacement.
+  ///
+  /// See `mln_vulkan_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func vulkanSurfaceSetTarget(
     descriptor bindingArg0: VulkanSurfaceDescriptor
   ) async throws {
@@ -46,7 +55,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_webgpu_surface_set_target`.
+  /// Starts an ordered WebGPU surface replacement.
+  ///
+  /// See `mln_webgpu_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func webgpuSurfaceSetTarget(
     descriptor bindingArg0: WebgpuSurfaceDescriptor
   ) async throws {

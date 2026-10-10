@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// One atomic absolute camera update.
+/// </summary>
+/// <remarks>
+/// See <c>mln_camera_update</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+/// </remarks>
 public readonly partial record struct CameraUpdate(
     CameraUpdateMode Mode,
     CameraOptions Camera,

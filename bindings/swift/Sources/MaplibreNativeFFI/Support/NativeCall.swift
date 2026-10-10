@@ -91,6 +91,24 @@ extension NativeReceiver {
     try nativeInvoke(operation, access, call) { () }
   }
 
+  /// Calls a status-returning function like `nativeInvoke`, except that
+  /// `absent` reports that native published no output, and returns nil.
+  func nativeInvoke<T>(
+    _ operation: String,
+    _ access: NativeAccess = .live,
+    absentOn absent: mln_status,
+    _ call: NativeStatusCall,
+    result: () throws -> T
+  ) throws -> T? {
+    var present = true
+    return try nativeInvoke(operation, access, { raw, arena, diagnostic in
+      let status = try call(raw, arena, diagnostic)
+      guard status == absent else { return status }
+      present = false
+      return MLN_STATUS_OK
+    }) { present ? try result() : nil }
+  }
+
   /// Starts work and awaits the value `convert` copies from its completion.
   func nativeStart<T: Sendable>(
     _ operation: String,
@@ -290,6 +308,24 @@ func nativeInvoke(
   _ call: NativeStatusCall
 ) throws {
   try nativeInvoke(owner: owner, operation, call) { () }
+}
+
+/// Calls a status-returning function like `nativeInvoke`, except that
+/// `absent` reports that native published no output, and returns nil.
+func nativeInvoke<T>(
+  owner: AnyObject? = nil,
+  _ operation: String,
+  absentOn absent: mln_status,
+  _ call: NativeStatusCall,
+  result: () throws -> T
+) throws -> T? {
+  var present = true
+  return try nativeInvoke(owner: owner, operation, { raw, arena, diagnostic in
+    let status = try call(raw, arena, diagnostic)
+    guard status == absent else { return status }
+    present = false
+    return MLN_STATUS_OK
+  }) { present ? try result() : nil }
 }
 
 /// Starts global work and awaits the value `convert` copies from its

@@ -43,6 +43,16 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
     Status.check(status) { NativeDiagnostics.message(NativeDiagnostics.buffer()) }
   }
 
+  /**
+   * Checks [status] like [check], except that [absent] reports that native published no output.
+   * Returns whether the output holds a value.
+   */
+  fun present(status: Int, absent: Int): Boolean {
+    if (status == absent) return false
+    check(status)
+    return true
+  }
+
   /** Roots the registrations native accepted in [owner]. */
   fun accept(owner: CallbackOwner) {
     scope?.accept(owner)

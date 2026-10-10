@@ -26,12 +26,27 @@ class DartEmitterTests(unittest.TestCase):
     def test_generated_values_and_keyword_parameters_round_trip(self):
         dart_tool = require_tool(self, "dart", BINDING)
         clang = require_tool(self, "clang")
-        header = protocol_header(groups=("values", "keywords"))
+        header = protocol_header(
+            groups=(
+                "values",
+                "keywords",
+                "defaults",
+                "default_registration",
+                "absent_value",
+            )
+        )
         api = parse_sources({"api.h": header})
         validate(api)
         self.assertEqual(
             set(dart.coverage(api)["generated"]),
-            {"mln_keyword_combine", "mln_probe_roundtrip"},
+            {
+                "mln_keyword_combine",
+                "mln_probe_hooks_default",
+                "mln_probe_read_level",
+                "mln_probe_roundtrip",
+                "mln_probe_settings_check",
+                "mln_probe_settings_default",
+            },
         )
         with TemporaryDirectory() as directory:
             root = Path(directory)

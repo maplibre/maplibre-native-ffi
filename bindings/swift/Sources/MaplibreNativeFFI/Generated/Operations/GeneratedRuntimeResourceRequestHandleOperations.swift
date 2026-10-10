@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension ResourceRequestHandle {
-  /// Calls `mln_resource_request_cancelled`.
+  /// Reports whether MapLibre has cancelled a C API resource provider request.
+  ///
+  /// See `mln_resource_request_cancelled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func cancelled() throws -> Bool {
     var value0 = false
     return try nativeInvoke("mln_resource_request_cancelled") { raw, _, diagnostic in
@@ -16,7 +19,10 @@ public extension ResourceRequestHandle {
     } result: { value0 }
   }
 
-  /// Calls `mln_resource_request_complete`.
+  /// Completes a C API resource provider request.
+  ///
+  /// See `mln_resource_request_complete` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func complete(response bindingArg0: ResourceResponse) throws {
     try nativeInvoke("mln_resource_request_complete",
                      .claim)
@@ -27,13 +33,22 @@ public extension ResourceRequestHandle {
     ) }
   }
 
+  /// Releases the provider's reference to a resource request handle.
+  ///
+  /// See `mln_resource_request_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func close() throws {
     try nativeClose("mln_resource_request_release") { raw in
       mln_resource_request_release(raw)
     }
   }
 
-  /// Calls `mln_resource_request_wait_until_retired`.
+  /// Blocks until a resource request is released and its cancel callback
+  /// registration has retired: the callback, if it ran, and release_user_data
+  /// have both returned. Completing a request does not release its owner.
+  ///
+  /// See `mln_resource_request_wait_until_retired` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func waitUntilRetired() throws {
     try nativeInvoke("mln_resource_request_wait_until_retired",
                      .issued)
@@ -45,6 +60,11 @@ public extension ResourceRequestHandle {
 }
 
 public extension ResourceRequestHandle {
+  /// Registers a callback that runs when MapLibre cancels a C API resource
+  /// provider request.
+  ///
+  /// See `mln_resource_request_set_cancel_callback` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func setCancelCallback(_ callback: @escaping @Sendable () throws
     -> Void) throws -> Bool
   {

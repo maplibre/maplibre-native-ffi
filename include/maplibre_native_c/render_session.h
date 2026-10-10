@@ -81,8 +81,13 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
 /** One nonblocking request for a frame. */
 typedef struct mln_frame_demand {
   uint32_t size;
-  /** A bitwise OR of mln_frame_demand_flag values. */
-  uint32_t flags MLN_BINDING("enum=mln_frame_demand_flag");
+  /**
+   * A bitwise OR of mln_frame_demand_flag values. Defaults to
+   * MLN_FRAME_DEMAND_IF_NEEDED.
+   */
+  uint32_t flags MLN_BINDING(
+    "enum=mln_frame_demand_flag;default=MLN_FRAME_DEMAND_IF_NEEDED"
+  );
   /** Host identity returned with the terminal frame result. */
   uint64_t token;
   /** Demands coalesce only when this value and their flags match. */
@@ -226,13 +231,14 @@ MLN_API mln_status mln_render_session_request_frame(
  * - MLN_STATUS_OK when a batch is published in *out_batch.
  * - MLN_STATUS_NOT_READY when no frame result is queued. This is not an error:
  *   *out_batch is left unchanged, no batch is allocated, and the caller retries
- *   after the next demand.
+ *   after the next demand. Bindings return their language's empty form instead
+ *   of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when session has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=event_batch")
+MLN_BINDING("execution=event_batch;absent_on=MLN_STATUS_NOT_READY")
 MLN_API mln_status mln_render_session_drain_frame_results(
   mln_render_session session,
   mln_render_frame_batch* out_batch MLN_BINDING("direction=out"),
@@ -283,7 +289,8 @@ MLN_API void mln_render_frame_batch_release(
  * - MLN_STATUS_OK when a frame is published in *out_frame.
  * - MLN_STATUS_NOT_READY when no rendered frame is available. This is not an
  *   error: *out_frame is left unchanged, and the caller retries after the next
- *   demand reports MLN_RENDER_RESULT_RENDERED.
+ *   demand reports MLN_RENDER_RESULT_RENDERED. Bindings return their
+ *   language's empty form instead of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_frame
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
@@ -291,6 +298,7 @@ MLN_API void mln_render_frame_batch_release(
  *   MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
+MLN_BINDING("absent_on=MLN_STATUS_NOT_READY")
 MLN_API mln_status mln_render_session_acquire_frame(
   mln_render_session session,
   mln_acquired_frame* out_frame MLN_BINDING("direction=out"),

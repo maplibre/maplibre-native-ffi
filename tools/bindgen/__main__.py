@@ -9,7 +9,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import copy_cases
+from . import copy_cases, default_cases
 from .compiler import compile_api
 from .frontend import parse_headers
 from .model import Api, ModelError
@@ -17,6 +17,8 @@ from .schema import validate
 from .semantic import support_relation
 
 ROOT = Path(__file__).resolve().parents[2]
+# The coverage report also lists every output, so the next run finds stale ones.
+COVERAGE = "bindings/generated-coverage.json"
 
 
 def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
@@ -39,6 +41,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
     outputs = native_capture.generate(bound)
     outputs.update(native_results.generate(bound))
     outputs.update(copy_cases.generate(bound))
+    outputs.update(default_cases.generate(bound))
     for directory, emitter in (
         ("bindings/go", go),
         ("bindings/dotnet/src/Maplibre.NativeFfi", dotnet),
@@ -108,7 +111,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
         "files": sorted(outputs),
         "languages": reports,
     }
-    outputs["bindings/generated-coverage.json"] = dprint_format(
+    outputs[COVERAGE] = dprint_format(
         json.dumps(report, indent=2, sort_keys=True) + "\n", "json"
     )
     return outputs, report
@@ -221,46 +224,80 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
     return {path: (staging / path).read_text() for path in outputs}
 
 
-def generated_files(root: Path = ROOT) -> set[str]:
-    """Find generated files on disk, stale ones included, by their header line."""
-    candidates = [
-        root / "bindings/.gitattributes",
-        root / "bindings/go/generated_api.go",
-        root / "bindings/go/generated_callbacks.h",
-        root / "bindings/go/generated_callbacks.c",
-        root / "include/maplibre_native_c/callback_capture_generated.h",
-        root / "src/c_api/callback_capture_generated.inc",
-        root / "src/c_api/callback_port_generated.inc",
-        root / "src/completion/completion_result_generated.inc",
-        root / copy_cases.PATH,
+CONFLICT_MARKERS = ("<<<<<<<", "|||||||", "=======", ">>>>>>>")
+
+
+def recorded_files(text: str) -> list[str] | None:
+    """Return the `files` entries of a coverage report, or None without one.
+
+    A report that a merge left with conflict markers is not JSON, so this
+    reads the one entry per line that the report holds instead, and keeps the
+    entries from every side of each conflict.
+    """
+    try:
+        recorded = json.loads(text)
+    except ValueError:
+        pass
+    else:
+        files = recorded.get("files") if isinstance(recorded, dict) else None
+        if isinstance(files, list) and all(isinstance(path, str) for path in files):
+            return files
+        return None
+    lines = iter(text.splitlines())
+    if not any(line.strip() == '"files": [' for line in lines):
+        return None
+    files = []
+    for line in lines:
+        entry = line.strip()
+        if entry in ("]", "],"):
+            return files
+        if entry.startswith(CONFLICT_MARKERS):
+            continue
+        try:
+            path = json.loads(entry.removesuffix(","))
+        except ValueError:
+            return None
+        if not isinstance(path, str):
+            return None
+        files.append(path)
+    return None
+
+
+def previous_outputs(root: Path) -> set[str]:
+    """Read the outputs that the last run recorded in its coverage report."""
+    manifest = root / COVERAGE
+    if not manifest.is_file():
+        return set()
+    files = recorded_files(manifest.read_text())
+    if files is None:
+        message = "cannot read the previous output list; resolve or restore the file"
+        raise ModelError([f"{COVERAGE}: {message}, then regenerate"])
+    unsafe = [
+        path for path in files if Path(path).is_absolute() or ".." in Path(path).parts
     ]
-    candidates.extend((root / "bindings/dotnet/src").rglob("*.g.cs"))
-    candidates.extend((root / "bindings/kotlin/src/androidMain/jni").glob("*.c"))
-    for language in ("rust", "python", "swift", "dart", "kotlin", "zig"):
-        candidates.extend(
-            path
-            for path in (root / "bindings" / language).rglob("*")
-            if path.suffix in {".rs", ".swift", ".dart", ".py", ".pyi", ".kt", ".zig"}
-            and not any(
-                part in {"build", ".build", ".dart_tool", ".venv", "target"}
-                for part in path.parts
-            )
+    if unsafe:
+        raise ModelError(
+            [
+                f"{COVERAGE}: output path outside the repository: {path}"
+                for path in unsafe
+            ]
         )
-    return {
-        path.relative_to(root).as_posix()
-        for path in candidates
-        if path.is_file() and "tools/bindgen" in path.read_text()[:160].split("\n")[0]
-    }
+    return set(files)
 
 
 def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -> int:
-    """Write or check the outputs under `root` and return the exit status."""
+    """Write or check the outputs under `root` and return the exit status.
+
+    A file that the previous run recorded and this run no longer writes is
+    stale: a check reports it, and a generation deletes it.
+    """
+    previous = previous_outputs(root)
     (root / "build").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(
         prefix="bindgen-", dir=root / "build"
     ) as directory:
         outputs, report = render(api, Path(directory))
-    stale = generated_files(root) - outputs.keys()
+    stale = {path for path in previous - outputs.keys() if (root / path).is_file()}
     different = [
         path
         for path, source in outputs.items()

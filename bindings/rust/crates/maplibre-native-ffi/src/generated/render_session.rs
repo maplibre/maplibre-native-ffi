@@ -3,11 +3,19 @@ use super::*;
 
 native_owner! {
     /// Owns one `mln_render_session` native handle.
+    ///
+    /// A render session, which renders one map to one render target.
+    ///
+    /// See `mln_render_session` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, out_diagnostic) });
 }
 
 impl RenderSessionHandle {
-    /// Calls `mln_metal_borrowed_texture_set_target`.
+    /// Starts an ordered caller-owned Metal texture replacement.
+    ///
+    /// See `mln_metal_borrowed_texture_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -30,7 +38,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_metal_surface_set_target`.
+    /// Starts an ordered Metal surface replacement.
+    ///
+    /// See `mln_metal_surface_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -48,7 +59,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_opengl_borrowed_texture_set_target`.
+    /// Starts an ordered caller-owned OpenGL texture replacement.
+    ///
+    /// See `mln_opengl_borrowed_texture_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -71,7 +85,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_opengl_surface_set_target`.
+    /// Starts an ordered OpenGL surface replacement.
+    ///
+    /// See `mln_opengl_surface_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -89,7 +106,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_abandon`.
+    /// Irreversibly closes control and mailboxes without graphics calls.
+    ///
+    /// See `mln_render_session_abandon` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn abandon(&self) -> Result<RenderAbandonResult> {
         let mut call = self.inner.call("mln_render_session_abandon")?;
         let mut out_result: sys::mln_render_abandon_result = unsafe { std::mem::zeroed() };
@@ -100,18 +120,31 @@ impl RenderSessionHandle {
         Ok(unsafe { from_native(out_result) }?)
     }
 
-    /// Calls `mln_render_session_acquire_frame`.
-    pub fn acquire_frame(&self) -> Result<AcquiredFrameHandle> {
+    /// Acquires the oldest rendered frame that is not already acquired. The
+    /// frame owns its slot until release. The call is nonblocking.
+    ///
+    /// See `mln_render_session_acquire_frame` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn acquire_frame(&self) -> Result<Option<AcquiredFrameHandle>> {
         let mut call = self.inner.call("mln_render_session_acquire_frame")?;
-        let parent = self.inner.parent();
         let mut out_frame = sys::mln_acquired_frame(0);
-        call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_acquire_frame(session, &mut out_frame, out_diagnostic)
-        })?;
-        Ok(AcquiredFrameHandle::adopt(out_frame, parent)?)
+        if !call.status_unless(
+            sys::MLN_STATUS_NOT_READY,
+            |session, out_diagnostic| unsafe {
+                sys::mln_render_session_acquire_frame(session, &mut out_frame, out_diagnostic)
+            },
+        )? {
+            return Ok(None);
+        }
+        let parent = self.inner.parent();
+        Ok(Some(AcquiredFrameHandle::adopt(out_frame, parent)?))
     }
 
-    /// Calls `mln_render_session_barrier`.
+    /// Starts a barrier that completes after all render work accepted before it
+    /// has a terminal result. A barrier does not request a frame.
+    ///
+    /// See `mln_render_session_barrier` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn barrier(&self) -> Result<NativeFuture<()>> {
         let call = self.inner.call("mln_render_session_barrier")?;
         call.complete(
@@ -122,7 +155,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_clear_data`.
+    /// Starts asynchronous renderer-data clearing.
+    ///
+    /// See `mln_render_session_clear_data` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn clear_data(&self) -> Result<NativeFuture<()>> {
         let call = self.inner.call("mln_render_session_clear_data")?;
         call.complete(
@@ -133,7 +169,13 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_destroy`.
+    /// Retires a detached or abandoned session handle. The call is CPU-only and
+    /// may run on any native thread, including from one of the session's own
+    /// completions. If an abandonment is still in progress on another thread,
+    /// this waits for it to finish before consuming the session owner.
+    ///
+    /// See `mln_render_session_destroy` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn destroy(&self) -> Result<()> {
         self.inner.close(|session| {
             let mut call = Call::new(session, None);
@@ -143,7 +185,10 @@ impl RenderSessionHandle {
         })
     }
 
-    /// Calls `mln_render_session_detach`.
+    /// Starts normal graphics-owner teardown and map detachment.
+    ///
+    /// See `mln_render_session_detach` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn detach(&self) -> Result<NativeFuture<()>> {
         let call = self.inner.call("mln_render_session_detach")?;
         call.complete(
@@ -154,7 +199,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_dispose`.
+    /// Consumes a session and schedules CPU-side abandonment and destruction.
+    ///
+    /// See `mln_render_session_dispose` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dispose(&self) -> Result<()> {
         self.inner.close(|session| {
             let mut call = Call::new(session, None);
@@ -164,17 +212,30 @@ impl RenderSessionHandle {
         })
     }
 
-    /// Calls `mln_render_session_drain_frame_results`.
-    pub fn drain_frame_results(&self) -> Result<RenderFrameBatchHandle> {
+    /// Drains every currently queued terminal frame result into an
+    /// independently owned batch. The records remain stable until the batch is
+    /// released.
+    ///
+    /// See `mln_render_session_drain_frame_results` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn drain_frame_results(&self) -> Result<Option<RenderFrameBatchHandle>> {
         let mut call = self.inner.call("mln_render_session_drain_frame_results")?;
         let mut out_batch = sys::mln_render_frame_batch(0);
-        call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_drain_frame_results(session, &mut out_batch, out_diagnostic)
-        })?;
-        Ok(RenderFrameBatchHandle::adopt(out_batch, None)?)
+        if !call.status_unless(
+            sys::MLN_STATUS_NOT_READY,
+            |session, out_diagnostic| unsafe {
+                sys::mln_render_session_drain_frame_results(session, &mut out_batch, out_diagnostic)
+            },
+        )? {
+            return Ok(None);
+        }
+        Ok(Some(RenderFrameBatchHandle::adopt(out_batch, None)?))
     }
 
-    /// Calls `mln_render_session_dump_debug_logs`.
+    /// Starts asynchronous renderer diagnostic-log emission.
+    ///
+    /// See `mln_render_session_dump_debug_logs` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn dump_debug_logs(&self) -> Result<NativeFuture<()>> {
         let call = self.inner.call("mln_render_session_dump_debug_logs")?;
         call.complete(
@@ -185,7 +246,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_get_capabilities`.
+    /// Returns the immutable capabilities fixed during attachment.
+    ///
+    /// See `mln_render_session_get_capabilities` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_capabilities(&self) -> Result<RenderSessionCapabilities> {
         let mut call = self.inner.call("mln_render_session_get_capabilities")?;
         let mut out_capabilities: sys::mln_render_session_capabilities =
@@ -197,7 +261,10 @@ impl RenderSessionHandle {
         Ok(unsafe { from_native(out_capabilities) }?)
     }
 
-    /// Calls `mln_render_session_get_snapshot`.
+    /// Copies the latest render-session snapshot from any native thread.
+    ///
+    /// See `mln_render_session_get_snapshot` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get_snapshot(&self) -> Result<RenderSessionSnapshot> {
         let mut call = self.inner.call("mln_render_session_get_snapshot")?;
         let mut out_snapshot: sys::mln_render_session_snapshot = unsafe { std::mem::zeroed() };
@@ -208,7 +275,14 @@ impl RenderSessionHandle {
         Ok(unsafe { from_native(out_snapshot) }?)
     }
 
-    /// Calls `mln_render_session_projection_create`.
+    /// Copies the last completed rendered transform into an independent
+    /// projection. Callable from any thread. Returns invalid state before a
+    /// completed render, after an extent or target change, or after detachment.
+    /// The caller owns the returned projection, which remains usable after the
+    /// session is released. out_projection must point to a null handle.
+    ///
+    /// See `mln_render_session_projection_create` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn projection_create(&self) -> Result<MapProjectionHandle> {
         let mut call = self.inner.call("mln_render_session_projection_create")?;
         let mut out_projection = sys::mln_map_projection(0);
@@ -218,7 +292,12 @@ impl RenderSessionHandle {
         Ok(MapProjectionHandle::adopt(out_projection, None)?)
     }
 
-    /// Calls `mln_render_session_query_feature_extensions`.
+    /// Starts a feature-extension query against the latest driver state. The
+    /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
+    /// 1), valid only for the callback.
+    ///
+    /// See `mln_render_session_query_feature_extensions` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     pub fn query_feature_extensions(
         &self,
         source_id: &str,
@@ -252,7 +331,11 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_query_rendered_features`.
+    /// Starts a rendered-feature query against the session's latest driver
+    /// state.
+    ///
+    /// See `mln_render_session_query_rendered_features` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     pub fn query_rendered_features(
         &self,
         geometry: &RenderedQueryGeometry,
@@ -277,7 +360,12 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_query_source_features`.
+    /// Starts a source-feature query against the session's latest driver state.
+    /// The completion borrows an array of `mln_queried_feature` values
+    /// (value_count entries), valid only for the callback.
+    ///
+    /// See `mln_render_session_query_source_features` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     pub fn query_source_features(
         &self,
         source_id: &str,
@@ -302,7 +390,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_reduce_memory_use`.
+    /// Starts best-effort release of renderer caches.
+    ///
+    /// See `mln_render_session_reduce_memory_use` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn reduce_memory_use(&self) -> Result<NativeFuture<()>> {
         let call = self.inner.call("mln_render_session_reduce_memory_use")?;
         call.complete(
@@ -313,7 +404,12 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_render_session_request_frame`.
+    /// Requests a frame without waiting. Every accepted demand produces one
+    /// terminal result record. A core worker wakes itself; a caller driver
+    /// publishes its driver-work endpoint.
+    ///
+    /// See `mln_render_session_request_frame` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn request_frame(&self, demand: &FrameDemand) -> Result<()> {
         let mut call = self.inner.call("mln_render_session_request_frame")?;
         let demand = call.reference(&demand)?;
@@ -323,7 +419,11 @@ impl RenderSessionHandle {
         Ok(())
     }
 
-    /// Calls `mln_render_session_resize`.
+    /// Starts an ordered logical resize. The completion runs after the selected
+    /// driver applies the extent and updates the map viewport.
+    ///
+    /// See `mln_render_session_resize` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn resize(&self, extent: &RenderTargetExtent) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call("mln_render_session_resize")?;
         let extent = call.reference(&extent)?;
@@ -332,7 +432,14 @@ impl RenderSessionHandle {
         })
     }
 
-    /// Calls `mln_render_session_service_driver_work`.
+    /// Services up to max_work items for a caller-graphics-thread driver; zero
+    /// services every item currently queued. The first successful service call
+    /// fixes the session's graphics-thread identity; later calls from another
+    /// native thread return `MLN_STATUS_WRONG_THREAD`. The target context must
+    /// be current. Core-worker sessions return `MLN_STATUS_INVALID_STATE`.
+    ///
+    /// See `mln_render_session_service_driver_work` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn service_driver_work(&self, max_work: usize) -> Result<usize> {
         let mut call = self.inner.call("mln_render_session_service_driver_work")?;
         let mut out_serviced: usize = Default::default();
@@ -347,7 +454,10 @@ impl RenderSessionHandle {
         Ok(out_serviced)
     }
 
-    /// Calls `mln_texture_read_premultiplied_rgba8`.
+    /// Starts readback of the latest rendered texture frame.
+    ///
+    /// See `mln_texture_read_premultiplied_rgba8` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn texture_read_premultiplied_rgba8(&self) -> Result<NativeFuture<TextureReadbackResult>> {
         let call = self.inner.call("mln_texture_read_premultiplied_rgba8")?;
         call.complete(
@@ -358,7 +468,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_vulkan_borrowed_texture_set_target`.
+    /// Starts an ordered caller-owned Vulkan texture replacement.
+    ///
+    /// See `mln_vulkan_borrowed_texture_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -381,7 +494,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_vulkan_surface_set_target`.
+    /// Starts an ordered Vulkan surface replacement.
+    ///
+    /// See `mln_vulkan_surface_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -399,7 +515,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_webgpu_borrowed_texture_set_target`.
+    /// Starts an ordered caller-owned WebGPU texture replacement.
+    ///
+    /// See `mln_webgpu_borrowed_texture_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
@@ -422,7 +541,10 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Calls `mln_webgpu_surface_set_target`.
+    /// Starts an ordered WebGPU surface replacement.
+    ///
+    /// See `mln_webgpu_surface_set_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.

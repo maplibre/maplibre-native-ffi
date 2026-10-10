@@ -316,18 +316,6 @@ fn generated_copy_mln_custom_geometry_source_options(
     value: &sys::mln_custom_geometry_source_options,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("fetch_tile", py.None())?;
-    if value.fetch_tile.is_some() {
-        return Err(native_error(
-            "native callback cannot be copied into a Python closure",
-        ));
-    }
-    dict.set_item("cancel_tile", py.None())?;
-    if value.cancel_tile.is_some() {
-        return Err(native_error(
-            "native callback cannot be copied into a Python closure",
-        ));
-    }
     dict.set_item(
         "min_zoom",
         generated_optional(
@@ -428,18 +416,6 @@ fn generated_copy_mln_custom_mvt_vector_source_options(
     value: &sys::mln_custom_mvt_vector_source_options,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("fetch_tile", py.None())?;
-    if value.fetch_tile.is_some() {
-        return Err(native_error(
-            "native callback cannot be copied into a Python closure",
-        ));
-    }
-    dict.set_item("cancel_tile", py.None())?;
-    if value.cancel_tile.is_some() {
-        return Err(native_error(
-            "native callback cannot be copied into a Python closure",
-        ));
-    }
     dict.set_item(
         "min_zoom",
         generated_optional(
@@ -1363,26 +1339,6 @@ unsafe extern "C" fn generated_callback_mln_queue_lock_unlock(user_data: *mut st
     )
 }
 
-fn generated_copy_mln_queue_lock(
-    py: Python<'_>,
-    value: &sys::mln_queue_lock,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("lock", py.None())?;
-    if value.lock.is_some() {
-        return Err(native_error(
-            "native callback cannot be copied into a Python closure",
-        ));
-    }
-    dict.set_item("unlock", py.None())?;
-    if value.unlock.is_some() {
-        return Err(native_error(
-            "native callback cannot be copied into a Python closure",
-        ));
-    }
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_render_abandon_result(
     py: Python<'_>,
     value: &sys::mln_render_abandon_result,
@@ -1428,18 +1384,6 @@ fn generated_copy_mln_render_session_attach_options(
     dict.set_item(
         "requested_texture_ring_depth",
         generated_value(py, value.requested_texture_ring_depth)?,
-    )?;
-    dict.set_item(
-        "frame_wake",
-        generated_copy_mln_wake(py, &value.frame_wake)?,
-    )?;
-    dict.set_item(
-        "driver_work_wake",
-        generated_copy_mln_wake(py, &value.driver_work_wake)?,
-    )?;
-    dict.set_item(
-        "queue_lock",
-        generated_copy_mln_queue_lock(py, &value.queue_lock)?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1927,10 +1871,6 @@ fn generated_copy_mln_runtime_options(
         generated_c_string(py, value.cache_path, true)
     }?)?;
     dict.set_item("event_mask", generated_value(py, value.event_mask)?)?;
-    dict.set_item(
-        "event_wake",
-        generated_copy_mln_wake(py, &value.event_wake)?,
-    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2637,17 +2577,6 @@ unsafe extern "C" fn generated_callback_mln_wake_callback(user_data: *mut std::f
             Ok(())
         },
     )
-}
-
-fn generated_copy_mln_wake(py: Python<'_>, value: &sys::mln_wake) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("callback", py.None())?;
-    if value.callback.is_some() {
-        return Err(native_error(
-            "native callback cannot be copied into a Python closure",
-        ));
-    }
-    Ok(dict.into_any().unbind())
 }
 
 fn generated_copy_mln_webgl_context_descriptor(
@@ -8483,11 +8412,14 @@ impl RenderSessionHandle {
             GeneratedCall::new(py, "mln_render_session_acquire_frame", self.admission())?;
         let handle = self.live()?;
         let mut out_frame: sys::mln_acquired_frame = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
+        let result = unsafe {
+            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
                 sys::mln_render_session_acquire_frame(handle, &mut out_frame, diagnostic)
             })
-        }?;
+        };
+        if !result? {
+            return Ok(py.None());
+        }
         unsafe { AcquiredFrameHandle::adopt(py, out_frame, Vec::new()) }
     }
     #[pyo3(signature = ())]
@@ -8552,11 +8484,14 @@ impl RenderSessionHandle {
         )?;
         let handle = self.live()?;
         let mut out_batch: sys::mln_render_frame_batch = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
+        let result = unsafe {
+            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
                 sys::mln_render_session_drain_frame_results(handle, &mut out_batch, diagnostic)
             })
-        }?;
+        };
+        if !result? {
+            return Ok(py.None());
+        }
         unsafe { RenderFrameBatchHandle::adopt(py, out_batch, Vec::new()) }
     }
     #[pyo3(signature = ())]

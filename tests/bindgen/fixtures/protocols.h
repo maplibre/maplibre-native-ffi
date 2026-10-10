@@ -14,10 +14,11 @@
 #if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
-#if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) || \
-  defined(MLN_PROTOCOL_PRESENCE_MASK) ||                              \
-  defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                         \
-  defined(MLN_PROTOCOL_ABI_VERSION)
+#if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) ||    \
+  defined(MLN_PROTOCOL_PRESENCE_MASK) ||                                 \
+  defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                            \
+  defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) || \
+  defined(MLN_PROTOCOL_DEFAULT_REGISTRATION)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -114,7 +115,7 @@ typedef unsigned long long mln_map
 void mln_map_close(mln_map map);
 #elif defined(MLN_PROTOCOL_MAP_RELEASE)
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
-void mln_map_release(mln_map map BIND("consumes=always"));
+void mln_map_release(mln_map map);
 #else
 typedef unsigned long long mln_map;
 #endif
@@ -150,6 +151,62 @@ mln_status mln_probe_nullable_text(
   mln_probe_text_result* out_result BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
+#endif
+
+#ifdef MLN_PROTOCOL_DEFAULTS
+// A record whose native default holds nonzero values: a scalar of each kind,
+// an enumerator, a bitmask with one flag and with several, and a nested record
+// with defaults of its own. A binding builds it from language defaults.
+typedef enum mln_probe_mode : uint32_t {
+  MLN_PROBE_MODE_FIRST = 1,
+  MLN_PROBE_MODE_SECOND = 2,
+} mln_probe_mode;
+typedef enum BIND("kind=bitmask") mln_probe_flag : uint32_t {
+  MLN_PROBE_FLAG_NONE = 0,
+  MLN_PROBE_FLAG_NORTH = 1,
+  MLN_PROBE_FLAG_SOUTH = 2,
+  MLN_PROBE_FLAG_ALL = 3,
+} mln_probe_flag;
+typedef struct mln_probe_extent {
+  uint32_t width BIND("default=256");
+  double scale BIND("default=1.5");
+} mln_probe_extent;
+typedef struct mln_probe_settings {
+  uint32_t size;
+  mln_probe_extent extent;
+  uint32_t mode BIND("enum=mln_probe_mode;default=MLN_PROBE_MODE_SECOND");
+  uint32_t flags BIND("enum=mln_probe_flag;default=MLN_PROBE_FLAG_ALL");
+  uint32_t heading BIND("enum=mln_probe_flag;default=MLN_PROBE_FLAG_SOUTH");
+  float ratio BIND("default=0.25");
+  int32_t offset BIND("default=-3");
+  bool enabled BIND("default=true");
+  int32_t count;
+} mln_probe_settings;
+mln_probe_settings mln_probe_settings_default(void);
+// Succeeds when every field of `settings` equals the native default, and
+// otherwise names the first field that differs.
+mln_status mln_probe_settings_check(
+  mln_probe_settings settings, mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_DEFAULT_REGISTRATION
+// A record default that holds a callback registration with its callback null.
+// A copy of the default keeps the limit and leaves the registration unset.
+typedef void (*mln_probe_notify)(void* user_data, uint32_t count);
+typedef void (*mln_probe_notify_release)(void* user_data);
+typedef struct mln_probe_signal {
+  uint32_t size;
+  mln_probe_notify callback BIND("nullable=true");
+  void* user_data BIND("kind=context");
+  mln_probe_notify_release release_user_data;
+} mln_probe_signal BIND("kind=callback_registration;release=release_user_data");
+typedef struct mln_probe_hooks {
+  uint32_t size;
+  uint32_t limit BIND("default=4");
+  mln_probe_signal signal;
+} mln_probe_hooks;
+mln_probe_hooks mln_probe_hooks_default(void);
 #endif
 
 #ifdef MLN_PROTOCOL_KEYWORDS
@@ -259,9 +316,9 @@ mln_status mln_map_set_label(
 
 #ifdef MLN_PROTOCOL_PLAN_NAMES
 // Names that the semantic plan derives once for every binding: a handle whose
-// operations begin with a prefix other than its type name, an explicit member
-// name, a record whose field order is its meaning, and presence groups whose
-// record name shares no prefix with its bit constants.
+// operations begin with a prefix other than its type name, a record whose field
+// order is its meaning, and presence groups whose record name shares no prefix
+// with its bit constants.
 typedef uint64_t mln_pass_handle BIND(
   "kind=handle;release=mln_pass_close;dispose=mln_pass_close;prefix=mln_pass"
 );
@@ -269,7 +326,6 @@ void mln_pass_close(mln_pass_handle pass);
 mln_status mln_pass_redeem(
   mln_pass_handle pass, mln_diagnostic* out_diagnostic
 );
-BIND("name=punch")
 mln_status mln_pass_stamp(mln_pass_handle pass, mln_diagnostic* out_diagnostic);
 typedef struct mln_point {
   double x;
@@ -362,7 +418,6 @@ mln_status mln_measurement_read(
   mln_measurement owner, double* out_value BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
-BIND("receiver=measurement")
 mln_status mln_measurement_take_sample(
   mln_measurement measurement,
   mln_sample_handle* out_sample BIND("direction=out"),
@@ -384,7 +439,7 @@ typedef struct mln_sample_options {
   void* context BIND("kind=context");
   mln_sample_release release;
 } mln_sample_options BIND("kind=callback_registration;release=release");
-BIND("receiver=map;execution=command")
+BIND("execution=command")
 mln_status mln_map_observe_sample(
   mln_map map, const mln_sample_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -476,6 +531,28 @@ BIND("registration=callback;release_callback=release")
 mln_status mln_notice_set_callback(
   mln_notice_callback callback, void* context BIND("kind=context"),
   mln_notice_release release, mln_diagnostic* out_diagnostic
+);
+#endif
+
+// Outputs that a failure status reports as absent: each call first finds
+// nothing, then publishes its output, and then fails.
+#ifdef MLN_PROTOCOL_ABSENT_HANDLE
+typedef unsigned long long mln_probe_parcel BIND(
+  "kind=handle;release=mln_probe_parcel_release;dispose=mln_probe_parcel_"
+  "release"
+);
+void mln_probe_parcel_release(mln_probe_parcel parcel);
+BIND("absent_on=MLN_STATUS_NOT_READY")
+mln_status mln_probe_take_parcel(
+  mln_probe_parcel* out_parcel BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_ABSENT_VALUE
+BIND("absent_on=MLN_STATUS_NOT_READY")
+mln_status mln_probe_read_level(
+  double* out_level BIND("direction=out"), mln_diagnostic* out_diagnostic
 );
 #endif
 

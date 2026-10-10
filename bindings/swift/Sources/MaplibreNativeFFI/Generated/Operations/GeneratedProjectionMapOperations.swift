@@ -4,7 +4,12 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Calls `mln_map_projection_create`.
+  /// Starts creation of a standalone projection from the map's ordered
+  /// transform
+  /// state.
+  ///
+  /// See `mln_map_projection_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func projectionCreate() async throws -> MapProjectionHandle {
     try await nativeStart(
       "mln_map_projection_create",

@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// One query hit borrowed for a completion callback.
+/// </summary>
+/// <remarks>
+/// See <c>mln_queried_feature</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html">C API reference</see>.
+/// </remarks>
 public sealed record QueriedFeature
 {
     public byte[] Feature

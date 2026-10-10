@@ -59,6 +59,12 @@ check(
   entry == KeywordEntry(type: 3, defer: 7, raw: 11),
   "keyword parameters: \(entry)"
 )
+/// A copy of a native default keeps its values and leaves a registration unset.
+let hooks = ProbeHooks.default
+check(
+  hooks.limit == 4 && hooks.signal.callback == nil,
+  "hooks default: \(hooks)"
+)
 do {
   _ = try Maplibre.probeRoundtrip(input: ProbeOptions(right: Array(
     repeating: point,
@@ -75,3 +81,22 @@ do {
     "diagnostic: \(error)"
   )
 }
+
+// A status that the C API declares as absence returns nil, and any other
+// failure still reports its diagnostic.
+try check(Maplibre.probeTakeParcel() == nil, "absent parcel")
+let parcel = try Maplibre.probeTakeParcel()
+check(parcel?.id == 42, "published parcel: \(String(describing: parcel))")
+try parcel?.close()
+do {
+  _ = try Maplibre.probeTakeParcel()
+  check(false, "an exhausted parcel was not reported")
+} catch let error as MaplibreError {
+  check(
+    error.kind == .invalidArgument && error.diagnostic == "exhausted",
+    "exhausted parcel: \(error)"
+  )
+}
+
+try check(Maplibre.probeReadLevel() == nil, "absent level")
+try check(Maplibre.probeReadLevel() == 0.5, "published level")

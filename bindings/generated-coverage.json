@@ -317,7 +317,8 @@
     "src/c_api/callback_capture_generated.inc",
     "src/c_api/callback_port_generated.inc",
     "src/completion/completion_result_generated.inc",
-    "tests/native/abi/adapter/adapter_copy_cases_generated.inc"
+    "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
+    "tests/native/abi/base/default_cases_generated.inc"
   ],
   "function_count": 297,
   "languages": {

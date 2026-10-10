@@ -1,8 +1,8 @@
 /// One generated method's native call: its admission, the Python storage its
 /// arguments borrow, and the native call with the interpreter detached.
 ///
-/// Every native call that a method makes goes through `status`, `run`,
-/// `command`, `complete`, or `complete_owned`. Each is unsafe with the
+/// Every native call that a method makes goes through `status`,
+/// `status_unless`, `run`, `command`, `complete`, or `complete_owned`. Each is unsafe with the
 /// contract of `generated_native_call`: the closure only reads the converted
 /// arguments, which this call's storage keeps rooted, and calls native code.
 struct GeneratedCall<'py> {
@@ -29,6 +29,29 @@ impl<'py> GeneratedCall<'py> {
         // SAFETY: the caller upholds the native call contract.
         maplibre_core::check(|diagnostic| unsafe { generated_native_call(py, || call(diagnostic)) })
             .map_err(map_error)
+    }
+
+    /// Makes a call that returns a status, where `absent` reports that native
+    /// published no output rather than an error. Returns whether the output
+    /// holds a value.
+    unsafe fn status_unless(
+        &mut self,
+        absent: sys::mln_status,
+        call: impl FnOnce(*mut sys::mln_diagnostic) -> sys::mln_status,
+    ) -> PyResult<bool> {
+        let py = self.py;
+        let mut present = true;
+        maplibre_core::check(|diagnostic| {
+            // SAFETY: the caller upholds the native call contract.
+            let status = unsafe { generated_native_call(py, || call(diagnostic)) };
+            if status != absent {
+                return status;
+            }
+            present = false;
+            sys::MLN_STATUS_OK
+        })
+        .map_err(map_error)?;
+        Ok(present)
     }
 
     /// Makes a call that returns a value or nothing.

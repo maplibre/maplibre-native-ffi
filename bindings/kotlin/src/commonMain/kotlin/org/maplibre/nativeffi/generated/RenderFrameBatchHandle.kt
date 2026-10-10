@@ -3,6 +3,12 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.lifecycle.*
 
+/**
+ * An owned batch of frame results from one drain.
+ *
+ * See `mln_render_frame_batch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public class RenderFrameBatchHandle
 internal constructor(
   handle: Long,

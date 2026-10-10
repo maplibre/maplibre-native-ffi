@@ -2,8 +2,18 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Complete style image borrowed for a completion callback.
+/// </summary>
+/// <remarks>
+/// See <c>mln_style_image_result</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+/// </remarks>
 public readonly record struct StyleImageResult
 {
+    public StyleImageResult()
+        : this(new StyleImageInfo(), default!, default!, default!) { }
+
     public StyleImageResult(
         StyleImageInfo Info,
         byte[] Pixels,

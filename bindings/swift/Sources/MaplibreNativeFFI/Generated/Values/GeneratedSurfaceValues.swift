@@ -3,9 +3,16 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Metal attachment options for a native surface.
+///
+/// See `mln_metal_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
+  /// Logical surface extent.
   public var extent: RenderTargetExtent
+  /// Metal backend context. device is optional for Metal surfaces.
   public var context: MetalContextDescriptor
+  /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
   public var layer: NativePointer
   public static var `default`: Self {
     Self(raw: mln_metal_surface_descriptor_default())
@@ -36,9 +43,18 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// OpenGL attachment options for a native surface.
+///
+/// See `mln_opengl_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
+  /// Logical surface extent.
   public var extent: RenderTargetExtent
+  /// Borrowed OpenGL context provider data.
   public var context: OpenglContextDescriptor
+  /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
+  /// EGL, both required. Null for WebGL, whose context carries its canvas
+  /// binding.
   public var surface: NativePointer
   public static var `default`: Self {
     try! Self(raw: mln_opengl_surface_descriptor_default())
@@ -78,9 +94,18 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// Vulkan attachment options for a native surface.
+///
+/// See `mln_vulkan_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
+  /// Logical surface extent.
   public var extent: RenderTargetExtent
+  /// Borrowed Vulkan context. All handles are required. The device must support
+  /// VK_KHR_swapchain, and the queue family must support graphics and
+  /// presentation to this descriptor's surface.
   public var context: VulkanContextDescriptor
+  /// Borrowed VkSurfaceKHR bit pattern. Required.
   public var surface: UInt64
   public static var `default`: Self {
     Self(raw: mln_vulkan_surface_descriptor_default())
@@ -111,10 +136,21 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// WebGPU attachment options for a native surface.
+///
+/// See `mln_webgpu_surface_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct WebgpuSurfaceDescriptor: Equatable, Hashable, Sendable {
+  /// Logical surface extent.
   public var extent: RenderTargetExtent
+  /// Borrowed WebGPU context. device is required.
   public var context: WebgpuContextDescriptor
+  /// Borrowed WGPUSurface. Required, and must stay alive for the session. The
+  /// session configures it for this device and extent, and unconfigures it when
+  /// the session ends.
   public var surface: NativePointer
+  /// WGPUTextureFormat to configure the surface with. Required. A browser host
+  /// takes it from navigator.gpu.getPreferredCanvasFormat().
   public var format: UInt32
   public static var `default`: Self {
     Self(raw: mln_webgpu_surface_descriptor_default())

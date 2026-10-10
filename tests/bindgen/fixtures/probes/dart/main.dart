@@ -39,6 +39,32 @@ void main() {
     'keyword parameters: ${entry.type} ${entry.defer} ${entry.raw}',
   );
 
+  // A record built from its constructor defaults equals the native default.
+  probeSettingsCheck(const ProbeSettings());
+
+  // A copy of a native default keeps its values and leaves a registration
+  // unset.
+  final hooks = probeHooksDefault();
+  check(
+    hooks.limit == 4 && hooks.signal == const ProbeSignal(),
+    'hooks default: ${hooks.limit} ${hooks.signal}',
+  );
+
+  // A status that the C API declares as absence returns null, and any other
+  // failure still reports its diagnostic.
+  check(probeReadLevel() == null, 'absent level');
+  final level = probeReadLevel();
+  check(level == 0.5, 'published level: $level');
+  try {
+    probeReadLevel();
+    check(false, 'an exhausted level was not reported');
+  } on NativeFailure catch (failure) {
+    check(
+      failure.status == -1 && failure.message == 'exhausted',
+      'exhausted level: ${failure.status} ${failure.message}',
+    );
+  }
+
   try {
     probeRoundtrip(ProbeOptions(right: List.filled(9, point)));
     check(false, 'native failure was not reported');

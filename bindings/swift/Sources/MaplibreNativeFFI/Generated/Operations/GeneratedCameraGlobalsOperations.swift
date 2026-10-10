@@ -4,70 +4,101 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_animation_options_default`.
+  /// Returns empty animation options initialized for this C API version.
+  ///
+  /// See `mln_animation_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func animationOptionsDefault() throws -> AnimationOptions {
     try nativeDirect("mln_animation_options_default") { _ in
       AnimationOptions(raw: mln_animation_options_default())
     }
   }
 
-  /// Calls `mln_bound_options_default`.
+  /// Returns empty map bound options initialized for this C API version.
+  ///
+  /// See `mln_bound_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func boundOptionsDefault() throws -> BoundOptions {
     try nativeDirect("mln_bound_options_default") { _ in
       BoundOptions(raw: mln_bound_options_default())
     }
   }
 
-  /// Calls `mln_camera_delta_default`.
+  /// Returns an empty relative camera update initialized for this API version.
+  ///
+  /// See `mln_camera_delta_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func cameraDeltaDefault() throws -> CameraDelta {
     try nativeDirect("mln_camera_delta_default") { _ in
       CameraDelta(raw: mln_camera_delta_default())
     }
   }
 
-  /// Calls `mln_camera_fit_options_default`.
+  /// Returns empty camera fitting options initialized for this C API version.
+  ///
+  /// See `mln_camera_fit_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func cameraFitOptionsDefault() throws -> CameraFitOptions {
     try nativeDirect("mln_camera_fit_options_default") { _ in
       CameraFitOptions(raw: mln_camera_fit_options_default())
     }
   }
 
-  /// Calls `mln_camera_options_default`.
+  /// Returns empty camera options initialized for this C API version.
+  ///
+  /// See `mln_camera_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func cameraOptionsDefault() throws -> CameraOptions {
     try nativeDirect("mln_camera_options_default") { _ in
       CameraOptions(raw: mln_camera_options_default())
     }
   }
 
-  /// Calls `mln_camera_update_default`.
+  /// Returns an empty atomic camera update initialized for this API version.
+  ///
+  /// See `mln_camera_update_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func cameraUpdateDefault() throws -> CameraUpdate {
     try nativeDirect("mln_camera_update_default") { _ in
       CameraUpdate(raw: mln_camera_update_default())
     }
   }
 
-  /// Calls `mln_free_camera_options_default`.
+  /// Returns empty free camera options initialized for this C API version.
+  ///
+  /// See `mln_free_camera_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func freeCameraOptionsDefault() throws -> FreeCameraOptions {
     try nativeDirect("mln_free_camera_options_default") { _ in
       FreeCameraOptions(raw: mln_free_camera_options_default())
     }
   }
 
-  /// Calls `mln_map_tile_options_default`.
+  /// Returns empty tile tuning options initialized for this C API version.
+  ///
+  /// See `mln_map_tile_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func mapTileOptionsDefault() throws -> MapTileOptions {
     try nativeDirect("mln_map_tile_options_default") { _ in
       MapTileOptions(raw: mln_map_tile_options_default())
     }
   }
 
-  /// Calls `mln_map_viewport_options_default`.
+  /// Returns empty viewport options initialized for this C API version.
+  ///
+  /// See `mln_map_viewport_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func mapViewportOptionsDefault() throws -> MapViewportOptions {
     try nativeDirect("mln_map_viewport_options_default") { _ in
       MapViewportOptions(raw: mln_map_viewport_options_default())
     }
   }
 
-  /// Calls `mln_projection_mode_default`.
+  /// Returns empty axonometric rendering options initialized for this C API
+  /// version.
+  ///
+  /// See `mln_projection_mode_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func projectionModeDefault() throws -> ProjectionMode {
     try nativeDirect("mln_projection_mode_default") { _ in
       ProjectionMode(raw: mln_projection_mode_default())

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import replace
 
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.semantic import BoundApi, OperationPlan, view_support
 
@@ -32,6 +33,11 @@ SCALARS = {
 
 class Unsupported(ValueError):
     pass
+
+
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The rustdoc comment of a declaration, or empty when it has none."""
+    return docs.line_comment(bound.doc(native), indent)
 
 
 def ctype(value: CType) -> str:
@@ -322,10 +328,12 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
     }
     if len(parents) > 1:
         raise Unsupported("operation transfers owners from distinct parents")
+    parent_line = None
     if parents:
         parent = next(iter(parents))
         source = "self" if parent == plan.receiver else names[parent]
-        prelude.append(f"let parent = {source}.inner.parent();")
+        parent_line = f"let parent = {source}.inner.parent();"
+        prelude.append(parent_line)
     direct_arguments = {}
     for registration in plan.direct_registrations:
         from .rust_direct import add
@@ -584,6 +592,18 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
             if not function.diagnostic:
                 raise Unsupported(f"{function.name}: status return has no diagnostic")
             ending = [f"call.status({closure} {native})?;", f"Ok({output})"]
+            if plan.absence:
+                # The parent joins only an output that native published.
+                if parent_line:
+                    prelude.remove(parent_line)
+                ending = [
+                    f"if !call.status_unless(sys::{plan.absence.status}, {closure} {native})? {{",
+                    "    return Ok(None);",
+                    "}",
+                    *([parent_line] if parent_line else []),
+                    f"Ok(Some({output}))",
+                ]
+                public = f"Option<{public}>"
     else:
         if execution == "command":
             if plan.result is not None:
@@ -667,7 +687,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         else ""
     )
     code = (
-        f"    /// Calls `{function.name}`.\n"
+        doc(value_types.bound, function.name, "    ")
         + safety_doc
         + f"    pub {'unsafe ' if unsafe_input else ''}fn {method}{generic}({', '.join(signature)}) -> Result<{public}> {{\n"
         + "\n".join("        " + line for line in body)

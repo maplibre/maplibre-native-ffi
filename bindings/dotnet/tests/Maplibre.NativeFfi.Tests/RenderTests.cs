@@ -42,6 +42,23 @@ public sealed class RenderTests
 
     [Theory]
     [MemberData(nameof(Backends))]
+    public void ADrainBeforeAnyDemandReturnsNull(TestGraphicsBackend backend)
+    {
+        RenderFixture.Run(
+            backend,
+            fixture =>
+            {
+                var session = fixture.Session;
+                fixture.Await(session.Completion, "the attachment");
+                // Native reports both calls as not ready, which reads as null.
+                Assert.Null(session.DrainFrameResults());
+                Assert.Null(session.AcquireFrame());
+            }
+        );
+    }
+
+    [Theory]
+    [MemberData(nameof(Backends))]
     public void ACallerDrivenSessionIsServicedFromAManagedThread(TestGraphicsBackend backend)
     {
         RenderFixture.Run(
@@ -78,7 +95,9 @@ public sealed class RenderTests
                 var session = fixture.Session;
                 fixture.Await(session.Completion, "the attachment");
                 var rendered = fixture.RenderFrame();
-                using var frame = session.AcquireFrame();
+                using var frame =
+                    session.AcquireFrame()
+                    ?? throw new InvalidOperationException("No rendered frame is ready");
                 Assert.Equal(rendered.FrameGeneration, frame.GetResult().FrameGeneration);
 
                 Func<uint>? escaped = null;

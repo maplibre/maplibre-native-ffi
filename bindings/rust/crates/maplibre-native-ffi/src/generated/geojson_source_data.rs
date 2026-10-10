@@ -7,7 +7,10 @@ native_owner! {
 }
 
 impl GeojsonSourceDataHandle {
-    /// Calls `mln_geojson_source_data_destroy`.
+    /// Releases prepared GeoJSON source data.
+    ///
+    /// See `mln_geojson_source_data_destroy` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     pub fn destroy(&self) -> Result<()> {
         self.inner.close(|data| {
             let mut call = Call::new(data, None);

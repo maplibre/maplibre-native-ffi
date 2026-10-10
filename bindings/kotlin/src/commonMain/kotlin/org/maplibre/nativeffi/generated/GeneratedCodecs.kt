@@ -1095,11 +1095,8 @@ internal fun readCameraUpdate(source: Long): CameraUpdate =
     gesturePhase = GesturePhase(readU32(source + 200)),
   )
 
-internal fun readCustomGeometrySourceOptions(source: Long): CustomGeometrySourceOptions {
-  check(!(readAddress(source + 8) != 0L || readAddress(source + w(12, 16)) != 0L)) {
-    "cannot copy an installed callback descriptor"
-  }
-  return CustomGeometrySourceOptions(
+internal fun readCustomGeometrySourceOptions(source: Long): CustomGeometrySourceOptions =
+  CustomGeometrySourceOptions(
     fetchTile = null,
     cancelTile = null,
     minZoom = if ((readU32(source + 4) and 1u) != 0u) readF64(source + w(24, 32)) else null,
@@ -1110,19 +1107,14 @@ internal fun readCustomGeometrySourceOptions(source: Long): CustomGeometrySource
     clip = if ((readU32(source + 4) and 32u) != 0u) readBool(source + w(56, 64)) else null,
     wrap = if ((readU32(source + 4) and 64u) != 0u) readBool(source + w(57, 65)) else null,
   )
-}
 
-internal fun readCustomMvtVectorSourceOptions(source: Long): CustomMvtVectorSourceOptions {
-  check(!(readAddress(source + 8) != 0L || readAddress(source + w(12, 16)) != 0L)) {
-    "cannot copy an installed callback descriptor"
-  }
-  return CustomMvtVectorSourceOptions(
+internal fun readCustomMvtVectorSourceOptions(source: Long): CustomMvtVectorSourceOptions =
+  CustomMvtVectorSourceOptions(
     fetchTile = null,
     cancelTile = null,
     minZoom = if ((readU32(source + 4) and 1u) != 0u) readF64(source + w(24, 32)) else null,
     maxZoom = if ((readU32(source + 4) and 2u) != 0u) readF64(source + w(32, 40)) else null,
   )
-}
 
 internal fun readFrameDemand(source: Long): FrameDemand =
   FrameDemand(
@@ -1254,9 +1246,9 @@ internal fun readRenderSessionAttachOptions(source: Long): RenderSessionAttachOp
   RenderSessionAttachOptions(
     driver = RenderDriverKind(readU32(source + 4)),
     requestedTextureRingDepth = readU32(source + 8),
-    frameWake = readWake(source + 16),
-    driverWorkWake = readWake(source + w(32, 48)),
-    queueLock = readQueueLock(source + w(48, 80)),
+    frameWake = Wake(),
+    driverWorkWake = Wake(),
+    queueLock = QueueLock(),
   )
 
 internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQueryOptions =
@@ -1293,7 +1285,7 @@ internal fun readRuntimeOptions(source: Long): RuntimeOptions =
     assetPath = readCStringOrNull(readAddress(source + 8)),
     cachePath = readCStringOrNull(readAddress(source + w(12, 16))),
     eventMask = RuntimeEventMask(readU64(source + w(16, 24))),
-    eventWake = readWake(source + w(24, 32)),
+    eventWake = Wake(),
   )
 
 internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOptions =
@@ -1900,18 +1892,6 @@ internal fun readOpenglContextDescriptor(source: Long): OpenglContextDescriptor 
         }
       },
   )
-
-internal fun readWake(source: Long): Wake {
-  check(!(readAddress(source + w(4, 8)) != 0L)) { "cannot copy an installed callback descriptor" }
-  return Wake(callback = null)
-}
-
-internal fun readQueueLock(source: Long): QueueLock {
-  check(!(readAddress(source + w(4, 8)) != 0L || readAddress(source + w(8, 16)) != 0L)) {
-    "cannot copy an installed callback descriptor"
-  }
-  return QueueLock(lock = null, unlock = null)
-}
 
 internal fun readScreenBox(source: Long): ScreenBox =
   ScreenBox(min = readScreenPoint(source), max = readScreenPoint(source + 16))

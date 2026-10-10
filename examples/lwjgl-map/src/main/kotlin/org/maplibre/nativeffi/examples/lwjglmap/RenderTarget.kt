@@ -4,8 +4,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
 import org.lwjgl.glfw.GLFW.glfwPostEmptyEvent
 import org.lwjgl.glfw.GLFW.glfwWaitEvents
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
@@ -135,13 +133,7 @@ internal open class RenderTarget(
    * forced retry follows after about one refresh.
    */
   protected fun drainFrameResults(): Boolean {
-    val batch =
-      try {
-        session.drainFrameResults()
-      } catch (error: MaplibreException) {
-        if (error.status == MaplibreStatus.NOT_READY) return false
-        throw error
-      }
+    val batch = session.drainFrameResults() ?: return false
     var rendered = false
     var retry = false
     var repaint = false
@@ -312,13 +304,7 @@ internal abstract class OwnedTextureTarget(attached: AttachedSession) :
   override fun present(): Boolean {
     var newest: AcquiredFrameHandle? = null
     while (true) {
-      val frame =
-        try {
-          session.acquireFrame()
-        } catch (error: MaplibreException) {
-          if (error.status == MaplibreStatus.NOT_READY) break
-          throw error
-        }
+      val frame = session.acquireFrame() ?: break
       // Nothing read an older frame, so it releases CPU-complete.
       newest?.release()
       newest = frame

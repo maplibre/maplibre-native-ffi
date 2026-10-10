@@ -246,18 +246,8 @@ internal static unsafe class GeneratedValues
     ) =>
         new()
         {
-            FetchTile =
-                value.fetch_tile == null
-                    ? null
-                    : throw new InvalidOperationException(
-                        "Native callback cannot be copied into a managed delegate."
-                    ),
-            CancelTile =
-                value.cancel_tile == null
-                    ? null
-                    : throw new InvalidOperationException(
-                        "Native callback cannot be copied into a managed delegate."
-                    ),
+            FetchTile = default,
+            CancelTile = default,
             MinZoom = value.fields.HasFlag(MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM)
                 ? value.min_zoom
                 : null,
@@ -375,18 +365,8 @@ internal static unsafe class GeneratedValues
     ) =>
         new()
         {
-            FetchTile =
-                value.fetch_tile == null
-                    ? null
-                    : throw new InvalidOperationException(
-                        "Native callback cannot be copied into a managed delegate."
-                    ),
-            CancelTile =
-                value.cancel_tile == null
-                    ? null
-                    : throw new InvalidOperationException(
-                        "Native callback cannot be copied into a managed delegate."
-                    ),
+            FetchTile = default,
+            CancelTile = default,
             MinZoom = value.fields.HasFlag(MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MIN_ZOOM)
                 ? value.min_zoom
                 : null,
@@ -494,26 +474,6 @@ internal static unsafe class GeneratedValues
         native.get_proc_address = (void*)value.GetProcAddress.Address;
         return native;
     }
-
-    internal static FeatureStateSelector CopyFeatureStateSelector(
-        mln_feature_state_selector value
-    ) =>
-        new()
-        {
-            SourceId = RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
-            SourceLayerId = value.fields.HasFlag(MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID)
-                ? RuntimeStructs.CopyUtf8(
-                    (sbyte*)value.source_layer_id.data,
-                    value.source_layer_id.size
-                )
-                : null,
-            FeatureId = value.fields.HasFlag(MLN_FEATURE_STATE_SELECTOR_FEATURE_ID)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.feature_id.data, value.feature_id.size)
-                : null,
-            StateKey = value.fields.HasFlag(MLN_FEATURE_STATE_SELECTOR_STATE_KEY)
-                ? RuntimeStructs.CopyUtf8((sbyte*)value.state_key.data, value.state_key.size)
-                : null,
-        };
 
     internal static mln_feature_state_selector NativeFeatureStateSelector(
         FeatureStateSelector value,
@@ -717,15 +677,6 @@ internal static unsafe class GeneratedValues
         native.value = value.Value;
         return native;
     }
-
-    internal static HttpHeaderTransform CopyHttpHeaderTransform(mln_http_header_transform value) =>
-        new(
-            value.callback == null
-                ? null
-                : throw new InvalidOperationException(
-                    "Native callback cannot be copied into a managed delegate."
-                )
-        );
 
     private static readonly string[] AllowedHttpHeaderTransformCallback =
     [
@@ -1568,20 +1519,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static QueueLock CopyQueueLock(mln_queue_lock value) =>
-        new(
-            value.@lock == null
-                ? null
-                : throw new InvalidOperationException(
-                    "Native callback cannot be copied into a managed delegate."
-                ),
-            value.unlock == null
-                ? null
-                : throw new InvalidOperationException(
-                    "Native callback cannot be copied into a managed delegate."
-                )
-        );
-
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeQueueLockLock(void* user_data)
     {
@@ -1659,9 +1596,9 @@ internal static unsafe class GeneratedValues
         new(
             (RenderDriverKind)value.driver,
             value.requested_texture_ring_depth,
-            CopyWake(value.frame_wake),
-            CopyWake(value.driver_work_wake),
-            CopyQueueLock(value.queue_lock)
+            default,
+            default,
+            default
         );
 
     internal static mln_render_session_attach_options NativeRenderSessionAttachOptions(
@@ -1866,15 +1803,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static ResourceProvider CopyResourceProvider(mln_resource_provider value) =>
-        new(
-            value.callback == null
-                ? null
-                : throw new InvalidOperationException(
-                    "Native callback cannot be copied into a managed delegate."
-                )
-        );
-
     private static readonly string[] AllowedResourceProviderCallback =
     [
         "mln_resource_request_complete",
@@ -2018,25 +1946,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static ResourceResponse CopyResourceResponse(mln_resource_response value) =>
-        new()
-        {
-            Status = (ResourceResponseStatus)value.status,
-            ErrorReason = (ResourceErrorReason)value.error_reason,
-            BytesStorage = new(
-                NativeCallScope.CopyArray<byte>((byte*)value.bytes, (nuint)(value.byte_count))
-            ),
-            ErrorMessage =
-                value.error_message == null
-                    ? null
-                    : NativeCallScope.CopyCString(value.error_message),
-            MustRevalidate = value.must_revalidate != 0,
-            ModifiedUnixMs = value.has_modified != 0 ? value.modified_unix_ms : null,
-            ExpiresUnixMs = value.has_expires != 0 ? value.expires_unix_ms : null,
-            Etag = value.etag == null ? null : NativeCallScope.CopyCString(value.etag),
-            RetryAfterUnixMs = value.has_retry_after != 0 ? value.retry_after_unix_ms : null,
-        };
-
     internal static mln_resource_response NativeResourceResponse(
         ResourceResponse value,
         NativeCallScope scope
@@ -2074,15 +1983,6 @@ internal static unsafe class GeneratedValues
         }
         return native;
     }
-
-    internal static ResourceTransform CopyResourceTransform(mln_resource_transform value) =>
-        new(
-            value.callback == null
-                ? null
-                : throw new InvalidOperationException(
-                    "Native callback cannot be copied into a managed delegate."
-                )
-        );
 
     private static readonly string[] AllowedResourceTransformCallback =
     [
@@ -2355,7 +2255,7 @@ internal static unsafe class GeneratedValues
             value.asset_path == null ? null : NativeCallScope.CopyCString(value.asset_path),
             value.cache_path == null ? null : NativeCallScope.CopyCString(value.cache_path),
             (RuntimeEventMask)value.event_mask,
-            CopyWake(value.event_wake)
+            default
         );
 
     internal static mln_runtime_options NativeRuntimeOptions(
@@ -3290,15 +3190,6 @@ internal static unsafe class GeneratedValues
         native.surface = value.Surface;
         return native;
     }
-
-    internal static Wake CopyWake(mln_wake value) =>
-        new(
-            value.callback == null
-                ? null
-                : throw new InvalidOperationException(
-                    "Native callback cannot be copied into a managed delegate."
-                )
-        );
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void InvokeWakeCallback(void* user_data)

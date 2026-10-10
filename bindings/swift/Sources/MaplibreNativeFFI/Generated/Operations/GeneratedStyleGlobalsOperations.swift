@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_custom_geometry_source_options_default`.
+  /// Returns default custom geometry source options.
+  ///
+  /// See `mln_custom_geometry_source_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func customGeometrySourceOptionsDefault() throws
     -> CustomGeometrySourceOptions
   {
@@ -15,7 +18,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_custom_mvt_vector_source_options_default`.
+  /// Returns default custom MVT vector source options.
+  ///
+  /// See `mln_custom_mvt_vector_source_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func customMvtVectorSourceOptionsDefault() throws
     -> CustomMvtVectorSourceOptions
   {
@@ -26,7 +32,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_geojson_source_data_create`.
+  /// Prepares GeoJSON source data for installation on a map.
+  ///
+  /// See `mln_geojson_source_data_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func geojsonSourceDataCreate(
     data bindingArg0: Data,
     options bindingArg1: GeojsonSourceOptions? = nil
@@ -42,14 +51,20 @@ public extension Maplibre {
     } result: { try GeojsonSourceDataHandle(adopting: value0) }
   }
 
-  /// Calls `mln_geojson_source_options_default`.
+  /// Returns default GeoJSON source options.
+  ///
+  /// See `mln_geojson_source_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func geojsonSourceOptionsDefault() throws -> GeojsonSourceOptions {
     try nativeDirect("mln_geojson_source_options_default") { _ in
       try GeojsonSourceOptions(raw: mln_geojson_source_options_default())
     }
   }
 
-  /// Calls `mln_premultiplied_rgba8_image_default`.
+  /// Returns a default premultiplied RGBA8 image descriptor.
+  ///
+  /// See `mln_premultiplied_rgba8_image_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func premultipliedRgba8ImageDefault() throws
     -> PremultipliedRgba8Image
   {
@@ -58,28 +73,40 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_style_image_info_default`.
+  /// Returns default runtime style image metadata.
+  ///
+  /// See `mln_style_image_info_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func styleImageInfoDefault() throws -> StyleImageInfo {
     try nativeDirect("mln_style_image_info_default") { _ in
       StyleImageInfo(raw: mln_style_image_info_default())
     }
   }
 
-  /// Calls `mln_style_image_options_default`.
+  /// Returns default runtime style image options.
+  ///
+  /// See `mln_style_image_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func styleImageOptionsDefault() throws -> StyleImageOptions {
     try nativeDirect("mln_style_image_options_default") { _ in
       try StyleImageOptions(raw: mln_style_image_options_default())
     }
   }
 
-  /// Calls `mln_style_tile_source_options_default`.
+  /// Returns default tile source options.
+  ///
+  /// See `mln_style_tile_source_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func styleTileSourceOptionsDefault() throws -> StyleTileSourceOptions {
     try nativeDirect("mln_style_tile_source_options_default") { _ in
       try StyleTileSourceOptions(raw: mln_style_tile_source_options_default())
     }
   }
 
-  /// Calls `mln_style_transition_options_default`.
+  /// Returns default global style transition options.
+  ///
+  /// See `mln_style_transition_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   static func styleTransitionOptionsDefault() throws -> StyleTransitionOptions {
     try nativeDirect("mln_style_transition_options_default") { _ in
       StyleTransitionOptions(raw: mln_style_transition_options_default())

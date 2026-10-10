@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// A rendered frame that a render session lends until its release.
+/// </summary>
+/// <remarks>
+/// See <c>mln_acquired_frame</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwner<MlnAcquiredFrame>
 {
     private readonly NativeHandleState<MlnAcquiredFrame> state;
@@ -41,6 +48,13 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         state.Retire();
     }
 
+    /// <summary>
+    /// Copies Metal-native metadata from an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_get_metal_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public void WithMetalTexture(Action<MetalOwnedTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_metal_texture");
@@ -72,6 +86,13 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         }
     }
 
+    /// <summary>
+    /// Copies OpenGL-native metadata from an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_get_opengl_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public void WithOpenglTexture(Action<OpenglOwnedTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_opengl_texture");
@@ -103,6 +124,13 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         }
     }
 
+    /// <summary>
+    /// Copies the producer synchronization for an acquired texture frame.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_get_producer_sync</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
     public void WithProducerSync(Action<GpuSyncView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_producer_sync");
@@ -129,6 +157,13 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         }
     }
 
+    /// <summary>
+    /// Copies common metadata for an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_get_result</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderFrameResult GetResult()
     {
         using var read = state.Read(this, "mln_acquired_frame_get_result");
@@ -140,6 +175,13 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         return CopyRenderFrameResult(outResult);
     }
 
+    /// <summary>
+    /// Copies Vulkan-native metadata from an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_get_vulkan_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public void WithVulkanTexture(Action<VulkanOwnedTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_vulkan_texture");
@@ -171,6 +213,13 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         }
     }
 
+    /// <summary>
+    /// Copies WebGPU-native metadata from an acquired frame.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_get_webgpu_texture</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public void WithWebgpuTexture(Action<WebgpuOwnedTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_webgpu_texture");
@@ -202,6 +251,13 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
         }
     }
 
+    /// <summary>
+    /// Releases an acquired frame after optional consumer GPU work.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_acquired_frame_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+    /// </remarks>
     public void Release(GpuSync consumerCompletion)
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_acquired_frame_release");

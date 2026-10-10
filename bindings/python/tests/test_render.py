@@ -245,11 +245,10 @@ class OwnedTexture:
         )
 
         def check() -> mln.RenderFrameResult | None:
-            try:
-                with session.drain_frame_results() as batch:
+            batch = session.drain_frame_results()
+            if batch is not None:
+                with batch:
                     self._results.extend(batch.get(i) for i in range(batch.count()))
-            except mln.NotReadyError:
-                pass
             for index, frame in enumerate(self._results):
                 if frame.token == token:
                     return self._results.pop(index)
@@ -346,6 +345,14 @@ def test_an_owned_texture_renders_pixels_the_binding_reads_back(
         assert image.info.stride >= WIDTH * 4
         assert len(image.data) == image.info.byte_length
         assert image.data[:4] == RED_PIXEL
+
+
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_a_drain_before_any_demand_returns_none(harness: Harness, backend: str) -> None:
+    with OwnedTexture(harness, backend, _default_driver(backend)) as target:
+        # Native reports both calls as not ready, which reads as no value.
+        assert target.session.drain_frame_results() is None
+        assert target.session.acquire_frame() is None
 
 
 @pytest.mark.parametrize("backend", BACKENDS)

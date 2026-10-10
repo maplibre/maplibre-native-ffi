@@ -4,6 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension AcquiredFrameHandle {
+  /// Consumes an acquired frame and quarantines its slot of the texture ring.
+  ///
+  /// See `mln_acquired_frame_dispose` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func dispose() throws {
     try nativeClose("mln_acquired_frame_dispose") { raw, diagnostic in
       mln_acquired_frame_dispose(
@@ -13,6 +17,10 @@ public extension AcquiredFrameHandle {
     }
   }
 
+  /// Copies the producer synchronization for an acquired texture frame.
+  ///
+  /// See `mln_acquired_frame_get_producer_sync` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func withProducerSync<Result>(_ body: (GpuSyncView) throws -> Result) throws
     -> Result
   {
@@ -35,7 +43,10 @@ public extension AcquiredFrameHandle {
     ) { raw, scope in try body(GpuSyncView(GpuSync(raw: raw), scope: scope)) }
   }
 
-  /// Calls `mln_acquired_frame_get_result`.
+  /// Copies common metadata for an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_result` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func getResult() throws -> RenderFrameResult {
     var value0 = mln_render_frame_result()
     value0.size = UInt32(MemoryLayout<mln_render_frame_result>.size)
@@ -50,6 +61,10 @@ public extension AcquiredFrameHandle {
 }
 
 public extension AcquiredFrameHandle {
+  /// Releases an acquired frame after optional consumer GPU work.
+  ///
+  /// See `mln_acquired_frame_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   func release(consumerCompletion: GpuSync) throws {
     try NativeCallbackGuard.check(
       owner: self,

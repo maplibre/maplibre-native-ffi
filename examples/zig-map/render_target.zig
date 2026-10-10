@@ -144,10 +144,7 @@ pub const Session = struct {
     /// Drains every queued frame result.
     pub fn drainResults(self: *Session) !FrameResults {
         var results: FrameResults = .{};
-        var batch = maplibre.renderSessionDrainFrameResults(self.handle.?, null) catch |err| switch (err) {
-            error.NotReady => return results,
-            else => return err,
-        };
+        var batch = try maplibre.renderSessionDrainFrameResults(self.handle.?, null) orelse return results;
         defer batch.deinit();
         const count = try maplibre.renderFrameBatchCount(batch, null);
         results.any = count > 0;
@@ -200,13 +197,10 @@ pub const Session = struct {
         var acquired = false;
         while (true) {
             var diagnostic: maplibre.Diagnostic = .{};
-            const frame = maplibre.renderSessionAcquireFrame(self.handle.?, &diagnostic) catch |err| switch (err) {
-                error.NotReady => return acquired,
-                else => {
-                    diagnostics.logError("texture acquire failed", err, &diagnostic);
-                    return types.AppError.BackendDrawFailed;
-                },
-            };
+            const frame = maplibre.renderSessionAcquireFrame(self.handle.?, &diagnostic) catch |err| {
+                diagnostics.logError("texture acquire failed", err, &diagnostic);
+                return types.AppError.BackendDrawFailed;
+            } orelse return acquired;
             releaseFrame(held);
             held.* = frame;
             acquired = true;

@@ -1,6 +1,5 @@
 """Managed emitters must reject contracts their runtime cannot represent."""
 
-import re
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -49,17 +48,6 @@ mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("ki
         self.assertTrue(bound.callbacks["mln_watch"].reentry_policy.registration_owner)
 
     def parse(self, source="", header="metrics.h", map_handle=False, groups=()):
-        # Kotlin generates operations only for receivers that are handles.
-        source = re.sub(
-            r'(?:BIND\("([^"\n]*)"\)\s+)?(mln_status mln_map_\w+\(mln_map map)',
-            lambda match: (
-                'BIND("receiver=map'
-                + (f";{match[1]}" if match[1] else "")
-                + '")\n'
-                + match[2]
-            ),
-            source,
-        )
         api = parse(
             source,
             groups=groups,
@@ -127,7 +115,7 @@ typedef struct mln_matrix {{ {field} }} mln_matrix;
         api = self.parse("""
 typedef unsigned long long mln_measurement BIND("kind=handle;release=mln_measurement_close;dispose=mln_measurement_close");
 void mln_measurement_close(mln_measurement owner);
-BIND("receiver=measurement;execution=command")
+BIND("execution=command")
 mln_status mln_measurement_change(mln_measurement measurement, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """)
         self.assertIn("mln_measurement_change", dart.coverage(api)["generated"])

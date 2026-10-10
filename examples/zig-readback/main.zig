@@ -225,10 +225,7 @@ fn renderStillImage(
         // wait is short.
         if (updates.still_image_done) return still_image.wait(null);
         var demand = updates.render_update;
-        var results = maplibre.renderSessionDrainFrameResults(session, null) catch |err| switch (err) {
-            error.NotReady => null,
-            else => return err,
-        };
+        var results = try maplibre.renderSessionDrainFrameResults(session, null);
         if (results) |*batch| {
             defer batch.deinit();
             for (0..try maplibre.renderFrameBatchCount(batch.*, null)) |index| {

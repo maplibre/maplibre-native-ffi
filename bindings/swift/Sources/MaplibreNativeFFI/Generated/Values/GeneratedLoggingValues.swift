@@ -3,6 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Log event categories emitted by MapLibre Native.
+///
+/// See `mln_log_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
@@ -30,6 +34,10 @@ public struct LogEvent: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let timing: LogEvent = .init(rawValue: 16)
 }
 
+/// Log severity values emitted by MapLibre Native.
+///
+/// See `mln_log_severity` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogSeverity: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -43,6 +51,10 @@ public struct LogSeverity: RawRepresentable, NativeOpenValue, Equatable,
   public static let error: LogSeverity = .init(rawValue: 3)
 }
 
+/// Bitmask values for log severities dispatched asynchronously.
+///
+/// See `mln_log_severity_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 public struct LogSeverityMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {

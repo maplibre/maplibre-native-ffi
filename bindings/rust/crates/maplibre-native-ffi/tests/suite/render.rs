@@ -52,15 +52,33 @@ fn an_owned_texture_session_renders_a_frame_the_binding_reads_back() {
 }
 
 #[test]
+fn a_drain_before_any_demand_returns_no_batch() {
+    let graphics = Graphics::new();
+    let (_fixture, session) = rendering_fixture(&graphics);
+    // Native reports both calls as not ready, which reads as no value.
+    assert!(session.handle.drain_frame_results().unwrap().is_none());
+    assert!(session.handle.acquire_frame().unwrap().is_none());
+    session.close();
+}
+
+#[test]
 fn a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it() {
     let graphics = Graphics::new();
     let (fixture, session) = rendering_fixture(&graphics);
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
-    let frame = session.handle.acquire_frame().unwrap();
+    let frame = session
+        .handle
+        .acquire_frame()
+        .unwrap()
+        .expect("a rendered frame");
     // A second frame needs a newer map update to render.
     fixture.repaint();
     assert_eq!(session.render_frame().disposition, RenderResult::Rendered);
-    let sibling = session.handle.acquire_frame().unwrap();
+    let sibling = session
+        .handle
+        .acquire_frame()
+        .unwrap()
+        .expect("a rendered frame");
 
     let no_sync = GpuSync::default();
     let (size, (frame_release, session_abandon)) = with_frame_view(&frame, || {

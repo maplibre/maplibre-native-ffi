@@ -4,14 +4,20 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_log_clear_callback`.
+  /// Clears the process-global log callback.
+  ///
+  /// See `mln_log_clear_callback` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
   static func logClearCallback() throws {
     try nativeInvoke("mln_log_clear_callback") { _, _, diagnostic in
       mln_log_clear_callback(diagnostic)
     }
   }
 
-  /// Calls `mln_log_set_async_severity_mask`.
+  /// Controls which log severities MapLibre Native may dispatch asynchronously.
+  ///
+  /// See `mln_log_set_async_severity_mask` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
   static func logSetAsyncSeverityMask(mask bindingArg0: LogSeverityMask) throws {
     try nativeInvoke("mln_log_set_async_severity_mask") { _, _, diagnostic in
       mln_log_set_async_severity_mask(
@@ -23,6 +29,10 @@ public extension Maplibre {
 }
 
 public extension Maplibre {
+  /// Installs a process-global MapLibre Native log callback.
+  ///
+  /// See `mln_log_set_callback` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
   static func logSetCallback(_ callback: (@Sendable (
     LogSeverity,
     LogEvent,

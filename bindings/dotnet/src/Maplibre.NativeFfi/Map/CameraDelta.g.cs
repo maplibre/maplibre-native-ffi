@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// One relative camera operation.
+/// </summary>
+/// <remarks>
+/// See <c>mln_camera_delta</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+/// </remarks>
 public sealed record CameraDelta
 {
     public CameraDeltaKind Kind { get; set; }

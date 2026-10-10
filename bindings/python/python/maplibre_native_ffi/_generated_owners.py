@@ -40,6 +40,12 @@ class ResourceTransformResponseScope(_ResourceTransformResponseScopeOperations):
 
 
 class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
+    """A rendered frame that a render session lends until its release.
+
+    See `mln_acquired_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "AcquiredFrameHandle"
     _parent: NativeHandleMixin | None
 
@@ -55,6 +61,12 @@ class AcquiredFrameHandle(_AcquiredFrameHandleOperations, NativeHandleMixin):
 
 
 class BufferHandle(_BufferHandleOperations, NativeHandleMixin):
+    """An owned buffer of bytes.
+
+    See `mln_buffer` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "BufferHandle"
     _parent: NativeHandleMixin | None
 
@@ -70,6 +82,12 @@ class BufferHandle(_BufferHandleOperations, NativeHandleMixin):
 
 
 class EventBatchHandle(_EventBatchHandleOperations, NativeHandleMixin):
+    """An owned batch of runtime events from one drain.
+
+    See `mln_event_batch` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "EventBatchHandle"
     _parent: NativeHandleMixin | None
 
@@ -100,6 +118,12 @@ class GeojsonSourceDataHandle(_GeojsonSourceDataHandleOperations, NativeHandleMi
 
 
 class MapHandle(_MapHandleOperations, NativeHandleMixin):
+    """A map, which holds map state independent of any render target.
+
+    See `mln_map` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "MapHandle"
     _parent: NativeHandleMixin | None
 
@@ -115,6 +139,12 @@ class MapHandle(_MapHandleOperations, NativeHandleMixin):
 
 
 class MapProjectionHandle(_MapProjectionHandleOperations, NativeHandleMixin):
+    """A standalone projection of a map's transform state at its creation.
+
+    See `mln_map_projection` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "MapProjectionHandle"
     _parent: NativeHandleMixin | None
 
@@ -130,6 +160,12 @@ class MapProjectionHandle(_MapProjectionHandleOperations, NativeHandleMixin):
 
 
 class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, NativeHandleMixin):
+    """An owned batch of frame results from one drain.
+
+    See `mln_render_frame_batch` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "RenderFrameBatchHandle"
     _parent: NativeHandleMixin | None
 
@@ -145,6 +181,12 @@ class RenderFrameBatchHandle(_RenderFrameBatchHandleOperations, NativeHandleMixi
 
 
 class RenderSessionHandle(_RenderSessionHandleOperations, NativeHandleMixin):
+    """A render session, which renders one map to one render target.
+
+    See `mln_render_session` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "RenderSessionHandle"
     _parent: NativeHandleMixin | None
 
@@ -160,6 +202,12 @@ class RenderSessionHandle(_RenderSessionHandleOperations, NativeHandleMixin):
 
 
 class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin):
+    """A resource request that a resource provider handles.
+
+    See `mln_resource_request_handle` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "ResourceRequestHandle"
     _parent: NativeHandleMixin | None
 
@@ -175,6 +223,12 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin)
 
 
 class RuntimeHandle(_RuntimeHandleOperations, NativeHandleMixin):
+    """A runtime: the native scheduler thread and event store for its maps.
+
+    See `mln_runtime` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "RuntimeHandle"
     _parent: NativeHandleMixin | None
 

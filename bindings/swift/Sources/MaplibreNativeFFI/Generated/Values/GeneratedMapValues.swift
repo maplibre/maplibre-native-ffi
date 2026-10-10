@@ -3,6 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Field mask values for `mln_animation_options`.
+///
+/// See `mln_animation_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct AnimationOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -18,11 +22,21 @@ public struct AnimationOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let transitionId: AnimationOptionField = .init(rawValue: 16)
 }
 
+/// Optional animation controls for camera transitions.
+///
+/// See `mln_animation_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct AnimationOptions: Equatable, Hashable, Sendable {
+  /// Duration in milliseconds. Must be finite and non-negative. Values that
+  /// would overflow MapLibre Native's internal duration are invalid.
   public var durationMs: Double?
+  /// Average fly velocity in screenfuls per second. Must be positive and
+  /// defaults to 1.2 when omitted.
   public var velocity: Double?
+  /// Peak zoom for flyTo transitions.
   public var minZoom: Double?
   public var easing: UnitBezier?
+  /// Caller-chosen identity for the transition this options struct starts.
   public var transitionId: UInt64?
   public static var `default`: Self {
     Self(raw: mln_animation_options_default())
@@ -80,6 +94,10 @@ public struct AnimationOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_bound_options`.
+///
+/// See `mln_bound_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct BoundOptionField: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
@@ -88,16 +106,34 @@ public struct BoundOptionField: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
+  /// Selects `mln_bound_options.bounds` as a geographic constraint that the
+  /// camera center stays inside. Mutually exclusive with
+  /// `MLN_BOUND_OPTION_UNBOUNDED`.
   public static let bounds: BoundOptionField = .init(rawValue: 1)
   public static let minZoom: BoundOptionField = .init(rawValue: 2)
   public static let maxZoom: BoundOptionField = .init(rawValue: 4)
   public static let minPitch: BoundOptionField = .init(rawValue: 8)
   public static let maxPitch: BoundOptionField = .init(rawValue: 16)
+  /// Selects the unbounded geographic constraint, which leaves every camera
+  /// center unconstrained and lets the map pan freely across the antimeridian.
+  /// This differs from world bounds of -90/-180 to 90/180, which clamp
+  /// longitude to that range. Mutually exclusive with
+  /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
   public static let unbounded: BoundOptionField = .init(rawValue: 32)
 }
 
+/// Optional map camera constraint fields.
+///
+/// See `mln_bound_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct BoundOptions: Equatable, Hashable, Sendable {
+  /// Selects the unbounded geographic constraint, which leaves every camera
+  /// center unconstrained and lets the map pan freely across the antimeridian.
+  /// This differs from world bounds of -90/-180 to 90/180, which clamp
+  /// longitude to that range. Mutually exclusive with
+  /// `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
   public var unbounded: Bool
+  /// Read when fields contains `MLN_BOUND_OPTION_BOUNDS`.
   public var bounds: LatLngBounds?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -161,6 +197,10 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// One relative camera operation.
+///
+/// See `mln_camera_delta` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraDelta: Equatable, Hashable, Sendable {
   public var kind: CameraDeltaKind
   public var offset: ScreenPoint
@@ -207,6 +247,10 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
   }
 }
 
+/// Relative camera operation carried by `mln_camera_delta`.
+///
+/// See `mln_camera_delta_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraDeltaKind: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -221,6 +265,10 @@ public struct CameraDeltaKind: RawRepresentable, NativeOpenValue, Equatable,
   public static let pitch: CameraDeltaKind = .init(rawValue: 3)
 }
 
+/// Field mask values for `mln_camera_fit_options`.
+///
+/// See `mln_camera_fit_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraFitOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -234,6 +282,10 @@ public struct CameraFitOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let pitch: CameraFitOptionField = .init(rawValue: 4)
 }
 
+/// Optional fitting controls for camera-for-viewport queries.
+///
+/// See `mln_camera_fit_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraFitOptions: Equatable, Hashable, Sendable {
   public var padding: EdgeInsets?
   public var bearing: Double?
@@ -278,6 +330,10 @@ public struct CameraFitOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_camera_options`.
+///
+/// See `mln_camera_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable,
   Sendable
@@ -298,10 +354,15 @@ public struct CameraOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let fov: CameraOptionField = .init(rawValue: 256)
 }
 
+/// Camera fields used by snapshots and camera updates.
+///
+/// See `mln_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraOptions: Equatable, Hashable, Sendable {
   public var center: LatLng?
   public var centerAltitude: Double?
   public var padding: EdgeInsets?
+  /// Optional screen-space focal point in logical map pixels.
   public var anchor: ScreenPoint?
   public var zoom: Double?
   public var bearing: Double?
@@ -392,6 +453,10 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Camera result borrowed for an ordered camera-query completion.
+///
+/// See `mln_camera_query_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraQueryResult: Equatable, Hashable, Sendable {
   public var generation: UInt64
   public var camera: CameraOptions
@@ -421,6 +486,10 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// One atomic absolute camera update.
+///
+/// See `mln_camera_update` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraUpdate: Equatable, Hashable, Sendable {
   public var mode: CameraUpdateMode
   public var camera: CameraOptions
@@ -459,6 +528,10 @@ public struct CameraUpdate: Equatable, Hashable, Sendable {
   }
 }
 
+/// Camera transition behavior for `mln_camera_update`.
+///
+/// See `mln_camera_update_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraUpdateMode: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -472,6 +545,10 @@ public struct CameraUpdateMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let fly: CameraUpdateMode = .init(rawValue: 2)
 }
 
+/// Map constraint modes used by `mln_map_viewport_options`.
+///
+/// See `mln_constrain_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ConstrainMode: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -486,6 +563,10 @@ public struct ConstrainMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let screen: ConstrainMode = .init(rawValue: 3)
 }
 
+/// Screen-space inset in logical map pixels.
+///
+/// See `mln_edge_insets` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct EdgeInsets: Equatable, Hashable, Sendable {
   public var top: Double
   public var left: Double
@@ -524,10 +605,18 @@ public struct EdgeInsets: Equatable, Hashable, Sendable {
   }
 }
 
+/// Feature-state source, feature, and key selector.
+///
+/// See `mln_feature_state_selector` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FeatureStateSelector: Equatable, Hashable, Sendable {
+  /// Source ID. Required and borrowed for the duration of the call.
   public var sourceId: String
+  /// Optional source layer ID. Required for vector-source disambiguation.
   public var sourceLayerId: String?
+  /// Optional feature ID string. Required by set/get and optional for remove.
   public var featureId: String?
+  /// Optional state key. Used only by remove and requires feature_id.
   public var stateKey: String?
   public static var `default`: Self {
     Self()
@@ -593,6 +682,10 @@ public struct FeatureStateSelector: Equatable, Hashable, Sendable {
   }
 }
 
+/// Optional fields for `mln_feature_state_selector`.
+///
+/// See `mln_feature_state_selector_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FeatureStateSelectorField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -607,6 +700,10 @@ public struct FeatureStateSelectorField: OptionSet, NativeOpenValue, Equatable,
   public static let stateKey: FeatureStateSelectorField = .init(rawValue: 4)
 }
 
+/// Field mask values for `mln_free_camera_options`.
+///
+/// See `mln_free_camera_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FreeCameraOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -619,6 +716,10 @@ public struct FreeCameraOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let orientation: FreeCameraOptionField = .init(rawValue: 2)
 }
 
+/// Free camera position and orientation in MapLibre Native camera space.
+///
+/// See `mln_free_camera_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   public var position: Vec3?
   public var orientation: Quaternion?
@@ -656,6 +757,10 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Gesture boundary carried atomically with a camera update.
+///
+/// See `mln_gesture_phase` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -664,15 +769,28 @@ public struct GesturePhase: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// The update carries no gesture boundary and leaves the flag as it is.
   public static let none: GesturePhase = .init(rawValue: 0)
+  /// Marks a gesture as in progress before the camera write. It does not cancel
+  /// running transitions; use `mln_map_cancel_transitions()` for that.
   public static let begin: GesturePhase = .init(rawValue: 1)
+  /// Keeps the gesture marked as in progress before the camera write.
   public static let update: GesturePhase = .init(rawValue: 2)
+  /// Clears the gesture flag after the camera write.
   public static let end: GesturePhase = .init(rawValue: 3)
+  /// Cancels transitions running after the camera write, then clears the
+  /// gesture flag.
   public static let cancel: GesturePhase = .init(rawValue: 4)
 }
 
+/// Geographic coordinate in degrees used by map and projection APIs.
+///
+/// See `mln_lat_lng` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LatLng: Equatable, Hashable, Sendable {
+  /// Latitude in degrees. Input latitude must be finite and within \[-90, 90\].
   public var latitude: Double
+  /// Longitude in degrees. Input longitude must be finite.
   public var longitude: Double
   public static var `default`: Self {
     Self(raw: mln_lat_lng())
@@ -699,6 +817,10 @@ public struct LatLng: Equatable, Hashable, Sendable {
   }
 }
 
+/// Geographic bounds in degrees.
+///
+/// See `mln_lat_lng_bounds` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LatLngBounds: Equatable, Hashable, Sendable {
   public var southwest: LatLng
   public var northeast: LatLng
@@ -727,9 +849,18 @@ public struct LatLngBounds: Equatable, Hashable, Sendable {
   }
 }
 
+/// Logical map extent in UI pixels and device-pixel scale.
+///
+/// See `mln_logical_extent` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct LogicalExtent: Equatable, Hashable, Sendable {
+  /// Width in UI pixels. Defaults to 256.
   public var width: UInt32
+  /// Height in UI pixels. Defaults to 256.
   public var height: UInt32
+  /// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
+  /// creation, so `mln_map_resize()` accepts only the value the map was created
+  /// with.
   public var scaleFactor: Double
   public static var `default`: Self {
     Self(raw: mln_logical_extent())
@@ -760,6 +891,10 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   }
 }
 
+/// Debug overlay mask values for `mln_map_set_debug_options()`.
+///
+/// See `mln_map_debug_option` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapDebugOption: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
@@ -777,6 +912,10 @@ public struct MapDebugOption: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let depthBuffer: MapDebugOption = .init(rawValue: 128)
 }
 
+/// Map rendering modes used when creating a map.
+///
+/// See `mln_map_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapMode: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
@@ -785,15 +924,30 @@ public struct MapMode: RawRepresentable, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
+  /// Continuously updates as data arrives and map state changes.
   public static let continuous: MapMode = .init(rawValue: 0)
+  /// Produces one-off still images of an arbitrary viewport.
   public static let `static`: MapMode = .init(rawValue: 1)
+  /// Produces one-off still images for a single tile.
   public static let tile: MapMode = .init(rawValue: 2)
 }
 
+/// Options used when creating a map.
+///
+/// See `mln_map_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapOptions: Equatable, Hashable, Sendable {
+  /// Initial logical extent. Width and height must be positive. The scale
+  /// factor must be positive and finite, and fixes the map's scale factor for
+  /// its lifetime.
   public var initialExtent: LogicalExtent
+  /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
   public var mapMode: MapMode
+  /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+  /// encodings. Defaults to false.
   public var fastPforEnabled: Bool
+  /// Map-originated event types this map queues, as a bitwise OR of
+  /// `mln_runtime_event_mask` values.
   public var eventMask: RuntimeEventMask
   public static var `default`: Self {
     Self(raw: mln_map_options_default())
@@ -828,16 +982,23 @@ public struct MapOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Immutable map state copied from the latest published generation.
+///
+/// See `mln_map_snapshot` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapSnapshot: Equatable, Hashable, Sendable {
+  /// Debug overlay mask of `mln_map_debug_option` values.
   public var debugOptions: MapDebugOption
   public var generation: UInt64
   public var camera: CameraOptions
   public var logicalExtent: LogicalExtent
   public var projectionMode: ProjectionMode
   public var viewport: MapViewportOptions
+  /// True once every requested style and tile resource finished loading.
   public var fullyLoaded: Bool
   public var renderingStatsViewEnabled: Bool
   public var repaintDemand: Bool
+  /// True while the map is inside a gesture.
   public var gestureInProgress: Bool
   public var eventMask: RuntimeEventMask
   public var latestRenderUpdateGeneration: UInt64
@@ -924,6 +1085,10 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_map_tile_options`.
+///
+/// See `mln_map_tile_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapTileOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -940,12 +1105,18 @@ public struct MapTileOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let lodMode: MapTileOptionField = .init(rawValue: 32)
 }
 
+/// Tile prefetch and LOD tuning controls.
+///
+/// See `mln_map_tile_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapTileOptions: Equatable, Hashable, Sendable {
+  /// Native uint8_t prefetch zoom delta.
   public var prefetchZoomDelta: UInt32?
   public var lodMinRadius: Double?
   public var lodScale: Double?
   public var lodPitchThreshold: Double?
   public var lodZoomShift: Double?
+  /// One of `mln_tile_lod_mode`.
   public var lodMode: TileLodMode?
   public static var `default`: Self {
     Self(raw: mln_map_tile_options_default())
@@ -1013,6 +1184,10 @@ public struct MapTileOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_map_viewport_options`.
+///
+/// See `mln_map_viewport_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapViewportOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1028,9 +1203,16 @@ public struct MapViewportOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let frustumOffset: MapViewportOptionField = .init(rawValue: 8)
 }
 
+/// Live map viewport and render-transform controls.
+///
+/// See `mln_map_viewport_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapViewportOptions: Equatable, Hashable, Sendable {
+  /// One of `mln_north_orientation`.
   public var northOrientation: NorthOrientation?
+  /// One of `mln_constrain_mode`.
   public var constrainMode: ConstrainMode?
+  /// One of `mln_viewport_mode`.
   public var viewportMode: ViewportMode?
   public var frustumOffset: EdgeInsets?
   public static var `default`: Self {
@@ -1084,6 +1266,10 @@ public struct MapViewportOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Map north orientation values used by `mln_map_viewport_options`.
+///
+/// See `mln_north_orientation` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct NorthOrientation: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1098,10 +1284,18 @@ public struct NorthOrientation: RawRepresentable, NativeOpenValue, Equatable,
   public static let left: NorthOrientation = .init(rawValue: 3)
 }
 
+/// Geometry offline region definition.
+///
+/// See `mln_offline_geometry_region_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
+  /// Style URL. Copied during region creation.
   public var styleUrl: String
+  /// UTF-8 GeoJSON Geometry bytes. Borrowed during region creation.
   public var geometry: Data
   public var minZoom: Double
+  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
+  /// each tile source use its own maximum zoom.
   public var maxZoom: Double
   public var pixelRatio: Float
   public var includeIdeographs: Bool
@@ -1155,6 +1349,10 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
   }
 }
 
+/// Tagged offline region definition.
+///
+/// See `mln_offline_region_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
   public var data: OfflineRegionDefinitionData
   public static var `default`: Self {
@@ -1223,6 +1421,10 @@ public struct OfflineRegionDefinition: Equatable, Hashable, Sendable {
   }
 }
 
+/// Offline region definition data.
+///
+/// See `mln_offline_region_definition_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public enum OfflineRegionDefinitionData: Equatable, Hashable, Sendable {
   case tilePyramid(OfflineTilePyramidRegionDefinition)
   case geometry(OfflineGeometryRegionDefinition)
@@ -1233,9 +1435,14 @@ public enum OfflineRegionDefinitionData: Equatable, Hashable, Sendable {
   }
 }
 
+/// Region data delivered by an offline completion.
+///
+/// See `mln_offline_region_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
   public var id: Int64
   public var definition: OfflineRegionDefinition
+  /// Metadata bytes.
   public var metadata: Data
   public static var `default`: Self {
     Self()
@@ -1275,12 +1482,19 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
   }
 }
 
+/// Tile-pyramid offline region definition.
+///
+/// See `mln_offline_tile_pyramid_region_definition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
   Sendable
 {
+  /// Style URL. Copied during region creation.
   public var styleUrl: String
   public var bounds: LatLngBounds
   public var minZoom: Double
+  /// Maximum zoom. Positive infinity follows MapLibre Native behavior and lets
+  /// each tile source use its own maximum zoom.
   public var maxZoom: Double
   public var pixelRatio: Float
   public var includeIdeographs: Bool
@@ -1333,8 +1547,14 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
   }
 }
 
+/// Lower-level Spherical Mercator projected-meter coordinate.
+///
+/// See `mln_projected_meters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectedMeters: Equatable, Hashable, Sendable {
+  /// Distance measured northward from the equator, in meters.
   public var northing: Double
+  /// Distance measured eastward from the prime meridian, in meters.
   public var easting: Double
   public static var `default`: Self {
     Self(raw: mln_projected_meters())
@@ -1361,9 +1581,16 @@ public struct ProjectedMeters: Equatable, Hashable, Sendable {
   }
 }
 
+/// MapLibre axonometric rendering options used for snapshots and commands.
+///
+/// See `mln_projection_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectionMode: Equatable, Hashable, Sendable {
+  /// Enables a non-perspective axonometric render transform.
   public var axonometric: Bool?
+  /// Native x-skew factor used by the axonometric transform.
   public var xSkew: Double?
+  /// Native y-skew factor used by the axonometric transform.
   public var ySkew: Double?
   public static var `default`: Self {
     Self(raw: mln_projection_mode_default())
@@ -1405,6 +1632,10 @@ public struct ProjectionMode: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for MapLibre axonometric rendering options.
+///
+/// See `mln_projection_mode_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ProjectionModeField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1418,6 +1649,10 @@ public struct ProjectionModeField: OptionSet, NativeOpenValue, Equatable,
   public static let ySkew: ProjectionModeField = .init(rawValue: 4)
 }
 
+/// Quaternion stored as x, y, z, w components.
+///
+/// See `mln_quaternion` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Quaternion: Equatable, Hashable, Sendable {
   public var x: Double
   public var y: Double
@@ -1456,6 +1691,10 @@ public struct Quaternion: Equatable, Hashable, Sendable {
   }
 }
 
+/// Screen-space point in logical map pixels.
+///
+/// See `mln_screen_point` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ScreenPoint: Equatable, Hashable, Sendable {
   public var x: Double
   public var y: Double
@@ -1484,6 +1723,10 @@ public struct ScreenPoint: Equatable, Hashable, Sendable {
   }
 }
 
+/// Tile LOD algorithms used by `mln_map_tile_options`.
+///
+/// See `mln_tile_lod_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct TileLodMode: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1496,6 +1739,10 @@ public struct TileLodMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let distance: TileLodMode = .init(rawValue: 1)
 }
 
+/// Cubic easing curve for animated camera transitions.
+///
+/// See `mln_unit_bezier` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct UnitBezier: Equatable, Hashable, Sendable {
   public var x1: Double
   public var y1: Double
@@ -1534,6 +1781,10 @@ public struct UnitBezier: Equatable, Hashable, Sendable {
   }
 }
 
+/// Three-component vector used by free camera options.
+///
+/// See `mln_vec3` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct Vec3: Equatable, Hashable, Sendable {
   public var x: Double
   public var y: Double
@@ -1567,6 +1818,10 @@ public struct Vec3: Equatable, Hashable, Sendable {
   }
 }
 
+/// Viewport orientation modes used by `mln_map_viewport_options`.
+///
+/// See `mln_viewport_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct ViewportMode: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {

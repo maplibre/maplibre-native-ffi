@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_lat_lng_for_projected_meters`.
+  /// Converts spherical Mercator projected meters to a geographic coordinate.
+  ///
+  /// See `mln_lat_lng_for_projected_meters` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   static func latLngForProjectedMeters(
     meters bindingArg0: ProjectedMeters
   ) throws
@@ -20,7 +23,10 @@ public extension Maplibre {
     } result: { LatLng(raw: value0) }
   }
 
-  /// Calls `mln_projected_meters_for_lat_lng`.
+  /// Converts a geographic coordinate to spherical Mercator projected meters.
+  ///
+  /// See `mln_projected_meters_for_lat_lng` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   static func projectedMetersForLatLng(coordinate bindingArg0: LatLng) throws
     -> ProjectedMeters
   {

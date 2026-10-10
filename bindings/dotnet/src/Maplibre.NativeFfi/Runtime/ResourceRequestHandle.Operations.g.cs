@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// A resource request that a resource provider handles.
+/// </summary>
+/// <remarks>
+/// See <c>mln_resource_request_handle</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class ResourceRequestHandle
     : IDisposable,
         INativeOwner<MlnResourceRequest>
@@ -48,6 +55,14 @@ public sealed unsafe partial class ResourceRequestHandle
 
     internal bool FinishDecision(bool accepted) => state.FinishDecision(accepted);
 
+    /// <summary>
+    /// Reports whether MapLibre has cancelled a C API resource provider
+    /// request.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_resource_request_cancelled</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public bool Cancelled()
     {
         using var read = state.Read(this, "mln_resource_request_cancelled");
@@ -56,6 +71,13 @@ public sealed unsafe partial class ResourceRequestHandle
         return outCancelled;
     }
 
+    /// <summary>
+    /// Completes a C API resource provider request.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_resource_request_complete</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public void Complete(ResourceResponse response)
     {
         using var scope = new NativeCallScope(this, "mln_resource_request_complete");
@@ -66,12 +88,27 @@ public sealed unsafe partial class ResourceRequestHandle
         claim.Accept();
     }
 
+    /// <summary>
+    /// Releases the provider's reference to a resource request handle.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_resource_request_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public void Close()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_resource_request_release");
         state.Close();
     }
 
+    /// <summary>
+    /// Registers a callback that runs when MapLibre cancels a C API resource
+    /// provider request.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_resource_request_set_cancel_callback</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public bool SetCancelCallback(Action? callback)
     {
         using var read = state.Read(this, "mln_resource_request_set_cancel_callback");
@@ -92,6 +129,15 @@ public sealed unsafe partial class ResourceRequestHandle
         return outCancelled;
     }
 
+    /// <summary>
+    /// Blocks until a resource request is released and its cancel callback
+    /// registration has retired: the callback, if it ran, and release_user_data
+    /// have both returned. Completing a request does not release its owner.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_resource_request_wait_until_retired</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public void WaitUntilRetired()
     {
         using var call = Enter(this, "mln_resource_request_wait_until_retired");

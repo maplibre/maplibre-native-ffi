@@ -34,12 +34,14 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * renderer uses scale_factor; the physical size is stated separately below.
    */
   mln_render_target_extent extent;
-  /** Physical texture width in device pixels. Must be positive. */
-  uint32_t physical_width;
-  /** Physical texture height in device pixels. Must be positive. */
-  uint32_t physical_height;
+  /** Physical texture width in device pixels. Must be positive. Defaults to
+   * 256. */
+  uint32_t physical_width MLN_BINDING("default=256");
+  /** Physical texture height in device pixels. Must be positive. Defaults to
+   * 256. */
+  uint32_t physical_height MLN_BINDING("default=256");
   /**
-   * Borrowed id<MTLTexture> / MTL::Texture*. Required.
+   * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
    *
    * The texture's pixel dimensions must equal physical_width and
    * physical_height, the texture must allow render-target usage, and it must be
@@ -64,9 +66,9 @@ typedef struct mln_metal_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
-  /** Borrowed id<MTLTexture> / MTL::Texture*. Valid until frame release. */
+  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release. */
   void* texture;
-  /** Borrowed id<MTLDevice> / MTL::Device*. Valid until frame release. */
+  /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
   void* device;
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
   uint64_t pixel_format;
@@ -89,10 +91,12 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * renderer uses scale_factor; the physical size is stated separately below.
    */
   mln_render_target_extent extent;
-  /** Physical image width in device pixels. Must be positive. */
-  uint32_t physical_width;
-  /** Physical image height in device pixels. Must be positive. */
-  uint32_t physical_height;
+  /** Physical image width in device pixels. Must be positive. Defaults to 256.
+   */
+  uint32_t physical_width MLN_BINDING("default=256");
+  /** Physical image height in device pixels. Must be positive. Defaults to 256.
+   */
+  uint32_t physical_height MLN_BINDING("default=256");
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
   /**
@@ -124,8 +128,11 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
    * discarded.
    */
   uint32_t initial_layout;
-  /** Backend-native VkImageLayout value left after rendering succeeds. */
-  uint32_t final_layout;
+  /**
+   * Backend-native VkImageLayout value left after rendering succeeds. Defaults
+   * to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+   */
+  uint32_t final_layout MLN_BINDING("default=5");
 } mln_vulkan_borrowed_texture_descriptor;
 
 /** Vulkan frame acquired from a session-owned texture target. */
@@ -174,10 +181,12 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
    * renderer uses scale_factor; the physical size is stated separately below.
    */
   mln_render_target_extent extent;
-  /** Physical texture width in device pixels. Must be positive. */
-  uint32_t physical_width;
-  /** Physical texture height in device pixels. Must be positive. */
-  uint32_t physical_height;
+  /** Physical texture width in device pixels. Must be positive. Defaults to
+   * 256. */
+  uint32_t physical_width MLN_BINDING("default=256");
+  /** Physical texture height in device pixels. Must be positive. Defaults to
+   * 256. */
+  uint32_t physical_height MLN_BINDING("default=256");
   /**
    * Borrowed OpenGL context provider data. The texture must belong to this
    * context or a context in the same share group.
@@ -213,10 +222,10 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
   uint32_t size;
   /** Logical texture extent. */
   mln_render_target_extent extent;
-  /** Physical texture width in device pixels. */
-  uint32_t physical_width;
-  /** Physical texture height in device pixels. */
-  uint32_t physical_height;
+  /** Physical texture width in device pixels. Defaults to 256. */
+  uint32_t physical_width MLN_BINDING("default=256");
+  /** Physical texture height in device pixels. Defaults to 256. */
+  uint32_t physical_height MLN_BINDING("default=256");
   /** Borrowed WebGPU context. device is required. */
   mln_webgpu_context_descriptor context;
   /**

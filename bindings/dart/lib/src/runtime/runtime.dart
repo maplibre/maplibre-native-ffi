@@ -268,3 +268,11 @@ final class NativeAdoptionFailure implements Exception {
 }
 
 void _check(int status) => checkNativeCall(status);
+
+/// Checks [status] like [_check], except that [absent] reports that native
+/// published no output. Returns whether the output holds a value.
+bool _present(int status, int absent) {
+  if (status == absent) return false;
+  _check(status);
+  return true;
+}

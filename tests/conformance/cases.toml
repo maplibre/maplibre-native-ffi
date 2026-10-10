@@ -7,6 +7,7 @@
 # Status and diagnostics
 "ERR-01" = "A failed call maps its status to the language's error, keeps an unknown status code, and carries the call's diagnostic message"
 "ERR-02" = "Loading a library with a different C ABI version fails before any other call"
+"ERR-03" = "A status that the C API declares as absence returns the language's empty form instead of an error"
 
 # Handle lifecycle
 "LIFE-01" = "Closing a handle twice is safe and the second close does nothing"
@@ -38,6 +39,7 @@
 "VAL-03" = "A strided batch and a union with an unknown arm decode without losing data"
 "VAL-04" = "Integer narrowing is checked, open enums keep unknown values, and 64-bit carriers round-trip"
 "VAL-05" = "An array input is copied at submission, so changing it afterwards has no effect"
+"VAL-06" = "A record built from its constructor defaults equals the native default"
 
 # Views and rendering
 "VIEW-01" = "A borrowed view expires with its scope, and its owner refuses to close while it is borrowed"

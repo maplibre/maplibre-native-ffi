@@ -14,6 +14,12 @@ public abstract class GeneratedMapOperations internal constructor() {
   internal abstract val binding: HandleStateCore
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
+  /**
+   * Adds a color-relief layer for a raster DEM source.
+   *
+   * See `mln_map_add_color_relief_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addColorReliefLayer(
     layerId: String,
     sourceId: String,
@@ -32,6 +38,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a custom geometry source.
+   *
+   * See `mln_map_add_custom_geometry_source` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addCustomGeometrySource(
     sourceId: String,
     options: CustomGeometrySourceOptions,
@@ -48,6 +60,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a custom MVT vector source.
+   *
+   * See `mln_map_add_custom_mvt_vector_source` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addCustomMvtVectorSource(
     sourceId: String,
     options: CustomMvtVectorSourceOptions,
@@ -64,6 +82,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a GeoJSON source with prepared inline data.
+   *
+   * See `mln_map_add_geojson_source_data` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addGeojsonSourceData(
     sourceId: String,
     data: GeojsonSourceDataHandle,
@@ -80,6 +104,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a GeoJSON source with URL data.
+   *
+   * See `mln_map_add_geojson_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addGeojsonSourceUrl(
     sourceId: String,
     url: String,
@@ -98,6 +128,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a hillshade layer for a raster DEM source.
+   *
+   * See `mln_map_add_hillshade_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addHillshadeLayer(
     layerId: String,
     sourceId: String,
@@ -116,6 +152,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds an image source with inline image pixels.
+   *
+   * See `mln_map_add_image_source_image` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addImageSourceImage(
     sourceId: String,
     coordinates: List<LatLng>,
@@ -135,6 +177,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds an image source that loads its image from a URL.
+   *
+   * See `mln_map_add_image_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addImageSourceUrl(
     sourceId: String,
     coordinates: List<LatLng>,
@@ -154,6 +202,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a source-free location indicator layer.
+   *
+   * See `mln_map_add_location_indicator_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addLocationIndicatorLayer(
     layerId: String,
     beforeLayerId: String? = null,
@@ -170,6 +224,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a raster DEM source with inline tile URLs.
+   *
+   * See `mln_map_add_raster_dem_source_tiles` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addRasterDemSourceTiles(
     sourceId: String,
     tiles: List<String>,
@@ -191,6 +251,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a raster DEM source with a TileJSON URL.
+   *
+   * See `mln_map_add_raster_dem_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addRasterDemSourceUrl(
     sourceId: String,
     url: String,
@@ -209,6 +275,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a raster source with inline tile URLs.
+   *
+   * See `mln_map_add_raster_source_tiles` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addRasterSourceTiles(
     sourceId: String,
     tiles: List<String>,
@@ -230,6 +302,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a raster source with a TileJSON URL.
+   *
+   * See `mln_map_add_raster_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addRasterSourceUrl(
     sourceId: String,
     url: String,
@@ -248,6 +326,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds one style layer from a full style-spec layer JSON object.
+   *
+   * See `mln_map_add_style_layer_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addStyleLayerJson(
     layerJson: ByteArray,
     beforeLayerId: String? = null,
@@ -264,6 +348,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds one style source from a style-spec source JSON object.
+   *
+   * See `mln_map_add_style_source_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addStyleSourceJson(
     sourceId: String,
     sourceJson: ByteArray,
@@ -280,6 +370,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a vector source with inline tile URLs.
+   *
+   * See `mln_map_add_vector_source_tiles` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addVectorSourceTiles(
     sourceId: String,
     tiles: List<String>,
@@ -301,6 +397,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Adds a vector source with a TileJSON URL.
+   *
+   * See `mln_map_add_vector_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun addVectorSourceUrl(
     sourceId: String,
     url: String,
@@ -319,11 +421,23 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Submits one copied relative camera update.
+   *
+   * See `mln_map_apply_camera_delta` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_apply_camera_delta") {
       check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
     }
 
+  /**
+   * Starts an ordered query for a camera that fits a GeoJSON geometry.
+   *
+   * See `mln_map_camera_for_geometry` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun cameraForGeometry(
     geometry: ByteArray,
     fitOptions: CameraFitOptions? = null,
@@ -345,6 +459,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered query for a camera that fits geographic bounds.
+   *
+   * See `mln_map_camera_for_lat_lng_bounds` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions? = null,
@@ -366,6 +486,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered query for a camera that fits geographic coordinates.
+   *
+   * See `mln_map_camera_for_lat_lngs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions? = null,
@@ -388,6 +514,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered camera read.
+   *
+   * See `mln_map_camera_query` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun cameraQuery(): Deferred<CameraQueryResult> =
     nativeSubmit(
       this,
@@ -398,6 +530,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_camera_query(handle, completion, diagnostic))
     }
 
+  /**
+   * Copies the camera from the latest immutable map snapshot.
+   *
+   * See `mln_map_camera_snapshot_get` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun cameraSnapshotGet(): MapCameraSnapshotGetResult =
     nativeCall(this, binding, "mln_map_camera_snapshot_get") {
       val out0 = sized(120, 8)
@@ -406,11 +544,23 @@ public abstract class GeneratedMapOperations internal constructor() {
       MapCameraSnapshotGetResult(camera = readCameraOptions(out0), generation = readU64(out1))
     }
 
+  /**
+   * Cancels the camera transitions running when this command commits.
+   *
+   * See `mln_map_cancel_transitions` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun cancelTransitions(): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_cancel_transitions") {
       check(C.mln_map_cancel_transitions(handle, completion, diagnostic))
     }
 
+  /**
+   * Copies one layer's source ID.
+   *
+   * See `mln_map_copy_layer_source_id` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun copyLayerSourceId(layerId: String): Deferred<String?> =
     nativeSubmit(
       this,
@@ -421,6 +571,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_copy_layer_source_id(handle, view(layerId), completion, diagnostic))
     }
 
+  /**
+   * Copies one layer's source-layer ID.
+   *
+   * See `mln_map_copy_layer_source_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun copyLayerSourceLayer(layerId: String): Deferred<String?> =
     nativeSubmit(
       this,
@@ -431,6 +587,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_copy_layer_source_layer(handle, view(layerId), completion, diagnostic))
     }
 
+  /**
+   * Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
+   *
+   * See `mln_map_copy_style_image_premultiplied_rgba8` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<ByteArray?> =
     nativeSubmit(
       this,
@@ -451,6 +613,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Copies one runtime style image's stretchable intervals.
+   *
+   * See `mln_map_copy_style_image_stretches` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun copyStyleImageStretches(imageId: String): Deferred<StyleImageStretchesResult?> =
     nativeSubmit(
       this,
@@ -464,6 +632,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_copy_style_image_stretches(handle, view(imageId), completion, diagnostic))
     }
 
+  /**
+   * Copies one style source attribution string.
+   *
+   * See `mln_map_copy_style_source_attribution` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun copyStyleSourceAttribution(sourceId: String): Deferred<String?> =
     nativeSubmit(
       this,
@@ -477,6 +651,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_copy_style_source_attribution(handle, view(sourceId), completion, diagnostic))
     }
 
+  /**
+   * Copies one style source URL.
+   *
+   * See `mln_map_copy_style_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun copyStyleSourceUrl(sourceId: String): Deferred<String?> =
     nativeSubmit(
       this,
@@ -490,14 +670,32 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_copy_style_source_url(handle, view(sourceId), completion, diagnostic))
     }
 
+  /**
+   * Consumes a map handle without observing its asynchronous retirement.
+   *
+   * See `mln_map_dispose` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun dispose(): Unit =
     nativeClose(this, binding, "mln_map_dispose") { check(C.mln_map_dispose(handle, diagnostic)) }
 
+  /**
+   * Submits an ordered debug-log command.
+   *
+   * See `mln_map_dump_debug_logs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun dumpDebugLogs(): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_dump_debug_logs") {
       check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
     }
 
+  /**
+   * Starts an ordered read of per-feature state from this map.
+   *
+   * See `mln_map_get_feature_state` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun getFeatureState(selector: FeatureStateSelector): Deferred<ByteArray> =
     nativeSubmit(
       this,
@@ -515,6 +713,13 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Queries the global-state JSON object, including style defaults. Completion borrows one
+   * `mln_buffer_view` for the duration of the callback.
+   *
+   * See `mln_map_get_global_state` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getGlobalState(): Deferred<ByteArray> =
     nativeSubmit(
       this,
@@ -525,6 +730,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_global_state(handle, completion, diagnostic))
     }
 
+  /**
+   * Copies image source coordinates.
+   *
+   * See `mln_map_get_image_source_coordinates` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getImageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> =
     nativeSubmit(
       this,
@@ -545,6 +756,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_image_source_coordinates(handle, view(sourceId), completion, diagnostic))
     }
 
+  /**
+   * Serializes one layer filter as a style-spec JSON value.
+   *
+   * See `mln_map_get_layer_filter` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getLayerFilter(layerId: String): Deferred<ByteArray?> =
     nativeSubmit(
       this,
@@ -558,6 +775,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_layer_filter(handle, view(layerId), completion, diagnostic))
     }
 
+  /**
+   * Serializes one layer property as a style-spec JSON value.
+   *
+   * See `mln_map_get_layer_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getLayerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> =
     nativeSubmit(
       this,
@@ -579,6 +802,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Copies one complete runtime style image.
+   *
+   * See `mln_map_get_style_image_info` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getStyleImageInfo(imageId: String): Deferred<StyleImageResult?> =
     nativeSubmit(
       this,
@@ -592,6 +821,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_style_image_info(handle, view(imageId), completion, diagnostic))
     }
 
+  /**
+   * Copies complete metadata for one style layer.
+   *
+   * See `mln_map_get_style_layer_info` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getStyleLayerInfo(layerId: String): Deferred<StyleLayerResult?> =
     nativeSubmit(
       this,
@@ -605,6 +840,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_style_layer_info(handle, view(layerId), completion, diagnostic))
     }
 
+  /**
+   * Serializes one style layer as a full style-spec layer JSON object.
+   *
+   * See `mln_map_get_style_layer_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getStyleLayerJson(layerId: String): Deferred<ByteArray?> =
     nativeSubmit(
       this,
@@ -618,6 +859,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_style_layer_json(handle, view(layerId), completion, diagnostic))
     }
 
+  /**
+   * Serializes one style light property as a style-spec JSON value.
+   *
+   * See `mln_map_get_style_light_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getStyleLightProperty(propertyName: String): Deferred<ByteArray?> =
     nativeSubmit(
       this,
@@ -631,6 +878,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_style_light_property(handle, view(propertyName), completion, diagnostic))
     }
 
+  /**
+   * Copies complete metadata for one style source.
+   *
+   * See `mln_map_get_style_source_info` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getStyleSourceInfo(sourceId: String): Deferred<StyleSourceResult?> =
     nativeSubmit(
       this,
@@ -644,6 +897,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_style_source_info(handle, view(sourceId), completion, diagnostic))
     }
 
+  /**
+   * Copies one style source's inline TileJSON tile URLs.
+   *
+   * See `mln_map_get_style_source_tile_urls` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getStyleSourceTileUrls(sourceId: String): Deferred<StyleSourceTileUrlsResult?> =
     nativeSubmit(
       this,
@@ -657,6 +916,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_style_source_tile_urls(handle, view(sourceId), completion, diagnostic))
     }
 
+  /**
+   * Reads the style's global transition options.
+   *
+   * See `mln_map_get_style_transition_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun getStyleTransitionOptions(): Deferred<StyleTransitionOptions> =
     nativeSubmit(
       this,
@@ -667,6 +932,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_get_style_transition_options(handle, completion, diagnostic))
     }
 
+  /**
+   * Invalidates custom geometry source data inside one geographic region.
+   *
+   * See `mln_map_invalidate_custom_geometry_source_region` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun invalidateCustomGeometrySourceRegion(
     sourceId: String,
     bounds: LatLngBounds,
@@ -683,6 +954,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Invalidates custom geometry source data for one canonical tile.
+   *
+   * See `mln_map_invalidate_custom_geometry_source_tile` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun invalidateCustomGeometrySourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -699,6 +976,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Invalidates custom MVT vector source data for one canonical tile.
+   *
+   * See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun invalidateCustomMvtVectorSourceTile(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -715,6 +998,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered wrapped-bounds query for a copied camera.
+   *
+   * See `mln_map_lat_lng_bounds_for_camera` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun latLngBoundsForCamera(camera: CameraOptions): Deferred<LatLngBounds> =
     nativeSubmit(
       this,
@@ -732,6 +1021,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered unwrapped-bounds query for a copied camera.
+   *
+   * See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): Deferred<LatLngBounds> =
     nativeSubmit(
       this,
@@ -749,6 +1044,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered conversion from a screen point to a geographic coordinate.
+   *
+   * See `mln_map_lat_lng_for_pixel` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun latLngForPixel(point: ScreenPoint): Deferred<LatLng> =
     nativeSubmit(
       this,
@@ -759,6 +1060,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_lat_lng_for_pixel(handle, writeScreenPoint(point), completion, diagnostic))
     }
 
+  /**
+   * Starts an ordered conversion from a screen point to an unwrapped geographic coordinate.
+   *
+   * See `mln_map_lat_lng_for_pixel_unwrapped` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun latLngForPixelUnwrapped(point: ScreenPoint): Deferred<LatLng> =
     nativeSubmit(
       this,
@@ -776,6 +1083,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered conversion of copied screen points to coordinates.
+   *
+   * See `mln_map_lat_lngs_for_pixels` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun latLngsForPixels(points: List<ScreenPoint>): Deferred<List<LatLng>> =
     nativeSubmit(
       this,
@@ -802,6 +1115,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered conversion of copied screen points to unwrapped coordinates.
+   *
+   * See `mln_map_lat_lngs_for_pixels_unwrapped` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun latLngsForPixelsUnwrapped(points: List<ScreenPoint>): Deferred<List<LatLng>> =
     nativeSubmit(
       this,
@@ -828,6 +1147,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Copies style layer IDs in style order.
+   *
+   * See `mln_map_list_style_layer_ids` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun listStyleLayerIds(): Deferred<List<String>> =
     nativeSubmit(
       this,
@@ -846,6 +1171,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_list_style_layer_ids(handle, completion, diagnostic))
     }
 
+  /**
+   * Starts an ordered query of every style layer in style order.
+   *
+   * See `mln_map_list_style_layers` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun listStyleLayers(): Deferred<List<StyleLayerEntry>> =
     nativeSubmit(
       this,
@@ -864,6 +1195,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_list_style_layers(handle, completion, diagnostic))
     }
 
+  /**
+   * Copies style source IDs in style order.
+   *
+   * See `mln_map_list_style_source_ids` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun listStyleSourceIds(): Deferred<List<String>> =
     nativeSubmit(
       this,
@@ -882,6 +1219,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_list_style_source_ids(handle, completion, diagnostic))
     }
 
+  /**
+   * Starts an ordered copy of the last successfully parsed style document.
+   *
+   * See `mln_map_loaded_style_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun loadedStyleJson(): Deferred<ByteArray> =
     nativeSubmit(
       this,
@@ -892,6 +1235,13 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_loaded_style_json(handle, completion, diagnostic))
     }
 
+  /**
+   * Starts an ordered query of meters per logical pixel at a latitude and the current map zoom. The
+   * completion borrows one double.
+   *
+   * See `mln_map_meters_per_pixel_at_latitude` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun metersPerPixelAtLatitude(latitude: Double): Deferred<Double> =
     nativeSubmit(
       this,
@@ -902,6 +1252,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_meters_per_pixel_at_latitude(handle, latitude, completion, diagnostic))
     }
 
+  /**
+   * Moves one style layer before another layer or to the top.
+   *
+   * See `mln_map_move_style_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun moveStyleLayer(
     layerId: String,
     beforeLayerId: String? = null,
@@ -918,6 +1274,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts an ordered conversion from a geographic coordinate to a screen point.
+   *
+   * See `mln_map_pixel_for_lat_lng` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun pixelForLatLng(coordinate: LatLng): Deferred<ScreenPoint> =
     nativeSubmit(
       this,
@@ -928,6 +1290,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_pixel_for_lat_lng(handle, writeLatLng(coordinate), completion, diagnostic))
     }
 
+  /**
+   * Starts an ordered conversion of copied coordinates to screen points.
+   *
+   * See `mln_map_pixels_for_lat_lngs` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun pixelsForLatLngs(coordinates: List<LatLng>): Deferred<List<ScreenPoint>> =
     nativeSubmit(
       this,
@@ -954,6 +1322,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts creation of a standalone projection from the map's ordered transform state.
+   *
+   * See `mln_map_projection_create` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+   */
   public fun projectionCreate(): Deferred<MapProjectionHandle> =
     nativeSubmitOwned(
       this,
@@ -966,11 +1340,23 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_projection_create(handle, completion, diagnostic))
     }
 
+  /**
+   * Releases a map after synchronous state preflight.
+   *
+   * See `mln_map_release` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun release(): Deferred<Unit> =
     nativeRetire(this, binding, "mln_map_release") {
       check(C.mln_map_release(handle, completion, diagnostic))
     }
 
+  /**
+   * Removes per-feature state from this map.
+   *
+   * See `mln_map_remove_feature_state` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun removeFeatureState(selector: FeatureStateSelector): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_remove_feature_state") {
       check(
@@ -983,41 +1369,89 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Removes one runtime style image by ID.
+   *
+   * See `mln_map_remove_style_image` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun removeStyleImage(imageId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_remove_style_image") {
       check(C.mln_map_remove_style_image(handle, view(imageId), completion, diagnostic))
     }
 
+  /**
+   * Removes one style layer by ID.
+   *
+   * See `mln_map_remove_style_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun removeStyleLayer(layerId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_remove_style_layer") {
       check(C.mln_map_remove_style_layer(handle, view(layerId), completion, diagnostic))
     }
 
+  /**
+   * Removes one style source by ID.
+   *
+   * See `mln_map_remove_style_source` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun removeStyleSource(sourceId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_remove_style_source") {
       check(C.mln_map_remove_style_source(handle, view(sourceId), completion, diagnostic))
     }
 
+  /**
+   * Requests a repaint for a continuous map.
+   *
+   * See `mln_map_request_repaint` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun requestRepaint(): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_request_repaint") {
       check(C.mln_map_request_repaint(handle, completion, diagnostic))
     }
 
+  /**
+   * Requests one still image for a static or tile map.
+   *
+   * See `mln_map_request_still_image` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun requestStillImage(): Deferred<Unit> =
     nativeUnit(this, binding, "mln_map_request_still_image") {
       check(C.mln_map_request_still_image(handle, completion, diagnostic))
     }
 
+  /**
+   * Submits the sole post-creation logical extent update.
+   *
+   * See `mln_map_resize` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun resize(extent: LogicalExtent): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_resize") {
       check(C.mln_map_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
+  /**
+   * Submits a copied camera-constraint command.
+   *
+   * See `mln_map_set_bounds` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun setBounds(options: BoundOptions): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_bounds") {
       check(C.mln_map_set_bounds(handle, writeBoundOptions(options), completion, diagnostic))
     }
 
+  /**
+   * Sets custom geometry source data for one canonical tile.
+   *
+   * See `mln_map_set_custom_geometry_source_tile_data` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setCustomGeometrySourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -1036,6 +1470,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets custom MVT vector source data for one canonical tile.
+   *
+   * See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setCustomMvtVectorSourceTileData(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -1054,6 +1494,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Reports a custom MVT vector source error for one canonical tile.
+   *
+   * See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setCustomMvtVectorSourceTileError(
     sourceId: String,
     tileId: CanonicalTileId,
@@ -1072,16 +1518,34 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Submits a debug-overlay command.
+   *
+   * See `mln_map_set_debug_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun setDebugOptions(options: MapDebugOption): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_debug_options") {
       check(C.mln_map_set_debug_options(handle, options.rawValue.toInt(), completion, diagnostic))
     }
 
+  /**
+   * Selects which map-originated event types this map queues.
+   *
+   * See `mln_map_set_event_mask` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun setEventMask(mask: RuntimeEventMask): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_event_mask") {
       check(C.mln_map_set_event_mask(handle, mask.rawValue.toLong(), completion, diagnostic))
     }
 
+  /**
+   * Submits a copied per-feature-state command.
+   *
+   * See `mln_map_set_feature_state` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun setFeatureState(
     selector: FeatureStateSelector,
     state: ByteArray,
@@ -1098,6 +1562,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Submits a copied free-camera command.
+   *
+   * See `mln_map_set_free_camera_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun setFreeCameraOptions(options: FreeCameraOptions): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_free_camera_options") {
       check(
@@ -1110,6 +1580,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Updates one GeoJSON source with prepared inline data.
+   *
+   * See `mln_map_set_geojson_source_data` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setGeojsonSourceData(
     sourceId: String,
     data: GeojsonSourceDataHandle,
@@ -1126,6 +1602,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Overrides one GeoJSON source's synchronous tiling at runtime.
+   *
+   * See `mln_map_set_geojson_source_synchronous_tiling` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setGeojsonSourceSynchronousTiling(
     sourceId: String,
     enabled: Boolean,
@@ -1142,6 +1624,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Updates one GeoJSON source to load data from a URL.
+   *
+   * See `mln_map_set_geojson_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setGeojsonSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_geojson_source_url") {
       check(
@@ -1149,6 +1637,13 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Submits a global-state JSON value. JSON null restores the style default. Input is copied before
+   * return.
+   *
+   * See `mln_map_set_global_state_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setGlobalStateProperty(
     propertyName: String,
     valueValue: ByteArray,
@@ -1165,6 +1660,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Updates image source coordinates.
+   *
+   * See `mln_map_set_image_source_coordinates` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setImageSourceCoordinates(
     sourceId: String,
     coordinates: List<LatLng>,
@@ -1182,6 +1683,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Updates an image source with inline image pixels.
+   *
+   * See `mln_map_set_image_source_image` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setImageSourceImage(
     sourceId: String,
     image: PremultipliedRgba8Image,
@@ -1198,6 +1705,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Updates an image source to load its image from a URL.
+   *
+   * See `mln_map_set_image_source_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setImageSourceUrl(sourceId: String, url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_image_source_url") {
       check(
@@ -1205,6 +1718,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets or clears one layer filter.
+   *
+   * See `mln_map_set_layer_filter` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLayerFilter(
     layerId: String,
     filter: ByteArray? = null,
@@ -1221,16 +1740,34 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets the highest zoom at which one layer draws.
+   *
+   * See `mln_map_set_layer_max_zoom` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_layer_max_zoom") {
       check(C.mln_map_set_layer_max_zoom(handle, view(layerId), maxZoom, completion, diagnostic))
     }
 
+  /**
+   * Sets the lowest zoom at which one layer draws.
+   *
+   * See `mln_map_set_layer_min_zoom` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_layer_min_zoom") {
       check(C.mln_map_set_layer_min_zoom(handle, view(layerId), minZoom, completion, diagnostic))
     }
 
+  /**
+   * Sets one layer property using its MapLibre style-spec property name.
+   *
+   * See `mln_map_set_layer_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLayerProperty(
     layerId: String,
     propertyName: String,
@@ -1249,6 +1786,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets one layer's source ID.
+   *
+   * See `mln_map_set_layer_source_id` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLayerSourceId(layerId: String, sourceId: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_layer_source_id") {
       check(
@@ -1256,6 +1799,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets one layer's source-layer ID.
+   *
+   * See `mln_map_set_layer_source_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLayerSourceLayer(
     layerId: String,
     sourceLayer: String? = null,
@@ -1272,6 +1821,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets whether one layer draws.
+   *
+   * See `mln_map_set_layer_visibility` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLayerVisibility(
     layerId: String,
     visibility: StyleLayerVisibility,
@@ -1288,6 +1843,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets a location indicator layer accuracy radius in meters.
+   *
+   * See `mln_map_set_location_indicator_accuracy_radius` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLocationIndicatorAccuracyRadius(
     layerId: String,
     radius: Double,
@@ -1304,6 +1865,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets a location indicator layer bearing in degrees.
+   *
+   * See `mln_map_set_location_indicator_bearing` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLocationIndicatorBearing(
     layerId: String,
     bearing: Double,
@@ -1320,6 +1887,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets one location indicator image-name property.
+   *
+   * See `mln_map_set_location_indicator_image_name` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLocationIndicatorImageName(
     layerId: String,
     imageKind: LocationIndicatorImageKind,
@@ -1338,6 +1911,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets a location indicator layer location.
+   *
+   * See `mln_map_set_location_indicator_location` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setLocationIndicatorLocation(
     layerId: String,
     coordinate: LatLng,
@@ -1356,6 +1935,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Submits copied axonometric rendering option fields.
+   *
+   * See `mln_map_set_projection_mode` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun setProjectionMode(mode: ProjectionMode): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_projection_mode") {
       check(
@@ -1363,11 +1948,23 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Submits a rendering-stats visibility command.
+   *
+   * See `mln_map_set_rendering_stats_view_enabled` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun setRenderingStatsViewEnabled(enabled: Boolean): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_rendering_stats_view_enabled") {
       check(C.mln_map_set_rendering_stats_view_enabled(handle, enabled, completion, diagnostic))
     }
 
+  /**
+   * Sets one runtime style image.
+   *
+   * See `mln_map_set_style_image` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setStyleImage(
     imageId: String,
     image: PremultipliedRgba8Image,
@@ -1386,16 +1983,34 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Queues an inline style JSON command.
+   *
+   * See `mln_map_set_style_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun setStyleJson(json: ByteArray): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_json") {
       check(C.mln_map_set_style_json(handle, view(json), completion, diagnostic))
     }
 
+  /**
+   * Sets the style light from a style-spec light JSON object.
+   *
+   * See `mln_map_set_style_light_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setStyleLightJson(lightJson: ByteArray): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_light_json") {
       check(C.mln_map_set_style_light_json(handle, view(lightJson), completion, diagnostic))
     }
 
+  /**
+   * Sets one style light property using its MapLibre style-spec property name.
+   *
+   * See `mln_map_set_style_light_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setStyleLightProperty(
     propertyName: String,
     valueValue: ByteArray,
@@ -1412,6 +2027,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets whether one style source stores fetched tiles in the persistent cache.
+   *
+   * See `mln_map_set_style_source_volatile` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setStyleSourceVolatile(
     sourceId: String,
     isVolatile: Boolean,
@@ -1428,6 +2049,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Sets the style's global transition options.
+   *
+   * See `mln_map_set_style_transition_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
   public fun setStyleTransitionOptions(
     options: StyleTransitionOptions
   ): Deferred<CommandCompletion> =
@@ -1442,11 +2069,23 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Queues a style URL command.
+   *
+   * See `mln_map_set_style_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun setStyleUrl(url: String): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_style_url") {
       check(C.mln_map_set_style_url(handle, cString(url), completion, diagnostic))
     }
 
+  /**
+   * Submits a copied tile-options command.
+   *
+   * See `mln_map_set_tile_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun setTileOptions(options: MapTileOptions): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_tile_options") {
       check(
@@ -1454,6 +2093,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Submits a copied viewport-options command.
+   *
+   * See `mln_map_set_viewport_options` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun setViewportOptions(options: MapViewportOptions): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_set_viewport_options") {
       check(
@@ -1466,6 +2111,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Copies the latest immutable state published by the map worker.
+   *
+   * See `mln_map_snapshot_get` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun snapshotGet(): MapSnapshot =
     nativeCall(this, binding, "mln_map_snapshot_get") {
       val out = sized(456, 8)
@@ -1473,6 +2124,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       readMapSnapshot(out)
     }
 
+  /**
+   * Starts an ordered copy of the last requested style URL.
+   *
+   * See `mln_map_style_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
   public fun styleUrl(): Deferred<String> =
     nativeSubmit(
       this,
@@ -1483,11 +2140,23 @@ public abstract class GeneratedMapOperations internal constructor() {
       check(C.mln_map_style_url(handle, completion, diagnostic))
     }
 
+  /**
+   * Submits one atomic camera update.
+   *
+   * See `mln_map_update_camera` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
   public fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_update_camera") {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
     }
 
+  /**
+   * Starts attachment of a caller-owned Metal texture target.
+   *
+   * See `mln_metal_borrowed_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun metalBorrowedTextureAttach(
     descriptor: MetalBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1512,6 +2181,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a session-owned Metal texture ring.
+   *
+   * See `mln_metal_owned_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun metalOwnedTextureAttach(
     descriptor: MetalOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1536,6 +2211,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a Metal surface target.
+   *
+   * See `mln_metal_surface_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
   public fun metalSurfaceAttach(
     descriptor: MetalSurfaceDescriptor,
     options: RenderSessionAttachOptions,
@@ -1560,6 +2241,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a caller-owned OpenGL texture target.
+   *
+   * See `mln_opengl_borrowed_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun openglBorrowedTextureAttach(
     descriptor: OpenglBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1584,6 +2271,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a session-owned OpenGL texture ring.
+   *
+   * See `mln_opengl_owned_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun openglOwnedTextureAttach(
     descriptor: OpenglOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1608,6 +2301,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of an OpenGL surface target.
+   *
+   * See `mln_opengl_surface_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
   public fun openglSurfaceAttach(
     descriptor: OpenglSurfaceDescriptor,
     options: RenderSessionAttachOptions,
@@ -1632,6 +2331,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a caller-owned Vulkan texture target.
+   *
+   * See `mln_vulkan_borrowed_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun vulkanBorrowedTextureAttach(
     descriptor: VulkanBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1656,6 +2361,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a session-owned Vulkan texture ring.
+   *
+   * See `mln_vulkan_owned_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun vulkanOwnedTextureAttach(
     descriptor: VulkanOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1680,6 +2391,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a Vulkan surface target.
+   *
+   * See `mln_vulkan_surface_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
   public fun vulkanSurfaceAttach(
     descriptor: VulkanSurfaceDescriptor,
     options: RenderSessionAttachOptions,
@@ -1704,6 +2421,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a caller-owned WebGPU texture target.
+   *
+   * See `mln_webgpu_borrowed_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun webgpuBorrowedTextureAttach(
     descriptor: WebgpuBorrowedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1728,6 +2451,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a session-owned WebGPU texture ring.
+   *
+   * See `mln_webgpu_owned_texture_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
   public fun webgpuOwnedTextureAttach(
     descriptor: WebgpuOwnedTextureDescriptor,
     options: RenderSessionAttachOptions,
@@ -1752,6 +2481,12 @@ public abstract class GeneratedMapOperations internal constructor() {
       )
     }
 
+  /**
+   * Starts attachment of a WebGPU surface target.
+   *
+   * See `mln_webgpu_surface_attach` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
   public fun webgpuSurfaceAttach(
     descriptor: WebgpuSurfaceDescriptor,
     options: RenderSessionAttachOptions,

@@ -4,6 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapProjectionHandle {
+  /// Closes a standalone projection.
+  ///
+  /// See `mln_map_projection_close` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func close() throws {
     try nativeClose("mln_map_projection_close") { raw, diagnostic in
       mln_map_projection_close(
@@ -13,7 +17,10 @@ public extension MapProjectionHandle {
     }
   }
 
-  /// Calls `mln_map_projection_get_camera`.
+  /// Copies the projection camera into out_camera.
+  ///
+  /// See `mln_map_projection_get_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func getCamera() throws -> CameraOptions {
     var value0: mln_camera_options = mln_camera_options_default()
     return try nativeInvoke("mln_map_projection_get_camera") { raw, _, diagnostic in
@@ -25,7 +32,10 @@ public extension MapProjectionHandle {
     } result: { CameraOptions(raw: value0) }
   }
 
-  /// Calls `mln_map_projection_lat_lng_for_pixel`.
+  /// Converts a screen point to a geographic coordinate.
+  ///
+  /// See `mln_map_projection_lat_lng_for_pixel` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func latLngForPixel(point bindingArg0: ScreenPoint) throws -> LatLng {
     var value0 = mln_lat_lng()
     return try nativeInvoke("mln_map_projection_lat_lng_for_pixel") { raw, _, diagnostic in
@@ -38,7 +48,10 @@ public extension MapProjectionHandle {
     } result: { LatLng(raw: value0) }
   }
 
-  /// Calls `mln_map_projection_lat_lng_for_pixel_unwrapped`.
+  /// Converts a screen point to an unwrapped geographic coordinate.
+  ///
+  /// See `mln_map_projection_lat_lng_for_pixel_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func latLngForPixelUnwrapped(point bindingArg0: ScreenPoint) throws
     -> LatLng
   {
@@ -53,7 +66,12 @@ public extension MapProjectionHandle {
     } result: { LatLng(raw: value0) }
   }
 
-  /// Calls `mln_map_projection_meters_per_pixel_at_latitude`.
+  /// Reads the ground distance covered by one logical map pixel at a latitude
+  /// for
+  /// the helper camera zoom.
+  ///
+  /// See `mln_map_projection_meters_per_pixel_at_latitude` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func metersPerPixelAtLatitude(latitude bindingArg0: Double) throws -> Double {
     var value0: Double = 0
     return try nativeInvoke("mln_map_projection_meters_per_pixel_at_latitude") { raw, _, diagnostic in
@@ -66,7 +84,10 @@ public extension MapProjectionHandle {
     } result: { value0 }
   }
 
-  /// Calls `mln_map_projection_pixel_for_lat_lng`.
+  /// Converts a geographic coordinate to a screen point.
+  ///
+  /// See `mln_map_projection_pixel_for_lat_lng` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func pixelForLatLng(coordinate bindingArg0: LatLng) throws -> ScreenPoint {
     var value0 = mln_screen_point()
     return try nativeInvoke("mln_map_projection_pixel_for_lat_lng") { raw, _, diagnostic in
@@ -79,7 +100,10 @@ public extension MapProjectionHandle {
     } result: { ScreenPoint(raw: value0) }
   }
 
-  /// Calls `mln_map_projection_set_camera`.
+  /// Applies a camera update to a standalone projection.
+  ///
+  /// See `mln_map_projection_set_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func setCamera(camera bindingArg0: CameraOptions) throws {
     try nativeInvoke("mln_map_projection_set_camera") { raw, arena, diagnostic in
       mln_map_projection_set_camera(
@@ -90,7 +114,10 @@ public extension MapProjectionHandle {
     }
   }
 
-  /// Calls `mln_map_projection_set_visible_coordinates`.
+  /// Applies a camera fit for geographic coordinates.
+  ///
+  /// See `mln_map_projection_set_visible_coordinates` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func setVisibleCoordinates(
     coordinates bindingArg0: [LatLng],
     padding bindingArg2: EdgeInsets
@@ -106,7 +133,10 @@ public extension MapProjectionHandle {
     }
   }
 
-  /// Calls `mln_map_projection_set_visible_geometry`.
+  /// Applies a camera fit for GeoJSON Geometry bytes.
+  ///
+  /// See `mln_map_projection_set_visible_geometry` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   func setVisibleGeometry(
     geometry bindingArg0: Data,
     padding bindingArg1: EdgeInsets

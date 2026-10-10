@@ -4,7 +4,13 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  /// Calls `mln_render_session_query_feature_extensions`.
+  /// Starts a feature-extension query against the latest driver state. The
+  /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
+  /// 1),
+  /// valid only for the callback.
+  ///
+  /// See `mln_render_session_query_feature_extensions` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   func queryFeatureExtensions(
     sourceId bindingArg0: String,
     feature bindingArg1: Data,
@@ -29,7 +35,10 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_render_session_query_rendered_features`.
+  /// Starts a rendered-feature query against the session's latest driver state.
+  ///
+  /// See `mln_render_session_query_rendered_features` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   func queryRenderedFeatures(
     geometry bindingArg0: RenderedQueryGeometry,
     options bindingArg1: RenderedFeatureQueryOptions? = nil
@@ -51,7 +60,13 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Calls `mln_render_session_query_source_features`.
+  /// Starts a source-feature query against the session's latest driver state.
+  /// The
+  /// completion borrows an array of `mln_queried_feature` values (value_count
+  /// entries), valid only for the callback.
+  ///
+  /// See `mln_render_session_query_source_features` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   func querySourceFeatures(
     sourceId bindingArg0: String,
     options bindingArg1: SourceFeatureQueryOptions? = nil

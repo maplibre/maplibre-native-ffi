@@ -6,6 +6,7 @@
 [cases]
 "ERR-01" = "bindings/python/tests/test_errors.py::test_native_statuses_raise_their_exception_with_code_and_diagnostic"
 "ERR-02" = { na = "The extension links the native archive in when the wheel is built, so no other library can load in its place; the import checks the version it linked against" }
+"ERR-03" = "bindings/python/tests/test_render.py::test_a_drain_before_any_demand_returns_none"
 "LIFE-01" = "bindings/python/tests/test_lifecycle.py::test_closing_twice_is_safe_and_a_closed_handle_refuses_use"
 "LIFE-02" = "bindings/python/tests/test_lifecycle.py::test_a_refused_close_leaves_the_handle_usable"
 "LIFE-03" = "bindings/python/tests/test_render.py::test_a_borrow_on_another_thread_holds_off_close"
@@ -29,6 +30,7 @@
 "VAL-03" = "bindings/python/tests/test_values.py::test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native"
 "VAL-04" = "bindings/python/tests/test_values.py::test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip"
 "VAL-05" = "bindings/python/tests/test_values.py::test_an_array_input_is_copied_when_it_is_submitted"
+"VAL-06" = { na = "A value's constructor takes every field, and MapOptions.default() returns a copy of the native default" }
 "VIEW-01" = "bindings/python/tests/test_render.py::test_a_frame_view_holds_its_owners_until_its_scope_ends"
 "REND-01" = "bindings/python/tests/test_render.py::test_an_owned_texture_renders_pixels_the_binding_reads_back"
 "REND-02" = "bindings/python/tests/test_render.py::test_a_caller_driven_session_is_serviced_from_a_python_thread"

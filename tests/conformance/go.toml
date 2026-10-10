@@ -19,6 +19,7 @@
 [cases]
 "ERR-01" = "bindings/go/errors_test.go::TestNativeStatusMapsToTypedErrors"
 "ERR-02" = "bindings/go/errors_test.go::TestMismatchedCABIVersionIsRejected"
+"ERR-03" = "bindings/go/render_test.go::TestDrainBeforeAnyDemandReturnsNoBatch"
 "LIFE-01" = "bindings/go/lifecycle_test.go::TestClosingTwiceIsSafe"
 "LIFE-02" = "bindings/go/lifecycle_test.go::TestRefusedCloseLeavesTheHandleUsable"
 "LIFE-03" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
@@ -42,6 +43,7 @@
 "VAL-03" = "bindings/go/events_test.go::TestEventDecoderReadsAStridedBatchWithUnknownValues"
 "VAL-04" = "bindings/go/binding_runtime_test.go::TestIntegerCarriersKeepTheirValues"
 "VAL-05" = "bindings/go/values_test.go::TestArrayInputsAreCopiedAtSubmission"
+"VAL-06" = { na = "A Go struct has no constructor: its zero value is zero in every field, and DefaultMapOptions returns a copy of the native default" }
 "VIEW-01" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
 "REND-01" = "bindings/go/render_test.go::TestOwnedTextureFrameReadsBackAsPixels"
 "REND-02" = "bindings/go/render_test.go::TestCallerDriverIsServicedFromAGoroutine"

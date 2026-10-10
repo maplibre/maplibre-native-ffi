@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Calls `mln_map_add_color_relief_layer`.
+  /// Adds a color-relief layer for a raster DEM source.
+  ///
+  /// See `mln_map_add_color_relief_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addColorReliefLayer(
     layerId bindingArg0: String,
@@ -23,7 +26,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_custom_geometry_source`.
+  /// Adds a custom geometry source.
+  ///
+  /// See `mln_map_add_custom_geometry_source` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addCustomGeometrySource(
     sourceId bindingArg0: String,
@@ -40,7 +46,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_custom_mvt_vector_source`.
+  /// Adds a custom MVT vector source.
+  ///
+  /// See `mln_map_add_custom_mvt_vector_source` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addCustomMvtVectorSource(
     sourceId bindingArg0: String,
@@ -57,7 +66,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_geojson_source_data`.
+  /// Adds a GeoJSON source with prepared inline data.
+  ///
+  /// See `mln_map_add_geojson_source_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addGeojsonSourceData(
     sourceId bindingArg0: String,
@@ -74,7 +86,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_geojson_source_url`.
+  /// Adds a GeoJSON source with URL data.
+  ///
+  /// See `mln_map_add_geojson_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addGeojsonSourceUrl(
     sourceId bindingArg0: String,
@@ -93,7 +108,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_hillshade_layer`.
+  /// Adds a hillshade layer for a raster DEM source.
+  ///
+  /// See `mln_map_add_hillshade_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addHillshadeLayer(
     layerId bindingArg0: String,
@@ -112,7 +130,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_image_source_image`.
+  /// Adds an image source with inline image pixels.
+  ///
+  /// See `mln_map_add_image_source_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addImageSourceImage(
     sourceId bindingArg0: String,
@@ -132,7 +153,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_image_source_url`.
+  /// Adds an image source that loads its image from a URL.
+  ///
+  /// See `mln_map_add_image_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addImageSourceUrl(
     sourceId bindingArg0: String,
@@ -152,7 +176,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_location_indicator_layer`.
+  /// Adds a source-free location indicator layer.
+  ///
+  /// See `mln_map_add_location_indicator_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addLocationIndicatorLayer(
     layerId bindingArg0: String,
@@ -169,7 +196,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_raster_dem_source_tiles`.
+  /// Adds a raster DEM source with inline tile URLs.
+  ///
+  /// See `mln_map_add_raster_dem_source_tiles` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addRasterDemSourceTiles(
     sourceId bindingArg0: String,
@@ -189,7 +219,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_raster_dem_source_url`.
+  /// Adds a raster DEM source with a TileJSON URL.
+  ///
+  /// See `mln_map_add_raster_dem_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addRasterDemSourceUrl(
     sourceId bindingArg0: String,
@@ -208,7 +241,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_raster_source_tiles`.
+  /// Adds a raster source with inline tile URLs.
+  ///
+  /// See `mln_map_add_raster_source_tiles` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addRasterSourceTiles(
     sourceId bindingArg0: String,
@@ -228,7 +264,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_raster_source_url`.
+  /// Adds a raster source with a TileJSON URL.
+  ///
+  /// See `mln_map_add_raster_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addRasterSourceUrl(
     sourceId bindingArg0: String,
@@ -247,7 +286,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_style_layer_json`.
+  /// Adds one style layer from a full style-spec layer JSON object.
+  ///
+  /// See `mln_map_add_style_layer_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addStyleLayerJson(
     layerJson bindingArg0: Data,
@@ -264,7 +306,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_style_source_json`.
+  /// Adds one style source from a style-spec source JSON object.
+  ///
+  /// See `mln_map_add_style_source_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addStyleSourceJson(
     sourceId bindingArg0: String,
@@ -281,7 +326,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_vector_source_tiles`.
+  /// Adds a vector source with inline tile URLs.
+  ///
+  /// See `mln_map_add_vector_source_tiles` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addVectorSourceTiles(
     sourceId bindingArg0: String,
@@ -301,7 +349,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_add_vector_source_url`.
+  /// Adds a vector source with a TileJSON URL.
+  ///
+  /// See `mln_map_add_vector_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func addVectorSourceUrl(
     sourceId bindingArg0: String,
@@ -320,7 +371,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_copy_layer_source_id`.
+  /// Copies one layer's source ID.
+  ///
+  /// See `mln_map_copy_layer_source_id` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func copyLayerSourceId(layerId bindingArg0: String) async throws -> String? {
     try await nativeStart(
       "mln_map_copy_layer_source_id",
@@ -336,7 +390,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_copy_layer_source_layer`.
+  /// Copies one layer's source-layer ID.
+  ///
+  /// See `mln_map_copy_layer_source_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func copyLayerSourceLayer(layerId bindingArg0: String) async throws
     -> String?
   {
@@ -354,7 +411,11 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_copy_style_image_premultiplied_rgba8`.
+  /// Copies one runtime style image as tightly packed premultiplied RGBA8
+  /// pixels.
+  ///
+  /// See `mln_map_copy_style_image_premultiplied_rgba8` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func copyStyleImagePremultipliedRgba8(
     imageId bindingArg0: String
   ) async throws
@@ -377,7 +438,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_copy_style_image_stretches`.
+  /// Copies one runtime style image's stretchable intervals.
+  ///
+  /// See `mln_map_copy_style_image_stretches` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func copyStyleImageStretches(imageId bindingArg0: String) async throws
     -> StyleImageStretchesResult?
   {
@@ -403,7 +467,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_copy_style_source_attribution`.
+  /// Copies one style source attribution string.
+  ///
+  /// See `mln_map_copy_style_source_attribution` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func copyStyleSourceAttribution(sourceId bindingArg0: String) async throws
     -> String?
   {
@@ -424,7 +491,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_copy_style_source_url`.
+  /// Copies one style source URL.
+  ///
+  /// See `mln_map_copy_style_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func copyStyleSourceUrl(sourceId bindingArg0: String) async throws
     -> String?
   {
@@ -443,7 +513,11 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_global_state`.
+  /// Queries the global-state JSON object, including style defaults. Completion
+  /// borrows one `mln_buffer_view` for the duration of the callback.
+  ///
+  /// See `mln_map_get_global_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getGlobalState() async throws -> Data {
     try await nativeStart(
       "mln_map_get_global_state",
@@ -455,7 +529,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_image_source_coordinates`.
+  /// Copies image source coordinates.
+  ///
+  /// See `mln_map_get_image_source_coordinates` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getImageSourceCoordinates(sourceId bindingArg0: String) async throws
     -> [LatLng]?
   {
@@ -479,7 +556,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_get_layer_filter`.
+  /// Serializes one layer filter as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getLayerFilter(layerId bindingArg0: String) async throws -> Data? {
     try await nativeStart(
       "mln_map_get_layer_filter",
@@ -496,7 +576,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_layer_property`.
+  /// Serializes one layer property as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getLayerProperty(
     layerId bindingArg0: String,
     propertyName bindingArg1: String
@@ -517,7 +600,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_style_image_info`.
+  /// Copies one complete runtime style image.
+  ///
+  /// See `mln_map_get_style_image_info` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleImageInfo(imageId bindingArg0: String) async throws
     -> StyleImageResult?
   {
@@ -541,7 +627,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_style_layer_info`.
+  /// Copies complete metadata for one style layer.
+  ///
+  /// See `mln_map_get_style_layer_info` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleLayerInfo(layerId bindingArg0: String) async throws
     -> StyleLayerResult?
   {
@@ -565,7 +654,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_style_layer_json`.
+  /// Serializes one style layer as a full style-spec layer JSON object.
+  ///
+  /// See `mln_map_get_style_layer_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleLayerJson(layerId bindingArg0: String) async throws -> Data? {
     try await nativeStart(
       "mln_map_get_style_layer_json",
@@ -582,7 +674,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_style_light_property`.
+  /// Serializes one style light property as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_style_light_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleLightProperty(propertyName bindingArg0: String) async throws
     -> Data?
   {
@@ -601,7 +696,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_style_source_info`.
+  /// Copies complete metadata for one style source.
+  ///
+  /// See `mln_map_get_style_source_info` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleSourceInfo(sourceId bindingArg0: String) async throws
     -> StyleSourceResult?
   {
@@ -625,7 +723,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_style_source_tile_urls`.
+  /// Copies one style source's inline TileJSON tile URLs.
+  ///
+  /// See `mln_map_get_style_source_tile_urls` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleSourceTileUrls(sourceId bindingArg0: String) async throws
     -> StyleSourceTileUrlsResult?
   {
@@ -651,7 +752,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_get_style_transition_options`.
+  /// Reads the style's global transition options.
+  ///
+  /// See `mln_map_get_style_transition_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getStyleTransitionOptions() async throws -> StyleTransitionOptions {
     try await nativeStart(
       "mln_map_get_style_transition_options",
@@ -663,7 +767,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_invalidate_custom_geometry_source_region`.
+  /// Invalidates custom geometry source data inside one geographic region.
+  ///
+  /// See `mln_map_invalidate_custom_geometry_source_region` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func invalidateCustomGeometrySourceRegion(
     sourceId bindingArg0: String,
@@ -680,7 +787,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_invalidate_custom_geometry_source_tile`.
+  /// Invalidates custom geometry source data for one canonical tile.
+  ///
+  /// See `mln_map_invalidate_custom_geometry_source_tile` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func invalidateCustomGeometrySourceTile(
     sourceId bindingArg0: String,
@@ -697,7 +807,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_invalidate_custom_mvt_vector_source_tile`.
+  /// Invalidates custom MVT vector source data for one canonical tile.
+  ///
+  /// See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func invalidateCustomMvtVectorSourceTile(
     sourceId bindingArg0: String,
@@ -714,7 +827,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_list_style_layer_ids`.
+  /// Copies style layer IDs in style order.
+  ///
+  /// See `mln_map_list_style_layer_ids` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func listStyleLayerIds() async throws -> [String] {
     try await nativeStart(
       "mln_map_list_style_layer_ids",
@@ -729,7 +845,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_list_style_layers`.
+  /// Starts an ordered query of every style layer in style order.
+  ///
+  /// See `mln_map_list_style_layers` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func listStyleLayers() async throws -> [StyleLayerEntry] {
     try await nativeStart(
       "mln_map_list_style_layers",
@@ -744,7 +863,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_list_style_source_ids`.
+  /// Copies style source IDs in style order.
+  ///
+  /// See `mln_map_list_style_source_ids` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func listStyleSourceIds() async throws -> [String] {
     try await nativeStart(
       "mln_map_list_style_source_ids",
@@ -759,7 +881,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_move_style_layer`.
+  /// Moves one style layer before another layer or to the top.
+  ///
+  /// See `mln_map_move_style_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func moveStyleLayer(
     layerId bindingArg0: String,
@@ -776,7 +901,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_remove_style_image`.
+  /// Removes one runtime style image by ID.
+  ///
+  /// See `mln_map_remove_style_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func removeStyleImage(imageId bindingArg0: String) async throws
     -> CommandCompletion
@@ -791,7 +919,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_remove_style_layer`.
+  /// Removes one style layer by ID.
+  ///
+  /// See `mln_map_remove_style_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func removeStyleLayer(layerId bindingArg0: String) async throws
     -> CommandCompletion
@@ -806,7 +937,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_remove_style_source`.
+  /// Removes one style source by ID.
+  ///
+  /// See `mln_map_remove_style_source` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func removeStyleSource(sourceId bindingArg0: String) async throws
     -> CommandCompletion
@@ -821,7 +955,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_custom_geometry_source_tile_data`.
+  /// Sets custom geometry source data for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_geometry_source_tile_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setCustomGeometrySourceTileData(
     sourceId bindingArg0: String,
@@ -840,7 +977,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_custom_mvt_vector_source_tile_data`.
+  /// Sets custom MVT vector source data for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setCustomMvtVectorSourceTileData(
     sourceId bindingArg0: String,
@@ -859,7 +999,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_custom_mvt_vector_source_tile_error`.
+  /// Reports a custom MVT vector source error for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setCustomMvtVectorSourceTileError(
     sourceId bindingArg0: String,
@@ -878,7 +1021,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_geojson_source_data`.
+  /// Updates one GeoJSON source with prepared inline data.
+  ///
+  /// See `mln_map_set_geojson_source_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeojsonSourceData(
     sourceId bindingArg0: String,
@@ -895,7 +1041,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_geojson_source_synchronous_tiling`.
+  /// Overrides one GeoJSON source's synchronous tiling at runtime.
+  ///
+  /// See `mln_map_set_geojson_source_synchronous_tiling` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeojsonSourceSynchronousTiling(
     sourceId bindingArg0: String,
@@ -912,7 +1061,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_geojson_source_url`.
+  /// Updates one GeoJSON source to load data from a URL.
+  ///
+  /// See `mln_map_set_geojson_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGeojsonSourceUrl(
     sourceId bindingArg0: String,
@@ -929,7 +1081,11 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_global_state_property`.
+  /// Submits a global-state JSON value. JSON null restores the style default.
+  /// Input is copied before return.
+  ///
+  /// See `mln_map_set_global_state_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setGlobalStateProperty(
     propertyName bindingArg0: String,
@@ -946,7 +1102,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_image_source_coordinates`.
+  /// Updates image source coordinates.
+  ///
+  /// See `mln_map_set_image_source_coordinates` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setImageSourceCoordinates(
     sourceId bindingArg0: String,
@@ -964,7 +1123,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_image_source_image`.
+  /// Updates an image source with inline image pixels.
+  ///
+  /// See `mln_map_set_image_source_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setImageSourceImage(
     sourceId bindingArg0: String,
@@ -981,7 +1143,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_image_source_url`.
+  /// Updates an image source to load its image from a URL.
+  ///
+  /// See `mln_map_set_image_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setImageSourceUrl(
     sourceId bindingArg0: String,
@@ -998,7 +1163,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_layer_filter`.
+  /// Sets or clears one layer filter.
+  ///
+  /// See `mln_map_set_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLayerFilter(
     layerId bindingArg0: String,
@@ -1015,7 +1183,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_layer_max_zoom`.
+  /// Sets the highest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_layer_max_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLayerMaxZoom(
     layerId bindingArg0: String,
@@ -1032,7 +1203,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_layer_min_zoom`.
+  /// Sets the lowest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_layer_min_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLayerMinZoom(
     layerId bindingArg0: String,
@@ -1049,7 +1223,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_layer_property`.
+  /// Sets one layer property using its MapLibre style-spec property name.
+  ///
+  /// See `mln_map_set_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLayerProperty(
     layerId bindingArg0: String,
@@ -1068,7 +1245,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_layer_source_id`.
+  /// Sets one layer's source ID.
+  ///
+  /// See `mln_map_set_layer_source_id` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLayerSourceId(
     layerId bindingArg0: String,
@@ -1085,7 +1265,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_layer_source_layer`.
+  /// Sets one layer's source-layer ID.
+  ///
+  /// See `mln_map_set_layer_source_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLayerSourceLayer(
     layerId bindingArg0: String,
@@ -1102,7 +1285,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_layer_visibility`.
+  /// Sets whether one layer draws.
+  ///
+  /// See `mln_map_set_layer_visibility` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLayerVisibility(
     layerId bindingArg0: String,
@@ -1119,7 +1305,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_location_indicator_accuracy_radius`.
+  /// Sets a location indicator layer accuracy radius in meters.
+  ///
+  /// See `mln_map_set_location_indicator_accuracy_radius` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLocationIndicatorAccuracyRadius(
     layerId bindingArg0: String,
@@ -1136,7 +1325,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_location_indicator_bearing`.
+  /// Sets a location indicator layer bearing in degrees.
+  ///
+  /// See `mln_map_set_location_indicator_bearing` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLocationIndicatorBearing(
     layerId bindingArg0: String,
@@ -1153,7 +1345,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_location_indicator_image_name`.
+  /// Sets one location indicator image-name property.
+  ///
+  /// See `mln_map_set_location_indicator_image_name` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLocationIndicatorImageName(
     layerId bindingArg0: String,
@@ -1172,7 +1367,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_location_indicator_location`.
+  /// Sets a location indicator layer location.
+  ///
+  /// See `mln_map_set_location_indicator_location` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setLocationIndicatorLocation(
     layerId bindingArg0: String,
@@ -1191,7 +1389,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_style_image`.
+  /// Sets one runtime style image.
+  ///
+  /// See `mln_map_set_style_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleImage(
     imageId bindingArg0: String,
@@ -1210,7 +1411,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_style_light_json`.
+  /// Sets the style light from a style-spec light JSON object.
+  ///
+  /// See `mln_map_set_style_light_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleLightJson(lightJson bindingArg0: Data) async throws
     -> CommandCompletion
@@ -1225,7 +1429,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_style_light_property`.
+  /// Sets one style light property using its MapLibre style-spec property name.
+  ///
+  /// See `mln_map_set_style_light_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleLightProperty(
     propertyName bindingArg0: String,
@@ -1242,7 +1449,11 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_style_source_volatile`.
+  /// Sets whether one style source stores fetched tiles in the persistent
+  /// cache.
+  ///
+  /// See `mln_map_set_style_source_volatile` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleSourceVolatile(
     sourceId bindingArg0: String,
@@ -1259,7 +1470,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_style_transition_options`.
+  /// Sets the style's global transition options.
+  ///
+  /// See `mln_map_set_style_transition_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   @discardableResult
   func setStyleTransitionOptions(
     options bindingArg0: StyleTransitionOptions

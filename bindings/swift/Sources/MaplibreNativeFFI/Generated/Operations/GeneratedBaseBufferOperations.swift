@@ -4,11 +4,18 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension BufferHandle {
+  /// Destroys an owned buffer. A null handle is a no-op.
+  ///
+  /// See `mln_buffer_destroy` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   func close() throws {
     try nativeClose("mln_buffer_destroy") { raw in mln_buffer_destroy(raw) }
   }
 
-  /// Calls `mln_buffer_get`.
+  /// Borrows the data stored by an owned buffer.
+  ///
+  /// See `mln_buffer_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   func get() throws -> Data {
     var value0 = mln_buffer_view()
     return try nativeInvoke("mln_buffer_get") { raw, _, diagnostic in

@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Calls `mln_metal_surface_attach`.
+  /// Starts attachment of a Metal surface target.
+  ///
+  /// See `mln_metal_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func metalSurfaceAttach(
     descriptor bindingArg0: MetalSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -23,7 +26,10 @@ public extension MapHandle {
     ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_opengl_surface_attach`.
+  /// Starts attachment of an OpenGL surface target.
+  ///
+  /// See `mln_opengl_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func openglSurfaceAttach(
     descriptor bindingArg0: OpenglSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -42,7 +48,10 @@ public extension MapHandle {
     ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_vulkan_surface_attach`.
+  /// Starts attachment of a Vulkan surface target.
+  ///
+  /// See `mln_vulkan_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func vulkanSurfaceAttach(
     descriptor bindingArg0: VulkanSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -61,7 +70,10 @@ public extension MapHandle {
     ) } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_webgpu_surface_attach`.
+  /// Starts attachment of a WebGPU surface target.
+  ///
+  /// See `mln_webgpu_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   func webgpuSurfaceAttach(
     descriptor bindingArg0: WebgpuSurfaceDescriptor,
     options bindingArg1: RenderSessionAttachOptions

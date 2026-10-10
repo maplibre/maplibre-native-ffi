@@ -144,11 +144,7 @@ let pulsingFrameWake = Wake(callback: { Pulse.shared.signal() })
 
 extension RenderSessionHandle {
   func drainFrameCopies() throws -> [RenderFrameResult] {
-    let batch: RenderFrameBatchHandle
-    do { batch = try drainFrameResults() }
-    catch let error as MaplibreError where error.kind == .notReady {
-      return []
-    }
+    guard let batch = try drainFrameResults() else { return [] }
     defer { try? batch.close() }
     return try (0 ..< batch.count()).map { try batch.get(index: $0) }
   }

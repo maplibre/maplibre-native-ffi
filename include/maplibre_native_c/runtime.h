@@ -395,13 +395,13 @@ typedef struct mln_runtime_options {
    * Runtime-scoped event types this runtime queues, as a bitwise OR of
    * mln_runtime_event_mask values.
    *
-   * This field is always read, so set it explicitly.
-   * MLN_RUNTIME_EVENT_MASK_ALL selects every event type this library reports
-   * and is the value mln_runtime_options_default() populates.
-   * MLN_RUNTIME_EVENT_MASK_NONE queues none. See
-   * mln_runtime_set_event_mask().
+   * This field is always read. MLN_RUNTIME_EVENT_MASK_ALL selects every event
+   * type this library reports, and MLN_RUNTIME_EVENT_MASK_NONE queues none.
+   * Defaults to MLN_RUNTIME_EVENT_MASK_ALL. See mln_runtime_set_event_mask().
    */
-  uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
+  uint64_t event_mask MLN_BINDING(
+    "enum=mln_runtime_event_mask;default=MLN_RUNTIME_EVENT_MASK_ALL"
+  );
   /** Wakes the receiver when the runtime event queue becomes nonempty. */
   mln_wake event_wake;
 } mln_runtime_options;

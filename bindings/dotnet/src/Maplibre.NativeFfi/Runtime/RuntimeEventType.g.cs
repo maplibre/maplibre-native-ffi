@@ -1,6 +1,13 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Runtime event types carried by <c>mln_runtime_event.type</c>.
+/// </summary>
+/// <remarks>
+/// See <c>mln_runtime_event_type</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+/// </remarks>
 public enum RuntimeEventType : uint
 {
     MapCameraWillChange = 1,

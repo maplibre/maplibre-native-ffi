@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from os.path import commonprefix
 
-from .. import native_ports
+from .. import docs, native_ports
 from ..managed_contracts import DART_RESERVED
 from ..names import camel, pascal
 from ..native_capture import arguments_record, deferred_constant
@@ -53,6 +53,11 @@ def owner_names(handle) -> tuple[str, str]:
     return name + "Handle", "Native" + name
 
 
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The dartdoc comment of a declaration, or empty when it has none."""
+    return docs.line_comment(bound.doc(native), indent)
+
+
 class Unsupported(ValueError):
     pass
 
@@ -79,11 +84,6 @@ class Values:
 
         # The completion descriptors that queries name, by descriptor name.
         self.results: dict[str, str] = {}
-        self.projections = tuple(
-            value for value in bound.values.values() if value.projection
-        )
-        for value in self.projections:
-            self.check(value.projection)
 
     def scalar(self, value):
         return SCALARS.get(
@@ -445,7 +445,16 @@ class Values:
 
     def copy(self, value, expression, count=None):
         if value.registration:
-            return f"_read{public_name(value.native)}({expression})"
+            public = public_name(value.native)
+            # Native never returns callbacks. A registration's own default
+            # copies its other fields, and any other copy leaves it unset.
+            if value.native in self.bound.returned:
+                return f"_read{public}({expression})"
+            if value.nullable:
+                return "null"
+            if self.port_callbacks(value):
+                return f"const {public}()"
+            return f"const {public}.empty()"
         if value.kind == "native_pointer":
             result = f"NativePointer({expression}.address)"
         elif value.kind == "scalar":
@@ -564,6 +573,15 @@ class Values:
             else f"result.ref.{mask} = true;"
         )
 
+    def field_default(self, field):
+        """A field's default: its annotated initial value, or its type's."""
+        value, initial = field.value, field.initial
+        if initial is None:
+            return self.default_expression(value)
+        if value.kind == "enum":
+            return f"{public_name(value.native)}.{identifier(initial.member)}"
+        return initial.literal
+
     def default_expression(self, value):
         if value.nullable or value.optional:
             return "null"
@@ -587,7 +605,7 @@ class Values:
                     continue
                 if group:
                     return None
-                default = self.default_expression(children[0].value)
+                default = self.field_default(children[0])
                 if default is None:
                     return None
                 if value.ordered:
@@ -698,7 +716,7 @@ class Values:
                 )
             field = children[0]
             fields.append(f"  final {typ} {name};")
-            default = self.default_expression(field.value)
+            default = self.field_default(field)
             args.append(
                 f"this.{name}"
                 if typ.endswith("?")
@@ -760,13 +778,8 @@ class Values:
             for name, _, children, _ in self.members(value)
         )
         reader = (
-            f"{public} _read{public}(raw.{value.native} source) {{\n"
-            + "\n".join(
-                f"  if (source.{name} != nullptr) {{ throwInvalidState('cannot copy a registered native callback'); }}"
-                for name in ports
-            )
-            + f"\n  return {public}({read_args});\n}}\n"
-            if disabled
+            f"{public} _read{public}(raw.{value.native} source) => {public}({read_args});\n"
+            if disabled and value.native in self.bound.returned
             else ""
         )
         declaration = (
@@ -832,12 +845,9 @@ class Values:
             + "\n    }\n  } catch (_) { if (!transferred) { arena.releaseAll(); } rethrow; }\n}\n"
         )
         reader = (
-            f"{public} _read{public}(raw.{value.native} source) {{\n"
-            + "\n".join(
-                f"  if (source.{name} != nullptr) {{ throwInvalidState('cannot copy a registered native callback'); }}"
-                for name in value.registration.callbacks
-            )
-            + f"\n  return const {public}.empty();\n}}\n"
+            f"{public} _read{public}(raw.{value.native} source) => const {public}.empty();\n"
+            if value.native in self.bound.returned
+            else ""
         )
         return "\n".join(declarations), conversion + reader
 
@@ -894,7 +904,7 @@ class Values:
         arguments, fields, writes, reads = [], [], [], []
         for field in members:
             name, typ = identifier(field.name), self.public(field.value)
-            default = self.default_expression(field.value)
+            default = self.field_default(field)
             arguments.append(
                 f"this.{name}"
                 if typ.endswith("?")
@@ -998,7 +1008,10 @@ class Values:
 
     def render(self):
         declarations, conversions = [], []
+        # The first declaration that each value renders carries its comment.
+        documented = []
         for value in list(self.used.values()):
+            documented.append((len(declarations), value.native))
             if value.kind == "enum":
                 public = public_name(value.native)
                 prefix = (
@@ -1008,7 +1021,7 @@ class Values:
                     + "_"
                 )
                 members = "\n".join(
-                    f"  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
+                    f"{doc(self.bound, name, '  ')}  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
                     for name, number in value.enum_values
                 )
                 bitmask = value.enum_kind == "bitmask"
@@ -1058,15 +1071,24 @@ class Values:
             flags = []
             for flag in value.mask_flags:
                 flags.append((identifier(flag.member), flag))
-            fields = "\n".join(f"  final {typ} {name};" for name, typ, _, _ in members)
-            fields += "\n" + "\n".join(f"  final bool {name};" for name, _ in flags)
+            fields = "\n".join(
+                (
+                    doc(self.bound, f"{value.native}.{children[0].name}", "  ")
+                    if not group
+                    else ""
+                )
+                + f"  final {typ} {name};"
+                for name, typ, children, group in members
+            )
+            fields += "\n" + "\n".join(
+                f"{doc(self.bound, flag.name, '  ')}  final bool {name};"
+                for name, flag in flags
+            )
             # A record whose field order is its meaning constructs positionally.
             positional = value.ordered
             args, initializers = [], []
             for name, typ, children, group in members:
-                default = (
-                    self.default_expression(children[0].value) if not group else None
-                )
+                default = self.field_default(children[0]) if not group else None
                 copied = typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
                 if copied:
                     args.append(
@@ -1215,11 +1237,8 @@ class Values:
                 + "\n".join(read)
                 + "\n);\n"
             )
-            for projection in self.projections:
-                if projection.projection.native == value.native:
-                    conversions.append(
-                        f"{public} _read{public_name(projection.native)}(raw.{projection.native} source) => {public}(\n"
-                        + "\n".join(read)
-                        + "\n);\n"
-                    )
+        ends = [start for start, _ in documented[1:]] + [len(declarations)]
+        for (start, native), end in zip(documented, ends):
+            if start < end:
+                declarations[start] = doc(self.bound, native) + declarations[start]
         return "\n".join(declarations), "\n".join(conversions)

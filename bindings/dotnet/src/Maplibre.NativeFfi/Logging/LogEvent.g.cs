@@ -1,6 +1,13 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Log event categories emitted by MapLibre Native.
+/// </summary>
+/// <remarks>
+/// See <c>mln_log_event</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html">C API reference</see>.
+/// </remarks>
 public enum LogEvent : uint
 {
     General = 0,
