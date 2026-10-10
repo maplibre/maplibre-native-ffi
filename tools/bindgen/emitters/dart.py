@@ -749,7 +749,6 @@ def generate(api: Api | BoundApi) -> str:
             + descriptors,
         )
     )
-    needed.update("_read" + public_name(value.native) for value in values.projections)
     while True:
         expanded = needed | set(
             re.findall(

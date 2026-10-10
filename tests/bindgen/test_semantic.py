@@ -43,28 +43,6 @@ mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_di
                     },
                 )
 
-    def test_adapter_projection_preserves_public_value_contract(self):
-        source = """
-typedef enum category : unsigned { CATEGORY_A = 1 } category;
-typedef struct request { unsigned size; unsigned kind BIND("enum=category"); const char *url BIND("nullable=true"); } request;
-typedef struct queued { void *context BIND("kind=context"); unsigned kind; const char *url BIND("nullable=true"); } queued BIND("projection=request");
-mln_status capture(queued *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
-"""
-        model = bind(self.parse(source), require_complete=True)
-        projection = model.values["queued"].projection
-        self.assertEqual(projection.native, "request")
-        self.assertEqual(projection.fields[1].value.kind, "enum")
-        self.assertTrue(projection.fields[2].value.nullable)
-        with self.assertRaisesRegex(ModelError, "must preserve its source C type"):
-            bind(
-                self.parse(source.replace("unsigned kind;", "double kind;")),
-                require_complete=True,
-            )
-        with self.assertRaisesRegex(ModelError, "must preserve its source C type"):
-            bind(
-                self.parse(source.replace("unsigned kind;", "")), require_complete=True
-            )
-
     def test_public_enums_and_retired_handle_access(self):
         source = """
 typedef enum event_code : unsigned { CAMERA_CHANGED = 3 } event_code;
@@ -471,7 +449,6 @@ mln_status install(const registration *value, mln_diagnostic *out_diagnostic);
             (plan.callbacks, plan.user_data, plan.release),
             (("callback",), "context", "release"),
         )
-        self.assertEqual(model.callbacks["notify"].thread, "native")
         with self.assertRaisesRegex(
             ModelError, "registration release requires a descriptor field"
         ):
@@ -560,12 +537,6 @@ BIND("execution=lifecycle") mln_status attach(
         self.assertEqual((owner.parameter, owner.parent_parameter), ("owner", "parent"))
         self.assertEqual(owner.handle.finalize, ("abandon_child", "close_child"))
         self.assertEqual(operation.owned_outputs, (owner,))
-        self.assertTrue(operation.completion.inline)
-        self.assertIn(
-            ("completion_failure", "retain_immediate_owner"),
-            [(step.phase, step.action) for step in operation.completion.transitions],
-        )
-        self.assertEqual(operation.completion.native_release, "quiescence")
         with self.assertRaisesRegex(ModelError, "requires its parent handle input"):
             bind(
                 self.parse(
@@ -623,10 +594,6 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
         )
         self.assertEqual(decision.wait_retired, "await_retirement")
         self.assertEqual(decision.handle.release_consumes, "always")
-        self.assertIn(
-            ("complete_enter", "force_accept_decision"),
-            [(step.phase, step.action) for step in decision.transitions],
-        )
         registration = model.operations_by_name["on_cancel"].direct_registrations[0]
         self.assertEqual(
             (registration.release_callback, registration.accepted_unless),
@@ -726,12 +693,8 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
         self.assertEqual(operation.receiver, "ticket")
         (registration,) = operation.direct_registrations
         self.assertEqual(
-            (
-                registration.release_callback,
-                registration.accepted_unless,
-                registration.transfer,
-            ),
-            ("release", "cancelled", "acceptance"),
+            (registration.release_callback, registration.accepted_unless),
+            ("release", "cancelled"),
         )
 
     def test_disposal_support_requires_a_handle_consumer(self):

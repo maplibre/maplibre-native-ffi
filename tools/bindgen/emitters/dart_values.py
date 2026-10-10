@@ -79,11 +79,6 @@ class Values:
 
         # The completion descriptors that queries name, by descriptor name.
         self.results: dict[str, str] = {}
-        self.projections = tuple(
-            value for value in bound.values.values() if value.projection
-        )
-        for value in self.projections:
-            self.check(value.projection)
 
     def scalar(self, value):
         return SCALARS.get(
@@ -1194,11 +1189,4 @@ class Values:
                 + "\n".join(read)
                 + "\n);\n"
             )
-            for projection in self.projections:
-                if projection.projection.native == value.native:
-                    conversions.append(
-                        f"{public} _read{public_name(projection.native)}(raw.{projection.native} source) => {public}(\n"
-                        + "\n".join(read)
-                        + "\n);\n"
-                    )
         return "\n".join(declarations), "\n".join(conversions)

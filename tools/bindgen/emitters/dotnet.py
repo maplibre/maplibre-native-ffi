@@ -38,8 +38,6 @@ def operation_contract(plan: OperationPlan) -> str | None:
     value = result.element if result and result.kind == "array" else result
     if execution == "query" and (result is None or result.ownership != "borrowed"):
         return "query requires borrowed result storage"
-    if value and value.optional == "null":
-        return "null optional result needs a presence rule"
     if (
         value
         and value.lifetime != "call"
@@ -85,7 +83,7 @@ def operation_contract(plan: OperationPlan) -> str | None:
         planned = planned_parameters[parameter.name]
         value = planned.value
         # A null pointer argument needs a pointer that is not a C string.
-        if (value.nullable or value.optional == "null") and not (
+        if value.nullable and not (
             parameter.type.pointee and type_name(parameter.type.pointee) != "char"
         ):
             return f"parameter {parameter.name} needs a nullable input conversion"

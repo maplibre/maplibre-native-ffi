@@ -93,10 +93,6 @@ def owner(bound, native, plans):
     parameters = ["handle: Long"]
     parents = ""
     if handle.parent:
-        if handle.parent_retention != "strong":
-            raise ValueError(
-                f"{native}: parent retention {handle.parent_retention} needs a Kotlin owner"
-            )
         parameters.append(f"parent: {owner_name(bound.handles[handle.parent])}")
         parents = ", parent"
     dispose = family[0].lower() + family[1:]

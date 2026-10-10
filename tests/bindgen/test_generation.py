@@ -112,7 +112,7 @@ mln_status mln_map_test_scale(mln_map map, double latitude, const mln_completion
                     """
 BIND("execution=query;result=double")
 mln_status mln_map_new_scale(mln_map map, float latitude, const mln_completion *completion, mln_diagnostic *out_diagnostic);
-BIND("receiver=map;execution=command")
+BIND("execution=command")
 mln_status mln_map_new_command(mln_map map, bool enabled, const mln_completion *completion, mln_diagnostic *out_diagnostic);
 """,
                     owned_map=True,
@@ -190,7 +190,7 @@ mln_status mln_map_variants(mln_map map, const mln_completion *completion, mln_d
     def test_consumed_input_requires_a_resolved_owner(self):
         for contract, receiver in (
             (";consumes=success", "mln_map map"),
-            ("", 'mln_map map BIND("consumes=always")'),
+            ("", 'mln_map map BIND("consumes=success")'),
         ):
             api = self.parse(f"""
 BIND("execution=command{contract}")

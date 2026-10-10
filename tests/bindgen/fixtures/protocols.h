@@ -114,7 +114,7 @@ typedef unsigned long long mln_map
 void mln_map_close(mln_map map);
 #elif defined(MLN_PROTOCOL_MAP_RELEASE)
 typedef unsigned long long mln_map BIND("kind=handle;release=mln_map_release");
-void mln_map_release(mln_map map BIND("consumes=always"));
+void mln_map_release(mln_map map);
 #else
 typedef unsigned long long mln_map;
 #endif
@@ -225,9 +225,9 @@ mln_status mln_map_set_label(
 
 #ifdef MLN_PROTOCOL_PLAN_NAMES
 // Names that the semantic plan derives once for every binding: a handle whose
-// operations begin with a prefix other than its type name, an explicit member
-// name, a record whose field order is its meaning, and presence groups whose
-// record name shares no prefix with its bit constants.
+// operations begin with a prefix other than its type name, a record whose field
+// order is its meaning, and presence groups whose record name shares no prefix
+// with its bit constants.
 typedef uint64_t mln_pass_handle BIND(
   "kind=handle;release=mln_pass_close;dispose=mln_pass_close;prefix=mln_pass"
 );
@@ -235,7 +235,6 @@ void mln_pass_close(mln_pass_handle pass);
 mln_status mln_pass_redeem(
   mln_pass_handle pass, mln_diagnostic* out_diagnostic
 );
-BIND("name=punch")
 mln_status mln_pass_stamp(mln_pass_handle pass, mln_diagnostic* out_diagnostic);
 typedef struct mln_point {
   double x;
@@ -328,7 +327,6 @@ mln_status mln_measurement_read(
   mln_measurement owner, double* out_value BIND("direction=out"),
   mln_diagnostic* out_diagnostic
 );
-BIND("receiver=measurement")
 mln_status mln_measurement_take_sample(
   mln_measurement measurement,
   mln_sample_handle* out_sample BIND("direction=out"),
@@ -350,7 +348,7 @@ typedef struct mln_sample_options {
   void* context BIND("kind=context");
   mln_sample_release release;
 } mln_sample_options BIND("kind=callback_registration;release=release");
-BIND("receiver=map;execution=command")
+BIND("execution=command")
 mln_status mln_map_observe_sample(
   mln_map map, const mln_sample_options* options,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

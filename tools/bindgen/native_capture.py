@@ -11,7 +11,7 @@ import zlib
 
 from .compiler import compile_api
 from .model import Api, CType, Field, Function, ModelError, Record
-from .schema import FIELD_KEYS, IMPLICIT, Conventions, has_diagnostic
+from .schema import FIELD_KEYS, Conventions, has_diagnostic
 from .semantic import BoundApi, FieldPlan, ValuePlan
 
 
@@ -78,7 +78,7 @@ def _field_metadata(record: Record, index: int, conventions: Conventions) -> str
     items = ";".join(
         f"{key}={value}"
         for key, value in metadata.items()
-        if defaults.get(key, IMPLICIT.get(key)) != value
+        if defaults.get(key) != value
     )
     return f' MLN_BINDING("{items}")' if items else ""
 

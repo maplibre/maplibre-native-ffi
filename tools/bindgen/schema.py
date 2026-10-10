@@ -24,9 +24,25 @@ EXECUTIONS = frozenset(
     }
 )
 COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"})
-SHAPES = frozenset({"none", "value", "array", "bytes"})
-OWNERSHIPS = frozenset({"value", "borrowed", "owned"})
 ENCODINGS = frozenset({"utf8", "json", "bytes"})
+# The values that a header annotation may write for each key. Conventions fill
+# in the rest of a key's vocabulary, such as direction=in, shape=none,
+# ownership=value, encoding=utf8, and reentry=allow, so a header never writes
+# them; an absent nullable or handle_access means false or live.
+ANNOTATION_VALUES = {
+    "execution": EXECUTIONS - {"immediate"},
+    "shape": frozenset({"array"}),
+    "ownership": frozenset({"borrowed", "owned"}),
+    "encoding": frozenset({"json", "bytes"}),
+    "direction": frozenset({"out", "inout"}),
+    "nullable": frozenset({"true"}),
+    "optional": frozenset({"empty"}),
+    "lifetime": frozenset({"call", "owner", "process"}),
+    "consumes": frozenset({"success"}),
+    "reentry": frozenset({"forbid", "protocol"}),
+    "handle_access": frozenset({"issued"}),
+    "dispose_invalidates": frozenset({"parent"}),
+}
 
 # The same semantic vocabulary applies to all target languages. A field's
 # optional=empty means that its empty representation denotes absence.
@@ -36,9 +52,7 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "execution",
         "result",
         "shape",
-        "receiver",
         "consumes",
-        "name",
         "kind",
         "length",
         "registration",
@@ -77,7 +91,7 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
     }
 )
 RECORD_KEYS = COMMON_KEYS | frozenset(
-    {"kind", "default", "mask", "tag", "release", "user_data", "projection", "fields"}
+    {"kind", "default", "mask", "tag", "release", "user_data", "fields"}
 )
 TYPEDEF_KEYS = COMMON_KEYS | frozenset(
     {
@@ -88,17 +102,14 @@ TYPEDEF_KEYS = COMMON_KEYS | frozenset(
         "dispose_invalidates",
         "view_begin",
         "view_end",
-        "release_consumes",
         "default",
         "user_data",
-        "thread",
         "failure",
         "enum",
         "reentry",
         "reentry_calls",
         "reentry_owner",
         "abandon",
-        "projection",
         "decision_handle",
         "decision_accept",
         "decision_pass",
@@ -172,8 +183,6 @@ STRUCT_SIZE_FIELD = "size"
 # Pointers whose kind already says that the generator never reads through them.
 OPAQUE_POINTER_KINDS = frozenset({"context", "native_pointer", "erased"})
 TEXT_POINTEE_KINDS = frozenset({"char_s", "char_u"})
-# Values that only restate the absence of a key; never written, never needed.
-IMPLICIT = {"handle_access": "live", "nullable": "false"}
 
 
 class Conventions:
@@ -331,16 +340,15 @@ class Conventions:
         return defaults
 
     def typedef(self, typedef) -> dict[str, str]:
-        """A callback runs on a native thread, allows reentry, and contains a
-        failure it cannot report; a handle has no parent, and its operations
-        begin with its own name; a registration's user
-        data is its context field; and a record's default value comes from the
-        one function that takes nothing and returns it."""
+        """A callback allows reentry and contains a failure it cannot report; a
+        handle has no parent, and its operations begin with its own name; a
+        registration's user data is its context field; and a record's default
+        value comes from the one function that takes nothing and returns it."""
         explicit = typedef.metadata
         defaults = {}
         signature = typedef.type.pointee if typedef.type.kind == "pointer" else None
         if signature is not None and signature.kind == "function":
-            defaults.update(thread="native", reentry="allow")
+            defaults["reentry"] = "allow"
             if signature.result is not None and signature.result.kind == "void":
                 defaults["failure"] = "contain"
         if explicit.get("kind") == "handle":
@@ -370,7 +378,9 @@ def apply_defaults(api: Api) -> Api:
     """Complete every declaration's metadata with its conventional defaults.
 
     An explicit annotation that restates a default is an error, so the headers
-    stay minimal and each annotation marks a real departure from convention.
+    stay minimal and each annotation marks a real departure from convention. An
+    annotation also writes only a value in ANNOTATION_VALUES; the conventional
+    values that this step fills in are the only other values a key takes.
     """
     conventions = Conventions(api)
     errors: list[str] = []
@@ -379,8 +389,10 @@ def apply_defaults(api: Api) -> Api:
         explicit: dict[str, str], defaults: dict[str, str], context: str
     ) -> dict[str, str]:
         for key, value in explicit.items():
-            if defaults.get(key, IMPLICIT.get(key)) == value:
+            if defaults.get(key) == value:
                 errors.append(f"{context}: {key}={value} restates the default")
+            elif value not in ANNOTATION_VALUES.get(key, (value,)):
+                errors.append(f"{context}: unsupported {key}={value!r}")
         return dict(sorted({**defaults, **explicit}.items()))
 
     functions = []
@@ -468,25 +480,6 @@ def metadata_errors(
     ]
     if "kind" in metadata and metadata["kind"] not in kinds:
         errors.append(f"{context}: unsupported kind={metadata['kind']!r}")
-    values = {
-        "execution": EXECUTIONS,
-        "shape": SHAPES,
-        "ownership": OWNERSHIPS,
-        "encoding": ENCODINGS,
-        "direction": frozenset({"in", "out", "inout"}),
-        "nullable": frozenset({"true", "false"}),
-        "optional": frozenset({"empty", "null"}),
-        "lifetime": frozenset({"call", "completion", "owner", "process"}),
-        "release_consumes": frozenset({"success", "always"}),
-        "consumes": frozenset({"success", "always"}),
-        "thread": frozenset({"native", "host"}),
-        "reentry": frozenset({"allow", "forbid", "protocol"}),
-        "handle_access": frozenset({"live", "issued"}),
-        "dispose_invalidates": frozenset({"self", "parent"}),
-    }
-    for key, accepted in values.items():
-        if key in metadata and metadata[key] not in accepted:
-            errors.append(f"{context}: unsupported {key}={metadata[key]!r}")
     if metadata.get("nullable") == "true" and "optional" in metadata:
         errors.append(
             f"{context}: nullable and optional specify different absence representations"
@@ -667,11 +660,6 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: completion requires command, query, operation, or lifecycle execution"
                 )
-            for key in ("result", "shape", "ownership"):
-                if key not in metadata:
-                    errors.append(
-                        f"{context}: erased completion payload requires {key} metadata"
-                    )
             result = metadata.get("result")
             shape = metadata.get("shape")
             if result and result not in known_types:
@@ -683,8 +671,6 @@ def validate(api: Api) -> None:
                 )
             if result == "void" and shape != "none":
                 errors.append(f"{context}: void completion requires shape=none")
-            elif result and result != "void" and shape == "none":
-                errors.append(f"{context}: non-void completion requires a value shape")
             if execution == "command" and result != "void":
                 errors.append(
                     f"{context}: commands use disposition and generation, not a value payload"
@@ -694,20 +680,14 @@ def validate(api: Api) -> None:
             ownership = metadata.get("ownership")
             if result == "void" and ownership != "value":
                 errors.append(f"{context}: void completion requires ownership=value")
-            elif result != "void" and ownership == "value":
-                errors.append(
-                    f"{context}: completion storage requires borrowed or owned ownership"
-                )
             if ownership == "owned":
                 handle = api.typedefs_by_name.get(result or "")
                 if handle is None or handle.metadata.get("kind") != "handle":
                     errors.append(
                         f"{context}: owned completion requires a declared handle type"
                     )
-            if "encoding" in metadata and result != BUFFER_VIEW and shape != "bytes":
-                errors.append(
-                    f"{context}: encoded completion requires a buffer view or byte shape"
-                )
+            if "encoding" in metadata and result != BUFFER_VIEW:
+                errors.append(f"{context}: encoded completion requires a buffer view")
             if metadata.get("optional") == "empty" and result != BUFFER_VIEW:
                 errors.append(
                     f"{context}: optional=empty requires a buffer view result"
@@ -731,11 +711,6 @@ def validate(api: Api) -> None:
                 f"{context}: variadic public functions cannot be generated safely"
             )
         parameters = {parameter.name: parameter for parameter in function.parameters}
-        if "receiver" in metadata and (
-            not function.parameters
-            or metadata["receiver"] != function.parameters[0].name
-        ):
-            errors.append(f"{context}: receiver must name the first parameter")
         if (
             metadata.keys() & {"user_data", "release_callback", "accepted_unless"}
             and "registration" not in metadata
@@ -838,37 +813,6 @@ def validate(api: Api) -> None:
         errors.extend(
             metadata_errors(record.metadata, RECORD_KEYS, context, KINDS["record"])
         )
-        projection = record.metadata.get("projection") or (
-            api.typedefs_by_name[record.name].metadata.get("projection")
-            if record.name in api.typedefs_by_name
-            else None
-        )
-        if projection:
-            source = api.records_by_name.get(projection)
-            if (
-                source is None
-                or not source.complete
-                or source.kind != "struct"
-                or source.metadata.get("projection")
-            ):
-                errors.append(
-                    f"{context}: projection requires a complete source record without another projection"
-                )
-            elif record.kind != "struct":
-                errors.append(f"{context}: projection requires a struct")
-            else:
-                projected = {field.name: field for field in record.fields}
-                for source_field in source.fields:
-                    if source_field.metadata.get("kind") in {"size", "reserved"}:
-                        continue
-                    target = projected.get(source_field.name)
-                    if (
-                        target is None
-                        or target.type.canonical != source_field.type.canonical
-                    ):
-                        errors.append(
-                            f"{context}: projection field {source_field.name} must preserve its source C type"
-                        )
         if "fields" in record.metadata:
             errors.extend(ordered_errors(record, record.metadata["fields"], context))
         for field in record.fields:
@@ -1055,8 +999,6 @@ def validate(api: Api) -> None:
         errors.extend(
             metadata_errors(typedef.metadata, TYPEDEF_KEYS, context, KINDS["typedef"])
         )
-        if "projection" in typedef.metadata and typedef.name not in api.records_by_name:
-            errors.append(f"{context}: projection requires a record typedef")
         if "fields" in typedef.metadata:
             errors.extend(
                 ordered_errors(
@@ -1383,7 +1325,6 @@ FUNCTION_REFERENCES = {
 }
 PARAMETER_REFERENCES = {
     "function": (
-        "receiver",
         "view_owner",
         "registration",
         "user_data",

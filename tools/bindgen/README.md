@@ -48,7 +48,9 @@ category.
 The frontend completes each declaration's metadata with the conventions that
 `Conventions` in `schema.py` derives from its C shape, so every later stage
 reads a complete contract. An annotation states a departure from convention, and
-the schema rejects one that restates a default.
+the schema rejects one that restates a default. An annotation writes only the
+values in `ANNOTATION_VALUES`; conventions supply each key's other values, such
+as `direction=in` and `shape=none`.
 
 | Declaration                         | Default                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -64,7 +66,7 @@ the schema rejects one that restates a default.
 | First struct member `uint32_t size` | `kind=size;default=sizeof`                                                                 |
 | Member that a sibling names         | `kind=count` for `length`, `kind=presence_mask` for `mask`, `kind=tag` for `tag`           |
 | `kind=reserved` member              | `default=0`                                                                                |
-| Callback typedef                    | `thread=native;reentry=allow`; a void callback has `failure=contain`                       |
+| Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                     |
 | Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                  |
 | Callback registration               | `user_data` names its one `kind=context` member or parameter                               |
 | Record typedef                      | `default` names the one function that takes no arguments and returns the record            |
@@ -85,6 +87,10 @@ Two keys state what a C shape cannot:
   of its meaning, as with coordinates, so a binding may construct it
   positionally. The schema rejects it on a record with control, pointer, or
   array members.
+
+No annotation names a callback's thread. Every generated binding treats a
+callback as able to run on any native thread, and each callback's header comment
+states the threads that it runs on.
 
 An annotation that names another declaration, such as `reentry_calls`,
 `complete`, `cancel_registration`, or `wait_retired`, must name one that exists;
@@ -109,7 +115,7 @@ case and escapes keywords:
 
 | Plan field              | Rule                                                                                        |
 | ----------------------- | ------------------------------------------------------------------------------------------- |
-| `OperationPlan.member`  | `name=` if declared; else the name without its receiver's prefix; else without `mln_`       |
+| `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                              |
 | `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                 |
 | `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                 |
 | `PresenceGroup.member`  | A bit without its enum's shared prefix, or a boolean mask without `has_`                    |

@@ -60,7 +60,6 @@ typedef struct mln_adapter_completion_record {
  * owned result when capture fails. Otherwise the listener owns the record and
  * releases it with mln_adapter_completion_record_destroy().
  */
-MLN_BINDING("thread=host")
 typedef void (*mln_adapter_completion_listener)(
   void* user_data, mln_adapter_completion_record* record
                      MLN_BINDING("ownership=owned;lifetime=owner")

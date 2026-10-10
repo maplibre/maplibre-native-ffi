@@ -74,8 +74,8 @@ class ConventionTests(unittest.TestCase):
         bound = compile_api(parse(REGISTRATION))
         notify = bound.callbacks["notify"]
         self.assertEqual(
-            (notify.thread, notify.failure, notify.reentry, notify.context),
-            ("native", "contain", "allow", "context"),
+            (notify.failure, notify.reentry, notify.context),
+            ("contain", "allow", "context"),
         )
         message = notify.parameters[1].value
         self.assertEqual(
@@ -160,6 +160,70 @@ class ConventionTests(unittest.TestCase):
                 "mln_map map, const mln_completion *completion, "
                 "mln_diagnostic *out_diagnostic);",
             )
+
+    def test_an_annotation_writes_only_the_vocabulary_headers_use(self):
+        source = (
+            REGISTRATION
+            + """
+BIND("execution=query;result=double") mln_status session_scale(
+  session value, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+BIND("execution=command") mln_status session_flush(
+  session value, const mln_completion *completion, mln_diagnostic *out_diagnostic);
+"""
+        )
+        validate(parse(source))
+        command = 'BIND("execution=command'
+        message = "const char *message"
+        close = "session_close(session value"
+        handle = "release=session_close"
+        # Keys that no header writes, and where each would go.
+        keys = (
+            ("receiver", command, command + ";receiver=value"),
+            ("name", command, command + ";name=flush_now"),
+            (
+                "projection",
+                "release=release_context",
+                "release=release_context;projection=listener",
+            ),
+            ("release_consumes", handle, handle + ";release_consumes=always"),
+            (
+                "thread",
+                "(*release)(void *context)",
+                '(*release)(void *context) BIND("thread=host")',
+            ),
+        )
+        for key, before, after in keys:
+            with (
+                self.subTest(key=key),
+                self.assertRaisesRegex(ModelError, f"unknown metadata key '{key}'"),
+            ):
+                validate(parse(source.replace(before, after, 1)))
+        # Values that no header writes, each where it departs from the default.
+        values = (
+            ("shape=none", "result=double", "result=double;shape=none"),
+            ("shape=value", command, command + ";shape=value"),
+            ("shape=bytes", "result=double", "result=double;shape=bytes"),
+            ("ownership=value", "result=double", "result=double;ownership=value"),
+            ("optional=null", message, message + ' BIND("optional=null")'),
+            ("nullable=false", message, message + ' BIND("nullable=false")'),
+            ("lifetime=completion", message, message + ' BIND("lifetime=completion")'),
+            (
+                "direction=in",
+                "notify callback;",
+                'notify callback BIND("direction=in");',
+            ),
+            ("consumes=always", close, close + ' BIND("consumes=always")'),
+            ("handle_access=live", close, close + ' BIND("handle_access=live")'),
+            ("reentry=allow", handle, handle + ";reentry=allow"),
+            ("dispose_invalidates=self", handle, handle + ";dispose_invalidates=self"),
+        )
+        for annotation, before, after in values:
+            key, value = annotation.split("=")
+            with (
+                self.subTest(annotation=annotation),
+                self.assertRaisesRegex(ModelError, f"unsupported {key}='{value}'"),
+            ):
+                parse(source.replace(before, after, 1))
 
     def test_a_default_constructor_is_inferred_only_when_it_is_unambiguous(self):
         source = """
