@@ -90,6 +90,15 @@ mln_status mln_map_new_entries(mln_map map, const mln_completion *completion, ml
         self.assertIsNone(copied.title)
         self.assertEqual(copied.class_, 2.0)
 
+    def test_a_nested_registration_defaults_to_a_disabled_one(self):
+        api = self.parse(groups=("record_notification",))
+        self.assertIn("mln_map_request_reading", python.coverage(api)["generated"])
+        values = self.materialize(api).values
+        first = values.ReadingRequest(level=3)
+        second = values.ReadingRequest(level=4)
+        self.assertIsNone(first.handler.callback)
+        self.assertIsNot(first.handler, second.handler)
+
     def test_input_identifiers_cannot_shadow_callback_runtime_locals(self):
         api = self.parse("""
 BIND("execution=command")

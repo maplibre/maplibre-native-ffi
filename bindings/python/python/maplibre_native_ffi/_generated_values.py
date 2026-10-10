@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntFlag
 from typing import TYPE_CHECKING
 
@@ -2606,9 +2606,9 @@ class RenderSessionAttachOptions:
 
     driver: RenderDriverKind
     requested_texture_ring_depth: int
-    frame_wake: Wake
-    driver_work_wake: Wake
-    queue_lock: QueueLock
+    frame_wake: Wake = field(default_factory=lambda: Wake())
+    driver_work_wake: Wake = field(default_factory=lambda: Wake())
+    queue_lock: QueueLock = field(default_factory=lambda: QueueLock())
 
     @classmethod
     def _from_native(cls, raw):
@@ -3084,9 +3084,9 @@ class RuntimeOptions:
     """
 
     event_mask: RuntimeEventMask
-    event_wake: Wake
     asset_path: str | None = None
     cache_path: str | None = None
+    event_wake: Wake = field(default_factory=lambda: Wake())
 
     @classmethod
     def _from_native(cls, raw):

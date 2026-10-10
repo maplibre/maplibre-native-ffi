@@ -569,9 +569,18 @@ class Values:
                 public_copies.append(f'{member}=raw["{member}"]')
                 continue
             public_type = self.type(value)
-            fields.append(
-                f"    {member}: {public_type}" + (" = None" if optional(value) else "")
-            )
+            if optional(value):
+                default = " = None"
+            elif value.registration:
+                # A registration without presence defaults to a disabled one,
+                # which is what the record's native default holds. The lambda
+                # defers the name, whose class may come later in the module.
+                default = (
+                    f" = field(default_factory=lambda: {public_name(value.native)}())"
+                )
+            else:
+                default = ""
+            fields.append(f"    {member}: {public_type}{default}")
             if value.registration:
                 # Native never returns callbacks, so a copy leaves them unset.
                 unset = "None" if optional(value) else public_name(value.native) + "()"

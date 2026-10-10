@@ -22,6 +22,11 @@ def constant(owner: str, field: str) -> str:
     )
 
 
+# Control fields that a port message leaves out, because the receiver rebuilds
+# the record from its value fields.
+PORT_SKIPPED_ROLES = {"size", "reserved"}
+
+
 def flattened(value, expression):
     if (
         value.kind in {"scalar", "enum"}
@@ -30,9 +35,19 @@ def flattened(value, expression):
         and value.ctype.canonical not in {"float", "double"}
     ):
         return [expression]
+    if (
+        value.kind == "reference"
+        and value.length == "1"
+        and not value.nullable
+        and value.element is not None
+        and value.element.kind == "record"
+    ):
+        return flattened(value.element, f"(*{expression})")
     if value.kind == "record":
         result = []
         for field in value.fields:
+            if field.role in PORT_SKIPPED_ROLES:
+                continue
             if field.role != "value" or field.presence:
                 return None
             children = flattened(field.value, f"{expression}.{field.name}")

@@ -63,6 +63,37 @@ int main() {
             )
             self.assertEqual(dart.coverage(bound)["unsupported"], {})
 
+    def test_a_borrowed_record_argument_crosses_a_port_without_its_size(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            header = protocol_header(groups=("record_notification",))
+            (root / "sample.h").write_text(header)
+            bound = compile_api(parse_sources({"sample.h": header}))
+            run_port(
+                self,
+                root,
+                bound,
+                """
+static unsigned deliveries = 0;
+template <std::size_t Count>
+void dart_port_notify(void *context, const std::int64_t (&values)[Count]) {
+  assert(context == reinterpret_cast<void*>(17));
+  assert(Count == 3 && values[1] == 7 && values[2] == -1);
+  ++deliveries;
+}
+""",
+                """
+int main() {
+  const auto callback = reinterpret_cast<mln_reading_callback>(dart_port_function(MLN_ADAPTER_DART_PORT_READING_HANDLER_CALLBACK));
+  assert(callback);
+  const mln_reading reading = {sizeof(mln_reading), 7, UINT64_MAX};
+  callback(reinterpret_cast<void*>(17), &reading);
+  assert(deliveries == 1);
+}
+""",
+            )
+            self.assertEqual(dart.coverage(bound)["unsupported"], {})
+
     def test_declinable_registration_generates_a_native_port_and_dart_method(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

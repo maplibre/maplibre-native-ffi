@@ -26,10 +26,15 @@
 #define MLN_PROTOCOL_DECLINABLE_REGISTRATION
 #endif
 #if defined(MLN_PROTOCOL_DECLINABLE_REGISTRATION) || \
-  defined(MLN_PROTOCOL_DEFERRED_CALLBACK)
+  defined(MLN_PROTOCOL_DEFERRED_CALLBACK) ||         \
+  defined(MLN_PROTOCOL_RECORD_NOTIFICATION)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_RETAINED_REGISTRATION) && \
+  !defined(MLN_PROTOCOL_MAP_RELEASE)
+#define MLN_PROTOCOL_MAP_CLOSE
+#endif
+#if defined(MLN_PROTOCOL_RECORD_NOTIFICATION) && \
   !defined(MLN_PROTOCOL_MAP_RELEASE)
 #define MLN_PROTOCOL_MAP_CLOSE
 #endif
@@ -440,6 +445,33 @@ typedef struct mln_sample_options {
 BIND("execution=command")
 mln_status mln_map_observe_sample(
   mln_map map, const mln_sample_options* options,
+  const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_RECORD_NOTIFICATION
+// A notification that borrows a sized record for the callback, from a
+// registration that a command copies inside the record it takes.
+typedef struct mln_reading {
+  uint32_t size;
+  uint32_t level;
+  uint64_t stamp;
+} mln_reading;
+typedef void (*mln_reading_callback)(void* context, const mln_reading* reading);
+typedef void (*mln_reading_release)(void* context);
+typedef struct mln_reading_handler {
+  mln_reading_callback callback BIND("nullable=true");
+  void* context BIND("kind=context");
+  mln_reading_release release;
+} mln_reading_handler BIND("kind=callback_registration;release=release");
+typedef struct mln_reading_request {
+  uint32_t size;
+  uint32_t level;
+  mln_reading_handler handler;
+} mln_reading_request;
+BIND("execution=command")
+mln_status mln_map_request_reading(
+  mln_map map, const mln_reading_request* request,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 #endif

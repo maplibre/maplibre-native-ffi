@@ -1002,7 +1002,7 @@ def lower(api: Api | BoundApi) -> tuple[dict[str, str], list[str], dict[str, str
         facade.get("", [])
     )
     files["python/maplibre_native_ffi/_generated_values.py"] = (
-        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom dataclasses import dataclass\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Callable\nfrom ._enum import UnknownIntEnum\n'
+        f'"""{notice}"""\n\nfrom __future__ import annotations\nfrom dataclasses import dataclass, field\nfrom enum import IntFlag\nfrom typing import TYPE_CHECKING, Callable\nfrom ._enum import UnknownIntEnum\n'
         + (
             "from ._operation import _wrap_response\n"
             if any(value.response for value in values.records.values())

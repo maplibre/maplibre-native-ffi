@@ -675,6 +675,8 @@ class Values:
         return "\n".join(lines) + "\n"
 
     def port_copy(self, value, offset):
+        if value.kind == "reference":
+            return self.port_copy(value.element, offset)
         if value.kind == "record":
             args = []
             for field in self.fields(value):
