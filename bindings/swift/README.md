@@ -21,6 +21,11 @@ operations reach native in the order that their executor runs them:
 The module builds with the `NonisolatedNonsendingByDefault` feature to give its
 operations this behavior, so the package needs Swift 6.2 or later.
 
+Start a command group's begin, its commands, and its end as tasks on one actor,
+and then await their completions. The group holds the map's render updates until
+its end, so a host that awaits each command before it starts the next leaves its
+render targets unchanged until every one of those completions arrives.
+
 Cancelling a task that awaits an operation ends the wait with
 `CancellationError`. The native work still finishes, and the binding disposes a
 value that arrives afterwards, such as a created map.
