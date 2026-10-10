@@ -209,6 +209,9 @@ public sealed interface NativeSurfaceTarget {
   /** The number of textures in the ring. */
   public val ringDepth: Int
 
+  /** The ring slot whose texture is in front. */
+  public val slotIndex: Int
+
   /** This target with the texture of ring slot [index] in front. */
   public fun slot(index: Int): NativeSurfaceTarget
 }
@@ -226,13 +229,14 @@ public data class MetalTextureTarget(
   override val extent: SurfaceExtent,
   override val generation: Long,
   public val ring: List<NativeHandle> = listOf(texture),
+  override val slotIndex: Int = 0,
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.METAL
 
   override val ringDepth: Int
     get() = ring.size
 
-  override fun slot(index: Int): MetalTextureTarget = copy(texture = ring[index])
+  override fun slot(index: Int): MetalTextureTarget = copy(texture = ring[index], slotIndex = index)
 }
 
 public enum class TextureOrigin {
@@ -261,6 +265,7 @@ public data class VulkanImageTarget(
   override val extent: SurfaceExtent,
   override val generation: Long,
   public val ring: List<VulkanImageSlot> = listOf(VulkanImageSlot(image, imageView)),
+  override val slotIndex: Int = 0,
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.VULKAN
 
@@ -268,7 +273,7 @@ public data class VulkanImageTarget(
     get() = ring.size
 
   override fun slot(index: Int): VulkanImageTarget =
-    copy(image = ring[index].image, imageView = ring[index].imageView)
+    copy(image = ring[index].image, imageView = ring[index].imageView, slotIndex = index)
 }
 
 public data class VulkanContextHandles(
@@ -314,11 +319,13 @@ public data class OpenGlTextureTarget(
   override val extent: SurfaceExtent,
   override val generation: Long,
   public val ring: List<Int> = listOf(textureName),
+  override val slotIndex: Int = 0,
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.OPENGL
 
   override val ringDepth: Int
     get() = ring.size
 
-  override fun slot(index: Int): OpenGlTextureTarget = copy(textureName = ring[index])
+  override fun slot(index: Int): OpenGlTextureTarget =
+    copy(textureName = ring[index], slotIndex = index)
 }

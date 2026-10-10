@@ -95,14 +95,12 @@ These rules hold in every example, and the code alone does not show why:
   rendered frame and holds it until it acquires a newer one, so the session
   renders into the other texture while the compositor samples the held one.
   `compose-map` hands each frame to its bridge, which draws it after the render
-  call returns, so it releases a frame no earlier than the next render call. Its
-  macOS Metal bridge lends a ring of two textures; the other bridges lend one,
-  whose frame the next demand releases first.
-- A borrowed-texture resize releases the held frame, because a replacement waits
-  until the host holds none, then replaces the ring and also resizes the map,
-  because a target replacement leaves the map's extent unchanged. The outgoing
-  ring stays alive until the replacement completes, and the host then demands a
-  forced frame: the replacement publishes no map update.
+  call returns, so it releases a frame no earlier than the next render call.
+- A borrowed-texture resize releases the held frame, because a replacement is
+  refused while the host holds a frame, then replaces the ring and also resizes
+  the map, because a target replacement leaves the map's extent unchanged. The
+  outgoing ring stays alive until the replacement completes, and the host then
+  demands a forced frame: the replacement publishes no map update.
 - A session fixes its scale factor at attachment, so a scale change reattaches.
 - The process never exits while a session can still make graphics calls: it
   detaches, or abandons the session when detach fails. When an abandon keeps

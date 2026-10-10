@@ -2,26 +2,19 @@ package org.maplibre.nativeffi.examples.composemap.surface
 
 import androidx.compose.ui.graphics.drawscope.DrawScope
 
+/**
+ * Lends the session a ring of Vulkan images imported from Skiko Metal textures through MoltenVK,
+ * and draws the Metal textures.
+ */
 internal class MacVulkanMetalBridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-mac-vulkan-renderer")
   private var vulkan: MacVulkanContext? = null
-  private var metalTexture = NativeHandle(0)
-  private var metalDevice = NativeHandle(0)
-  private var pixelFormat = 0L
-  private var importedTexture: MacVulkanImportedTexture? = null
+  private val ring = MacMetalTextureRing()
+
+  // One import per texture of the ring, in slot order.
+  private var importedTextures: List<MacVulkanImportedTexture> = emptyList()
   private var currentExtent = SurfaceExtent.Empty
-
-  // Read on the Compose thread while the renderer thread writes them.
-  @Volatile private var generation = 0L
-  @Volatile private var renderedGeneration = 0L
-
-  // The Metal texture a frame last landed in, kept alive until one lands in its replacement. Skiko
-  // allocates a new texture for every resize and the map needs a frame or two to fill it, so this
-  // is what the consumer draws in between.
-  private var retiredTexture = NativeHandle(0)
-  private var retiredPixelFormat = 0L
-  @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.VULKAN
 
@@ -41,12 +34,11 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
   }
 
   private fun resizeOnRendererThread(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
-    if (extent == currentExtent && importedTexture != null) {
+    if (extent == currentExtent && importedTextures.isNotEmpty()) {
       return
     }
-    recreateTexture(extent, skikoDevice)
+    recreateTextures(extent, skikoDevice)
     currentExtent = extent
-    generation += 1
   }
 
   override fun acquireFrame(
@@ -54,25 +46,26 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
-    if (importedTexture == null || extent != currentExtent) {
+    if (importedTextures.isEmpty() || extent != currentExtent) {
       resize(extent)
     }
+    check(importedTextures.isNotEmpty()) { "Vulkan texture is not initialized" }
     return NativeSurfaceFrameLease(
       frameId = frameId,
       extent = extent,
-      target = target(generation),
+      target = MacVulkanImportedTexture.ringTarget(importedTextures, ring.generation),
       presentationTimeNanos = presentationTimeNanos,
     )
   }
 
   // The session reports a rendered frame once its GPU work completes, so the consumer can read it.
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    renderedGeneration = frame.target.generation
+    ring.markRendered(frame.target.generation)
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
     rendererDispatcher.run {
-      releaseRetiredOnceReplaced()
+      ring.releaseRetiredOnceReplaced()
       action()
     }
 
@@ -83,38 +76,14 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
       return false
     }
     // Only a texture this bridge still holds is safe to draw.
-    val texture: NativeHandle
-    val format: Long
-    when (target.generation) {
-      generation -> {
-        texture = metalTexture
-        format = pixelFormat
-      }
-      retiredGeneration -> {
-        texture = retiredTexture
-        format = retiredPixelFormat
-      }
-      else -> return false
-    }
-    if (texture.address == 0L) {
-      return false
-    }
-    return SkikoHost.drawMetalTexture(
-      scope,
-      MetalTextureTarget(
-        texture = texture,
-        device = metalDevice,
-        pixelFormat = format,
-        extent = target.extent,
-        generation = target.generation,
-      ),
-    )
+    val drawable = ring.drawable(target, TextureOrigin.TOP_LEFT) ?: return false
+    return SkikoHost.drawMetalTexture(scope, drawable)
   }
 
   override fun close() {
     try {
       rendererDispatcher.run {
-        disposeTexture()
+        disposeTextures()
         val closingVulkan = vulkan
         vulkan = null
         closingVulkan?.close()
@@ -124,118 +93,44 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
     }
   }
 
-  private fun target(generation: Long): NativeSurfaceTarget =
-    checkNotNull(importedTexture) { "Vulkan texture is not initialized" }.target(generation)
-
-  private fun recreateTexture(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
+  private fun recreateTextures(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
     if (extent.isEmpty) {
-      disposeTexture()
+      disposeTextures()
       return
     }
-
-    val oldTexture = metalTexture
-    val oldPixelFormat = pixelFormat
     // Resolved by the caller: asking Skiko from the renderer thread waits on the event dispatch
     // thread, which is already waiting on this one.
     val requiredMetalDevice =
       checkNotNull(skikoDevice) { "The Skiko Metal device is resolved before this hop" }
     val requiredMetalAdapter = MacMetalBridgeNative.metalAdapter(requiredMetalDevice.ptr)
-    // Only the device that allocated a texture can take it back, so a Skiko device change
-    // allocates rather than reusing.
-    val reusableTexture =
-      if (metalDevice.address == requiredMetalDevice.ptr) oldTexture.address else 0L
-    val newTextureAddress =
-      MacMetalBridgeNative.createMetalTexture(
-        metalDevice = requiredMetalDevice.ptr,
-        oldTexture = reusableTexture,
-        width = extent.physicalWidth,
-        height = extent.physicalHeight,
-      )
-    val newTexture = NativeHandle(newTextureAddress)
-    if (newTexture == oldTexture && importedTexture != null) {
-      return
-    }
-
-    // The session still names this image until its target replacement completes, after this
-    // returns. Destroying it now is safe only because each draw waits for its own demand's result,
-    // which leaves the core worker idle between draws.
-    importedTexture?.close()
-    importedTexture = null
-    if (newTexture != oldTexture) {
-      retire(
-        oldTexture,
-        oldPixelFormat,
-        deviceChanged = metalDevice.address != requiredMetalDevice.ptr,
-      )
-    }
-    metalTexture = newTexture
-    metalDevice = NativeHandle(requiredMetalDevice.ptr)
-    pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
+    // The session still names these images until its target replacement completes, after this
+    // returns. Destroying them first is safe only because each draw waits for its own demand's
+    // result, which leaves the core worker idle between draws.
+    closeImports()
+    ring.allocate(extent, requiredMetalDevice)
     try {
       val context = vulkan ?: MacVulkanContext.create(requiredMetalAdapter).also { vulkan = it }
-      importedTexture = context.createImportedTexture(newTexture, extent)
+      val imported = mutableListOf<MacVulkanImportedTexture>()
+      try {
+        ring.textures.forEach { imported += context.createImportedTexture(it, extent) }
+      } catch (error: RuntimeException) {
+        imported.forEach(MacVulkanImportedTexture::close)
+        throw error
+      }
+      importedTextures = imported
     } catch (error: RuntimeException) {
-      disposeTexture()
+      disposeTextures()
       throw error
     }
   }
 
-  // Holds the outgoing texture for the consumer to draw while the replacement is still empty. A
-  // texture from a device Skiko has replaced cannot be drawn on the new one.
-  private fun retire(outgoing: NativeHandle, outgoingPixelFormat: Long, deviceChanged: Boolean) {
-    if (outgoing.address == 0L) {
-      return
-    }
-    if (deviceChanged) {
-      // Both belong to the device Skiko replaced.
-      releaseMetalTexture(outgoing)
-      releaseMetalTexture(retiredTexture)
-      retiredTexture = NativeHandle(0)
-      retiredPixelFormat = 0
-      retiredGeneration = 0
-      return
-    }
-    if (renderedGeneration != generation) {
-      // This one never held a frame, so whatever is already retired stays.
-      releaseMetalTexture(outgoing)
-      return
-    }
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = outgoing
-    retiredPixelFormat = outgoingPixelFormat
-    retiredGeneration = generation
+  private fun closeImports() {
+    importedTextures.forEach(MacVulkanImportedTexture::close)
+    importedTextures = emptyList()
   }
 
-  // Released a frame after the replacement rendered, so the consumer's last recorded frame from
-  // the retired texture has been flushed.
-  private fun releaseRetiredOnceReplaced() {
-    if (retiredTexture.address == 0L || renderedGeneration != generation) {
-      return
-    }
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = NativeHandle(0)
-    retiredPixelFormat = 0
-    retiredGeneration = 0
-  }
-
-  private fun disposeTexture() {
-    importedTexture?.close()
-    importedTexture = null
-    releaseMetalTexture(metalTexture)
-    metalTexture = NativeHandle(0)
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = NativeHandle(0)
-    retiredPixelFormat = 0
-    retiredGeneration = 0
-    metalDevice = NativeHandle(0)
-    pixelFormat = 0
-  }
-
-  private fun releaseMetalTexture(texture: NativeHandle) {
-    if (texture.address == 0L) {
-      return
-    }
-    SkikoHost.forgetMetalTexture(texture)
-    MacMetalBridgeNative.disposeMetalTexture(texture.address)
+  private fun disposeTextures() {
+    closeImports()
+    ring.dispose()
   }
 }

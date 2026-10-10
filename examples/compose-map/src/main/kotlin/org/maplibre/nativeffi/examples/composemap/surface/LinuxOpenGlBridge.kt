@@ -66,6 +66,10 @@ import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 
+/**
+ * Lends the session a ring of OpenGL textures in this bridge's own EGL context, each backed by a
+ * Vulkan image that Skiko's OpenGL context imports as well, and draws the Skiko imports.
+ */
 internal class LinuxOpenGlBridge : NativeSurfaceBridge {
   private var vulkan: LinuxVulkanContext? = null
   private val producerThreadRef = AtomicReference<Thread?>()
@@ -76,22 +80,25 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     }
   }
   private val egl: LinuxEglContext
-  private var exportedTexture: LinuxExportedVulkanTexture? = null
-  private var producerTexture: LinuxEglImportedTexture? = null
-  private var consumerTexture: LinuxOpenGlImportedTexture? = null
+
+  // One entry per ring slot, in slot order: the Vulkan image, the producer's import of it, and the
+  // consumer's import of it.
+  private var exportedTextures: List<LinuxExportedVulkanTexture> = emptyList()
+  private var producerTextures: List<LinuxEglImportedTexture> = emptyList()
+  @Volatile private var consumerTextures: List<LinuxOpenGlImportedTexture> = emptyList()
   private var currentExtent = SurfaceExtent.Empty
 
   @Volatile private var generation = 0L
   @Volatile private var renderedGeneration = 0L
 
-  // The consumer texture a frame last landed in, kept alive until one lands in its replacement.
-  // Skiko allocates a new texture for every resize and the map needs a frame or two to fill it, so
-  // this is what the consumer draws in between.
-  private var retiredConsumerTexture: LinuxOpenGlImportedTexture? = null
-  private var retiredExportedTexture: LinuxExportedVulkanTexture? = null
+  // The ring a frame last landed in, kept alive until one lands in its replacement. The bridge
+  // allocates a new ring for every resize and the map needs a frame or two to fill it, so this is
+  // what the consumer draws in between.
+  @Volatile private var retiredConsumerTextures: List<LinuxOpenGlImportedTexture> = emptyList()
+  private var retiredExportedTextures: List<LinuxExportedVulkanTexture> = emptyList()
   @Volatile private var retiredGeneration = 0L
 
-  // The Skiko OpenGL context both consumer imports were made in. A GL name means nothing in a
+  // The Skiko OpenGL context the consumer imports were made in. A GL name means nothing in a
   // context that did not issue it, and Skiko replaces this context with its redrawer.
   private var consumerContext: SkikoOpenGlContext? = null
 
@@ -127,13 +134,13 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
     abandonConsumerTexturesIfContextChanged()
-    // The retired texture is released only a frame after the replacement rendered, so its last
+    // The retired ring is released only a frame after the replacement rendered, so its last
     // recorded frame has been flushed. Skiko's context is current here, which closing it needs.
-    if (retiredConsumerTexture != null && renderedGeneration == generation) {
-      disposeRetiredTexture(consumerContextCurrent = true)
+    if (retiredConsumerTextures.isNotEmpty() && renderedGeneration == generation) {
+      disposeRetiredTextures(consumerContextCurrent = true)
     }
-    if (producerTexture == null || consumerTexture == null || extent != currentExtent) {
-      recreateTexture(extent)
+    if (producerTextures.isEmpty() || consumerTextures.isEmpty() || extent != currentExtent) {
+      recreateTextures(extent)
     }
     return NativeSurfaceFrameLease(
       frameId = frameId,
@@ -158,12 +165,13 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
       return false
     }
     // Only a texture this bridge still holds is safe to draw.
-    val texture =
+    val held =
       when (target.generation) {
-        generation -> consumerTexture
-        retiredGeneration -> retiredConsumerTexture
-        else -> null
-      } ?: return false
+        generation -> consumerTextures
+        retiredGeneration -> retiredConsumerTextures
+        else -> emptyList()
+      }
+    val texture = held.getOrNull(target.slotIndex) ?: return false
     return SkikoHost.drawOpenGlTexture(scope, texture.target(target.generation))
   }
 
@@ -172,8 +180,8 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
       // Skiko may have replaced the context these were imported into, and a name deleted there is
       // an unrelated object in whatever context is current now.
       if (consumerContextStillCurrent()) {
-        disposeTexture(consumerContextCurrent = false)
-        disposeRetiredTexture(consumerContextCurrent = false)
+        disposeTextures(consumerContextCurrent = false)
+        disposeRetiredTextures(consumerContextCurrent = false)
       } else {
         abandonConsumerTextures()
       }
@@ -188,46 +196,51 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     }
   }
 
-  private fun target(generation: Long): NativeSurfaceTarget =
-    checkNotNull(producerTexture) { "Linux EGL texture is not initialized" }.target(generation)
+  private fun target(generation: Long): NativeSurfaceTarget {
+    check(producerTextures.isNotEmpty()) { "Linux EGL texture is not initialized" }
+    return LinuxEglImportedTexture.ringTarget(producerTextures, generation)
+  }
 
-  private fun recreateTexture(extent: SurfaceExtent) {
+  private fun recreateTextures(extent: SurfaceExtent) {
     if (extent.isEmpty) {
-      disposeTexture(consumerContextCurrent = true)
+      disposeTextures(consumerContextCurrent = true)
       currentExtent = SurfaceExtent.Empty
       generation += 1
       return
     }
 
-    retireTexture()
+    retireTextures()
     val context =
       vulkan ?: LinuxVulkanContext.create(currentOpenGlDeviceUuids()).also { vulkan = it }
-    val exported = context.createExportedTexture(extent)
-    var producer: LinuxEglImportedTexture? = null
-    var consumer: LinuxOpenGlImportedTexture? = null
+    val exported = mutableListOf<LinuxExportedVulkanTexture>()
+    val producers = mutableListOf<LinuxEglImportedTexture>()
+    val consumers = mutableListOf<LinuxOpenGlImportedTexture>()
     try {
-      producer = runOnProducerThread {
-        LinuxEglImportedTexture.create(egl, exported.exportFd(), exported, extent)
+      repeat(RING_DEPTH) {
+        val image = context.createExportedTexture(extent).also { exported += it }
+        producers += runOnProducerThread {
+          LinuxEglImportedTexture.create(egl, image.exportFd(), image, extent)
+        }
+        consumers +=
+          LinuxOpenGlImportedTexture.create(
+            image.exportFd(),
+            image.memorySize(),
+            extent,
+            origin = TextureOrigin.BOTTOM_LEFT,
+          )
       }
-      consumer =
-        LinuxOpenGlImportedTexture.create(
-          exported.exportFd(),
-          exported.memorySize(),
-          extent,
-          origin = TextureOrigin.BOTTOM_LEFT,
-        )
-      exportedTexture = exported
-      producerTexture = producer
-      consumerTexture = consumer
+      exportedTextures = exported
+      producerTextures = producers
+      consumerTextures = consumers
       consumerContext = SkikoHost.requireLinuxOpenGlContext()
       currentExtent = extent
       generation += 1
     } catch (error: RuntimeException) {
-      if (producer != null) {
-        runOnProducerThread { producer.close() }
+      if (producers.isNotEmpty()) {
+        runOnProducerThread { producers.forEach(LinuxEglImportedTexture::close) }
       }
-      consumer?.close()
-      exported.close()
+      consumers.forEach(LinuxOpenGlImportedTexture::close)
+      exported.forEach(LinuxExportedVulkanTexture::close)
       throw error
     }
   }
@@ -251,76 +264,74 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
   }
 
   private fun abandonConsumerTextures() {
-    consumerTexture?.abandon()
-    consumerTexture = null
-    retiredConsumerTexture?.abandon()
-    retiredConsumerTexture = null
+    consumerTextures.forEach(LinuxOpenGlImportedTexture::abandon)
+    consumerTextures = emptyList()
+    retiredConsumerTextures.forEach(LinuxOpenGlImportedTexture::abandon)
+    retiredConsumerTextures = emptyList()
     retiredGeneration = 0
     consumerContext = null
-    // The producer import lives in this bridge's own EGL context and the images in its own Vulkan
+    // The producer imports live in this bridge's own EGL context and the images in its own Vulkan
     // device, which Skiko's context change leaves alone, so those are released.
-    val oldProducerTexture = producerTexture
-    producerTexture = null
-    if (oldProducerTexture != null) {
-      runOnProducerThread { oldProducerTexture.close() }
-    }
-    exportedTexture?.close()
-    exportedTexture = null
-    retiredExportedTexture?.close()
-    retiredExportedTexture = null
+    closeProducerTextures()
+    exportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    exportedTextures = emptyList()
+    retiredExportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    retiredExportedTextures = emptyList()
     currentExtent = SurfaceExtent.Empty
     generation += 1
   }
 
-  // Holds the outgoing consumer texture for drawing while the replacement is still empty.
-  private fun retireTexture() {
-    if (renderedGeneration != generation || consumerTexture == null) {
-      disposeTexture(consumerContextCurrent = true)
+  // Holds the outgoing consumer textures for drawing while the replacement is still empty.
+  private fun retireTextures() {
+    if (renderedGeneration != generation || consumerTextures.isEmpty()) {
+      disposeTextures(consumerContextCurrent = true)
       return
     }
-    disposeRetiredTexture(consumerContextCurrent = true)
-    val oldProducerTexture = producerTexture
-    producerTexture = null
-    if (oldProducerTexture != null) {
-      runOnProducerThread { oldProducerTexture.close() }
-    }
-    retiredConsumerTexture = consumerTexture
-    retiredExportedTexture = exportedTexture
+    disposeRetiredTextures(consumerContextCurrent = true)
+    closeProducerTextures()
+    retiredConsumerTextures = consumerTextures
+    retiredExportedTextures = exportedTextures
     retiredGeneration = generation
-    consumerTexture = null
-    exportedTexture = null
+    consumerTextures = emptyList()
+    exportedTextures = emptyList()
   }
 
-  private fun disposeRetiredTexture(consumerContextCurrent: Boolean = true) {
-    retiredConsumerTexture?.let { texture ->
-      if (consumerContextCurrent) {
-        texture.close()
-      } else {
-        SkikoHost.withLinuxOpenGlContext { texture.close() }
-      }
-    }
-    retiredConsumerTexture = null
-    retiredExportedTexture?.close()
-    retiredExportedTexture = null
+  private fun disposeRetiredTextures(consumerContextCurrent: Boolean = true) {
+    closeConsumerTextures(retiredConsumerTextures, consumerContextCurrent)
+    retiredConsumerTextures = emptyList()
+    retiredExportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    retiredExportedTextures = emptyList()
     retiredGeneration = 0
   }
 
-  private fun disposeTexture(consumerContextCurrent: Boolean = true) {
-    val oldProducerTexture = producerTexture
-    producerTexture = null
-    if (oldProducerTexture != null) {
-      runOnProducerThread { oldProducerTexture.close() }
+  private fun disposeTextures(consumerContextCurrent: Boolean = true) {
+    closeProducerTextures()
+    closeConsumerTextures(consumerTextures, consumerContextCurrent)
+    consumerTextures = emptyList()
+    exportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    exportedTextures = emptyList()
+  }
+
+  private fun closeProducerTextures() {
+    val closing = producerTextures
+    producerTextures = emptyList()
+    if (closing.isNotEmpty()) {
+      runOnProducerThread { closing.forEach(LinuxEglImportedTexture::close) }
     }
-    consumerTexture?.let { texture ->
-      if (consumerContextCurrent) {
-        texture.close()
-      } else {
-        SkikoHost.withLinuxOpenGlContext { texture.close() }
-      }
+  }
+
+  private fun closeConsumerTextures(
+    textures: List<LinuxOpenGlImportedTexture>,
+    consumerContextCurrent: Boolean,
+  ) {
+    if (textures.isEmpty()) {
+      return
     }
-    consumerTexture = null
-    exportedTexture?.close()
-    exportedTexture = null
+    if (consumerContextCurrent) {
+      textures.forEach(LinuxOpenGlImportedTexture::close)
+    } else {
+      SkikoHost.withLinuxOpenGlContext { textures.forEach(LinuxOpenGlImportedTexture::close) }
+    }
   }
 
   private fun <T> runOnProducerThread(action: () -> T): T {
@@ -332,6 +343,11 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     } catch (error: ExecutionException) {
       throw error.cause ?: error
     }
+  }
+
+  private companion object {
+    /** Two textures: one the consumer draws, and one the session renders into meanwhile. */
+    const val RING_DEPTH = 2
   }
 }
 
@@ -502,17 +518,6 @@ private constructor(
   private var memoryObject = 0
   private var textureName = 0
 
-  fun target(generation: Long): OpenGlTextureTarget =
-    OpenGlTextureTarget(
-      context = context.handles,
-      textureName = textureName,
-      textureTarget = GL_TEXTURE_2D,
-      format = GL_RGBA8,
-      contextProvider = OpenGlContextProvider { context.makeCurrent() },
-      extent = extent,
-      generation = generation,
-    )
-
   private fun create() {
     context.makeCurrent()
     val capabilities = ensureLwjglOpenGlCapabilities()
@@ -576,6 +581,21 @@ private constructor(
   }
 
   companion object {
+    /** The target of a ring of imported textures, one per slot in slot order. */
+    fun ringTarget(ring: List<LinuxEglImportedTexture>, generation: Long): OpenGlTextureTarget {
+      val front = ring.first()
+      return OpenGlTextureTarget(
+        context = front.context.handles,
+        textureName = front.textureName,
+        textureTarget = GL_TEXTURE_2D,
+        format = GL_RGBA8,
+        contextProvider = OpenGlContextProvider { front.context.makeCurrent() },
+        extent = front.extent,
+        generation = generation,
+        ring = ring.map { it.textureName },
+      )
+    }
+
     fun create(
       context: LinuxEglContext,
       fd: Int,

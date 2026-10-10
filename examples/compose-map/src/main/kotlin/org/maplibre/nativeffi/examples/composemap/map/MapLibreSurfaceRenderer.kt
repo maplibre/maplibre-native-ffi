@@ -33,10 +33,9 @@ import org.maplibre.nativeffi.generated.Wake
  * producer thread, which services it while it waits.
  *
  * Each rendered frame is acquired and handed to the bridge, which draws it after [render] returns.
- * The renderer holds that frame until the bridge is done with it, so the session never renders into
- * the texture the bridge draws. In a ring of two, the frame stays held until a newer one is
- * acquired, and the session renders into the other texture meanwhile. A ring of one has no other
- * texture, so its frame is released at the next demand, after the bridge has drawn it.
+ * The renderer holds that frame until a newer one is acquired, so the session never renders into
+ * the texture the bridge draws: every bridge lends a ring of two, and the session renders into the
+ * other texture meanwhile.
  *
  * Input becomes map commands on the Compose thread. The runtime's event wake asks Compose for a
  * draw when a map update is ready to render.
@@ -138,9 +137,6 @@ internal class MapLibreSurfaceRenderer(
     if (callerDriver) session.serviceDriverWork(0uL)
     val forced = frameForced.getAndSet(false)
     if (!frameWanted.getAndSet(false) && !forced) return NativeSurfaceRenderResult.Skipped
-    // A ring of one has no texture to render into while its frame is held. The bridge drew that
-    // frame before this call, so it goes first.
-    if (frame.target.ringDepth == 1) releaseHeld()
     val token = ++nextToken
     session.requestFrame(
       FrameDemand(
@@ -343,7 +339,7 @@ internal class MapLibreSurfaceRenderer(
           return existing
         }
         try {
-          // A replacement waits until the host holds no frame of the ring.
+          // A replacement is refused while the host holds a frame of the ring.
           releaseHeld()
           await(existing.session, borrowed.setTarget(existing.session))
         } catch (error: RuntimeException) {

@@ -53,6 +53,10 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.windows.User32
 
+/**
+ * Lends the session a ring of OpenGL textures imported from shared Skiko Direct3D 12 textures, and
+ * draws the Direct3D textures.
+ */
 internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   private val producerThreadRef = AtomicReference<Thread?>()
   private val producerExecutor = Executors.newSingleThreadExecutor { task ->
@@ -62,19 +66,21 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     }
   }
   private var wgl: WindowsWglContext? = null
-  private var direct3DTexture = NativeHandle(0)
+
+  // One entry per ring slot, in slot order: the Direct3D texture and the producer's import of it.
+  @Volatile private var direct3DTextures: List<NativeHandle> = emptyList()
   private var direct3DDevice = NativeHandle(0)
-  private var producerTexture: WindowsWglImportedD3D12Texture? = null
+  private var producerTextures: List<WindowsWglImportedD3D12Texture> = emptyList()
   private var currentExtent = SurfaceExtent.Empty
 
   // Read on the Compose thread while the producer thread writes them.
   @Volatile private var generation = 0L
   @Volatile private var renderedGeneration = 0L
 
-  // The Direct3D texture a frame last landed in, kept alive until one lands in its replacement.
-  // Skiko allocates a new texture for every resize and the map needs a frame or two to fill it, so
-  // this is what the consumer draws in between.
-  private var retiredDirect3DTexture = NativeHandle(0)
+  // The ring a frame last landed in, kept alive until one lands in its replacement. The bridge
+  // allocates a new ring for every resize and the map needs a frame or two to fill it, so this is
+  // what the consumer draws in between.
+  @Volatile private var retiredDirect3DTextures: List<NativeHandle> = emptyList()
   @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.OPENGL
@@ -95,10 +101,10 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   }
 
   private fun resizeOnProducerThread(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
-    if (extent == currentExtent && producerTexture != null) {
+    if (extent == currentExtent && producerTextures.isNotEmpty()) {
       return
     }
-    recreateTexture(extent, device)
+    recreateTextures(extent, device)
     currentExtent = extent
     generation += 1
   }
@@ -108,7 +114,7 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
-    if (producerTexture == null || extent != currentExtent) {
+    if (producerTextures.isEmpty() || extent != currentExtent) {
       resize(extent)
     }
     return NativeSurfaceFrameLease(
@@ -137,12 +143,13 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
       return false
     }
     // Only a texture this bridge still holds is safe to draw.
-    val texture =
+    val held =
       when (target.generation) {
-        generation -> direct3DTexture
-        retiredGeneration -> retiredDirect3DTexture
-        else -> NativeHandle(0)
+        generation -> direct3DTextures
+        retiredGeneration -> retiredDirect3DTextures
+        else -> emptyList()
       }
+    val texture = held.getOrNull(target.slotIndex) ?: return false
     if (texture.address == 0L) {
       return false
     }
@@ -161,7 +168,7 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
 
   override fun close() {
     try {
-      disposeTexture()
+      disposeTextures()
     } finally {
       try {
         runOnProducerThread {
@@ -174,12 +181,14 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     }
   }
 
-  private fun target(generation: Long): NativeSurfaceTarget =
-    checkNotNull(producerTexture) { "Windows WGL texture is not initialized" }.target(generation)
+  private fun target(generation: Long): NativeSurfaceTarget {
+    check(producerTextures.isNotEmpty()) { "Windows WGL texture is not initialized" }
+    return WindowsWglImportedD3D12Texture.ringTarget(producerTextures, generation)
+  }
 
-  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
+  private fun recreateTextures(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
     if (extent.isEmpty) {
-      disposeTexture()
+      disposeTextures()
       return
     }
 
@@ -188,29 +197,49 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     val requiredDirect3DDevice =
       checkNotNull(device) { "The Skiko Direct3D device is resolved before this hop" }
     // Only the device that allocated a texture can present it.
-    retireTexture(deviceChanged = direct3DDevice.address != requiredDirect3DDevice.ptr)
+    retireTextures(deviceChanged = direct3DDevice.address != requiredDirect3DDevice.ptr)
     direct3DDevice = NativeHandle(requiredDirect3DDevice.ptr)
-    direct3DTexture =
-      WindowsD3D12Interop.createSharedTexture(
-        requiredDirect3DDevice,
-        extent,
-        dxgiFormat = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
-      )
-    val memorySize =
-      WindowsD3D12Interop.textureMemorySize(
-        direct3DTexture,
-        extent,
-        dxgiFormat = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
-      )
-    var sharedHandle = NULL
+    val textures = mutableListOf<NativeHandle>()
+    val imports = mutableListOf<WindowsWglImportedD3D12Texture>()
     try {
-      sharedHandle = WindowsD3D12Interop.createSharedHandle(direct3DTexture)
-      producerTexture = importTexture(sharedHandle, memorySize, extent)
+      repeat(RING_DEPTH) { slot ->
+        val texture =
+          WindowsD3D12Interop.createSharedTexture(
+              requiredDirect3DDevice,
+              extent,
+              dxgiFormat = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
+            )
+            .also { textures += it }
+        val memorySize =
+          WindowsD3D12Interop.textureMemorySize(
+            texture,
+            extent,
+            dxgiFormat = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
+          )
+        var sharedHandle = NULL
+        try {
+          sharedHandle = WindowsD3D12Interop.createSharedHandle(texture)
+          // The first import picks the context; every other slot imports into the same one.
+          imports +=
+            if (slot == 0) {
+              importTexture(sharedHandle, memorySize, extent)
+            } else {
+              checkNotNull(wgl).tryImportD3D12(sharedHandle, memorySize, extent)
+                ?: throw NativeSurfaceBridgeException(
+                  "The WGL context could not import every texture of the ring"
+                )
+            }
+        } finally {
+          WindowsD3D12Interop.closeSharedHandle(sharedHandle)
+        }
+      }
+      direct3DTextures = textures
+      producerTextures = imports
     } catch (error: RuntimeException) {
-      disposeTexture()
+      imports.forEach(WindowsWglImportedD3D12Texture::close)
+      textures.forEach(::releaseDirect3DTexture)
+      disposeTextures()
       throw error
-    } finally {
-      WindowsD3D12Interop.closeSharedHandle(sharedHandle)
     }
   }
 
@@ -233,55 +262,57 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     return selectedImport.texture
   }
 
-  // Holds the outgoing texture for the consumer to draw while the replacement is still empty.
-  private fun retireTexture(deviceChanged: Boolean) {
+  // Holds the outgoing ring for the consumer to draw while the replacement is still empty.
+  private fun retireTextures(deviceChanged: Boolean) {
     if (deviceChanged) {
       // Both belong to the device Skiko replaced.
-      disposeTexture()
+      disposeTextures()
       return
     }
-    if (renderedGeneration != generation || direct3DTexture.address == 0L) {
+    if (renderedGeneration != generation || direct3DTextures.isEmpty()) {
       // This one never held a frame, so whatever is already retired stays.
-      disposeCurrentTexture()
+      disposeCurrentTextures()
       return
     }
-    val oldProducerTexture = producerTexture
-    producerTexture = null
-    if (oldProducerTexture != null) {
-      runOnProducerThread { oldProducerTexture.close() }
-    }
-    releaseDirect3DTexture(retiredDirect3DTexture)
-    retiredDirect3DTexture = direct3DTexture
+    closeProducerTextures()
+    retiredDirect3DTextures.forEach(::releaseDirect3DTexture)
+    retiredDirect3DTextures = direct3DTextures
     retiredGeneration = generation
-    direct3DTexture = NativeHandle(0)
+    direct3DTextures = emptyList()
   }
 
   // Released a frame after the replacement rendered, so the consumer's last recorded frame from
-  // the retired texture has been flushed.
+  // the retired ring has been flushed.
   private fun releaseRetiredOnceReplaced() {
-    if (retiredDirect3DTexture.address == 0L || renderedGeneration != generation) {
+    if (retiredDirect3DTextures.isEmpty() || renderedGeneration != generation) {
       return
     }
-    releaseDirect3DTexture(retiredDirect3DTexture)
-    retiredDirect3DTexture = NativeHandle(0)
+    releaseRetiredTextures()
+  }
+
+  private fun disposeTextures() {
+    disposeCurrentTextures()
+    releaseRetiredTextures()
+  }
+
+  private fun releaseRetiredTextures() {
+    retiredDirect3DTextures.forEach(::releaseDirect3DTexture)
+    retiredDirect3DTextures = emptyList()
     retiredGeneration = 0
   }
 
-  private fun disposeTexture() {
-    disposeCurrentTexture()
-    releaseDirect3DTexture(retiredDirect3DTexture)
-    retiredDirect3DTexture = NativeHandle(0)
-    retiredGeneration = 0
+  private fun disposeCurrentTextures() {
+    closeProducerTextures()
+    direct3DTextures.forEach(::releaseDirect3DTexture)
+    direct3DTextures = emptyList()
   }
 
-  private fun disposeCurrentTexture() {
-    val oldProducerTexture = producerTexture
-    producerTexture = null
-    if (oldProducerTexture != null) {
-      runOnProducerThread { oldProducerTexture.close() }
+  private fun closeProducerTextures() {
+    val closing = producerTextures
+    producerTextures = emptyList()
+    if (closing.isNotEmpty()) {
+      runOnProducerThread { closing.forEach(WindowsWglImportedD3D12Texture::close) }
     }
-    releaseDirect3DTexture(direct3DTexture)
-    direct3DTexture = NativeHandle(0)
   }
 
   private fun releaseDirect3DTexture(texture: NativeHandle) {
@@ -301,6 +332,11 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     } catch (error: ExecutionException) {
       throw error.cause ?: error
     }
+  }
+
+  private companion object {
+    /** Two textures: one the consumer draws, and one the session renders into meanwhile. */
+    const val RING_DEPTH = 2
   }
 }
 
@@ -569,18 +605,6 @@ private constructor(
   private var memoryObject = 0
   private var textureName = 0
 
-  fun target(generation: Long): OpenGlTextureTarget =
-    OpenGlTextureTarget(
-      context = context.handles,
-      textureName = textureName,
-      textureTarget = GL_TEXTURE_2D,
-      format = GL_RGBA8,
-      origin = TextureOrigin.BOTTOM_LEFT,
-      contextProvider = OpenGlContextProvider { context.makeCurrent() },
-      extent = extent,
-      generation = generation,
-    )
-
   private fun create() {
     context.makeCurrent()
     val capabilities = ensureLwjglOpenGlCapabilities()
@@ -635,6 +659,25 @@ private constructor(
   }
 
   companion object {
+    /** The target of a ring of imported textures, one per slot in slot order. */
+    fun ringTarget(
+      ring: List<WindowsWglImportedD3D12Texture>,
+      generation: Long,
+    ): OpenGlTextureTarget {
+      val front = ring.first()
+      return OpenGlTextureTarget(
+        context = front.context.handles,
+        textureName = front.textureName,
+        textureTarget = GL_TEXTURE_2D,
+        format = GL_RGBA8,
+        origin = TextureOrigin.BOTTOM_LEFT,
+        contextProvider = OpenGlContextProvider { front.context.makeCurrent() },
+        extent = front.extent,
+        generation = generation,
+        ring = ring.map { it.textureName },
+      )
+    }
+
     fun create(
       context: WindowsWglContext,
       sharedHandle: Long,
