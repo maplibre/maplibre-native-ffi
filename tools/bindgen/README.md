@@ -96,8 +96,10 @@ Three keys state what a C shape cannot:
   value, and an unannotated field defaults to zero. The generated cases in
   `tests/native/abi/base/defaults.c` check every default function against these
   values. The schema accepts the key only on a plain scalar or enum field of a
-  record that a default function returns, directly or nested by value. The cases
-  skip optional fields, unions, and union tags, so those take no `default=`.
+  record that a default function returns, directly or nested by value through
+  required fields. The cases skip optional fields, unions, union tags, buffer
+  views, and arrays, so those fields take no `default=`, and neither does a
+  record that only those fields reach.
 
 No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment

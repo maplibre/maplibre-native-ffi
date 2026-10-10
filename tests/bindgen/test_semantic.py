@@ -196,10 +196,13 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
         source = """
 typedef enum mode : unsigned { MODE_OFF = 0, MODE_ON = 1 } mode;
 typedef struct extent { unsigned width; } extent;
+typedef struct turn { double w; } turn;
 typedef struct settings {
   unsigned size;
   bool has_zoom;
+  bool has_turn;
   extent area;
+  turn orientation BIND("mask=has_turn");
   unsigned level;
   unsigned mode BIND("enum=mode");
   double zoom BIND("mask=has_zoom");
@@ -212,7 +215,7 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
         self.assertEqual(
             bind(self.parse(source), require_complete=True)
             .values["settings"]
-            .fields[3]
+            .fields[5]
             .initial,
             None,
         )
@@ -239,6 +242,13 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
             (
                 "typedef struct loose { unsigned width; }",
                 'typedef struct loose { unsigned width BIND("default=1"); }',
+                "default function returns",
+            ),
+            # The default leaves an optional member absent, so no case checks
+            # the defaults of a record reached only through one.
+            (
+                "typedef struct turn { double w; }",
+                'typedef struct turn { double w BIND("default=1.0"); }',
                 "default function returns",
             ),
         ):

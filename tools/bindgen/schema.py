@@ -1325,8 +1325,13 @@ def validate(api: Api) -> None:
 
 
 def defaulted_records(api: Api) -> set[str]:
-    """The structs that a record default function returns, directly or nested
-    by value in a struct it returns."""
+    """The structs whose fields the generated default cases check.
+
+    These are the structs that a record default function returns, and the
+    structs nested by value in one through a required member. The cases skip
+    optional members, unions, buffer views, and arrays, so a struct reached
+    only through one of those has no case to check its defaults.
+    """
     conventions = Conventions(api)
     pending = [
         typedef.name
@@ -1341,10 +1346,11 @@ def defaulted_records(api: Api) -> set[str]:
             continue
         found.add(name)
         for field in record.fields:
-            type_ = conventions.resolve(field.type)
-            while type_.kind == "array" and type_.element is not None:
-                type_ = conventions.resolve(type_.element)
-            pending.append(type_.declaration or type_.spelling)
+            if "mask" in field.metadata or is_buffer_view(field.type):
+                continue
+            # An array, a union, or a union's integer tag resolves to no
+            # struct, so the loop skips it.
+            pending.append(conventions.resolve(field.type).declaration or "")
     return found
 
 
