@@ -1283,19 +1283,21 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Copies style source IDs in style order.
+    /// Lists every style source in style order.
     /// </summary>
     /// <remarks>
-    /// See <c>mln_map_list_style_source_ids</c> in the <see
+    /// See <c>mln_map_list_style_sources</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<string[]> ListStyleSourceIdsAsync(CancellationToken cancellationToken = default)
+    public Task<StyleSourceInfo[]> ListStyleSourcesAsync(
+        CancellationToken cancellationToken = default
+    )
     {
-        using var scope = new NativeCallScope(this, "mln_map_list_style_source_ids");
-        return scope.QueryArray<mln_buffer_view, string>(
+        using var scope = new NativeCallScope(this, "mln_map_list_style_sources");
+        return scope.QueryArray<mln_style_source_info, StyleSourceInfo>(
             (completion, diagnostic) =>
-                NativeMethods.mln_map_list_style_source_ids(Handle, completion, diagnostic),
-            ValueStructs.CopyUtf8View,
+                NativeMethods.mln_map_list_style_sources(Handle, completion, diagnostic),
+            CopyStyleSourceInfo,
             cancellationToken
         );
     }

@@ -1324,6 +1324,7 @@ final class mln_style_layer_info extends Struct {
 final class mln_style_source_info extends Struct {
   @Uint32()
   external int size;
+  external mln_buffer_view id;
   @Uint32()
   external int type;
   @Uint32()
@@ -3465,7 +3466,7 @@ external int mln_map_list_style_layers(
 @Native<
   Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
-external int mln_map_list_style_source_ids(
+external int mln_map_list_style_sources(
   int map,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,

@@ -5293,6 +5293,8 @@ pub enum StyleRasterDemEncoding: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleSourceInfo {
+    /// Source ID.
+    pub id: String,
     /// One of `mln_style_source_type`.
     pub r#type: StyleSourceType,
     /// Whether the source is marked volatile.
@@ -5315,6 +5317,7 @@ pub struct StyleSourceInfo {
 impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
     unsafe fn from_native(raw: sys::mln_style_source_info) -> Result<Self> {
         Ok(Self {
+            id: unsafe { from_native(raw.id) }?,
             r#type: unsafe { from_native(raw.type_) }?,
             is_volatile: raw.is_volatile,
             attribution: unsafe {

@@ -4116,6 +4116,7 @@ pub const StyleRasterDemEncoding = enum(u32) {
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceInfo = struct {
+    id: []const u8 = &.{},
     type: StyleSourceType = std.mem.zeroes(StyleSourceType),
     is_volatile: bool = std.mem.zeroes(bool),
     attribution: ?[]const u8 = null,
@@ -4129,6 +4130,7 @@ pub const StyleSourceInfo = struct {
         var raw = std.mem.zeroes(c.mln_style_source_info);
         raw.fields = 0;
         raw.size = @sizeOf(c.mln_style_source_info);
+        raw.id = marshal.view(self.id);
         raw.type = self.type.toNative();
         raw.is_volatile = self.is_volatile;
         if (self.attribution) |item| {
@@ -4152,6 +4154,7 @@ pub const StyleSourceInfo = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_info) status.Error!StyleSourceInfo {
         return .{
+            .id = try marshal.copyView(allocator, raw.id),
             .type = StyleSourceType.fromNative(raw.type),
             .is_volatile = raw.is_volatile,
             .attribution = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) try marshal.copyView(allocator, raw.attribution) else null,
@@ -5829,12 +5832,12 @@ pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map, diagnostic: ?*
     return call.submit("mln_map_list_style_layers", .lease, map, call.slice(StyleLayerEntry, c.mln_style_layer_entry), allocator, diagnostic, .{});
 }
 
-/// Copies style source IDs in style order.
+/// Lists every style source in style order.
 ///
-/// See `mln_map_list_style_source_ids` in the
+/// See `mln_map_list_style_sources` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapListStyleSourceIds(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const []const u8)) {
-    return call.submit("mln_map_list_style_source_ids", .lease, map, call.slice([]const u8, c.mln_buffer_view), allocator, diagnostic, .{});
+pub fn mapListStyleSources(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const StyleSourceInfo)) {
+    return call.submit("mln_map_list_style_sources", .lease, map, call.slice(StyleSourceInfo, c.mln_style_source_info), allocator, diagnostic, .{});
 }
 
 /// Starts an ordered copy of the last successfully parsed style document.

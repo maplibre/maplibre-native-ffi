@@ -3214,6 +3214,8 @@ public data class StyleSourceTileInfo(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleSourceInfo(
+  /** Source ID. */
+  public val id: String = "",
   /** One of `mln_style_source_type`. */
   public val type: StyleSourceType = StyleSourceType(0u),
   /** Whether the source is marked volatile. */

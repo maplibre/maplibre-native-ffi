@@ -674,18 +674,18 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies style source IDs in style order.
+  /// Lists every style source in style order.
   ///
-  /// See `mln_map_list_style_source_ids` in the
+  /// See `mln_map_list_style_sources` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func listStyleSourceIds() async throws -> [String] {
+  func listStyleSources() async throws -> [StyleSourceInfo] {
     try await nativeStart(
-      "mln_map_list_style_source_ids",
+      "mln_map_list_style_sources",
       convert: { result in try NativeCompletion.values(
         result,
-        as: mln_buffer_view.self
-      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
-    ) { raw, _, completion, diagnostic in mln_map_list_style_source_ids(
+        as: mln_style_source_info.self
+      ).map { try StyleSourceInfo(raw: $0) } }
+    ) { raw, _, completion, diagnostic in mln_map_list_style_sources(
       raw,
       completion,
       diagnostic

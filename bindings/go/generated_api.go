@@ -4229,6 +4229,8 @@ func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
 // See mln_style_source_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceInfo struct {
+	// Source ID.
+	Id string
 	// One of mln_style_source_type.
 	Type StyleSourceType
 	// Whether the source is marked volatile.
@@ -4251,6 +4253,7 @@ type StyleSourceInfo struct {
 
 func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	var result StyleSourceInfo
+	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
 	result.Type = StyleSourceType(raw._type)
 	result.IsVolatile = bool(raw.is_volatile)
 	result.Attribution = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
@@ -6387,14 +6390,14 @@ func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerEntry], error)
 	}, completionListOf(copyStyleLayerEntry))
 }
 
-// ListStyleSourceIds copies style source IDs in style order.
+// ListStyleSources lists every style source in style order.
 //
-// See mln_map_list_style_source_ids in the C API reference:
+// See mln_map_list_style_sources in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) ListStyleSourceIds() (*Future[[]string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_source_ids), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_list_style_source_ids(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyViewText))
+func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_sources), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_list_style_sources(C.mln_map(raw), completion, diagnostic))
+	}, completionListOf(copyStyleSourceInfo))
 }
 
 // LoadedStyleJson starts an ordered copy of the last successfully parsed style

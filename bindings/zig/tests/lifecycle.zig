@@ -111,9 +111,11 @@ test "prepared GeoJSON data outlives its release through submitted installs" {
     try maplibre.geojsonSourceDataDestroy(data);
     try support.expectCommitted(first);
     try support.expectCommitted(second);
-    var ids = try support.resolve(try maplibre.mapListStyleSourceIds(testing.allocator, fixture.map, null));
-    defer ids.deinit();
-    try testing.expectEqual(@as(usize, 2), ids.value.len);
+    var sources = try support.resolve(try maplibre.mapListStyleSources(testing.allocator, fixture.map, null));
+    defer sources.deinit();
+    try testing.expectEqual(@as(usize, 2), sources.value.len);
+    try testing.expectEqualStrings("first", sources.value[0].id);
+    try testing.expectEqualStrings("second", sources.value[1].id);
 
     try testing.expectError(error.InvalidState, maplibre.mapAddGeojsonSourceData(fixture.map, "third", data, null));
 }

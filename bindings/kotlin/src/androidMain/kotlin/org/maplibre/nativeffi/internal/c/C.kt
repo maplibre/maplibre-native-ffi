@@ -559,7 +559,7 @@ internal actual object C {
   ): Int
 
   @JvmStatic
-  actual external fun mln_map_list_style_source_ids(
+  actual external fun mln_map_list_style_sources(
     map: Long,
     completion: Long,
     outDiagnostic: Long,

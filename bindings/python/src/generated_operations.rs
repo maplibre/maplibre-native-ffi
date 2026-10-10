@@ -2123,6 +2123,7 @@ fn generated_copy_mln_style_source_info(
     value: &sys::mln_style_source_info,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
+    dict.set_item("id", generated_text(py, value.id)?)?;
     dict.set_item("type", generated_value(py, value.type_)?)?;
     dict.set_item("is_volatile", generated_value(py, value.is_volatile)?)?;
     dict.set_item(
@@ -5951,20 +5952,20 @@ impl MapHandle {
         }
     }
     #[pyo3(signature = ())]
-    fn list_style_source_ids(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_list_style_source_ids", self.admission())?;
+    fn list_style_sources(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_map_list_style_sources", self.admission())?;
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_buffer_view>(result)? {
-                list.append(generated_text(py, *value)?)?;
+            for value in generated_completion_slice::<sys::mln_style_source_info>(result)? {
+                list.append(generated_copy_mln_style_source_info(py, value)?)?;
             }
             Ok(list.into_any().unbind())
         };
         unsafe {
             call.complete(
                 |completion, diagnostic| {
-                    sys::mln_map_list_style_source_ids(handle, completion, diagnostic)
+                    sys::mln_map_list_style_sources(handle, completion, diagnostic)
                 },
                 convert,
             )

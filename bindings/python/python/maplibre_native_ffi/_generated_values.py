@@ -3220,6 +3220,7 @@ class StyleSourceInfo:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
+    id: str
     type: StyleSourceType
     is_volatile: bool
     attribution: str | None = None
@@ -3233,6 +3234,7 @@ class StyleSourceInfo:
     @classmethod
     def _from_native(cls, raw):
         return cls(
+            id=raw["id"],
             type=StyleSourceType(raw["type"]),
             is_volatile=raw["is_volatile"],
             attribution=raw["attribution"],

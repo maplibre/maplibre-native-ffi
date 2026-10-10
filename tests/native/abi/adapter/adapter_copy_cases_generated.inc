@@ -42,14 +42,11 @@ static inline bool mln_adapter_copy_case_string(
 }
 
 static const void* mln_adapter_copy_case_buffer_view_value(size_t* count) {
-  static mln_buffer_view values[2];
+  static mln_buffer_view values[1];
   static const char text_1[] = "mln_buffer_view[0]";
-  static const char text_2[] = "mln_buffer_view[1]";
   values[0].data = text_1;
   values[0].size = sizeof(text_1) - 1;
-  values[1].data = text_2;
-  values[1].size = sizeof(text_2) - 1;
-  *count = 2;
+  *count = 1;
   return values;
 }
 
@@ -755,43 +752,86 @@ static bool mln_adapter_copy_case_style_layer_info_matches(
 static const void* mln_adapter_copy_case_style_source_info_value(
   size_t* count
 ) {
-  static mln_style_source_info values[1];
-  static const char text_1[] = "mln_style_source_info[0].attribution";
-  static const char text_2[] = "mln_style_source_info[0].url";
-  static struct mln_buffer_view items_3[2];
-  static const char text_4[] = "mln_style_source_info[0].tilejson.tile_urls[0]";
-  static const char text_5[] = "mln_style_source_info[0].tilejson.tile_urls[1]";
+  static mln_style_source_info values[2];
+  static const char text_1[] = "mln_style_source_info[0].id";
+  static const char text_2[] = "mln_style_source_info[0].attribution";
+  static const char text_3[] = "mln_style_source_info[0].url";
+  static struct mln_buffer_view items_4[2];
+  static const char text_5[] = "mln_style_source_info[0].tilejson.tile_urls[0]";
+  static const char text_6[] = "mln_style_source_info[0].tilejson.tile_urls[1]";
+  static const char text_14[] = "mln_style_source_info[1].id";
+  static const char text_15[] = "mln_style_source_info[1].attribution";
+  static const char text_16[] = "mln_style_source_info[1].url";
+  static struct mln_buffer_view items_17[2];
+  static const char text_18[] =
+    "mln_style_source_info[1].tilejson.tile_urls[0]";
+  static const char text_19[] =
+    "mln_style_source_info[1].tilejson.tile_urls[1]";
   values[0].size = sizeof(values[0]);
+  values[0].id.data = text_1;
+  values[0].id.size = sizeof(text_1) - 1;
   values[0].type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
   values[0].is_volatile = true;
   values[0].fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
-  values[0].attribution.data = text_1;
-  values[0].attribution.size = sizeof(text_1) - 1;
+  values[0].attribution.data = text_2;
+  values[0].attribution.size = sizeof(text_2) - 1;
   values[0].fields |= MLN_STYLE_SOURCE_INFO_URL;
-  values[0].url.data = text_2;
-  values[0].url.size = sizeof(text_2) - 1;
+  values[0].url.data = text_3;
+  values[0].url.size = sizeof(text_3) - 1;
   values[0].fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  items_3[0].data = text_4;
-  items_3[0].size = sizeof(text_4) - 1;
-  items_3[1].data = text_5;
-  items_3[1].size = sizeof(text_5) - 1;
-  values[0].tilejson.tile_urls = items_3;
+  items_4[0].data = text_5;
+  items_4[0].size = sizeof(text_5) - 1;
+  items_4[1].data = text_6;
+  items_4[1].size = sizeof(text_6) - 1;
+  values[0].tilejson.tile_urls = items_4;
   values[0].tilejson.tile_url_count = 2;
-  values[0].tilejson.min_zoom = 6.5;
-  values[0].tilejson.max_zoom = 7.5;
+  values[0].tilejson.min_zoom = 7.5;
+  values[0].tilejson.max_zoom = 8.5;
   values[0].tilejson.scheme = MLN_STYLE_TILE_SCHEME_XYZ;
   values[0].fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
-  values[0].bounds.southwest.latitude = 8.5;
-  values[0].bounds.southwest.longitude = 9.5;
-  values[0].bounds.northeast.latitude = 10.5;
-  values[0].bounds.northeast.longitude = 11.5;
+  values[0].bounds.southwest.latitude = 9.5;
+  values[0].bounds.southwest.longitude = 10.5;
+  values[0].bounds.northeast.latitude = 11.5;
+  values[0].bounds.northeast.longitude = 12.5;
   values[0].fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
-  values[0].tile_size = 12;
+  values[0].tile_size = 13;
   values[0].fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
   values[0].vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
   values[0].fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
   values[0].raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
-  *count = 1;
+  values[1].size = sizeof(values[1]);
+  values[1].id.data = text_14;
+  values[1].id.size = sizeof(text_14) - 1;
+  values[1].type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
+  values[1].is_volatile = true;
+  values[1].fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+  values[1].attribution.data = text_15;
+  values[1].attribution.size = sizeof(text_15) - 1;
+  values[1].fields |= MLN_STYLE_SOURCE_INFO_URL;
+  values[1].url.data = text_16;
+  values[1].url.size = sizeof(text_16) - 1;
+  values[1].fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
+  items_17[0].data = text_18;
+  items_17[0].size = sizeof(text_18) - 1;
+  items_17[1].data = text_19;
+  items_17[1].size = sizeof(text_19) - 1;
+  values[1].tilejson.tile_urls = items_17;
+  values[1].tilejson.tile_url_count = 2;
+  values[1].tilejson.min_zoom = 20.5;
+  values[1].tilejson.max_zoom = 21.5;
+  values[1].tilejson.scheme = MLN_STYLE_TILE_SCHEME_XYZ;
+  values[1].fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
+  values[1].bounds.southwest.latitude = 22.5;
+  values[1].bounds.southwest.longitude = 23.5;
+  values[1].bounds.northeast.latitude = 24.5;
+  values[1].bounds.northeast.longitude = 25.5;
+  values[1].fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
+  values[1].tile_size = 26;
+  values[1].fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
+  values[1].vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
+  values[1].fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
+  values[1].raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
+  *count = 2;
   return values;
 }
 
@@ -802,6 +842,8 @@ static bool mln_adapter_copy_case_style_source_info_matches(
   const mln_style_source_info* source =
     (const mln_style_source_info*)source_value;
   for (size_t index = 0; index < count; ++index) {
+    if (!mln_adapter_copy_case_view(copy[index].id, source[index].id))
+      return false;
     if (copy[index].type != source[index].type) return false;
     if (copy[index].fields != source[index].fields) return false;
     if (copy[index].is_volatile != source[index].is_volatile) return false;
@@ -817,11 +859,11 @@ static bool mln_adapter_copy_case_style_source_info_matches(
        copy[index].tilejson.tile_urls == source[index].tilejson.tile_urls)
     )
       return false;
-    for (size_t index_13 = 0; index_13 < source[index].tilejson.tile_url_count;
-         ++index_13) {
+    for (size_t index_27 = 0; index_27 < source[index].tilejson.tile_url_count;
+         ++index_27) {
       if (!mln_adapter_copy_case_view(
-            copy[index].tilejson.tile_urls[index_13],
-            source[index].tilejson.tile_urls[index_13]
+            copy[index].tilejson.tile_urls[index_27],
+            source[index].tilejson.tile_urls[index_27]
           ))
         return false;
     }

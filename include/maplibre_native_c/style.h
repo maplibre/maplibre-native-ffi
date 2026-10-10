@@ -285,6 +285,8 @@ typedef struct mln_style_source_tile_info {
  */
 typedef struct mln_style_source_info {
   uint32_t size;
+  /** Source ID. */
+  mln_buffer_view id;
   /** One of mln_style_source_type. */
   uint32_t type MLN_BINDING("enum=mln_style_source_type");
   /** Bitwise combination of mln_style_source_info_field values. */
@@ -847,9 +849,12 @@ MLN_API mln_status mln_map_set_style_source_volatile(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies style source IDs in style order.
+ * Lists every style source in style order.
  *
- * The completion borrows an array of mln_buffer_view values.
+ * The completion borrows mln_style_source_info[value_count], one per source:
+ * the sources the style document declares, in its order, then added sources in
+ * the order they were added. Copy retained entries, their views, and their tile
+ * URLs before the callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -858,8 +863,8 @@ MLN_API mln_status mln_map_set_style_source_volatile(
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=query;result=mln_buffer_view;shape=array")
-MLN_API mln_status mln_map_list_style_source_ids(
+MLN_BINDING("execution=query;result=mln_style_source_info;shape=array")
+MLN_API mln_status mln_map_list_style_sources(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

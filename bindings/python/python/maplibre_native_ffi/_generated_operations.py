@@ -854,15 +854,15 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: tuple(StyleLayerEntry._from_native(item) for item in value),
         )
 
-    def list_style_source_ids(self) -> Future[tuple[str, ...]]:
-        """Copies style source IDs in style order.
+    def list_style_sources(self) -> Future[tuple[StyleSourceInfo, ...]]:
+        """Lists every style source in style order.
 
-        See `mln_map_list_style_source_ids` in the
+        See `mln_map_list_style_sources` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.list_style_source_ids(),
-            lambda value: tuple(item for item in value),
+            self._native.list_style_sources(),
+            lambda value: tuple(StyleSourceInfo._from_native(item) for item in value),
         )
 
     def loaded_style_json(self) -> Future[bytes]:

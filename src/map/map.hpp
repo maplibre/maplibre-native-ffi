@@ -57,6 +57,7 @@ auto style_transition_options_default() noexcept
 // its views when the result is delivered.
 struct StyleSourceRecord {
   mln_style_source_info info{};
+  std::string id;
   std::string attribution;
   std::string url;
   std::vector<std::string> tile_urls;
@@ -85,12 +86,12 @@ struct StyleImageRecord {
 struct StyleOperationResult {
   bool found = false;
   StyleSourceRecord source;
+  std::vector<StyleSourceRecord> sources;
   StyleLayerRecord layer;
   std::vector<StyleLayerRecord> layers;
   StyleImageRecord image;
   mln_style_transition_options transition_options{};
   std::string bytes;
-  std::vector<std::string> strings;
   std::vector<mln_lat_lng> coordinates;
 };
 
@@ -128,20 +129,39 @@ auto deliver_style_result(
       return;
     }
   }
-  if constexpr (std::is_same_v<Type, mln_buffer_view> && Value::array) {
-    Value::deliver(descriptor, views(result.strings));
-  } else if constexpr (std::is_same_v<Type, mln_buffer_view>) {
+  if constexpr (std::is_same_v<Type, mln_buffer_view>) {
     Value::deliver(descriptor, view(result.bytes));
   } else if constexpr (std::is_same_v<Type, mln_style_source_info>) {
-    const auto& source = result.source;
-    const auto tile_urls = views(source.tile_urls);
-    auto info = source.info;
-    info.size = sizeof(mln_style_source_info);
-    info.attribution = view(source.attribution);
-    info.url = view(source.url);
-    info.tilejson.tile_urls = tile_urls.data();
-    info.tilejson.tile_url_count = tile_urls.size();
-    Value::deliver(descriptor, info);
+    // Each info points into the tile URL views it is given, which must outlive
+    // the delivery.
+    const auto present = [&view](
+                           const StyleSourceRecord& source,
+                           const std::vector<mln_buffer_view>& tile_urls
+                         ) -> mln_style_source_info {
+      auto info = source.info;
+      info.size = sizeof(mln_style_source_info);
+      info.id = view(source.id);
+      info.attribution = view(source.attribution);
+      info.url = view(source.url);
+      info.tilejson.tile_urls = tile_urls.data();
+      info.tilejson.tile_url_count = tile_urls.size();
+      return info;
+    };
+    if constexpr (Value::array) {
+      auto tile_urls = std::vector<std::vector<mln_buffer_view>>{};
+      tile_urls.reserve(result.sources.size());
+      auto sources = std::vector<mln_style_source_info>{};
+      sources.reserve(result.sources.size());
+      for (const auto& source : result.sources) {
+        sources.push_back(
+          present(source, tile_urls.emplace_back(views(source.tile_urls)))
+        );
+      }
+      Value::deliver(descriptor, sources);
+    } else {
+      const auto tile_urls = views(result.source.tile_urls);
+      Value::deliver(descriptor, present(result.source, tile_urls));
+    }
   } else if constexpr (std::is_same_v<Type, mln_style_layer_entry>) {
     auto layers = std::vector<mln_style_layer_entry>{};
     layers.reserve(result.layers.size());
@@ -272,8 +292,8 @@ auto map_get_style_source(
 auto map_set_style_source_volatile(
   MapObject& live, mln_buffer_view source_id, bool is_volatile
 ) -> mln_status;
-auto map_list_style_source_ids(
-  MapObject& live, std::vector<std::string>& out_source_ids
+auto map_list_style_sources(
+  MapObject& live, std::vector<StyleSourceRecord>& out_sources
 ) -> mln_status;
 auto map_add_geojson_source_url(
   MapObject& live, mln_buffer_view source_id, mln_buffer_view url,

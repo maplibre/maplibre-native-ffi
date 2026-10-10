@@ -1081,6 +1081,8 @@ public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
+  /// Source ID.
+  public var id: String
   /// One of `mln_style_source_type`.
   public var type: StyleSourceType
   /// Whether the source is marked volatile.
@@ -1104,6 +1106,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   }
 
   public init(
+    id: String = "",
     type: StyleSourceType = .init(rawValue: 0),
     isVolatile: Bool = false,
     attribution: String? = nil,
@@ -1114,6 +1117,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     vectorEncoding: StyleVectorTileEncoding? = nil,
     rasterEncoding: StyleRasterDemEncoding? = nil
   ) {
+    self.id = id
     self.type = type
     self.isVolatile = isVolatile
     self.attribution = attribution
@@ -1129,6 +1133,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     raw: mln_style_source_info,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
+    id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
     type = StyleSourceType(rawValue: raw.type)
     isVolatile = raw.is_volatile
     attribution = raw.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION
@@ -1159,6 +1164,7 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
     var raw = mln_style_source_info()
     raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_style_source_info>.size)
+    raw.id = arena.view(id)
     raw.type = type.rawValue
     raw.is_volatile = isVolatile
     if let item = attribution {

@@ -161,9 +161,9 @@ struct CompletionResult<&mln_map_list_style_layers> {
   static constexpr bool nullable = false;
 };
 template <>
-struct CompletionResult<&mln_map_list_style_source_ids> {
+struct CompletionResult<&mln_map_list_style_sources> {
   static constexpr bool has_value = true;
-  using type = mln_buffer_view;
+  using type = mln_style_source_info;
   static constexpr bool array = true;
   static constexpr bool nullable = false;
 };

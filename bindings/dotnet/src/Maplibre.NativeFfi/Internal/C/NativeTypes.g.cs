@@ -923,6 +923,7 @@ internal unsafe struct mln_style_layer_info
 internal unsafe struct mln_style_source_info
 {
     public uint size;
+    public mln_buffer_view id;
     public uint type;
     public mln_style_source_info_field fields;
     public byte is_volatile;

@@ -1250,6 +1250,7 @@ StyleSourceTileInfo _readStyleSourceTileInfo(
 
 StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
     StyleSourceInfo(
+      id: utf8.decode(_copyBufferView(source.id)),
       type: StyleSourceType.fromRawValue(source.type),
       isVolatile: source.is_volatile,
       attribution: (source.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
@@ -4873,13 +4874,13 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Copies style source IDs in style order.
+  /// Lists every style source in style order.
   ///
-  /// See `mln_map_list_style_source_ids` in the
+  /// See `mln_map_list_style_sources` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<List<String>> listStyleSourceIds() => _queryList(
-    _resultString,
-    (arena, completion) => raw.mln_map_list_style_source_ids(
+  Future<List<StyleSourceInfo>> listStyleSources() => _queryList(
+    _resultStyleSourceInfo,
+    (arena, completion) => raw.mln_map_list_style_sources(
       _handle.raw,
       completion,
       nativeDiagnostic,

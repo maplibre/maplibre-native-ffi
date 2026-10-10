@@ -247,6 +247,7 @@ auto capture_mln_style_source_info(
   [[maybe_unused]] Arena<Writing>& arena, mln_style_source_info source
 ) -> mln_style_source_info {
   auto result = source;
+  result.id = buffer(arena, source.id);
   if ((source.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
     result.attribution = buffer(arena, source.attribution);
   } else {
@@ -389,6 +390,8 @@ auto value(
       return target;
     }
     case MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW:
+      if (result.value_count != 1)
+        throw std::invalid_argument{"invalid completion count"};
       return span(
         arena, static_cast<const mln_buffer_view*>(result.value),
         result.value_count, [](auto& storage, auto source) {
@@ -503,8 +506,6 @@ auto value(
         }
       );
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO:
-      if (result.value_count != 1)
-        throw std::invalid_argument{"invalid completion count"};
       return span(
         arena, static_cast<const mln_style_source_info*>(result.value),
         result.value_count, [](auto& storage, auto source) {

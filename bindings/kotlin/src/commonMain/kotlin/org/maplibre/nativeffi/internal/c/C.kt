@@ -408,7 +408,7 @@ internal expect object C {
 
   fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_list_style_source_ids(map: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_list_style_sources(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_loaded_style_json(map: Long, completion: Long, outDiagnostic: Long): Int
 

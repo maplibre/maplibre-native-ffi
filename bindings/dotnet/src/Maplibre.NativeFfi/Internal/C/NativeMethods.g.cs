@@ -599,7 +599,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_list_style_source_ids(
+    internal static partial mln_status mln_map_list_style_sources(
         MlnMap map,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic

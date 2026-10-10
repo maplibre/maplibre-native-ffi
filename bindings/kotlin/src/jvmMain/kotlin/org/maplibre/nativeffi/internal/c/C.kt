@@ -499,8 +499,8 @@ internal actual object C {
     )
   private val mln_map_list_style_layers =
     Ffm.downcall("mln_map_list_style_layers", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_list_style_source_ids =
-    Ffm.downcall("mln_map_list_style_source_ids", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_list_style_sources =
+    Ffm.downcall("mln_map_list_style_sources", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_loaded_style_json =
     Ffm.downcall("mln_map_loaded_style_json", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_meters_per_pixel_at_latitude =
@@ -2350,8 +2350,8 @@ internal actual object C {
   actual fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_list_style_layers.invokeExact(map, completion, outDiagnostic) as Int
 
-  actual fun mln_map_list_style_source_ids(map: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_map_list_style_source_ids.invokeExact(map, completion, outDiagnostic) as Int
+  actual fun mln_map_list_style_sources(map: Long, completion: Long, outDiagnostic: Long): Int =
+    mln_map_list_style_sources.invokeExact(map, completion, outDiagnostic) as Int
 
   actual fun mln_map_loaded_style_json(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_loaded_style_json.invokeExact(map, completion, outDiagnostic) as Int

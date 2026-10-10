@@ -837,10 +837,10 @@ static jint mln_map_list_style_layers_jni(
   );
 }
 
-static jint mln_map_list_style_source_ids_jni(
+static jint mln_map_list_style_sources_jni(
   JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
-  return (jint)mln_map_list_style_source_ids(
+  return (jint)mln_map_list_style_sources(
     (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2780,8 +2780,8 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_lat_lngs_for_pixels_unwrapped", "(JJJJJ)I",
    (void*)mln_map_lat_lngs_for_pixels_unwrapped_jni},
   {"mln_map_list_style_layers", "(JJJ)I", (void*)mln_map_list_style_layers_jni},
-  {"mln_map_list_style_source_ids", "(JJJ)I",
-   (void*)mln_map_list_style_source_ids_jni},
+  {"mln_map_list_style_sources", "(JJJ)I",
+   (void*)mln_map_list_style_sources_jni},
   {"mln_map_loaded_style_json", "(JJJ)I", (void*)mln_map_loaded_style_json_jni},
   {"mln_map_meters_per_pixel_at_latitude", "(JDJJ)I",
    (void*)mln_map_meters_per_pixel_at_latitude_jni},

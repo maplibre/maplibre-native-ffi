@@ -9,61 +9,91 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
-// Deep-copies one source result, whose views die with the callback. Strings
-// longer than their buffers are truncated, which the cases never reach.
-typedef struct source_probe {
-  atomic_bool done;
-  mln_status status;
+// A deep copy of one source's metadata, whose views die with the callback.
+// Strings longer than their buffers are truncated, which the cases never reach.
+typedef struct source_copy {
   bool found;
   mln_style_source_info info;
+  char id[32];
   char attribution[64];
   char url[64];
   char tile_urls[2][64];
+} source_copy;
+
+#define SOURCE_PROBE_CAPACITY 4
+
+// Copies of the sources one get or list query delivered.
+typedef struct source_probe {
+  atomic_bool done;
+  mln_status status;
+  size_t count;
+  source_copy sources[SOURCE_PROBE_CAPACITY];
 } source_probe;
 
 static void copy_text(mln_buffer_view view, char* out, size_t capacity) {
   snprintf(out, capacity, "%.*s", (int)view.size, (const char*)view.data);
 }
 
-static void copy_source(void* user_data, const mln_completion_result* result) {
+static void copy_sources(void* user_data, const mln_completion_result* result) {
   source_probe* probe = user_data;
   probe->status = result->status;
-  probe->found = result->value_count == 1;
-  if (probe->found) {
-    const mln_style_source_info* info = result->value;
-    probe->info = *info;
-    copy_text(
-      info->attribution, probe->attribution, sizeof(probe->attribution)
-    );
-    copy_text(info->url, probe->url, sizeof(probe->url));
-    for (size_t index = 0; index < info->tilejson.tile_url_count && index < 2;
-         index += 1) {
+  probe->count = result->value_count;
+  const mln_style_source_info* infos = result->value;
+  for (size_t index = 0;
+       index < result->value_count && index < SOURCE_PROBE_CAPACITY;
+       index += 1) {
+    const mln_style_source_info* info = &infos[index];
+    source_copy* copy = &probe->sources[index];
+    copy->found = true;
+    copy->info = *info;
+    copy_text(info->id, copy->id, sizeof(copy->id));
+    copy_text(info->attribution, copy->attribution, sizeof(copy->attribution));
+    copy_text(info->url, copy->url, sizeof(copy->url));
+    for (size_t url = 0; url < info->tilejson.tile_url_count && url < 2;
+         url += 1) {
       copy_text(
-        info->tilejson.tile_urls[index], probe->tile_urls[index],
-        sizeof(probe->tile_urls[index])
+        info->tilejson.tile_urls[url], copy->tile_urls[url],
+        sizeof(copy->tile_urls[url])
       );
     }
   }
   mln_test_flag_set(&probe->done);
 }
 
-// Reads a source's metadata. `found` reports whether the source exists.
-static source_probe read_source(mln_map map, const char* id) {
-  source_probe probe = {.status = MLN_STATUS_INVALID_STATE};
-  atomic_init(&probe.done, false);
-  const mln_completion completion = {
+static mln_completion source_completion(source_probe* probe) {
+  atomic_init(&probe->done, false);
+  return (mln_completion){
     .size = sizeof(mln_completion),
-    .callback = copy_source,
-    .user_data = &probe,
+    .callback = copy_sources,
+    .user_data = probe,
   };
+}
+
+static void finish_source_probe(const source_probe* probe) {
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_wait_for_flag(&probe->done), "the source query never completed"
+  );
+  MLN_TEST_OK(probe->status);
+  TEST_ASSERT_LESS_OR_EQUAL_size_t(SOURCE_PROBE_CAPACITY, probe->count);
+}
+
+// Reads a source's metadata. `found` reports whether the source exists.
+static source_copy read_source(mln_map map, const char* id) {
+  source_probe probe = {.status = MLN_STATUS_INVALID_STATE};
+  const mln_completion completion = source_completion(&probe);
   MLN_TEST_OK(
     mln_map_get_style_source(map, mln_test_view_of(id), &completion, NULL)
   );
-  TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_wait_for_flag(&probe.done), "the source query never completed"
-  );
-  MLN_TEST_OK(probe.status);
-  return probe;
+  finish_source_probe(&probe);
+  TEST_ASSERT_LESS_OR_EQUAL_size_t(1, probe.count);
+  return probe.sources[0];
+}
+
+// Lists every source's metadata into `probe`, which starts zeroed.
+static void list_sources(mln_map map, source_probe* probe) {
+  const mln_completion completion = source_completion(probe);
+  MLN_TEST_OK(mln_map_list_style_sources(map, &completion, NULL));
+  finish_source_probe(probe);
 }
 
 static bool source_exists(mln_map map, const char* id) {
@@ -249,7 +279,7 @@ static void tile_sources_report_their_effective_options(void) {
     );
     MLN_TEST_OK_MESSAGE(mln_test_completion_settle(&completion), label);
 
-    const source_probe probe = read_source(map, id);
+    const source_copy probe = read_source(map, id);
     TEST_ASSERT_TRUE_MESSAGE(probe.found, label);
     const mln_style_source_info* info = &probe.info;
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(row->type, info->type, label);
@@ -455,7 +485,7 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
     MLN_BUFFER_LITERAL("fixture://second.geojson"), &completion.descriptor, NULL
   ));
 
-  source_probe probe = read_source(map, "remote");
+  source_copy probe = read_source(map, "remote");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_HEX32(
     MLN_STYLE_SOURCE_INFO_URL,
@@ -493,11 +523,35 @@ static void a_source_reports_its_url_attribution_and_tilejson(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Source IDs list in style order: the style's own sources as the document
-// declares them, then added ones, less removed ones.
-static void source_ids_list_in_style_order(void) {
+static void assert_same_source(
+  const source_copy* expected, const source_copy* actual
+) {
+  const mln_style_source_info* want = &expected->info;
+  const mln_style_source_info* got = &actual->info;
+  TEST_ASSERT_EQUAL_STRING(expected->id, actual->id);
+  TEST_ASSERT_EQUAL_UINT32(want->type, got->type);
+  TEST_ASSERT_EQUAL_HEX32(want->fields, got->fields);
+  TEST_ASSERT_EQUAL_INT(want->is_volatile, got->is_volatile);
+  TEST_ASSERT_EQUAL_STRING(expected->attribution, actual->attribution);
+  TEST_ASSERT_EQUAL_STRING(expected->url, actual->url);
+  TEST_ASSERT_EQUAL_size_t(
+    want->tilejson.tile_url_count, got->tilejson.tile_url_count
+  );
+  TEST_ASSERT_EQUAL_STRING(expected->tile_urls[0], actual->tile_urls[0]);
+  TEST_ASSERT_EQUAL_DOUBLE(want->tilejson.min_zoom, got->tilejson.min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(want->tilejson.max_zoom, got->tilejson.max_zoom);
+  TEST_ASSERT_EQUAL_UINT32(want->tilejson.scheme, got->tilejson.scheme);
+  TEST_ASSERT_EQUAL_UINT32(want->tile_size, got->tile_size);
+  TEST_ASSERT_EQUAL_UINT32(want->vector_encoding, got->vector_encoding);
+}
+
+// Sources list in style order with the same metadata a get reports: the
+// style's own sources as the document declares them, then added ones, less
+// removed ones.
+static void sources_list_in_style_order_with_their_info(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
+  mln_test_style_serve(runtime, NULL, 0);
   mln_test_load_style_and_wait(
     runtime, map,
     MLN_BUFFER_LITERAL(
@@ -505,21 +559,50 @@ static void source_ids_list_in_style_order(void) {
       ",\"second\":" MLN_TEST_EMPTY_GEOJSON_SOURCE "},\"layers\":[]}"
     )
   );
-  add_source_json(map, "third", MLN_TEST_EMPTY_GEOJSON_SOURCE);
+  mln_style_tile_source_options attributed =
+    mln_style_tile_source_options_default();
+  attributed.fields = MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+  attributed.attribution = MLN_BUFFER_LITERAL("Third tiles");
+  MLN_TEST_AWAIT_OK(mln_map_add_vector_source_tiles(
+    map, MLN_BUFFER_LITERAL("third"), fixture_tiles, 1, &attributed,
+    &completion.descriptor, NULL
+  ));
   MLN_TEST_AWAIT_OK(mln_map_remove_style_source(
     map, MLN_BUFFER_LITERAL("first"), &completion.descriptor, NULL
   ));
-  const mln_test_style_list list = mln_test_style_list_source_ids(map);
-  MLN_TEST_OK(list.status);
+
+  source_probe list = {.status = MLN_STATUS_INVALID_STATE};
+  list_sources(map, &list);
   TEST_ASSERT_EQUAL_size_t(2, list.count);
-  TEST_ASSERT_EQUAL_STRING("second", list.entries[0].id);
-  TEST_ASSERT_EQUAL_STRING("third", list.entries[1].id);
+  const source_copy* second = &list.sources[0];
+  const source_copy* third = &list.sources[1];
+  TEST_ASSERT_EQUAL_STRING("second", second->id);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_GEOJSON, second->info.type);
+  TEST_ASSERT_EQUAL_HEX32(
+    0, second->info.fields &
+         (MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON)
+  );
+  TEST_ASSERT_EQUAL_STRING("third", third->id);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_VECTOR, third->info.type);
+  TEST_ASSERT_EQUAL_HEX32(
+    MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON,
+    third->info.fields &
+      (MLN_STYLE_SOURCE_INFO_ATTRIBUTION | MLN_STYLE_SOURCE_INFO_TILEJSON)
+  );
+  TEST_ASSERT_EQUAL_STRING("Third tiles", third->attribution);
+  TEST_ASSERT_EQUAL_size_t(1, third->info.tilejson.tile_url_count);
+  TEST_ASSERT_EQUAL_STRING("fixture://tiles/{z}/{x}/{y}", third->tile_urls[0]);
+
+  const source_copy got = read_source(map, "third");
+  TEST_ASSERT_TRUE(got.found);
+  assert_same_source(&got, third);
+
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
 static bool source_is_volatile(mln_map map) {
-  const source_probe probe = read_source(map, "volatile-vector");
+  const source_copy probe = read_source(map, "volatile-vector");
   TEST_ASSERT_TRUE(probe.found);
   return probe.info.is_volatile;
 }
@@ -634,7 +717,7 @@ static void image_sources_hold_corners_and_pixels(void) {
   MLN_TEST_AWAIT_OK(mln_map_add_image_source_url(
     map, remote_image, corners, 4, png, &completion.descriptor, NULL
   ));
-  const source_probe probe = read_source(map, "inline-image");
+  const source_copy probe = read_source(map, "inline-image");
   TEST_ASSERT_TRUE(probe.found);
   TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_SOURCE_TYPE_IMAGE, probe.info.type);
 
@@ -733,7 +816,7 @@ MLN_TEST_GROUP {
   RUN_TEST(tile_sources_report_their_effective_options);
   RUN_TEST(tile_source_options_are_validated_at_submission);
   RUN_TEST(a_source_reports_its_url_attribution_and_tilejson);
-  RUN_TEST(source_ids_list_in_style_order);
+  RUN_TEST(sources_list_in_style_order_with_their_info);
   RUN_TEST(style_source_volatility_round_trips);
   RUN_TEST(an_in_use_source_removal_fails_and_leaves_the_source);
   RUN_TEST(image_sources_hold_corners_and_pixels);

@@ -1478,20 +1478,28 @@ internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
 
 internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
   StyleSourceInfo(
-    type = StyleSourceType(readU32(source + 4)),
-    isVolatile = readBool(source + 12),
-    attribution = if ((readU32(source + 8) and 64u) != 0u) readViewString(source + 16) else null,
-    url = if ((readU32(source + 8) and 1u) != 0u) readViewString(source + w(24, 32)) else null,
+    id = readViewString(source + w(4, 8)),
+    type = StyleSourceType(readU32(source + w(12, 24))),
+    isVolatile = readBool(source + w(20, 32)),
+    attribution =
+      if ((readU32(source + w(16, 28)) and 64u) != 0u) readViewString(source + w(24, 40)) else null,
+    url =
+      if ((readU32(source + w(16, 28)) and 1u) != 0u) readViewString(source + w(32, 56)) else null,
     tilejson =
-      if ((readU32(source + 8) and 2u) != 0u) readStyleSourceTileInfo(source + w(32, 48)) else null,
-    bounds = if ((readU32(source + 8) and 4u) != 0u) readLatLngBounds(source + w(64, 88)) else null,
-    tileSize = if ((readU32(source + 8) and 8u) != 0u) readU32(source + w(96, 120)) else null,
+      if ((readU32(source + w(16, 28)) and 2u) != 0u) readStyleSourceTileInfo(source + w(40, 72))
+      else null,
+    bounds =
+      if ((readU32(source + w(16, 28)) and 4u) != 0u) readLatLngBounds(source + w(72, 112))
+      else null,
+    tileSize =
+      if ((readU32(source + w(16, 28)) and 8u) != 0u) readU32(source + w(104, 144)) else null,
     vectorEncoding =
-      if ((readU32(source + 8) and 16u) != 0u)
-        StyleVectorTileEncoding(readU32(source + w(100, 124)))
+      if ((readU32(source + w(16, 28)) and 16u) != 0u)
+        StyleVectorTileEncoding(readU32(source + w(108, 148)))
       else null,
     rasterEncoding =
-      if ((readU32(source + 8) and 32u) != 0u) StyleRasterDemEncoding(readU32(source + w(104, 128)))
+      if ((readU32(source + w(16, 28)) and 32u) != 0u)
+        StyleRasterDemEncoding(readU32(source + w(112, 152)))
       else null,
   )
 

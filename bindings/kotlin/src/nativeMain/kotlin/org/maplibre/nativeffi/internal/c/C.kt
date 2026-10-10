@@ -945,8 +945,8 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_list_style_source_ids(map: Long, completion: Long, outDiagnostic: Long): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_list_style_source_ids(
+  actual fun mln_map_list_style_sources(map: Long, completion: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_list_style_sources(
       map.toULong(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),

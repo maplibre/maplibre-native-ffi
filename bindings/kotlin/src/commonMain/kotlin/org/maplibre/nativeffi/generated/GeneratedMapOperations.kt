@@ -1038,27 +1038,27 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies style source IDs in style order.
+   * Lists every style source in style order.
    *
-   * See `mln_map_list_style_source_ids` in the
+   * See `mln_map_list_style_sources` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleSourceIds(): Deferred<List<String>> =
+  public fun listStyleSources(): Deferred<List<StyleSourceInfo>> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_list_style_source_ids",
+      "mln_map_list_style_sources",
       { result ->
         readArray(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          2 * NativeMemory.addressSize.toLong(),
+          w(120, 160).toLong(),
         ) {
-          readViewString(it)
+          readStyleSourceInfo(it)
         }
       },
     ) {
-      check(C.mln_map_list_style_source_ids(handle, completion, diagnostic))
+      check(C.mln_map_list_style_sources(handle, completion, diagnostic))
     }
 
   /**

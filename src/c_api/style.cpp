@@ -402,16 +402,17 @@ auto mln_map_get_style_source(
     );
   });
 }
-auto mln_map_list_style_source_ids(
+
+auto mln_map_list_style_sources(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::start_style_operation<&mln_map_list_style_source_ids>(
+    return mln::core::start_style_operation<&mln_map_list_style_sources>(
       map,
       [](
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
-        return mln::core::map_list_style_source_ids(live, result.strings);
+        return mln::core::map_list_style_sources(live, result.sources);
       },
       completion
     );

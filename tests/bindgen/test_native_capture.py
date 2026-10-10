@@ -212,6 +212,7 @@ int main() {
   char url[] = "retained URL";
   mln_buffer_view views[] = {{url, sizeof(url) - 1}, {url, 3}};
   mln_style_source_info source{};
+  source.id = {url, 8};
   source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
   source.tilejson.tile_urls = views;
   source.tilejson.tile_url_count = 2;
@@ -229,6 +230,7 @@ int main() {
   std::memset(url, 'X', sizeof(url));
   assert(std::memcmp(copied->tilejson.tile_urls[0].data, "retained URL", 12) == 0);
   assert(std::memcmp(copied->attribution.data, "retai", 5) == 0);
+  assert(std::memcmp(copied->id.data, "retained", 8) == 0);
   mln::capture::destroy(record);
 
   // A clear bit leaves the embedded record unread, so the copy never follows
@@ -246,20 +248,20 @@ int main() {
   assert(std::memcmp(&copied->tilejson, &zero, sizeof(zero)) == 0);
   mln::capture::destroy(record);
 
-  result.value = views;
+  result.value = &source;
   result.value_count = 0;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO, 0);
   assert(record->view.result.value != nullptr);
   mln::capture::destroy(record);
   result.value = nullptr;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW, 0);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO, 0);
   assert(record->view.result.value == nullptr);
   mln::capture::destroy(record);
 
   result.value = &source;
   result.value_count = std::numeric_limits<std::size_t>::max();
   bool overflow = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW, 0); }
+  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO, 0); }
   catch (const std::bad_alloc&) { overflow = true; }
   assert(overflow);
 

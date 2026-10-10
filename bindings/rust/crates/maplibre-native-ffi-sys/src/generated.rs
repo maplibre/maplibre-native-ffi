@@ -1284,6 +1284,7 @@ pub struct mln_style_layer_info {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_info {
     pub size: u32,
+    pub id: mln_buffer_view,
     pub type_: u32,
     pub fields: u32,
     pub is_volatile: bool,
@@ -2024,7 +2025,7 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_list_style_source_ids(
+    pub fn mln_map_list_style_sources(
         map: mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,

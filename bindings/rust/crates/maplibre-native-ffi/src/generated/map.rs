@@ -1012,17 +1012,17 @@ impl MapHandle {
         )
     }
 
-    /// Copies style source IDs in style order.
+    /// Lists every style source in style order.
     ///
-    /// See `mln_map_list_style_source_ids` in the
+    /// See `mln_map_list_style_sources` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn list_style_source_ids(&self) -> Result<NativeFuture<Vec<String>>> {
-        let call = self.inner.call("mln_map_list_style_source_ids")?;
+    pub fn list_style_sources(&self) -> Result<NativeFuture<Vec<StyleSourceInfo>>> {
+        let call = self.inner.call("mln_map_list_style_sources")?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_list_style_source_ids(map, completion, out_diagnostic)
+                sys::mln_map_list_style_sources(map, completion, out_diagnostic)
             },
-            completion::list::<sys::mln_buffer_view, _>,
+            completion::list::<sys::mln_style_source_info, _>,
         )
     }
 

@@ -2612,6 +2612,7 @@ internal static unsafe class GeneratedValues
     internal static StyleSourceInfo CopyStyleSourceInfo(mln_style_source_info value) =>
         new()
         {
+            Id = RuntimeStructs.CopyUtf8((sbyte*)value.id.data, value.id.size),
             Type = (StyleSourceType)value.type,
             IsVolatile = value.is_volatile != 0,
             Attribution = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
@@ -2642,9 +2643,11 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(value.Id, "StyleSourceInfo.Id must not be null.");
         var native = new mln_style_source_info();
         native.fields = 0;
         native.size = (uint)sizeof(mln_style_source_info);
+        native.id = scope.Utf8(value.Id);
         native.type = (uint)value.Type;
         native.is_volatile = (byte)(value.IsVolatile ? 1 : 0);
         native.fields |= Put(

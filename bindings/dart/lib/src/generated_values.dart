@@ -2632,6 +2632,7 @@ final class StyleSourceTileInfo extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleSourceInfo extends _Value {
   const StyleSourceInfo({
+    required this.id,
     this.type = const StyleSourceType.fromRawValue(0),
     this.isVolatile = false,
     this.attribution,
@@ -2642,6 +2643,9 @@ final class StyleSourceInfo extends _Value {
     this.vectorEncoding,
     this.rasterEncoding,
   });
+
+  /// Source ID.
+  final String id;
 
   /// One of `mln_style_source_type`.
   final StyleSourceType type;
@@ -2672,6 +2676,7 @@ final class StyleSourceInfo extends _Value {
 
   @override
   List<Object?> get _members => [
+    id,
     type,
     isVolatile,
     attribution,

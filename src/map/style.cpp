@@ -1530,49 +1530,46 @@ auto map_remove_style_source(MapObject& live, mln_buffer_view source_id)
   return MLN_STATUS_OK;
 }
 
-auto map_get_style_source(
-  MapObject& live, mln_buffer_view source_id, StyleSourceRecord& out_source
-) -> bool {
-  const auto* source =
-    map_native(live).getStyle().getSource(string_from_view(source_id));
-  if (source == nullptr) {
-    return false;
-  }
+namespace {
 
-  auto& info = out_source.info;
-  info.type = to_c_source_type(source->getType());
-  info.is_volatile = source->isVolatile();
-  if (auto attribution = source->getAttribution()) {
+// Builds the one record that both the get and the list queries deliver.
+auto style_source_record(const mln::style::Source& source)
+  -> StyleSourceRecord {
+  auto record = StyleSourceRecord{.id = source.getID()};
+  auto& info = record.info;
+  info.type = to_c_source_type(source.getType());
+  info.is_volatile = source.isVolatile();
+  if (auto attribution = source.getAttribution()) {
     info.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
-    out_source.attribution = std::move(*attribution);
+    record.attribution = std::move(*attribution);
   }
-  if (auto url = source_url(*source)) {
+  if (auto url = source_url(source)) {
     info.fields |= MLN_STYLE_SOURCE_INFO_URL;
-    out_source.url = std::move(*url);
+    record.url = std::move(*url);
   }
 
-  const auto* tile_source = tile_source_from_source(*source);
+  const auto* tile_source = tile_source_from_source(source);
   if (tile_source == nullptr) {
-    return true;
+    return record;
   }
 
   info.fields |= MLN_STYLE_SOURCE_INFO_TILE_SIZE;
   info.tile_size = tile_source->getTileSize();
-  if (const auto* vector_source = source->as<mln::style::VectorSource>()) {
+  if (const auto* vector_source = source.as<mln::style::VectorSource>()) {
     info.fields |= MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING;
     info.vector_encoding = to_c_vector_encoding(vector_source->getEncoding());
   }
 
   const auto* tileset = inline_tileset(*tile_source);
   if (tileset == nullptr) {
-    return true;
+    return record;
   }
 
   info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
   info.tilejson.min_zoom = tileset->zoomRange.min;
   info.tilejson.max_zoom = tileset->zoomRange.max;
   info.tilejson.scheme = to_c_tile_scheme(tileset->scheme);
-  out_source.tile_urls = tileset->tiles;
+  record.tile_urls = tileset->tiles;
   if (tileset->bounds) {
     info.fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
     info.bounds = from_native_lat_lng_bounds(*tileset->bounds);
@@ -1585,15 +1582,28 @@ auto map_get_style_source(
     info.fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
     info.raster_encoding = to_c_raster_encoding(*tileset->rasterEncoding);
   }
+  return record;
+}
+
+}  // namespace
+
+auto map_get_style_source(
+  MapObject& live, mln_buffer_view source_id, StyleSourceRecord& out_source
+) -> bool {
+  const auto* source =
+    map_native(live).getStyle().getSource(string_from_view(source_id));
+  if (source == nullptr) {
+    return false;
+  }
+  out_source = style_source_record(*source);
   return true;
 }
 
-auto map_list_style_source_ids(
-  MapObject& live, std::vector<std::string>& out_source_ids
+auto map_list_style_sources(
+  MapObject& live, std::vector<StyleSourceRecord>& out_sources
 ) -> mln_status {
-  out_source_ids.clear();
   for (const auto* source : map_native(live).getStyle().getSources()) {
-    out_source_ids.push_back(source->getID());
+    out_sources.push_back(style_source_record(*source));
   }
   return MLN_STATUS_OK;
 }

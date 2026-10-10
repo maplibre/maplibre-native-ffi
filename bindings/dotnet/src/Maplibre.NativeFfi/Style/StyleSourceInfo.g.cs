@@ -12,6 +12,11 @@ namespace Maplibre.NativeFfi;
 public sealed record StyleSourceInfo
 {
     /// <summary>
+    /// Source ID.
+    /// </summary>
+    public required string Id { get; set; }
+
+    /// <summary>
     /// One of <c>mln_style_source_type</c>.
     /// </summary>
     public StyleSourceType Type { get; set; }
