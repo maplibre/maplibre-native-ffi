@@ -42,6 +42,44 @@ category.
 | `event_batch`   | Drains queued events or frame results into an owned batch      |
 | `render_driver` | Services graphics work on the thread that the driver requires  |
 
+## Follow the ABI rules
+
+Each declaration follows these rules, which every binding relies on:
+
+- Declare each function as `MLN_API <type> <name>(...) MLN_NOEXCEPT`.
+- A fallible function returns `mln_status` and takes
+  `mln_diagnostic* out_diagnostic` as its last parameter. Its comment lists
+  every status that it returns under `Returns:`, and an asynchronous function
+  lists its completion outcomes under `Completes with:`. The handle comment in
+  `base.h` defines the status for an invalid or released handle.
+- Use fixed-width integers, `size_t` for counts and byte lengths, `float`,
+  `double`, and `bool`. An enum declares a fixed underlying type, which is
+  `uint32_t` unless its values need another. A struct member that holds an enum
+  value has that integer type and `MLN_BINDING("enum=<enum>")`. An enum of flags
+  that combine is `kind=bitmask`.
+- A struct that can grow begins with `uint32_t size`, and new members go at the
+  end. Native rejects a size below its own `sizeof` with
+  `MLN_STATUS_INVALID_ARGUMENT` and accepts a larger one. This applies to input
+  structs and to output structs that the caller allocates. Native sets the size
+  of each struct that it passes to a callback.
+- An input struct whose defaults are not all zero has a `mln_<struct>_default()`
+  function. It returns the struct with size set and every member at its default.
+  A binding starts each record from that function, or from zero with size set
+  when the struct has none.
+- A versioned struct embedded by value versions with its parent, because growing
+  it changes the parent's layout. Native validates the size of both, as it does
+  for the `camera` member of `mln_camera_update`.
+- A reserved member is `kind=reserved`, and every writer sets it to zero.
+- A handle output parameter owns the handle that it receives, and `*out_handle`
+  must equal `MLN_HANDLE_NULL` on entry. Every other pointer is borrowed for the
+  call unless its annotation says otherwise. A function that keeps an input
+  copies it before returning, and its comment says so.
+
+While `API_EPOCH` is `0`, a change may break the ABI; see
+[Versioning](../../docs/src/content/docs/development/versioning.md). New structs
+still follow the size and default rules, so that a stable epoch can grow them
+compatibly.
+
 ## Annotate only what convention leaves open
 
 The frontend completes each declaration's metadata with the conventions that

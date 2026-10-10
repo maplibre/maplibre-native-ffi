@@ -10,7 +10,8 @@ include/                  Public C headers, the ABI surface
   binding-interfaces.toml The headers that the binding generator reads
 src/                      C++ implementation and render backends
   testing/                Unexported seams for the internal test suite
-tools/bindgen/            Generator: C headers to binding code (see README.md)
+tools/bindgen/            Generator from headers to bindings, and the header
+                          ABI rules (see README.md)
 bindings/<language>/      Kotlin, Rust, Swift, Zig, .NET, Python, Go, Dart:
                           generated code over a handwritten runtime
 tests/
