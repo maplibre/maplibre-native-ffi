@@ -541,6 +541,65 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
   destroy_fixture(fixture);
 }
 
+struct ParkedDisposal {
+  SyncPointScope* points;
+  mln_acquired_frame first;
+  mln_acquired_frame second;
+  bool parked = false;
+  mln_status first_status = MLN_STATUS_NATIVE_ERROR;
+  mln_status second_status = MLN_STATUS_NATIVE_ERROR;
+};
+
+// Disposes both frames while the driver is held just after parking a demand,
+// then lets the driver go.
+void dispose_when_parked(void* argument) {
+  auto& disposal = *static_cast<ParkedDisposal*>(argument);
+  disposal.parked =
+    disposal.points->wait_for_hits(SyncPoint::RenderFrameDemandParked, 1);
+  disposal.first_status = mln_acquired_frame_dispose(disposal.first, nullptr);
+  disposal.second_status = mln_acquired_frame_dispose(disposal.second, nullptr);
+  disposal.points->release(SyncPoint::RenderFrameDemandParked);
+}
+
+// A demand that finds the ring full parks in the same locked section, so a
+// disposal on another thread that quarantines the last slot sees the parked
+// demand and queues the work that resolves it. Holding the driver right after
+// the park is the window that no public fence reaches.
+void a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto disposal = ParkedDisposal{
+    .points = &points,
+    .first = mln_test_render_and_acquire(&fixture.render, 131),
+    .second = mln_test_render_and_acquire(&fixture.render, 132),
+  };
+  points.hold(SyncPoint::RenderFrameDemandParked);
+  auto* disposing = mln_test_thread_start(dispose_when_parked, &disposal);
+  mln_test_render_request_forced(&fixture.render, 133);
+  if (fixture.render.driver != MLN_RENDER_DRIVER_CORE_WORKER) {
+    // The case's own thread runs the demand, so it parks inside this call
+    // until the disposal lets it go.
+    auto serviced = std::size_t{0};
+    MLN_TEST_OK(mln_render_session_service_driver_work(
+      fixture.render.session, 0, &serviced, nullptr
+    ));
+  }
+  mln_test_thread_join(disposing);
+  TEST_ASSERT_TRUE(disposal.parked);
+  MLN_TEST_OK(disposal.first_status);
+  MLN_TEST_OK(disposal.second_status);
+
+  const auto batch = wait_for_results(fixture, 1);
+  const auto result = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(133, result.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
+  );
+  destroy_fixture(fixture);
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -552,4 +611,5 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
   RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);
+  RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
 }

@@ -206,11 +206,12 @@ MLN_API mln_status mln_render_session_get_snapshot(
  *   null or undersized, or demand->flags carries a bit outside
  *   mln_frame_demand_flag.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or disposed frames quarantined every slot of its texture ring.
+ *   or every slot of its texture ring is quarantined.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
- * A demand accepted before the last usable slot was quarantined receives
- * MLN_RENDER_RESULT_TARGET_NOT_READY.
+ * A slot is quarantined when its frame is disposed, or when its release fails
+ * to wait for consumer synchronization. A demand accepted before the last
+ * usable slot was quarantined receives MLN_RENDER_RESULT_TARGET_NOT_READY.
  */
 MLN_API mln_status mln_render_session_request_frame(
   mln_render_session session, const mln_frame_demand* demand,
@@ -338,7 +339,9 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * A synchronization kind the backend does not support fails with
  * MLN_STATUS_UNSUPPORTED before the handle is consumed, so the caller keeps
  * frame ownership. After abandonment the call closes the handle without
- * graphics work.
+ * graphics work. When the driver fails to wait for the consumer
+ * synchronization, the host's GPU may still read the frame's texture, so the
+ * frame's slot is quarantined as mln_acquired_frame_dispose() quarantines it.
  *
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
@@ -509,11 +512,11 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * leave the session attached. Once accepted, earlier mailbox operations reach
  * a terminal result before graphics resources are destroyed.
  *
- * When a disposed frame quarantined a slot of the texture ring, the host's GPU
- * may still read that slot's texture. Detach then releases the ring and its
- * graphics context without destroying them, and they stay allocated until the
- * process exits. Detach waits for the map's in-flight tile work in that case,
- * so the host may destroy its device once detach completes.
+ * When a disposed frame or a failed release quarantined a slot of the texture
+ * ring, the host's GPU may still read that slot's texture. Detach then releases
+ * the ring and its graphics context without destroying them, and they stay
+ * allocated until the process exits. Detach waits for the map's in-flight tile
+ * work in that case, so the host may destroy its device once detach completes.
  *
  * Returns:
  * - MLN_STATUS_OK when the detach is accepted.

@@ -442,11 +442,30 @@ static void borrowed_views_hold_a_frame_until_every_view_ends(void) {
   detach(runtime, map, &fixture);
 }
 
+// Waits until the driver has run every work item that it already holds, then
+// counts the demands that it parked behind a full texture ring.
+static uint32_t parked_demand_count(const mln_test_render_fixture* fixture) {
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, fixture,
+    mln_render_session_reduce_memory_use(
+      fixture->session, &completion.descriptor, NULL
+    )
+  );
+  mln_render_session_snapshot snapshot = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(fixture->session, &snapshot, NULL)
+  );
+  return snapshot.pending_demand_count;
+}
+
 // Disposing a frame, which a binding's finalizer uses in place of a
 // synchronized release, consumes it and quarantines its slot of the ring. The
 // session stays attached: a view already open on the disposed frame reads
-// until it ends, the other frame stays readable, and later frames render into
-// the remaining slot. Detach still completes, keeping the quarantined texture.
+// until it ends, the other frame stays readable, and later frames render only
+// into the remaining slot. Detach still completes, keeping the quarantined
+// texture.
 static void disposing_a_frame_quarantines_only_its_slot(void) {
   mln_runtime runtime;
   mln_map map;
@@ -481,24 +500,23 @@ static void disposing_a_frame_quarantines_only_its_slot(void) {
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_SESSION_STATE_ATTACHED, snapshot.state);
   TEST_ASSERT_EQUAL_UINT32(1, snapshot.acquired_frame_count);
   mln_test_render_release_frame(&kept);
-  for (uint64_t token = 3; token <= 4; token += 1) {
-    mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, token);
-    mln_test_render_release_frame(&frame);
-  }
+
+  // Holding the frame in the one usable slot leaves the next demand nowhere
+  // to render, even though the quarantined slot holds no frame.
+  mln_acquired_frame held = mln_test_render_and_acquire(&fixture, 3);
+  mln_test_render_request_forced(&fixture, 4);
+  TEST_ASSERT_EQUAL_UINT32(1, parked_demand_count(&fixture));
+  mln_test_render_release_frame(&held);
+  const mln_render_frame_batch batch =
+    mln_test_render_wait_for_results(&fixture, 1);
+  result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(4, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
   detach(runtime, map, &fixture);
 }
 
-// Waits until the driver has run every work item that it already holds.
-static void fence_driver(const mln_test_render_fixture* fixture) {
-  MLN_TEST_RENDER_AWAIT(
-    MLN_STATUS_OK, fixture,
-    mln_render_session_reduce_memory_use(
-      fixture->session, &completion.descriptor, NULL
-    )
-  );
-}
-
-// Once disposed frames quarantine every slot, no frame can render again. A
+// Once disposed frames quarantine every slot, no frame can render again. Every
 // demand parked behind the full ring resolves as target-not-ready, frame
 // requests fail with an invalid-state status, and detach still completes.
 static void a_fully_quarantined_ring_takes_no_more_demands(void) {
@@ -508,29 +526,28 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   attach(&runtime, &map, &fixture, mln_test_empty_style_json);
   const mln_acquired_frame first = mln_test_render_and_acquire(&fixture, 1);
   const mln_acquired_frame second = mln_test_render_and_acquire(&fixture, 2);
+  // Each demand has its own coalescing boundary, so neither supersedes the
+  // other and both park.
   mln_test_render_request_forced(&fixture, 3);
-  fence_driver(&fixture);
-  mln_render_session_snapshot snapshot = {
-    .size = sizeof(mln_render_session_snapshot)
-  };
-  MLN_TEST_OK(
-    mln_render_session_get_snapshot(fixture.session, &snapshot, NULL)
-  );
-  TEST_ASSERT_EQUAL_UINT32(1, snapshot.pending_demand_count);
+  mln_test_render_request_forced(&fixture, 4);
+  TEST_ASSERT_EQUAL_UINT32(2, parked_demand_count(&fixture));
 
   MLN_TEST_OK(mln_acquired_frame_dispose(first, NULL));
   MLN_TEST_OK(mln_acquired_frame_dispose(second, NULL));
   const mln_render_frame_batch batch =
-    mln_test_render_wait_for_results(&fixture, 1);
-  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+    mln_test_render_wait_for_results(&fixture, 2);
+  for (size_t index = 0; index < 2; index += 1) {
+    const mln_render_frame_result result =
+      mln_test_render_batch_result(batch, index);
+    TEST_ASSERT_EQUAL_UINT64(3 + index, result.token);
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
+    );
+  }
   mln_render_frame_batch_release(batch);
-  TEST_ASSERT_EQUAL_UINT64(3, result.token);
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
-  );
 
   mln_frame_demand demand = mln_frame_demand_default();
-  demand.token = 4;
+  demand.token = 5;
   MLN_TEST_INVALID_STATE(mln_render_session_request_frame(
     fixture.session, &demand, MLN_TEST_DIAGNOSTIC
   ));

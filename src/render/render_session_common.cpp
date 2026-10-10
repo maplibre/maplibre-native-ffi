@@ -1091,12 +1091,11 @@ auto publish_driver_work_locked(
 
 // Queues one work item behind whatever the driver is already waiting on. While
 // an ordered resize waits for the map, everything after it parks with it so the
-// driver keeps its accepted order. Queueing allocates, and a throw queues
-// nothing.
+// driver keeps its accepted order.
 auto push_driver_work_locked(
   mln_render_session_object& session, RenderDriverWork work,
   DeferredWakes& wakes
-) -> void {
+) noexcept -> void {
   auto& queue = session.waiting_update_work.empty()
                   ? session.driver_work
                   : session.waiting_update_work;
@@ -2499,10 +2498,24 @@ auto run_frame_demand(
   auto ring_full = false;
   auto ring_quarantined = false;
   {
+    auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{session->control_mutex};
     auto& slots = session->texture.slots;
     ring_quarantined = every_slot_quarantined_locked(*session);
-    if (!slots.empty() && !ring_quarantined) {
+    if (ring_quarantined) {
+      // No slot can ever take a frame again, so waiting for a release would
+      // park every queued demand until detach. Parked demands keep no work
+      // item, so this one resolves them all.
+      auto stranded = std::deque<PendingFrameDemand>{};
+      stranded.swap(session->demands);
+      result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
+      publish_frame_result_locked(*session, result, wakes);
+      for (const auto& other : stranded) {
+        auto other_result = result;
+        other_result.token = other.demand.token;
+        publish_frame_result_locked(*session, other_result, wakes);
+      }
+    } else if (!slots.empty()) {
       const auto busy = [](const RenderTextureSlot& value) {
         return value.acquired || value.rendering || value.quarantined;
       };
@@ -2522,7 +2535,12 @@ auto run_frame_demand(
                               }
                             );
       ring_full = slot == slots.end() || busy(*slot);
-      if (!ring_full) {
+      if (ring_full) {
+        // Parking in the section that found the ring full keeps the demand
+        // visible to a release or disposal on another thread, which queues
+        // the work that resumes it.
+        session->demands.push_front(pending);
+      } else {
         selected_slot = static_cast<std::size_t>(slot - slots.begin());
         slot->available = false;
         slot->rendering = true;
@@ -2530,15 +2548,11 @@ auto run_frame_demand(
     }
   }
   if (ring_quarantined) {
-    // No slot can ever take a frame again, so waiting for a release would
-    // park the demand until detach.
-    result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
-    publish_frame_result(session, result);
+    mln::testing::hit(mln::testing::SyncPoint::RenderFrameResultPublished);
     return;
   }
   if (ring_full) {
-    const auto lock = std::scoped_lock{session->control_mutex};
-    session->demands.push_front(pending);
+    mln::testing::hit(mln::testing::SyncPoint::RenderFrameDemandParked);
     return;
   }
   if (
@@ -3759,22 +3773,26 @@ auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
   // A demand parked behind a full ring waits for a release. Once no slot can
   // take a frame, no release can come, so the driver gives the demand its
   // terminal result now. Queueing allocates; if it fails, detach resolves the
-  // demand instead.
+  // demand instead. The queue choice matches push_driver_work_locked().
   if (
-    session.state == MLN_RENDER_SESSION_STATE_ATTACHED &&
-    !session.demands.empty() && every_slot_quarantined_locked(session)
-  ) {
-    try {
-      push_driver_work_locked(
-        session,
-        RenderDriverWork{
-          [owner = live->session]() { run_frame_demand(owner); }, {}
-        },
-        wakes
-      );
-    } catch (...) {
-    }
+    session.state != MLN_RENDER_SESSION_STATE_ATTACHED ||
+    session.demands.empty() || !every_slot_quarantined_locked(session)
+  )
+    return MLN_STATUS_OK;
+  auto& queue = session.waiting_update_work.empty()
+                  ? session.driver_work
+                  : session.waiting_update_work;
+  try {
+    queue.push_back(
+      RenderDriverWork{
+        [owner = live->session]() { run_frame_demand(owner); }, {}
+      }
+    );
+  } catch (...) {
+    return MLN_STATUS_OK;
   }
+  if (session.waiting_update_work.empty())
+    publish_driver_work_locked(session, wakes);
   return MLN_STATUS_OK;
 }
 

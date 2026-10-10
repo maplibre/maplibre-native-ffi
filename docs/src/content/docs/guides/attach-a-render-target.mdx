@@ -97,7 +97,10 @@ the new session.
 Normal detach completes asynchronously. The selected driver destroys graphics
 resources on its graphics thread and detaches the map. Continue servicing a
 caller driver until the completion runs, then destroy the detached session
-handle from any thread.
+handle from any thread. A session-owned texture ring is the exception when a
+frame was disposed instead of released with consumer synchronization: the host's
+GPU may still read that frame's texture, so detach keeps the ring allocated
+until the process exits.
 
 Abandon is the failure path for a host that can no longer service graphics
 work. It closes control and mailboxes, invalidates graphics accessors, detaches
