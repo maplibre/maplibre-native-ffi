@@ -2,18 +2,22 @@
 
 import contextlib
 import io
+import shutil
 import sys
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from support import parse, protocol_header
+from support import ROOT, parse, protocol_header
 
 from tools.bindgen import __main__ as cli
 
 # Formatting belongs to the language tools. These tests keep emitted text as is.
 UNFORMATTED = patch.object(cli, "format_outputs", lambda outputs, _staging: outputs)
+UNFORMATTED_HEADER = patch.object(
+    cli, "dprint_format", lambda source, _extension: source
+)
 
 
 class GenerateCommandTests(unittest.TestCase):
@@ -125,6 +129,44 @@ class GenerateCommandTests(unittest.TestCase):
             self.assertEqual(status, 1)
             status, _ = self.generate(root, ("keywords",), require_complete=True)
             self.assertEqual(status, 0)
+
+    def test_one_run_settles_a_stale_generated_header(self):
+        # Outputs declare the generated header's contents, so a run that read
+        # the stale header would leave outputs that the next check rejects.
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            include = root / "include"
+            shutil.copytree(ROOT / "include", include)
+            header = include / cli.native_capture.HEADER
+            header.write_text(
+                header.read_text().replace(
+                    "} mln_adapter_deferred_callback;",
+                    "  MLN_ADAPTER_DEFERRED_STALE = 7U,\n} mln_adapter_deferred_callback;",
+                )
+            )
+            renders = []
+            generate = cli.generate
+
+            def run(*options):
+                arguments = ["bindgen", "generate", "--include", str(include)]
+                with (
+                    UNFORMATTED,
+                    UNFORMATTED_HEADER,
+                    patch.object(sys, "argv", [*arguments, *options]),
+                    patch.object(
+                        cli,
+                        "generate",
+                        lambda *args: (
+                            renders.append(args) or generate(*args, root=root)
+                        ),
+                    ),
+                    contextlib.redirect_stdout(io.StringIO()),
+                ):
+                    return cli.main()
+
+            self.assertEqual(run(), 0)
+            self.assertEqual(len(renders), 1)
+            self.assertEqual(run("--check"), 0)
 
     def test_invalid_headers_fail_before_writing_output(self):
         with TemporaryDirectory() as directory:

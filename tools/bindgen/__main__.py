@@ -7,9 +7,10 @@ import json
 import subprocess
 import sys
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
-from . import copy_cases, default_cases
+from . import copy_cases, default_cases, native_capture
 from .compiler import compile_api
 from .frontend import parse_headers
 from .model import Api, ModelError
@@ -22,7 +23,7 @@ COVERAGE = "bindings/generated-coverage.json"
 
 
 def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
-    from . import native_capture, native_results
+    from . import native_results
     from .emitters import (
         dart,
         dart_native,
@@ -328,9 +329,16 @@ def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -
     )
 
 
-def header_texts(include: Path) -> dict[Path, str]:
-    """Read every header under `include`, keyed by path."""
-    return {path: path.read_text() for path in sorted(include.rglob("*.h"))}
+def parse_with_generated_header(load: Callable[[dict[str, str]], Api]) -> Api:
+    """Parse the headers with the generated header as this run writes it.
+
+    `load` parses the headers with the given texts in place of theirs. The
+    generated header declares only what the other headers imply, so a parse
+    that leaves it empty derives it, whatever it held before.
+    """
+    derived = native_capture.generate(load({native_capture.HEADER: ""}))
+    header = dprint_format(derived["include/" + native_capture.HEADER], "h")
+    return load({native_capture.HEADER: header})
 
 
 def main() -> int:
@@ -349,11 +357,12 @@ def main() -> int:
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
 
-    def load() -> Api:
+    def load(contents: dict[str, str] | None = None) -> Api:
         api = parse_headers(
             args.include,
             clang=args.clang,
             clang_args=(f"-I{args.native_include.resolve()}", *args.clang_arg),
+            contents=contents,
         )
         if args.command != "inventory":
             validate(api)
@@ -363,19 +372,10 @@ def main() -> int:
         return api
 
     try:
-        api = load()
         if args.command == "generate":
-            # Generation rewrites a header that the frontend parses, and some
-            # outputs declare that header's contents, so a run that changes it
-            # renders again from the new header until nothing under include/
-            # changes.
-            for _ in range(3):
-                before = header_texts(args.include)
-                status = generate(api, args.check, args.require_complete)
-                if args.check or header_texts(args.include) == before:
-                    return status
-                api = load()
-            raise ModelError(["generated headers did not settle after 3 runs"])
+            api = parse_with_generated_header(load)
+            return generate(api, args.check, args.require_complete)
+        api = load()
         if args.output:
             args.output.write_text(api.to_json())
         elif args.command == "inventory":

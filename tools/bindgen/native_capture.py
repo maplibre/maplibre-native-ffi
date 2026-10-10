@@ -14,6 +14,10 @@ from .model import Api, CType, Field, Function, ModelError, Record
 from .schema import FIELD_KEYS, Conventions, has_diagnostic
 from .semantic import BoundApi, FieldPlan, ValuePlan
 
+# The generated header, under the include directory. The frontend parses it
+# with the others, but nothing that it declares feeds its own generation.
+HEADER = "maplibre_native_c/callback_capture_generated.h"
+
 
 def native_call(function: Function, *arguments: str) -> str:
     """Calls a C function, discarding its diagnostic when it takes one."""
@@ -404,7 +408,7 @@ def generate(api: Api | BoundApi) -> dict[str, str]:
     output.extend(["  return MLN_STATUS_INVALID_ARGUMENT;", "}", ""])
     output.extend(deferred_output)
     return {
-        "include/maplibre_native_c/callback_capture_generated.h": "\n".join(header),
+        "include/" + HEADER: "\n".join(header),
         "src/c_api/callback_capture_generated.inc": "\n".join(output),
         "src/c_api/callback_port_generated.inc": port_output,
     }
