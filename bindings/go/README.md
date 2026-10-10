@@ -38,4 +38,6 @@ Native cannot receive a panic, so the binding recovers a callback's panic and
 returns the callback's declared failure value to native. The binding logs the
 panic with `slog.Error` on the default logger, with the C callback type, the
 panic value, and the stack as attributes. Install a handler with
-`slog.SetDefault` to route these records.
+`slog.SetDefault` to route these records. The handler runs on the native
+callback's stack, where the binding refuses every native call with
+`ErrInvalidState`.

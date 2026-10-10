@@ -9,10 +9,17 @@ import org.maplibre.nativeffi.error.CallbackException
  */
 internal expect fun platformReportCallbackFailure(failure: CallbackException)
 
-/** Reports [error], which the upcall of the C [callback] type contained. Never throws. */
+/**
+ * Reports [error], which the upcall of the C [callback] type contained. Never throws.
+ *
+ * The handler runs on the native callback's stack, so it runs in a scope that refuses every native
+ * call, whatever the callback itself may call.
+ */
 internal fun reportCallbackFailure(callback: String, error: Throwable) {
   try {
-    platformReportCallbackFailure(CallbackException(callback, error))
+    CallbackAdmission.scope(null, emptySet()).use {
+      platformReportCallbackFailure(CallbackException(callback, error))
+    }
   } catch (_: Throwable) {
     // A failing handler must not reach native either.
   }

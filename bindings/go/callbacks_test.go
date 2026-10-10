@@ -225,7 +225,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 	f.awaitEvent(t, "the style load from the original URL", isStyleLoaded)
 	receive(t, panicked, "the transform's panic")
-	if got := receive(t, panics, "the transform's panic log"); got != (callbackPanic{"mln_resource_transform_callback", "transform failed"}) {
+	if got := receive(t, panics, "the transform's panic log"); got != (callbackPanic{"mln_resource_transform_callback", "transform failed", true}) {
 		t.Fatalf("logged %+v", got)
 	}
 
@@ -237,7 +237,7 @@ func TestCallbackPanicIsContained(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the pass-through's loading failure", isLoadingFailure("custom://unserved.json"))
-	if got := receive(t, panics, "the provider's panic log"); got != (callbackPanic{"mln_resource_provider_callback", "provider failed"}) {
+	if got := receive(t, panics, "the provider's panic log"); got != (callbackPanic{"mln_resource_provider_callback", "provider failed", true}) {
 		t.Fatalf("logged %+v", got)
 	}
 	select {
@@ -247,8 +247,26 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 }
 
-// callbackPanic is one panic that the binding logged.
-type callbackPanic struct{ callback, panic string }
+// A panic log reaches its handler on the callback's stack, so the handler may
+// not reenter native, even from a callback such as the wake callback that
+// admits every native call.
+func TestCallbackPanicHandlerCannotCallNative(t *testing.T) {
+	panics := capturePanicLogs(t)
+	// A trampoline holds its thread while it reports, as this test does.
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+	bindingReportCallbackPanic("mln_wake_callback", "wake failed")
+	if got := receive(t, panics, "the wake's panic log"); got != (callbackPanic{"mln_wake_callback", "wake failed", true}) {
+		t.Fatalf("logged %+v", got)
+	}
+}
+
+// callbackPanic is one panic that the binding logged, and whether the binding
+// refused a native call from the log's handler.
+type callbackPanic struct {
+	callback, panic string
+	refused         bool
+}
 
 // capturePanicLogs routes the default slog logger's callback panics to the
 // returned channel until the test ends.
@@ -280,6 +298,8 @@ func (handler panicLogHandler) Handle(_ context.Context, record slog.Record) err
 		}
 		return true
 	})
+	_, err := NetworkStatusGet()
+	logged.refused = errors.Is(err, ErrInvalidState)
 	offer(handler, logged)
 	return nil
 }

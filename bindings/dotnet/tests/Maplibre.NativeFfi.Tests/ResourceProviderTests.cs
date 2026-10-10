@@ -89,12 +89,17 @@ public sealed class ResourceProviderTests
         ResourceRequestHandle? escaped = null;
         var thrown = new FormatException("Host callback failed.");
         var reports = new List<CallbackExceptionEventArgs>();
+        Exception? reentry = null;
         // Other tests' callbacks may throw concurrently, so only this exception counts.
         EventHandler<CallbackExceptionEventArgs> record = (_, report) =>
         {
-            if (ReferenceEquals(report.Exception, thrown))
-                lock (reports)
-                    reports.Add(report);
+            if (!ReferenceEquals(report.Exception, thrown))
+                return;
+            lock (reports)
+                reports.Add(report);
+            // The handler runs on the provider's stack, where the binding refuses every native
+            // call.
+            reentry = Record.Exception(() => Maplibre.NetworkStatusGet());
         };
         using var scope = new NativeCallScope();
         var native = GeneratedValues.NativeResourceProvider(
@@ -136,6 +141,7 @@ public sealed class ResourceProviderTests
 
         var report = Assert.Single(reports);
         Assert.Equal("mln_resource_provider_callback", report.Callback);
+        Assert.IsType<InvalidOperationException>(reentry);
         // The request is copied before the callback runs, so native reusing its memory afterwards
         // leaves the copy intact.
         ((byte*)bytes.data)[0] = 99;

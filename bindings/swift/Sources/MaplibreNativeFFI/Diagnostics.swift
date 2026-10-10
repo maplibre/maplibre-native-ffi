@@ -19,8 +19,9 @@ public extension Maplibre {
   /// previous one, or restores the default, which writes each diagnostic to
   /// standard error.
   ///
-  /// The handler may run on any thread, including a native callback thread
-  /// where native calls are refused, so it should return quickly.
+  /// The handler may run on any thread, so it should return quickly. A
+  /// `callbackError` reaches it on the native callback's stack, where the
+  /// binding refuses every native call with `MaplibreError.invalidState`.
   static func setDiagnosticHandler(
     _ handler: (@Sendable (MaplibreDiagnostic) -> Void)?
   ) {
@@ -36,6 +37,13 @@ enum NativeDiagnostics {
     -> Void)?
 
   static func report(_ diagnostic: MaplibreDiagnostic) {
+    // A callback error arrives on the native callback's stack, so the handler
+    // may not reenter native, whatever the callback itself may call.
+    var admission: NativeCallbackGuard.Scope?
+    if case .callbackError = diagnostic {
+      admission = NativeCallbackGuard.enter(owner: nil, operations: [])
+    }
+    defer { admission?.end() }
     let current = lock.withLock { handler }
     if let current { current(diagnostic) }
     else { writeStandardError(describe(diagnostic)) }

@@ -424,10 +424,14 @@ func bindingCallbackValue[T any](pointer unsafe.Pointer) (T, bool) {
 // bindingReportCallbackPanic reports a panic that the trampoline of the C
 // callback type named callback recovered, through the default slog logger,
 // which a host replaces with slog.SetDefault. Native receives the callback's
-// declared failure value instead.
+// declared failure value instead. The trampoline holds its thread, and the
+// handler runs on the native callback's stack, so the binding refuses every
+// native call the handler makes, whatever the callback itself may call.
 func bindingReportCallbackPanic(callback string, failure any) {
 	// A panicking handler must not escape the trampoline either.
 	defer func() { _ = recover() }()
+	C.binding_report_enter()
+	defer C.binding_report_leave()
 	slog.Error("maplibre: callback panicked", "callback", callback, "panic", failure, "stack", string(debug.Stack()))
 }
 

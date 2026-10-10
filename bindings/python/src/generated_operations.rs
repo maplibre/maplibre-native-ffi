@@ -8928,7 +8928,7 @@ impl ResourceRequestHandle {
                     if let Some(callback) = root.get(py, 0)
                         && let Err(error) = callback.bind(py).call0()
                     {
-                        error.write_unraisable(py, None);
+                        generated_report_unraisable(py, error);
                     }
                 });
             }))

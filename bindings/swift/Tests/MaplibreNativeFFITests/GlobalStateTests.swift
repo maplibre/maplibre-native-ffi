@@ -95,9 +95,37 @@ struct GlobalStateTests {
     }
     #expect(reports.value == ["mln_resource_provider_callback"])
   }
+
+  /// A callback error reaches the handler on the callback's stack, so the
+  /// handler may not reenter native, even for a callback such as the wake
+  /// callback that admits every native call.
+  @Test func theHandlerOfACallbackErrorCannotCallNative() {
+    let refusals = LockedBox([Bool]())
+    Maplibre.setDiagnosticHandler { diagnostic in
+      // Tests in other suites run concurrently, so only this error counts.
+      guard case let .callbackError(_, error) = diagnostic,
+            error is WakeFailure else { return }
+      let refused: Bool
+      do {
+        _ = try Maplibre.networkStatusGet()
+        refused = false
+      } catch {
+        refused = (error as? MaplibreError)?.kind == .invalidState
+      }
+      refusals.update { $0.append(refused) }
+    }
+    defer { Maplibre.setDiagnosticHandler(nil) }
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_wake_callback",
+      error: WakeFailure()
+    ))
+    #expect(refusals.value == [true])
+  }
 }
 
 private struct ProviderFailure: Error {}
+
+private struct WakeFailure: Error {}
 
 private func recordingCallback(
   into records: LockedBox<[LogSeverity]>,

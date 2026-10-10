@@ -153,6 +153,48 @@ def test_an_exception_in_a_callback_is_reported_and_contained(
     assert str(report.exc_value) == "provider failed"
 
 
+class _WakeFailure(Exception):
+    pass
+
+
+def test_the_hook_that_receives_a_callback_exception_cannot_call_native(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The wake callback may make any native call, but the hook that receives
+    # its exception runs on the callback's stack, where the binding refuses
+    # every native call.
+    refusals: list[bool] = []
+    reported = threading.Event()
+
+    def hook(report: sys.UnraisableHookArgs) -> None:
+        if not isinstance(report.exc_value, _WakeFailure):
+            return
+        try:
+            mln.network_status_get()
+        except mln.InvalidStateError:
+            refusals.append(True)
+        else:
+            refusals.append(False)
+        reported.set()
+
+    def wake() -> None:
+        raise _WakeFailure
+
+    monkeypatch.setattr(sys, "unraisablehook", hook)
+    runtime = mln.runtime_create(
+        replace(mln.RuntimeOptions.default(), event_wake=mln.Wake(wake))
+    )
+    try:
+        map_handle = result(runtime.map_create())
+        result(map_handle.set_style_json(EMPTY_STYLE))
+        assert reported.wait(TIMEOUT)
+        result(map_handle.close())
+    finally:
+        result(runtime.close())
+    assert refusals
+    assert all(refusals)
+
+
 def test_a_provider_can_answer_a_request_later_from_another_thread(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:

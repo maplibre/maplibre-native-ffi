@@ -171,6 +171,39 @@ class ResourceCallbackTest {
   }
 
   @Test
+  fun theHandlerOfAContainedExceptionCannotCallNative(): Unit = runSuspendTest {
+    val thrown = IllegalStateException("transform failure")
+    val reentry = CompletableDeferred<Throwable?>()
+    val restore =
+      interceptCallbackFailures { failure ->
+        // The handler runs on the transform's stack after its admission ends, where the binding
+        // still refuses every native call.
+        if (failure.cause === thrown)
+          reentry.complete(runCatching { GeneratedApi.networkStatusGet() }.exceptionOrNull())
+      } ?: return@runSuspendTest
+    try {
+      withMap(
+        provider =
+          denyingProvider { request, _ ->
+            if (request.requestedUrl == STYLE_URL) ResourceProviderDecision.PASS_THROUGH else null
+          }
+      ) {
+        runtime
+          .setResourceTransform(
+            ResourceTransform { _, url, _ -> if (url == STYLE_URL) throw thrown }
+          )
+          .awaitWithin("the transform")
+        map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+        val refusal = reentry.awaitWithin("the transform's report")
+        assertTrue(refusal is InvalidStateException, "a native call inside the handler: $refusal")
+        runtime.clearResourceTransform().awaitWithin("the transform clear")
+      }
+    } finally {
+      restore()
+    }
+  }
+
+  @Test
   fun aClaimedRequestCanBeAnsweredAfterTheProviderReturns(): Unit = runSuspendTest {
     val claimed = CompletableDeferred<ResourceRequestHandle>()
     withMap(provider = claimingProvider(STYLE_URL, claimed)) {

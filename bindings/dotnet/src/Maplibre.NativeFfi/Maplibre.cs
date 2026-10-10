@@ -12,7 +12,8 @@ public static unsafe partial class Maplibre
     /// </summary>
     /// <remarks>
     /// A handler runs on the native thread that called the callback, before native continues, so
-    /// it should return quickly. An exception that a handler throws is discarded.
+    /// it should return quickly. The binding refuses every native call that a handler makes with
+    /// <see cref="InvalidOperationException" />. An exception that a handler throws is discarded.
     /// </remarks>
     public static event EventHandler<CallbackExceptionEventArgs>? CallbackException;
 

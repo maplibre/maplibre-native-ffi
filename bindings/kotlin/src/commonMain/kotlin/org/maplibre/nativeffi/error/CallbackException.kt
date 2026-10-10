@@ -4,6 +4,10 @@ package org.maplibre.nativeffi.error
  * Reports an exception that a native callback threw, which native cannot receive. Native receives
  * the callback's failure value instead, and the binding hands this exception to the platform's
  * handler for exceptions that no caller can receive.
+ *
+ * That handler runs on the native thread that called the callback, before native continues, so it
+ * should return quickly. The binding refuses every native call that the handler makes with
+ * [InvalidStateException].
  */
 public class CallbackException
 internal constructor(

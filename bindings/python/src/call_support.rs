@@ -259,11 +259,19 @@ fn generated_invoke<R>(failure: impl Fn() -> R, body: impl FnOnce(Python<'_>) ->
     match result {
         Ok(Some(Ok(result))) => result,
         Ok(Some(Err(error))) => {
-            Python::try_attach(|py| error.write_unraisable(py, None));
+            Python::try_attach(|py| generated_report_unraisable(py, error));
             failure()
         }
         _ => failure(),
     }
+}
+
+/// Reports an exception that a native callback raised to `sys.unraisablehook`.
+/// The hook runs on the native callback's stack, so it may make no native
+/// call, whatever the callback itself may call.
+fn generated_report_unraisable(py: Python<'_>, error: PyErr) {
+    let _policy = GeneratedCallbackPolicy::enter(&[], 0);
+    error.write_unraisable(py, None);
 }
 
 /// Converts a scalar, enum, or pointer value into a Python object.

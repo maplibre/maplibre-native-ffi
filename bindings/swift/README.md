@@ -31,4 +31,5 @@ binding reports the error as a `MaplibreDiagnostic.callbackError`, which names
 the C callback type, to the handler that `Maplibre.setDiagnosticHandler`
 installs. The same handler receives a `leakedHandle` diagnostic for a dropped
 handle that the binding could not dispose. Without a handler, each diagnostic
-goes to standard error.
+goes to standard error. A `callbackError` reaches the handler on the native
+callback's stack, where the binding refuses every native call.

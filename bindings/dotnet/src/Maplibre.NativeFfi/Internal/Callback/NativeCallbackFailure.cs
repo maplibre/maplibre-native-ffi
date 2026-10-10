@@ -5,10 +5,12 @@ internal static class NativeCallbackFailure
     /// <summary>
     /// Reports an exception that the trampoline of <paramref name="callback" /> caught to each
     /// <see cref="Maplibre.CallbackException" /> handler, or to standard error when there is none.
-    /// Never throws, since it runs inside a native callback.
+    /// Never throws, since it runs inside a native callback, and refuses every native call that a
+    /// handler makes, whatever the callback itself may call.
     /// </summary>
     internal static void Report(string callback, Exception exception)
     {
+        using var forbidden = NativeCallbackGuard.ForbidReentry();
         var handlers = Maplibre.CallbackExceptionHandlers;
         if (handlers is null)
         {
