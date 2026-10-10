@@ -909,13 +909,15 @@ void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
   auto busy_weak = std::weak_ptr{busy};
   busy.reset();
   // Driver work belongs to the thread that first services it, so one helper
-  // thread services both the attachment and the blocking operation.
+  // thread services both the attachment and the blocking operation. The first
+  // call services only the attachment, because the operation can be queued
+  // before that call returns.
   auto checks = BackgroundChecks{};
   auto serve = std::atomic_bool{false};
   auto graphics = std::thread{[&] {
     auto serviced = std::size_t{0};
     checks.check(
-      mln_render_session_service_driver_work(busy_id, 0, &serviced, nullptr) ==
+      mln_render_session_service_driver_work(busy_id, 1, &serviced, nullptr) ==
         MLN_STATUS_OK,
       "servicing the attachment failed"
     );

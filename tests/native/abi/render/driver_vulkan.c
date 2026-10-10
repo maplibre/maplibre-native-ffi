@@ -485,7 +485,10 @@ static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
 
 // Abandon ends the session's graphics calls at once, so it lets go of the
 // host's queue lock before it returns: the lock is given back as often as it
-// was taken, and its release has run.
+// was taken, and its release has run. The session renders into an owned
+// texture: on the Android emulator's Vulkan driver, destroying the device after
+// abandoning a session that rendered into a borrowed texture crashes the
+// driver.
 static void abandon_releases_the_host_queue_lock(void) {
   const mln_queue_lock queue_lock = reset_shared_lock();
   mln_runtime runtime = mln_test_create_runtime();
@@ -493,8 +496,8 @@ static void abandon_releases_the_host_queue_lock(void) {
   mln_test_render_prepare_map(runtime, map);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
-    mln_test_render_fixture_create_vulkan_borrowed_texture(
-      map, &fixture, NULL, NULL, &queue_lock
+    mln_test_render_fixture_create_vulkan_owned_texture(
+      map, &fixture, &queue_lock
     ),
     mln_test_graphics_last_error()
   );
