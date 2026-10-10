@@ -1916,6 +1916,10 @@ pub struct MapSnapshot {
     /// True while the map is inside a gesture.
     pub gesture_in_progress: bool,
     pub event_mask: RuntimeEventMask,
+    /// Generation of the latest render update the map published. A rendered
+    /// frame at or past it draws map state that includes every command this
+    /// snapshot observes, though animations and resource loads finish in later
+    /// frames.
     pub latest_render_update_generation: u64,
     pub tile: MapTileOptions,
     pub bounds: BoundOptions,
@@ -3464,6 +3468,10 @@ pub struct RenderFrameResult {
     /// One `mln_render_result` value.
     pub disposition: RenderResult,
     pub token: u64,
+    /// Generation of the map render update the demand evaluated. When
+    /// disposition is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update;
+    /// compare it with `mln_map_snapshot.latest_render_update_generation` to
+    /// find the first frame that includes a command.
     pub map_update_generation: u64,
     pub extent_generation: u64,
     /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.

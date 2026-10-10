@@ -160,6 +160,12 @@ renders each update without a runtime-event round trip. A direct frame-result
 wake callback remains armed until the host drains all frame results, so
 coalesced wakeups do not lose results.
 
+To find the first frame that includes a command, read a map snapshot at or past
+the command's completion generation. A rendered frame whose map-update
+generation is at or past the snapshot's latest render-update generation draws
+map state that includes the command. Animated camera changes, paint transitions,
+and resource loads reach later frames.
+
 Disposing a session, as a binding does for a handle that it reclaims, ends the
 session without a completion. A core-worker session that is attached and has no
 acquired frame detaches on its worker and frees its graphics resources. Disposal

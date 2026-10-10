@@ -144,6 +144,10 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// One `mln_render_result` value.
   public var disposition: RenderResult
   public var token: UInt64
+  /// Generation of the map render update the demand evaluated. When disposition
+  /// is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
+  /// with `mln_map_snapshot.latest_render_update_generation` to find the first
+  /// frame that includes a command.
   public var mapUpdateGeneration: UInt64
   public var extentGeneration: UInt64
   /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.

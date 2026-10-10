@@ -1467,6 +1467,10 @@ pub const MapSnapshot = struct {
     /// True while the map is inside a gesture.
     gesture_in_progress: bool = std.mem.zeroes(bool),
     event_mask: RuntimeEventMask = std.mem.zeroes(RuntimeEventMask),
+    /// Generation of the latest render update the map published. A rendered
+    /// frame at or past it draws map state that includes every command this
+    /// snapshot observes, though animations and resource loads finish in later
+    /// frames.
     latest_render_update_generation: u64 = std.mem.zeroes(u64),
     tile: MapTileOptions = .{},
     bounds: BoundOptions = .{},
@@ -2648,6 +2652,10 @@ pub const RenderFrameResult = struct {
     /// One `mln_render_result` value.
     disposition: RenderResult = std.mem.zeroes(RenderResult),
     token: u64 = std.mem.zeroes(u64),
+    /// Generation of the map render update the demand evaluated. When
+    /// disposition is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update;
+    /// compare it with `mln_map_snapshot.latest_render_update_generation` to
+    /// find the first frame that includes a command.
     map_update_generation: u64 = std.mem.zeroes(u64),
     extent_generation: u64 = std.mem.zeroes(u64),
     /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.

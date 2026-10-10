@@ -2259,8 +2259,11 @@ type MapSnapshot struct {
 	RenderingStatsViewEnabled bool
 	RepaintDemand             bool
 	// True while the map is inside a gesture.
-	GestureInProgress            bool
-	EventMask                    RuntimeEventMask
+	GestureInProgress bool
+	EventMask         RuntimeEventMask
+	// Generation of the latest render update the map published. A rendered frame at
+	// or past it draws map state that includes every command this snapshot
+	// observes, though animations and resource loads finish in later frames.
 	LatestRenderUpdateGeneration uint64
 	Tile                         MapTileOptions
 	Bounds                       BoundOptions
@@ -3206,8 +3209,12 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderFrameResult struct {
 	// One mln_render_result value.
-	Disposition         RenderResult
-	Token               uint64
+	Disposition RenderResult
+	Token       uint64
+	// Generation of the map render update the demand evaluated. When disposition is
+	// MLN_RENDER_RESULT_RENDERED, the frame drew that update; compare it with
+	// mln_map_snapshot.latest_render_update_generation to find the first frame that
+	// includes a command.
 	MapUpdateGeneration uint64
 	ExtentGeneration    uint64
 	// Zero unless disposition is MLN_RENDER_RESULT_RENDERED.

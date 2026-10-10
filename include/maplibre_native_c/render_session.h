@@ -141,6 +141,12 @@ typedef struct mln_render_frame_result {
   /** One mln_render_result value. */
   uint32_t disposition MLN_BINDING("enum=mln_render_result");
   uint64_t token;
+  /**
+   * Generation of the map render update the demand evaluated. When disposition
+   * is MLN_RENDER_RESULT_RENDERED, the frame drew that update; compare it with
+   * mln_map_snapshot.latest_render_update_generation to find the first frame
+   * that includes a command.
+   */
   uint64_t map_update_generation;
   uint64_t extent_generation;
   /** Zero unless disposition is MLN_RENDER_RESULT_RENDERED. */

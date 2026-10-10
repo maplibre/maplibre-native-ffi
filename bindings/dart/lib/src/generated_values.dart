@@ -1309,6 +1309,11 @@ final class RenderFrameResult extends _Value {
   /// One `mln_render_result` value.
   final RenderResult disposition;
   final BigInt token;
+
+  /// Generation of the map render update the demand evaluated. When disposition
+  /// is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
+  /// with `mln_map_snapshot.latest_render_update_generation` to find the first
+  /// frame that includes a command.
   final BigInt mapUpdateGeneration;
   final BigInt extentGeneration;
 
@@ -3000,6 +3005,10 @@ final class MapSnapshot extends _Value {
   /// True while the map is inside a gesture.
   final bool gestureInProgress;
   final RuntimeEventMask eventMask;
+
+  /// Generation of the latest render update the map published. A rendered frame
+  /// at or past it draws map state that includes every command this snapshot
+  /// observes, though animations and resource loads finish in later frames.
   final BigInt latestRenderUpdateGeneration;
   final MapTileOptions tile;
   final BoundOptions bounds;
