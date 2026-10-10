@@ -162,7 +162,10 @@ session without a completion. A core-worker session that is attached and has no
 acquired frame detaches on its worker and frees its graphics resources. Disposal
 abandons any other session, which destroys those resources where abandon can. In
 both cases the host keeps its graphics objects alive until the session's wakes
-are released.
+are released. Disposal reports nothing about the objects that it keeps, so a
+Vulkan host keeps its device, surface, and instance until the process exits. To
+destroy them sooner, detach or abandon the session before disposing of it, and
+follow what that call reports.
 
 Host-acquirable owned texture targets negotiate a ring of one to three slots.
 Acquiring a frame leases one slot and returns producer-completion

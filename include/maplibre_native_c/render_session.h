@@ -672,9 +672,11 @@ MLN_API mln_status mln_render_session_destroy(
  * graphics resources as mln_render_session_abandon() does. A session that
  * waits for those does not delay other sessions' retirement. Either way,
  * retirement releases the map attachment. The host keeps its graphics objects
- * alive until the session's wake release callbacks run, and keeps the parents
- * of a kept Vulkan object until the process exits, as for
- * mln_render_session_abandon(). Acquired frame accessors report target loss
+ * alive until the session's wake release callbacks run. Disposal reports
+ * nothing about what it keeps, so a Vulkan host keeps its VkDevice and
+ * VkSurfaceKHR, and their VkInstance, until the process exits. The exception
+ * is a session whose target an earlier detach or abandon already released:
+ * the rules of that call apply. Acquired frame accessors report target loss
  * after acceptance; their owners still release or dispose those frames.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an

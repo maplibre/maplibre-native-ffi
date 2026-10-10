@@ -3208,11 +3208,18 @@ auto acquired_frame_release(
       if (consumed->slot < slots.size()) {
         auto& slot = slots[consumed->slot];
         slot.acquired = false;
-        // A failed sync wait must not make the slot reusable: the host GPU
-        // may still be reading the texture. TARGET_LOST is safe because an
-        // abandoned session renders nothing further.
-        if (status != MLN_STATUS_OK && status != MLN_STATUS_TARGET_LOST)
+        // The slot is quarantined unless the host's GPU is done reading its
+        // texture: after a failed sync wait, and after abandon when the host
+        // handed over a GPU wait that native never ran. A release that races
+        // abandon after it took the backend skips the backend's sync check,
+        // so it can carry any kind, and abandon must keep the ring for it.
+        if (
+          (status != MLN_STATUS_OK && status != MLN_STATUS_TARGET_LOST) ||
+          (status == MLN_STATUS_TARGET_LOST &&
+           copied.kind != MLN_GPU_SYNC_CPU_COMPLETE)
+        ) {
           slot.quarantined = true;
+        }
       }
       resume_demand = !consumed->session->demands.empty();
     }
@@ -3876,12 +3883,11 @@ auto abandon_render_session(
   // The host's GPU may still read the texture of a session-owned slot that a
   // frame holds or that a disposed frame quarantined, and nothing tells native
   // when that read ends, so such a ring is kept. This reads the slots after
-  // the loop above, which ran the releases still queued for the driver: each
-  // one let go of its slot without quarantining it. That is safe because
-  // CPU_COMPLETE is the only consumer sync a backend accepts, by which the
-  // host attests that its GPU read is done. A consumer sync that hands native
-  // a GPU wait would need that wait submitted to the session's queue before
-  // the drain that precedes teardown.
+  // the loop above, which ran the releases still queued for the driver. A
+  // release with CPU_COMPLETE, by which the host attests that its GPU read is
+  // done, lets go of its slot. A release with a GPU wait quarantines its slot
+  // instead, because abandon never runs that wait: one can arrive between
+  // taking the backend and this read, when no backend checks its kind.
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     keep_ring = live->texture.mode == TextureSessionMode::Owned &&

@@ -4,8 +4,8 @@
 // fail after it. And a session shares its device with the host, so it waits on
 // its own queue and never on the whole device, and a host that shares the
 // queue with it gives it a lock that it takes around each call on the queue.
-// Abandon destroys every object that the session created on the device, so
-// the host may destroy the device once abandon returns.
+// Abandon destroys every object that the session created on the device that
+// it can, after it drains the session's queue, and reports how many it keeps.
 
 #include <vulkan/vulkan_core.h>
 
@@ -537,7 +537,25 @@ static const char* const counted_kind_names[COUNTED_KIND_COUNT] = {
 static atomic_int live_objects[COUNTED_KIND_COUNT];
 static PFN_vkGetDeviceProcAddr counting_real_get_device_proc_addr;
 
+// How teardown orders its drain, its waits, and its destroys. The counters are
+// written on the session's threads, so a case asserts on them afterwards.
+static atomic_bool watching_teardown;
+// The fence of the latest empty submission, which drains the queue.
+static _Atomic(VkFence) pending_drain_fence;
+// Drains whose wait returned since the case began watching teardown.
+static atomic_uint drains_waited;
+// Objects destroyed while watching teardown before any drain was waited.
+static atomic_uint destroys_before_drain;
+// Fence waits made by a thread that held the host queue lock.
+static atomic_uint waits_holding_queue_lock;
+
 static void count_objects(counted_kind kind, int change) {
+  if (
+    change < 0 && atomic_load(&watching_teardown) &&
+    atomic_load(&drains_waited) == 0
+  ) {
+    atomic_fetch_add(&destroys_before_drain, 1);
+  }
   atomic_fetch_add(&live_objects[kind], change);
 }
 
@@ -681,6 +699,38 @@ static VKAPI_ATTR void VKAPI_CALL counting_DestroyPipeline(
   real_DestroyPipeline(device, pipeline, allocator);
 }
 
+static PFN_vkQueueSubmit real_QueueSubmit;
+static PFN_vkWaitForFences real_WaitForFences;
+
+static VKAPI_ATTR VkResult VKAPI_CALL counting_QueueSubmit(
+  VkQueue queue, uint32_t submit_count, const VkSubmitInfo* submits,
+  VkFence fence
+) {
+  if (submit_count == 0 && fence != VK_NULL_HANDLE) {
+    atomic_store(&pending_drain_fence, fence);
+  }
+  return real_QueueSubmit(queue, submit_count, submits, fence);
+}
+
+static VKAPI_ATTR VkResult VKAPI_CALL counting_WaitForFences(
+  VkDevice device, uint32_t count, const VkFence* fences, VkBool32 wait_all,
+  uint64_t timeout
+) {
+  if (holds_host_queue_lock) {
+    atomic_fetch_add(&waits_holding_queue_lock, 1);
+  }
+  const VkResult result =
+    real_WaitForFences(device, count, fences, wait_all, timeout);
+  const VkFence drain_fence = atomic_load(&pending_drain_fence);
+  if (
+    result == VK_SUCCESS && atomic_load(&watching_teardown) && count == 1 &&
+    drain_fence != VK_NULL_HANDLE && fences[0] == drain_fence
+  ) {
+    atomic_fetch_add(&drains_waited, 1);
+  }
+  return result;
+}
+
 // Routes `name` to its counting function: keeps the device's function in
 // `real_##function` and returns the counting one, or null when the device has
 // no such function.
@@ -736,6 +786,8 @@ counting_get_device_proc_addr(VkDevice device, const char* name) {
   COUNTED_FUNCTION(DestroyQueryPool)
   COUNTED_FUNCTION(CreateSwapchainKHR)
   COUNTED_FUNCTION(DestroySwapchainKHR)
+  COUNTED_FUNCTION(QueueSubmit)
+  COUNTED_FUNCTION(WaitForFences)
   return real;
 }
 
@@ -743,6 +795,11 @@ static void counter_reset(void) {
   for (size_t kind = 0; kind < COUNTED_KIND_COUNT; kind += 1) {
     atomic_store(&live_objects[kind], 0);
   }
+  atomic_store(&watching_teardown, false);
+  atomic_store(&pending_drain_fence, VK_NULL_HANDLE);
+  atomic_store(&drains_waited, 0);
+  atomic_store(&destroys_before_drain, 0);
+  atomic_store(&waits_holding_queue_lock, 0);
 }
 
 static void* counting_wrap(void* get_device_proc_addr) {
@@ -784,9 +841,10 @@ static void abandon_destroying_everything(mln_render_session session) {
 }
 
 // Abandon destroys a session's device objects, so the host may destroy its
-// device once abandon returns. It drains the queue before it destroys them,
-// under the host's queue lock, which it then releases: the lock is given back
-// as often as it was taken, and its release has run.
+// device once abandon returns. It drains the queue before it destroys any of
+// them, and holds the host's queue lock only around the drain's submission,
+// never across a wait. It then releases the lock: the lock is given back as
+// often as it was taken, and its release has run.
 static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
   counter_reset();
   const mln_queue_lock queue_lock = reset_shared_lock();
@@ -804,8 +862,17 @@ static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
   TEST_ASSERT_GREATER_THAN_INT(0, live_object_total());
   const unsigned int locks_before = atomic_load(&shared_lock.locks);
   TEST_ASSERT_GREATER_THAN_UINT(0, locks_before);
+  // The barrier orders the rest of the frame's driver call before the watch.
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
+  );
+  atomic_store(&watching_teardown, true);
 
   abandon_destroying_everything(fixture.session);
+  TEST_ASSERT_GREATER_THAN_UINT(0, atomic_load(&drains_waited));
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&destroys_before_drain));
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&waits_holding_queue_lock));
   TEST_ASSERT_GREATER_THAN_UINT(locks_before, atomic_load(&shared_lock.locks));
   TEST_ASSERT_EQUAL_UINT(
     atomic_load(&shared_lock.locks), atomic_load(&shared_lock.unlocks)

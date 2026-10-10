@@ -601,6 +601,84 @@ void abandon_destroys_a_ring_whose_frame_release_is_still_queued() {
   destroy_fixture(fixture);
 }
 
+// Releases the host's frame with a GPU wait from the completion of an
+// operation that abandon discards, which runs after abandon took the session's
+// backend and before it decides what to keep.
+struct RacingRelease {
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  mln_status completion_status = MLN_STATUS_NATIVE_ERROR;
+  mln_status release_status = MLN_STATUS_NATIVE_ERROR;
+};
+
+void release_with_a_gpu_wait(
+  void* user_data, const mln_completion_result* result
+) {
+  auto& racing = *static_cast<RacingRelease*>(user_data);
+  racing.completion_status = static_cast<mln_status>(result->status);
+  auto sync = mln_gpu_sync_default();
+  sync.kind = MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
+  sync.value = 1;
+  racing.release_status =
+    mln_acquired_frame_release(&racing.frame, &sync, nullptr);
+}
+
+// A frame release can reach a session after abandon took its backend and
+// before abandon decides what to keep, when no backend checks the release's
+// sync kind. Native never runs the GPU wait that such a release hands over,
+// so the host's GPU may still read the slot, and abandon keeps the ring. The
+// blocked driver keeps the operation queued until abandon discards it, which
+// no public fence reaches.
+void abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto racing =
+    RacingRelease{.frame = mln_test_render_and_acquire(&fixture.render, 142)};
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  const auto completion = mln_completion{
+    .size = sizeof(mln_completion),
+    .callback = release_with_a_gpu_wait,
+    .user_data = &racing,
+    .release_user_data = nullptr,
+  };
+  MLN_TEST_OK(mln_render_session_reduce_memory_use(
+    fixture.render.session, &completion, nullptr
+  ));
+
+  auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
+  auto* releasing =
+    mln_test_thread_start(release_blocker_when_abandon_waits, &release);
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  const auto abandon_status =
+    mln_render_session_abandon(fixture.render.session, &result, nullptr);
+  release.abandon_returned.store(true);
+  mln_test_pulse();
+  mln_test_thread_join(releasing);
+  MLN_TEST_OK(abandon_status);
+  MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, racing.completion_status);
+  MLN_TEST_OK(racing.release_status);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, racing.frame);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
+  );
+  // OpenGL and WebGPU keep the renderer too, which only their graphics thread
+  // may destroy.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(1, result.quarantined_resource_count);
+#else
+  TEST_ASSERT_EQUAL_UINT32(2, result.quarantined_resource_count);
+#endif
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&blocker.completion, -1));
+  mln_test_completion_destroy(&blocker.completion);
+  blocker.submitted = false;
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
+#endif
+  destroy_fixture(fixture);
+}
+
 struct ParkedDisposal {
   SyncPointScope* points;
   mln_acquired_frame first;
@@ -677,5 +755,6 @@ MLN_TEST_GROUP {
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
   RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);
   RUN_TEST(abandon_destroys_a_ring_whose_frame_release_is_still_queued);
+  RUN_TEST(abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons);
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
 }
