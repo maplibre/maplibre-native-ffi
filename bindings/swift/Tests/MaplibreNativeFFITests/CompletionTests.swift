@@ -159,7 +159,7 @@ private struct ConversionFailure: Error {}
 /// suspends. Each committed command publishes the next map generation, so the
 /// generations rise with the order the tasks started in. A task that starts
 /// immediately submits before its start returns; an enqueued task submits when
-/// the actor runs it, which is in the order the tasks were enqueued.
+/// the main actor runs it, which is in the order the tasks were enqueued.
 @Test func commandsStartedInOrderOnOneActorSubmitInThatOrder() async throws {
   try await withMapFixture { fixture in
     let enqueued = try await generationsOfCommandsStarted(

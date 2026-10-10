@@ -7,10 +7,18 @@ Published snapshots return their result synchronously.
 
 An `async` operation runs on its caller's executor until it first suspends, and
 it submits its work to native before that suspension. Operations that one actor
-starts in order therefore reach native in that order. This holds for tasks that
-the actor starts with `Task {}`, because the actor runs them in the order that
-it enqueued them, and for `Task.immediate`, which submits before it returns. The
-module builds with the `NonisolatedNonsendingByDefault` feature to give its
+awaits in order therefore reach native in that order. Tasks that start
+operations reach native in the order that their executor runs them:
+
+- `Task.immediate` runs its operation until the first suspension before it
+  returns, so tasks that one actor starts this way submit in the order that it
+  starts them. It needs the macOS, iOS, or tvOS 26 runtime, or Swift 6.2 on
+  Linux.
+- `Task {}` enqueues its operation on the actor. The main actor runs its queue
+  in order. Another actor runs tasks of equal priority in the order that it
+  enqueued them, and it can run a task of higher or escalated priority first.
+
+The module builds with the `NonisolatedNonsendingByDefault` feature to give its
 operations this behavior, so the package needs Swift 6.2 or later.
 
 Cancelling a task that awaits an operation ends the wait with
