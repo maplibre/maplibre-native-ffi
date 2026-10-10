@@ -38,7 +38,7 @@ class GeneratedShapesTest {
   fun terminatedStringsRejectAnEmbeddedNulAndExplicitLengthsKeepIt(): Unit = runSuspendTest {
     withMap {
       // A URL crosses as a NUL-terminated string, which cannot hold a NUL.
-      assertFailsWith<InvalidArgumentException> { map.setStyleUrl("custom://a\u0000b").await() }
+      assertFailsWith<InvalidArgumentException> { map.setStyleUrl("custom://a\u0000b") }
 
       // A feature ID crosses as an explicit-length view, so "a\u0000b" and "a" are two IDs.
       val withNul = FeatureStateSelector("source", featureId = "a\u0000b")

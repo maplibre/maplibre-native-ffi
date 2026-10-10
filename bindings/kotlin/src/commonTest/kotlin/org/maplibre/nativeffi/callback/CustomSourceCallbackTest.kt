@@ -34,9 +34,7 @@ class CustomSourceCallbackTest {
 
       // A registration the closed map rejects on the calling thread roots nothing.
       map.release().awaitWithin("the map release")
-      assertFailsWith<InvalidStateException> {
-        map.addCustomGeometrySource("rejected", options).await()
-      }
+      assertFailsWith<InvalidStateException> { map.addCustomGeometrySource("rejected", options) }
       assertEquals(base, roots.rootCountForTesting())
     }
   }
