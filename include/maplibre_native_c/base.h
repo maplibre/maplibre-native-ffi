@@ -87,9 +87,11 @@ typedef enum mln_status : int32_t {
  * Every status-returning function, except the binding-internal callback
  * adapters, takes a nullable mln_diagnostic* as its last parameter,
  * out_diagnostic. The caller sets size to sizeof(mln_diagnostic). The function
- * writes message as null-terminated UTF-8, empty when it returns MLN_STATUS_OK
- * and describing the failure otherwise, truncated to fit. It writes no more
- * than size bytes of the struct. A null out_diagnostic discards the message.
+ * writes message as null-terminated UTF-8, truncated to fit. The message is
+ * empty when the function returns MLN_STATUS_OK, or MLN_STATUS_NOT_READY from a
+ * drain with nothing queued, and describes the failure otherwise. It writes no
+ * more than size bytes of the struct. A null out_diagnostic discards the
+ * message.
  *
  * Asynchronous failures carry their diagnostic in the completion instead.
  */

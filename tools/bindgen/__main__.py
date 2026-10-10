@@ -328,6 +328,11 @@ def generate(api: Api, check: bool, require_complete: bool, root: Path = ROOT) -
     )
 
 
+def header_texts(include: Path) -> dict[Path, str]:
+    """Read every header under `include`, keyed by path."""
+    return {path: path.read_text() for path in sorted(include.rglob("*.h"))}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("inventory", "validate", "generate"))
@@ -343,7 +348,8 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--require-complete", action="store_true")
     args = parser.parse_args()
-    try:
+
+    def load() -> Api:
         api = parse_headers(
             args.include,
             clang=args.clang,
@@ -354,8 +360,22 @@ def main() -> int:
             bound = compile_api(api)
             if bound.diagnostics:
                 raise ModelError(list(bound.diagnostics))
+        return api
+
+    try:
+        api = load()
         if args.command == "generate":
-            return generate(api, args.check, args.require_complete)
+            # Generation rewrites a header that the frontend parses, and some
+            # outputs declare that header's contents, so a run that changes it
+            # renders again from the new header until nothing under include/
+            # changes.
+            for _ in range(3):
+                before = header_texts(args.include)
+                status = generate(api, args.check, args.require_complete)
+                if args.check or header_texts(args.include) == before:
+                    return status
+                api = load()
+            raise ModelError(["generated headers did not settle after 3 runs"])
         if args.output:
             args.output.write_text(api.to_json())
         elif args.command == "inventory":
