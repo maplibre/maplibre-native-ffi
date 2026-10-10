@@ -31,7 +31,8 @@ reports the map handle, or a terminal error, exactly once.
 
 Map options include the initial logical extent, map mode, and FastPFOR decoding.
 The extent contains width, height, and scale factor. It initializes camera and
-projection state before a render target exists.
+projection state before a render target exists, so a standalone projection that
+a host creates right after map creation already converts at that extent.
 
 The scale factor is fixed for the map's life. It selects sprites, glyphs, raster
 tiles, and pixel-ratio-dependent renderer state, so a resize that names a
@@ -57,6 +58,8 @@ the public handle immediately; native teardown continues in submission order,
 and the runtime release completion reports when all of it, including released
 maps' teardown, has finished. Wait for that completion before tearing down
 state that the runtime's callbacks use; a process may exit without waiting. A
-standalone projection snapshot does not keep either source handle open.
+standalone projection is created synchronously from the map's latest published
+snapshot and owns its copy of that state, so it stays usable after the map and
+runtime are released.
 
 <Code code={region(createMap, "release")} lang="c" title="create-map.c" />

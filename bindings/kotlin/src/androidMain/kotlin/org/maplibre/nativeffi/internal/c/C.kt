@@ -677,7 +677,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_map_projection_create(
     map: Long,
-    completion: Long,
+    outProjection: Long,
     outDiagnostic: Long,
   ): Int
 

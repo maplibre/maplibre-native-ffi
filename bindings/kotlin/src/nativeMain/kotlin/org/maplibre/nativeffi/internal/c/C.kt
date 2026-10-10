@@ -1125,10 +1125,10 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_projection_create(map: Long, completion: Long, outDiagnostic: Long): Int =
+  actual fun mln_map_projection_create(map: Long, outProjection: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_projection_create(
       map.toULong(),
-      completion.toCPointer(),
+      outProjection.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 

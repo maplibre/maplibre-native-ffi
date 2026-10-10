@@ -1634,24 +1634,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts creation of a standalone projection from the map's ordered
-    /// transform state.
+    /// Creates a standalone projection from the map's latest published
+    /// snapshot.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_projection_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<MapProjectionHandle> ProjectionCreateAsync(
-        CancellationToken cancellationToken = default
-    )
+    public MapProjectionHandle ProjectionCreate()
     {
-        using var scope = new NativeCallScope(this, "mln_map_projection_create");
-        return scope.Query<MlnMapProjection, MapProjectionHandle>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_projection_create(Handle, completion, diagnostic),
-            handle => MapProjectionHandle.Adopt(handle),
-            cancellationToken
-        );
+        using var call = Enter(this, "mln_map_projection_create");
+        MlnMapProjection outProjection = default;
+        Check(NativeMethods.mln_map_projection_create(Handle, &outProjection, Diagnostic));
+        return MapProjectionHandle.Adopt(outProjection);
     }
 
     /// <summary>

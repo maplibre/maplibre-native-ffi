@@ -12,7 +12,7 @@ void main() {
     () async {
       final fixture = await openRuntime();
       final map = await fixture.openMap();
-      final projection = await map.projectionCreate();
+      final projection = map.projectionCreate();
 
       projection.close();
       projection.close();

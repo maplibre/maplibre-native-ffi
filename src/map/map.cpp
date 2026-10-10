@@ -2419,9 +2419,11 @@ auto publish_map_snapshot(MapObject& live) -> uint64_t {
     .free_camera = from_native_free_camera(live.map->getFreeCameraOptions())
   };
   const auto generation = snapshot.generation;
+  auto transform = live.map->getTransformState();
   {
     const std::scoped_lock lock(live.snapshot_mutex);
     live.snapshot = snapshot;
+    live.snapshot_transform = std::move(transform);
   }
   live.event_state->published_generation = generation;
   return generation;
@@ -4562,65 +4564,19 @@ auto map_projection_create_from_transform(
   return MLN_STATUS_OK;
 }
 
-auto map_projection_create_start(mln_map map, const mln_completion* completion)
+auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status {
-  const auto completion_status = validate_completion(completion);
-  if (completion_status != MLN_STATUS_OK) return completion_status;
-
-  auto context = MapSubmissionContext{};
-  const auto acquire_status = acquire_map_submission(map, context);
-  if (acquire_status != MLN_STATUS_OK) {
-    return acquire_status;
+  auto live = lease_map(map);
+  if (live == nullptr) return recorded_handle_fault_status();
+  if (live->control.is_closing()) {
+    set_thread_error("map is closing");
+    return MLN_STATUS_INVALID_STATE;
   }
-  auto completion_state = std::make_shared<Completion>(*completion);
-  auto state = std::make_shared<OperationObject>([completion_state](
-                                                   mln_status status,
-                                                   std::string diagnostic,
-                                                   std::any result
-                                                 ) {
-    auto* projection =
-      std::any_cast<std::shared_ptr<MapProjectionObject>>(&result);
-    if (
-      status != MLN_STATUS_OK || projection == nullptr || *projection == nullptr
-    ) {
-      complete_failure(
-        completion_state,
-        status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
-        status == MLN_STATUS_OK
-          ? "projection creation produced an invalid result"
-          : std::move(diagnostic)
-      );
-      return;
-    }
-    const auto handle = handle_table<MapProjectionObject>().insert(*projection);
-    CompletionValue<&mln_map_projection_create>::complete(
-      completion_state, handle
-    );
-  });
-  const auto submit_status = submit_runtime_operation(
-    context.runtime, state,
-    [parent = std::move(context.map), control = std::move(context.control),
-     state]() mutable -> void {
-      // The control lease is captured so map teardown waits for this work.
-      static_cast<void>(control);
-      try {
-        auto projection = std::make_shared<MapProjectionObject>();
-        projection->projection =
-          std::make_unique<mln::MapProjection>(*parent->map);
-        state->complete(MLN_STATUS_OK, {}, std::any{std::move(projection)});
-      } catch (...) {
-        state->complete(
-          MLN_STATUS_NATIVE_ERROR, exception_message(std::current_exception()),
-          {}
-        );
-      }
-    }
-  );
-  if (submit_status == MLN_STATUS_OK)
-    completion_state->accept();
-  else
-    completion_state->reject();
-  return submit_status;
+  const auto transform = [&]() -> mln::TransformState {
+    const std::scoped_lock lock(live->snapshot_mutex);
+    return live->snapshot_transform;
+  }();
+  return map_projection_create_from_transform(transform, out_projection);
 }
 
 auto map_projection_close(mln_map_projection projection) -> mln_status {

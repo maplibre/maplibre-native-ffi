@@ -1000,14 +1000,14 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: tuple(ScreenPoint._from_native(item) for item in value),
         )
 
-    def projection_create(self) -> Future[MapProjectionHandle]:
-        """Starts creation of a standalone projection from the map's ordered
-        transform state.
+    def projection_create(self) -> MapProjectionHandle:
+        """Creates a standalone projection from the map's latest published
+        snapshot.
 
         See `mln_map_projection_create` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
-        return _adopt_future(
+        return _adopt_value(
             self._native.projection_create(), "MapProjectionHandle", None
         )
 

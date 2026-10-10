@@ -1003,10 +1003,11 @@ static jint mln_map_projection_close_jni(
 }
 
 static jint mln_map_projection_create_jni(
-  JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
+  JNIEnv* env, jclass type, jlong map, jlong out_projection,
+  jlong out_diagnostic
 ) {
   return (jint)mln_map_projection_create(
-    (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
+    (mln_map)map, MLN_JNI_POINTER(mln_map_projection*, out_projection),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }

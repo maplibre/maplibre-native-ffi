@@ -2576,8 +2576,8 @@ internal actual object C {
   actual fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int =
     mln_map_projection_close.invokeExact(projection, outDiagnostic) as Int
 
-  actual fun mln_map_projection_create(map: Long, completion: Long, outDiagnostic: Long): Int =
-    mln_map_projection_create.invokeExact(map, completion, outDiagnostic) as Int
+  actual fun mln_map_projection_create(map: Long, outProjection: Long, outDiagnostic: Long): Int =
+    mln_map_projection_create.invokeExact(map, outProjection, outDiagnostic) as Int
 
   actual fun mln_map_projection_get_camera(
     projection: Long,

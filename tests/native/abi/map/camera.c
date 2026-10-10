@@ -551,13 +551,8 @@ static void every_camera_delta_field_follows_its_convention(void) {
 }
 
 static mln_map_projection create_projection(mln_map map) {
-  mln_test_completion completion =
-    mln_test_completion_default(sizeof(mln_map_projection));
-  MLN_TEST_OK(mln_map_projection_create(map, &completion.descriptor, NULL));
   mln_map_projection projection = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_completion_finish_value(
-    &completion, &projection, sizeof(projection)
-  ));
+  MLN_TEST_OK(mln_map_projection_create(map, &projection, NULL));
   return projection;
 }
 

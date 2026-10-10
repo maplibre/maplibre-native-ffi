@@ -252,13 +252,6 @@ struct CompletionResult<&mln_map_pixels_for_lat_lngs> {
   static constexpr bool nullable = false;
 };
 template <>
-struct CompletionResult<&mln_map_projection_create> {
-  static constexpr bool has_value = true;
-  using type = mln_map_projection;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
 struct CompletionResult<&mln_map_release> {
   static constexpr bool has_value = false;
 };

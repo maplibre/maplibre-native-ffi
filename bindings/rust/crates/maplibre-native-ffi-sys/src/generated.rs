@@ -2168,7 +2168,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_projection_create(
         map: mln_map,
-        completion: *const mln_completion,
+        out_projection: *mut mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_get_camera(

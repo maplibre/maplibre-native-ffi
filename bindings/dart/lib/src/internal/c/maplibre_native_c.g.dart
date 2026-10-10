@@ -1697,7 +1697,6 @@ const MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT = 1485572681;
 const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG = 2638194669;
 const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS = 3400515811;
 const MLN_ADAPTER_COMPLETION_COPY_MAP = 438078448;
-const MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION = 3555078466;
 const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO = 3939645993;
 const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
 const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = 3048968095;
@@ -3751,11 +3750,11 @@ external int mln_map_projection_close(
 );
 
 @Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+  Int32 Function(mln_map, Pointer<mln_map_projection>, Pointer<mln_diagnostic>)
 >()
 external int mln_map_projection_create(
   int map,
-  Pointer<mln_completion> completion,
+  Pointer<mln_map_projection> out_projection,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

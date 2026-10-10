@@ -6134,13 +6134,12 @@ pub fn mapProjectionClose(projection: MapProjection, diagnostic: ?*diagnostics.D
     return call.invoke("mln_map_projection_close", .close, projection, null, diagnostic, .{});
 }
 
-/// Starts creation of a standalone projection from the map's ordered transform
-/// state.
+/// Creates a standalone projection from the map's latest published snapshot.
 ///
 /// See `mln_map_projection_create` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapProjectionCreate(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(MapProjection) {
-    return call.submit("mln_map_projection_create", .lease, map, call.handle(MapProjection, c.mln_map_projection, .none), null, diagnostic, .{});
+pub fn mapProjectionCreate(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
+    return call.invoke("mln_map_projection_create", .lease, map, null, diagnostic, .{call.adopt(MapProjection, .none)});
 }
 
 /// Copies the projection camera into out_camera.

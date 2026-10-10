@@ -96,7 +96,9 @@ Published snapshots provide synchronous copies of state needed by UI and display
 threads. Snapshot reads never call into mutable MapLibre map state. A map
 command publishes a snapshot after it runs, whether it commits or fails, and its
 completion reports that snapshot's generation, so a host can fence a snapshot
-read on it.
+read on it. A standalone projection copies the transform that the map published
+with its latest snapshot, so a projection created after a completion converts
+with the state that the command committed.
 
 ## Render session
 

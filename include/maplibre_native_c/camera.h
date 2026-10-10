@@ -491,7 +491,9 @@ MLN_API mln_status mln_map_set_projection_mode(
  *
  * Each conversion queues one map query. Hot paths such as per-pointer-move
  * conversion use a standalone projection, whose conversions are synchronous.
- * The completion borrows one mln_screen_point.
+ * A host recreates that projection, which is cheap and synchronous, when the
+ * snapshot's extent, viewport options, or projection mode changes. The
+ * completion borrows one mln_screen_point.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
@@ -514,7 +516,9 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
  *
  * The output longitude is wrapped to -180 to 180. Each conversion queues one
  * map query. Hot paths such as per-pointer-move conversion use a standalone
- * projection, whose conversions are synchronous. The completion borrows one
+ * projection, whose conversions are synchronous. A host recreates that
+ * projection, which is cheap and synchronous, when the snapshot's extent,
+ * viewport options, or projection mode changes. The completion borrows one
  * mln_lat_lng.
  *
  * Returns:

@@ -1,20 +1,15 @@
-// Standalone projections: a projection copies the map's transform when it is
-// created, outlives the map, converts and fits synchronously on any thread,
-// and reads its scale at its own camera. The spherical Mercator helpers need
-// no map at all.
+// Standalone projections: a projection copies the transform the map published
+// with its latest snapshot, outlives the map, converts and fits synchronously
+// on any thread, and reads its scale at its own camera. The spherical Mercator
+// helpers need no map at all.
 
 #include <math.h>
 
 #include "support/test_support.h"
 
 static mln_map_projection create_projection(mln_map map) {
-  mln_test_completion completion =
-    mln_test_completion_default(sizeof(mln_map_projection));
-  MLN_TEST_OK(mln_map_projection_create(map, &completion.descriptor, NULL));
   mln_map_projection projection = MLN_HANDLE_NULL;
-  MLN_TEST_OK(mln_test_completion_finish_value(
-    &completion, &projection, sizeof(projection)
-  ));
+  MLN_TEST_OK(mln_map_projection_create(map, &projection, NULL));
   return projection;
 }
 
@@ -28,19 +23,8 @@ static void projection_outlives_its_source_map_and_runtime(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
-  MLN_TEST_INVALID(mln_map_projection_create(map, NULL, NULL));
-  mln_test_completion completion =
-    mln_test_completion_default(sizeof(mln_map_projection));
-  MLN_TEST_OK(mln_map_projection_create(map, &completion.descriptor, NULL));
+  const mln_map_projection projection = create_projection(map);
   mln_test_destroy_map(map);
-  MLN_TEST_OK(mln_test_completion_finish(&completion));
-
-  mln_map_projection projection = MLN_HANDLE_NULL;
-  TEST_ASSERT_TRUE(
-    mln_test_completion_copy_value(&completion, &projection, sizeof(projection))
-  );
-  mln_test_completion_destroy(&completion);
-
   mln_test_destroy_runtime(runtime);
   const mln_camera_options source_camera = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 0.0, source_camera.latitude);
@@ -79,8 +63,8 @@ static void creation_observes_earlier_map_camera_commands(void) {
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
 
-  // Creation is ordered after the accepted camera command, so the projection
-  // copies the committed transform state.
+  // The command published its snapshot before its completion ran, so the
+  // projection copies the committed transform state.
   mln_map_projection projection = create_projection(map);
   const mln_camera_options camera = read_camera(projection);
   TEST_ASSERT_DOUBLE_WITHIN(1e-7, 12.0, camera.latitude);
@@ -89,6 +73,104 @@ static void creation_observes_earlier_map_camera_commands(void) {
 
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
   mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static mln_screen_point projected_pixel(
+  mln_map_projection projection, mln_lat_lng coordinate
+) {
+  mln_screen_point point = {0};
+  MLN_TEST_OK(
+    mln_map_projection_pixel_for_lat_lng(projection, coordinate, &point, NULL)
+  );
+  return point;
+}
+
+static void projection_follows_committed_extent_viewport_and_mode(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_map_snapshot initial = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_snapshot_get(map, &initial, NULL));
+  const mln_map_projection before = create_projection(map);
+
+  MLN_TEST_AWAIT_OK(mln_map_resize(
+    map, (mln_logical_extent){512, 256, 1.0}, &completion.descriptor, NULL
+  ));
+  mln_projection_mode mode = mln_projection_mode_default();
+  mode.fields = MLN_PROJECTION_MODE_AXONOMETRIC;
+  mode.axonometric = true;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_projection_mode(map, &mode, &completion.descriptor, NULL)
+  );
+  mln_map_viewport_options viewport = mln_map_viewport_options_default();
+  viewport.fields = MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+  viewport.north_orientation = MLN_NORTH_ORIENTATION_RIGHT;
+  MLN_TEST_AWAIT_OK(
+    mln_map_set_viewport_options(map, &viewport, &completion.descriptor, NULL)
+  );
+
+  // The map has no style, so nothing publishes between these two reads.
+  const mln_map_projection projection = create_projection(map);
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+  TEST_ASSERT_TRUE(snapshot.projection_mode.axonometric);
+
+  // The two paths derive camera options independently, so they agree within a
+  // tolerance rather than bytewise.
+  const mln_camera_options camera = read_camera(projection);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, snapshot.camera.latitude, camera.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, snapshot.camera.longitude, camera.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, snapshot.camera.zoom, camera.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, snapshot.camera.bearing, camera.bearing);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, snapshot.camera.pitch, camera.pitch);
+
+  const mln_lat_lng center = {
+    .latitude = snapshot.camera.latitude, .longitude = snapshot.camera.longitude
+  };
+  const mln_screen_point centered = projected_pixel(projection, center);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 256.0, centered.x);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, 128.0, centered.y);
+  // North points right, so a coordinate north of the center lies to its right.
+  const mln_screen_point northward = projected_pixel(
+    projection,
+    (mln_lat_lng){
+      .latitude = center.latitude + 10.0, .longitude = center.longitude
+    }
+  );
+  TEST_ASSERT_GREATER_THAN_DOUBLE(centered.x + 1.0, northward.x);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, centered.y, northward.y);
+
+  // A projection created before the commands keeps the extent it copied.
+  const mln_screen_point earlier = projected_pixel(before, center);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-6, initial.logical_extent.width / 2.0, earlier.x
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-6, initial.logical_extent.height / 2.0, earlier.y
+  );
+
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+  MLN_TEST_OK(mln_map_projection_close(before, NULL));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void creation_rejects_invalid_arguments_and_released_maps(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  MLN_TEST_INVALID(mln_map_projection_create(map, NULL, NULL));
+  mln_map_projection occupied = 1;
+  MLN_TEST_INVALID(mln_map_projection_create(map, &occupied, NULL));
+  TEST_ASSERT_EQUAL_UINT64(1, occupied);
+  mln_map_projection projection = MLN_HANDLE_NULL;
+  MLN_TEST_INVALID(
+    mln_map_projection_create(MLN_HANDLE_NULL, &projection, NULL)
+  );
+
+  mln_test_destroy_map(map);
+  MLN_TEST_INVALID_STATE(mln_map_projection_create(map, &projection, NULL));
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, projection);
   mln_test_destroy_runtime(runtime);
 }
 
@@ -635,6 +717,8 @@ static void projection_setters_reject_invalid_values(void) {
 MLN_TEST_GROUP {
   RUN_TEST(projection_outlives_its_source_map_and_runtime);
   RUN_TEST(creation_observes_earlier_map_camera_commands);
+  RUN_TEST(projection_follows_committed_extent_viewport_and_mode);
+  RUN_TEST(creation_rejects_invalid_arguments_and_released_maps);
   RUN_TEST(setters_apply_before_return_and_conversions_round_trip);
   RUN_TEST(projection_setters_reject_invalid_values);
   RUN_TEST(unwrapped_conversion_preserves_world_copies);

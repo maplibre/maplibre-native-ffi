@@ -10,7 +10,6 @@
 #include <stdint.h>
 
 #include "base.h"
-#include "completion.h"
 #include "map.h"
 
 #ifdef __cplusplus
@@ -18,33 +17,35 @@ extern "C" {
 #endif
 
 /**
- * Starts creation of a standalone projection from the map's ordered transform
- * state.
+ * Creates a standalone projection from the map's latest published snapshot.
  *
- * The completion borrows an independent projection handle that copies the
- * map's transform state after every earlier map command. A binding takes
- * ownership of that handle before the callback returns. The projection remains
- * usable after its source map and runtime close. This function may be called
- * from any thread.
+ * The projection copies the transform the map published with that snapshot:
+ * its camera, logical extent, viewport options, camera constraints and
+ * axonometric mode. A projection created after a command's completion
+ * therefore observes that command. The caller owns the returned handle, which
+ * stays usable after the map and runtime close. out_projection must point to
+ * the null handle. This function never reads mutable MapLibre state and may be
+ * called from any thread.
+ *
+ * This projection follows the map's latest committed state, while
+ * mln_render_session_projection_create() copies the transform of the last
+ * frame the session drew. Hit-testing against what is on screen uses the
+ * session's projection.
  *
  * Every later projection call is synchronous, runs on the calling thread, and
  * is internally serialized. A projection never observes map changes made after
  * its creation.
  *
  * Returns:
- * - MLN_STATUS_OK when the creation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
- *   invalid.
- * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or
+ *   out_projection is null or does not point to the null handle.
+ * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- *
- * Completes with:
- * - MLN_STATUS_NATIVE_ERROR when the projection fails to construct on the map
- *   worker.
  */
-MLN_BINDING("execution=lifecycle;result=mln_map_projection")
 MLN_API mln_status mln_map_projection_create(
-  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+  mln_map map, mln_map_projection* out_projection MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

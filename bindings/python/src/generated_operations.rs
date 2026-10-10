@@ -6500,31 +6500,13 @@ impl MapHandle {
     fn projection_create(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_projection_create", self.admission())?;
         let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| unsafe {
-            MapProjectionHandle::adopt(
-                py,
-                completion_value::<sys::mln_map_projection>(result)?,
-                Vec::new(),
-            )
-        };
-        let discard: unsafe fn(&sys::mln_completion_result) = |result| {
-            if !result.value.is_null() && result.value_count == 1 {
-                unsafe {
-                    generated_dispose_mln_map_projection(
-                        result.value.cast::<sys::mln_map_projection>().read(),
-                    );
-                }
-            }
-        };
+        let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
         unsafe {
-            call.complete_owned(
-                |completion, diagnostic| {
-                    sys::mln_map_projection_create(handle, completion, diagnostic)
-                },
-                convert,
-                discard,
-            )
-        }
+            call.status(|diagnostic| {
+                sys::mln_map_projection_create(handle, &mut out_projection, diagnostic)
+            })
+        }?;
+        unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
     }
     #[pyo3(signature = ())]
     fn close(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {

@@ -6683,15 +6683,19 @@ func (receiver *MapProjectionHandle) Close() error {
 	})
 }
 
-// ProjectionCreate starts creation of a standalone projection from the map's
-// ordered transform state.
+// ProjectionCreate creates a standalone projection from the map's latest
+// published snapshot.
 //
 // See mln_map_projection_create in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapHandle) ProjectionCreate() (*Future[*MapProjectionHandle], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_create), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_create(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(func(raw C.mln_map_projection) *MapProjectionHandle { return adoptMapProjectionHandle(uint64(raw), nil) }))
+func (receiver *MapHandle) ProjectionCreate() (*MapProjectionHandle, error) {
+	var outProjection C.mln_map_projection
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_create), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_projection_create(C.mln_map(raw), &outProjection, diagnostic))
+	}, func(arena *bindingArena) *MapProjectionHandle {
+		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
+		return adopted
+	})
 }
 
 // GetCamera copies the projection camera into out_camera.

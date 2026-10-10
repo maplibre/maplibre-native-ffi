@@ -721,7 +721,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_create(
         MlnMap map,
-        mln_completion* completion,
+        MlnMapProjection* out_projection,
         mln_diagnostic* out_diagnostic
     );
 

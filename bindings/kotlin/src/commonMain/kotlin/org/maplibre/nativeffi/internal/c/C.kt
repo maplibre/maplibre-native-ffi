@@ -507,7 +507,7 @@ internal expect object C {
 
   fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int
 
-  fun mln_map_projection_create(map: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_projection_create(map: Long, outProjection: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_get_camera(projection: Long, outCamera: Long, outDiagnostic: Long): Int
 

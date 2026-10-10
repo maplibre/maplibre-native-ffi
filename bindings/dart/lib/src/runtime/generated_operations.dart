@@ -5193,26 +5193,27 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
         );
       });
 
-  /// Starts creation of a standalone projection from the map's ordered
-  /// transform state.
+  /// Creates a standalone projection from the map's latest published snapshot.
   ///
   /// See `mln_map_projection_create` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  Future<MapProjectionHandle> projectionCreate() => _queryOwned(
-    raw.MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
-    (arena, completion) => raw.mln_map_projection_create(
-      _handle.raw,
-      completion,
-      nativeDiagnostic,
-    ),
-    (handle) => _adoptOwned(
-      handle,
-      () => MapProjectionHandle._(NativeMapProjection(handle)),
+  MapProjectionHandle projectionCreate() => withNativeArena((arena) {
+    final outProjection = arena<Uint64>();
+    _check(
+      raw.mln_map_projection_create(
+        _handle.raw,
+        outProjection,
+        nativeDiagnostic,
+      ),
+    );
+    return _adoptOwned(
+      outProjection.value,
+      () => MapProjectionHandle._(NativeMapProjection(outProjection.value)),
       (handle) {
         _check(raw.mln_map_projection_close(handle, nativeDiagnostic));
       },
-    ),
-  );
+    );
+  });
 
   /// Releases a map after synchronous state preflight.
   ///

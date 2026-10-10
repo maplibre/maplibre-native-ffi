@@ -1278,24 +1278,18 @@ impl MapHandle {
         )
     }
 
-    /// Starts creation of a standalone projection from the map's ordered
-    /// transform state.
+    /// Creates a standalone projection from the map's latest published
+    /// snapshot.
     ///
     /// See `mln_map_projection_create` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn projection_create(&self) -> Result<NativeFuture<MapProjectionHandle>> {
-        let call = self.inner.call("mln_map_projection_create")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_projection_create(map, completion, out_diagnostic)
-            },
-            move |result| {
-                MapProjectionHandle::adopt(
-                    completion::copy_value::<sys::mln_map_projection>(result)?,
-                    None,
-                )
-            },
-        )
+    pub fn projection_create(&self) -> Result<MapProjectionHandle> {
+        let mut call = self.inner.call("mln_map_projection_create")?;
+        let mut out_projection = sys::mln_map_projection(0);
+        call.status(|map, out_diagnostic| unsafe {
+            sys::mln_map_projection_create(map, &mut out_projection, out_diagnostic)
+        })?;
+        Ok(MapProjectionHandle::adopt(out_projection, None)?)
     }
 
     /// Releases a map after synchronous state preflight.

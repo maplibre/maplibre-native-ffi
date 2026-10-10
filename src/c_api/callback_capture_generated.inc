@@ -122,13 +122,6 @@ auto capture_mln_map([[maybe_unused]] Arena<Writing>& arena, mln_map source)
   return result;
 }
 template <bool Writing>
-auto capture_mln_map_projection(
-  [[maybe_unused]] Arena<Writing>& arena, mln_map_projection source
-) -> mln_map_projection {
-  auto result = source;
-  return result;
-}
-template <bool Writing>
 auto capture_mln_offline_region_info(
   [[maybe_unused]] Arena<Writing>& arena, mln_offline_region_info source
 ) -> mln_offline_region_info {
@@ -390,12 +383,6 @@ inline auto discard(
           static_cast<const mln_map*>(result.value)[index], nullptr
         ));
       break;
-    case MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION:
-      for (std::size_t index = 0; index < result.value_count; ++index)
-        static_cast<void>(mln_map_projection_close(
-          static_cast<const mln_map_projection*>(result.value)[index], nullptr
-        ));
-      break;
     default:
       break;
   }
@@ -409,7 +396,6 @@ inline auto valid_kind(std::uint32_t kind) -> bool {
     case MLN_ADAPTER_COMPLETION_COPY_LAT_LNG:
     case MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS:
     case MLN_ADAPTER_COMPLETION_COPY_MAP:
-    case MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION:
     case MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO:
     case MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS:
     case MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE:
@@ -500,15 +486,6 @@ auto value(
         arena, static_cast<const mln_map*>(result.value), result.value_count,
         [](auto& storage, auto source) {
           return capture_mln_map(storage, source);
-        }
-      );
-    case MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION:
-      if (result.value_count != 1)
-        throw std::invalid_argument{"invalid completion count"};
-      return span(
-        arena, static_cast<const mln_map_projection*>(result.value),
-        result.value_count, [](auto& storage, auto source) {
-          return capture_mln_map_projection(storage, source);
         }
       );
     case MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO:

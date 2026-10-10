@@ -1323,21 +1323,16 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Starts creation of a standalone projection from the map's ordered transform state.
+   * Creates a standalone projection from the map's latest published snapshot.
    *
    * See `mln_map_projection_create` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  public fun projectionCreate(): Deferred<MapProjectionHandle> =
-    nativeSubmitOwned(
-      this,
-      binding,
-      "mln_map_projection_create",
-      { MapProjectionHandle(it) },
-      GeneratedOwnerDisposal::mapProjection,
-      { it.close() },
-    ) {
-      check(C.mln_map_projection_create(handle, completion, diagnostic))
+  public fun projectionCreate(): MapProjectionHandle =
+    nativeCall(this, binding, "mln_map_projection_create") {
+      val out = allocate(8, 8)
+      check(C.mln_map_projection_create(handle, out, diagnostic))
+      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
     }
 
   /**

@@ -16,12 +16,8 @@ using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
 auto create_projection(mln_map map) -> mln_map_projection {
-  auto completion = mln_test_completion_default(sizeof(mln_map_projection));
-  MLN_TEST_OK(mln_map_projection_create(map, &completion.descriptor, nullptr));
   auto projection = mln_map_projection{MLN_HANDLE_NULL};
-  MLN_TEST_OK(mln_test_completion_finish_value(
-    &completion, &projection, sizeof(projection)
-  ));
+  MLN_TEST_OK(mln_map_projection_create(map, &projection, nullptr));
   return projection;
 }
 

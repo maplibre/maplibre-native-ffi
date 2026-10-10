@@ -7,6 +7,8 @@
 #include <mutex>
 #include <string>
 
+#include <mln/map/transform_state.hpp>
+
 #include "execution/control_state.hpp"
 #include "execution/retirement.hpp"
 #include "handles/handle_table.hpp"
@@ -46,6 +48,9 @@ struct MapObject {
   mln_logical_extent logical_extent{256, 256, 1.0};
   mutable std::mutex snapshot_mutex;
   mln_map_snapshot snapshot{};
+  // The transform published with `snapshot`, guarded by the same mutex so a
+  // standalone projection copies state that pairs with the C snapshot.
+  mln::TransformState snapshot_transform;
   uint64_t next_snapshot_generation = 1;
   std::atomic<uint64_t> latest_resize_submission{0};
   bool still_image_request_pending = false;

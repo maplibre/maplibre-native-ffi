@@ -568,7 +568,7 @@ auto map_projection_create_from_transform(
   const mln::TransformState& transform, mln_map_projection* out_projection
 ) -> mln_status;
 
-auto map_projection_create_start(mln_map map, const mln_completion* completion)
+auto map_projection_create(mln_map map, mln_map_projection* out_projection)
   -> mln_status;
 auto map_projection_close(mln_map_projection projection) -> mln_status;
 auto map_projection_get_camera(
