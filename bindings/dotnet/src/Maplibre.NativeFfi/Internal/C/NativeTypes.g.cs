@@ -900,24 +900,16 @@ internal unsafe struct mln_style_image_options
     public byte sdf;
 }
 
-internal unsafe struct mln_style_layer_entry
+internal unsafe struct mln_style_layer_info
 {
     public uint size;
     public mln_buffer_view id;
     public mln_buffer_view type;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer;
-}
-
-internal unsafe struct mln_style_layer_info
-{
-    public uint size;
-    public uint visibility;
-    public mln_buffer_view type;
     public double min_zoom;
     public double max_zoom;
-    public mln_buffer_view source_id;
-    public mln_buffer_view source_layer;
+    public uint visibility;
 }
 
 internal unsafe struct mln_style_source_info

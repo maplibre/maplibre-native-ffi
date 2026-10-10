@@ -82,7 +82,6 @@ from ._generated_values import (
     SourceFeatureQueryOptions,
     StyleImageInfo,
     StyleImageOptions,
-    StyleLayerEntry,
     StyleLayerInfo,
     StyleLayerVisibility,
     StyleSourceInfo,
@@ -861,7 +860,7 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: tuple(LatLng._from_native(item) for item in value),
         )
 
-    def list_style_layers(self) -> Future[tuple[StyleLayerEntry, ...]]:
+    def list_style_layers(self) -> Future[tuple[StyleLayerInfo, ...]]:
         """Starts an ordered query of every style layer in style order.
 
         See `mln_map_list_style_layers` in the
@@ -869,7 +868,7 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return map_future(
             self._native.list_style_layers(),
-            lambda value: tuple(StyleLayerEntry._from_native(item) for item in value),
+            lambda value: tuple(StyleLayerInfo._from_native(item) for item in value),
         )
 
     def list_style_sources(self) -> Future[tuple[StyleSourceInfo, ...]]:

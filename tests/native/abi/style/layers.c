@@ -39,6 +39,7 @@ typedef struct layer_probe {
   mln_status status;
   bool found;
   mln_style_layer_info info;
+  char id[64];
   char type[32];
   char source_id[64];
   size_t source_id_size;
@@ -64,6 +65,7 @@ static void copy_layer_result(
   if (probe->found) {
     const mln_style_layer_info* layer = result->value;
     probe->info = *layer;
+    copy_view_into(layer->id, probe->id, sizeof(probe->id), NULL);
     copy_view_into(layer->type, probe->type, sizeof(probe->type), NULL);
     copy_view_into(
       layer->source_id, probe->source_id, sizeof(probe->source_id),
@@ -108,6 +110,7 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
   );
   layer_probe probe = take_layer_result(runtime, map, "info-layer");
   TEST_ASSERT_TRUE(probe.found);
+  TEST_ASSERT_EQUAL_STRING("info-layer", probe.id);
   TEST_ASSERT_EQUAL_STRING("circle", probe.type);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_STYLE_LAYER_VISIBILITY_VISIBLE, probe.info.visibility
@@ -147,6 +150,19 @@ static void layer_result_reports_scalars_and_carries_the_source_ids(void) {
     MLN_STYLE_LAYER_VISIBILITY_NONE, probe.info.visibility
   );
   TEST_ASSERT_EQUAL_STRING("roads", probe.source_layer);
+
+  // The list delivers the same record as the get.
+  const mln_test_style_list layers = mln_test_style_list_layers(map);
+  MLN_TEST_OK(layers.status);
+  TEST_ASSERT_EQUAL_size_t(1, layers.count);
+  const mln_test_style_entry* entry = &layers.entries[0];
+  TEST_ASSERT_EQUAL_STRING(probe.id, entry->id);
+  TEST_ASSERT_EQUAL_STRING(probe.type, entry->type);
+  TEST_ASSERT_EQUAL_STRING(probe.source_id, entry->source_id);
+  TEST_ASSERT_EQUAL_STRING(probe.source_layer, entry->source_layer);
+  TEST_ASSERT_EQUAL_DOUBLE(probe.info.min_zoom, entry->min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(probe.info.max_zoom, entry->max_zoom);
+  TEST_ASSERT_EQUAL_UINT32(probe.info.visibility, entry->visibility);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

@@ -660,13 +660,13 @@ public extension MapHandle {
   ///
   /// See `mln_map_list_style_layers` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func listStyleLayers() async throws -> [StyleLayerEntry] {
+  func listStyleLayers() async throws -> [StyleLayerInfo] {
     try await nativeStart(
       "mln_map_list_style_layers",
       convert: { result in try NativeCompletion.values(
         result,
-        as: mln_style_layer_entry.self
-      ).map { try StyleLayerEntry(raw: $0) } }
+        as: mln_style_layer_info.self
+      ).map { try StyleLayerInfo(raw: $0) } }
     ) { raw, _, completion, diagnostic in mln_map_list_style_layers(
       raw,
       completion,

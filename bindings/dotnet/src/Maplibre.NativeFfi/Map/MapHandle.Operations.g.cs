@@ -1309,15 +1309,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_list_style_layers</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<StyleLayerEntry[]> ListStyleLayersAsync(
+    public Task<StyleLayerInfo[]> ListStyleLayersAsync(
         CancellationToken cancellationToken = default
     )
     {
         using var scope = new NativeCallScope(this, "mln_map_list_style_layers");
-        return scope.QueryArray<mln_style_layer_entry, StyleLayerEntry>(
+        return scope.QueryArray<mln_style_layer_info, StyleLayerInfo>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_list_style_layers(Handle, completion, diagnostic),
-            CopyStyleLayerEntry,
+            CopyStyleLayerInfo,
             cancellationToken
         );
     }

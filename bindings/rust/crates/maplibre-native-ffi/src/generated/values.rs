@@ -5210,57 +5210,37 @@ pub enum StyleImageTextFit: u32 {
 } Unknown
 }
 
-/// One style layer borrowed for a list completion callback.
-///
-/// See `mln_style_layer_entry` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct StyleLayerEntry {
-    pub id: String,
-    pub r#type: String,
-    pub source_id: Option<String>,
-    pub source_layer: Option<String>,
-}
-impl FromNative<sys::mln_style_layer_entry> for StyleLayerEntry {
-    unsafe fn from_native(raw: sys::mln_style_layer_entry) -> Result<Self> {
-        Ok(Self {
-            id: unsafe { from_native(raw.id) }?,
-            r#type: unsafe { from_native(raw.type_) }?,
-            source_id: unsafe { convert::nonempty(raw.source_id) }?,
-            source_layer: unsafe { convert::nonempty(raw.source_layer) }?,
-        })
-    }
-}
-
-/// Complete metadata of one style layer, borrowed for a completion callback.
+/// One style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct StyleLayerInfo {
-    /// One of `mln_style_layer_visibility`.
-    pub visibility: StyleLayerVisibility,
-    /// The style-spec layer type string. The view stays valid for the life of
-    /// the process.
+    /// Layer ID.
+    pub id: String,
+    /// The style-spec layer type string.
     pub r#type: String,
-    /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
-    pub min_zoom: f64,
-    /// Highest zoom at which the layer draws; INFINITY with no upper bound.
-    pub max_zoom: f64,
     /// Source ID. Empty for a layer type that takes no source.
     pub source_id: Option<String>,
     /// Source-layer ID. Empty when the layer sets none.
     pub source_layer: Option<String>,
+    /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+    pub min_zoom: f64,
+    /// Highest zoom at which the layer draws; INFINITY with no upper bound.
+    pub max_zoom: f64,
+    /// One of `mln_style_layer_visibility`.
+    pub visibility: StyleLayerVisibility,
 }
 impl FromNative<sys::mln_style_layer_info> for StyleLayerInfo {
     unsafe fn from_native(raw: sys::mln_style_layer_info) -> Result<Self> {
         Ok(Self {
-            visibility: unsafe { from_native(raw.visibility) }?,
+            id: unsafe { from_native(raw.id) }?,
             r#type: unsafe { from_native(raw.type_) }?,
-            min_zoom: raw.min_zoom,
-            max_zoom: raw.max_zoom,
             source_id: unsafe { convert::nonempty(raw.source_id) }?,
             source_layer: unsafe { convert::nonempty(raw.source_layer) }?,
+            min_zoom: raw.min_zoom,
+            max_zoom: raw.max_zoom,
+            visibility: unsafe { from_native(raw.visibility) }?,
         })
     }
 }

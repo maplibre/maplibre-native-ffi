@@ -2310,11 +2310,9 @@ auto style_image_info(const StyleImageRecord& record) noexcept
   const auto& image = *record.image;
   const auto& pixels = image.getImage();
   const auto& content = image.getContent();
+  // A member whose bit is absent is zero.
   const auto text_fit = [](const std::optional<mln::style::TextFit>& value) {
-    return value ? from_native_text_fit(*value)
-                 : static_cast<uint32_t>(
-                     MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK
-                   );
+    return value ? from_native_text_fit(*value) : 0U;
   };
   return mln_style_image_info{
     .size = sizeof(mln_style_image_info),
@@ -2796,6 +2794,7 @@ auto map_remove_style_layer(MapObject& live, mln_buffer_view layer_id)
 
 namespace {
 
+// Builds the one record that both the get and the list queries deliver.
 auto style_layer_record(const mln::style::Layer& layer) -> StyleLayerRecord {
   return {
     .id = layer.getID(),

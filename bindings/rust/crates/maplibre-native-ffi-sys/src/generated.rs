@@ -1262,23 +1262,15 @@ pub struct mln_style_image_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_style_layer_entry {
+pub struct mln_style_layer_info {
     pub size: u32,
     pub id: mln_buffer_view,
     pub type_: mln_buffer_view,
     pub source_id: mln_buffer_view,
     pub source_layer: mln_buffer_view,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_layer_info {
-    pub size: u32,
-    pub visibility: u32,
-    pub type_: mln_buffer_view,
     pub min_zoom: f64,
     pub max_zoom: f64,
-    pub source_id: mln_buffer_view,
-    pub source_layer: mln_buffer_view,
+    pub visibility: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

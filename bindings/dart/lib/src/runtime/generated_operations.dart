@@ -1222,16 +1222,17 @@ StyleImageInfo _readStyleImageInfo(
 
 StyleLayerInfo _readStyleLayerInfo(raw.mln_style_layer_info source) =>
     StyleLayerInfo(
-      visibility: StyleLayerVisibility.fromRawValue(source.visibility),
+      id: utf8.decode(_copyBufferView(source.id)),
       type: utf8.decode(_copyBufferView(source.type)),
-      minZoom: source.min_zoom,
-      maxZoom: source.max_zoom,
       sourceId: source.source_id.size == 0
           ? null
           : utf8.decode(_copyBufferView(source.source_id)),
       sourceLayer: source.source_layer.size == 0
           ? null
           : utf8.decode(_copyBufferView(source.source_layer)),
+      minZoom: source.min_zoom,
+      maxZoom: source.max_zoom,
+      visibility: StyleLayerVisibility.fromRawValue(source.visibility),
     );
 
 StyleSourceTileInfo _readStyleSourceTileInfo(
@@ -1316,18 +1317,6 @@ StyleTransitionOptions _readStyleTransitionOptions(
       ? source.enable_placement_transitions
       : null,
 );
-
-StyleLayerEntry _readStyleLayerEntry(raw.mln_style_layer_entry source) =>
-    StyleLayerEntry(
-      id: utf8.decode(_copyBufferView(source.id)),
-      type: utf8.decode(_copyBufferView(source.type)),
-      sourceId: source.source_id.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.source_id)),
-      sourceLayer: source.source_layer.size == 0
-          ? null
-          : utf8.decode(_copyBufferView(source.source_layer)),
-    );
 
 Pointer<raw.mln_projection_mode> _writeProjectionMode(
   ProjectionMode value,
@@ -3047,12 +3036,6 @@ final _resultStyleImageInfo = _CompletionValue(
   sizeOf<raw.mln_style_image_info>(),
   (element) =>
       _readStyleImageInfo(element.cast<raw.mln_style_image_info>().ref),
-);
-final _resultStyleLayerEntry = _CompletionValue(
-  raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY,
-  sizeOf<raw.mln_style_layer_entry>(),
-  (element) =>
-      _readStyleLayerEntry(element.cast<raw.mln_style_layer_entry>().ref),
 );
 final _resultStyleLayerInfo = _CompletionValue(
   raw.MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO,
@@ -4891,8 +4874,8 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_map_list_style_layers` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  Future<List<StyleLayerEntry>> listStyleLayers() => _queryList(
-    _resultStyleLayerEntry,
+  Future<List<StyleLayerInfo>> listStyleLayers() => _queryList(
+    _resultStyleLayerInfo,
     (arena, completion) => raw.mln_map_list_style_layers(
       _handle.raw,
       completion,

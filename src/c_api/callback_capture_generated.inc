@@ -222,21 +222,11 @@ auto capture_mln_style_image_info(
   return result;
 }
 template <bool Writing>
-auto capture_mln_style_layer_entry(
-  [[maybe_unused]] Arena<Writing>& arena, mln_style_layer_entry source
-) -> mln_style_layer_entry {
-  auto result = source;
-  result.id = buffer(arena, source.id);
-  result.type = buffer(arena, source.type);
-  result.source_id = buffer(arena, source.source_id);
-  result.source_layer = buffer(arena, source.source_layer);
-  return result;
-}
-template <bool Writing>
 auto capture_mln_style_layer_info(
   [[maybe_unused]] Arena<Writing>& arena, mln_style_layer_info source
 ) -> mln_style_layer_info {
   auto result = source;
+  result.id = buffer(arena, source.id);
   result.type = buffer(arena, source.type);
   result.source_id = buffer(arena, source.source_id);
   result.source_layer = buffer(arena, source.source_layer);
@@ -354,7 +344,6 @@ inline auto valid_kind(std::uint32_t kind) -> bool {
     case MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE:
     case MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT:
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO:
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY:
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO:
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO:
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS:
@@ -489,16 +478,7 @@ auto value(
           return capture_mln_style_image_info(storage, source);
         }
       );
-    case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY:
-      return span(
-        arena, static_cast<const mln_style_layer_entry*>(result.value),
-        result.value_count, [](auto& storage, auto source) {
-          return capture_mln_style_layer_entry(storage, source);
-        }
-      );
     case MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO:
-      if (result.value_count != 1)
-        throw std::invalid_argument{"invalid completion count"};
       return span(
         arena, static_cast<const mln_style_layer_info*>(result.value),
         result.value_count, [](auto& storage, auto source) {

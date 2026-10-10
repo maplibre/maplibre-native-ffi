@@ -166,7 +166,6 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Style/StyleImageOptionField.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Style/StyleImageOptions.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Style/StyleImageTextFit.g.cs",
-    "bindings/dotnet/src/Maplibre.NativeFfi/Style/StyleLayerEntry.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Style/StyleLayerInfo.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Style/StyleLayerVisibility.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Style/StyleRasterDemEncoding.g.cs",

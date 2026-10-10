@@ -3170,24 +3170,26 @@ public data class StyleImageInfo(
 )
 
 /**
- * Complete metadata of one style layer, borrowed for a completion callback.
+ * One style layer, borrowed for a completion callback.
  *
  * See `mln_style_layer_info` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleLayerInfo(
-  /** One of `mln_style_layer_visibility`. */
-  public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
-  /** The style-spec layer type string. The view stays valid for the life of the process. */
+  /** Layer ID. */
+  public val id: String = "",
+  /** The style-spec layer type string. */
   public val type: String = "",
-  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
-  public val minZoom: Double = 0.0,
-  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
-  public val maxZoom: Double = 0.0,
   /** Source ID. Empty for a layer type that takes no source. */
   public val sourceId: String? = null,
   /** Source-layer ID. Empty when the layer sets none. */
   public val sourceLayer: String? = null,
+  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
+  public val minZoom: Double = 0.0,
+  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
+  public val maxZoom: Double = 0.0,
+  /** One of `mln_style_layer_visibility`. */
+  public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
 )
 
 /**
@@ -3234,19 +3236,6 @@ public data class StyleSourceInfo(
   public val vectorEncoding: StyleVectorTileEncoding? = null,
   /** DEM raster encoding, when inline TileJSON sets one. */
   public val rasterEncoding: StyleRasterDemEncoding? = null,
-)
-
-/**
- * One style layer borrowed for a list completion callback.
- *
- * See `mln_style_layer_entry` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleLayerEntry(
-  public val id: String = "",
-  public val type: String = "",
-  public val sourceId: String? = null,
-  public val sourceLayer: String? = null,
 )
 
 /**

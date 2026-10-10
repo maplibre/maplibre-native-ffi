@@ -1468,12 +1468,13 @@ internal fun readStyleImageInfo(source: Long): StyleImageInfo =
 
 internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
   StyleLayerInfo(
-    visibility = StyleLayerVisibility(readU32(source + 4)),
-    type = readViewString(source + 8),
-    minZoom = readF64(source + w(16, 24)),
-    maxZoom = readF64(source + w(24, 32)),
-    sourceId = readViewString(source + w(32, 40)).takeIf { it.isNotEmpty() },
-    sourceLayer = readViewString(source + w(40, 56)).takeIf { it.isNotEmpty() },
+    id = readViewString(source + w(4, 8)),
+    type = readViewString(source + w(12, 24)),
+    sourceId = readViewString(source + w(20, 40)).takeIf { it.isNotEmpty() },
+    sourceLayer = readViewString(source + w(28, 56)).takeIf { it.isNotEmpty() },
+    minZoom = readF64(source + w(40, 72)),
+    maxZoom = readF64(source + w(48, 80)),
+    visibility = StyleLayerVisibility(readU32(source + w(56, 88))),
   )
 
 internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
@@ -1505,14 +1506,6 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
 
 internal fun readLatLngBounds(source: Long): LatLngBounds =
   LatLngBounds(southwest = readLatLng(source), northeast = readLatLng(source + 16))
-
-internal fun readStyleLayerEntry(source: Long): StyleLayerEntry =
-  StyleLayerEntry(
-    id = readViewString(source + w(4, 8)),
-    type = readViewString(source + w(12, 24)),
-    sourceId = readViewString(source + w(20, 40)).takeIf { it.isNotEmpty() },
-    sourceLayer = readViewString(source + w(28, 56)).takeIf { it.isNotEmpty() },
-  )
 
 internal fun readScreenPoint(source: Long): ScreenPoint =
   ScreenPoint(x = readF64(source), y = readF64(source + 8))

@@ -4019,70 +4019,42 @@ pub const StyleImageTextFit = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// One style layer borrowed for a list completion callback.
-///
-/// See `mln_style_layer_entry` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub const StyleLayerEntry = struct {
-    id: []const u8 = &.{},
-    type: []const u8 = &.{},
-    source_id: ?[]const u8 = null,
-    source_layer: ?[]const u8 = null,
-    pub fn toNative(self: StyleLayerEntry, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_layer_entry {
-        _ = allocator;
-        _ = roots;
-        var raw = std.mem.zeroes(c.mln_style_layer_entry);
-        raw.size = @sizeOf(c.mln_style_layer_entry);
-        raw.id = marshal.view(self.id);
-        raw.type = marshal.view(self.type);
-        raw.source_id = if (self.source_id) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
-        raw.source_layer = if (self.source_layer) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
-        return raw;
-    }
-
-    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_entry) status.Error!StyleLayerEntry {
-        return .{
-            .id = try marshal.copyView(allocator, raw.id),
-            .type = try marshal.copyView(allocator, raw.type),
-            .source_id = if (raw.source_id.size == 0) null else try marshal.copyView(allocator, raw.source_id),
-            .source_layer = if (raw.source_layer.size == 0) null else try marshal.copyView(allocator, raw.source_layer),
-        };
-    }
-};
-
-/// Complete metadata of one style layer, borrowed for a completion callback.
+/// One style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleLayerInfo = struct {
-    visibility: StyleLayerVisibility = std.mem.zeroes(StyleLayerVisibility),
+    id: []const u8 = &.{},
     type: []const u8 = &.{},
-    min_zoom: f64 = std.mem.zeroes(f64),
-    max_zoom: f64 = std.mem.zeroes(f64),
     source_id: ?[]const u8 = null,
     source_layer: ?[]const u8 = null,
+    min_zoom: f64 = std.mem.zeroes(f64),
+    max_zoom: f64 = std.mem.zeroes(f64),
+    visibility: StyleLayerVisibility = std.mem.zeroes(StyleLayerVisibility),
     pub fn toNative(self: StyleLayerInfo, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_style_layer_info {
         _ = allocator;
         _ = roots;
         var raw = std.mem.zeroes(c.mln_style_layer_info);
         raw.size = @sizeOf(c.mln_style_layer_info);
-        raw.visibility = self.visibility.toNative();
+        raw.id = marshal.view(self.id);
         raw.type = marshal.view(self.type);
-        raw.min_zoom = self.min_zoom;
-        raw.max_zoom = self.max_zoom;
         raw.source_id = if (self.source_id) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
         raw.source_layer = if (self.source_layer) |array_item_0| marshal.view(array_item_0) else std.mem.zeroes(c.mln_buffer_view);
+        raw.min_zoom = self.min_zoom;
+        raw.max_zoom = self.max_zoom;
+        raw.visibility = self.visibility.toNative();
         return raw;
     }
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_layer_info) status.Error!StyleLayerInfo {
         return .{
-            .visibility = StyleLayerVisibility.fromNative(raw.visibility),
+            .id = try marshal.copyView(allocator, raw.id),
             .type = try marshal.copyView(allocator, raw.type),
-            .min_zoom = raw.min_zoom,
-            .max_zoom = raw.max_zoom,
             .source_id = if (raw.source_id.size == 0) null else try marshal.copyView(allocator, raw.source_id),
             .source_layer = if (raw.source_layer.size == 0) null else try marshal.copyView(allocator, raw.source_layer),
+            .min_zoom = raw.min_zoom,
+            .max_zoom = raw.max_zoom,
+            .visibility = StyleLayerVisibility.fromNative(raw.visibility),
         };
     }
 };
@@ -5845,8 +5817,8 @@ pub fn mapLatLngsForPixelsUnwrapped(allocator: std.mem.Allocator, map: Map, poin
 ///
 /// See `mln_map_list_style_layers` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const StyleLayerEntry)) {
-    return call.submit("mln_map_list_style_layers", .lease, map, call.slice(StyleLayerEntry, c.mln_style_layer_entry), allocator, diagnostic, .{});
+pub fn mapListStyleLayers(allocator: std.mem.Allocator, map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(OwnedValue([]const StyleLayerInfo)) {
+    return call.submit("mln_map_list_style_layers", .lease, map, call.slice(StyleLayerInfo, c.mln_style_layer_info), allocator, diagnostic, .{});
 }
 
 /// Lists every style source in style order.

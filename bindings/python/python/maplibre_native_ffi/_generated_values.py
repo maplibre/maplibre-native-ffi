@@ -3162,15 +3162,18 @@ class StyleImageOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class StyleLayerEntry:
-    """One style layer borrowed for a list completion callback.
+class StyleLayerInfo:
+    """One style layer, borrowed for a completion callback.
 
-    See `mln_style_layer_entry` in the
+    See `mln_style_layer_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     id: str
     type: str
+    min_zoom: float
+    max_zoom: float
+    visibility: StyleLayerVisibility
     source_id: str | None = None
     source_layer: str | None = None
 
@@ -3181,33 +3184,9 @@ class StyleLayerEntry:
             type=raw["type"],
             source_id=raw["source_id"],
             source_layer=raw["source_layer"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class StyleLayerInfo:
-    """Complete metadata of one style layer, borrowed for a completion callback.
-
-    See `mln_style_layer_info` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    visibility: StyleLayerVisibility
-    type: str
-    min_zoom: float
-    max_zoom: float
-    source_id: str | None = None
-    source_layer: str | None = None
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            visibility=StyleLayerVisibility(raw["visibility"]),
-            type=raw["type"],
             min_zoom=raw["min_zoom"],
             max_zoom=raw["max_zoom"],
-            source_id=raw["source_id"],
-            source_layer=raw["source_layer"],
+            visibility=StyleLayerVisibility(raw["visibility"]),
         )
 
 

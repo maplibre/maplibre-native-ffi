@@ -249,6 +249,47 @@ static const effective_options_case effective_cases[] = {
    MLN_STYLE_SOURCE_TYPE_RASTER_DEM, URL_INFO, MLN_STYLE_SOURCE_INFO_TILEJSON},
 };
 
+static bool all_zero(const void* bytes, size_t size) {
+  const unsigned char* byte = bytes;
+  for (size_t index = 0; index < size; index += 1) {
+    if (byte[index] != 0) return false;
+  }
+  return true;
+}
+
+// Each masked member whose bit is absent from fields reads as zero.
+static void expect_absent_members_zero(
+  const mln_style_source_info* info, const char* label
+) {
+  static const struct {
+    uint32_t bit;
+    size_t offset;
+    size_t size;
+  } members[] = {
+#define MEMBER(bit, name)                      \
+  {bit, offsetof(mln_style_source_info, name), \
+   sizeof(((mln_style_source_info*)0)->name)}
+    MEMBER(MLN_STYLE_SOURCE_INFO_ATTRIBUTION, attribution),
+    MEMBER(MLN_STYLE_SOURCE_INFO_URL, url),
+    MEMBER(MLN_STYLE_SOURCE_INFO_TILEJSON, tilejson),
+    MEMBER(MLN_STYLE_SOURCE_INFO_BOUNDS, bounds),
+    MEMBER(MLN_STYLE_SOURCE_INFO_TILE_SIZE, tile_size),
+    MEMBER(MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, vector_encoding),
+    MEMBER(MLN_STYLE_SOURCE_INFO_RASTER_ENCODING, raster_encoding),
+#undef MEMBER
+  };
+  for (size_t index = 0; index < sizeof(members) / sizeof(members[0]);
+       index += 1) {
+    if ((info->fields & members[index].bit) != 0) continue;
+    TEST_ASSERT_TRUE_MESSAGE(
+      all_zero(
+        (const unsigned char*)info + members[index].offset, members[index].size
+      ),
+      label
+    );
+  }
+}
+
 // A source reports what its options set and the documented default for what
 // they omit, including null options, and reports an encoding only for the
 // source kinds that have one.
@@ -287,6 +328,7 @@ static void tile_sources_report_their_effective_options(void) {
       row->present, info->fields & row->present, label
     );
     TEST_ASSERT_EQUAL_HEX32_MESSAGE(0, info->fields & row->absent, label);
+    expect_absent_members_zero(info, label);
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(
       expected.tile_size, info->tile_size, label
     );

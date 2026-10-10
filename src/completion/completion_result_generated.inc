@@ -156,7 +156,7 @@ struct CompletionResult<&mln_map_lat_lngs_for_pixels_unwrapped> {
 template <>
 struct CompletionResult<&mln_map_list_style_layers> {
   static constexpr bool has_value = true;
-  using type = mln_style_layer_entry;
+  using type = mln_style_layer_info;
   static constexpr bool array = true;
   static constexpr bool nullable = false;
 };

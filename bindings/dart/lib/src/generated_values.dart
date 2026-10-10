@@ -2554,32 +2554,26 @@ final class StyleImageInfo extends _Value {
   ];
 }
 
-/// Complete metadata of one style layer, borrowed for a completion callback.
+/// One style layer, borrowed for a completion callback.
 ///
 /// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 final class StyleLayerInfo extends _Value {
   const StyleLayerInfo({
-    this.visibility = const StyleLayerVisibility.fromRawValue(0),
+    required this.id,
     required this.type,
-    this.minZoom = 0,
-    this.maxZoom = 0,
     this.sourceId,
     this.sourceLayer,
+    this.minZoom = 0,
+    this.maxZoom = 0,
+    this.visibility = const StyleLayerVisibility.fromRawValue(0),
   });
 
-  /// One of `mln_style_layer_visibility`.
-  final StyleLayerVisibility visibility;
+  /// Layer ID.
+  final String id;
 
-  /// The style-spec layer type string. The view stays valid for the life of the
-  /// process.
+  /// The style-spec layer type string.
   final String type;
-
-  /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
-  final double minZoom;
-
-  /// Highest zoom at which the layer draws; INFINITY with no upper bound.
-  final double maxZoom;
 
   /// Source ID. Empty for a layer type that takes no source.
   final String? sourceId;
@@ -2587,14 +2581,24 @@ final class StyleLayerInfo extends _Value {
   /// Source-layer ID. Empty when the layer sets none.
   final String? sourceLayer;
 
+  /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+  final double minZoom;
+
+  /// Highest zoom at which the layer draws; INFINITY with no upper bound.
+  final double maxZoom;
+
+  /// One of `mln_style_layer_visibility`.
+  final StyleLayerVisibility visibility;
+
   @override
   List<Object?> get _members => [
-    visibility,
+    id,
     type,
-    minZoom,
-    maxZoom,
     sourceId,
     sourceLayer,
+    minZoom,
+    maxZoom,
+    visibility,
   ];
 }
 
@@ -2718,26 +2722,6 @@ final class StyleTransitionOptions extends _Value {
     delayMs,
     enablePlacementTransitions,
   ];
-}
-
-/// One style layer borrowed for a list completion callback.
-///
-/// See `mln_style_layer_entry` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-final class StyleLayerEntry extends _Value {
-  const StyleLayerEntry({
-    required this.id,
-    required this.type,
-    this.sourceId,
-    this.sourceLayer,
-  });
-  final String id;
-  final String type;
-  final String? sourceId;
-  final String? sourceLayer;
-
-  @override
-  List<Object?> get _members => [id, type, sourceId, sourceLayer];
 }
 
 /// MapLibre axonometric rendering options used for snapshots and commands.

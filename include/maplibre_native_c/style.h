@@ -280,8 +280,8 @@ typedef struct mln_style_source_tile_info {
 /**
  * Complete metadata of one style source, borrowed for a completion callback.
  *
- * Views and arrays remain valid until the completion callback returns. Each
- * masked member is meaningful only when fields contains its bit.
+ * Views and arrays remain valid until the completion callback returns. A
+ * masked member whose bit is absent from fields is zero.
  */
 typedef struct mln_style_source_info {
   uint32_t size;
@@ -320,43 +320,26 @@ typedef struct mln_style_source_info {
 } mln_style_source_info;
 
 /**
- * One style layer borrowed for a list completion callback.
+ * One style layer, borrowed for a completion callback.
  *
- * Views remain valid until the completion callback returns. type is the
- * style-spec layer type string. source_id is empty for a layer type that takes
- * no source, and source_layer is empty when the layer names none.
- */
-typedef struct mln_style_layer_entry {
-  uint32_t size;
-  mln_buffer_view id;
-  mln_buffer_view type;
-  mln_buffer_view source_id MLN_BINDING("optional=empty");
-  mln_buffer_view source_layer MLN_BINDING("optional=empty");
-} mln_style_layer_entry;
-
-/**
- * Complete metadata of one style layer, borrowed for a completion callback.
- *
- * source_id and source_layer remain valid until the completion callback
- * returns.
+ * Every view stays valid until the callback returns.
  */
 typedef struct mln_style_layer_info {
   uint32_t size;
-  /** One of mln_style_layer_visibility. */
-  uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility");
-  /**
-   * The style-spec layer type string. The view stays valid for the life of the
-   * process.
-   */
+  /** Layer ID. */
+  mln_buffer_view id;
+  /** The style-spec layer type string. */
   mln_buffer_view type;
-  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
-  double min_zoom;
-  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
-  double max_zoom;
   /** Source ID. Empty for a layer type that takes no source. */
   mln_buffer_view source_id MLN_BINDING("optional=empty");
   /** Source-layer ID. Empty when the layer sets none. */
   mln_buffer_view source_layer MLN_BINDING("optional=empty");
+  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
+  double min_zoom;
+  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
+  double max_zoom;
+  /** One of mln_style_layer_visibility. */
+  uint32_t visibility MLN_BINDING("enum=mln_style_layer_visibility");
 } mln_style_layer_info;
 
 /** Options for vector and raster tile sources. */
@@ -630,7 +613,7 @@ typedef struct mln_style_image_options {
  * One complete runtime style image, borrowed for a completion callback.
  *
  * pixels and the stretch arrays remain valid until the completion callback
- * returns. Each masked member is meaningful only when fields contains its bit.
+ * returns. A masked member whose bit is absent from fields is zero.
  */
 typedef struct mln_style_image_info {
   uint32_t size;
@@ -1913,9 +1896,9 @@ MLN_API mln_status mln_map_remove_style_layer(
 /**
  * Copies the complete metadata of one style layer.
  *
- * A found layer completes with one borrowed mln_style_layer_info that includes
- * its source ID and source-layer ID. A missing layer completes successfully
- * with no value. Copy retained views before the callback returns.
+ * A found layer completes with one borrowed mln_style_layer_info whose id is
+ * the requested ID. A missing layer completes successfully with no value. Copy
+ * retained views before the callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -1933,8 +1916,8 @@ MLN_API mln_status mln_map_get_style_layer(
 /**
  * Starts an ordered query of every style layer in style order.
  *
- * The completion borrows mln_style_layer_entry[value_count]. Copy retained
- * entries and their string views before the callback returns.
+ * The completion borrows mln_style_layer_info[value_count] in style order.
+ * Copy retained entries and their views before the callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.
@@ -1943,7 +1926,7 @@ MLN_API mln_status mln_map_get_style_layer(
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=query;result=mln_style_layer_entry;shape=array")
+MLN_BINDING("execution=query;result=mln_style_layer_info;shape=array")
 MLN_API mln_status mln_map_list_style_layers(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

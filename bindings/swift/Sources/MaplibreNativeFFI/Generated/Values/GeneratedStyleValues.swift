@@ -922,15 +922,25 @@ public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
   public static let proportional: StyleImageTextFit = .init(rawValue: 2)
 }
 
-/// One style layer borrowed for a list completion callback.
+/// One style layer, borrowed for a completion callback.
 ///
-/// See `mln_style_layer_entry` in the
+/// See `mln_style_layer_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleLayerEntry: Equatable, Hashable, Sendable {
+public struct StyleLayerInfo: Equatable, Hashable, Sendable {
+  /// Layer ID.
   public var id: String
+  /// The style-spec layer type string.
   public var type: String
+  /// Source ID. Empty for a layer type that takes no source.
   public var sourceId: String?
+  /// Source-layer ID. Empty when the layer sets none.
   public var sourceLayer: String?
+  /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+  public var minZoom: Double
+  /// Highest zoom at which the layer draws; INFINITY with no upper bound.
+  public var maxZoom: Double
+  /// One of `mln_style_layer_visibility`.
+  public var visibility: StyleLayerVisibility
   public static var `default`: Self {
     Self()
   }
@@ -939,16 +949,22 @@ public struct StyleLayerEntry: Equatable, Hashable, Sendable {
     id: String = "",
     type: String = "",
     sourceId: String? = nil,
-    sourceLayer: String? = nil
+    sourceLayer: String? = nil,
+    minZoom: Double = 0,
+    maxZoom: Double = 0,
+    visibility: StyleLayerVisibility = .init(rawValue: 0)
   ) {
     self.id = id
     self.type = type
     self.sourceId = sourceId
     self.sourceLayer = sourceLayer
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.visibility = visibility
   }
 
   init(
-    raw: mln_style_layer_entry,
+    raw: mln_style_layer_info,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
     id = try NativeString.copyUTF8(data: raw.id.data, size: raw.id.size)
@@ -961,84 +977,21 @@ public struct StyleLayerEntry: Equatable, Hashable, Sendable {
       data: raw.source_layer.data,
       size: raw.source_layer.size
     )
-  }
-
-  func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_entry {
-    var raw = mln_style_layer_entry()
-    raw.size = UInt32(MemoryLayout<mln_style_layer_entry>.size)
-    raw.id = arena.view(id)
-    raw.type = arena.view(type)
-    raw.source_id = sourceId.map { arena.view($0) } ?? mln_buffer_view()
-    raw.source_layer = sourceLayer.map { arena.view($0) } ?? mln_buffer_view()
-    return raw
-  }
-}
-
-/// Complete metadata of one style layer, borrowed for a completion callback.
-///
-/// See `mln_style_layer_info` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-public struct StyleLayerInfo: Equatable, Hashable, Sendable {
-  /// One of `mln_style_layer_visibility`.
-  public var visibility: StyleLayerVisibility
-  /// The style-spec layer type string. The view stays valid for the life of the
-  /// process.
-  public var type: String
-  /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
-  public var minZoom: Double
-  /// Highest zoom at which the layer draws; INFINITY with no upper bound.
-  public var maxZoom: Double
-  /// Source ID. Empty for a layer type that takes no source.
-  public var sourceId: String?
-  /// Source-layer ID. Empty when the layer sets none.
-  public var sourceLayer: String?
-  public static var `default`: Self {
-    Self()
-  }
-
-  public init(
-    visibility: StyleLayerVisibility = .init(rawValue: 0),
-    type: String = "",
-    minZoom: Double = 0,
-    maxZoom: Double = 0,
-    sourceId: String? = nil,
-    sourceLayer: String? = nil
-  ) {
-    self.visibility = visibility
-    self.type = type
-    self.minZoom = minZoom
-    self.maxZoom = maxZoom
-    self.sourceId = sourceId
-    self.sourceLayer = sourceLayer
-  }
-
-  init(
-    raw: mln_style_layer_info,
-    recordBytes _: UnsafeRawBufferPointer? = nil
-  ) throws {
-    visibility = StyleLayerVisibility(rawValue: raw.visibility)
-    type = try NativeString.copyUTF8(data: raw.type.data, size: raw.type.size)
     minZoom = raw.min_zoom
     maxZoom = raw.max_zoom
-    sourceId = raw.source_id.size == 0 ? nil : try NativeString.copyUTF8(
-      data: raw.source_id.data,
-      size: raw.source_id.size
-    )
-    sourceLayer = raw.source_layer.size == 0 ? nil : try NativeString.copyUTF8(
-      data: raw.source_layer.data,
-      size: raw.source_layer.size
-    )
+    visibility = StyleLayerVisibility(rawValue: raw.visibility)
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_info {
     var raw = mln_style_layer_info()
     raw.size = UInt32(MemoryLayout<mln_style_layer_info>.size)
-    raw.visibility = visibility.rawValue
+    raw.id = arena.view(id)
     raw.type = arena.view(type)
-    raw.min_zoom = minZoom
-    raw.max_zoom = maxZoom
     raw.source_id = sourceId.map { arena.view($0) } ?? mln_buffer_view()
     raw.source_layer = sourceLayer.map { arena.view($0) } ?? mln_buffer_view()
+    raw.min_zoom = minZoom
+    raw.max_zoom = maxZoom
+    raw.visibility = visibility.rawValue
     return raw
   }
 }

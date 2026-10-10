@@ -4146,20 +4146,30 @@ func DefaultStyleImageOptions() StyleImageOptions {
 	return copyStyleImageOptions(C.mln_style_image_options_default())
 }
 
-// StyleLayerEntry corresponds to mln_style_layer_entry. One style layer
-// borrowed for a list completion callback.
+// StyleLayerInfo corresponds to mln_style_layer_info. One style layer, borrowed
+// for a completion callback.
 //
-// See mln_style_layer_entry in the C API reference:
+// See mln_style_layer_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleLayerEntry struct {
-	Id          string
-	Type        string
-	SourceId    *string
+type StyleLayerInfo struct {
+	// Layer ID.
+	Id string
+	// The style-spec layer type string.
+	Type string
+	// Source ID. Empty for a layer type that takes no source.
+	SourceId *string
+	// Source-layer ID. Empty when the layer sets none.
 	SourceLayer *string
+	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+	MinZoom float64
+	// Highest zoom at which the layer draws; INFINITY with no upper bound.
+	MaxZoom float64
+	// One of mln_style_layer_visibility.
+	Visibility StyleLayerVisibility
 }
 
-func copyStyleLayerEntry(raw C.mln_style_layer_entry) StyleLayerEntry {
-	var result StyleLayerEntry
+func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
+	var result StyleLayerInfo
 	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
 	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
 	result.SourceId = func() *string {
@@ -4176,50 +4186,9 @@ func copyStyleLayerEntry(raw C.mln_style_layer_entry) StyleLayerEntry {
 		value := bindingString(raw.source_layer.data, uint64(raw.source_layer.size))
 		return &value
 	}()
-	return result
-}
-
-// StyleLayerInfo corresponds to mln_style_layer_info. Complete metadata of one
-// style layer, borrowed for a completion callback.
-//
-// See mln_style_layer_info in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleLayerInfo struct {
-	// One of mln_style_layer_visibility.
-	Visibility StyleLayerVisibility
-	// The style-spec layer type string. The view stays valid for the life of the
-	// process.
-	Type string
-	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
-	MinZoom float64
-	// Highest zoom at which the layer draws; INFINITY with no upper bound.
-	MaxZoom float64
-	// Source ID. Empty for a layer type that takes no source.
-	SourceId *string
-	// Source-layer ID. Empty when the layer sets none.
-	SourceLayer *string
-}
-
-func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
-	var result StyleLayerInfo
-	result.Visibility = StyleLayerVisibility(raw.visibility)
-	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
-	result.SourceId = func() *string {
-		if raw.source_id.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.source_id.data, uint64(raw.source_id.size))
-		return &value
-	}()
-	result.SourceLayer = func() *string {
-		if raw.source_layer.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.source_layer.data, uint64(raw.source_layer.size))
-		return &value
-	}()
+	result.Visibility = StyleLayerVisibility(raw.visibility)
 	return result
 }
 
@@ -6406,10 +6375,10 @@ func (receiver *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) (*Fut
 //
 // See mln_map_list_style_layers in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerEntry], error) {
+func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerInfo], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_layers), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_list_style_layers(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyStyleLayerEntry))
+	}, completionListOf(copyStyleLayerInfo))
 }
 
 // ListStyleSources lists every style source in style order.

@@ -1298,27 +1298,19 @@ final class mln_style_image_options extends Struct {
   external bool sdf;
 }
 
-final class mln_style_layer_entry extends Struct {
+final class mln_style_layer_info extends Struct {
   @Uint32()
   external int size;
   external mln_buffer_view id;
   external mln_buffer_view type;
   external mln_buffer_view source_id;
   external mln_buffer_view source_layer;
-}
-
-final class mln_style_layer_info extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int visibility;
-  external mln_buffer_view type;
   @Double()
   external double min_zoom;
   @Double()
   external double max_zoom;
-  external mln_buffer_view source_id;
-  external mln_buffer_view source_layer;
+  @Uint32()
+  external int visibility;
 }
 
 final class mln_style_source_info extends Struct {
@@ -1618,7 +1610,6 @@ const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
 const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = 3048968095;
 const MLN_ADAPTER_COMPLETION_COPY_SCREEN_POINT = 990046368;
 const MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO = 4245014400;
-const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY = 2945408873;
 const MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO = 3674928708;
 const MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO = 3318217596;
 const MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS = 221419390;

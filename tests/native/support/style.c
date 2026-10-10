@@ -334,8 +334,8 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
        index < result->value_count && index < MLN_TEST_STYLE_LIST_CAPACITY;
        index += 1) {
     mln_test_style_entry* copy = &probe->list.entries[index];
-    const mln_style_layer_entry* entry =
-      &((const mln_style_layer_entry*)result->value)[index];
+    const mln_style_layer_info* entry =
+      &((const mln_style_layer_info*)result->value)[index];
     fits &= copy_text(entry->id, copy->id, sizeof(copy->id));
     fits &= copy_text(entry->type, copy->type, sizeof(copy->type));
     fits &=
@@ -343,6 +343,9 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
     fits &= copy_text(
       entry->source_layer, copy->source_layer, sizeof(copy->source_layer)
     );
+    copy->min_zoom = entry->min_zoom;
+    copy->max_zoom = entry->max_zoom;
+    copy->visibility = entry->visibility;
   }
   probe->overflowed = !fits;
   mln_test_flag_set(&probe->done);

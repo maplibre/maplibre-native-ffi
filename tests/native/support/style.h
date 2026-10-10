@@ -146,9 +146,9 @@ void mln_test_style_serve(
   mln_runtime runtime, mln_test_style_route* routes, size_t route_count
 );
 
-// Copies of the layer entries a list query returned, each string
-// null-terminated. A list longer than MLN_TEST_STYLE_LIST_CAPACITY, or a string
-// longer than its buffer, fails the test.
+// Copies of the layers a list query returned, each string null-terminated. A
+// list longer than MLN_TEST_STYLE_LIST_CAPACITY, or a string longer than its
+// buffer, fails the test.
 #define MLN_TEST_STYLE_LIST_CAPACITY 8
 
 typedef struct mln_test_style_entry {
@@ -156,6 +156,9 @@ typedef struct mln_test_style_entry {
   char type[32];
   char source_id[64];
   char source_layer[64];
+  double min_zoom;
+  double max_zoom;
+  uint32_t visibility;
 } mln_test_style_entry;
 
 typedef struct mln_test_style_list {

@@ -649,18 +649,16 @@ static bool mln_adapter_copy_case_style_image_info_matches(
   return true;
 }
 
-static const void* mln_adapter_copy_case_style_layer_entry_value(
-  size_t* count
-) {
-  static mln_style_layer_entry values[2];
-  static const char text_1[] = "mln_style_layer_entry[0].id";
-  static const char text_2[] = "mln_style_layer_entry[0].type";
-  static const char text_3[] = "mln_style_layer_entry[0].source_id";
-  static const char text_4[] = "mln_style_layer_entry[0].source_layer";
-  static const char text_5[] = "mln_style_layer_entry[1].id";
-  static const char text_6[] = "mln_style_layer_entry[1].type";
-  static const char text_7[] = "mln_style_layer_entry[1].source_id";
-  static const char text_8[] = "mln_style_layer_entry[1].source_layer";
+static const void* mln_adapter_copy_case_style_layer_info_value(size_t* count) {
+  static mln_style_layer_info values[2];
+  static const char text_1[] = "mln_style_layer_info[0].id";
+  static const char text_2[] = "mln_style_layer_info[0].type";
+  static const char text_3[] = "mln_style_layer_info[0].source_id";
+  static const char text_4[] = "mln_style_layer_info[0].source_layer";
+  static const char text_7[] = "mln_style_layer_info[1].id";
+  static const char text_8[] = "mln_style_layer_info[1].type";
+  static const char text_9[] = "mln_style_layer_info[1].source_id";
+  static const char text_10[] = "mln_style_layer_info[1].source_layer";
   values[0].size = sizeof(values[0]);
   values[0].id.data = text_1;
   values[0].id.size = sizeof(text_1) - 1;
@@ -670,25 +668,31 @@ static const void* mln_adapter_copy_case_style_layer_entry_value(
   values[0].source_id.size = sizeof(text_3) - 1;
   values[0].source_layer.data = text_4;
   values[0].source_layer.size = sizeof(text_4) - 1;
+  values[0].min_zoom = 5.5;
+  values[0].max_zoom = 6.5;
+  values[0].visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
   values[1].size = sizeof(values[1]);
-  values[1].id.data = text_5;
-  values[1].id.size = sizeof(text_5) - 1;
-  values[1].type.data = text_6;
-  values[1].type.size = sizeof(text_6) - 1;
-  values[1].source_id.data = text_7;
-  values[1].source_id.size = sizeof(text_7) - 1;
-  values[1].source_layer.data = text_8;
-  values[1].source_layer.size = sizeof(text_8) - 1;
+  values[1].id.data = text_7;
+  values[1].id.size = sizeof(text_7) - 1;
+  values[1].type.data = text_8;
+  values[1].type.size = sizeof(text_8) - 1;
+  values[1].source_id.data = text_9;
+  values[1].source_id.size = sizeof(text_9) - 1;
+  values[1].source_layer.data = text_10;
+  values[1].source_layer.size = sizeof(text_10) - 1;
+  values[1].min_zoom = 11.5;
+  values[1].max_zoom = 12.5;
+  values[1].visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
   *count = 2;
   return values;
 }
 
-static bool mln_adapter_copy_case_style_layer_entry_matches(
+static bool mln_adapter_copy_case_style_layer_info_matches(
   const void* copy_value, const void* source_value, size_t count
 ) {
-  const mln_style_layer_entry* copy = (const mln_style_layer_entry*)copy_value;
-  const mln_style_layer_entry* source =
-    (const mln_style_layer_entry*)source_value;
+  const mln_style_layer_info* copy = (const mln_style_layer_info*)copy_value;
+  const mln_style_layer_info* source =
+    (const mln_style_layer_info*)source_value;
   for (size_t index = 0; index < count; ++index) {
     if (!mln_adapter_copy_case_view(copy[index].id, source[index].id))
       return false;
@@ -702,49 +706,9 @@ static bool mln_adapter_copy_case_style_layer_entry_matches(
           copy[index].source_layer, source[index].source_layer
         ))
       return false;
-  }
-  return true;
-}
-
-static const void* mln_adapter_copy_case_style_layer_info_value(size_t* count) {
-  static mln_style_layer_info values[1];
-  static const char text_1[] = "mln_style_layer_info[0].type";
-  static const char text_4[] = "mln_style_layer_info[0].source_id";
-  static const char text_5[] = "mln_style_layer_info[0].source_layer";
-  values[0].size = sizeof(values[0]);
-  values[0].visibility = MLN_STYLE_LAYER_VISIBILITY_VISIBLE;
-  values[0].type.data = text_1;
-  values[0].type.size = sizeof(text_1) - 1;
-  values[0].min_zoom = 2.5;
-  values[0].max_zoom = 3.5;
-  values[0].source_id.data = text_4;
-  values[0].source_id.size = sizeof(text_4) - 1;
-  values[0].source_layer.data = text_5;
-  values[0].source_layer.size = sizeof(text_5) - 1;
-  *count = 1;
-  return values;
-}
-
-static bool mln_adapter_copy_case_style_layer_info_matches(
-  const void* copy_value, const void* source_value, size_t count
-) {
-  const mln_style_layer_info* copy = (const mln_style_layer_info*)copy_value;
-  const mln_style_layer_info* source =
-    (const mln_style_layer_info*)source_value;
-  for (size_t index = 0; index < count; ++index) {
-    if (copy[index].visibility != source[index].visibility) return false;
-    if (!mln_adapter_copy_case_view(copy[index].type, source[index].type))
-      return false;
     if (copy[index].min_zoom != source[index].min_zoom) return false;
     if (copy[index].max_zoom != source[index].max_zoom) return false;
-    if (!mln_adapter_copy_case_view(
-          copy[index].source_id, source[index].source_id
-        ))
-      return false;
-    if (!mln_adapter_copy_case_view(
-          copy[index].source_layer, source[index].source_layer
-        ))
-      return false;
+    if (copy[index].visibility != source[index].visibility) return false;
   }
   return true;
 }
@@ -1016,9 +980,6 @@ static const mln_adapter_copy_case mln_adapter_copy_cases[] = {
   {MLN_ADAPTER_COMPLETION_COPY_STYLE_IMAGE_INFO, "mln_style_image_info",
    sizeof(mln_style_image_info), mln_adapter_copy_case_style_image_info_value,
    mln_adapter_copy_case_style_image_info_matches},
-  {MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_ENTRY, "mln_style_layer_entry",
-   sizeof(mln_style_layer_entry), mln_adapter_copy_case_style_layer_entry_value,
-   mln_adapter_copy_case_style_layer_entry_matches},
   {MLN_ADAPTER_COMPLETION_COPY_STYLE_LAYER_INFO, "mln_style_layer_info",
    sizeof(mln_style_layer_info), mln_adapter_copy_case_style_layer_info_value,
    mln_adapter_copy_case_style_layer_info_matches},

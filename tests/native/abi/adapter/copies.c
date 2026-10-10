@@ -258,8 +258,10 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
     &source_delivery
   );
   const mln_style_source_info* copied_source = record->result.value;
-  TEST_ASSERT_EQUAL_size_t(0, copied_source->attribution.size);
-  TEST_ASSERT_EQUAL_size_t(0, copied_source->url.size);
+  TEST_ASSERT_TRUE(
+    all_zero(&copied_source->attribution, sizeof(copied_source->attribution))
+  );
+  TEST_ASSERT_TRUE(all_zero(&copied_source->url, sizeof(copied_source->url)));
   TEST_ASSERT_TRUE(
     all_zero(&copied_source->tilejson, sizeof(copied_source->tilejson))
   );

@@ -2072,9 +2072,9 @@ fn generated_copy_mln_style_image_options(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_style_layer_entry(
+fn generated_copy_mln_style_layer_info(
     py: Python<'_>,
-    value: &sys::mln_style_layer_entry,
+    value: &sys::mln_style_layer_info,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
     dict.set_item("id", generated_text(py, value.id)?)?;
@@ -2091,30 +2091,9 @@ fn generated_copy_mln_style_layer_entry(
             generated_text(py, value.source_layer)
         })?,
     )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_style_layer_info(
-    py: Python<'_>,
-    value: &sys::mln_style_layer_info,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("visibility", generated_value(py, value.visibility)?)?;
-    dict.set_item("type", generated_text(py, value.type_)?)?;
     dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
     dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
-    dict.set_item(
-        "source_id",
-        generated_optional(py, value.source_id.size != 0, || {
-            generated_text(py, value.source_id)
-        })?,
-    )?;
-    dict.set_item(
-        "source_layer",
-        generated_optional(py, value.source_layer.size != 0, || {
-            generated_text(py, value.source_layer)
-        })?,
-    )?;
+    dict.set_item("visibility", generated_value(py, value.visibility)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -5957,8 +5936,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_style_layer_entry>(result)? {
-                list.append(generated_copy_mln_style_layer_entry(py, value)?)?;
+            for value in generated_completion_slice::<sys::mln_style_layer_info>(result)? {
+                list.append(generated_copy_mln_style_layer_info(py, value)?)?;
             }
             Ok(list.into_any().unbind())
         };

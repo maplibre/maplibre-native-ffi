@@ -1026,13 +1026,13 @@ impl MapHandle {
     ///
     /// See `mln_map_list_style_layers` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn list_style_layers(&self) -> Result<NativeFuture<Vec<StyleLayerEntry>>> {
+    pub fn list_style_layers(&self) -> Result<NativeFuture<Vec<StyleLayerInfo>>> {
         let call = self.inner.call("mln_map_list_style_layers")?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_list_style_layers(map, completion, out_diagnostic)
             },
-            completion::list::<sys::mln_style_layer_entry, _>,
+            completion::list::<sys::mln_style_layer_info, _>,
         )
     }
 

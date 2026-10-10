@@ -1041,7 +1041,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_list_style_layers` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleLayers(): Deferred<List<StyleLayerEntry>> =
+  public fun listStyleLayers(): Deferred<List<StyleLayerInfo>> =
     nativeSubmit(
       this,
       binding,
@@ -1050,9 +1050,9 @@ public abstract class GeneratedMapOperations internal constructor() {
         readArray(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(36, 72).toLong(),
+          w(64, 96).toLong(),
         ) {
-          readStyleLayerEntry(it)
+          readStyleLayerInfo(it)
         }
       },
     ) {

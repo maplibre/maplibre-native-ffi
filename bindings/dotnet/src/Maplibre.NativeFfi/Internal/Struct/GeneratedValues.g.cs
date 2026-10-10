@@ -2550,7 +2550,7 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static StyleLayerEntry CopyStyleLayerEntry(mln_style_layer_entry value) =>
+    internal static StyleLayerInfo CopyStyleLayerInfo(mln_style_layer_info value) =>
         new(
             RuntimeStructs.CopyUtf8((sbyte*)value.id.data, value.id.size),
             RuntimeStructs.CopyUtf8((sbyte*)value.type.data, value.type.size),
@@ -2559,37 +2559,10 @@ internal static unsafe class GeneratedValues
                 : RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
             value.source_layer.size == 0
                 ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size)
-        );
-
-    internal static mln_style_layer_entry NativeStyleLayerEntry(
-        StyleLayerEntry value,
-        NativeCallScope scope
-    )
-    {
-        Required(value.Id, "StyleLayerEntry.Id must not be null.");
-        Required(value.Type, "StyleLayerEntry.Type must not be null.");
-        var native = new mln_style_layer_entry();
-        native.size = (uint)sizeof(mln_style_layer_entry);
-        native.id = scope.Utf8(value.Id);
-        native.type = scope.Utf8(value.Type);
-        native.source_id = scope.Utf8(value.SourceId ?? "");
-        native.source_layer = scope.Utf8(value.SourceLayer ?? "");
-        return native;
-    }
-
-    internal static StyleLayerInfo CopyStyleLayerInfo(mln_style_layer_info value) =>
-        new(
-            (StyleLayerVisibility)value.visibility,
-            RuntimeStructs.CopyUtf8((sbyte*)value.type.data, value.type.size),
+                : RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size),
             value.min_zoom,
             value.max_zoom,
-            value.source_id.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.source_id.data, value.source_id.size),
-            value.source_layer.size == 0
-                ? null
-                : RuntimeStructs.CopyUtf8((sbyte*)value.source_layer.data, value.source_layer.size)
+            (StyleLayerVisibility)value.visibility
         );
 
     internal static mln_style_layer_info NativeStyleLayerInfo(
@@ -2597,15 +2570,17 @@ internal static unsafe class GeneratedValues
         NativeCallScope scope
     )
     {
+        Required(value.Id, "StyleLayerInfo.Id must not be null.");
         Required(value.Type, "StyleLayerInfo.Type must not be null.");
         var native = new mln_style_layer_info();
         native.size = (uint)sizeof(mln_style_layer_info);
-        native.visibility = (uint)value.Visibility;
+        native.id = scope.Utf8(value.Id);
         native.type = scope.Utf8(value.Type);
-        native.min_zoom = value.MinZoom;
-        native.max_zoom = value.MaxZoom;
         native.source_id = scope.Utf8(value.SourceId ?? "");
         native.source_layer = scope.Utf8(value.SourceLayer ?? "");
+        native.min_zoom = value.MinZoom;
+        native.max_zoom = value.MaxZoom;
+        native.visibility = (uint)value.Visibility;
         return native;
     }
 

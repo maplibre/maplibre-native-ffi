@@ -127,6 +127,11 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_FLOAT(1.0f, info->pixel_ratio);
   TEST_ASSERT_FALSE(info->sdf);
   TEST_ASSERT_EQUAL_HEX32(0, info->fields);
+  // A member whose bit is absent reads as zero.
+  const mln_image_content no_content = {0};
+  TEST_ASSERT_EQUAL_MEMORY(&no_content, &info->content, sizeof(info->content));
+  TEST_ASSERT_EQUAL_UINT32(0, info->text_fit_width);
+  TEST_ASSERT_EQUAL_UINT32(0, info->text_fit_height);
 
   options = mln_style_image_options_default();
   options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;

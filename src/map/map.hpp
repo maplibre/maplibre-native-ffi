@@ -138,13 +138,20 @@ auto deliver_style_result(
                            const StyleSourceRecord& source,
                            const std::vector<mln_buffer_view>& tile_urls
                          ) -> mln_style_source_info {
+      // A member whose bit is absent stays zero, as the record leaves it.
       auto info = source.info;
       info.size = sizeof(mln_style_source_info);
       info.id = view(source.id);
-      info.attribution = view(source.attribution);
-      info.url = view(source.url);
-      info.tilejson.tile_urls = tile_urls.data();
-      info.tilejson.tile_url_count = tile_urls.size();
+      if ((info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
+        info.attribution = view(source.attribution);
+      }
+      if ((info.fields & MLN_STYLE_SOURCE_INFO_URL) != 0) {
+        info.url = view(source.url);
+      }
+      if ((info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
+        info.tilejson.tile_urls = tile_urls.data();
+        info.tilejson.tile_url_count = tile_urls.size();
+      }
       return info;
     };
     if constexpr (Value::array) {
@@ -162,31 +169,27 @@ auto deliver_style_result(
       const auto tile_urls = views(result.source.tile_urls);
       Value::deliver(descriptor, present(result.source, tile_urls));
     }
-  } else if constexpr (std::is_same_v<Type, mln_style_layer_entry>) {
-    auto layers = std::vector<mln_style_layer_entry>{};
-    layers.reserve(result.layers.size());
-    for (const auto& entry : result.layers) {
-      layers.push_back(
-        {.size = sizeof(mln_style_layer_entry),
-         .id = view(entry.id),
-         .type = {.data = entry.type.data(), .size = entry.type.size()},
-         .source_id = view(entry.source_id),
-         .source_layer = view(entry.source_layer)}
-      );
-    }
-    Value::deliver(descriptor, layers);
   } else if constexpr (std::is_same_v<Type, mln_style_layer_info>) {
-    const auto& layer = result.layer;
-    Value::deliver(
-      descriptor,
-      {.size = sizeof(mln_style_layer_info),
-       .visibility = layer.visibility,
-       .type = {.data = layer.type.data(), .size = layer.type.size()},
-       .min_zoom = layer.min_zoom,
-       .max_zoom = layer.max_zoom,
-       .source_id = view(layer.source_id),
-       .source_layer = view(layer.source_layer)}
-    );
+    const auto present = [&view](const StyleLayerRecord& record) {
+      return mln_style_layer_info{
+        .size = sizeof(mln_style_layer_info),
+        .id = view(record.id),
+        .type = {.data = record.type.data(), .size = record.type.size()},
+        .source_id = view(record.source_id),
+        .source_layer = view(record.source_layer),
+        .min_zoom = record.min_zoom,
+        .max_zoom = record.max_zoom,
+        .visibility = record.visibility
+      };
+    };
+    if constexpr (Value::array) {
+      auto layers = std::vector<mln_style_layer_info>{};
+      layers.reserve(result.layers.size());
+      for (const auto& layer : result.layers) layers.push_back(present(layer));
+      Value::deliver(descriptor, layers);
+    } else {
+      Value::deliver(descriptor, present(result.layer));
+    }
   } else if constexpr (std::is_same_v<Type, mln_style_image_info>) {
     Value::deliver(descriptor, style_image_info(result.image));
   } else if constexpr (std::is_same_v<Type, mln_style_transition_options>) {
