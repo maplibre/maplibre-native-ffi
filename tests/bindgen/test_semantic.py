@@ -1,5 +1,6 @@
 """Semantic mutation tests shared by every static language backend."""
 
+import re
 import unittest
 
 from support import parse
@@ -302,9 +303,26 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
                 self.parse(source.replace("bit=ZOOM", "bit=CENTER")),
                 require_complete=True,
             )
-        with self.assertRaisesRegex(ModelError, "both mask and bit"):
+        with self.assertRaisesRegex(ModelError, "both mask and bit") as raised:
             bind(
-                self.parse(source.replace("mask=fields;bit=ZOOM", "mask=fields")),
+                self.parse(re.sub(r";bit=\w+", "", source)),
+                require_complete=True,
+            )
+        self.assertNotIn("guards more than one member", str(raised.exception))
+        with self.assertRaisesRegex(
+            ModelError,
+            r"options\.item_count: a count takes its array's presence; "
+            "drop mask and bit",
+        ):
+            bind(
+                self.parse(
+                    source.replace(
+                        'double longitude BIND("mask=fields;bit=ZOOM");',
+                        "const double *items "
+                        'BIND("length=item_count;mask=fields;bit=ZOOM");\n'
+                        'unsigned long item_count BIND("mask=fields;bit=ZOOM");',
+                    )
+                ),
                 require_complete=True,
             )
 

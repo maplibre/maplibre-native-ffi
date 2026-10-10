@@ -78,12 +78,12 @@ Each declaration follows these rules, which every binding relies on:
   struct's `fields` mask, a `uint32_t` whose `enum=` names a `kind=bitmask`
   enum: `MLN_BINDING("mask=fields;bit=<constant>")`. Each optional member has
   its own bit. Values that are present together form a record embedded under one
-  bit, and the schema rejects a bit that guards two members of one struct.
-  Native treats an unknown bit in an input mask as invalid. A pointer-shaped
-  value, such as a callback, an owned handle, a nul-terminated string, or a
-  by-pointer parameter, is optional through `nullable=true`. A buffer-view
-  parameter, result, or member that treats an empty view as absent is
-  `optional=empty`.
+  bit, and the schema rejects a bit that guards two members of one struct. An
+  array's count takes the array's presence and carries no mask or bit. Native
+  treats an unknown bit in an input mask as invalid. A pointer-shaped value,
+  such as a callback, an owned handle, a nul-terminated string, or a by-pointer
+  parameter, is optional through `nullable=true`. A buffer-view parameter,
+  result, or member that treats an empty view as absent is `optional=empty`.
 - A reserved member is `kind=reserved`, and every writer sets it to zero.
 - A handle output parameter owns the handle that it receives, and `*out_handle`
   must equal `MLN_HANDLE_NULL` on entry. Every other pointer is borrowed for the

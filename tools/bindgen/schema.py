@@ -847,13 +847,27 @@ def validate(api: Api) -> None:
             errors.extend(ordered_errors(record, record.metadata["fields"], context))
         # A presence bit guards one member, so a value that several fields
         # describe together is a record embedded under that bit. An array's
-        # count names no bit: the array's own bit covers it. A member of
-        # another record may reuse the bit through a longer mask path.
+        # count takes the array's presence and names no bit of its own. A
+        # member of another record may reuse the bit through a longer mask
+        # path.
+        counts = {
+            field.metadata["length"]
+            for field in record.fields
+            if "length" in field.metadata
+        }
         guarded = set()
         for field in record.fields:
-            if "mask" not in field.metadata:
+            if field.name in counts and (
+                "mask" in field.metadata or "bit" in field.metadata
+            ):
+                errors.append(
+                    f"{field.location}: {record.name}.{field.name}: a count takes "
+                    "its array's presence; drop mask and bit"
+                )
                 continue
-            presence = (field.metadata["mask"], field.metadata.get("bit"))
+            if "mask" not in field.metadata or "bit" not in field.metadata:
+                continue
+            presence = (field.metadata["mask"], field.metadata["bit"])
             if presence in guarded:
                 errors.append(
                     f"{field.location}: {record.name}.{field.name}: presence bit "
