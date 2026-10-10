@@ -617,6 +617,11 @@ struct mln_render_session_object
   uint32_t acquired_frame_count = 0;
   bool driver_call_in_flight = false;
   std::optional<mln::core::OwnerThreadToken> driver_call_thread;
+  // Retirement tasks for this session and its frames that found a driver call
+  // or a borrowed view still running. They chain through their own `next`
+  // links and return to the teardown lane once the session is idle, so a busy
+  // session never holds the lane that every other session retires on.
+  mln::core::RetirementTask* parked_retirements = nullptr;
   // Abandons waiting for a core worker's call to end. The worker starts no
   // call while any wait.
   std::size_t abandon_waiters = 0;

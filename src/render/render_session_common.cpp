@@ -898,6 +898,42 @@ auto session_teardown_lane() -> RetirementLane& {
   static auto* lane = new RetirementLane{};
   return *lane;
 }
+
+auto session_idle_locked(const mln_render_session_object& session) noexcept
+  -> bool {
+  return !session.driver_call_in_flight && session.active_views == 0;
+}
+
+// Runs on the lane. A retirement that finds its session busy parks there, in
+// order, and returns, so the lane moves on to other sessions.
+auto park_retirement_while_busy(
+  mln_render_session_object& session, RetirementTask& task
+) noexcept -> bool {
+  const auto lock = std::scoped_lock{session.control_mutex};
+  if (session_idle_locked(session)) return false;
+  auto** tail = &session.parked_retirements;
+  while (*tail != nullptr) tail = &(*tail)->next;
+  *tail = &task;
+  return true;
+}
+
+// Every transition that can make a session idle calls this under the control
+// lock and passes the result to resubmit_parked_retirements after releasing
+// it.
+auto take_parked_retirements_locked(mln_render_session_object& session) noexcept
+  -> RetirementTask* {
+  if (!session_idle_locked(session)) return nullptr;
+  return std::exchange(session.parked_retirements, nullptr);
+}
+
+auto resubmit_parked_retirements(RetirementTask* task) noexcept -> void {
+  while (task != nullptr) {
+    // The lane may run and destroy the task's owner once it is submitted.
+    auto* next = std::exchange(task->next, nullptr);
+    session_teardown_lane().submit(*task);
+    task = next;
+  }
+}
 auto abandon_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
   mln_render_abandon_result* out_result
@@ -1082,12 +1118,15 @@ auto run_core_worker(
       if (work.abandon) work.abandon();
     }
     mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
+    auto* parked = static_cast<RetirementTask*>(nullptr);
     {
       const auto lock = std::scoped_lock{session->control_mutex};
       session->driver_call_in_flight = false;
       session->driver_call_thread.reset();
+      parked = take_parked_retirements_locked(*session);
       session->worker_condition.notify_all();
     }
+    resubmit_parked_retirements(parked);
   }
 }
 
@@ -2672,14 +2711,19 @@ auto render_session_service_driver_work(
     std::shared_ptr<mln_render_session_object> session;
     ~DriverCallGuard() {
       mln::testing::hit(mln::testing::SyncPoint::RenderDriverExited);
-      const auto lock = std::scoped_lock{session->control_mutex};
-      session->driver_call_in_flight = false;
-      session->driver_call_thread.reset();
-      session->worker_condition.notify_all();
-      session->driver_wake_pending = !session->driver_work.empty();
-      if (session->driver_wake_pending && session->driver_wake) {
-        session->driver_wake->notify();
+      auto* parked = static_cast<RetirementTask*>(nullptr);
+      {
+        const auto lock = std::scoped_lock{session->control_mutex};
+        session->driver_call_in_flight = false;
+        session->driver_call_thread.reset();
+        parked = take_parked_retirements_locked(*session);
+        session->worker_condition.notify_all();
+        session->driver_wake_pending = !session->driver_work.empty();
+        if (session->driver_wake_pending && session->driver_wake) {
+          session->driver_wake->notify();
+        }
       }
+      resubmit_parked_retirements(parked);
     }
   } guard{live};
   mln::testing::hit(mln::testing::SyncPoint::RenderDriverEntered);
@@ -2889,12 +2933,15 @@ void acquired_frame_view_end(void* scope) noexcept {
   if (!scope) return;
   auto& frame = *static_cast<mln_acquired_frame_object*>(scope);
   auto owner = std::shared_ptr<mln_acquired_frame_object>{};
+  auto* parked = static_cast<RetirementTask*>(nullptr);
   {
     const auto lock = std::scoped_lock{frame.session->control_mutex};
     --frame.session->active_views;
     if (--frame.active_views == 0) owner = std::move(frame.view_owner);
+    parked = take_parked_retirements_locked(*frame.session);
     frame.session->worker_condition.notify_all();
   }
+  resubmit_parked_retirements(parked);
 }
 
 auto acquired_frame_get_result(
@@ -3540,8 +3587,10 @@ auto abandon_render_session(
   return MLN_STATUS_OK;
 }
 
-// Admission owns an embedded node and a self-reference. The lane waits for an
-// existing driver call outside registry locks before abandoning the target.
+// Admission owns an embedded node and a self-reference. A driver call or a
+// borrowed view still running when the lane reaches the node parks it on the
+// session, and the call or view that leaves the session idle returns it to the
+// lane, which abandons the target outside registry locks.
 auto dispose_render_session(
   const std::shared_ptr<mln_render_session_object>& live
 ) -> void {
@@ -3554,13 +3603,8 @@ auto dispose_render_session(
     live->disposal_task.context = live.get();
     live->disposal_task.run = [](RetirementTask* task) noexcept {
       auto& session = *static_cast<mln_render_session_object*>(task->context);
+      if (park_retirement_while_busy(session, *task)) return;
       auto owned = session.disposal_owner;
-      {
-        auto lock = std::unique_lock{session.control_mutex};
-        session.worker_condition.wait(lock, [&] {
-          return !session.driver_call_in_flight && session.active_views == 0;
-        });
-      }
       auto result =
         mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
       try {
@@ -3600,14 +3644,8 @@ auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
   live->disposal_task.context = live.get();
   live->disposal_task.run = [](RetirementTask* task) noexcept {
     auto& frame = *static_cast<mln_acquired_frame_object*>(task->context);
+    if (park_retirement_while_busy(*frame.session, *task)) return;
     auto owned = frame.disposal_owner;
-    {
-      auto lock = std::unique_lock{owned->session->control_mutex};
-      owned->session->worker_condition.wait(lock, [&] {
-        return !owned->session->driver_call_in_flight &&
-               owned->session->active_views == 0;
-      });
-    }
     auto result =
       mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
     try {
