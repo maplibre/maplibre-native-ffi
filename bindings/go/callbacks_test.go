@@ -5,6 +5,7 @@ import (
 	"fmt"
 	stdruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"weak"
@@ -155,6 +156,42 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
 	receive(t, invoked, "the transform's invocation")
+	failures.check(t)
+}
+
+// Admission is per OS thread. A goroutine that a callback starts runs on
+// another thread, so a call the callback may not make succeeds there.
+func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
+	f := newFixture(t)
+	failures := newFailureLog()
+	type barrier struct {
+		future *Future[struct{}]
+		err    error
+	}
+	barriers := make(chan barrier, 1)
+	var spawn sync.Once
+	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, _ string, _ *ResourceTransformResponseScope) Status {
+		if _, err := f.runtime.Barrier(); !errors.Is(err, ErrInvalidState) {
+			failures.add("Barrier inside the transform = %v, want ErrInvalidState", err)
+		}
+		spawn.Do(func() {
+			go func() {
+				future, err := f.runtime.Barrier()
+				barriers <- barrier{future, err}
+			}()
+		})
+		return StatusOk
+	}})))
+	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
+	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitEvent(t, "the style load", isStyleLoaded)
+	result := receive(t, barriers, "the goroutine's barrier")
+	if result.err != nil {
+		t.Fatalf("Barrier from the goroutine: %v", result.err)
+	}
+	await(t, result.future)
 	failures.check(t)
 }
 
