@@ -395,18 +395,26 @@ static void event_masks_select_every_type_and_keep_foreign_bits(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A drain of an empty queue reports not ready, leaves its output null, and
-// consumes nothing: the next drain is empty too, and the next event still
-// arrives in a batch. One drain takes the whole queue, so the drain after it
-// is empty again.
+// A drain of an empty queue reports not ready, leaves its output null, clears
+// a diagnostic left by an earlier failure, and consumes nothing: the next
+// drain is empty too, and the next event still arrives in a batch. One drain
+// takes the whole queue, so the drain after it is empty again.
 static void an_empty_drain_publishes_no_batch(void) {
   mln_runtime runtime = mln_test_create_runtime();
   for (int attempt = 0; attempt < 2; attempt += 1) {
+    mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
+    mln_event_batch_view unread = {.size = sizeof(unread)};
+    MLN_TEST_INVALID(
+      mln_event_batch_get(MLN_HANDLE_NULL, &unread, &diagnostic)
+    );
+    TEST_ASSERT_GREATER_THAN_size_t(0, strlen(diagnostic.message));
     mln_event_batch batch = MLN_HANDLE_NULL;
     MLN_TEST_STATUS(
-      MLN_STATUS_NOT_READY, mln_runtime_drain_events(runtime, &batch, NULL)
+      MLN_STATUS_NOT_READY,
+      mln_runtime_drain_events(runtime, &batch, &diagnostic)
     );
     TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, batch);
+    TEST_ASSERT_EQUAL_size_t(0, strlen(diagnostic.message));
   }
 
   mln_map map = mln_test_create_map(runtime);

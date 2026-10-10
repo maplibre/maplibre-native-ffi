@@ -271,9 +271,9 @@ MLN_API mln_status mln_render_session_request_frame(
  * - MLN_STATUS_OK when a batch holding at least one result is published in
  *   *out_batch.
  * - MLN_STATUS_NOT_READY when no frame result is queued. This is not an error:
- *   *out_batch is left unchanged, no batch is allocated, and the caller retries
- *   after the next demand. Bindings return their language's empty form instead
- *   of an error.
+ *   *out_batch is left unchanged, no batch is allocated, the diagnostic
+ *   message is empty, and the caller retries after the next demand. Bindings
+ *   return their language's empty form instead of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when session has been released.

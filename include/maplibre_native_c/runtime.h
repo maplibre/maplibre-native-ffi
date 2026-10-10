@@ -1465,9 +1465,9 @@ MLN_API mln_status mln_runtime_dispose(
  * - MLN_STATUS_OK when a batch holding at least one event is published in
  *   *out_batch.
  * - MLN_STATUS_NOT_READY when no event is queued. This is not an error:
- *   *out_batch is left unchanged, no batch is allocated, and the caller drains
- *   again after the next event wake. Bindings return their language's empty
- *   form instead of an error.
+ *   *out_batch is left unchanged, no batch is allocated, the diagnostic
+ *   message is empty, and the caller drains again after the next event wake.
+ *   Bindings return their language's empty form instead of an error.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, or out_batch
  *   is null or does not point to the null handle.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.

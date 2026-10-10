@@ -540,7 +540,8 @@ mln_status mln_notice_set_callback(
 
 // Outputs that a failure status reports as absent: each call first finds
 // nothing, then publishes its output, and then fails. The parcel drain is
-// absent on MLN_STATUS_NOT_READY by convention, and the level names its status.
+// absent on MLN_STATUS_NOT_READY by convention; mln_probe_read_level is not a
+// drain, so it names the status with absent_on.
 #ifdef MLN_PROTOCOL_ABSENT_HANDLE
 typedef unsigned long long mln_probe_parcel BIND(
   "kind=handle;release=mln_probe_parcel_release;dispose=mln_probe_parcel_"

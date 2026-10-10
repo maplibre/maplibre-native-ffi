@@ -151,8 +151,8 @@ Five keys state what a C shape cannot:
 - `absent_on=` on a function names a failure status of `mln_status` that reports
   its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
   for `mln_render_session_acquire_frame` when no frame has rendered. A drain is
-  absent on `MLN_STATUS_NOT_READY` by convention, so only another kind of
-  function writes the key. A binding returns its language's empty form for that
+  absent on `MLN_STATUS_NOT_READY` by convention, so a drain writes the key only
+  to name another status. A binding returns its language's empty form for that
   status, such as `None`, `nil`, or `null`, and reads or adopts the output only
   on success. The schema accepts the key only on a function that returns a
   status, takes no completion, and has exactly one output. The semantic plan
