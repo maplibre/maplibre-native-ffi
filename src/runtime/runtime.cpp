@@ -2647,16 +2647,22 @@ auto drain_runtime_events(mln_runtime runtime, mln_event_batch* out_batch)
     const std::scoped_lock lock(queue->mutex);
     if (queue->pending.events.empty()) return MLN_STATUS_NOT_READY;
   }
-  // Allocating before the swap means a failed allocation loses no events.
-  auto owned = std::make_shared<EventBatchObject>();
+  // Allocating and registering the batch before the swap means a failure
+  // loses no events: nothing after the swap can throw. The handle stays
+  // private until this call returns it.
+  const auto owned = std::make_shared<EventBatchObject>();
+  const auto handle = handle_table<EventBatchObject>().insert(owned);
   {
     const std::scoped_lock lock(queue->mutex);
     owned->storage.events.swap(queue->pending.events);
     owned->storage.messages.swap(queue->pending.messages);
   }
   // A concurrent drain can empty the queue between the two locks.
-  if (owned->storage.events.empty()) return MLN_STATUS_NOT_READY;
-  *out_batch = handle_table<EventBatchObject>().insert(std::move(owned));
+  if (owned->storage.events.empty()) {
+    release_event_batch(handle);
+    return MLN_STATUS_NOT_READY;
+  }
+  *out_batch = handle;
   return MLN_STATUS_OK;
 }
 
@@ -2671,8 +2677,7 @@ auto get_event_batch(mln_event_batch batch, mln_event_batch_view* out_view)
   *out_view = mln_event_batch_view{
     .size = sizeof(mln_event_batch_view),
     .event_size = sizeof(mln_runtime_event),
-    .events =
-      live->storage.events.empty() ? nullptr : live->storage.events.data(),
+    .events = live->storage.events.data(),
     .event_count = live->storage.events.size(),
     .messages =
       live->storage.messages.empty() ? nullptr : live->storage.messages.data(),

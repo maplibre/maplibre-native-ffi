@@ -154,7 +154,6 @@ typedef struct mln_render_frame_batch_view {
   uint32_t result_size;
   /**
    * Borrowed array of result_count terminal frame results in completion order.
-   * Null when result_count is 0.
    */
   const mln_render_frame_result* results
     MLN_BINDING("length=result_count;stride=result_size");

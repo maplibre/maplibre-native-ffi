@@ -105,6 +105,14 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   MLN_TEST_INVALID_STATE(mln_render_frame_batch_get(batch, &stale, NULL));
   MLN_TEST_INVALID(mln_render_frame_batch_get(MLN_HANDLE_NULL, &stale, NULL));
   TEST_ASSERT_EQUAL_size_t(99, stale.result_count);
+  // The view check runs before the lease, so the stale handle reports the
+  // invalid view rather than its state.
+  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, NULL, NULL));
+  mln_render_frame_batch_view small = {
+    .size = sizeof(small) - 1, .result_count = 99
+  };
+  MLN_TEST_INVALID(mln_render_frame_batch_get(batch, &small, NULL));
+  TEST_ASSERT_EQUAL_size_t(99, small.result_count);
   detach(runtime, map, &fixture);
 }
 

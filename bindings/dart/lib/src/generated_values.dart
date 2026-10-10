@@ -3386,7 +3386,6 @@ final class RenderFrameBatchView extends _Value {
     : results = List.unmodifiable(results);
 
   /// Borrowed array of result_count terminal frame results in completion order.
-  /// Null when result_count is 0.
   final List<RenderFrameResult> results;
 
   @override

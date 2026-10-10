@@ -3475,10 +3475,7 @@ public data class TextureReadbackResult(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public data class RenderFrameBatchView(
-  /**
-   * Borrowed array of result_count terminal frame results in completion order. Null when
-   * result_count is 0.
-   */
+  /** Borrowed array of result_count terminal frame results in completion order. */
   public val results: List<RenderFrameResult> = emptyList()
 )
 

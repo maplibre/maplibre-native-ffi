@@ -3418,7 +3418,7 @@ pub enum RenderDriverKind: u32 {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct RenderFrameBatchView {
     /// Borrowed array of result_count terminal frame results in completion
-    /// order. Null when result_count is 0.
+    /// order.
     pub results: Vec<RenderFrameResult>,
 }
 impl FromNative<sys::mln_render_frame_batch_view> for RenderFrameBatchView {

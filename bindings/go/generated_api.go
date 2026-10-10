@@ -3130,7 +3130,6 @@ func copyRenderAbandonResult(raw C.mln_render_abandon_result) RenderAbandonResul
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderFrameBatchView struct {
 	// Borrowed array of result_count terminal frame results in completion order.
-	// Null when result_count is 0.
 	Results []RenderFrameResult
 }
 

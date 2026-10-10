@@ -2894,16 +2894,23 @@ auto render_session_drain_frame_results(
       return MLN_STATUS_NOT_READY;
     }
   }
-  // Allocating before the swap means a failed allocation loses no results.
-  auto batch = std::make_shared<mln_render_frame_batch_object>();
+  // Allocating and registering the batch before the swap means a failure
+  // loses no results: nothing after the swap can throw. The handle stays
+  // private until this call returns it.
+  const auto batch = std::make_shared<mln_render_frame_batch_object>();
+  const auto handle =
+    handle_table<mln_render_frame_batch_object>().insert(batch);
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     batch->results.swap(live->frame_results);
     live->frame_wake_pending = false;
   }
   // A concurrent drain can empty the queue between the two locks.
-  if (batch->results.empty()) return MLN_STATUS_NOT_READY;
-  *out_batch = handle_table<mln_render_frame_batch_object>().insert(batch);
+  if (batch->results.empty()) {
+    render_frame_batch_release(handle);
+    return MLN_STATUS_NOT_READY;
+  }
+  *out_batch = handle;
   return MLN_STATUS_OK;
 }
 
@@ -2919,7 +2926,7 @@ auto render_frame_batch_get(
   *out_view = mln_render_frame_batch_view{
     .size = sizeof(mln_render_frame_batch_view),
     .result_size = sizeof(mln_render_frame_result),
-    .results = live->results.empty() ? nullptr : live->results.data(),
+    .results = live->results.data(),
     .result_count = live->results.size(),
   };
   return MLN_STATUS_OK;
