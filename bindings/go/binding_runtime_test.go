@@ -53,7 +53,7 @@ func TestIntegerCarriersKeepTheirValues(t *testing.T) {
 	)
 	arena := &bindingArena{}
 	defer arena.close()
-	extent := RenderTargetExtent{Width: 64, Height: 32, ScaleFactor: 2}
+	extent := LogicalExtent{Width: 64, Height: 32, ScaleFactor: 2}
 	context := VulkanContextDescriptor{Instance: 0x30, PhysicalDevice: 0x40, Device: 0x50, GraphicsQueue: 0x60}
 	texture := nativeVulkanBorrowedTextureDescriptor(VulkanBorrowedTextureDescriptor{
 		Extent: extent, PhysicalWidth: 128, PhysicalHeight: 64, Context: context, Image: image, ImageView: imageView,

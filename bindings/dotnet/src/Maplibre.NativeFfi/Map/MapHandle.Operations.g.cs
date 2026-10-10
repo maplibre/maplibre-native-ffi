@@ -543,7 +543,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Submits one copied relative camera update.
+    /// Submits one atomic relative camera update.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_apply_camera_delta</c> in the <see
@@ -1016,24 +1016,19 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts creation of a standalone projection from the map's ordered
-    /// transform state.
+    /// Creates a standalone projection from the map's latest published
+    /// snapshot.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_create_projection</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<MapProjectionHandle> CreateProjectionAsync(
-        CancellationToken cancellationToken = default
-    )
+    public MapProjectionHandle CreateProjection()
     {
-        using var scope = new NativeCallScope(this, "mln_map_create_projection");
-        return scope.Query<MlnMapProjection, MapProjectionHandle>(
-            (completion, diagnostic) =>
-                NativeMethods.mln_map_create_projection(Handle, completion, diagnostic),
-            handle => MapProjectionHandle.Adopt(handle),
-            cancellationToken
-        );
+        using var call = Enter(this, "mln_map_create_projection");
+        MlnMapProjection outProjection = default;
+        Check(NativeMethods.mln_map_create_projection(Handle, &outProjection, Diagnostic));
+        return MapProjectionHandle.Adopt(outProjection);
     }
 
     /// <summary>
@@ -1089,29 +1084,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             CopyCameraQueryResult,
             cancellationToken
         );
-    }
-
-    /// <summary>
-    /// Copies the camera from the latest immutable map snapshot.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_get_camera_snapshot</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public (CameraOptions Camera, ulong Generation) GetCameraSnapshot()
-    {
-        using var read = state.Read(this, "mln_map_get_camera_snapshot");
-        var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
-        ulong outGeneration = default;
-        Check(
-            NativeMethods.mln_map_get_camera_snapshot(
-                read.Handle,
-                &outCamera,
-                &outGeneration,
-                Diagnostic
-            )
-        );
-        return (CopyCameraOptions(outCamera), outGeneration);
     }
 
     /// <summary>

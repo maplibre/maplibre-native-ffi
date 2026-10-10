@@ -56,12 +56,12 @@ auto mln_opengl_supported_context_provider_mask(void) noexcept -> uint32_t {
   return mln::core::opengl_supported_context_provider_mask();
 }
 
-auto mln_render_target_extent_physical_size(
-  const mln_render_target_extent* extent, uint32_t* out_width,
-  uint32_t* out_height, mln_diagnostic* out_diagnostic
+auto mln_logical_extent_physical_size(
+  mln_logical_extent extent, uint32_t* out_width, uint32_t* out_height,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::render_target_extent_physical_size(
+    return mln::core::logical_extent_physical_size(
       extent, out_width, out_height
     );
   });

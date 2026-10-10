@@ -110,6 +110,29 @@ public static unsafe partial class Maplibre
     }
 
     /// <summary>
+    /// Computes the physical device-pixel size of a logical extent.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_logical_extent_physical_size</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+    /// </remarks>
+    public static (uint Width, uint Height) LogicalExtentPhysicalSize(LogicalExtent extent)
+    {
+        using var call = Enter(null, "mln_logical_extent_physical_size");
+        uint outWidth = default;
+        uint outHeight = default;
+        Check(
+            NativeMethods.mln_logical_extent_physical_size(
+                NativeLogicalExtent(extent),
+                &outWidth,
+                &outHeight,
+                Diagnostic
+            )
+        );
+        return (outWidth, outHeight);
+    }
+
+    /// <summary>
     /// Reads MapLibre Native's process-global network status.
     /// </summary>
     /// <remarks>
@@ -185,33 +208,6 @@ public static unsafe partial class Maplibre
             )
         );
         return CopyProjectedMeters(outMeters);
-    }
-
-    /// <summary>
-    /// Computes the physical device-pixel size of a logical render target
-    /// extent.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_render_target_extent_physical_size</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
-    /// </remarks>
-    public static (uint Width, uint Height) RenderTargetExtentPhysicalSize(
-        RenderTargetExtent extent
-    )
-    {
-        using var call = Enter(null, "mln_render_target_extent_physical_size");
-        var nativeExtent = NativeRenderTargetExtent(extent);
-        uint outWidth = default;
-        uint outHeight = default;
-        Check(
-            NativeMethods.mln_render_target_extent_physical_size(
-                &nativeExtent,
-                &outWidth,
-                &outHeight,
-                Diagnostic
-            )
-        );
-        return (outWidth, outHeight);
     }
 
     /// <summary>

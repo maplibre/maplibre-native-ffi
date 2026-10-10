@@ -35,6 +35,9 @@ typedef enum mln_command_disposition : uint32_t {
  * disposition and generation are meaningful for commands. Other one-shot
  * functions set disposition to MLN_COMMAND_DISPOSITION_COMMITTED and
  * generation to zero.
+ *
+ * A map command queues the runtime events it raises before its completion
+ * runs, and those events carry the generation this result reports.
  */
 typedef struct mln_completion_result {
   uint32_t size;
@@ -48,7 +51,11 @@ typedef struct mln_completion_result {
    * null. Index array results with this value.
    */
   uint32_t value_size;
-  /** Map snapshot generation published by a committed command, or zero. */
+  /**
+   * Map snapshot generation published after a map command ran, whether it
+   * committed or failed; zero when the command never ran or the function is
+   * not a command.
+   */
   uint64_t generation;
   /** Borrowed diagnostic bytes, empty on success. */
   mln_buffer_view diagnostic;

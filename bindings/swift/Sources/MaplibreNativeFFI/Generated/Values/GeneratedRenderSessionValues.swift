@@ -266,7 +266,8 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
   public var driver: RenderDriverKind
   /// Most recent terminal `mln_render_result` value.
   public var latestResult: RenderResult
-  public var extent: RenderTargetExtent
+  /// Logical extent, including a resize the driver has not applied yet.
+  public var extent: LogicalExtent
   public var generation: UInt64
   public var mapUpdateGeneration: UInt64
   public var renderedUpdateGeneration: UInt64
@@ -285,7 +286,7 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     state: RenderSessionState = RenderSessionSnapshot.default.state,
     driver: RenderDriverKind = RenderSessionSnapshot.default.driver,
     latestResult: RenderResult = RenderSessionSnapshot.default.latestResult,
-    extent: RenderTargetExtent = RenderSessionSnapshot.default.extent,
+    extent: LogicalExtent = RenderSessionSnapshot.default.extent,
     generation: UInt64 = RenderSessionSnapshot.default.generation,
     mapUpdateGeneration: UInt64 = RenderSessionSnapshot.default
       .mapUpdateGeneration,
@@ -321,7 +322,7 @@ public struct RenderSessionSnapshot: Equatable, Hashable, Sendable {
     state = RenderSessionState(rawValue: raw.state)
     driver = RenderDriverKind(rawValue: raw.driver)
     latestResult = RenderResult(rawValue: raw.latest_result)
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     generation = raw.generation
     mapUpdateGeneration = raw.map_update_generation
     renderedUpdateGeneration = raw.rendered_update_generation

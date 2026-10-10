@@ -95,8 +95,7 @@ static void a_borrowed_texture_holds_the_rendered_frame(void) {
   );
   TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
   MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
-  const mln_render_target_extent smaller = {
-    .size = sizeof(mln_render_target_extent),
+  const mln_logical_extent smaller = {
     .width = MLN_TEST_HOST_TARGET_SIZE / 2,
     .height = MLN_TEST_HOST_TARGET_SIZE / 2,
     .scale_factor = 1.0,
@@ -105,7 +104,7 @@ static void a_borrowed_texture_holds_the_rendered_frame(void) {
   MLN_TEST_STATUS(
     MLN_STATUS_UNSUPPORTED,
     mln_render_session_resize(
-      fixture.session, &smaller, &resize.descriptor, MLN_TEST_DIAGNOSTIC
+      fixture.session, smaller, &resize.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );
   TEST_ASSERT_NOT_NULL(strstr(mln_test_last_error(), "sized by its owner"));
@@ -137,8 +136,7 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   );
   MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
 
-  const mln_render_target_extent extent = {
-    .size = sizeof(mln_render_target_extent),
+  const mln_logical_extent extent = {
     .width = 48,
     .height = 32,
     .scale_factor = 1.0,
@@ -146,7 +144,7 @@ static void a_surface_presents_frames_and_takes_a_resize(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, &extent, &completion.descriptor, NULL
+      fixture.session, extent, &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT32(
@@ -188,8 +186,7 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
   TEST_ASSERT_TRUE(mln_test_graphics_surface_get_info(replacement, &info));
   mln_metal_surface_descriptor descriptor =
     mln_metal_surface_descriptor_default();
-  descriptor.extent = (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
+  descriptor.extent = (mln_logical_extent){
     .width = MLN_TEST_HOST_TARGET_SIZE,
     .height = MLN_TEST_HOST_TARGET_SIZE,
     .scale_factor = 2.0,

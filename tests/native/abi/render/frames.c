@@ -564,8 +564,7 @@ static void a_resize_retires_every_old_size_slot(void) {
   mln_test_render_release_frame(&frame);
   mln_test_render_release_frame(&held);
 
-  const mln_render_target_extent resized = {
-    .size = sizeof(mln_render_target_extent),
+  const mln_logical_extent resized = {
     .width = 48,
     .height = 24,
     .scale_factor = 1.0,
@@ -573,7 +572,7 @@ static void a_resize_retires_every_old_size_slot(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, &resized, &completion.descriptor, NULL
+      fixture.session, resized, &completion.descriptor, NULL
     )
   );
   for (uint64_t token = 303; token <= 304; token += 1) {
@@ -589,19 +588,14 @@ static void a_resize_retires_every_old_size_slot(void) {
 
 typedef struct physical_row {
   const char* label;
-  mln_render_target_extent extent;
+  mln_logical_extent extent;
   mln_status expected;
   uint32_t width;
   uint32_t height;
 } physical_row;
 
-#define EXTENT(w, h, scale)                   \
-  ((mln_render_target_extent){                \
-    .size = sizeof(mln_render_target_extent), \
-    .width = (w),                             \
-    .height = (h),                            \
-    .scale_factor = (scale)                   \
-  })
+#define EXTENT(w, h, scale) \
+  ((mln_logical_extent){.width = (w), .height = (h), .scale_factor = (scale)})
 
 // Each physical dimension is the logical one times the scale factor, rounded
 // up, and must fit in 32 bits.
@@ -623,18 +617,13 @@ static void physical_sizes_round_up_and_reject_overflow(void) {
     {"a height past the limit overflows", EXTENT(1, UINT32_MAX, 1.5),
      MLN_STATUS_INVALID_ARGUMENT, 0, 0},
     {"a zero width", EXTENT(0, 1, 1.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
+    {"a zero height", EXTENT(1, 0, 1.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
     {"a zero scale", EXTENT(1, 1, 0.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
     {"a negative scale", EXTENT(1, 1, -1.0), MLN_STATUS_INVALID_ARGUMENT, 0, 0},
+    {"an infinite scale", EXTENT(1, 1, (double)INFINITY),
+     MLN_STATUS_INVALID_ARGUMENT, 0, 0},
     {"a scale that is not a number", EXTENT(1, 1, (double)NAN),
      MLN_STATUS_INVALID_ARGUMENT, 0, 0},
-    {"an undersized extent",
-     {.size = sizeof(mln_render_target_extent) - 1,
-      .width = 1,
-      .height = 1,
-      .scale_factor = 1.0},
-     MLN_STATUS_INVALID_ARGUMENT,
-     0,
-     0},
   };
   for (size_t index = 0; index < sizeof(rows) / sizeof(rows[0]); index += 1) {
     const physical_row* row = &rows[index];
@@ -642,9 +631,7 @@ static void physical_sizes_round_up_and_reject_overflow(void) {
     uint32_t height = 7;
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       row->expected,
-      mln_render_target_extent_physical_size(
-        &row->extent, &width, &height, NULL
-      ),
+      mln_logical_extent_physical_size(row->extent, &width, &height, NULL),
       row->label
     );
     // A failed call leaves the outputs alone.
@@ -654,15 +641,12 @@ static void physical_sizes_round_up_and_reject_overflow(void) {
   }
   uint32_t width = 0;
   uint32_t height = 0;
-  const mln_render_target_extent extent = EXTENT(1, 1, 1.0);
+  const mln_logical_extent extent = EXTENT(1, 1, 1.0);
   MLN_TEST_INVALID(
-    mln_render_target_extent_physical_size(NULL, &width, &height, NULL)
+    mln_logical_extent_physical_size(extent, NULL, &height, NULL)
   );
   MLN_TEST_INVALID(
-    mln_render_target_extent_physical_size(&extent, NULL, &height, NULL)
-  );
-  MLN_TEST_INVALID(
-    mln_render_target_extent_physical_size(&extent, &width, NULL, NULL)
+    mln_logical_extent_physical_size(extent, &width, NULL, NULL)
   );
 }
 

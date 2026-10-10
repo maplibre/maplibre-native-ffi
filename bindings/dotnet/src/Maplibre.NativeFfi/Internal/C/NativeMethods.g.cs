@@ -171,6 +171,14 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_logical_extent_physical_size(
+        mln_logical_extent extent,
+        uint* out_width,
+        uint* out_height,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_add_color_relief_layer(
         MlnMap map,
         mln_buffer_view layer_id,
@@ -512,7 +520,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_create_projection(
         MlnMap map,
-        mln_completion* completion,
+        MlnMapProjection* out_projection,
         mln_diagnostic* out_diagnostic
     );
 
@@ -537,14 +545,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_get_camera(
         MlnMap map,
         mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_camera_snapshot(
-        MlnMap map,
-        mln_camera_options* out_camera,
-        ulong* out_generation,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1455,7 +1455,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_resize(
         MlnRenderSession session,
-        mln_render_target_extent* extent,
+        mln_logical_extent extent,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1529,14 +1529,6 @@ internal static unsafe partial class NativeMethods
         MlnRenderSession session,
         mln_webgpu_surface_descriptor* descriptor,
         mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_target_extent_physical_size(
-        mln_render_target_extent* extent,
-        uint* out_width,
-        uint* out_height,
         mln_diagnostic* out_diagnostic
     );
 

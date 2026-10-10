@@ -10,7 +10,9 @@ import Foundation
 public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
-  public var extent: RenderTargetExtent
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  public var extent: LogicalExtent
   /// Physical texture width in device pixels. Must be positive. Defaults to
   /// 256.
   public var physicalWidth: UInt32
@@ -24,7 +26,7 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = MetalBorrowedTextureDescriptor.default.extent,
+    extent: LogicalExtent = MetalBorrowedTextureDescriptor.default.extent,
     physicalWidth: UInt32 = MetalBorrowedTextureDescriptor.default
       .physicalWidth,
     physicalHeight: UInt32 = MetalBorrowedTextureDescriptor.default
@@ -38,7 +40,7 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_metal_borrowed_texture_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     texture = NativePointer(bitPattern: unsafeBitCast(
@@ -62,8 +64,9 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_metal_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent.
-  public var extent: RenderTargetExtent
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Metal backend context. device is required.
   public var context: MetalContextDescriptor
   public static var `default`: Self {
@@ -71,7 +74,7 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = MetalOwnedTextureDescriptor.default.extent,
+    extent: LogicalExtent = MetalOwnedTextureDescriptor.default.extent,
     context: MetalContextDescriptor = MetalOwnedTextureDescriptor.default
       .context
   ) {
@@ -80,7 +83,7 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_metal_owned_texture_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = MetalContextDescriptor(raw: raw.context)
   }
 
@@ -173,7 +176,9 @@ public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
 public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
-  public var extent: RenderTargetExtent
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  public var extent: LogicalExtent
   /// Physical texture width in device pixels. Must be positive. Defaults to
   /// 256.
   public var physicalWidth: UInt32
@@ -192,7 +197,7 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = OpenglBorrowedTextureDescriptor.default.extent,
+    extent: LogicalExtent = OpenglBorrowedTextureDescriptor.default.extent,
     physicalWidth: UInt32 = OpenglBorrowedTextureDescriptor.default
       .physicalWidth,
     physicalHeight: UInt32 = OpenglBorrowedTextureDescriptor.default
@@ -214,7 +219,7 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw: mln_opengl_borrowed_texture_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = try OpenglContextDescriptor(raw: raw.context)
@@ -242,8 +247,9 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_opengl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent.
-  public var extent: RenderTargetExtent
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Borrowed OpenGL context provider data. Shared ownership creates a context
   /// whose texture frames the host can acquire. Dedicated EGL or transferred
   /// WebGL ownership creates a private core-worker context for CPU readback.
@@ -253,7 +259,7 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = OpenglOwnedTextureDescriptor.default.extent,
+    extent: LogicalExtent = OpenglOwnedTextureDescriptor.default.extent,
     context: OpenglContextDescriptor = OpenglOwnedTextureDescriptor.default
       .context
   ) {
@@ -265,7 +271,7 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
     raw: mln_opengl_owned_texture_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = try OpenglContextDescriptor(raw: raw.context)
   }
 
@@ -451,7 +457,9 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
 public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
-  public var extent: RenderTargetExtent
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  public var extent: LogicalExtent
   /// Physical image width in device pixels. Must be positive. Defaults to 256.
   public var physicalWidth: UInt32
   /// Physical image height in device pixels. Must be positive. Defaults to 256.
@@ -474,7 +482,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = VulkanBorrowedTextureDescriptor.default.extent,
+    extent: LogicalExtent = VulkanBorrowedTextureDescriptor.default.extent,
     physicalWidth: UInt32 = VulkanBorrowedTextureDescriptor.default
       .physicalWidth,
     physicalHeight: UInt32 = VulkanBorrowedTextureDescriptor.default
@@ -500,7 +508,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_vulkan_borrowed_texture_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = VulkanContextDescriptor(raw: raw.context)
@@ -531,8 +539,9 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent.
-  public var extent: RenderTargetExtent
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
   public static var `default`: Self {
@@ -540,7 +549,7 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = VulkanOwnedTextureDescriptor.default.extent,
+    extent: LogicalExtent = VulkanOwnedTextureDescriptor.default.extent,
     context: VulkanContextDescriptor = VulkanOwnedTextureDescriptor.default
       .context
   ) {
@@ -549,7 +558,7 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_vulkan_owned_texture_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = VulkanContextDescriptor(raw: raw.context)
   }
 
@@ -649,8 +658,11 @@ public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
 /// See `mln_webgpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent.
-  public var extent: RenderTargetExtent
+  /// Logical texture extent. The map viewport uses width and height and the
+  /// renderer uses scale_factor; the physical size is stated separately below.
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  public var extent: LogicalExtent
   /// Physical texture width in device pixels. Defaults to 256.
   public var physicalWidth: UInt32
   /// Physical texture height in device pixels. Defaults to 256.
@@ -668,7 +680,7 @@ public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = WebgpuBorrowedTextureDescriptor.default.extent,
+    extent: LogicalExtent = WebgpuBorrowedTextureDescriptor.default.extent,
     physicalWidth: UInt32 = WebgpuBorrowedTextureDescriptor.default
       .physicalWidth,
     physicalHeight: UInt32 = WebgpuBorrowedTextureDescriptor.default
@@ -690,7 +702,7 @@ public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_webgpu_borrowed_texture_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = WebgpuContextDescriptor(raw: raw.context)
@@ -723,8 +735,9 @@ public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_webgpu_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 public struct WebgpuOwnedTextureDescriptor: Equatable, Hashable, Sendable {
-  /// Logical texture extent.
-  public var extent: RenderTargetExtent
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Borrowed WebGPU context. device is required.
   public var context: WebgpuContextDescriptor
   public static var `default`: Self {
@@ -732,7 +745,7 @@ public struct WebgpuOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = WebgpuOwnedTextureDescriptor.default.extent,
+    extent: LogicalExtent = WebgpuOwnedTextureDescriptor.default.extent,
     context: WebgpuContextDescriptor = WebgpuOwnedTextureDescriptor.default
       .context
   ) {
@@ -741,7 +754,7 @@ public struct WebgpuOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_webgpu_owned_texture_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = WebgpuContextDescriptor(raw: raw.context)
   }
 

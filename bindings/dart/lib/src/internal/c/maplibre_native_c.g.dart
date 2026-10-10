@@ -230,13 +230,19 @@ final class mln_camera_delta extends Struct {
   external int size;
   @Uint32()
   external int fields;
-  @Uint32()
-  external int kind;
   external mln_screen_point offset;
   @Double()
-  external double amount;
+  external double scale;
+  @Double()
+  external double bearing;
+  @Double()
+  external double pitch;
   external mln_screen_point anchor;
   external mln_animation_options animation;
+  @Uint32()
+  external int gesture_phase;
+  @Uint32()
+  external int reserved;
 }
 
 final class mln_camera_fit_options extends Struct {
@@ -617,7 +623,7 @@ final class mln_map_viewport_options extends Struct {
 final class mln_metal_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   @Uint32()
   external int physical_width;
   @Uint32()
@@ -632,7 +638,7 @@ final class mln_metal_context_descriptor extends Struct {
 final class mln_metal_owned_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_metal_context_descriptor context;
 }
 
@@ -658,7 +664,7 @@ final class mln_metal_owned_texture_frame extends Struct {
 final class mln_metal_surface_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_metal_context_descriptor context;
   external Pointer<Void> layer;
 }
@@ -735,7 +741,7 @@ final class mln_offline_tile_pyramid_region_definition extends Struct {
 final class mln_opengl_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   @Uint32()
   external int physical_width;
   @Uint32()
@@ -764,7 +770,7 @@ final class mln_opengl_context_descriptor_data extends Union {
 final class mln_opengl_owned_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_opengl_context_descriptor context;
 }
 
@@ -796,7 +802,7 @@ final class mln_opengl_owned_texture_frame extends Struct {
 final class mln_opengl_surface_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_opengl_context_descriptor context;
   external Pointer<Void> surface;
 }
@@ -934,7 +940,7 @@ final class mln_render_session_snapshot extends Struct {
   external int driver;
   @Uint32()
   external int latest_result;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   @Uint64()
   external int generation;
   @Uint64()
@@ -955,17 +961,6 @@ final class mln_render_session_snapshot extends Struct {
   external bool target_ready;
   @Bool()
   external bool pending_changes;
-}
-
-final class mln_render_target_extent extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int width;
-  @Uint32()
-  external int height;
-  @Double()
-  external double scale_factor;
 }
 
 final class mln_rendered_feature_query_options extends Struct {
@@ -1103,6 +1098,8 @@ final class mln_runtime_event extends Struct {
   external int source_type;
   @Uint64()
   external int source;
+  @Uint64()
+  external int generation;
   @Int32()
   external int code;
   @Uint32()
@@ -1390,7 +1387,7 @@ final class mln_vec3 extends Struct {
 final class mln_vulkan_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   @Uint32()
   external int physical_width;
   @Uint32()
@@ -1422,7 +1419,7 @@ final class mln_vulkan_context_descriptor extends Struct {
 final class mln_vulkan_owned_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_vulkan_context_descriptor context;
 }
 
@@ -1453,7 +1450,7 @@ final class mln_vulkan_owned_texture_frame extends Struct {
 final class mln_vulkan_surface_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_vulkan_context_descriptor context;
   @Uint64()
   external int surface;
@@ -1476,7 +1473,7 @@ final class mln_webgl_context_descriptor extends Struct {
 final class mln_webgpu_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   @Uint32()
   external int physical_width;
   @Uint32()
@@ -1497,7 +1494,7 @@ final class mln_webgpu_context_descriptor extends Struct {
 final class mln_webgpu_owned_texture_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_webgpu_context_descriptor context;
 }
 
@@ -1524,7 +1521,7 @@ final class mln_webgpu_owned_texture_frame extends Struct {
 final class mln_webgpu_surface_descriptor extends Struct {
   @Uint32()
   external int size;
-  external mln_render_target_extent extent;
+  external mln_logical_extent extent;
   external mln_webgpu_context_descriptor context;
   external Pointer<Void> surface;
   @Uint32()
@@ -1545,7 +1542,6 @@ const MLN_ADAPTER_COMPLETION_COPY_CAMERA_QUERY_RESULT = 1485572681;
 const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG = 2638194669;
 const MLN_ADAPTER_COMPLETION_COPY_LAT_LNG_BOUNDS = 3400515811;
 const MLN_ADAPTER_COMPLETION_COPY_MAP = 438078448;
-const MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION = 3555078466;
 const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO = 3939645993;
 const MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_STATUS = 1567541687;
 const MLN_ADAPTER_COMPLETION_COPY_QUERIED_FEATURE = 3048968095;
@@ -1608,13 +1604,11 @@ const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
 const MLN_CAMERA_CHANGE_MODE_ANIMATED = 1;
 
 // mln_camera_delta_field
-const MLN_CAMERA_DELTA_FIELD_ANCHOR = 1;
-
-// mln_camera_delta_kind
-const MLN_CAMERA_DELTA_MOVE = 0;
-const MLN_CAMERA_DELTA_SCALE = 1;
-const MLN_CAMERA_DELTA_BEARING = 2;
-const MLN_CAMERA_DELTA_PITCH = 3;
+const MLN_CAMERA_DELTA_OFFSET = 1;
+const MLN_CAMERA_DELTA_SCALE = 2;
+const MLN_CAMERA_DELTA_BEARING = 4;
+const MLN_CAMERA_DELTA_PITCH = 8;
+const MLN_CAMERA_DELTA_ANCHOR = 16;
 
 // mln_camera_fit_option_field
 const MLN_CAMERA_FIT_OPTION_PADDING = 1;
@@ -2603,6 +2597,21 @@ external int mln_log_set_callback(
 
 @Native<
   Int32 Function(
+    mln_logical_extent,
+    Pointer<Uint32>,
+    Pointer<Uint32>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_logical_extent_physical_size(
+  mln_logical_extent extent,
+  Pointer<Uint32> out_width,
+  Pointer<Uint32> out_height,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
     mln_map,
     mln_buffer_view,
     mln_buffer_view,
@@ -3237,11 +3246,11 @@ external int mln_map_cancel_transitions(
 );
 
 @Native<
-  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+  Int32 Function(mln_map, Pointer<mln_map_projection>, Pointer<mln_diagnostic>)
 >()
 external int mln_map_create_projection(
   int map,
-  Pointer<mln_completion> completion,
+  Pointer<mln_map_projection> out_projection,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -3272,21 +3281,6 @@ external int mln_map_end_command_group(
 external int mln_map_get_camera(
   int map,
   Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    mln_map,
-    Pointer<mln_camera_options>,
-    Pointer<Uint64>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_map_get_camera_snapshot(
-  int map,
-  Pointer<mln_camera_options> out_camera,
-  Pointer<Uint64> out_generation,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -4890,14 +4884,14 @@ external int mln_render_session_request_frame(
 @Native<
   Int32 Function(
     mln_render_session,
-    Pointer<mln_render_target_extent>,
+    mln_logical_extent,
     Pointer<mln_completion>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_render_session_resize(
   int session,
-  Pointer<mln_render_target_extent> extent,
+  mln_logical_extent extent,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -5034,21 +5028,6 @@ external int mln_render_session_set_webgpu_surface_target(
   int session,
   Pointer<mln_webgpu_surface_descriptor> descriptor,
   Pointer<mln_completion> completion,
-  Pointer<mln_diagnostic> out_diagnostic,
-);
-
-@Native<
-  Int32 Function(
-    Pointer<mln_render_target_extent>,
-    Pointer<Uint32>,
-    Pointer<Uint32>,
-    Pointer<mln_diagnostic>,
-  )
->()
-external int mln_render_target_extent_physical_size(
-  Pointer<mln_render_target_extent> extent,
-  Pointer<Uint32> out_width,
-  Pointer<Uint32> out_height,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 

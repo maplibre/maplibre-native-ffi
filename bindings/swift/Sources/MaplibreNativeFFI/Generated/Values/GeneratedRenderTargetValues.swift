@@ -530,47 +530,6 @@ public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
     .init(rawValue: 8)
 }
 
-/// Logical render target extent in UI pixels.
-///
-/// See `mln_render_target_extent` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-public struct RenderTargetExtent: Equatable, Hashable, Sendable {
-  /// Logical map width in UI pixels. Defaults to 256.
-  public var width: UInt32
-  /// Logical map height in UI pixels. Defaults to 256.
-  public var height: UInt32
-  /// UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0.
-  public var scaleFactor: Double
-  public static var `default`: Self {
-    Self(raw: mln_render_target_extent())
-  }
-
-  public init(
-    width: UInt32 = RenderTargetExtent.default.width,
-    height: UInt32 = RenderTargetExtent.default.height,
-    scaleFactor: Double = RenderTargetExtent.default.scaleFactor
-  ) {
-    self.width = width
-    self.height = height
-    self.scaleFactor = scaleFactor
-  }
-
-  init(raw: mln_render_target_extent) {
-    width = raw.width
-    height = raw.height
-    scaleFactor = raw.scale_factor
-  }
-
-  func nativeValue() -> mln_render_target_extent {
-    var raw = mln_render_target_extent()
-    raw.size = UInt32(MemoryLayout<mln_render_target_extent>.size)
-    raw.width = width
-    raw.height = height
-    raw.scale_factor = scaleFactor
-    return raw
-  }
-}
-
 /// Vulkan backend context fields shared by Vulkan render targets.
 ///
 /// See `mln_vulkan_context_descriptor` in the

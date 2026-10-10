@@ -4,7 +4,7 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Submits one copied relative camera update.
+  /// Submits one atomic relative camera update.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -126,25 +126,6 @@ public extension MapHandle {
       completion,
       diagnostic
     ) }
-  }
-
-  /// Copies the camera from the latest immutable map snapshot.
-  ///
-  /// See `mln_map_get_camera_snapshot` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func getCameraSnapshot() throws
-    -> (camera: CameraOptions, generation: UInt64)
-  {
-    var value0: mln_camera_options = mln_camera_options_default()
-    var value1: UInt64 = 0
-    return try nativeInvoke("mln_map_get_camera_snapshot") { raw, _, diagnostic in
-      mln_map_get_camera_snapshot(
-        raw,
-        &value0,
-        &value1,
-        diagnostic
-      )
-    } result: { (CameraOptions(raw: value0), value1) }
   }
 
   /// Starts an ordered wrapped-bounds query for a copied camera.

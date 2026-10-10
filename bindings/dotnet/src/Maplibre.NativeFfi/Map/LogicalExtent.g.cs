@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Logical map extent in UI pixels and device-pixel scale.
+/// Logical extent in UI pixels and the device-pixel scale.
 /// </summary>
 /// <remarks>
 /// See <c>mln_logical_extent</c> in the <see
@@ -16,9 +16,7 @@ namespace Maplibre.NativeFfi;
 /// Height in UI pixels. Defaults to 256.
 /// </param>
 /// <param name="ScaleFactor">
-/// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
-/// creation, so <c>mln_map_resize()</c> accepts only the value the map was
-/// created with.
+/// Device pixels per UI pixel. Defaults to 1.0.
 /// </param>
 public readonly partial record struct LogicalExtent(uint Width, uint Height, double ScaleFactor)
 {

@@ -4,20 +4,18 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Starts creation of a standalone projection from the map's ordered
-  /// transform
-  /// state.
+  /// Creates a standalone projection from the map's latest published snapshot.
   ///
   /// See `mln_map_create_projection` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  func createProjection() async throws -> MapProjectionHandle {
-    try await nativeStart(
-      "mln_map_create_projection",
-      copying: { try MapProjectionHandle(adopting: $0) }
-    ) { raw, _, completion, diagnostic in mln_map_create_projection(
-      raw,
-      completion,
-      diagnostic
-    ) }
+  func createProjection() throws -> MapProjectionHandle {
+    var value0: mln_map_projection = 0
+    return try nativeInvoke("mln_map_create_projection") { raw, _, diagnostic in
+      mln_map_create_projection(
+        raw,
+        &value0,
+        diagnostic
+      )
+    } result: { try MapProjectionHandle(adopting: value0) }
   }
 }

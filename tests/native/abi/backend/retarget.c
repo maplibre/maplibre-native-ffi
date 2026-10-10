@@ -464,8 +464,7 @@ static mln_status submit_metal_texture(
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   mln_metal_borrowed_texture_descriptor descriptor =
     mln_metal_borrowed_texture_descriptor_default();
-  descriptor.extent = (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
+  descriptor.extent = (mln_logical_extent){
     .width = MLN_TEST_HOST_TARGET_SIZE,
     .height = MLN_TEST_HOST_TARGET_SIZE,
     .scale_factor = 1.0,

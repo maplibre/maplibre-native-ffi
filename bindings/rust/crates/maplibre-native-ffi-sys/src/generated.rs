@@ -23,12 +23,11 @@ pub type mln_camera_change_mode = u32;
 pub const MLN_CAMERA_CHANGE_MODE_IMMEDIATE: mln_camera_change_mode = 0;
 pub const MLN_CAMERA_CHANGE_MODE_ANIMATED: mln_camera_change_mode = 1;
 pub type mln_camera_delta_field = u32;
-pub const MLN_CAMERA_DELTA_FIELD_ANCHOR: mln_camera_delta_field = 1;
-pub type mln_camera_delta_kind = u32;
-pub const MLN_CAMERA_DELTA_MOVE: mln_camera_delta_kind = 0;
-pub const MLN_CAMERA_DELTA_SCALE: mln_camera_delta_kind = 1;
-pub const MLN_CAMERA_DELTA_BEARING: mln_camera_delta_kind = 2;
-pub const MLN_CAMERA_DELTA_PITCH: mln_camera_delta_kind = 3;
+pub const MLN_CAMERA_DELTA_OFFSET: mln_camera_delta_field = 1;
+pub const MLN_CAMERA_DELTA_SCALE: mln_camera_delta_field = 2;
+pub const MLN_CAMERA_DELTA_BEARING: mln_camera_delta_field = 4;
+pub const MLN_CAMERA_DELTA_PITCH: mln_camera_delta_field = 8;
+pub const MLN_CAMERA_DELTA_ANCHOR: mln_camera_delta_field = 16;
 pub type mln_camera_fit_option_field = u32;
 pub const MLN_CAMERA_FIT_OPTION_PADDING: mln_camera_fit_option_field = 1;
 pub const MLN_CAMERA_FIT_OPTION_BEARING: mln_camera_fit_option_field = 2;
@@ -477,11 +476,14 @@ pub struct mln_buffer_view {
 pub struct mln_camera_delta {
     pub size: u32,
     pub fields: u32,
-    pub kind: u32,
     pub offset: mln_screen_point,
-    pub amount: f64,
+    pub scale: f64,
+    pub bearing: f64,
+    pub pitch: f64,
     pub anchor: mln_screen_point,
     pub animation: mln_animation_options,
+    pub gesture_phase: u32,
+    pub reserved: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -775,7 +777,7 @@ pub struct mln_map_viewport_options {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub physical_width: u32,
     pub physical_height: u32,
     pub texture: *mut std::ffi::c_void,
@@ -789,7 +791,7 @@ pub struct mln_metal_context_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_owned_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_metal_context_descriptor,
 }
 #[repr(C)]
@@ -809,7 +811,7 @@ pub struct mln_metal_owned_texture_frame {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_surface_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_metal_context_descriptor,
     pub layer: *mut std::ffi::c_void,
 }
@@ -871,7 +873,7 @@ pub struct mln_offline_tile_pyramid_region_definition {
 #[derive(Clone, Copy)]
 pub struct mln_opengl_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_opengl_context_descriptor,
@@ -896,7 +898,7 @@ pub union mln_opengl_context_descriptor_data {
 #[derive(Clone, Copy)]
 pub struct mln_opengl_owned_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_opengl_context_descriptor,
 }
 #[repr(C)]
@@ -918,7 +920,7 @@ pub struct mln_opengl_owned_texture_frame {
 #[derive(Clone, Copy)]
 pub struct mln_opengl_surface_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_opengl_context_descriptor,
     pub surface: *mut std::ffi::c_void,
 }
@@ -1025,7 +1027,7 @@ pub struct mln_render_session_snapshot {
     pub state: u32,
     pub driver: u32,
     pub latest_result: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub generation: u64,
     pub map_update_generation: u64,
     pub rendered_update_generation: u64,
@@ -1036,14 +1038,6 @@ pub struct mln_render_session_snapshot {
     pub acquired_frame_count: u32,
     pub target_ready: bool,
     pub pending_changes: bool,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_render_target_extent {
-    pub size: u32,
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1155,6 +1149,7 @@ pub struct mln_runtime_event {
     pub type_: u32,
     pub source_type: u32,
     pub source: u64,
+    pub generation: u64,
     pub code: i32,
     pub payload_type: u32,
     pub message_offset: u64,
@@ -1382,7 +1377,7 @@ pub struct mln_vec3 {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_vulkan_context_descriptor,
@@ -1407,7 +1402,7 @@ pub struct mln_vulkan_context_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_owned_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_vulkan_context_descriptor,
 }
 #[repr(C)]
@@ -1429,7 +1424,7 @@ pub struct mln_vulkan_owned_texture_frame {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_surface_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_vulkan_context_descriptor,
     pub surface: mln_vulkan_non_dispatchable_handle,
 }
@@ -1451,7 +1446,7 @@ pub struct mln_webgl_context_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_webgpu_borrowed_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_webgpu_context_descriptor,
@@ -1470,7 +1465,7 @@ pub struct mln_webgpu_context_descriptor {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_webgpu_owned_texture_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_webgpu_context_descriptor,
 }
 #[repr(C)]
@@ -1491,7 +1486,7 @@ pub struct mln_webgpu_owned_texture_frame {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_webgpu_surface_descriptor {
     pub size: u32,
-    pub extent: mln_render_target_extent,
+    pub extent: mln_logical_extent,
     pub context: mln_webgpu_context_descriptor,
     pub surface: *mut std::ffi::c_void,
     pub format: u32,
@@ -1684,6 +1679,12 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_log_set_callback(
         handler: *const mln_log_handler,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_logical_extent_physical_size(
+        extent: mln_logical_extent,
+        out_width: *mut u32,
+        out_height: *mut u32,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_add_color_relief_layer(
@@ -1957,7 +1958,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_create_projection(
         map: mln_map,
-        completion: *const mln_completion,
+        out_projection: *mut mln_map_projection,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_dispose(map: mln_map, out_diagnostic: *mut mln_diagnostic) -> mln_status;
@@ -1974,12 +1975,6 @@ unsafe extern "C" {
     pub fn mln_map_get_camera(
         map: mln_map,
         completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_get_camera_snapshot(
-        map: mln_map,
-        out_camera: *mut mln_camera_options,
-        out_generation: *mut u64,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_get_feature_state(
@@ -2643,7 +2638,7 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_render_session_resize(
         session: mln_render_session,
-        extent: *const mln_render_target_extent,
+        extent: mln_logical_extent,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2699,12 +2694,6 @@ unsafe extern "C" {
         session: mln_render_session,
         descriptor: *const mln_webgpu_surface_descriptor,
         completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_render_target_extent_physical_size(
-        extent: *const mln_render_target_extent,
-        out_width: *mut u32,
-        out_height: *mut u32,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_rendered_feature_query_options_default() -> mln_rendered_feature_query_options;

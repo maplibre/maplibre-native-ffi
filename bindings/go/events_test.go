@@ -27,6 +27,7 @@ func TestEventDecoderReadsAStridedBatchWithUnknownValues(t *testing.T) {
 				TileId:    TileId{OverscaledZ: 9, Wrap: -1, CanonicalZ: 8, CanonicalX: 7, CanonicalY: 6},
 			}),
 		newRuntimeEventForTest(RuntimeEventType(0x7fff_0001), RuntimeEventSourceType(0x7fff_0002), 0x7fff_0004).
+			withGeneration(0x1_0000_0003).
 			withRawPayload(RuntimeEventPayloadType(0x7fff_0003), window),
 		newRuntimeEventForTest(RuntimeEventTypeMapCameraTransitionFinished, RuntimeEventSourceTypeMap, 1).
 			withCameraTransitionFinished(RuntimeEventCameraTransitionFinished{TransitionId: 7}),
@@ -45,8 +46,8 @@ func TestEventDecoderReadsAStridedBatchWithUnknownValues(t *testing.T) {
 		t.Fatalf("tile action message = %q, want the source ID", decoded[1].Message)
 	}
 	unknown := decoded[2]
-	if unknown.Type != RuntimeEventType(0x7fff_0001) || unknown.SourceType != RuntimeEventSourceType(0x7fff_0002) || unknown.Source != 0x7fff_0004 {
-		t.Fatalf("unknown event = %+v, want its raw type, source type, and source", unknown)
+	if unknown.Type != RuntimeEventType(0x7fff_0001) || unknown.SourceType != RuntimeEventSourceType(0x7fff_0002) || unknown.Source != 0x7fff_0004 || unknown.Generation != 0x1_0000_0003 {
+		t.Fatalf("unknown event = %+v, want its raw type, source type, source, and generation", unknown)
 	}
 	if payload, ok := unknown.Payload.(UnknownVariant); !ok || payload.Tag != 0x7fff_0003 {
 		t.Fatalf("unknown payload = %#v, want UnknownVariant with the raw tag", unknown.Payload)

@@ -93,9 +93,12 @@ cancellation, so a Dart wait can only time out, and the future still delivers
 its result.
 
 Published snapshots provide synchronous copies of state needed by UI and display
-threads. Snapshot reads never call into mutable MapLibre map state. Each
-committed command completion reports the snapshot generation that its commit
-published, so a host can fence a snapshot read on it.
+threads. Snapshot reads never call into mutable MapLibre map state. A map
+command publishes a snapshot after it runs, whether it commits or fails, and its
+completion reports that snapshot's generation, so a host can fence a snapshot
+read on it. A standalone projection copies the transform that the map published
+with its latest snapshot, so a projection created after a completion converts
+with the state that the command committed.
 
 A command publishes at most one render update, so no frame shows a command
 partly applied. A command group extends this to several commands, such as a
@@ -205,6 +208,15 @@ and asynchronous failures.
 
 Rendering observer events reach the runtime queue asynchronously. The runtime's
 direct event wake callback reports that the queue is ready to drain.
+
+Each map event carries a snapshot generation. A map command queues the events
+that it raises before its completion runs, and those events carry the generation
+that the completion reports. An event at or past a command's generation came
+from that command or a later change, and an event below it came from earlier
+work. A camera, style, loading-finished, loading-failed, or idle event follows
+the snapshot that includes its change, so a snapshot read after draining it
+shows state at least as new as the event. One map's events arrive in
+non-decreasing generation order.
 
 Each map and each runtime carries a subscription: the set of event types it
 queues. Default options select every event type the library reports, and a host

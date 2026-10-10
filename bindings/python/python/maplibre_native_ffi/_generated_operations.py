@@ -70,7 +70,6 @@ from ._generated_values import (
     RenderSessionAttachOptions,
     RenderSessionCapabilities,
     RenderSessionSnapshot,
-    RenderTargetExtent,
     ResourceProvider,
     ResourceRequestCancelHandler,
     ResourceResponse,
@@ -109,6 +108,11 @@ if TYPE_CHECKING:
         RenderSessionHandle,
         RuntimeHandle,
     )
+
+
+class LogicalExtentPhysicalSizeResult(NamedTuple):
+    width: int
+    height: int
 
 
 class MapAttachMetalBorrowedTextureResult(NamedTuple):
@@ -169,16 +173,6 @@ class MapAttachWebgpuOwnedTextureResult(NamedTuple):
 class MapAttachWebgpuSurfaceResult(NamedTuple):
     session: RenderSessionHandle
     completion: Future[None]
-
-
-class MapGetCameraSnapshotResult(NamedTuple):
-    camera: CameraOptions
-    generation: int
-
-
-class RenderTargetExtentPhysicalSizeResult(NamedTuple):
-    width: int
-    height: int
 
 
 class _AcquiredFrameHandleOperations(GeneratedOperations):
@@ -515,7 +509,7 @@ class _MapHandleOperations(GeneratedOperations):
     def apply_camera_delta(
         self, delta: CameraDelta | None = None
     ) -> Future[CommandCompletion]:
-        """Submits one copied relative camera update.
+        """Submits one atomic relative camera update.
 
         See `mln_map_apply_camera_delta` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -773,14 +767,14 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.cancel_transitions()
 
-    def create_projection(self) -> Future[MapProjectionHandle]:
-        """Starts creation of a standalone projection from the map's ordered
-        transform state.
+    def create_projection(self) -> MapProjectionHandle:
+        """Creates a standalone projection from the map's latest published
+        snapshot.
 
         See `mln_map_create_projection` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
-        return _adopt_future(
+        return _adopt_value(
             self._native.create_projection(), "MapProjectionHandle", None
         )
 
@@ -810,17 +804,6 @@ class _MapHandleOperations(GeneratedOperations):
         return map_future(
             self._native.get_camera(),
             lambda value: CameraQueryResult._from_native(value),
-        )
-
-    def get_camera_snapshot(self) -> MapGetCameraSnapshotResult:
-        """Copies the camera from the latest immutable map snapshot.
-
-        See `mln_map_get_camera_snapshot` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        raw = self._native.get_camera_snapshot()
-        return MapGetCameraSnapshotResult(
-            CameraOptions._from_native(raw["camera"]), raw["generation"]
         )
 
     def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
@@ -1874,7 +1857,7 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.request_frame(demand)
 
-    def resize(self, extent: RenderTargetExtent) -> Future[CommandCompletion]:
+    def resize(self, extent: LogicalExtent) -> Future[CommandCompletion]:
         """Starts an ordered logical resize. The completion runs after the
         selected driver applies the extent and updates the map viewport.
 
@@ -2339,6 +2322,18 @@ def log_set_callback(handler: LogHandler) -> None:
     return _native.log_set_callback(handler)
 
 
+def logical_extent_physical_size(
+    extent: LogicalExtent,
+) -> LogicalExtentPhysicalSizeResult:
+    """Computes the physical device-pixel size of a logical extent.
+
+    See `mln_logical_extent_physical_size` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+    raw = _native.logical_extent_physical_size(extent)
+    return LogicalExtentPhysicalSizeResult(raw["width"], raw["height"])
+
+
 def network_get_status() -> NetworkStatus:
     """Reads MapLibre Native's process-global network status.
 
@@ -2386,19 +2381,6 @@ def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
     return ProjectedMeters._from_native(
         _native.projected_meters_for_lat_lng(coordinate)
     )
-
-
-def render_target_extent_physical_size(
-    extent: RenderTargetExtent,
-) -> RenderTargetExtentPhysicalSizeResult:
-    """Computes the physical device-pixel size of a logical render target
-    extent.
-
-    See `mln_render_target_extent_physical_size` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-    """
-    raw = _native.render_target_extent_physical_size(extent)
-    return RenderTargetExtentPhysicalSizeResult(raw["width"], raw["height"])
 
 
 def rendered_query_geometry_box(input_box: ScreenBox) -> RenderedQueryGeometry:

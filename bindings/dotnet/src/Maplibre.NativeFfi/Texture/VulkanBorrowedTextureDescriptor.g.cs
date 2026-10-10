@@ -11,7 +11,9 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 /// <param name="Extent">
 /// Logical texture extent. The map viewport uses width and height and the
-/// renderer uses scale_factor; the physical size is stated separately below.
+/// renderer uses scale_factor; the physical size is stated separately below. A
+/// scale_factor that differs from the map's is accepted and logged as a
+/// warning.
 /// </param>
 /// <param name="PhysicalWidth">
 /// Physical image width in device pixels. Must be positive. Defaults to 256.
@@ -39,7 +41,7 @@ namespace Maplibre.NativeFfi;
 /// to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
 /// </param>
 public readonly partial record struct VulkanBorrowedTextureDescriptor(
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     uint PhysicalWidth,
     uint PhysicalHeight,
     VulkanContextDescriptor Context,
@@ -51,8 +53,7 @@ public readonly partial record struct VulkanBorrowedTextureDescriptor(
 )
 {
     public VulkanBorrowedTextureDescriptor()
-        : this(new RenderTargetExtent(), 256, 256, default, default, default, default, default, 5)
-    { }
+        : this(new LogicalExtent(), 256, 256, default, default, default, default, default, 5) { }
 
     public static VulkanBorrowedTextureDescriptor Default
     {

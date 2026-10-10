@@ -85,13 +85,17 @@ internal static unsafe class GeneratedValues
     internal static CameraDelta CopyCameraDelta(mln_camera_delta value) =>
         new()
         {
-            Kind = (CameraDeltaKind)value.kind,
-            Offset = CopyScreenPoint(value.offset),
-            Amount = value.amount,
-            Anchor = value.fields.HasFlag(MLN_CAMERA_DELTA_FIELD_ANCHOR)
+            Offset = value.fields.HasFlag(MLN_CAMERA_DELTA_OFFSET)
+                ? CopyScreenPoint(value.offset)
+                : null,
+            Scale = value.fields.HasFlag(MLN_CAMERA_DELTA_SCALE) ? value.scale : null,
+            Bearing = value.fields.HasFlag(MLN_CAMERA_DELTA_BEARING) ? value.bearing : null,
+            Pitch = value.fields.HasFlag(MLN_CAMERA_DELTA_PITCH) ? value.pitch : null,
+            Anchor = value.fields.HasFlag(MLN_CAMERA_DELTA_ANCHOR)
                 ? CopyScreenPoint(value.anchor)
                 : null,
             Animation = CopyAnimationOptions(value.animation),
+            GesturePhase = (GesturePhase)value.gesture_phase,
         };
 
     internal static mln_camera_delta NativeCameraDelta(CameraDelta value)
@@ -100,16 +104,23 @@ internal static unsafe class GeneratedValues
         var native = NativeMethods.mln_camera_delta_default();
         native.fields = 0;
         native.size = (uint)sizeof(mln_camera_delta);
-        native.kind = (uint)value.Kind;
-        native.offset = NativeScreenPoint(value.Offset);
-        native.amount = value.Amount;
+        native.fields |= Put(
+            value.Offset,
+            ref native.offset,
+            MLN_CAMERA_DELTA_OFFSET,
+            NativeScreenPoint
+        );
+        native.fields |= Put(value.Scale, ref native.scale, MLN_CAMERA_DELTA_SCALE);
+        native.fields |= Put(value.Bearing, ref native.bearing, MLN_CAMERA_DELTA_BEARING);
+        native.fields |= Put(value.Pitch, ref native.pitch, MLN_CAMERA_DELTA_PITCH);
         native.fields |= Put(
             value.Anchor,
             ref native.anchor,
-            MLN_CAMERA_DELTA_FIELD_ANCHOR,
+            MLN_CAMERA_DELTA_ANCHOR,
             NativeScreenPoint
         );
         native.animation = NativeAnimationOptions(value.Animation);
+        native.gesture_phase = (uint)value.GesturePhase;
         return native;
     }
 
@@ -1049,7 +1060,7 @@ internal static unsafe class GeneratedValues
         mln_metal_borrowed_texture_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             value.physical_width,
             value.physical_height,
             NativePointer.FromNativeAddress((nint)value.texture)
@@ -1061,7 +1072,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_metal_borrowed_texture_descriptor_default();
         native.size = (uint)sizeof(mln_metal_borrowed_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.texture = (void*)value.Texture.Address;
@@ -1083,7 +1094,7 @@ internal static unsafe class GeneratedValues
 
     internal static MetalOwnedTextureDescriptor CopyMetalOwnedTextureDescriptor(
         mln_metal_owned_texture_descriptor value
-    ) => new(CopyRenderTargetExtent(value.extent), CopyMetalContextDescriptor(value.context));
+    ) => new(CopyLogicalExtent(value.extent), CopyMetalContextDescriptor(value.context));
 
     internal static mln_metal_owned_texture_descriptor NativeMetalOwnedTextureDescriptor(
         MetalOwnedTextureDescriptor value
@@ -1091,7 +1102,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_metal_owned_texture_descriptor_default();
         native.size = (uint)sizeof(mln_metal_owned_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeMetalContextDescriptor(value.Context);
         return native;
     }
@@ -1131,7 +1142,7 @@ internal static unsafe class GeneratedValues
         mln_metal_surface_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             CopyMetalContextDescriptor(value.context),
             NativePointer.FromNativeAddress((nint)value.layer)
         );
@@ -1142,7 +1153,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_metal_surface_descriptor_default();
         native.size = (uint)sizeof(mln_metal_surface_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeMetalContextDescriptor(value.Context);
         native.layer = (void*)value.Layer.Address;
         return native;
@@ -1311,7 +1322,7 @@ internal static unsafe class GeneratedValues
         mln_opengl_borrowed_texture_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             value.physical_width,
             value.physical_height,
             CopyOpenglContextDescriptor(value.context),
@@ -1326,7 +1337,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_opengl_borrowed_texture_descriptor_default();
         native.size = (uint)sizeof(mln_opengl_borrowed_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
@@ -1391,7 +1402,7 @@ internal static unsafe class GeneratedValues
 
     internal static OpenglOwnedTextureDescriptor CopyOpenglOwnedTextureDescriptor(
         mln_opengl_owned_texture_descriptor value
-    ) => new(CopyRenderTargetExtent(value.extent), CopyOpenglContextDescriptor(value.context));
+    ) => new(CopyLogicalExtent(value.extent), CopyOpenglContextDescriptor(value.context));
 
     internal static mln_opengl_owned_texture_descriptor NativeOpenglOwnedTextureDescriptor(
         OpenglOwnedTextureDescriptor value,
@@ -1400,7 +1411,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_opengl_owned_texture_descriptor_default();
         native.size = (uint)sizeof(mln_opengl_owned_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
         return native;
     }
@@ -1444,7 +1455,7 @@ internal static unsafe class GeneratedValues
         mln_opengl_surface_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             CopyOpenglContextDescriptor(value.context),
             NativePointer.FromNativeAddress((nint)value.surface)
         );
@@ -1456,7 +1467,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_opengl_surface_descriptor_default();
         native.size = (uint)sizeof(mln_opengl_surface_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
         native.surface = (void*)value.Surface.Address;
         return native;
@@ -1744,7 +1755,7 @@ internal static unsafe class GeneratedValues
             (RenderSessionState)value.state,
             (RenderDriverKind)value.driver,
             (RenderResult)value.latest_result,
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             value.generation,
             value.map_update_generation,
             value.rendered_update_generation,
@@ -1766,7 +1777,7 @@ internal static unsafe class GeneratedValues
         native.state = (uint)value.State;
         native.driver = (uint)value.Driver;
         native.latest_result = (uint)value.LatestResult;
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.generation = value.Generation;
         native.map_update_generation = value.MapUpdateGeneration;
         native.rendered_update_generation = value.RenderedUpdateGeneration;
@@ -1777,19 +1788,6 @@ internal static unsafe class GeneratedValues
         native.acquired_frame_count = value.AcquiredFrameCount;
         native.target_ready = (byte)(value.TargetReady ? 1 : 0);
         native.pending_changes = (byte)(value.PendingChanges ? 1 : 0);
-        return native;
-    }
-
-    internal static RenderTargetExtent CopyRenderTargetExtent(mln_render_target_extent value) =>
-        new(value.width, value.height, value.scale_factor);
-
-    internal static mln_render_target_extent NativeRenderTargetExtent(RenderTargetExtent value)
-    {
-        var native = new mln_render_target_extent();
-        native.size = (uint)sizeof(mln_render_target_extent);
-        native.width = value.Width;
-        native.height = value.Height;
-        native.scale_factor = value.ScaleFactor;
         return native;
     }
 
@@ -2211,6 +2209,7 @@ internal static unsafe class GeneratedValues
             (RuntimeEventType)value.type,
             (RuntimeEventSourceType)value.source_type,
             value.source,
+            value.generation,
             value.code,
             value.payload_type switch
             {
@@ -3018,7 +3017,7 @@ internal static unsafe class GeneratedValues
         mln_vulkan_borrowed_texture_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             value.physical_width,
             value.physical_height,
             CopyVulkanContextDescriptor(value.context),
@@ -3035,7 +3034,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_vulkan_borrowed_texture_descriptor_default();
         native.size = (uint)sizeof(mln_vulkan_borrowed_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeVulkanContextDescriptor(value.Context);
@@ -3077,7 +3076,7 @@ internal static unsafe class GeneratedValues
 
     internal static VulkanOwnedTextureDescriptor CopyVulkanOwnedTextureDescriptor(
         mln_vulkan_owned_texture_descriptor value
-    ) => new(CopyRenderTargetExtent(value.extent), CopyVulkanContextDescriptor(value.context));
+    ) => new(CopyLogicalExtent(value.extent), CopyVulkanContextDescriptor(value.context));
 
     internal static mln_vulkan_owned_texture_descriptor NativeVulkanOwnedTextureDescriptor(
         VulkanOwnedTextureDescriptor value
@@ -3085,7 +3084,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_vulkan_owned_texture_descriptor_default();
         native.size = (uint)sizeof(mln_vulkan_owned_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeVulkanContextDescriptor(value.Context);
         return native;
     }
@@ -3129,7 +3128,7 @@ internal static unsafe class GeneratedValues
         mln_vulkan_surface_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             CopyVulkanContextDescriptor(value.context),
             value.surface
         );
@@ -3140,7 +3139,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_vulkan_surface_descriptor_default();
         native.size = (uint)sizeof(mln_vulkan_surface_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeVulkanContextDescriptor(value.Context);
         native.surface = value.Surface;
         return native;
@@ -3197,7 +3196,7 @@ internal static unsafe class GeneratedValues
         mln_webgpu_borrowed_texture_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             value.physical_width,
             value.physical_height,
             CopyWebgpuContextDescriptor(value.context),
@@ -3212,7 +3211,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_webgpu_borrowed_texture_descriptor_default();
         native.size = (uint)sizeof(mln_webgpu_borrowed_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeWebgpuContextDescriptor(value.Context);
@@ -3244,7 +3243,7 @@ internal static unsafe class GeneratedValues
 
     internal static WebgpuOwnedTextureDescriptor CopyWebgpuOwnedTextureDescriptor(
         mln_webgpu_owned_texture_descriptor value
-    ) => new(CopyRenderTargetExtent(value.extent), CopyWebgpuContextDescriptor(value.context));
+    ) => new(CopyLogicalExtent(value.extent), CopyWebgpuContextDescriptor(value.context));
 
     internal static mln_webgpu_owned_texture_descriptor NativeWebgpuOwnedTextureDescriptor(
         WebgpuOwnedTextureDescriptor value
@@ -3252,7 +3251,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_webgpu_owned_texture_descriptor_default();
         native.size = (uint)sizeof(mln_webgpu_owned_texture_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeWebgpuContextDescriptor(value.Context);
         return native;
     }
@@ -3294,7 +3293,7 @@ internal static unsafe class GeneratedValues
         mln_webgpu_surface_descriptor value
     ) =>
         new(
-            CopyRenderTargetExtent(value.extent),
+            CopyLogicalExtent(value.extent),
             CopyWebgpuContextDescriptor(value.context),
             NativePointer.FromNativeAddress((nint)value.surface),
             value.format
@@ -3306,7 +3305,7 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_webgpu_surface_descriptor_default();
         native.size = (uint)sizeof(mln_webgpu_surface_descriptor);
-        native.extent = NativeRenderTargetExtent(value.Extent);
+        native.extent = NativeLogicalExtent(value.Extent);
         native.context = NativeWebgpuContextDescriptor(value.Context);
         native.surface = (void*)value.Surface.Address;
         native.format = value.Format;

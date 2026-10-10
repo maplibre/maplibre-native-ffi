@@ -259,11 +259,7 @@ final class MetalRenderTarget {
     // Nothing has rendered into the replacement yet, so the compositor keeps
     // sampling the outgoing texture until this demand's frame renders.
     replacement = try (texture, requestFrame(force: true))
-    try await map.resize(extent: LogicalExtent(
-      width: viewport.logicalWidth,
-      height: viewport.logicalHeight,
-      scaleFactor: viewport.scaleFactor
-    ))
+    try await map.resize(extent: viewport.extent)
   }
 
   func close() async throws {

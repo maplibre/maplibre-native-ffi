@@ -15,7 +15,6 @@ import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionHandle
-import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.Wake
 
 /**
@@ -242,12 +241,8 @@ internal open class RenderTarget(
       }
     }
 
-    fun extent(viewport: Viewport): RenderTargetExtent =
-      RenderTargetExtent(
-        viewport.width().toUInt(),
-        viewport.height().toUInt(),
-        viewport.scaleFactor(),
-      )
+    fun extent(viewport: Viewport): LogicalExtent =
+      LogicalExtent(viewport.width().toUInt(), viewport.height().toUInt(), viewport.scaleFactor())
   }
 }
 
@@ -373,11 +368,7 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
         throw error
       }
     // A target replacement leaves the map's extent unchanged.
-    map
-      .resize(
-        LogicalExtent(viewport.width().toUInt(), viewport.height().toUInt(), viewport.scaleFactor())
-      )
-      .reportFailure("map resize")
+    map.resize(extent(viewport)).reportFailure("map resize")
     try {
       await(handover)
     } catch (error: RuntimeException) {

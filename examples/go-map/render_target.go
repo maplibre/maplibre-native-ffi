@@ -245,11 +245,7 @@ func (driver *callerDriver) Close() error {
 // resizeMap carries the new logical extent to the map when the session
 // cannot: a replaced target changes only the graphics resource.
 func resizeMap(m *maplibre.MapHandle, v viewport) {
-	future, err := m.Resize(maplibre.LogicalExtent{
-		Width:       v.logicalWidth,
-		Height:      v.logicalHeight,
-		ScaleFactor: v.scaleFactor,
-	})
+	future, err := m.Resize(v.extent())
 	reportFailure(future, err, "map resize")
 }
 

@@ -106,22 +106,11 @@ public data class CameraDeltaField(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
-    public val ANCHOR: CameraDeltaField = CameraDeltaField(1u)
-  }
-}
-
-/**
- * Relative camera operation carried by `mln_camera_delta`.
- *
- * See `mln_camera_delta_kind` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
- */
-public data class CameraDeltaKind(public val rawValue: UInt) {
-  public companion object {
-    public val MOVE: CameraDeltaKind = CameraDeltaKind(0u)
-    public val SCALE: CameraDeltaKind = CameraDeltaKind(1u)
-    public val BEARING: CameraDeltaKind = CameraDeltaKind(2u)
-    public val PITCH: CameraDeltaKind = CameraDeltaKind(3u)
+    public val OFFSET: CameraDeltaField = CameraDeltaField(1u)
+    public val SCALE: CameraDeltaField = CameraDeltaField(2u)
+    public val BEARING: CameraDeltaField = CameraDeltaField(4u)
+    public val PITCH: CameraDeltaField = CameraDeltaField(8u)
+    public val ANCHOR: CameraDeltaField = CameraDeltaField(16u)
   }
 }
 
@@ -376,7 +365,7 @@ public data class GeojsonSourceOptionField(public val rawValue: UInt) {
 }
 
 /**
- * Gesture boundary carried atomically with a camera update.
+ * Gesture boundary carried atomically with a camera update or delta.
  *
  * See `mln_gesture_phase` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2052,17 +2041,24 @@ public data class BoundOptions(
 public data class ScreenPoint(public val x: Double = 0.0, public val y: Double = 0.0)
 
 /**
- * One relative camera operation.
+ * One atomic relative camera update.
  *
  * See `mln_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraDelta(
-  public val kind: CameraDeltaKind = CameraDeltaKind(0u),
-  public val offset: ScreenPoint = ScreenPoint(),
-  public val amount: Double = 0.0,
+  /** Pan in logical map pixels; the content moves by this offset. */
+  public val offset: ScreenPoint? = null,
+  /** Positive zoom factor; 2 zooms in one level. */
+  public val scale: Double? = null,
+  /** Degrees added to the bearing. */
+  public val bearing: Double? = null,
+  /** Degrees added to the pitch; positive tilts further from straight down. */
+  public val pitch: Double? = null,
+  /** Screen point in logical map pixels that scale, bearing, and pitch keep fixed. */
   public val anchor: ScreenPoint? = null,
   public val animation: AnimationOptions = AnimationOptions(),
+  public val gesturePhase: GesturePhase = GesturePhase(0u),
 )
 
 /**
@@ -2237,7 +2233,7 @@ public data class ProjectedMeters(
 )
 
 /**
- * Logical map extent in UI pixels and device-pixel scale.
+ * Logical extent in UI pixels and the device-pixel scale.
  *
  * See `mln_logical_extent` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -2247,10 +2243,7 @@ public data class LogicalExtent(
   public val width: UInt = 256u,
   /** Height in UI pixels. Defaults to 256. */
   public val height: UInt = 256u,
-  /**
-   * Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map creation, so
-   * `mln_map_resize()` accepts only the value the map was created with.
-   */
+  /** Device pixels per UI pixel. Defaults to 1.0. */
   public val scaleFactor: Double = 1.0,
 )
 
@@ -2262,8 +2255,8 @@ public data class LogicalExtent(
  */
 public data class MapOptions(
   /**
-   * Initial logical extent. Width and height must be positive. The scale factor must be positive
-   * and finite, and fixes the map's scale factor for its lifetime.
+   * Initial logical extent. Width and height must be nonzero, and scale_factor must be finite and
+   * positive. scale_factor is fixed for the map's lifetime.
    */
   public val initialExtent: LogicalExtent = LogicalExtent(),
   /** One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`. */
@@ -2313,21 +2306,6 @@ public data class MapViewportOptions(
 )
 
 /**
- * Logical render target extent in UI pixels.
- *
- * See `mln_render_target_extent` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class RenderTargetExtent(
-  /** Logical map width in UI pixels. Defaults to 256. */
-  public val width: UInt = 256u,
-  /** Logical map height in UI pixels. Defaults to 256. */
-  public val height: UInt = 256u,
-  /** UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0. */
-  public val scaleFactor: Double = 1.0,
-)
-
-/**
  * Metal attachment options for a borrowed texture target.
  *
  * See `mln_metal_borrowed_texture_descriptor` in the
@@ -2336,9 +2314,10 @@ public data class RenderTargetExtent(
 public data class MetalBorrowedTextureDescriptor(
   /**
    * Logical texture extent. The map viewport uses width and height and the renderer uses
-   * scale_factor; the physical size is stated separately below.
+   * scale_factor; the physical size is stated separately below. A scale_factor that differs from
+   * the map's is accepted and logged as a warning.
    */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Physical texture width in device pixels. Must be positive. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
   /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
@@ -2365,8 +2344,11 @@ public data class MetalContextDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class MetalOwnedTextureDescriptor(
-  /** Logical texture extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Metal backend context. device is required. */
   public val context: MetalContextDescriptor,
 )
@@ -2378,8 +2360,11 @@ public data class MetalOwnedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class MetalSurfaceDescriptor(
-  /** Logical surface extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Metal backend context. device is optional for Metal surfaces. */
   public val context: MetalContextDescriptor,
   /** `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required. */
@@ -2492,9 +2477,10 @@ public data class OpenglContextDescriptor(
 public data class OpenglBorrowedTextureDescriptor(
   /**
    * Logical texture extent. The map viewport uses width and height and the renderer uses
-   * scale_factor; the physical size is stated separately below.
+   * scale_factor; the physical size is stated separately below. A scale_factor that differs from
+   * the map's is accepted and logged as a warning.
    */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Physical texture width in device pixels. Must be positive. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
   /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
@@ -2517,8 +2503,11 @@ public data class OpenglBorrowedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class OpenglOwnedTextureDescriptor(
-  /** Logical texture extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context whose texture frames
    * the host can acquire. Dedicated EGL or transferred WebGL ownership creates a private
@@ -2534,8 +2523,11 @@ public data class OpenglOwnedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class OpenglSurfaceDescriptor(
-  /** Logical surface extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Borrowed OpenGL context provider data. */
   public val context: OpenglContextDescriptor,
   /**
@@ -2824,9 +2816,10 @@ public data class VulkanContextDescriptor(
 public data class VulkanBorrowedTextureDescriptor(
   /**
    * Logical texture extent. The map viewport uses width and height and the renderer uses
-   * scale_factor; the physical size is stated separately below.
+   * scale_factor; the physical size is stated separately below. A scale_factor that differs from
+   * the map's is accepted and logged as a warning.
    */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Physical image width in device pixels. Must be positive. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
   /** Physical image height in device pixels. Must be positive. Defaults to 256. */
@@ -2855,8 +2848,11 @@ public data class VulkanBorrowedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class VulkanOwnedTextureDescriptor(
-  /** Logical texture extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Borrowed Vulkan context. All handles are required. */
   public val context: VulkanContextDescriptor,
 )
@@ -2868,8 +2864,11 @@ public data class VulkanOwnedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class VulkanSurfaceDescriptor(
-  /** Logical surface extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /**
    * Borrowed Vulkan context. All handles are required. The device must support VK_KHR_swapchain,
    * and the queue family must support graphics and presentation to this descriptor's surface.
@@ -2904,8 +2903,12 @@ public data class WebgpuContextDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class WebgpuBorrowedTextureDescriptor(
-  /** Logical texture extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical texture extent. The map viewport uses width and height and the renderer uses
+   * scale_factor; the physical size is stated separately below. A scale_factor that differs from
+   * the map's is accepted and logged as a warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Physical texture width in device pixels. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
   /** Physical texture height in device pixels. Defaults to 256. */
@@ -2927,8 +2930,11 @@ public data class WebgpuBorrowedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
 public data class WebgpuOwnedTextureDescriptor(
-  /** Logical texture extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Borrowed WebGPU context. device is required. */
   public val context: WebgpuContextDescriptor,
 )
@@ -2940,8 +2946,11 @@ public data class WebgpuOwnedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
  */
 public data class WebgpuSurfaceDescriptor(
-  /** Logical surface extent. */
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  public val extent: LogicalExtent = LogicalExtent(),
   /** Borrowed WebGPU context. device is required. */
   public val context: WebgpuContextDescriptor,
   /**
@@ -3143,6 +3152,11 @@ public data class RuntimeEvent(
    * uint64_t, so this needs no cast.
    */
   public val source: ULong = 0uL,
+  /**
+   * Map snapshot generation that the event reports, or zero when source_type is
+   * `MLN_RUNTIME_EVENT_SOURCE_RUNTIME`.
+   */
+  public val generation: ULong = 0uL,
   /**
    * Secondary event detail whose meaning type selects. Depending on type it carries an
    * `mln_camera_change_mode`, an `mln_status`, a MapLibre Native error ordinal, or 0. See
@@ -3364,7 +3378,8 @@ public data class RenderSessionSnapshot(
   public val driver: RenderDriverKind,
   /** Most recent terminal `mln_render_result` value. */
   public val latestResult: RenderResult = RenderResult(0u),
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Logical extent, including a resize the driver has not applied yet. */
+  public val extent: LogicalExtent = LogicalExtent(),
   public val generation: ULong = 0uL,
   public val mapUpdateGeneration: ULong = 0uL,
   public val renderedUpdateGeneration: ULong = 0uL,
@@ -3555,15 +3570,7 @@ public data class RenderSessionAttachment(
   public val ready: kotlinx.coroutines.Deferred<Unit>,
 )
 
-public data class RenderTargetExtentPhysicalSizeResult(
-  public val width: UInt,
-  public val height: UInt,
-)
-
-public data class MapGetCameraSnapshotResult(
-  public val camera: CameraOptions,
-  public val generation: ULong,
-)
+public data class LogicalExtentPhysicalSizeResult(public val width: UInt, public val height: UInt)
 
 /**
  * Options for custom geometry sources.

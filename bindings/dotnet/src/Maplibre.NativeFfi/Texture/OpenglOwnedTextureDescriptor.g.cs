@@ -10,7 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical texture extent.
+/// Logical texture extent. A scale_factor that differs from the map's is
+/// accepted and logged as a warning.
 /// </param>
 /// <param name="Context">
 /// Borrowed OpenGL context provider data. Shared ownership creates a context
@@ -18,12 +19,12 @@ namespace Maplibre.NativeFfi;
 /// WebGL ownership creates a private core-worker context for CPU readback.
 /// </param>
 public readonly partial record struct OpenglOwnedTextureDescriptor(
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     OpenglContextDescriptor Context
 )
 {
     public OpenglOwnedTextureDescriptor()
-        : this(new RenderTargetExtent(), default) { }
+        : this(new LogicalExtent(), default) { }
 
     public static OpenglOwnedTextureDescriptor Default
     {

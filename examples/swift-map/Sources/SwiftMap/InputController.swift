@@ -98,8 +98,7 @@ final class InputController {
       mapState.moveBy(dx: dx, dy: dy)
     case .rotate:
       if dx == 0, dy == 0 { return }
-      mapState.adjustBearing(delta: dx * 0.5)
-      mapState.adjustPitch(delta: dy * 0.5)
+      mapState.adjustOrientation(bearing: dx * 0.5, pitch: dy * 0.5)
     }
   }
 
@@ -158,23 +157,23 @@ final class InputController {
         animation: animation
       )
     case 12:
-      mapState.adjustBearing(
-        delta: -bearingStep,
+      mapState.adjustOrientation(
+        bearing: -bearingStep,
         animation: animation
       )
     case 14:
-      mapState.adjustBearing(
-        delta: bearingStep,
+      mapState.adjustOrientation(
+        bearing: bearingStep,
         animation: animation
       )
     case 30:
-      mapState.adjustPitch(
-        delta: pitchStep,
+      mapState.adjustOrientation(
+        pitch: pitchStep,
         animation: animation
       )
     case 33:
-      mapState.adjustPitch(
-        delta: -pitchStep,
+      mapState.adjustOrientation(
+        pitch: -pitchStep,
         animation: animation
       )
     case 29:

@@ -160,7 +160,7 @@ class OwnedTexture:
 
     def _attach(self, options: mln.RenderSessionAttachOptions) -> tuple:
         assert self.graphics is not None and self.map is not None
-        extent = mln.RenderTargetExtent(WIDTH, HEIGHT, 1.0)
+        extent = mln.LogicalExtent(WIDTH, HEIGHT, 1.0)
         context = self.graphics.context
         if self.backend == "metal":
             return self.map.attach_metal_owned_texture(

@@ -111,10 +111,8 @@ func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, sta
 	case dragPan:
 		return state.moveBy(dx, dy, nil)
 	case dragRotate:
-		if err := state.adjustBearing(dx*0.5, nil); err != nil {
-			return err
-		}
-		return state.adjustPitch(dy*0.5, nil)
+		bearing, pitch := dx*0.5, dy*0.5
+		return state.adjustOrientation(&bearing, &pitch, nil)
 	}
 	return nil
 }
@@ -155,13 +153,17 @@ func handleKeyDown(event *sdl.KeyboardEvent, state *runtimeMapState, v viewport)
 	case sdl.ScancodeMinus, sdl.ScancodeKPMinus:
 		err = state.scaleBy(1/zoomStep, center, &durationMS)
 	case sdl.ScancodeQ:
-		err = state.adjustBearing(-bearingStep, &durationMS)
+		bearing := -bearingStep
+		err = state.adjustOrientation(&bearing, nil, &durationMS)
 	case sdl.ScancodeE:
-		err = state.adjustBearing(bearingStep, &durationMS)
+		bearing := bearingStep
+		err = state.adjustOrientation(&bearing, nil, &durationMS)
 	case sdl.ScancodeRightbracket:
-		err = state.adjustPitch(pitchStep, &durationMS)
+		pitch := pitchStep
+		err = state.adjustOrientation(nil, &pitch, &durationMS)
 	case sdl.ScancodeLeftbracket:
-		err = state.adjustPitch(-pitchStep, &durationMS)
+		pitch := -pitchStep
+		err = state.adjustOrientation(nil, &pitch, &durationMS)
 	case sdl.Scancode0:
 		err = state.resetOrientation(220)
 	}

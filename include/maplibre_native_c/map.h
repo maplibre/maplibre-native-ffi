@@ -158,17 +158,13 @@ typedef enum mln_map_mode : uint32_t {
   /** Produces one-off still images for a single tile. */
   MLN_MAP_MODE_TILE = 2,
 } mln_map_mode;
-/** Logical map extent in UI pixels and device-pixel scale. */
+/** Logical extent in UI pixels and the device-pixel scale. */
 typedef struct mln_logical_extent {
   /** Width in UI pixels. Defaults to 256. */
   uint32_t width MLN_BINDING("default=256");
   /** Height in UI pixels. Defaults to 256. */
   uint32_t height MLN_BINDING("default=256");
-  /**
-   * Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
-   * creation, so mln_map_resize() accepts only the value the map was created
-   * with.
-   */
+  /** Device pixels per UI pixel. Defaults to 1.0. */
   double scale_factor MLN_BINDING("default=1.0");
 } mln_logical_extent;
 
@@ -176,9 +172,8 @@ typedef struct mln_logical_extent {
 typedef struct mln_map_options {
   uint32_t size;
   /**
-   * Initial logical extent. Width and height must be positive. The scale
-   * factor must be positive and finite, and fixes the map's scale factor for
-   * its lifetime.
+   * Initial logical extent. Width and height must be nonzero, and scale_factor
+   * must be finite and positive. scale_factor is fixed for the map's lifetime.
    *
    * After creation, mln_map_resize() is the only function that changes the
    * width and height.
@@ -300,8 +295,10 @@ typedef struct mln_animation_options {
    * the resulting camera against the requested one.
    *
    * The event is queued on the runtime that owns the map and is drained by
-   * mln_runtime_drain_events(). It is queued immediately before that command's
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event. Other commands can still be
+   * mln_runtime_drain_events(). It is queued immediately after that command's
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event and carries the same
+   * generation, so the published snapshot at that generation already shows
+   * the camera where the transition left it. Other commands can still be
    * animating when these events arrive. A map reports the terminal outcome
    * only while its event mask selects
    * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
@@ -312,40 +309,6 @@ typedef struct mln_animation_options {
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_TRANSITION_ID");
 } mln_animation_options;
 
-/** Relative camera operation carried by mln_camera_delta. */
-typedef enum mln_camera_delta_kind : uint32_t {
-  MLN_CAMERA_DELTA_MOVE = 0,
-  MLN_CAMERA_DELTA_SCALE = 1,
-  MLN_CAMERA_DELTA_BEARING = 2,
-  MLN_CAMERA_DELTA_PITCH = 3,
-} mln_camera_delta_kind;
-
-/** Field mask values for mln_camera_delta. */
-typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
-  MLN_CAMERA_DELTA_FIELD_ANCHOR = 1U << 0U,
-} mln_camera_delta_field;
-
-/**
- * One relative camera operation.
- *
- * MOVE reads offset. SCALE reads amount as a positive factor. BEARING and
- * PITCH read amount as degrees, added to the current value: a positive PITCH
- * amount tilts the camera further from straight down, the opposite of
- * MapLibre Native's Map::pitchBy(). SCALE and BEARING apply anchor when fields
- * contains MLN_CAMERA_DELTA_FIELD_ANCHOR, which no other kind accepts. Every
- * operation reads animation.
- */
-typedef struct mln_camera_delta {
-  uint32_t size;
-  uint32_t fields MLN_BINDING("enum=mln_camera_delta_field");
-  uint32_t kind MLN_BINDING("enum=mln_camera_delta_kind");
-  mln_screen_point offset;
-  double amount;
-  mln_screen_point anchor
-    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_FIELD_ANCHOR");
-  mln_animation_options animation;
-} mln_camera_delta;
-
 /** Camera transition behavior for mln_camera_update. */
 typedef enum mln_camera_update_mode : uint32_t {
   MLN_CAMERA_UPDATE_MODE_JUMP = 0,
@@ -354,7 +317,7 @@ typedef enum mln_camera_update_mode : uint32_t {
 } mln_camera_update_mode;
 
 /**
- * Gesture boundary carried atomically with a camera update.
+ * Gesture boundary carried atomically with a camera update or delta.
  *
  * The phase is applied around the camera write and is reported by
  * mln_map_snapshot.gesture_in_progress.
@@ -377,6 +340,63 @@ typedef enum mln_gesture_phase : uint32_t {
    */
   MLN_GESTURE_PHASE_CANCEL = 4,
 } mln_gesture_phase;
+
+/** Field mask values for mln_camera_delta. */
+typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
+  MLN_CAMERA_DELTA_OFFSET = 1U << 0U,
+  MLN_CAMERA_DELTA_SCALE = 1U << 1U,
+  MLN_CAMERA_DELTA_BEARING = 1U << 2U,
+  MLN_CAMERA_DELTA_PITCH = 1U << 3U,
+  MLN_CAMERA_DELTA_ANCHOR = 1U << 4U,
+} mln_camera_delta_field;
+
+/**
+ * One atomic relative camera update.
+ *
+ * Each selected component resolves against the camera as it stands when the
+ * command runs. Immediate deltas therefore compose exactly, however many are
+ * queued. An animated delta starts from the value a running transition has
+ * reached and replaces that component's transition, so queue animated deltas
+ * only after the previous one has rendered or finished.
+ *
+ * OFFSET pans first, in the current camera's logical pixels: the content moves
+ * by offset, so positive x moves it right and positive y moves it down, and a
+ * pointer drag delta passes through unchanged. The pan stops short of the
+ * horizon. SCALE, BEARING, and PITCH then change the camera about anchor when
+ * ANCHOR is set, keeping the coordinate under anchor in the panned camera
+ * fixed, or about the center otherwise. ANCHOR requires SCALE, BEARING, or
+ * PITCH. ANCHOR combines with OFFSET only for an immediate delta, one whose
+ * animation selects no DURATION or a zero duration; a two-finger gesture passes
+ * its centroid movement as offset and its new centroid as anchor. An animated
+ * bearing change takes the shorter way around.
+ *
+ * fields may be zero, in which case the delta changes only the gesture phase
+ * and reports any transition_id at once. gesture_phase is applied around the
+ * camera write, as in mln_camera_update. The command copies this struct before
+ * returning.
+ */
+typedef struct mln_camera_delta {
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_camera_delta_field");
+  /** Pan in logical map pixels; the content moves by this offset. */
+  mln_screen_point offset
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_OFFSET");
+  /** Positive zoom factor; 2 zooms in one level. */
+  double scale MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_SCALE");
+  /** Degrees added to the bearing. */
+  double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_BEARING");
+  /** Degrees added to the pitch; positive tilts further from straight down. */
+  double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_PITCH");
+  /**
+   * Screen point in logical map pixels that scale, bearing, and pitch keep
+   * fixed.
+   */
+  mln_screen_point anchor
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_ANCHOR");
+  mln_animation_options animation;
+  uint32_t gesture_phase MLN_BINDING("enum=mln_gesture_phase");
+  uint32_t reserved MLN_BINDING("kind=reserved");
+} mln_camera_delta;
 
 /**
  * One atomic absolute camera update.
@@ -881,10 +901,10 @@ typedef struct mln_map_tile_options {
  * Immutable map state copied from the latest published generation.
  *
  * Every field is unkeyed, fixed-size map state that changes only through this
- * map's own commands or through load progress. Each committed map command
+ * map's own commands or through load progress. Each map command that runs
  * publishes a new generation and reports it through its completion, even when
- * the command changes nothing, so a snapshot whose generation is at or past a
- * completion observes that commit.
+ * the command changes nothing or fails, so a snapshot whose generation is at
+ * or past a completion observes that command.
  */
 typedef struct mln_map_snapshot {
   uint32_t size;
@@ -902,7 +922,7 @@ typedef struct mln_map_snapshot {
   /**
    * True while the map is inside a gesture.
    *
-   * A camera update whose gesture_phase is MLN_GESTURE_PHASE_BEGIN or
+   * A camera update or delta whose gesture_phase is MLN_GESTURE_PHASE_BEGIN or
    * MLN_GESTURE_PHASE_UPDATE sets it; MLN_GESTURE_PHASE_END and
    * MLN_GESTURE_PHASE_CANCEL clear it.
    */
@@ -933,8 +953,10 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the creation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, options is
- *   null, undersized, or carries an invalid field, or completion is invalid.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle; options is
+ *   null, undersized, or carries an invalid field; options->initial_extent has
+ *   a zero width or height, or a scale_factor that is not finite and positive;
+ *   or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -972,14 +994,15 @@ MLN_API mln_status mln_map_get_snapshot(
  * through mln_render_session_resize(), which submits this command itself; a
  * direct map resize to a different extent leaves the session waiting for an
  * update that the map never publishes. The completion reports terminal
- * disposition and the snapshot generation published by a committed resize. A
+ * disposition and the snapshot generation that the resize published. A
  * resize that a later one replaces before the worker runs it completes as
  * superseded.
  *
  * Returns:
  * - MLN_STATUS_OK when the resize was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, extent has a
- *   zero dimension or a non-finite, non-positive, or changed scale factor, or
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; extent has a
+ *   zero width or height, or a scale_factor that is not finite and positive;
+ *   extent.scale_factor differs from the value the map was created with; or
  *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.

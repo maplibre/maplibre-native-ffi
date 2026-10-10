@@ -9,6 +9,7 @@ func rawRuntimeEvent(
   type: UInt32,
   sourceType: UInt32 = MLN_RUNTIME_EVENT_SOURCE_MAP.rawValue,
   source: UInt64 = 1,
+  generation: UInt64 = 0,
   code: Int32 = 0,
   payloadType: UInt32 = MLN_RUNTIME_EVENT_PAYLOAD_NONE.rawValue,
   messageOffset: UInt64 = 0,
@@ -18,6 +19,7 @@ func rawRuntimeEvent(
   event.type = type
   event.source_type = sourceType
   event.source = source
+  event.generation = generation
   event.code = code
   event.payload_type = payloadType
   event.message_offset = messageOffset

@@ -102,8 +102,7 @@ pub const Controller = struct {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
                 if (dx == 0 and dy == 0) return;
-                try state.adjustBearing(dx * 0.5);
-                try state.pitchBy(dy * 0.5);
+                try state.adjustOrientation(dx * 0.5, dy * 0.5);
             },
         }
     }

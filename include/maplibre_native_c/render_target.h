@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "map.h"
 #include "wake.h"
 
 #ifdef __cplusplus
@@ -26,17 +27,6 @@ typedef uint64_t mln_vulkan_non_dispatchable_handle;
 
 /** Null Vulkan non-dispatchable handle. */
 #define MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL UINT64_C(0)
-
-/** Logical render target extent in UI pixels. */
-typedef struct mln_render_target_extent {
-  uint32_t size;
-  /** Logical map width in UI pixels. Defaults to 256. */
-  uint32_t width MLN_BINDING("default=256");
-  /** Logical map height in UI pixels. Defaults to 256. */
-  uint32_t height MLN_BINDING("default=256");
-  /** UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0. */
-  double scale_factor MLN_BINDING("default=1.0");
-} mln_render_target_extent;
 
 /** Execution placement for one render session. */
 typedef enum mln_render_driver_kind : uint32_t {
@@ -385,7 +375,7 @@ MLN_API mln_render_session_attach_options
 mln_render_session_attach_options_default(void) MLN_NOEXCEPT;
 
 /**
- * Computes the physical device-pixel size of a logical render target extent.
+ * Computes the physical device-pixel size of a logical extent.
  *
  * Each dimension is ceil(logical * scale_factor). Session-owned texture targets
  * and surface targets are sized this way. Caller-owned borrowed texture targets
@@ -393,12 +383,12 @@ mln_render_session_attach_options_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when extent is null or invalid, out_width or
- *   out_height is null, or the scaled dimensions are too large.
+ * - MLN_STATUS_INVALID_ARGUMENT when extent has a zero width or height, or a
+ *   scale_factor that is not finite and positive; out_width or out_height is
+ *   null; or a scaled dimension exceeds UINT32_MAX.
  */
-MLN_API mln_status mln_render_target_extent_physical_size(
-  const mln_render_target_extent* extent,
-  uint32_t* out_width MLN_BINDING("direction=out"),
+MLN_API mln_status mln_logical_extent_physical_size(
+  mln_logical_extent extent, uint32_t* out_width MLN_BINDING("direction=out"),
   uint32_t* out_height MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

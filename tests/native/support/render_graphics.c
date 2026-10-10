@@ -107,10 +107,8 @@ uint32_t mln_test_backend_driver(void) {
 
 void mln_test_release_thread_gpu_resources(void) {}
 
-// Every descriptor versions its embedded extent, so native ignores the
-// extent's own size and these extents leave it zero.
-static mln_render_target_extent host_extent(void) {
-  return (mln_render_target_extent){
+static mln_logical_extent host_extent(void) {
+  return (mln_logical_extent){
     .width = MLN_TEST_HOST_TARGET_SIZE,
     .height = MLN_TEST_HOST_TARGET_SIZE,
     .scale_factor = 1.0,

@@ -10,8 +10,8 @@ struct Viewport: Equatable {
   var scaleFactor: Double
   var isEmpty: Bool
 
-  var extent: RenderTargetExtent {
-    RenderTargetExtent(
+  var extent: LogicalExtent {
+    LogicalExtent(
       width: logicalWidth,
       height: logicalHeight,
       scaleFactor: scaleFactor
@@ -52,11 +52,7 @@ final class MapState {
     let map: MapHandle
     do {
       map = try await runtime.createMap(options: MapOptions(
-        initialExtent: LogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        ),
+        initialExtent: viewport.extent,
         mapMode: .continuous,
         eventMask: [.mapRenderUpdateAvailable]
       ))
@@ -116,24 +112,21 @@ final class MapState {
 
   func scaleBy(_ scale: Double, anchor: ScreenPoint) {
     submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
-      kind: .scale,
-      amount: scale,
+      scale: scale,
       anchor: anchor
     )) }
   }
 
   func adjustBearing(delta: Double, anchor: ScreenPoint) {
     submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
-      kind: .bearing,
-      amount: delta,
+      bearing: delta,
       anchor: anchor
     )) }
   }
 
   func adjustPitch(delta: Double) {
     submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
-      kind: .pitch,
-      amount: delta
+      pitch: delta
     )) }
   }
 
@@ -141,10 +134,9 @@ final class MapState {
   /// from the zoom of the latest published camera snapshot.
   func zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions) {
     submit { [map] in
-      let zoom = try map.getCameraSnapshot().camera.zoom ?? 0
+      let zoom = try map.getSnapshot().camera.zoom ?? 0
       _ = try await map.applyCameraDelta(delta: CameraDelta(
-        kind: .scale,
-        amount: pow(2.0, (zoom.rounded() + 1) - zoom),
+        scale: pow(2.0, (zoom.rounded() + 1) - zoom),
         anchor: anchor,
         animation: animation
       ))

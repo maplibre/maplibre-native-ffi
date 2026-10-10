@@ -593,6 +593,7 @@ auto push_offline_region_event(
     .type = type,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
     .source = runtime->self,
+    .generation = 0,
     .code = 0,
     .payload_type = payload_type,
     .message_offset = 0,
@@ -2839,21 +2840,52 @@ auto invoke_http_header_transform(
   }
 }
 
-auto push_runtime_map_event(
-  mln_runtime runtime, mln_map map, uint32_t type, int32_t code,
-  const char* message
-) -> void {
-  push_runtime_map_event_payload(
-    runtime, map, type, MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(),
-    code, message == nullptr ? std::string{} : std::string{message}
-  );
+namespace {
+
+// A render draws the latest update, so one unread render-update event covers
+// every invalidation queued behind it. Comparing against the tail alone
+// preserves the order of every other event. The tail takes the newer
+// generation, and it stays the tail, so a map's generations stay in order.
+auto coalesce_render_update(
+  RuntimeEventStorage& pending, mln_map map, uint64_t generation, uint32_t type
+) -> bool {
+  if (
+    type != MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE ||
+    pending.events.empty()
+  ) {
+    return false;
+  }
+  auto& tail = pending.events.back();
+  if (tail.type != type || tail.source != map) return false;
+  tail.generation = generation;
+  return true;
 }
+
+auto map_event(
+  mln_map map, uint64_t generation, uint32_t type, uint32_t payload_type,
+  const mln_runtime_event_payload& payload, int32_t code
+) -> mln_runtime_event {
+  return mln_runtime_event{
+    .type = type,
+    .source_type = MLN_RUNTIME_EVENT_SOURCE_MAP,
+    .source = map,
+    .generation = generation,
+    .code = code,
+    .payload_type = payload_type,
+    .message_offset = 0,
+    .message_size = 0,
+    .payload = payload
+  };
+}
+
+}  // namespace
 
 // Producers test their subscription mask before they call this, so it holds no
 // mask test of its own.
 auto push_runtime_map_event_payload(
-  mln_runtime runtime, mln_map map, uint32_t type, uint32_t payload_type,
-  const mln_runtime_event_payload& payload, int32_t code, std::string message
+  mln_runtime runtime, mln_map map, uint64_t generation, uint32_t type,
+  uint32_t payload_type, const mln_runtime_event_payload& payload, int32_t code,
+  std::string message
 ) -> void {
   // Observer callbacks may race close; the lease keeps the queue object
   // reachable, and the queue lock decides whether this event still has a wake
@@ -2863,40 +2895,55 @@ auto push_runtime_map_event_payload(
     return;
   }
 
-  auto event = mln_runtime_event{
-    .type = type,
-    .source_type = MLN_RUNTIME_EVENT_SOURCE_MAP,
-    .source = map,
-    .code = code,
-    .payload_type = payload_type,
-    .message_offset = 0,
-    .message_size = 0,
-    .payload = payload
-  };
+  auto wake = std::shared_ptr<Wake>{};
+  {
+    const std::scoped_lock lock(live->event_queue->mutex);
+    auto& queue = *live->event_queue;
+    if (!queue.event_maps.contains(map)) return;
+    if (coalesce_render_update(queue.pending, map, generation, type)) return;
+    if (queue.pending.events.empty()) {
+      wake = queue.wake;
+    }
+    append_runtime_event(
+      queue.pending,
+      map_event(map, generation, type, payload_type, payload, code),
+      std::move(message)
+    );
+  }
+  if (wake != nullptr) wake->notify();
+}
+
+auto push_runtime_map_events(
+  mln_runtime runtime, mln_map map, uint64_t generation,
+  std::vector<HeldMapEvent>& events
+) -> void {
+  if (events.empty()) return;
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) {
+    return;
+  }
 
   auto wake = std::shared_ptr<Wake>{};
   {
     const std::scoped_lock lock(live->event_queue->mutex);
-    if (
-      map != MLN_HANDLE_NULL && !live->event_queue->event_maps.contains(map)
-    ) {
-      return;
+    auto& queue = *live->event_queue;
+    if (!queue.event_maps.contains(map)) return;
+    const auto was_empty = queue.pending.events.empty();
+    for (auto& held : events) {
+      if (coalesce_render_update(queue.pending, map, generation, held.type)) {
+        continue;
+      }
+      append_runtime_event(
+        queue.pending,
+        map_event(
+          map, generation, held.type, held.payload_type, held.payload, held.code
+        ),
+        std::move(held.message)
+      );
     }
-    // A render draws the latest update, so one unread render-update event
-    // covers every invalidation queued behind it. Comparing against the tail
-    // alone preserves the order of every other event.
-    if (
-      type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
-      map != MLN_HANDLE_NULL && !live->event_queue->pending.events.empty() &&
-      live->event_queue->pending.events.back().type == type &&
-      live->event_queue->pending.events.back().source == map
-    ) {
-      return;
+    if (was_empty && !queue.pending.events.empty()) {
+      wake = queue.wake;
     }
-    if (live->event_queue->pending.events.empty()) {
-      wake = live->event_queue->wake;
-    }
-    append_runtime_event(live->event_queue->pending, event, std::move(message));
   }
   if (wake != nullptr) wake->notify();
 }

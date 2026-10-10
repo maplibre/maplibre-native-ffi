@@ -159,30 +159,10 @@ MLN_API mln_status mln_map_set_tile_options(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the camera from the latest immutable map snapshot.
- *
- * The returned generation identifies the complete map snapshot that supplied
- * the camera. This function never reads mutable MapLibre state.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, out_camera is
- *   null or undersized, or out_generation is null.
- * - MLN_STATUS_INVALID_STATE when map has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=snapshot")
-MLN_API mln_status mln_map_get_camera_snapshot(
-  mln_map map, mln_camera_options* out_camera MLN_BINDING("direction=out"),
-  uint64_t* out_generation MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Submits one atomic camera update.
  *
  * The update is copied before return. The completion reports its terminal
- * disposition and the snapshot generation published by a committed update.
+ * disposition and the snapshot generation that the update published.
  * update->gesture_phase is applied around the camera write; see
  * mln_gesture_phase.
  *
@@ -214,17 +194,25 @@ MLN_API mln_status mln_map_update_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits one copied relative camera update.
+ * Submits one atomic relative camera update.
  *
- * The completion reports its terminal disposition and the snapshot generation
- * published by a committed update.
+ * The delta is copied before return. Its components and gesture phase apply in
+ * one command: render sessions receive one render update for the whole delta,
+ * and the completion reports its terminal disposition and the one snapshot
+ * generation that the delta published. The command completion reports
+ * application of the delta; when delta->animation carries a transition ID, one
+ * transition-finished event reports the end of all its animations.
+ *
+ * Validation reads only the fields that delta->fields selects.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, delta is null or
- *   undersized, delta->fields contains unknown bits, delta->kind is out of
- *   range, the offset, scale, or anchor the kind uses is not finite, an anchor
- *   accompanies a kind other than SCALE or BEARING, or completion is invalid.
+ *   undersized, delta->fields carries an unknown bit, delta->gesture_phase is
+ *   out of range, a selected offset, bearing, pitch, or anchor is not finite, a
+ *   selected scale is not finite and positive, ANCHOR is selected without
+ *   SCALE, BEARING, or PITCH, ANCHOR and OFFSET are selected with a positive
+ *   animation duration, delta->animation is invalid, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -483,7 +471,9 @@ MLN_API mln_status mln_map_set_projection_mode(
  *
  * Each conversion queues one map query. Hot paths such as per-pointer-move
  * conversion use a standalone projection, whose conversions are synchronous.
- * The completion borrows one mln_screen_point.
+ * A host recreates that projection, which is cheap and synchronous, when the
+ * snapshot's extent, viewport options, bounds, or projection mode changes. The
+ * completion borrows one mln_screen_point.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.
@@ -506,8 +496,10 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
  *
  * The output longitude is wrapped to -180 to 180. Each conversion queues one
  * map query. Hot paths such as per-pointer-move conversion use a standalone
- * projection, whose conversions are synchronous. The completion borrows one
- * mln_lat_lng.
+ * projection, whose conversions are synchronous. A host recreates that
+ * projection, which is cheap and synchronous, when the snapshot's extent,
+ * viewport options, bounds, or projection mode changes. The completion borrows
+ * one mln_lat_lng.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.

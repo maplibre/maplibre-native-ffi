@@ -56,6 +56,7 @@ static app_error pan(
   map_state* state, double dx, double dy, uint32_t mode, double duration_ms
 ) {
   mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields = MLN_CAMERA_DELTA_OFFSET;
   delta.offset = (mln_screen_point){.x = dx, .y = dy};
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
@@ -67,9 +68,8 @@ static app_error zoom(
   double duration_ms
 ) {
   mln_camera_delta delta = mln_camera_delta_default();
-  delta.kind = MLN_CAMERA_DELTA_SCALE;
-  delta.amount = scale;
-  delta.fields |= MLN_CAMERA_DELTA_FIELD_ANCHOR;
+  delta.fields = MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR;
+  delta.scale = scale;
   delta.anchor = anchor;
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
@@ -81,19 +81,14 @@ static app_error adjust_orientation(
   double duration_ms
 ) {
   mln_camera_delta delta = mln_camera_delta_default();
+  if (bearing_delta != 0.0) delta.fields |= MLN_CAMERA_DELTA_BEARING;
+  if (pitch_delta != 0.0) delta.fields |= MLN_CAMERA_DELTA_PITCH;
+  if (delta.fields == 0) return APP_OK;
+  delta.bearing = bearing_delta;
+  delta.pitch = pitch_delta;
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);
-  if (bearing_delta != 0.0) {
-    delta.kind = MLN_CAMERA_DELTA_BEARING;
-    delta.amount = bearing_delta;
-    MAP_TRY(apply_delta(state, &delta));
-  }
-  if (pitch_delta != 0.0) {
-    delta.kind = MLN_CAMERA_DELTA_PITCH;
-    delta.amount = pitch_delta;
-    MAP_TRY(apply_delta(state, &delta));
-  }
-  return APP_OK;
+  return apply_delta(state, &delta);
 }
 
 static drag_mode drag_mode_for_button(uint8_t button) {

@@ -5,11 +5,12 @@ use std::error::Error;
 use std::time::Duration;
 
 use maplibre_native_ffi::{
-    AnimationOptions, CameraDelta, CameraDeltaKind, CameraOptions, CameraUpdate, CameraUpdateMode,
-    GesturePhase, LatLng, LogicalExtent, MapHandle, MapMode, MapOptions, RuntimeEventMask,
-    RuntimeEventType, RuntimeHandle, RuntimeOptions, ScreenPoint,
+    AnimationOptions, CameraDelta, CameraOptions, CameraUpdate, CameraUpdateMode, GesturePhase,
+    LatLng, MapHandle, MapMode, MapOptions, RuntimeEventMask, RuntimeEventType, RuntimeHandle,
+    RuntimeOptions, ScreenPoint,
 };
 
+use crate::render_target::extent;
 use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
@@ -35,11 +36,7 @@ impl MapState {
             .map_err(|error| format!("runtime creation failed: {error}"))?;
 
         let map_options = MapOptions {
-            initial_extent: LogicalExtent::new(
-                viewport.logical_width,
-                viewport.logical_height,
-                viewport.scale_factor,
-            ),
+            initial_extent: extent(viewport),
             map_mode: MapMode::Continuous,
             ..MapOptions::default()
         };
@@ -79,11 +76,7 @@ impl MapState {
     /// session cannot: a caller-owned texture the host sizes. Target
     /// replacement changes only the graphics resource.
     pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.map.resize(LogicalExtent {
-            width: viewport.logical_width,
-            height: viewport.logical_height,
-            scale_factor: viewport.scale_factor,
-        })?;
+        self.map.resize(extent(viewport))?;
         Ok(())
     }
 
@@ -114,7 +107,7 @@ impl MapState {
         duration_ms: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
         let delta = CameraDelta {
-            offset: ScreenPoint::new(dx, dy),
+            offset: Some(ScreenPoint::new(dx, dy)),
             animation: duration_ms.map(animation).unwrap_or_default(),
             ..Default::default()
         };
@@ -129,8 +122,7 @@ impl MapState {
         duration_ms: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
         let delta = CameraDelta {
-            kind: CameraDeltaKind::Scale,
-            amount: scale,
+            scale: Some(scale),
             anchor: Some(anchor),
             animation: duration_ms.map(animation).unwrap_or_default(),
             ..Default::default()
@@ -139,29 +131,21 @@ impl MapState {
         Ok(())
     }
 
-    pub fn adjust_pitch(&self, delta: f64, duration_ms: Option<f64>) -> Result<(), Box<dyn Error>> {
-        let camera_delta = CameraDelta {
-            kind: CameraDeltaKind::Pitch,
-            amount: delta,
-            animation: duration_ms.map(animation).unwrap_or_default(),
-            ..Default::default()
-        };
-        self.map.apply_camera_delta(&camera_delta)?;
-        Ok(())
-    }
-
-    pub fn adjust_bearing(
+    /// Adds bearing and pitch degrees in one delta. `None` leaves that
+    /// component unchanged.
+    pub fn adjust_orientation(
         &self,
-        delta: f64,
+        bearing: Option<f64>,
+        pitch: Option<f64>,
         duration_ms: Option<f64>,
     ) -> Result<(), Box<dyn Error>> {
-        let camera_delta = CameraDelta {
-            kind: CameraDeltaKind::Bearing,
-            amount: delta,
+        let delta = CameraDelta {
+            bearing,
+            pitch,
             animation: duration_ms.map(animation).unwrap_or_default(),
             ..Default::default()
         };
-        self.map.apply_camera_delta(&camera_delta)?;
+        self.map.apply_camera_delta(&delta)?;
         Ok(())
     }
 

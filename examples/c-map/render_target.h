@@ -157,6 +157,6 @@ void texture_replacements_take_any(
   texture_replacements* replacements, void** out_texture
 );
 
-mln_render_target_extent render_target_extent(viewport current_viewport);
+mln_logical_extent render_target_extent(viewport current_viewport);
 
 #endif  // C_MAP_RENDER_TARGET_H

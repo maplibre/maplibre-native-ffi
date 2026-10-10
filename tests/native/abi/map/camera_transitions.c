@@ -1,6 +1,6 @@
-// Camera transitions and gestures: an ease advances only as frames render and
-// reports its end once, a cancellation stops it where it stands, and gesture
-// phases mark the map around a camera write.
+// Camera transitions and gestures: an ease or an animated delta advances only
+// as frames render and reports its end once, a cancellation stops it where it
+// stands, and gesture phases mark the map around a camera write.
 
 #include "support/test_support.h"
 
@@ -293,9 +293,163 @@ static void a_flight_with_every_animation_field_commits(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// An animated delta lasting `duration_ms` that reports its end under
+// `transition_id`.
+static mln_camera_delta animated_delta(
+  uint32_t fields, double duration_ms, uint64_t transition_id
+) {
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields = fields;
+  delta.animation.fields =
+    MLN_ANIMATION_OPTION_DURATION | MLN_ANIMATION_OPTION_TRANSITION_ID;
+  delta.animation.duration_ms = duration_ms;
+  delta.animation.transition_id = transition_id;
+  return delta;
+}
+
+static void apply_delta(mln_map map, const mln_camera_delta* delta) {
+  MLN_TEST_AWAIT_OK(
+    mln_map_apply_camera_delta(map, delta, &completion.descriptor, NULL)
+  );
+}
+
+// Renders frames until the transition reports its end, and returns how many
+// times it did.
+static size_t render_until_finished(
+  mln_runtime runtime, const mln_test_render_fixture* fixture,
+  uint64_t transition_id
+) {
+  transition_wait wait = {
+    .runtime = runtime, .fixture = fixture, .transition_id = transition_id
+  };
+  MLN_TEST_OK(mln_test_render_step_until(
+    fixture, transition_finished, &wait, mln_test_deadline_default(),
+    "a transition-finished event"
+  ));
+  TEST_ASSERT_FALSE(wait.failed);
+  TEST_ASSERT_FALSE(wait.demand_pending);
+  return wait.finished;
+}
+
+// An animated delta that pans and zooms runs as two MapLibre transitions and
+// reports its end once, after both. A rendered delta reaches its target, and a
+// cancelled one ends both transitions in one step, where reporting each of them
+// would show.
+static void an_animated_delta_reports_its_end_once(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  const mln_camera_options start = query_camera(map);
+  mln_test_drain_all(runtime);
+
+  mln_camera_delta delta =
+    animated_delta(MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE, 20.0, 71);
+  delta.offset = (mln_screen_point){.x = 40.0, .y = 0.0};
+  delta.scale = 2.0;
+  apply_delta(map, &delta);
+  TEST_ASSERT_EQUAL_size_t(1, render_until_finished(runtime, &fixture, 71));
+  const mln_camera_options rendered = query_camera(map);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, start.zoom + 1.0, rendered.zoom);
+  TEST_ASSERT_TRUE(rendered.center.longitude < start.center.longitude);
+
+  delta = animated_delta(
+    MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE, 60000.0, 72
+  );
+  delta.offset = (mln_screen_point){.x = 40.0, .y = 0.0};
+  delta.scale = 2.0;
+  apply_delta(map, &delta);
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_size_t(0, drain_finished(runtime, 72));
+  MLN_TEST_AWAIT_OK(
+    mln_map_cancel_transitions(map, &completion.descriptor, NULL)
+  );
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_size_t(1, drain_finished(runtime, 72));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// An animated delta starts from the camera that the running transition has
+// reached and replaces its transition. With no frame between them, the second
+// scale starts where the first did, so the camera ends one scale away from
+// the start, and the replaced transition reports its end at once.
+static void an_animated_delta_replaces_the_running_one(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  const double start_zoom = query_camera(map).zoom;
+  mln_test_drain_all(runtime);
+
+  mln_camera_delta first = animated_delta(MLN_CAMERA_DELTA_SCALE, 20.0, 61);
+  first.scale = 4.0;
+  mln_camera_delta second = animated_delta(MLN_CAMERA_DELTA_SCALE, 20.0, 62);
+  second.scale = 4.0;
+  const mln_completion discard = mln_test_discard_completion();
+  MLN_TEST_OK(mln_map_apply_camera_delta(map, &first, &discard, NULL));
+  apply_delta(map, &second);
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  TEST_ASSERT_EQUAL_size_t(1, drain_finished(runtime, 61));
+
+  TEST_ASSERT_EQUAL_size_t(1, render_until_finished(runtime, &fixture, 62));
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, start_zoom + 2.0, query_camera(map).zoom);
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A delta carries its gesture phase like a camera update. A delta without
+// components commits only its phase, and reports its transition ID before its
+// completion runs, as a release without inertia needs.
+static void a_delta_carries_its_gesture_phase(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_camera_update update = mln_camera_update_default();
+  update.camera = test_camera();
+  update_camera(map, &update);
+
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.gesture_phase = MLN_GESTURE_PHASE_BEGIN;
+  apply_delta(map, &delta);
+  mln_map_snapshot snapshot = read_settled_snapshot(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
+  TEST_ASSERT_EQUAL_DOUBLE(11.0, snapshot.camera.zoom);
+
+  delta.fields = MLN_CAMERA_DELTA_SCALE;
+  delta.scale = 2.0;
+  delta.gesture_phase = MLN_GESTURE_PHASE_UPDATE;
+  apply_delta(map, &delta);
+  snapshot = read_settled_snapshot(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.camera.zoom);
+  mln_test_drain_all(runtime);
+
+  delta = mln_camera_delta_default();
+  delta.animation.fields = MLN_ANIMATION_OPTION_TRANSITION_ID;
+  delta.animation.transition_id = 91;
+  delta.gesture_phase = MLN_GESTURE_PHASE_END;
+  apply_delta(map, &delta);
+  TEST_ASSERT_EQUAL_size_t(1, drain_finished(runtime, 91));
+  snapshot = read_settled_snapshot(runtime, map);
+  TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.camera.zoom);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_rendered_ease_completes_at_its_target);
   RUN_TEST(a_flight_with_every_animation_field_commits);
   RUN_TEST(cancel_transitions_commits_and_leaves_the_camera);
   RUN_TEST(gesture_phase_publishes_the_snapshot_flag);
+  RUN_TEST(an_animated_delta_reports_its_end_once);
+  RUN_TEST(an_animated_delta_replaces_the_running_one);
+  RUN_TEST(a_delta_carries_its_gesture_phase);
 }

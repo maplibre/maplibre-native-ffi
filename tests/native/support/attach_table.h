@@ -6,6 +6,7 @@
 // with a completion that no accepted row may reach: every row here expects a
 // rejection, and a rejected attach must leave its output session as it was.
 
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -155,24 +156,44 @@ static inline void mln_test_run_attach_table(
   );
 }
 
-// Defines the edit every descriptor shares, for the union member `member` of
-// type `type`: undersized. MLN_TEST_DESCRIPTOR_CASES(member) names its row.
-// The descriptor versions its embedded extent and context, so their sizes are
-// not checked.
+// Defines the edits every descriptor shares, for the union member `member` of
+// type `type`: undersized, and with an extent that breaks the positivity rule
+// in each way. MLN_TEST_DESCRIPTOR_CASES(member) names their rows.
 #define MLN_TEST_DESCRIPTOR_EDITS(member, type)                               \
   static void member##_undersized(void* call) {                               \
     ((mln_test_target_call*)call)->descriptor.member.size = sizeof(type) - 1; \
+  }                                                                           \
+  static void member##_zero_width(void* call) {                               \
+    ((mln_test_target_call*)call)->descriptor.member.extent.width = 0;        \
+  }                                                                           \
+  static void member##_zero_height(void* call) {                              \
+    ((mln_test_target_call*)call)->descriptor.member.extent.height = 0;       \
+  }                                                                           \
+  static void member##_zero_scale(void* call) {                               \
+    ((mln_test_target_call*)call)->descriptor.member.extent.scale_factor = 0; \
+  }                                                                           \
+  static void member##_infinite_scale(void* call) {                           \
+    ((mln_test_target_call*)call)->descriptor.member.extent.scale_factor =    \
+      (double)INFINITY;                                                       \
   }
 
 #define MLN_TEST_DESCRIPTOR_CASES(member)                                     \
   {"undersized descriptor", member##_undersized, MLN_STATUS_INVALID_ARGUMENT, \
-   "size is too small"}
+   "size is too small"},                                                      \
+    {"zero extent width", member##_zero_width, MLN_STATUS_INVALID_ARGUMENT,   \
+     "must be positive"},                                                     \
+    {"zero extent height", member##_zero_height, MLN_STATUS_INVALID_ARGUMENT, \
+     "must be positive"},                                                     \
+    {"zero scale factor", member##_zero_scale, MLN_STATUS_INVALID_ARGUMENT,   \
+     "must be positive"},                                                     \
+    {"infinite scale factor", member##_infinite_scale,                        \
+     MLN_STATUS_INVALID_ARGUMENT, "must be positive"}
 
 // For a target whose physical size follows from its extent: an extent that
 // overflows 32 bits once scaled. MLN_TEST_OVERFLOW_CASE(member) names its row.
 #define MLN_TEST_OVERFLOW_EDIT(member)                          \
   static void member##_overflowing_extent(void* call) {         \
-    mln_render_target_extent* extent =                          \
+    mln_logical_extent* extent =                                \
       &((mln_test_target_call*)call)->descriptor.member.extent; \
     extent->width = UINT32_MAX;                                 \
     extent->scale_factor = 2.0;                                 \
@@ -217,9 +238,8 @@ static inline void mln_test_run_attach_table(
   }
 
 // A logical extent every descriptor default can take.
-static inline mln_render_target_extent mln_test_target_extent(void) {
-  return (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
+static inline mln_logical_extent mln_test_target_extent(void) {
+  return (mln_logical_extent){
     .width = 64,
     .height = 64,
     .scale_factor = 1.0,

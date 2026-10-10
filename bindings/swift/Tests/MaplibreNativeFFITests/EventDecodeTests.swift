@@ -52,6 +52,7 @@ import Testing
     type: 0x4242,
     sourceType: 9,
     source: 0x77,
+    generation: 0x1_0000_0005,
     code: -12,
     payloadType: 0xBEEF,
     messageOffset: arena.offsets[0],
@@ -77,6 +78,7 @@ import Testing
   let decoded = try #require(batch.events.first)
   #expect(decoded.type.rawValue == 0x4242)
   #expect(decoded.sourceType.rawValue == 9 && decoded.source == 0x77)
+  #expect(decoded.generation == 0x1_0000_0005)
   #expect(decoded.code == -12)
   #expect(decoded.message == "opaque")
   #expect(decoded.payload == .unknown(0xBEEF, Data(window)))

@@ -49,7 +49,7 @@ final class TestGraphics: @unchecked Sendable {
   func attachOwnedTexture(
     map: MapHandle,
     options: RenderSessionAttachOptions,
-    extent: RenderTargetExtent = RenderTargetExtent(
+    extent: LogicalExtent = LogicalExtent(
       width: 32,
       height: 32,
       scaleFactor: 1

@@ -422,7 +422,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Submits one copied relative camera update.
+   * Submits one atomic relative camera update.
    *
    * See `mln_map_apply_camera_delta` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -897,21 +897,16 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Starts creation of a standalone projection from the map's ordered transform state.
+   * Creates a standalone projection from the map's latest published snapshot.
    *
    * See `mln_map_create_projection` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  public fun createProjection(): Deferred<MapProjectionHandle> =
-    nativeSubmitOwned(
-      this,
-      binding,
-      "mln_map_create_projection",
-      { MapProjectionHandle(it) },
-      GeneratedOwnerDisposal::mapProjection,
-      { it.close() },
-    ) {
-      check(C.mln_map_create_projection(handle, completion, diagnostic))
+  public fun createProjection(): MapProjectionHandle =
+    nativeCall(this, binding, "mln_map_create_projection") {
+      val out = allocate(8, 8)
+      check(C.mln_map_create_projection(handle, out, diagnostic))
+      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
     }
 
   /**
@@ -959,20 +954,6 @@ public abstract class GeneratedMapOperations internal constructor() {
       { result -> readCameraQueryResult(CompletionBridge.value(result)) },
     ) {
       check(C.mln_map_get_camera(handle, completion, diagnostic))
-    }
-
-  /**
-   * Copies the camera from the latest immutable map snapshot.
-   *
-   * See `mln_map_get_camera_snapshot` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun getCameraSnapshot(): MapGetCameraSnapshotResult =
-    nativeCall(this, binding, "mln_map_get_camera_snapshot") {
-      val out0 = sized(120, 8)
-      val out1 = allocate(8, 8)
-      check(C.mln_map_get_camera_snapshot(handle, out0, out1, diagnostic))
-      MapGetCameraSnapshotResult(camera = readCameraOptions(out0), generation = readU64(out1))
     }
 
   /**

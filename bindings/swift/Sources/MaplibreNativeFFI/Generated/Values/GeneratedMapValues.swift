@@ -197,54 +197,81 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// One relative camera operation.
+/// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct CameraDelta: Equatable, Hashable, Sendable {
-  public var kind: CameraDeltaKind
-  public var offset: ScreenPoint
-  public var amount: Double
+  /// Pan in logical map pixels; the content moves by this offset.
+  public var offset: ScreenPoint?
+  /// Positive zoom factor; 2 zooms in one level.
+  public var scale: Double?
+  /// Degrees added to the bearing.
+  public var bearing: Double?
+  /// Degrees added to the pitch; positive tilts further from straight down.
+  public var pitch: Double?
+  /// Screen point in logical map pixels that scale, bearing, and pitch keep
+  /// fixed.
   public var anchor: ScreenPoint?
   public var animation: AnimationOptions
+  public var gesturePhase: GesturePhase
   public static var `default`: Self {
     Self(raw: mln_camera_delta_default())
   }
 
   public init(
-    kind: CameraDeltaKind = CameraDelta.default.kind,
-    offset: ScreenPoint = CameraDelta.default.offset,
-    amount: Double = CameraDelta.default.amount,
+    offset: ScreenPoint? = CameraDelta.default.offset,
+    scale: Double? = CameraDelta.default.scale,
+    bearing: Double? = CameraDelta.default.bearing,
+    pitch: Double? = CameraDelta.default.pitch,
     anchor: ScreenPoint? = CameraDelta.default.anchor,
-    animation: AnimationOptions = CameraDelta.default.animation
+    animation: AnimationOptions = CameraDelta.default.animation,
+    gesturePhase: GesturePhase = CameraDelta.default.gesturePhase
   ) {
-    self.kind = kind
     self.offset = offset
-    self.amount = amount
+    self.scale = scale
+    self.bearing = bearing
+    self.pitch = pitch
     self.anchor = anchor
     self.animation = animation
+    self.gesturePhase = gesturePhase
   }
 
   init(raw: mln_camera_delta) {
-    kind = CameraDeltaKind(rawValue: raw.kind)
-    offset = ScreenPoint(raw: raw.offset)
-    amount = raw.amount
-    anchor = raw.fields & MLN_CAMERA_DELTA_FIELD_ANCHOR
+    offset = raw.fields & MLN_CAMERA_DELTA_OFFSET
+      .rawValue != 0 ? ScreenPoint(raw: raw.offset) : nil
+    scale = raw.fields & MLN_CAMERA_DELTA_SCALE.rawValue != 0 ? raw.scale : nil
+    bearing = raw.fields & MLN_CAMERA_DELTA_BEARING.rawValue != 0 ? raw
+      .bearing : nil
+    pitch = raw.fields & MLN_CAMERA_DELTA_PITCH.rawValue != 0 ? raw.pitch : nil
+    anchor = raw.fields & MLN_CAMERA_DELTA_ANCHOR
       .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
     animation = AnimationOptions(raw: raw.animation)
+    gesturePhase = GesturePhase(rawValue: raw.gesture_phase)
   }
 
   func nativeValue() -> mln_camera_delta {
     var raw = mln_camera_delta_default()
     raw.fields = 0
-    raw.kind = kind.rawValue
-    raw.offset = offset.nativeValue()
-    raw.amount = amount
+    if let item = offset {
+      raw.fields |= MLN_CAMERA_DELTA_OFFSET.rawValue; raw.offset = item
+        .nativeValue()
+    }
+    if let item = scale {
+      raw.fields |= MLN_CAMERA_DELTA_SCALE.rawValue; raw.scale = item
+    }
+    if let item = bearing {
+      raw.fields |= MLN_CAMERA_DELTA_BEARING.rawValue; raw.bearing = item
+    }
+    if let item = pitch {
+      raw.fields |= MLN_CAMERA_DELTA_PITCH.rawValue; raw.pitch = item
+    }
     if let item = anchor {
-      raw.fields |= MLN_CAMERA_DELTA_FIELD_ANCHOR.rawValue; raw.anchor = item
+      raw.fields |= MLN_CAMERA_DELTA_ANCHOR.rawValue; raw.anchor = item
         .nativeValue()
     }
     raw.animation = animation.nativeValue()
+    raw.gesture_phase = gesturePhase.rawValue
     return raw
   }
 }
@@ -261,25 +288,11 @@ public struct CameraDeltaField: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
-  public static let anchor: CameraDeltaField = .init(rawValue: 1)
-}
-
-/// Relative camera operation carried by `mln_camera_delta`.
-///
-/// See `mln_camera_delta_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraDeltaKind: RawRepresentable, NativeOpenValue, Equatable,
-  Hashable, Sendable
-{
-  public let rawValue: UInt32
-  public init(rawValue: UInt32) {
-    self.rawValue = rawValue
-  }
-
-  public static let move: CameraDeltaKind = .init(rawValue: 0)
-  public static let scale: CameraDeltaKind = .init(rawValue: 1)
-  public static let bearing: CameraDeltaKind = .init(rawValue: 2)
-  public static let pitch: CameraDeltaKind = .init(rawValue: 3)
+  public static let offset: CameraDeltaField = .init(rawValue: 1)
+  public static let scale: CameraDeltaField = .init(rawValue: 2)
+  public static let bearing: CameraDeltaField = .init(rawValue: 4)
+  public static let pitch: CameraDeltaField = .init(rawValue: 8)
+  public static let anchor: CameraDeltaField = .init(rawValue: 16)
 }
 
 /// Field mask values for `mln_camera_fit_options`.
@@ -771,7 +784,7 @@ public struct FreeCameraOptions: Equatable, Hashable, Sendable {
   }
 }
 
-/// Gesture boundary carried atomically with a camera update.
+/// Gesture boundary carried atomically with a camera update or delta.
 ///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -863,7 +876,7 @@ public struct LatLngBounds: Equatable, Hashable, Sendable {
   }
 }
 
-/// Logical map extent in UI pixels and device-pixel scale.
+/// Logical extent in UI pixels and the device-pixel scale.
 ///
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -872,12 +885,14 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   public var width: UInt32
   /// Height in UI pixels. Defaults to 256.
   public var height: UInt32
-  /// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
-  /// creation, so `mln_map_resize()` accepts only the value the map was created
-  /// with.
+  /// Device pixels per UI pixel. Defaults to 1.0.
   public var scaleFactor: Double
   public static var `default`: Self {
-    Self(raw: mln_logical_extent())
+    var value = Self(raw: mln_logical_extent())
+    value.width = 256
+    value.height = 256
+    value.scaleFactor = 1.0
+    return value
   }
 
   public init(
@@ -951,9 +966,8 @@ public struct MapMode: RawRepresentable, NativeOpenValue, Equatable, Hashable,
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapOptions: Equatable, Hashable, Sendable {
-  /// Initial logical extent. Width and height must be positive. The scale
-  /// factor must be positive and finite, and fixes the map's scale factor for
-  /// its lifetime.
+  /// Initial logical extent. Width and height must be nonzero, and scale_factor
+  /// must be finite and positive. scale_factor is fixed for the map's lifetime.
   public var initialExtent: LogicalExtent
   /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
   public var mapMode: MapMode

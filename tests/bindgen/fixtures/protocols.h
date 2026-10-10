@@ -174,6 +174,7 @@ typedef enum BIND("kind=bitmask") mln_probe_flag : uint32_t {
 typedef struct mln_probe_extent {
   uint32_t width BIND("default=256");
   double scale BIND("default=1.5");
+  uint32_t fit BIND("enum=mln_probe_mode;default=MLN_PROBE_MODE_FIRST");
 } mln_probe_extent;
 typedef struct mln_probe_settings {
   uint32_t size;

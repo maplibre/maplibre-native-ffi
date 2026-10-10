@@ -11,8 +11,7 @@ auto metal_surface_descriptor_default() noexcept
   return mln_metal_surface_descriptor{
     .size = sizeof(mln_metal_surface_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -30,8 +29,7 @@ auto vulkan_surface_descriptor_default() noexcept
   return mln_vulkan_surface_descriptor{
     .size = sizeof(mln_vulkan_surface_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -61,7 +59,7 @@ auto validate_metal_surface_descriptor(
     set_thread_error("mln_metal_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "surface dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -90,7 +88,7 @@ auto validate_vulkan_surface_descriptor(
     set_thread_error("mln_vulkan_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "surface dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -120,7 +118,7 @@ auto validate_webgpu_surface_descriptor(
     set_thread_error("mln_webgpu_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "surface dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -154,7 +152,7 @@ auto validate_opengl_surface_descriptor(
     set_thread_error("mln_opengl_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "surface dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {

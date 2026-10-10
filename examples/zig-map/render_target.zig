@@ -171,7 +171,7 @@ pub const Session = struct {
     /// pacing.
     pub fn resize(self: *Session, viewport: types.Viewport) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.renderSessionResize(std.heap.smp_allocator, self.handle.?, extent(viewport), &diagnostic) catch |err| {
+        var completion = maplibre.renderSessionResize(self.handle.?, extent(viewport), &diagnostic) catch |err| {
             diagnostics.logError("render session resize failed", err, &diagnostic);
             return types.AppError.ResizeFailed;
         };
@@ -328,6 +328,6 @@ pub fn Replacements(comptime Texture: type) type {
     };
 }
 
-pub fn extent(viewport: types.Viewport) maplibre.RenderTargetExtent {
+pub fn extent(viewport: types.Viewport) maplibre.LogicalExtent {
     return .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor };
 }

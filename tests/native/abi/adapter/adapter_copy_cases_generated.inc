@@ -269,24 +269,6 @@ static bool mln_adapter_copy_case_map_matches(
   return true;
 }
 
-static const void* mln_adapter_copy_case_map_projection_value(size_t* count) {
-  static mln_map_projection values[1];
-  values[0] = 1;
-  *count = 1;
-  return values;
-}
-
-static bool mln_adapter_copy_case_map_projection_matches(
-  const void* copy_value, const void* source_value, size_t count
-) {
-  const mln_map_projection* copy = (const mln_map_projection*)copy_value;
-  const mln_map_projection* source = (const mln_map_projection*)source_value;
-  for (size_t index = 0; index < count; ++index) {
-    if (copy[index] != source[index]) return false;
-  }
-  return true;
-}
-
 static const void* mln_adapter_copy_case_offline_region_info_value(
   size_t* count
 ) {
@@ -948,9 +930,6 @@ static const mln_adapter_copy_case mln_adapter_copy_cases[] = {
    mln_adapter_copy_case_lat_lng_bounds_matches},
   {MLN_ADAPTER_COMPLETION_COPY_MAP, "mln_map", sizeof(mln_map),
    mln_adapter_copy_case_map_value, mln_adapter_copy_case_map_matches},
-  {MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION, "mln_map_projection",
-   sizeof(mln_map_projection), mln_adapter_copy_case_map_projection_value,
-   mln_adapter_copy_case_map_projection_matches},
   {MLN_ADAPTER_COMPLETION_COPY_OFFLINE_REGION_INFO, "mln_offline_region_info",
    sizeof(mln_offline_region_info),
    mln_adapter_copy_case_offline_region_info_value,

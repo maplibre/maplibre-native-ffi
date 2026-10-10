@@ -10,7 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical surface extent.
+/// Logical surface extent. A scale_factor that differs from the map's is
+/// accepted and logged as a warning.
 /// </param>
 /// <param name="Context">
 /// Borrowed WebGPU context. device is required.
@@ -25,14 +26,14 @@ namespace Maplibre.NativeFfi;
 /// takes it from navigator.gpu.getPreferredCanvasFormat().
 /// </param>
 public readonly partial record struct WebgpuSurfaceDescriptor(
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     WebgpuContextDescriptor Context,
     NativePointer Surface,
     uint Format
 )
 {
     public WebgpuSurfaceDescriptor()
-        : this(new RenderTargetExtent(), default, default, default) { }
+        : this(new LogicalExtent(), default, default, default) { }
 
     public static WebgpuSurfaceDescriptor Default
     {

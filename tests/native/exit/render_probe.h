@@ -22,8 +22,7 @@ typedef mln_status (*probe_attach_fn)(
   mln_render_session* out_session, const mln_completion* completion
 );
 
-static const mln_render_target_extent probe_extent = {
-  .size = sizeof(mln_render_target_extent),
+static const mln_logical_extent probe_extent = {
   .width = 256,
   .height = 256,
   .scale_factor = 1.0,

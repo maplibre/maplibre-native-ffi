@@ -37,11 +37,7 @@ internal sealed class MapState : IDisposable
                 .CreateMapAsync(
                     MapOptions.Default with
                     {
-                        InitialExtent = new LogicalExtent(
-                            viewport.LogicalWidth,
-                            viewport.LogicalHeight,
-                            viewport.ScaleFactor
-                        ),
+                        InitialExtent = viewport.LogicalExtent,
                         MapMode = MapMode.Continuous,
                         EventMask = RuntimeEventMask.MapRenderUpdateAvailable,
                     }
@@ -108,33 +104,24 @@ internal sealed class MapState : IDisposable
         ApplyDelta(
             new CameraDelta
             {
-                Kind = CameraDeltaKind.Scale,
-                Amount = scale,
+                Scale = scale,
                 Anchor = anchor,
                 Animation = animation ?? new AnimationOptions(),
             }
         );
     }
 
-    public void AdjustBearing(double delta, AnimationOptions? animation = null)
+    public void AdjustOrientation(
+        double? bearing = null,
+        double? pitch = null,
+        AnimationOptions? animation = null
+    )
     {
         ApplyDelta(
             new CameraDelta
             {
-                Kind = CameraDeltaKind.Bearing,
-                Amount = delta,
-                Animation = animation ?? new AnimationOptions(),
-            }
-        );
-    }
-
-    public void AdjustPitch(double delta, AnimationOptions? animation = null)
-    {
-        ApplyDelta(
-            new CameraDelta
-            {
-                Kind = CameraDeltaKind.Pitch,
-                Amount = delta,
+                Bearing = bearing,
+                Pitch = pitch,
                 Animation = animation ?? new AnimationOptions(),
             }
         );

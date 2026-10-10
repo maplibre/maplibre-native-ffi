@@ -280,7 +280,7 @@ impl WebGpuBorrowedTexture {
 
     pub(super) fn descriptor(
         &self,
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         context: &WebGpuTestContext,
     ) -> WebgpuBorrowedTextureDescriptor {
         WebgpuBorrowedTextureDescriptor {

@@ -5,13 +5,11 @@ import kotlin.math.round
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
-import org.maplibre.nativeffi.generated.CameraDeltaKind
 import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GesturePhase
 import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventMask
@@ -44,12 +42,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
           .createMap(
             GeneratedApi.mapOptionsDefault()
               .copy(
-                initialExtent =
-                  LogicalExtent(
-                    initialViewport.logicalWidth.toUInt(),
-                    initialViewport.logicalHeight.toUInt(),
-                    initialViewport.scaleFactor,
-                  ),
+                initialExtent = initialViewport.extent,
                 mapMode = MapMode.CONTINUOUS,
                 eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
               )
@@ -82,27 +75,26 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
     map.applyCameraDelta(CameraDelta(offset = ScreenPoint(deltaX, deltaY)))
   }
 
-  fun scaleBy(scale: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
-  }
-
-  fun adjustBearing(degrees: Double, anchor: ScreenPoint) {
+  /**
+   * Pans by the centroid's movement, then scales and turns about the new centroid, in one delta, so
+   * no frame shows the pan without the zoom and turn.
+   */
+  fun pinchBy(offset: ScreenPoint, scale: Double, bearingDegrees: Double, centroid: ScreenPoint) {
     map.applyCameraDelta(
-      CameraDelta(kind = CameraDeltaKind.BEARING, amount = degrees, anchor = anchor)
+      CameraDelta(offset = offset, scale = scale, bearing = bearingDegrees, anchor = centroid)
     )
   }
 
   fun adjustPitch(degrees: Double) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.PITCH, amount = degrees))
+    map.applyCameraDelta(CameraDelta(pitch = degrees))
   }
 
   /** Eases to the next whole zoom level, as `round(zoom) + 1`, about [anchor]. */
   fun zoomToNextWholeLevel(anchor: ScreenPoint) {
-    val zoom = map.getCameraSnapshot().camera.zoom ?: 0.0
+    val zoom = map.getSnapshot().camera.zoom ?: 0.0
     map.applyCameraDelta(
       CameraDelta(
-        kind = CameraDeltaKind.SCALE,
-        amount = 2.0.pow(round(zoom) + 1.0 - zoom),
+        scale = 2.0.pow(round(zoom) + 1.0 - zoom),
         anchor = anchor,
         animation = animation(DOUBLE_TAP_DURATION_MS),
       )
@@ -110,13 +102,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
   }
 
   fun resize(viewport: Viewport) {
-    map.resize(
-      LogicalExtent(
-        viewport.logicalWidth.toUInt(),
-        viewport.logicalHeight.toUInt(),
-        viewport.scaleFactor,
-      )
-    )
+    map.resize(viewport.extent)
   }
 
   private fun animation(durationMs: Double) = AnimationOptions(durationMs = durationMs)

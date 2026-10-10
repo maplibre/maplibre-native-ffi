@@ -69,13 +69,6 @@ struct CompletionResult<&mln_map_camera_for_lat_lngs> {
   static constexpr bool nullable = false;
 };
 template <>
-struct CompletionResult<&mln_map_create_projection> {
-  static constexpr bool has_value = true;
-  using type = mln_map_projection;
-  static constexpr bool array = false;
-  static constexpr bool nullable = false;
-};
-template <>
 struct CompletionResult<&mln_map_get_camera> {
   static constexpr bool has_value = true;
   using type = mln_camera_query_result;

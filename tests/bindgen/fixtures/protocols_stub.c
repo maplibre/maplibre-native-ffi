@@ -67,7 +67,7 @@ mln_status mln_keyword_combine(
 mln_probe_settings mln_probe_settings_default(void) {
   return (mln_probe_settings){
     .size = sizeof(mln_probe_settings),
-    .extent = {.width = 256, .scale = 1.5},
+    .extent = {.width = 256, .scale = 1.5, .fit = MLN_PROBE_MODE_FIRST},
     .mode = MLN_PROBE_MODE_SECOND,
     .flags = MLN_PROBE_FLAG_ALL,
     .heading = MLN_PROBE_FLAG_SOUTH,
@@ -87,6 +87,9 @@ mln_status mln_probe_settings_check(
   }
   if (settings.extent.scale != expected.extent.scale) {
     return fail(out_diagnostic, "extent.scale");
+  }
+  if (settings.extent.fit != expected.extent.fit) {
+    return fail(out_diagnostic, "extent.fit");
   }
   if (settings.mode != expected.mode) return fail(out_diagnostic, "mode");
   if (settings.flags != expected.flags) return fail(out_diagnostic, "flags");

@@ -78,10 +78,10 @@ mln_status resize_session(
   double scale_factor, const mln_completion* completion
 ) {
   // #region resize
-  const mln_render_target_extent extent = {
+  const mln_logical_extent extent = {
     .width = width, .height = height, .scale_factor = scale_factor
   };
-  return mln_render_session_resize(session, &extent, completion, NULL);
+  return mln_render_session_resize(session, extent, completion, NULL);
   // #endregion resize
 }
 

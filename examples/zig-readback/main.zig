@@ -326,7 +326,7 @@ fn attachOwnedTexture(
     context: *OwnedTextureContext,
     map: *maplibre.Map,
     signal: *WakeSignal,
-    extent: maplibre.RenderTargetExtent,
+    extent: maplibre.LogicalExtent,
 ) !Attachment {
     const wakes: maplibre.RenderSessionAttachOptions = .{
         .requested_texture_ring_depth = 1,

@@ -186,10 +186,13 @@ mln_status mln_test_map_get_camera(
   if (out_camera == NULL) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  uint64_t generation = 0;
-  return mln_map_get_camera_snapshot(
-    map, out_camera, &generation, MLN_TEST_DIAGNOSTIC
-  );
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  const mln_status status =
+    mln_map_get_snapshot(map, &snapshot, MLN_TEST_DIAGNOSTIC);
+  if (status == MLN_STATUS_OK) {
+    *out_camera = snapshot.camera;
+  }
+  return status;
 }
 
 static MLN_TEST_THREAD_LOCAL mln_diagnostic test_diagnostic;

@@ -76,11 +76,10 @@ impl Controller {
         self.cursor_y = y;
 
         if self.right_down || (self.left_down && self.modifiers.control_key()) {
-            if dx != 0.0 {
-                map.adjust_bearing(dx * DRAG_ROTATE_FACTOR, None)?;
-            }
-            if dy != 0.0 {
-                map.adjust_pitch(dy * DRAG_PITCH_FACTOR, None)?;
+            if dx != 0.0 || dy != 0.0 {
+                let bearing = (dx != 0.0).then_some(dx * DRAG_ROTATE_FACTOR);
+                let pitch = (dy != 0.0).then_some(dy * DRAG_PITCH_FACTOR);
+                map.adjust_orientation(bearing, pitch, None)?;
             }
         } else if self.left_down && (dx != 0.0 || dy != 0.0) {
             map.move_by(dx, dy, None)?;
@@ -170,10 +169,18 @@ fn keyboard(
         KeyCode::Minus | KeyCode::NumpadSubtract => {
             map.scale_by(1.0 / KEYBOARD_ZOOM, center, Some(KEYBOARD_ANIMATION_MS))?
         }
-        KeyCode::KeyQ => map.adjust_bearing(-KEYBOARD_BEARING, Some(KEYBOARD_ANIMATION_MS))?,
-        KeyCode::KeyE => map.adjust_bearing(KEYBOARD_BEARING, Some(KEYBOARD_ANIMATION_MS))?,
-        KeyCode::BracketRight => map.adjust_pitch(KEYBOARD_PITCH, Some(KEYBOARD_ANIMATION_MS))?,
-        KeyCode::BracketLeft => map.adjust_pitch(-KEYBOARD_PITCH, Some(KEYBOARD_ANIMATION_MS))?,
+        KeyCode::KeyQ => {
+            map.adjust_orientation(Some(-KEYBOARD_BEARING), None, Some(KEYBOARD_ANIMATION_MS))?
+        }
+        KeyCode::KeyE => {
+            map.adjust_orientation(Some(KEYBOARD_BEARING), None, Some(KEYBOARD_ANIMATION_MS))?
+        }
+        KeyCode::BracketRight => {
+            map.adjust_orientation(None, Some(KEYBOARD_PITCH), Some(KEYBOARD_ANIMATION_MS))?
+        }
+        KeyCode::BracketLeft => {
+            map.adjust_orientation(None, Some(-KEYBOARD_PITCH), Some(KEYBOARD_ANIMATION_MS))?
+        }
         KeyCode::Digit0 | KeyCode::Numpad0 => map.reset_orientation(RESET_ANIMATION_MS)?,
         _ => {}
     }

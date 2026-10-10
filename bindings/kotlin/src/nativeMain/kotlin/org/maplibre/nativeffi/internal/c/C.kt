@@ -256,6 +256,19 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_logical_extent_physical_size(
+    extent: Long,
+    outWidth: Long,
+    outHeight: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_logical_extent_physical_size(
+      extent.toCPointer<mln_logical_extent>()!!.pointed.readValue(),
+      outWidth.toCPointer(),
+      outHeight.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_add_color_relief_layer(
     map: Long,
     layerId: Long,
@@ -821,10 +834,10 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_map_create_projection(map: Long, completion: Long, outDiagnostic: Long): Int =
+  actual fun mln_map_create_projection(map: Long, outProjection: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_create_projection(
       map.toULong(),
-      completion.toCPointer(),
+      outProjection.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -852,19 +865,6 @@ internal actual object C {
     org.maplibre.nativeffi.internal.cinterop.mln_map_get_camera(
       map.toULong(),
       completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_map_get_camera_snapshot(
-    map: Long,
-    outCamera: Long,
-    outGeneration: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_map_get_camera_snapshot(
-      map.toULong(),
-      outCamera.toCPointer(),
-      outGeneration.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2286,7 +2286,7 @@ internal actual object C {
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_render_session_resize(
       session.toULong(),
-      extent.toCPointer(),
+      extent.toCPointer<mln_logical_extent>()!!.pointed.readValue(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
     )
@@ -2405,19 +2405,6 @@ internal actual object C {
       session.toULong(),
       descriptor.toCPointer(),
       completion.toCPointer(),
-      outDiagnostic.toCPointer(),
-    )
-
-  actual fun mln_render_target_extent_physical_size(
-    extent: Long,
-    outWidth: Long,
-    outHeight: Long,
-    outDiagnostic: Long,
-  ): Int =
-    org.maplibre.nativeffi.internal.cinterop.mln_render_target_extent_physical_size(
-      extent.toCPointer(),
-      outWidth.toCPointer(),
-      outHeight.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 

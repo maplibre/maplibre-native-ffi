@@ -177,7 +177,7 @@ public sealed class RenderTests
         var nativeSurface = GeneratedValues.NativeVulkanSurfaceDescriptor(
             new VulkanSurfaceDescriptor
             {
-                Extent = new RenderTargetExtent(64, 32, 1),
+                Extent = new LogicalExtent(64, 32, 1),
                 Surface = surface,
                 Context = new VulkanContextDescriptor
                 {
@@ -191,7 +191,7 @@ public sealed class RenderTests
         var nativeTexture = GeneratedValues.NativeVulkanBorrowedTextureDescriptor(
             new VulkanBorrowedTextureDescriptor
             {
-                Extent = new RenderTargetExtent(64, 32, 1),
+                Extent = new LogicalExtent(64, 32, 1),
                 PhysicalWidth = 64,
                 PhysicalHeight = 32,
                 Image = image,

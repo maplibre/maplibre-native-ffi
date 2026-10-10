@@ -27,6 +27,7 @@ class RuntimeEventNativeTest {
         event.type = stridedEventType(index).toUInt()
         event.source_type = stridedSourceType(index).toUInt()
         event.source = stridedSource(index)
+        event.generation = stridedGeneration(index)
         event.code = stridedCode(index)
         event.payload_type = stridedPayloadType(index).toUInt()
         event.message_offset = stridedMessageOffset(index).toULong()

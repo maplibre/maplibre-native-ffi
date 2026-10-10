@@ -11,5 +11,9 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum CameraDeltaField : uint
 {
-    Anchor = 1,
+    Offset = 1,
+    Scale = 2,
+    Bearing = 4,
+    Pitch = 8,
+    Anchor = 16,
 }

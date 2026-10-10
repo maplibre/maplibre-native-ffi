@@ -163,6 +163,9 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
                 "extent": None,
                 "width": FieldInitial("256", 256),
                 "scale": FieldInitial("1.5", 1.5),
+                "fit": FieldInitial(
+                    "MLN_PROBE_MODE_FIRST", 1, "MLN_PROBE_MODE_FIRST", "first"
+                ),
                 "mode": FieldInitial(
                     "MLN_PROBE_MODE_SECOND", 2, "MLN_PROBE_MODE_SECOND", "second"
                 ),
@@ -190,6 +193,7 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
                 ("settings.size", "unsigned", "sizeof(mln_probe_settings)"),
                 ("settings.extent.width", "unsigned", "256"),
                 ("settings.extent.scale", "float", "1.5"),
+                ("settings.extent.fit", "unsigned", "MLN_PROBE_MODE_FIRST"),
                 ("settings.mode", "unsigned", "MLN_PROBE_MODE_SECOND"),
                 ("settings.flags", "unsigned", "MLN_PROBE_FLAG_ALL"),
                 ("settings.heading", "unsigned", "MLN_PROBE_FLAG_SOUTH"),

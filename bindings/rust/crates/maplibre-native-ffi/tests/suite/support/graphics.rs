@@ -163,7 +163,7 @@ impl Graphics {
     pub fn attach_owned_texture(
         &self,
         map: &MapHandle,
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         options: &RenderSessionAttachOptions,
     ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
         let context = &self.context;
@@ -230,7 +230,7 @@ impl Graphics {
 
     /// Attaches an owned-texture session with this build's default driver
     /// and waits until it is attached.
-    pub fn owned_texture_session(&self, map: &MapHandle, extent: RenderTargetExtent) -> Session {
+    pub fn owned_texture_session(&self, map: &MapHandle, extent: LogicalExtent) -> Session {
         let (options, wakes) = Session::attach_options(Self::default_driver());
         Session::finish_attach(
             self.attach_owned_texture(map, extent, &options).unwrap(),

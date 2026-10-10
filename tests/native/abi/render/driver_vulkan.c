@@ -25,8 +25,7 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
 
   mln_vulkan_owned_texture_descriptor descriptor =
     mln_vulkan_owned_texture_descriptor_default();
-  descriptor.extent = (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
+  descriptor.extent = (mln_logical_extent){
     .width = 32,
     .height = 32,
     .scale_factor = 1.0,

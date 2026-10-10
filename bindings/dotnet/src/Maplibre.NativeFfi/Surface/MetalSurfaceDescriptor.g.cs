@@ -10,7 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical surface extent.
+/// Logical surface extent. A scale_factor that differs from the map's is
+/// accepted and logged as a warning.
 /// </param>
 /// <param name="Context">
 /// Metal backend context. device is optional for Metal surfaces.
@@ -20,13 +21,13 @@ namespace Maplibre.NativeFfi;
 /// Required.
 /// </param>
 public readonly partial record struct MetalSurfaceDescriptor(
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     MetalContextDescriptor Context,
     NativePointer Layer
 )
 {
     public MetalSurfaceDescriptor()
-        : this(new RenderTargetExtent(), default, default) { }
+        : this(new LogicalExtent(), default, default) { }
 
     public static MetalSurfaceDescriptor Default
     {

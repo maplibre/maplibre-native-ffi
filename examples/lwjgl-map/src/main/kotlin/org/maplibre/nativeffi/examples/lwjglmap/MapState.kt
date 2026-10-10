@@ -3,7 +3,6 @@ package org.maplibre.nativeffi.examples.lwjglmap
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
-import org.maplibre.nativeffi.generated.CameraDeltaKind
 import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.CameraUpdateMode
@@ -39,26 +38,15 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   }
 
   fun scaleBy(scale: Double, anchor: ScreenPoint, durationMs: Double? = null) {
-    delta(
-      CameraDelta(
-        kind = CameraDeltaKind.SCALE,
-        amount = scale,
-        anchor = anchor,
-        animation = animation(durationMs),
-      )
-    )
+    delta(CameraDelta(scale = scale, anchor = anchor, animation = animation(durationMs)))
   }
 
-  fun adjustPitch(delta: Double, durationMs: Double? = null) {
-    delta(
-      CameraDelta(kind = CameraDeltaKind.PITCH, amount = delta, animation = animation(durationMs))
-    )
-  }
-
-  fun adjustBearing(delta: Double, durationMs: Double? = null) {
-    delta(
-      CameraDelta(kind = CameraDeltaKind.BEARING, amount = delta, animation = animation(durationMs))
-    )
+  fun adjustOrientation(
+    bearing: Double? = null,
+    pitch: Double? = null,
+    durationMs: Double? = null,
+  ) {
+    delta(CameraDelta(bearing = bearing, pitch = pitch, animation = animation(durationMs)))
   }
 
   fun resetOrientation(durationMs: Double) {
@@ -130,14 +118,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
               .createMap(
                 GeneratedApi.mapOptionsDefault()
                   .copy(
-                    initialExtent =
-                      GeneratedApi.mapOptionsDefault()
-                        .initialExtent
-                        .copy(
-                          width = (viewport.width()).toUInt(),
-                          height = (viewport.height()).toUInt(),
-                          scaleFactor = viewport.scaleFactor(),
-                        ),
+                    initialExtent = RenderTarget.extent(viewport),
                     mapMode = MapMode.CONTINUOUS,
                     eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
                   )

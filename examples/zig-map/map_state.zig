@@ -3,6 +3,7 @@ const maplibre = @import("maplibre_native_ffi");
 
 const diagnostics = @import("diagnostics.zig");
 const events = @import("events.zig");
+const render_target = @import("render_target.zig");
 const types = @import("types.zig");
 
 pub const MapState = struct {
@@ -34,7 +35,7 @@ pub const MapState = struct {
         // The render loop re-arms from the frame result's repaint flag, so the
         // map only has to report updates that arrive between frames.
         var map_future = maplibre.runtimeCreateMap(allocator, runtime, .{
-            .initial_extent = .{ .width = viewport.logical_width, .height = viewport.logical_height, .scale_factor = viewport.scale_factor },
+            .initial_extent = render_target.extent(viewport),
             .map_mode = .continuous,
             .event_mask = .{ .map_render_update_available = true },
         }, &diagnostic) catch |err| {
@@ -94,38 +95,31 @@ pub const MapState = struct {
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .scale, .amount = scale, .anchor = anchor }, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .scale = scale, .anchor = anchor }, &self.diagnostic));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
         try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .kind = .scale,
-            .amount = scale,
+            .scale = scale,
             .anchor = anchor,
             .animation = .{ .duration_ms = duration_ms },
         }, &self.diagnostic));
     }
 
-    pub fn pitchBy(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .pitch, .amount = delta }, &self.diagnostic));
-    }
-
-    pub fn adjustBearing(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .bearing, .amount = delta }, &self.diagnostic));
+    pub fn adjustOrientation(self: *MapState, bearing: f64, pitch: f64) !void {
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .bearing = bearing, .pitch = pitch }, &self.diagnostic));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
         try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .kind = .bearing,
-            .amount = delta,
+            .bearing = delta,
             .animation = .{ .duration_ms = duration_ms },
         }, &self.diagnostic));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
         try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .kind = .pitch,
-            .amount = delta,
+            .pitch = delta,
             .animation = .{ .duration_ms = duration_ms },
         }, &self.diagnostic));
     }

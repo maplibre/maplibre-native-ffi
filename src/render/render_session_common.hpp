@@ -34,6 +34,7 @@
 #include "handles/handle_table.hpp"
 #include "handles/owner_thread.hpp"
 #include "map/feature_state.hpp"
+#include "map/logical_extent.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
 #include "render/discard_present.hpp"
@@ -629,7 +630,7 @@ struct mln_render_session_object
   mln_render_result latest_result = MLN_RENDER_RESULT_NO_UPDATE;
   bool target_ready = true;
   bool pending_changes = true;
-  std::optional<mln_render_target_extent> pending_extent;
+  std::optional<mln_logical_extent> pending_extent;
   std::optional<mln::core::OwnerThreadToken> graphics_thread;
   uint32_t acquired_frame_count = 0;
   bool driver_call_in_flight = false;
@@ -773,21 +774,6 @@ inline auto physical_dimension(uint32_t logical, double scale_factor)
   return static_cast<uint32_t>(std::ceil(logical * scale_factor));
 }
 
-// Validates the members of an extent. A caller that passes the extent by
-// pointer checks its size first; a descriptor that embeds it versions it.
-inline auto validate_render_target_extent(
-  const mln_render_target_extent& extent, const char* dimension_message
-) -> mln_status {
-  if (
-    extent.width == 0 || extent.height == 0 ||
-    !std::isfinite(extent.scale_factor) || extent.scale_factor <= 0.0
-  ) {
-    set_thread_error(dimension_message);
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
 inline auto validate_metal_context(
   const mln_metal_context_descriptor& context, bool require_device
 ) -> mln_status {
@@ -811,9 +797,8 @@ inline auto validate_vulkan_context(
   return MLN_STATUS_OK;
 }
 
-auto render_target_extent_physical_size(
-  const mln_render_target_extent* extent, uint32_t* out_width,
-  uint32_t* out_height
+auto logical_extent_physical_size(
+  mln_logical_extent extent, uint32_t* out_width, uint32_t* out_height
 ) -> mln_status;
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t;
@@ -850,7 +835,7 @@ auto opengl_context_matches(
 ) -> bool;
 
 inline auto set_session_extent(
-  mln_render_session_object& session, const mln_render_target_extent& extent
+  mln_render_session_object& session, const mln_logical_extent& extent
 ) -> void {
   session.width = extent.width;
   session.height = extent.height;
@@ -864,7 +849,7 @@ inline auto set_session_extent(
 // Borrowed targets are sized by their owner, so the caller states the physical
 // size instead of deriving it from the logical extent and scale factor.
 inline auto set_borrowed_session_extent(
-  mln_render_session_object& session, const mln_render_target_extent& extent,
+  mln_render_session_object& session, const mln_logical_extent& extent,
   uint32_t physical_width, uint32_t physical_height
 ) -> void {
   session.width = extent.width;
@@ -928,14 +913,14 @@ using RenderTargetReplacer =
 // validates its own descriptor first.
 auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
-  const mln_render_target_extent& extent, uint32_t physical_width,
+  const mln_logical_extent& extent, uint32_t physical_width,
   uint32_t physical_height, const RenderTargetReplacer& replace
 ) -> mln_status;
 
 // render_session_set_target() for a surface, whose physical size follows from
 // its logical extent rather than being stated by the caller.
 auto surface_session_set_target(
-  mln_render_session session, const mln_render_target_extent& extent,
+  mln_render_session session, const mln_logical_extent& extent,
   const RenderTargetReplacer& replace
 ) -> mln_status;
 auto render_session_projection_create(
@@ -1042,7 +1027,7 @@ auto acquired_frame_release(
   mln_acquired_frame* frame, const mln_gpu_sync* consumer_completion
 ) -> mln_status;
 auto render_session_resize_start(
-  mln_render_session session, const mln_render_target_extent* extent,
+  mln_render_session session, mln_logical_extent extent,
   const mln_completion* completion
 ) -> mln_status;
 auto render_session_barrier_start(

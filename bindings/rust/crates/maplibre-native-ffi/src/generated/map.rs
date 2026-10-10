@@ -440,7 +440,7 @@ impl MapHandle {
         })
     }
 
-    /// Submits one copied relative camera update.
+    /// Submits one atomic relative camera update.
     ///
     /// See `mln_map_apply_camera_delta` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -954,24 +954,18 @@ impl MapHandle {
         })
     }
 
-    /// Starts creation of a standalone projection from the map's ordered
-    /// transform state.
+    /// Creates a standalone projection from the map's latest published
+    /// snapshot.
     ///
     /// See `mln_map_create_projection` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn create_projection(&self) -> Result<NativeFuture<MapProjectionHandle>> {
-        let call = self.inner.call("mln_map_create_projection")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_create_projection(map, completion, out_diagnostic)
-            },
-            move |result| {
-                MapProjectionHandle::adopt(
-                    completion::copy_value::<sys::mln_map_projection>(result)?,
-                    None,
-                )
-            },
-        )
+    pub fn create_projection(&self) -> Result<MapProjectionHandle> {
+        let mut call = self.inner.call("mln_map_create_projection")?;
+        let mut out_projection = sys::mln_map_projection(0);
+        call.status(|map, out_diagnostic| unsafe {
+            sys::mln_map_create_projection(map, &mut out_projection, out_diagnostic)
+        })?;
+        Ok(MapProjectionHandle::adopt(out_projection, None)?)
     }
 
     /// Consumes a map handle without observing its asynchronous retirement.
@@ -1020,26 +1014,6 @@ impl MapHandle {
             },
             completion::value::<sys::mln_camera_query_result, _>,
         )
-    }
-
-    /// Copies the camera from the latest immutable map snapshot.
-    ///
-    /// See `mln_map_get_camera_snapshot` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn get_camera_snapshot(&self) -> Result<(CameraOptions, u64)> {
-        let mut call = self.inner.call("mln_map_get_camera_snapshot")?;
-        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
-        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
-        let mut out_generation: u64 = Default::default();
-        call.status(|map, out_diagnostic| unsafe {
-            sys::mln_map_get_camera_snapshot(
-                map,
-                &mut out_camera,
-                &mut out_generation,
-                out_diagnostic,
-            )
-        })?;
-        Ok((unsafe { from_native(out_camera) }?, out_generation))
     }
 
     /// Starts an ordered read of per-feature state from this map.

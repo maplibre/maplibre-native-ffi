@@ -88,11 +88,12 @@ unchanged.
 
 <Code code={region(renderTarget, "set-target")} lang="c" title="render-target.c" />
 
-A session's scale factor is fixed at attachment because its shaders use a fixed
-pixel ratio, so a resize that names a different one reports an invalid-argument
-status. Detach the session and attach a new one at the new scale factor.
-Map-owned feature state survives that, and the next render update pushes it into
-the new session.
+A session's shaders use a fixed pixel ratio, so a resize must name the scale
+factor the session already has, from its attachment or its latest target
+replacement; any other value reports an invalid-argument status. To change it,
+replace a surface or borrowed texture with a descriptor at the new scale factor,
+or detach the session and attach a new one. Map-owned feature state survives either path, and
+the next render update pushes it into the renderer.
 
 Normal detach completes asynchronously. The selected driver destroys graphics
 resources on its graphics thread and detaches the map. Continue servicing a

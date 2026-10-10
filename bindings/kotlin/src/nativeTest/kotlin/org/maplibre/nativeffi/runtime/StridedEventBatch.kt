@@ -31,6 +31,9 @@ internal fun stridedSourceType(index: Int): Int = 910 + index
 /** A source whose top byte is set, as a handle's kind byte is, so a 64-bit carrier must keep it. */
 internal fun stridedSource(index: Int): ULong = 0xff00_0000_0000_005auL + index.toULong()
 
+/** A generation past 32 bits, so a narrowed carrier would lose it. */
+internal fun stridedGeneration(index: Int): ULong = 0x1_0000_0000uL + index.toULong()
+
 internal fun stridedCode(index: Int): Int = 920 + index
 
 internal fun stridedPayloadType(index: Int): Int = 930 + index
@@ -49,6 +52,7 @@ internal fun assertStridedBatchDecoded(events: List<RuntimeEvent>, payloadSize: 
     assertEquals(stridedEventType(index).toUInt(), event.type.rawValue)
     assertEquals(stridedSourceType(index).toUInt(), event.sourceType.rawValue)
     assertEquals(stridedSource(index), event.source)
+    assertEquals(stridedGeneration(index), event.generation)
     assertEquals(stridedCode(index), event.code)
     assertEquals(listOf("first", "second")[index], event.message)
     val payload = assertIs<RuntimeEventPayload.Unknown>(event.payload)

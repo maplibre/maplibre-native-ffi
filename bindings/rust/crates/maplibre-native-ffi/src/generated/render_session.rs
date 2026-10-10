@@ -345,9 +345,9 @@ impl RenderSessionHandle {
     ///
     /// See `mln_render_session_resize` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn resize(&self, extent: &RenderTargetExtent) -> Result<NativeFuture<CommandCompletion>> {
+    pub fn resize(&self, extent: LogicalExtent) -> Result<NativeFuture<CommandCompletion>> {
         let mut call = self.inner.call("mln_render_session_resize")?;
-        let extent = call.reference(&extent)?;
+        let extent = call.input(&extent)?;
         call.command(|session, completion, out_diagnostic| unsafe {
             sys::mln_render_session_resize(session, extent, completion, out_diagnostic)
         })

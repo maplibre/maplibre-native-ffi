@@ -13,7 +13,7 @@ test "copied handles share one close and close twice safely" {
     defer fixture.destroy();
     const map_copy = fixture.map;
     const runtime_copy = fixture.runtime;
-    const projection = try support.resolve(try maplibre.mapCreateProjection(fixture.map, null));
+    const projection = try maplibre.mapCreateProjection(fixture.map, null);
     const projection_copy = projection;
 
     try maplibre.mapProjectionClose(projection, null);

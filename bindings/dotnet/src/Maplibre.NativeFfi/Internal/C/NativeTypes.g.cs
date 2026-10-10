@@ -52,11 +52,14 @@ internal unsafe struct mln_camera_delta
 {
     public uint size;
     public mln_camera_delta_field fields;
-    public uint kind;
     public mln_screen_point offset;
-    public double amount;
+    public double scale;
+    public double bearing;
+    public double pitch;
     public mln_screen_point anchor;
     public mln_animation_options animation;
+    public uint gesture_phase;
+    public uint reserved;
 }
 
 internal unsafe struct mln_camera_fit_options
@@ -361,7 +364,7 @@ internal unsafe struct mln_map_viewport_options
 internal unsafe struct mln_metal_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public void* texture;
@@ -375,7 +378,7 @@ internal unsafe struct mln_metal_context_descriptor
 internal unsafe struct mln_metal_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_metal_context_descriptor context;
 }
 
@@ -395,7 +398,7 @@ internal unsafe struct mln_metal_owned_texture_frame
 internal unsafe struct mln_metal_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_metal_context_descriptor context;
     public void* layer;
 }
@@ -461,7 +464,7 @@ internal unsafe struct mln_offline_tile_pyramid_region_definition
 internal unsafe struct mln_opengl_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public mln_opengl_context_descriptor context;
@@ -492,7 +495,7 @@ internal unsafe struct mln_opengl_context_descriptor_data
 internal unsafe struct mln_opengl_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_opengl_context_descriptor context;
 }
 
@@ -514,7 +517,7 @@ internal unsafe struct mln_opengl_owned_texture_frame
 internal unsafe struct mln_opengl_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_opengl_context_descriptor context;
     public void* surface;
 }
@@ -621,7 +624,7 @@ internal unsafe struct mln_render_session_snapshot
     public uint state;
     public uint driver;
     public uint latest_result;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public ulong generation;
     public ulong map_update_generation;
     public ulong rendered_update_generation;
@@ -632,14 +635,6 @@ internal unsafe struct mln_render_session_snapshot
     public uint acquired_frame_count;
     public byte target_ready;
     public byte pending_changes;
-}
-
-internal unsafe struct mln_render_target_extent
-{
-    public uint size;
-    public uint width;
-    public uint height;
-    public double scale_factor;
 }
 
 internal unsafe struct mln_rendered_feature_query_options
@@ -766,6 +761,7 @@ internal unsafe struct mln_runtime_event
     public uint type;
     public uint source_type;
     public ulong source;
+    public ulong generation;
     public int code;
     public uint payload_type;
     public ulong message_offset;
@@ -1007,7 +1003,7 @@ internal unsafe struct mln_vec3
 internal unsafe struct mln_vulkan_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public mln_vulkan_context_descriptor context;
@@ -1032,7 +1028,7 @@ internal unsafe struct mln_vulkan_context_descriptor
 internal unsafe struct mln_vulkan_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_vulkan_context_descriptor context;
 }
 
@@ -1054,7 +1050,7 @@ internal unsafe struct mln_vulkan_owned_texture_frame
 internal unsafe struct mln_vulkan_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_vulkan_context_descriptor context;
     public ulong surface;
 }
@@ -1076,7 +1072,7 @@ internal unsafe struct mln_webgl_context_descriptor
 internal unsafe struct mln_webgpu_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public mln_webgpu_context_descriptor context;
@@ -1095,7 +1091,7 @@ internal unsafe struct mln_webgpu_context_descriptor
 internal unsafe struct mln_webgpu_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_webgpu_context_descriptor context;
 }
 
@@ -1116,7 +1112,7 @@ internal unsafe struct mln_webgpu_owned_texture_frame
 internal unsafe struct mln_webgpu_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_webgpu_context_descriptor context;
     public void* surface;
     public uint format;
@@ -1164,15 +1160,11 @@ internal enum mln_camera_change_mode : uint
 
 internal enum mln_camera_delta_field : uint
 {
-    MLN_CAMERA_DELTA_FIELD_ANCHOR = 1,
-}
-
-internal enum mln_camera_delta_kind : uint
-{
-    MLN_CAMERA_DELTA_MOVE = 0,
-    MLN_CAMERA_DELTA_SCALE = 1,
-    MLN_CAMERA_DELTA_BEARING = 2,
-    MLN_CAMERA_DELTA_PITCH = 3,
+    MLN_CAMERA_DELTA_OFFSET = 1,
+    MLN_CAMERA_DELTA_SCALE = 2,
+    MLN_CAMERA_DELTA_BEARING = 4,
+    MLN_CAMERA_DELTA_PITCH = 8,
+    MLN_CAMERA_DELTA_ANCHOR = 16,
 }
 
 internal enum mln_camera_fit_option_field : uint

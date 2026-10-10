@@ -92,11 +92,11 @@ That warning comes from a Dart finalizer, which runs from the event loop after
 the collection, and it is skipped for handles that the isolate's shutdown
 disposes.
 
-A map creates a projection handle asynchronously, and every later projection
-call is synchronous. Any isolate can make those calls, `close()` included, and
-each one runs on the calling isolate's thread. A projection never observes map
-changes made after its creation, and it remains usable after its source map and
-runtime close.
+A map creates a projection handle synchronously from its latest published
+snapshot, and every later projection call is also synchronous. Any isolate can
+make those calls, `close()` included, and each one runs on the calling isolate's
+thread. A projection never observes map changes made after its creation, and it
+remains usable after its source map and runtime close.
 
 Map creation, commands, ordered queries, and lifecycle operations return
 `Future` values, and a command copies its input before it returns. Snapshot

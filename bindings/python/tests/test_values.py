@@ -79,8 +79,9 @@ def test_absent_fields_stay_distinct_from_present_values(
 def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
     harness: Harness, map_handle: mln.MapHandle
 ) -> None:
-    # Loading an inline style queues its events before the command commits.
-    result(map_handle.set_style_json(EMPTY_STYLE))
+    # Loading an inline style queues its events, with the generation that the
+    # command reports, before the command completes.
+    loaded = result(map_handle.set_style_json(EMPTY_STYLE))
 
     batch = harness.runtime.drain_events()
     assert batch is not None
@@ -91,6 +92,7 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
     assert mln.RuntimeEventType.MAP_STYLE_LOADED in types
     assert len(types) >= 2
     assert {event.source for event in view.events} == {map_handle.id}
+    assert view.events[-1].generation == loaded.generation
 
     unknown = mln.OfflineRegionDefinition(mln.UnknownVariant(999))
     with pytest.raises(mln.InvalidArgumentError) as raised:

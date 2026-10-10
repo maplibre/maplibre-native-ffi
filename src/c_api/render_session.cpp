@@ -132,7 +132,7 @@ auto mln_acquired_frame_release(
 }
 
 auto mln_render_session_resize(
-  mln_render_session session, const mln_render_target_extent* extent,
+  mln_render_session session, mln_logical_extent extent,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&] {

@@ -10,7 +10,10 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical texture extent.
+/// Logical texture extent. The map viewport uses width and height and the
+/// renderer uses scale_factor; the physical size is stated separately below. A
+/// scale_factor that differs from the map's is accepted and logged as a
+/// warning.
 /// </param>
 /// <param name="PhysicalWidth">
 /// Physical texture width in device pixels. Defaults to 256.
@@ -31,7 +34,7 @@ namespace Maplibre.NativeFfi;
 /// Backend-native WGPUTextureFormat value. Undefined is invalid.
 /// </param>
 public readonly partial record struct WebgpuBorrowedTextureDescriptor(
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     uint PhysicalWidth,
     uint PhysicalHeight,
     WebgpuContextDescriptor Context,
@@ -41,7 +44,7 @@ public readonly partial record struct WebgpuBorrowedTextureDescriptor(
 )
 {
     public WebgpuBorrowedTextureDescriptor()
-        : this(new RenderTargetExtent(), 256, 256, default, default, default, default) { }
+        : this(new LogicalExtent(), 256, 256, default, default, default, default) { }
 
     public static WebgpuBorrowedTextureDescriptor Default
     {

@@ -231,13 +231,13 @@ public extension RenderSessionHandle {
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   @discardableResult
-  func resize(extent bindingArg0: RenderTargetExtent) async throws
+  func resize(extent bindingArg0: LogicalExtent) async throws
     -> CommandCompletion
   {
-    try await nativeCommand("mln_render_session_resize") { raw, arena, completion, diagnostic in
+    try await nativeCommand("mln_render_session_resize") { raw, _, completion, diagnostic in
       mln_render_session_resize(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        bindingArg0.nativeValue(),
         completion,
         diagnostic
       )

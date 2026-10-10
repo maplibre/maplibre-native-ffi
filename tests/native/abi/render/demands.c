@@ -255,28 +255,26 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
   );
   const mln_render_frame_result old_frame = take_one_result(&fixture);
 
-  mln_render_target_extent extent = {
-    .size = sizeof(mln_render_target_extent),
+  mln_logical_extent extent = {
     .width = 96,
     .height = 48,
     .scale_factor = 2.0,
   };
   mln_completion rejected_scale = mln_test_discard_completion();
   MLN_TEST_INVALID(
-    mln_render_session_resize(fixture.session, &extent, &rejected_scale, NULL)
+    mln_render_session_resize(fixture.session, extent, &rejected_scale, NULL)
   );
   extent.scale_factor = 1.0;
-  mln_render_target_extent undersized = extent;
-  undersized.size = sizeof(mln_render_target_extent) - 1;
-  mln_completion rejected_size = mln_test_discard_completion();
   MLN_TEST_INVALID(mln_render_session_resize(
-    fixture.session, &undersized, &rejected_size, NULL
+    fixture.session,
+    (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.0},
+    &rejected_scale, NULL
   ));
   mln_test_render_request_forced(&fixture, 302);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, &extent, &completion.descriptor, NULL
+      fixture.session, extent, &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT64(
@@ -298,28 +296,18 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
     new_frame.extent_generation, snapshot.extent_generation
   );
 
-  // The second caller was built against a newer header and passes a larger
-  // extent. The snapshot embeds the extent, so it reports this build's size
-  // whether or not the driver has applied the resize yet.
-  struct {
-    mln_render_target_extent extent;
-    uint8_t newer_members[16];
-  } second = {.extent = extent};
-  second.extent.size = sizeof(second);
-  second.extent.width = 128;
-  second.extent.height = 72;
+  mln_logical_extent second = extent;
+  second.width = 128;
+  second.height = 72;
   mln_test_completion first_resize = mln_test_completion_default(0);
   mln_test_completion second_resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, &extent, &first_resize.descriptor, NULL
+    fixture.session, extent, &first_resize.descriptor, NULL
   ));
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, &second.extent, &second_resize.descriptor, NULL
+    fixture.session, second, &second_resize.descriptor, NULL
   ));
   snapshot = read_snapshot(fixture.session);
-  TEST_ASSERT_EQUAL_UINT32(
-    sizeof(mln_render_target_extent), snapshot.extent.size
-  );
   TEST_ASSERT_EQUAL_UINT32(128, snapshot.extent.width);
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture, &first_resize)
@@ -340,6 +328,43 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
   snapshot = read_snapshot(fixture.session);
   TEST_ASSERT_EQUAL_UINT32(128, snapshot.extent.width);
   TEST_ASSERT_EQUAL_UINT32(72, snapshot.extent.height);
+  detach(runtime, map, &fixture);
+}
+
+// A session attached at a scale factor other than the map's resizes at its
+// own scale factor. The map keeps the one it was created with and takes only
+// the new width and height.
+static void a_session_resizes_at_its_own_scale_factor_over_a_different_map(
+  void
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent.scale_factor = 3.0;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  const uint64_t old_generation =
+    read_snapshot(fixture.session).extent_generation;
+
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_resize(
+      fixture.session,
+      (mln_logical_extent){.width = 96, .height = 48, .scale_factor = 1.0},
+      &completion.descriptor, NULL
+    )
+  );
+  const mln_render_session_snapshot snapshot = read_snapshot(fixture.session);
+  TEST_ASSERT_EQUAL_UINT32(96, snapshot.extent.width);
+  TEST_ASSERT_EQUAL_UINT32(48, snapshot.extent.height);
+  TEST_ASSERT_DOUBLE_WITHIN(0.0, 1.0, snapshot.extent.scale_factor);
+  TEST_ASSERT_GREATER_THAN_UINT64(old_generation, snapshot.extent_generation);
+  mln_map_snapshot map_snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &map_snapshot, NULL));
+  TEST_ASSERT_EQUAL_UINT32(96, map_snapshot.logical_extent.width);
+  TEST_ASSERT_EQUAL_UINT32(48, map_snapshot.logical_extent.height);
+  TEST_ASSERT_DOUBLE_WITHIN(0.0, 3.0, map_snapshot.logical_extent.scale_factor);
   detach(runtime, map, &fixture);
 }
 
@@ -419,5 +444,6 @@ MLN_TEST_GROUP {
   RUN_TEST(a_full_ring_parks_demands_until_a_release_or_detach);
   RUN_TEST(sustained_demands_past_the_ring_depth_keep_the_newest_frames);
   RUN_TEST(resizes_order_extent_generations_and_supersede_each_other);
+  RUN_TEST(a_session_resizes_at_its_own_scale_factor_over_a_different_map);
   RUN_TEST(still_image_completes_under_if_needed_keepalive_demands);
 }

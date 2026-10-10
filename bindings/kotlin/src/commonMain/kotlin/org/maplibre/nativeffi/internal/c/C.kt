@@ -85,6 +85,13 @@ internal expect object C {
 
   fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
 
+  fun mln_logical_extent_physical_size(
+    extent: Long,
+    outWidth: Long,
+    outHeight: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_add_color_relief_layer(
     map: Long,
     layerId: Long,
@@ -376,7 +383,7 @@ internal expect object C {
 
   fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_create_projection(map: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_create_projection(map: Long, outProjection: Long, outDiagnostic: Long): Int
 
   fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
 
@@ -385,13 +392,6 @@ internal expect object C {
   fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_get_camera(map: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_map_get_camera_snapshot(
-    map: Long,
-    outCamera: Long,
-    outGeneration: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_map_get_feature_state(
     map: Long,
@@ -1076,13 +1076,6 @@ internal expect object C {
     session: Long,
     descriptor: Long,
     completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_target_extent_physical_size(
-    extent: Long,
-    outWidth: Long,
-    outHeight: Long,
     outDiagnostic: Long,
   ): Int
 

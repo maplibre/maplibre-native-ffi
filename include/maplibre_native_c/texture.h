@@ -20,8 +20,11 @@ extern "C" {
 /** Metal attachment options for an owned texture target. */
 typedef struct mln_metal_owned_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /** Metal backend context. device is required. */
   mln_metal_context_descriptor context;
 } mln_metal_owned_texture_descriptor;
@@ -32,8 +35,10 @@ typedef struct mln_metal_borrowed_texture_descriptor {
   /**
    * Logical texture extent. The map viewport uses width and height and the
    * renderer uses scale_factor; the physical size is stated separately below.
+   * A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
    */
-  mln_render_target_extent extent;
+  mln_logical_extent extent;
   /** Physical texture width in device pixels. Must be positive. Defaults to
    * 256. */
   uint32_t physical_width MLN_BINDING("default=256");
@@ -77,8 +82,11 @@ typedef struct mln_metal_owned_texture_frame {
 /** Vulkan attachment options for an owned texture target. */
 typedef struct mln_vulkan_owned_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
 } mln_vulkan_owned_texture_descriptor;
@@ -89,8 +97,10 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
   /**
    * Logical texture extent. The map viewport uses width and height and the
    * renderer uses scale_factor; the physical size is stated separately below.
+   * A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
    */
-  mln_render_target_extent extent;
+  mln_logical_extent extent;
   /** Physical image width in device pixels. Must be positive. Defaults to 256.
    */
   uint32_t physical_width MLN_BINDING("default=256");
@@ -163,8 +173,11 @@ typedef struct mln_vulkan_owned_texture_frame {
 /** OpenGL attachment options for an owned texture target. */
 typedef struct mln_opengl_owned_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /**
    * Borrowed OpenGL context provider data. Shared ownership creates a context
    * whose texture frames the host can acquire. Dedicated EGL or transferred
@@ -179,8 +192,10 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   /**
    * Logical texture extent. The map viewport uses width and height and the
    * renderer uses scale_factor; the physical size is stated separately below.
+   * A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
    */
-  mln_render_target_extent extent;
+  mln_logical_extent extent;
   /** Physical texture width in device pixels. Must be positive. Defaults to
    * 256. */
   uint32_t physical_width MLN_BINDING("default=256");
@@ -211,8 +226,11 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
 /** WebGPU attachment options for an owned texture target. */
 typedef struct mln_webgpu_owned_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical texture extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /** Borrowed WebGPU context. device is required. */
   mln_webgpu_context_descriptor context;
 } mln_webgpu_owned_texture_descriptor;
@@ -220,8 +238,13 @@ typedef struct mln_webgpu_owned_texture_descriptor {
 /** WebGPU attachment options for a borrowed texture target. */
 typedef struct mln_webgpu_borrowed_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical texture extent. The map viewport uses width and height and the
+   * renderer uses scale_factor; the physical size is stated separately below.
+   * A scale_factor that differs from the map's is accepted and logged as a
+   * warning.
+   */
+  mln_logical_extent extent;
   /** Physical texture width in device pixels. Defaults to 256. */
   uint32_t physical_width MLN_BINDING("default=256");
   /** Physical texture height in device pixels. Defaults to 256. */
@@ -379,10 +402,11 @@ mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or
  *   options enable a queue lock.
@@ -418,10 +442,11 @@ MLN_API mln_status mln_map_attach_metal_owned_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, or a scale_factor
+ *   that is not finite and positive; the stated physical size is zero;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or
  *   options enable a queue lock.
@@ -456,10 +481,11 @@ MLN_API mln_status mln_map_attach_metal_borrowed_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -497,10 +523,11 @@ MLN_API mln_status mln_map_attach_vulkan_owned_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, or a scale_factor
+ *   that is not finite and positive; the stated physical size is zero;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -543,10 +570,11 @@ MLN_API mln_status mln_map_attach_vulkan_borrowed_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable; the requested driver does not match the
@@ -583,10 +611,11 @@ MLN_API mln_status mln_map_attach_opengl_owned_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, or a scale_factor
+ *   that is not finite and positive; the stated physical size is zero;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable; the requested driver is not
@@ -621,10 +650,11 @@ MLN_API mln_status mln_map_attach_opengl_borrowed_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
@@ -662,10 +692,11 @@ MLN_API mln_status mln_map_attach_webgpu_owned_texture(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, or a scale_factor
+ *   that is not finite and positive; the stated physical size is zero;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
@@ -694,8 +725,9 @@ MLN_API mln_status mln_map_attach_webgpu_borrowed_texture(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   descriptor->extent has a zero width or height, or a scale_factor that is
+ *   not finite and positive; or the stated physical size is zero.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
@@ -725,8 +757,9 @@ MLN_API mln_status mln_render_session_set_metal_borrowed_texture_target(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   descriptor->extent has a zero width or height, or a scale_factor that is
+ *   not finite and positive; or the stated physical size is zero.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
@@ -756,8 +789,9 @@ MLN_API mln_status mln_render_session_set_vulkan_borrowed_texture_target(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   descriptor->extent has a zero width or height, or a scale_factor that is
+ *   not finite and positive; or the stated physical size is zero.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
@@ -785,8 +819,9 @@ MLN_API mln_status mln_render_session_set_opengl_borrowed_texture_target(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   descriptor->extent has a zero width or height, or a scale_factor that is
+ *   not finite and positive; or the stated physical size is zero.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the

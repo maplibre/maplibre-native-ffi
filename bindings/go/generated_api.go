@@ -88,24 +88,14 @@ const (
 type CameraDeltaField uint32
 
 const (
-	CameraDeltaFieldAnchor CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_FIELD_ANCHOR)
+	CameraDeltaFieldOffset  CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_OFFSET)
+	CameraDeltaFieldScale   CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_SCALE)
+	CameraDeltaFieldBearing CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_BEARING)
+	CameraDeltaFieldPitch   CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_PITCH)
+	CameraDeltaFieldAnchor  CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_ANCHOR)
 )
 
 func (value CameraDeltaField) Has(flags CameraDeltaField) bool { return value&flags == flags }
-
-// CameraDeltaKind corresponds to mln_camera_delta_kind. Relative camera
-// operation carried by mln_camera_delta.
-//
-// See mln_camera_delta_kind in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type CameraDeltaKind uint32
-
-const (
-	CameraDeltaKindMove    CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_MOVE)
-	CameraDeltaKindScale   CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_SCALE)
-	CameraDeltaKindBearing CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_BEARING)
-	CameraDeltaKindPitch   CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_PITCH)
-)
 
 // CameraFitOptionField corresponds to mln_camera_fit_option_field. Field mask
 // values for mln_camera_fit_options.
@@ -299,7 +289,7 @@ func (value GeojsonSourceOptionField) Has(flags GeojsonSourceOptionField) bool {
 }
 
 // GesturePhase corresponds to mln_gesture_phase. Gesture boundary carried
-// atomically with a camera update.
+// atomically with a camera update or delta.
 //
 // See mln_gesture_phase in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -1485,25 +1475,35 @@ func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_opt
 
 func DefaultBoundOptions() BoundOptions { return copyBoundOptions(C.mln_bound_options_default()) }
 
-// CameraDelta corresponds to mln_camera_delta. One relative camera operation.
+// CameraDelta corresponds to mln_camera_delta. One atomic relative camera
+// update.
 //
 // See mln_camera_delta in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type CameraDelta struct {
-	Kind      CameraDeltaKind
-	Offset    ScreenPoint
-	Amount    float64
-	Anchor    *ScreenPoint
-	Animation AnimationOptions
+	// Pan in logical map pixels; the content moves by this offset.
+	Offset *ScreenPoint
+	// Positive zoom factor; 2 zooms in one level.
+	Scale *float64
+	// Degrees added to the bearing.
+	Bearing *float64
+	// Degrees added to the pitch; positive tilts further from straight down.
+	Pitch *float64
+	// Screen point in logical map pixels that scale, bearing, and pitch keep fixed.
+	Anchor       *ScreenPoint
+	Animation    AnimationOptions
+	GesturePhase GesturePhase
 }
 
 func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
 	var result CameraDelta
-	result.Kind = CameraDeltaKind(raw.kind)
-	result.Offset = copyScreenPoint(raw.offset)
-	result.Amount = float64(raw.amount)
-	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_FIELD_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
+	result.Offset = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_OFFSET != 0, func() ScreenPoint { return copyScreenPoint(raw.offset) })
+	result.Scale = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_SCALE != 0, func() float64 { return float64(raw.scale) })
+	result.Bearing = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_BEARING != 0, func() float64 { return float64(raw.bearing) })
+	result.Pitch = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_PITCH != 0, func() float64 { return float64(raw.pitch) })
+	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
 	result.Animation = copyAnimationOptions(raw.animation)
+	result.GesturePhase = GesturePhase(raw.gesture_phase)
 	return result
 }
 
@@ -1511,11 +1511,13 @@ func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delt
 	raw := C.mln_camera_delta_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	raw.kind = C.uint32_t(input.Kind)
-	raw.offset = nativeScreenPoint(input.Offset, arena)
-	raw.amount = C.double(input.Amount)
-	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_FIELD_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_OFFSET, &raw.offset, input.Offset, arena, nativeScreenPoint)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_SCALE, &raw.scale, input.Scale, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_BEARING, &raw.bearing, input.Bearing, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
+	raw.gesture_phase = C.uint32_t(input.GesturePhase)
 	return raw
 }
 
@@ -2251,8 +2253,8 @@ func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
 	return raw
 }
 
-// LogicalExtent corresponds to mln_logical_extent. Logical map extent in UI
-// pixels and device-pixel scale.
+// LogicalExtent corresponds to mln_logical_extent. Logical extent in UI pixels
+// and the device-pixel scale.
 //
 // See mln_logical_extent in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -2261,9 +2263,7 @@ type LogicalExtent struct {
 	Width uint32
 	// Height in UI pixels. Defaults to 256.
 	Height uint32
-	// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
-	// creation, so mln_map_resize() accepts only the value the map was created
-	// with.
+	// Device pixels per UI pixel. Defaults to 1.0.
 	ScaleFactor float64
 }
 
@@ -2288,9 +2288,8 @@ func nativeLogicalExtent(input LogicalExtent, arena *bindingArena) C.mln_logical
 // See mln_map_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type MapOptions struct {
-	// Initial logical extent. Width and height must be positive. The scale factor
-	// must be positive and finite, and fixes the map's scale factor for its
-	// lifetime.
+	// Initial logical extent. Width and height must be nonzero, and scale_factor
+	// must be finite and positive. scale_factor is fixed for the map's lifetime.
 	InitialExtent LogicalExtent
 	// One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS.
 	MapMode MapMode
@@ -2460,8 +2459,9 @@ func DefaultMapViewportOptions() MapViewportOptions {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type MetalBorrowedTextureDescriptor struct {
 	// Logical texture extent. The map viewport uses width and height and the
-	// renderer uses scale_factor; the physical size is stated separately below.
-	Extent RenderTargetExtent
+	// renderer uses scale_factor; the physical size is stated separately below. A
+	// scale_factor that differs from the map's is accepted and logged as a warning.
+	Extent LogicalExtent
 	// Physical texture width in device pixels. Must be positive. Defaults to 256.
 	PhysicalWidth uint32
 	// Physical texture height in device pixels. Must be positive. Defaults to 256.
@@ -2472,7 +2472,7 @@ type MetalBorrowedTextureDescriptor struct {
 
 func copyMetalBorrowedTextureDescriptor(raw C.mln_metal_borrowed_texture_descriptor) MetalBorrowedTextureDescriptor {
 	var result MetalBorrowedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
 	result.Texture = uintptr(unsafe.Pointer(raw.texture))
@@ -2482,7 +2482,7 @@ func copyMetalBorrowedTextureDescriptor(raw C.mln_metal_borrowed_texture_descrip
 func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, arena *bindingArena) C.mln_metal_borrowed_texture_descriptor {
 	raw := C.mln_metal_borrowed_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	raw.texture = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Texture)))
@@ -2522,15 +2522,16 @@ func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingAr
 // See mln_metal_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type MetalOwnedTextureDescriptor struct {
-	// Logical texture extent.
-	Extent RenderTargetExtent
+	// Logical texture extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Metal backend context. device is required.
 	Context MetalContextDescriptor
 }
 
 func copyMetalOwnedTextureDescriptor(raw C.mln_metal_owned_texture_descriptor) MetalOwnedTextureDescriptor {
 	var result MetalOwnedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyMetalContextDescriptor(raw.context)
 	return result
 }
@@ -2538,7 +2539,7 @@ func copyMetalOwnedTextureDescriptor(raw C.mln_metal_owned_texture_descriptor) M
 func nativeMetalOwnedTextureDescriptor(input MetalOwnedTextureDescriptor, arena *bindingArena) C.mln_metal_owned_texture_descriptor {
 	raw := C.mln_metal_owned_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeMetalContextDescriptor(input.Context, arena)
 	return raw
 }
@@ -2590,8 +2591,9 @@ func copyMetalOwnedTextureFrame(raw C.mln_metal_owned_texture_frame) MetalOwnedT
 // See mln_metal_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 type MetalSurfaceDescriptor struct {
-	// Logical surface extent.
-	Extent RenderTargetExtent
+	// Logical surface extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Metal backend context. device is optional for Metal surfaces.
 	Context MetalContextDescriptor
 	// CAMetalLayer* / CA::MetalLayer* retained by the session. Required.
@@ -2600,7 +2602,7 @@ type MetalSurfaceDescriptor struct {
 
 func copyMetalSurfaceDescriptor(raw C.mln_metal_surface_descriptor) MetalSurfaceDescriptor {
 	var result MetalSurfaceDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyMetalContextDescriptor(raw.context)
 	result.Layer = uintptr(unsafe.Pointer(raw.layer))
 	return result
@@ -2609,7 +2611,7 @@ func copyMetalSurfaceDescriptor(raw C.mln_metal_surface_descriptor) MetalSurface
 func nativeMetalSurfaceDescriptor(input MetalSurfaceDescriptor, arena *bindingArena) C.mln_metal_surface_descriptor {
 	raw := C.mln_metal_surface_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeMetalContextDescriptor(input.Context, arena)
 	raw.layer = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Layer)))
 	return raw
@@ -2798,8 +2800,9 @@ func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefi
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type OpenglBorrowedTextureDescriptor struct {
 	// Logical texture extent. The map viewport uses width and height and the
-	// renderer uses scale_factor; the physical size is stated separately below.
-	Extent RenderTargetExtent
+	// renderer uses scale_factor; the physical size is stated separately below. A
+	// scale_factor that differs from the map's is accepted and logged as a warning.
+	Extent LogicalExtent
 	// Physical texture width in device pixels. Must be positive. Defaults to 256.
 	PhysicalWidth uint32
 	// Physical texture height in device pixels. Must be positive. Defaults to 256.
@@ -2815,7 +2818,7 @@ type OpenglBorrowedTextureDescriptor struct {
 
 func copyOpenglBorrowedTextureDescriptor(raw C.mln_opengl_borrowed_texture_descriptor) OpenglBorrowedTextureDescriptor {
 	var result OpenglBorrowedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
 	result.Context = copyOpenglContextDescriptor(raw.context)
@@ -2827,7 +2830,7 @@ func copyOpenglBorrowedTextureDescriptor(raw C.mln_opengl_borrowed_texture_descr
 func nativeOpenglBorrowedTextureDescriptor(input OpenglBorrowedTextureDescriptor, arena *bindingArena) C.mln_opengl_borrowed_texture_descriptor {
 	raw := C.mln_opengl_borrowed_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
@@ -2897,8 +2900,9 @@ func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *binding
 // See mln_opengl_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type OpenglOwnedTextureDescriptor struct {
-	// Logical texture extent.
-	Extent RenderTargetExtent
+	// Logical texture extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Borrowed OpenGL context provider data. Shared ownership creates a context
 	// whose texture frames the host can acquire. Dedicated EGL or transferred WebGL
 	// ownership creates a private core-worker context for CPU readback.
@@ -2907,7 +2911,7 @@ type OpenglOwnedTextureDescriptor struct {
 
 func copyOpenglOwnedTextureDescriptor(raw C.mln_opengl_owned_texture_descriptor) OpenglOwnedTextureDescriptor {
 	var result OpenglOwnedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyOpenglContextDescriptor(raw.context)
 	return result
 }
@@ -2915,7 +2919,7 @@ func copyOpenglOwnedTextureDescriptor(raw C.mln_opengl_owned_texture_descriptor)
 func nativeOpenglOwnedTextureDescriptor(input OpenglOwnedTextureDescriptor, arena *bindingArena) C.mln_opengl_owned_texture_descriptor {
 	raw := C.mln_opengl_owned_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
 	return raw
 }
@@ -2973,8 +2977,9 @@ func copyOpenglOwnedTextureFrame(raw C.mln_opengl_owned_texture_frame) OpenglOwn
 // See mln_opengl_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 type OpenglSurfaceDescriptor struct {
-	// Logical surface extent.
-	Extent RenderTargetExtent
+	// Logical surface extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Borrowed OpenGL context provider data.
 	Context OpenglContextDescriptor
 	// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL,
@@ -2984,7 +2989,7 @@ type OpenglSurfaceDescriptor struct {
 
 func copyOpenglSurfaceDescriptor(raw C.mln_opengl_surface_descriptor) OpenglSurfaceDescriptor {
 	var result OpenglSurfaceDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyOpenglContextDescriptor(raw.context)
 	result.Surface = uintptr(unsafe.Pointer(raw.surface))
 	return result
@@ -2993,7 +2998,7 @@ func copyOpenglSurfaceDescriptor(raw C.mln_opengl_surface_descriptor) OpenglSurf
 func nativeOpenglSurfaceDescriptor(input OpenglSurfaceDescriptor, arena *bindingArena) C.mln_opengl_surface_descriptor {
 	raw := C.mln_opengl_surface_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	return raw
@@ -3330,8 +3335,9 @@ type RenderSessionSnapshot struct {
 	// One mln_render_driver_kind value.
 	Driver RenderDriverKind
 	// Most recent terminal mln_render_result value.
-	LatestResult             RenderResult
-	Extent                   RenderTargetExtent
+	LatestResult RenderResult
+	// Logical extent, including a resize the driver has not applied yet.
+	Extent                   LogicalExtent
 	Generation               uint64
 	MapUpdateGeneration      uint64
 	RenderedUpdateGeneration uint64
@@ -3349,7 +3355,7 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.State = RenderSessionState(raw.state)
 	result.Driver = RenderDriverKind(raw.driver)
 	result.LatestResult = RenderResult(raw.latest_result)
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Generation = uint64(raw.generation)
 	result.MapUpdateGeneration = uint64(raw.map_update_generation)
 	result.RenderedUpdateGeneration = uint64(raw.rendered_update_generation)
@@ -3361,37 +3367,6 @@ func copyRenderSessionSnapshot(raw C.mln_render_session_snapshot) RenderSessionS
 	result.TargetReady = bool(raw.target_ready)
 	result.PendingChanges = bool(raw.pending_changes)
 	return result
-}
-
-// RenderTargetExtent corresponds to mln_render_target_extent. Logical render
-// target extent in UI pixels.
-//
-// See mln_render_target_extent in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-type RenderTargetExtent struct {
-	// Logical map width in UI pixels. Defaults to 256.
-	Width uint32
-	// Logical map height in UI pixels. Defaults to 256.
-	Height uint32
-	// UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0.
-	ScaleFactor float64
-}
-
-func copyRenderTargetExtent(raw C.mln_render_target_extent) RenderTargetExtent {
-	var result RenderTargetExtent
-	result.Width = uint32(raw.width)
-	result.Height = uint32(raw.height)
-	result.ScaleFactor = float64(raw.scale_factor)
-	return result
-}
-
-func nativeRenderTargetExtent(input RenderTargetExtent, arena *bindingArena) C.mln_render_target_extent {
-	raw := C.mln_render_target_extent{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.width = C.uint32_t(input.Width)
-	raw.height = C.uint32_t(input.Height)
-	raw.scale_factor = C.double(input.ScaleFactor)
-	return raw
 }
 
 // RenderedFeatureQueryOptions corresponds to
@@ -3710,6 +3685,9 @@ type RuntimeEvent struct {
 	// Source handle selected by source_type: an mln_runtime or an mln_map. Every
 	// handle type is uint64_t, so this needs no cast.
 	Source uint64
+	// Map snapshot generation that the event reports, or zero when source_type is
+	// MLN_RUNTIME_EVENT_SOURCE_RUNTIME.
+	Generation uint64
 	// Secondary event detail whose meaning type selects. Depending on type it
 	// carries an mln_camera_change_mode, an mln_status, a MapLibre Native error
 	// ordinal, or 0. See mln_runtime_event_type for the per-type meaning.
@@ -3724,6 +3702,7 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 	result.Type = RuntimeEventType(raw._type)
 	result.SourceType = RuntimeEventSourceType(raw.source_type)
 	result.Source = uint64(raw.source)
+	result.Generation = uint64(raw.generation)
 	result.Code = int32(raw.code)
 	result.Payload = func() RuntimeEventPayload {
 		switch raw.payload_type {
@@ -4576,8 +4555,9 @@ func nativeVec3(input Vec3, arena *bindingArena) C.mln_vec3 {
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type VulkanBorrowedTextureDescriptor struct {
 	// Logical texture extent. The map viewport uses width and height and the
-	// renderer uses scale_factor; the physical size is stated separately below.
-	Extent RenderTargetExtent
+	// renderer uses scale_factor; the physical size is stated separately below. A
+	// scale_factor that differs from the map's is accepted and logged as a warning.
+	Extent LogicalExtent
 	// Physical image width in device pixels. Must be positive. Defaults to 256.
 	PhysicalWidth uint32
 	// Physical image height in device pixels. Must be positive. Defaults to 256.
@@ -4599,7 +4579,7 @@ type VulkanBorrowedTextureDescriptor struct {
 
 func copyVulkanBorrowedTextureDescriptor(raw C.mln_vulkan_borrowed_texture_descriptor) VulkanBorrowedTextureDescriptor {
 	var result VulkanBorrowedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
 	result.Context = copyVulkanContextDescriptor(raw.context)
@@ -4614,7 +4594,7 @@ func copyVulkanBorrowedTextureDescriptor(raw C.mln_vulkan_borrowed_texture_descr
 func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor, arena *bindingArena) C.mln_vulkan_borrowed_texture_descriptor {
 	raw := C.mln_vulkan_borrowed_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
@@ -4685,15 +4665,16 @@ func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *binding
 // See mln_vulkan_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type VulkanOwnedTextureDescriptor struct {
-	// Logical texture extent.
-	Extent RenderTargetExtent
+	// Logical texture extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Borrowed Vulkan context. All handles are required.
 	Context VulkanContextDescriptor
 }
 
 func copyVulkanOwnedTextureDescriptor(raw C.mln_vulkan_owned_texture_descriptor) VulkanOwnedTextureDescriptor {
 	var result VulkanOwnedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyVulkanContextDescriptor(raw.context)
 	return result
 }
@@ -4701,7 +4682,7 @@ func copyVulkanOwnedTextureDescriptor(raw C.mln_vulkan_owned_texture_descriptor)
 func nativeVulkanOwnedTextureDescriptor(input VulkanOwnedTextureDescriptor, arena *bindingArena) C.mln_vulkan_owned_texture_descriptor {
 	raw := C.mln_vulkan_owned_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
 	return raw
 }
@@ -4759,8 +4740,9 @@ func copyVulkanOwnedTextureFrame(raw C.mln_vulkan_owned_texture_frame) VulkanOwn
 // See mln_vulkan_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 type VulkanSurfaceDescriptor struct {
-	// Logical surface extent.
-	Extent RenderTargetExtent
+	// Logical surface extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Borrowed Vulkan context. All handles are required. The device must support
 	// VK_KHR_swapchain, and the queue family must support graphics and presentation
 	// to this descriptor's surface.
@@ -4771,7 +4753,7 @@ type VulkanSurfaceDescriptor struct {
 
 func copyVulkanSurfaceDescriptor(raw C.mln_vulkan_surface_descriptor) VulkanSurfaceDescriptor {
 	var result VulkanSurfaceDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyVulkanContextDescriptor(raw.context)
 	result.Surface = uint64(raw.surface)
 	return result
@@ -4780,7 +4762,7 @@ func copyVulkanSurfaceDescriptor(raw C.mln_vulkan_surface_descriptor) VulkanSurf
 func nativeVulkanSurfaceDescriptor(input VulkanSurfaceDescriptor, arena *bindingArena) C.mln_vulkan_surface_descriptor {
 	raw := C.mln_vulkan_surface_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
 	raw.surface = C.mln_vulkan_non_dispatchable_handle(input.Surface)
 	return raw
@@ -4847,8 +4829,10 @@ func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingAr
 // See mln_webgpu_borrowed_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type WebgpuBorrowedTextureDescriptor struct {
-	// Logical texture extent.
-	Extent RenderTargetExtent
+	// Logical texture extent. The map viewport uses width and height and the
+	// renderer uses scale_factor; the physical size is stated separately below. A
+	// scale_factor that differs from the map's is accepted and logged as a warning.
+	Extent LogicalExtent
 	// Physical texture width in device pixels. Defaults to 256.
 	PhysicalWidth uint32
 	// Physical texture height in device pixels. Defaults to 256.
@@ -4865,7 +4849,7 @@ type WebgpuBorrowedTextureDescriptor struct {
 
 func copyWebgpuBorrowedTextureDescriptor(raw C.mln_webgpu_borrowed_texture_descriptor) WebgpuBorrowedTextureDescriptor {
 	var result WebgpuBorrowedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
 	result.Context = copyWebgpuContextDescriptor(raw.context)
@@ -4878,7 +4862,7 @@ func copyWebgpuBorrowedTextureDescriptor(raw C.mln_webgpu_borrowed_texture_descr
 func nativeWebgpuBorrowedTextureDescriptor(input WebgpuBorrowedTextureDescriptor, arena *bindingArena) C.mln_webgpu_borrowed_texture_descriptor {
 	raw := C.mln_webgpu_borrowed_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
@@ -4930,15 +4914,16 @@ func nativeWebgpuContextDescriptor(input WebgpuContextDescriptor, arena *binding
 // See mln_webgpu_owned_texture_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
 type WebgpuOwnedTextureDescriptor struct {
-	// Logical texture extent.
-	Extent RenderTargetExtent
+	// Logical texture extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Borrowed WebGPU context. device is required.
 	Context WebgpuContextDescriptor
 }
 
 func copyWebgpuOwnedTextureDescriptor(raw C.mln_webgpu_owned_texture_descriptor) WebgpuOwnedTextureDescriptor {
 	var result WebgpuOwnedTextureDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyWebgpuContextDescriptor(raw.context)
 	return result
 }
@@ -4946,7 +4931,7 @@ func copyWebgpuOwnedTextureDescriptor(raw C.mln_webgpu_owned_texture_descriptor)
 func nativeWebgpuOwnedTextureDescriptor(input WebgpuOwnedTextureDescriptor, arena *bindingArena) C.mln_webgpu_owned_texture_descriptor {
 	raw := C.mln_webgpu_owned_texture_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
 	return raw
 }
@@ -5001,8 +4986,9 @@ func copyWebgpuOwnedTextureFrame(raw C.mln_webgpu_owned_texture_frame) WebgpuOwn
 // See mln_webgpu_surface_descriptor in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
 type WebgpuSurfaceDescriptor struct {
-	// Logical surface extent.
-	Extent RenderTargetExtent
+	// Logical surface extent. A scale_factor that differs from the map's is
+	// accepted and logged as a warning.
+	Extent LogicalExtent
 	// Borrowed WebGPU context. device is required.
 	Context WebgpuContextDescriptor
 	// Borrowed WGPUSurface. Required, and must stay alive for the session. The
@@ -5016,7 +5002,7 @@ type WebgpuSurfaceDescriptor struct {
 
 func copyWebgpuSurfaceDescriptor(raw C.mln_webgpu_surface_descriptor) WebgpuSurfaceDescriptor {
 	var result WebgpuSurfaceDescriptor
-	result.Extent = copyRenderTargetExtent(raw.extent)
+	result.Extent = copyLogicalExtent(raw.extent)
 	result.Context = copyWebgpuContextDescriptor(raw.context)
 	result.Surface = uintptr(unsafe.Pointer(raw.surface))
 	result.Format = uint32(raw.format)
@@ -5026,7 +5012,7 @@ func copyWebgpuSurfaceDescriptor(raw C.mln_webgpu_surface_descriptor) WebgpuSurf
 func nativeWebgpuSurfaceDescriptor(input WebgpuSurfaceDescriptor, arena *bindingArena) C.mln_webgpu_surface_descriptor {
 	raw := C.mln_webgpu_surface_descriptor_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.extent = nativeRenderTargetExtent(input.Extent, arena)
+	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
 	raw.surface = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Surface)))
 	raw.format = C.uint32_t(input.Format)
@@ -5863,6 +5849,26 @@ func LogSetCallback(handler LogHandler) error {
 	})
 }
 
+type LogicalExtentPhysicalSizeResult struct {
+	Width  uint32
+	Height uint32
+}
+
+// LogicalExtentPhysicalSize computes the physical device-pixel size of a
+// logical extent.
+//
+// See mln_logical_extent_physical_size in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
+func LogicalExtentPhysicalSize(extent LogicalExtent) (LogicalExtentPhysicalSizeResult, error) {
+	var outWidth C.uint32_t
+	var outHeight C.uint32_t
+	return bindingGet(bindingGlobal(C.binding_operation_mln_logical_extent_physical_size), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_logical_extent_physical_size(nativeLogicalExtent(extent, arena), &outWidth, &outHeight, diagnostic))
+	}, func(arena *bindingArena) LogicalExtentPhysicalSizeResult {
+		return LogicalExtentPhysicalSizeResult{Width: uint32(outWidth), Height: uint32(outHeight)}
+	})
+}
+
 // AddColorReliefLayer adds a color-relief layer for a raster DEM source.
 //
 // See mln_map_add_color_relief_layer in the C API reference:
@@ -6035,7 +6041,7 @@ func (receiver *MapHandle) AddVectorSourceUrl(sourceId string, url string, optio
 	}, completionCommand)
 }
 
-// ApplyCameraDelta submits one copied relative camera update.
+// ApplyCameraDelta submits one atomic relative camera update.
 //
 // See mln_map_apply_camera_delta in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
@@ -6348,15 +6354,19 @@ func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], erro
 	}, completionCommand)
 }
 
-// CreateProjection starts creation of a standalone projection from the map's
-// ordered transform state.
+// CreateProjection creates a standalone projection from the map's latest
+// published snapshot.
 //
 // See mln_map_create_projection in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapHandle) CreateProjection() (*Future[*MapProjectionHandle], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_create_projection), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_create_projection(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(func(raw C.mln_map_projection) *MapProjectionHandle { return adoptMapProjectionHandle(uint64(raw), nil) }))
+func (receiver *MapHandle) CreateProjection() (*MapProjectionHandle, error) {
+	var outProjection C.mln_map_projection
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_create_projection), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_create_projection(C.mln_map(raw), &outProjection, diagnostic))
+	}, func(arena *bindingArena) *MapProjectionHandle {
+		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
+		return adopted
+	})
 }
 
 // DumpDebugLogs submits an ordered debug-log command.
@@ -6388,26 +6398,6 @@ func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_camera(C.mln_map(raw), completion, diagnostic))
 	}, completionOf(copyCameraQueryResult))
-}
-
-type MapGetCameraSnapshotResult struct {
-	Camera     CameraOptions
-	Generation uint64
-}
-
-// GetCameraSnapshot copies the camera from the latest immutable map snapshot.
-//
-// See mln_map_get_camera_snapshot in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) GetCameraSnapshot() (MapGetCameraSnapshotResult, error) {
-	outCamera := C.mln_camera_options_default()
-	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
-	var outGeneration C.uint64_t
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_camera_snapshot), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_camera_snapshot(C.mln_map(raw), &outCamera, &outGeneration, diagnostic))
-	}, func(arena *bindingArena) MapGetCameraSnapshotResult {
-		return MapGetCameraSnapshotResult{Camera: copyCameraOptions(outCamera), Generation: uint64(outGeneration)}
-	})
 }
 
 // GetFeatureState starts an ordered read of per-feature state from this map.
@@ -7604,9 +7594,9 @@ func (receiver *RenderSessionHandle) RequestFrame(demand FrameDemand) error {
 //
 // See mln_render_session_resize in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) Resize(extent RenderTargetExtent) (*Future[CommandCompletion], error) {
+func (receiver *RenderSessionHandle) Resize(extent LogicalExtent) (*Future[CommandCompletion], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_resize), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_resize(C.mln_render_session(raw), bindingStore(nativeRenderTargetExtent(extent, arena), arena), completion, diagnostic))
+		return int32(C.mln_render_session_resize(C.mln_render_session(raw), nativeLogicalExtent(extent, arena), completion, diagnostic))
 	}, completionCommand)
 }
 
@@ -7709,26 +7699,6 @@ func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSur
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_webgpu_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_set_webgpu_surface_target(C.mln_render_session(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
 	}, completionUnit)
-}
-
-type RenderTargetExtentPhysicalSizeResult struct {
-	Width  uint32
-	Height uint32
-}
-
-// RenderTargetExtentPhysicalSize computes the physical device-pixel size of a
-// logical render target extent.
-//
-// See mln_render_target_extent_physical_size in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html
-func RenderTargetExtentPhysicalSize(extent RenderTargetExtent) (RenderTargetExtentPhysicalSizeResult, error) {
-	var outWidth C.uint32_t
-	var outHeight C.uint32_t
-	return bindingGet(bindingGlobal(C.binding_operation_mln_render_target_extent_physical_size), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_target_extent_physical_size(bindingStore(nativeRenderTargetExtent(extent, arena), arena), &outWidth, &outHeight, diagnostic))
-	}, func(arena *bindingArena) RenderTargetExtentPhysicalSizeResult {
-		return RenderTargetExtentPhysicalSizeResult{Width: uint32(outWidth), Height: uint32(outHeight)}
-	})
 }
 
 // RenderedQueryGeometryBox returns a rendered box query geometry descriptor.

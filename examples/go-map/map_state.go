@@ -31,7 +31,7 @@ func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runti
 	}
 	state := &runtimeMapState{runtime: runtimeHandle}
 	mapOptions := maplibre.DefaultMapOptions()
-	mapOptions.InitialExtent = maplibre.LogicalExtent{Width: v.logicalWidth, Height: v.logicalHeight, ScaleFactor: v.scaleFactor}
+	mapOptions.InitialExtent = v.extent()
 	// A map update becomes a frame demand; the frame result's repaint flag
 	// covers updates that a rendering frame asks for.
 	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable
@@ -117,28 +117,23 @@ func (state *runtimeMapState) setGestureInProgress(inProgress bool) error {
 
 func (state *runtimeMapState) moveBy(dx, dy float64, durationMS *float64) error {
 	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
-		Offset: maplibre.ScreenPoint{X: dx, Y: dy}, Animation: animationOptions(durationMS),
+		Offset: &maplibre.ScreenPoint{X: dx, Y: dy}, Animation: animationOptions(durationMS),
 	})
 	return err
 }
 
 func (state *runtimeMapState) scaleBy(scale float64, anchor maplibre.ScreenPoint, durationMS *float64) error {
 	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
-		Kind: maplibre.CameraDeltaKindScale, Amount: scale, Anchor: &anchor, Animation: animationOptions(durationMS),
+		Scale: &scale, Anchor: &anchor, Animation: animationOptions(durationMS),
 	})
 	return err
 }
 
-func (state *runtimeMapState) adjustPitch(delta float64, durationMS *float64) error {
+// adjustOrientation adds bearing and pitch degrees in one delta. A nil value
+// leaves that component unchanged.
+func (state *runtimeMapState) adjustOrientation(bearing, pitch, durationMS *float64) error {
 	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
-		Kind: maplibre.CameraDeltaKindPitch, Amount: delta, Animation: animationOptions(durationMS),
-	})
-	return err
-}
-
-func (state *runtimeMapState) adjustBearing(delta float64, durationMS *float64) error {
-	_, err := state.mapRef.ApplyCameraDelta(maplibre.CameraDelta{
-		Kind: maplibre.CameraDeltaKindBearing, Amount: delta, Animation: animationOptions(durationMS),
+		Bearing: bearing, Pitch: pitch, Animation: animationOptions(durationMS),
 	})
 	return err
 }

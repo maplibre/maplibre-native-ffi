@@ -132,13 +132,18 @@ internal class InputController(context: Context, private val mapState: () -> Map
 
       var changed = false
       if (mode == Mode.SCALE_ROTATE) {
-        val anchor = screenPoint(current.centroidX, current.centroidY)
-        if (scale.isFinite() && abs(scale - 1.0) >= SCALE_EPSILON) {
-          mapState()?.scaleBy(scale, anchor)
-          changed = true
-        }
-        if (abs(deltaDegrees) >= ROTATION_EPSILON_DEGREES) {
-          mapState()?.adjustBearing(-deltaDegrees, anchor)
+        // The baseline resets after every send, so each delta carries the
+        // measured movement since the last one, however small, and the deltas
+        // add up to exactly the finger movement.
+        val offset = ScreenPoint(logicalDelta(current.centroidX - baseline.centroidX), deltaY)
+        if (scale != 1.0 || deltaDegrees != 0.0 || offset.x != 0.0 || offset.y != 0.0) {
+          mapState()
+            ?.pinchBy(
+              offset = offset,
+              scale = scale,
+              bearingDegrees = -deltaDegrees,
+              centroid = screenPoint(current.centroidX, current.centroidY),
+            )
           changed = true
         }
       } else if (mode == Mode.SHOVE && deltaY != 0.0) {
@@ -229,9 +234,7 @@ internal class InputController(context: Context, private val mapState: () -> Map
 
   private companion object {
     private const val SCALE_START_DELTA = 0.015
-    private const val SCALE_EPSILON = 0.001
     private const val ROTATION_START_DEGREES = 2.0
-    private const val ROTATION_EPSILON_DEGREES = 0.1
     private const val SHOVE_START_LOGICAL_PX = 4.0
     private const val SHOVE_PITCH_FACTOR = 0.1
   }

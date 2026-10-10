@@ -103,24 +103,43 @@ fn generated_copy_mln_camera_delta(
     value: &sys::mln_camera_delta,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("kind", generated_value(py, value.kind)?)?;
     dict.set_item(
         "offset",
-        generated_copy_mln_screen_point(py, &value.offset)?,
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_OFFSET != 0, || {
+            generated_copy_mln_screen_point(py, &value.offset)
+        })?,
     )?;
-    dict.set_item("amount", generated_value(py, value.amount)?)?;
     dict.set_item(
-        "anchor",
+        "scale",
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_SCALE != 0, || {
+            generated_value(py, value.scale)
+        })?,
+    )?;
+    dict.set_item(
+        "bearing",
         generated_optional(
             py,
-            value.fields & sys::MLN_CAMERA_DELTA_FIELD_ANCHOR != 0,
-            || generated_copy_mln_screen_point(py, &value.anchor),
+            value.fields & sys::MLN_CAMERA_DELTA_BEARING != 0,
+            || generated_value(py, value.bearing),
         )?,
+    )?;
+    dict.set_item(
+        "pitch",
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_PITCH != 0, || {
+            generated_value(py, value.pitch)
+        })?,
+    )?;
+    dict.set_item(
+        "anchor",
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_ANCHOR != 0, || {
+            generated_copy_mln_screen_point(py, &value.anchor)
+        })?,
     )?;
     dict.set_item(
         "animation",
         generated_copy_mln_animation_options(py, &value.animation)?,
     )?;
+    dict.set_item("gesture_phase", generated_value(py, value.gesture_phase)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -933,7 +952,7 @@ fn generated_copy_mln_metal_borrowed_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
     dict.set_item(
@@ -960,7 +979,7 @@ fn generated_copy_mln_metal_owned_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -992,7 +1011,7 @@ fn generated_copy_mln_metal_surface_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -1134,7 +1153,7 @@ fn generated_copy_mln_opengl_borrowed_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
     dict.set_item(
@@ -1187,7 +1206,7 @@ fn generated_copy_mln_opengl_owned_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -1224,7 +1243,7 @@ fn generated_copy_mln_opengl_surface_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -1456,7 +1475,7 @@ fn generated_copy_mln_render_session_snapshot(
     dict.set_item("latest_result", generated_value(py, value.latest_result)?)?;
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item(
@@ -1492,17 +1511,6 @@ fn generated_copy_mln_render_session_snapshot(
         "pending_changes",
         generated_value(py, value.pending_changes)?,
     )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_render_target_extent(
-    py: Python<'_>,
-    value: &sys::mln_render_target_extent,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("width", generated_value(py, value.width)?)?;
-    dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1736,6 +1744,7 @@ fn generated_copy_mln_runtime_event(
     dict.set_item("type", generated_value(py, value.type_)?)?;
     dict.set_item("source_type", generated_value(py, value.source_type)?)?;
     dict.set_item("source", generated_value(py, value.source)?)?;
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("code", generated_value(py, value.code)?)?;
     dict.set_item(
         "payload",
@@ -2370,7 +2379,7 @@ fn generated_copy_mln_vulkan_borrowed_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
     dict.set_item(
@@ -2426,7 +2435,7 @@ fn generated_copy_mln_vulkan_owned_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -2460,7 +2469,7 @@ fn generated_copy_mln_vulkan_surface_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -2504,7 +2513,7 @@ fn generated_copy_mln_webgpu_borrowed_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item("physical_width", generated_value(py, value.physical_width)?)?;
     dict.set_item(
@@ -2542,7 +2551,7 @@ fn generated_copy_mln_webgpu_owned_texture_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -2578,7 +2587,7 @@ fn generated_copy_mln_webgpu_surface_descriptor(
     let dict = PyDict::new(py);
     dict.set_item(
         "extent",
-        generated_copy_mln_render_target_extent(py, &value.extent)?,
+        generated_copy_mln_logical_extent(py, &value.extent)?,
     )?;
     dict.set_item(
         "context",
@@ -2688,16 +2697,31 @@ fn generated_input_mln_camera_delta<'py>(
     let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
     raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
     raw.fields = 0;
-    raw.kind = value
-        .getattr("kind")?
-        .extract::<sys::mln_camera_delta_kind>()?;
-    raw.offset = generated_input_mln_screen_point(&value.getattr("offset")?, storage)?;
-    raw.amount = value.getattr("amount")?.extract::<f64>()?;
+    raw.reserved = 0;
+    if let Some(field) = generated_present(value, "offset")? {
+        raw.offset = generated_input_mln_screen_point(&field, storage)?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_OFFSET;
+    }
+    if let Some(field) = generated_present(value, "scale")? {
+        raw.scale = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_SCALE;
+    }
+    if let Some(field) = generated_present(value, "bearing")? {
+        raw.bearing = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_BEARING;
+    }
+    if let Some(field) = generated_present(value, "pitch")? {
+        raw.pitch = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_PITCH;
+    }
     if let Some(field) = generated_present(value, "anchor")? {
         raw.anchor = generated_input_mln_screen_point(&field, storage)?;
-        raw.fields |= sys::MLN_CAMERA_DELTA_FIELD_ANCHOR;
+        raw.fields |= sys::MLN_CAMERA_DELTA_ANCHOR;
     }
     raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
+    raw.gesture_phase = value
+        .getattr("gesture_phase")?
+        .extract::<sys::mln_gesture_phase>()?;
     Ok(raw)
 }
 
@@ -3273,7 +3297,7 @@ fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
     let mut raw: sys::mln_metal_borrowed_texture_descriptor =
         unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_metal_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.texture = value.getattr("texture")?.extract::<usize>()? as _;
@@ -3300,7 +3324,7 @@ fn generated_input_mln_metal_owned_texture_descriptor<'py>(
     let mut raw: sys::mln_metal_owned_texture_descriptor =
         unsafe { sys::mln_metal_owned_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_metal_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
     Ok(raw)
@@ -3316,7 +3340,7 @@ fn generated_input_mln_metal_surface_descriptor<'py>(
     let mut raw: sys::mln_metal_surface_descriptor =
         unsafe { sys::mln_metal_surface_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_metal_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_metal_context_descriptor(&value.getattr("context")?, storage)?;
     raw.layer = value.getattr("layer")?.extract::<usize>()? as _;
@@ -3388,7 +3412,7 @@ fn generated_input_mln_opengl_borrowed_texture_descriptor<'py>(
     let mut raw: sys::mln_opengl_borrowed_texture_descriptor =
         unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_opengl_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
@@ -3437,7 +3461,7 @@ fn generated_input_mln_opengl_owned_texture_descriptor<'py>(
     let mut raw: sys::mln_opengl_owned_texture_descriptor =
         unsafe { sys::mln_opengl_owned_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_opengl_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_opengl_context_descriptor(&value.getattr("context")?, storage)?;
     Ok(raw)
@@ -3453,7 +3477,7 @@ fn generated_input_mln_opengl_surface_descriptor<'py>(
     let mut raw: sys::mln_opengl_surface_descriptor =
         unsafe { sys::mln_opengl_surface_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_opengl_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_opengl_context_descriptor(&value.getattr("context")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
@@ -3578,19 +3602,6 @@ fn generated_input_mln_render_session_attach_options<'py>(
     raw.frame_wake = generated_input_mln_wake(&value.getattr("frame_wake")?, storage)?;
     raw.driver_work_wake = generated_input_mln_wake(&value.getattr("driver_work_wake")?, storage)?;
     raw.queue_lock = generated_input_mln_queue_lock(&value.getattr("queue_lock")?, storage)?;
-    Ok(raw)
-}
-
-fn generated_input_mln_render_target_extent<'py>(
-    value: &Bound<'py, PyAny>,
-    storage: &mut GeneratedInputStorage<'py>,
-) -> PyResult<sys::mln_render_target_extent> {
-    let _ = storage;
-    let mut raw: sys::mln_render_target_extent = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_render_target_extent>() as _;
-    raw.width = value.getattr("width")?.extract::<u32>()?;
-    raw.height = value.getattr("height")?.extract::<u32>()?;
-    raw.scale_factor = value.getattr("scale_factor")?.extract::<f64>()?;
     Ok(raw)
 }
 
@@ -3982,7 +3993,7 @@ fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
     let mut raw: sys::mln_vulkan_borrowed_texture_descriptor =
         unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
@@ -4025,7 +4036,7 @@ fn generated_input_mln_vulkan_owned_texture_descriptor<'py>(
     let mut raw: sys::mln_vulkan_owned_texture_descriptor =
         unsafe { sys::mln_vulkan_owned_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_vulkan_context_descriptor(&value.getattr("context")?, storage)?;
     Ok(raw)
@@ -4041,7 +4052,7 @@ fn generated_input_mln_vulkan_surface_descriptor<'py>(
     let mut raw: sys::mln_vulkan_surface_descriptor =
         unsafe { sys::mln_vulkan_surface_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_vulkan_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_vulkan_context_descriptor(&value.getattr("context")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<u64>()?;
@@ -4090,7 +4101,7 @@ fn generated_input_mln_webgpu_borrowed_texture_descriptor<'py>(
     let mut raw: sys::mln_webgpu_borrowed_texture_descriptor =
         unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_webgpu_borrowed_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
@@ -4123,7 +4134,7 @@ fn generated_input_mln_webgpu_owned_texture_descriptor<'py>(
     let mut raw: sys::mln_webgpu_owned_texture_descriptor =
         unsafe { sys::mln_webgpu_owned_texture_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_webgpu_owned_texture_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_webgpu_context_descriptor(&value.getattr("context")?, storage)?;
     Ok(raw)
@@ -4139,7 +4150,7 @@ fn generated_input_mln_webgpu_surface_descriptor<'py>(
     let mut raw: sys::mln_webgpu_surface_descriptor =
         unsafe { sys::mln_webgpu_surface_descriptor_default() };
     raw.size = std::mem::size_of::<sys::mln_webgpu_surface_descriptor>() as _;
-    raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
+    raw.extent = generated_input_mln_logical_extent(&value.getattr("extent")?, storage)?;
     raw.context =
         generated_input_mln_webgpu_context_descriptor(&value.getattr("context")?, storage)?;
     raw.surface = value.getattr("surface")?.extract::<usize>()? as _;
@@ -5841,31 +5852,13 @@ impl MapHandle {
     fn create_projection(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_map_create_projection", self.admission())?;
         let handle = self.live()?;
-        let convert = |py: Python<'_>, result: &sys::mln_completion_result| unsafe {
-            MapProjectionHandle::adopt(
-                py,
-                completion_value::<sys::mln_map_projection>(result)?,
-                Vec::new(),
-            )
-        };
-        let discard: unsafe fn(&sys::mln_completion_result) = |result| {
-            if !result.value.is_null() && result.value_count == 1 {
-                unsafe {
-                    generated_dispose_mln_map_projection(
-                        result.value.cast::<sys::mln_map_projection>().read(),
-                    );
-                }
-            }
-        };
+        let mut out_projection: sys::mln_map_projection = unsafe { std::mem::zeroed() };
         unsafe {
-            call.complete_owned(
-                |completion, diagnostic| {
-                    sys::mln_map_create_projection(handle, completion, diagnostic)
-                },
-                convert,
-                discard,
-            )
-        }
+            call.status(|diagnostic| {
+                sys::mln_map_create_projection(handle, &mut out_projection, diagnostic)
+            })
+        }?;
+        unsafe { MapProjectionHandle::adopt(py, out_projection, Vec::new()) }
     }
     #[pyo3(signature = ())]
     fn dump_debug_logs(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -5901,31 +5894,6 @@ impl MapHandle {
                 convert,
             )
         }
-    }
-    #[pyo3(signature = ())]
-    fn get_camera_snapshot(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
-        let mut call = GeneratedCall::new(py, "mln_map_get_camera_snapshot", self.admission())?;
-        let handle = self.live()?;
-        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
-        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
-        let mut out_generation: u64 = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
-                sys::mln_map_get_camera_snapshot(
-                    handle,
-                    &mut out_camera,
-                    &mut out_generation,
-                    diagnostic,
-                )
-            })
-        }?;
-        let dict = PyDict::new(py);
-        dict.set_item(
-            "camera",
-            generated_copy_mln_camera_options(py, &out_camera)?,
-        )?;
-        dict.set_item("generation", generated_value(py, out_generation)?)?;
-        Ok(dict.into_any().unbind())
     }
     #[pyo3(signature = (selector))]
     fn get_feature_state(
@@ -8243,11 +8211,11 @@ impl RenderSessionHandle {
     fn resize(&self, py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
         let mut call = GeneratedCall::new(py, "mln_render_session_resize", self.admission())?;
         let storage = &mut call.storage;
-        let extent_value = generated_input_mln_render_target_extent(&extent.clone(), storage)?;
+        let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
         let handle = self.live()?;
         unsafe {
             call.command(|completion, diagnostic| {
-                sys::mln_render_session_resize(handle, &extent_value, completion, diagnostic)
+                sys::mln_render_session_resize(handle, extent_value, completion, diagnostic)
             })
         }
     }
@@ -9458,6 +9426,30 @@ fn log_set_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<P
 }
 
 #[pyfunction]
+#[pyo3(signature = (extent))]
+fn logical_extent_physical_size(py: Python<'_>, extent: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py, "mln_logical_extent_physical_size", 0)?;
+    let storage = &mut call.storage;
+    let extent_value = generated_input_mln_logical_extent(&extent.clone(), storage)?;
+    let mut out_width: u32 = unsafe { std::mem::zeroed() };
+    let mut out_height: u32 = unsafe { std::mem::zeroed() };
+    unsafe {
+        call.status(|diagnostic| {
+            sys::mln_logical_extent_physical_size(
+                extent_value,
+                &mut out_width,
+                &mut out_height,
+                diagnostic,
+            )
+        })
+    }?;
+    let dict = PyDict::new(py);
+    dict.set_item("width", generated_value(py, out_width)?)?;
+    dict.set_item("height", generated_value(py, out_height)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+#[pyfunction]
 #[pyo3(signature = ())]
 fn network_get_status(py: Python<'_>) -> PyResult<Py<PyAny>> {
     let mut call = GeneratedCall::new(py, "mln_network_get_status", 0)?;
@@ -9509,33 +9501,6 @@ fn projected_meters_for_lat_lng(
         })
     }?;
     generated_copy_mln_projected_meters(py, &out_meters)
-}
-
-#[pyfunction]
-#[pyo3(signature = (extent))]
-fn render_target_extent_physical_size(
-    py: Python<'_>,
-    extent: &Bound<'_, PyAny>,
-) -> PyResult<Py<PyAny>> {
-    let mut call = GeneratedCall::new(py, "mln_render_target_extent_physical_size", 0)?;
-    let storage = &mut call.storage;
-    let extent_value = generated_input_mln_render_target_extent(&extent.clone(), storage)?;
-    let mut out_width: u32 = unsafe { std::mem::zeroed() };
-    let mut out_height: u32 = unsafe { std::mem::zeroed() };
-    unsafe {
-        call.status(|diagnostic| {
-            sys::mln_render_target_extent_physical_size(
-                &extent_value,
-                &mut out_width,
-                &mut out_height,
-                diagnostic,
-            )
-        })
-    }?;
-    let dict = PyDict::new(py);
-    dict.set_item("width", generated_value(py, out_width)?)?;
-    dict.set_item("height", generated_value(py, out_height)?)?;
-    Ok(dict.into_any().unbind())
 }
 
 #[pyfunction]
@@ -9718,6 +9683,7 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(log_clear_callback, module)?)?;
     module.add_function(wrap_pyfunction!(log_set_async_severity_mask, module)?)?;
     module.add_function(wrap_pyfunction!(log_set_callback, module)?)?;
+    module.add_function(wrap_pyfunction!(logical_extent_physical_size, module)?)?;
     module.add_function(wrap_pyfunction!(network_get_status, module)?)?;
     module.add_function(wrap_pyfunction!(network_set_status, module)?)?;
     module.add_function(wrap_pyfunction!(
@@ -9726,10 +9692,6 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(plugin_get_register_function_v1, module)?)?;
     module.add_function(wrap_pyfunction!(projected_meters_for_lat_lng, module)?)?;
-    module.add_function(wrap_pyfunction!(
-        render_target_extent_physical_size,
-        module
-    )?)?;
     module.add_function(wrap_pyfunction!(rendered_query_geometry_box, module)?)?;
     module.add_function(wrap_pyfunction!(
         rendered_query_geometry_line_string,

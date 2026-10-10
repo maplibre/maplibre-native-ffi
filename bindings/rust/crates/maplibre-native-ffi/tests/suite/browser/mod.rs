@@ -20,7 +20,7 @@ use maplibre_native_ffi::*;
 
 use crate::support::*;
 
-const EXTENT: RenderTargetExtent = RenderTargetExtent::new(32, 16, 1.0);
+const EXTENT: LogicalExtent = LogicalExtent::new(32, 16, 1.0);
 
 /// A fixture whose map matches EXTENT, with the background style loaded and
 /// an update published for the first frame.

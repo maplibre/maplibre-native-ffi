@@ -366,7 +366,7 @@ pub const OwnedTexture = struct {
 
     pub const default_driver: maplibre.RenderDriverKind = if (build_options.supports_opengl) .caller_graphics_thread else .core_worker;
 
-    pub fn attach(map: maplibre.Map, extent: maplibre.RenderTargetExtent, driver: maplibre.RenderDriverKind) !*OwnedTexture {
+    pub fn attach(map: maplibre.Map, extent: maplibre.LogicalExtent, driver: maplibre.RenderDriverKind) !*OwnedTexture {
         const self = try testing.allocator.create(OwnedTexture);
         errdefer testing.allocator.destroy(self);
         self.* = .{ .graphics = try Graphics.create(), .session = undefined, .caller_driven = driver == .caller_graphics_thread };

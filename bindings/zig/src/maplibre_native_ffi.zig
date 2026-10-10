@@ -261,33 +261,45 @@ pub const CameraChangeMode = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// One relative camera operation.
+/// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraDelta = struct {
-    kind: CameraDeltaKind = std.mem.zeroes(CameraDeltaKind),
-    offset: ScreenPoint = .{},
-    amount: f64 = std.mem.zeroes(f64),
+    /// Pan in logical map pixels; the content moves by this offset.
+    offset: ?ScreenPoint = null,
+    /// Positive zoom factor; 2 zooms in one level.
+    scale: ?f64 = null,
+    /// Degrees added to the bearing.
+    bearing: ?f64 = null,
+    /// Degrees added to the pitch; positive tilts further from straight down.
+    pitch: ?f64 = null,
+    /// Screen point in logical map pixels that scale, bearing, and pitch keep
+    /// fixed.
     anchor: ?ScreenPoint = null,
     animation: AnimationOptions = .{},
+    gesture_phase: GesturePhase = std.mem.zeroes(GesturePhase),
     pub fn toNative(self: CameraDelta) c.mln_camera_delta {
         var raw = c.mln_camera_delta_default();
         raw.fields = 0;
-        raw.kind = self.kind.toNative();
-        raw.offset = self.offset.toNative();
-        raw.amount = self.amount;
-        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_FIELD_ANCHOR, &raw.anchor, self.anchor);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_OFFSET, &raw.offset, self.offset);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_SCALE, &raw.scale, self.scale);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_BEARING, &raw.bearing, self.bearing);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_PITCH, &raw.pitch, self.pitch);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, self.anchor);
         raw.animation = self.animation.toNative();
+        raw.gesture_phase = self.gesture_phase.toNative();
         return raw;
     }
     pub fn fromNative(raw: c.mln_camera_delta) CameraDelta {
         return .{
-            .kind = CameraDeltaKind.fromNative(raw.kind),
-            .offset = ScreenPoint.fromNative(raw.offset),
-            .amount = raw.amount,
-            .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_FIELD_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
+            .offset = if (raw.fields & c.MLN_CAMERA_DELTA_OFFSET != 0) ScreenPoint.fromNative(raw.offset) else null,
+            .scale = if (raw.fields & c.MLN_CAMERA_DELTA_SCALE != 0) raw.scale else null,
+            .bearing = if (raw.fields & c.MLN_CAMERA_DELTA_BEARING != 0) raw.bearing else null,
+            .pitch = if (raw.fields & c.MLN_CAMERA_DELTA_PITCH != 0) raw.pitch else null,
+            .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
             .animation = AnimationOptions.fromNative(raw.animation),
+            .gesture_phase = GesturePhase.fromNative(raw.gesture_phase),
         };
     }
 };
@@ -297,29 +309,19 @@ pub const CameraDelta = struct {
 /// See `mln_camera_delta_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraDeltaField = struct {
+    offset: bool = false,
+    scale: bool = false,
+    bearing: bool = false,
+    pitch: bool = false,
     anchor: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{1};
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
     pub const contains = methods.contains;
     pub const isEmpty = methods.isEmpty;
     pub const unionWith = methods.unionWith;
-};
-
-/// Relative camera operation carried by `mln_camera_delta`.
-///
-/// See `mln_camera_delta_kind` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const CameraDeltaKind = enum(u32) {
-    pitch = 3,
-    bearing = 2,
-    scale = 1,
-    move = 0,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
 /// Field mask values for `mln_camera_fit_options`.
@@ -1091,7 +1093,7 @@ pub const GeojsonSourceOptions = struct {
     }
 };
 
-/// Gesture boundary carried atomically with a camera update.
+/// Gesture boundary carried atomically with a camera update or delta.
 ///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1417,7 +1419,7 @@ pub const LogSeverityMask = struct {
     pub const all = fromNative(14);
 };
 
-/// Logical map extent in UI pixels and device-pixel scale.
+/// Logical extent in UI pixels and the device-pixel scale.
 ///
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1426,9 +1428,7 @@ pub const LogicalExtent = struct {
     width: u32 = 256,
     /// Height in UI pixels. Defaults to 256.
     height: u32 = 256,
-    /// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at
-    /// map creation, so `mln_map_resize()` accepts only the value the map was
-    /// created with.
+    /// Device pixels per UI pixel. Defaults to 1.0.
     scale_factor: f64 = 1.0,
     pub fn toNative(self: LogicalExtent) c.mln_logical_extent {
         var raw = std.mem.zeroes(c.mln_logical_extent);
@@ -1489,9 +1489,9 @@ pub const MapMode = enum(u32) {
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const MapOptions = struct {
-    /// Initial logical extent. Width and height must be positive. The scale
-    /// factor must be positive and finite, and fixes the map's scale factor for
-    /// its lifetime.
+    /// Initial logical extent. Width and height must be nonzero, and
+    /// scale_factor must be finite and positive. scale_factor is fixed for the
+    /// map's lifetime.
     initial_extent: LogicalExtent = .{},
     /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
     map_mode: MapMode = std.mem.zeroes(MapMode),
@@ -1697,8 +1697,9 @@ pub const MapViewportOptions = struct {
 pub const MetalBorrowedTextureDescriptor = struct {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
-    /// below.
-    extent: RenderTargetExtent = .{},
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    extent: LogicalExtent = .{},
     /// Physical texture width in device pixels. Must be positive. Defaults to
     /// 256.
     physical_width: u32 = 256,
@@ -1717,7 +1718,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_metal_borrowed_texture_descriptor) MetalBorrowedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
             .texture = raw.texture,
@@ -1749,8 +1750,9 @@ pub const MetalContextDescriptor = struct {
 /// See `mln_metal_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const MetalOwnedTextureDescriptor = struct {
-    /// Logical texture extent.
-    extent: RenderTargetExtent = .{},
+    /// Logical texture extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    extent: LogicalExtent = .{},
     /// Metal backend context. device is required.
     context: MetalContextDescriptor = .{},
     pub fn toNative(self: MetalOwnedTextureDescriptor) c.mln_metal_owned_texture_descriptor {
@@ -1761,7 +1763,7 @@ pub const MetalOwnedTextureDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_metal_owned_texture_descriptor) MetalOwnedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = MetalContextDescriptor.fromNative(raw.context),
         };
     }
@@ -1820,8 +1822,9 @@ pub const MetalOwnedTextureFrame = struct {
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const MetalSurfaceDescriptor = struct {
-    /// Logical surface extent.
-    extent: RenderTargetExtent = .{},
+    /// Logical surface extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    extent: LogicalExtent = .{},
     /// Metal backend context. device is optional for Metal surfaces.
     context: MetalContextDescriptor = .{},
     /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
@@ -1835,7 +1838,7 @@ pub const MetalSurfaceDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_metal_surface_descriptor) MetalSurfaceDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = MetalContextDescriptor.fromNative(raw.context),
             .layer = raw.layer,
         };
@@ -2068,7 +2071,7 @@ pub const OfflineTilePyramidRegionDefinition = struct {
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenglBorrowedTextureDescriptor = struct {
-    extent: RenderTargetExtent = .{},
+    extent: LogicalExtent = .{},
     physical_width: u32 = 256,
     physical_height: u32 = 256,
     context: OpenglContextDescriptor = .{},
@@ -2088,7 +2091,7 @@ pub const OpenglBorrowedTextureDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_opengl_borrowed_texture_descriptor) status.Error!OpenglBorrowedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
             .context = try OpenglContextDescriptor.fromNative(allocator, raw.context),
@@ -2221,7 +2224,7 @@ pub const OpenglContextProviderFlag = struct {
 /// See `mln_opengl_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const OpenglOwnedTextureDescriptor = struct {
-    extent: RenderTargetExtent = .{},
+    extent: LogicalExtent = .{},
     context: OpenglContextDescriptor = .{},
     pub fn toNative(self: OpenglOwnedTextureDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_owned_texture_descriptor {
         var raw = c.mln_opengl_owned_texture_descriptor_default();
@@ -2233,7 +2236,7 @@ pub const OpenglOwnedTextureDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_opengl_owned_texture_descriptor) status.Error!OpenglOwnedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = try OpenglContextDescriptor.fromNative(allocator, raw.context),
         };
     }
@@ -2300,7 +2303,7 @@ pub const OpenglOwnedTextureFrame = struct {
 /// See `mln_opengl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const OpenglSurfaceDescriptor = struct {
-    extent: RenderTargetExtent = .{},
+    extent: LogicalExtent = .{},
     context: OpenglContextDescriptor = .{},
     surface: ?*anyopaque = null,
     pub fn toNative(self: OpenglSurfaceDescriptor, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_opengl_surface_descriptor {
@@ -2314,7 +2317,7 @@ pub const OpenglSurfaceDescriptor = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_opengl_surface_descriptor) status.Error!OpenglSurfaceDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = try OpenglContextDescriptor.fromNative(allocator, raw.context),
             .surface = raw.surface,
         };
@@ -2849,7 +2852,8 @@ pub const RenderSessionSnapshot = struct {
     driver: RenderDriverKind = std.mem.zeroes(RenderDriverKind),
     /// Most recent terminal `mln_render_result` value.
     latest_result: RenderResult = std.mem.zeroes(RenderResult),
-    extent: RenderTargetExtent = .{},
+    /// Logical extent, including a resize the driver has not applied yet.
+    extent: LogicalExtent = .{},
     generation: u64 = std.mem.zeroes(u64),
     map_update_generation: u64 = std.mem.zeroes(u64),
     rendered_update_generation: u64 = std.mem.zeroes(u64),
@@ -2884,7 +2888,7 @@ pub const RenderSessionSnapshot = struct {
             .state = RenderSessionState.fromNative(raw.state),
             .driver = RenderDriverKind.fromNative(raw.driver),
             .latest_result = RenderResult.fromNative(raw.latest_result),
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .generation = raw.generation,
             .map_update_generation = raw.map_update_generation,
             .rendered_update_generation = raw.rendered_update_generation,
@@ -2913,34 +2917,6 @@ pub const RenderSessionState = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
-};
-
-/// Logical render target extent in UI pixels.
-///
-/// See `mln_render_target_extent` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub const RenderTargetExtent = struct {
-    /// Logical map width in UI pixels. Defaults to 256.
-    width: u32 = 256,
-    /// Logical map height in UI pixels. Defaults to 256.
-    height: u32 = 256,
-    /// UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0.
-    scale_factor: f64 = 1.0,
-    pub fn toNative(self: RenderTargetExtent) c.mln_render_target_extent {
-        var raw = std.mem.zeroes(c.mln_render_target_extent);
-        raw.size = @sizeOf(c.mln_render_target_extent);
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_render_target_extent) RenderTargetExtent {
-        return .{
-            .width = raw.width,
-            .height = raw.height,
-            .scale_factor = raw.scale_factor,
-        };
-    }
 };
 
 /// Optional fields for `mln_rendered_feature_query_options`.
@@ -3482,6 +3458,7 @@ pub const RuntimeEvent = struct {
     type: RuntimeEventType = std.mem.zeroes(RuntimeEventType),
     source_type: RuntimeEventSourceType = std.mem.zeroes(RuntimeEventSourceType),
     source: u64 = std.mem.zeroes(u64),
+    generation: u64 = std.mem.zeroes(u64),
     code: i32 = std.mem.zeroes(i32),
     payload: RuntimeEventPayload = .{ .unknown = 0 },
     pub fn toNative(self: RuntimeEvent, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_event {
@@ -3491,6 +3468,7 @@ pub const RuntimeEvent = struct {
         raw.type = self.type.toNative();
         raw.source_type = self.source_type.toNative();
         raw.source = self.source;
+        raw.generation = self.generation;
         raw.code = self.code;
         switch (self.payload) {
             .render_frame => |item| {
@@ -3536,6 +3514,7 @@ pub const RuntimeEvent = struct {
             .type = RuntimeEventType.fromNative(raw.type),
             .source_type = RuntimeEventSourceType.fromNative(raw.source_type),
             .source = raw.source,
+            .generation = raw.generation,
             .code = raw.code,
             .payload = switch (raw.payload_type) {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => .{ .render_frame = RuntimeEventRenderFrame.fromNative(raw.payload.render_frame) },
@@ -4736,8 +4715,9 @@ pub const ViewportMode = enum(u32) {
 pub const VulkanBorrowedTextureDescriptor = struct {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
-    /// below.
-    extent: RenderTargetExtent = .{},
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    extent: LogicalExtent = .{},
     /// Physical image width in device pixels. Must be positive. Defaults to
     /// 256.
     physical_width: u32 = 256,
@@ -4772,7 +4752,7 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_vulkan_borrowed_texture_descriptor) VulkanBorrowedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
             .context = VulkanContextDescriptor.fromNative(raw.context),
@@ -4836,8 +4816,9 @@ pub const VulkanContextDescriptor = struct {
 /// See `mln_vulkan_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const VulkanOwnedTextureDescriptor = struct {
-    /// Logical texture extent.
-    extent: RenderTargetExtent = .{},
+    /// Logical texture extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    extent: LogicalExtent = .{},
     /// Borrowed Vulkan context. All handles are required.
     context: VulkanContextDescriptor = .{},
     pub fn toNative(self: VulkanOwnedTextureDescriptor) c.mln_vulkan_owned_texture_descriptor {
@@ -4848,7 +4829,7 @@ pub const VulkanOwnedTextureDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_vulkan_owned_texture_descriptor) VulkanOwnedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = VulkanContextDescriptor.fromNative(raw.context),
         };
     }
@@ -4915,8 +4896,9 @@ pub const VulkanOwnedTextureFrame = struct {
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const VulkanSurfaceDescriptor = struct {
-    /// Logical surface extent.
-    extent: RenderTargetExtent = .{},
+    /// Logical surface extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    extent: LogicalExtent = .{},
     /// Borrowed Vulkan context. All handles are required. The device must
     /// support VK_KHR_swapchain, and the queue family must support graphics and
     /// presentation to this descriptor's surface.
@@ -4932,7 +4914,7 @@ pub const VulkanSurfaceDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_vulkan_surface_descriptor) VulkanSurfaceDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = VulkanContextDescriptor.fromNative(raw.context),
             .surface = raw.surface,
         };
@@ -5025,8 +5007,11 @@ pub const WebglContextKind = enum(u32) {
 /// See `mln_webgpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const WebgpuBorrowedTextureDescriptor = struct {
-    /// Logical texture extent.
-    extent: RenderTargetExtent = .{},
+    /// Logical texture extent. The map viewport uses width and height and the
+    /// renderer uses scale_factor; the physical size is stated separately
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    extent: LogicalExtent = .{},
     /// Physical texture width in device pixels. Defaults to 256.
     physical_width: u32 = 256,
     /// Physical texture height in device pixels. Defaults to 256.
@@ -5052,7 +5037,7 @@ pub const WebgpuBorrowedTextureDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_webgpu_borrowed_texture_descriptor) WebgpuBorrowedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .physical_width = raw.physical_width,
             .physical_height = raw.physical_height,
             .context = WebgpuContextDescriptor.fromNative(raw.context),
@@ -5096,8 +5081,9 @@ pub const WebgpuContextDescriptor = struct {
 /// See `mln_webgpu_owned_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 pub const WebgpuOwnedTextureDescriptor = struct {
-    /// Logical texture extent.
-    extent: RenderTargetExtent = .{},
+    /// Logical texture extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    extent: LogicalExtent = .{},
     /// Borrowed WebGPU context. device is required.
     context: WebgpuContextDescriptor = .{},
     pub fn toNative(self: WebgpuOwnedTextureDescriptor) c.mln_webgpu_owned_texture_descriptor {
@@ -5108,7 +5094,7 @@ pub const WebgpuOwnedTextureDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_webgpu_owned_texture_descriptor) WebgpuOwnedTextureDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = WebgpuContextDescriptor.fromNative(raw.context),
         };
     }
@@ -5171,8 +5157,9 @@ pub const WebgpuOwnedTextureFrame = struct {
 /// See `mln_webgpu_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub const WebgpuSurfaceDescriptor = struct {
-    /// Logical surface extent.
-    extent: RenderTargetExtent = .{},
+    /// Logical surface extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    extent: LogicalExtent = .{},
     /// Borrowed WebGPU context. device is required.
     context: WebgpuContextDescriptor = .{},
     /// Borrowed WGPUSurface. Required, and must stay alive for the session. The
@@ -5192,7 +5179,7 @@ pub const WebgpuSurfaceDescriptor = struct {
     }
     pub fn fromNative(raw: c.mln_webgpu_surface_descriptor) WebgpuSurfaceDescriptor {
         return .{
-            .extent = RenderTargetExtent.fromNative(raw.extent),
+            .extent = LogicalExtent.fromNative(raw.extent),
             .context = WebgpuContextDescriptor.fromNative(raw.context),
             .surface = raw.surface,
             .format = raw.format,
@@ -5533,6 +5520,15 @@ pub fn logSetCallback(allocator: std.mem.Allocator, handler: LogHandler, diagnos
     return call.invoke("mln_log_set_callback", .none, {}, allocator, diagnostic, .{handler});
 }
 
+/// Computes the physical device-pixel size of a logical extent.
+///
+/// See `mln_logical_extent_physical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub fn logicalExtentPhysicalSize(extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { width: u32, height: u32 } {
+    const out = try call.invoke("mln_logical_extent_physical_size", .none, {}, null, diagnostic, .{ extent, call.out(u32), call.out(u32) });
+    return .{ .width = out[0], .height = out[1] };
+}
+
 /// Adds a color-relief layer for a raster DEM source.
 ///
 /// See `mln_map_add_color_relief_layer` in the
@@ -5669,7 +5665,7 @@ pub fn mapAddVectorSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     return call.submit("mln_map_add_vector_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, url, options });
 }
 
-/// Submits one copied relative camera update.
+/// Submits one atomic relative camera update.
 ///
 /// See `mln_map_apply_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
@@ -5826,13 +5822,12 @@ pub fn mapCancelTransitions(map: Map, diagnostic: ?*diagnostics.Diagnostic) stat
     return call.submit("mln_map_cancel_transitions", .lease, map, call.command, null, diagnostic, .{});
 }
 
-/// Starts creation of a standalone projection from the map's ordered transform
-/// state.
+/// Creates a standalone projection from the map's latest published snapshot.
 ///
 /// See `mln_map_create_projection` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-pub fn mapCreateProjection(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(MapProjection) {
-    return call.submit("mln_map_create_projection", .lease, map, call.handle(MapProjection, c.mln_map_projection, .none), null, diagnostic, .{});
+pub fn mapCreateProjection(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!MapProjection {
+    return call.invoke("mln_map_create_projection", .lease, map, null, diagnostic, .{call.adopt(MapProjection, .none)});
 }
 
 /// Consumes a map handle without observing its asynchronous retirement.
@@ -5865,15 +5860,6 @@ pub fn mapEndCommandGroup(map: Map, diagnostic: ?*diagnostics.Diagnostic) status
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn mapGetCamera(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraQueryResult) {
     return call.submit("mln_map_get_camera", .lease, map, call.value(CameraQueryResult, c.mln_camera_query_result), null, diagnostic, .{});
-}
-
-/// Copies the camera from the latest immutable map snapshot.
-///
-/// See `mln_map_get_camera_snapshot` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn mapGetCameraSnapshot(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { camera: CameraOptions, generation: u64 } {
-    const out = try call.invoke("mln_map_get_camera_snapshot", .lease, map, null, diagnostic, .{ call.sizedOut(CameraOptions), call.out(u64) });
-    return .{ .camera = out[0], .generation = out[1] };
 }
 
 /// Starts an ordered read of per-feature state from this map.
@@ -6874,8 +6860,8 @@ pub fn renderSessionRequestFrame(allocator: std.mem.Allocator, session: RenderSe
 ///
 /// See `mln_render_session_resize` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-pub fn renderSessionResize(allocator: std.mem.Allocator, session: RenderSession, extent: RenderTargetExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
-    return call.submit("mln_render_session_resize", .lease, session, call.command, allocator, diagnostic, .{extent});
+pub fn renderSessionResize(session: RenderSession, extent: LogicalExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_render_session_resize", .lease, session, call.command, null, diagnostic, .{extent});
 }
 
 /// Services up to max_work items for a caller-graphics-thread driver; zero
@@ -6952,15 +6938,6 @@ pub fn renderSessionSetWebgpuBorrowedTextureTarget(allocator: std.mem.Allocator,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 pub fn renderSessionSetWebgpuSurfaceTarget(allocator: std.mem.Allocator, session: RenderSession, descriptor: WebgpuSurfaceDescriptor, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {
     return call.submit("mln_render_session_set_webgpu_surface_target", .lease, session, call.unit, allocator, diagnostic, .{descriptor});
-}
-
-/// Computes the physical device-pixel size of a logical render target extent.
-///
-/// See `mln_render_target_extent_physical_size` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn renderTargetExtentPhysicalSize(allocator: std.mem.Allocator, extent: RenderTargetExtent, diagnostic: ?*diagnostics.Diagnostic) status.Error!struct { width: u32, height: u32 } {
-    const out = try call.invoke("mln_render_target_extent_physical_size", .none, {}, allocator, diagnostic, .{ extent, call.out(u32), call.out(u32) });
-    return .{ .width = out[0], .height = out[1] };
 }
 
 /// Returns default rendered feature query options.

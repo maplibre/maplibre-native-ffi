@@ -32,7 +32,7 @@ fn creation_checks_the_c_abi_version_before_it_reaches_native() {
 #[test]
 fn closing_a_handle_twice_does_nothing() {
     let fixture = Fixture::new();
-    let projection = wait_for(fixture.map().create_projection());
+    let projection = fixture.map().create_projection().unwrap();
     projection.close().unwrap();
     // The second close finds the handle closed and never reaches native.
     projection.close().unwrap();
@@ -156,7 +156,7 @@ fn exit_with_live_handles_and_callbacks() -> ! {
     let fixture = Fixture::new();
     fixture.load_style(BACKGROUND_STYLE_JSON);
     log_set_callback(LogHandler::new(|_, _, _, _| 1)).unwrap();
-    let projection = wait_for(fixture.map().create_projection());
+    let projection = fixture.map().create_projection().unwrap();
     std::mem::forget((fixture, projection));
     std::process::exit(0);
 }
