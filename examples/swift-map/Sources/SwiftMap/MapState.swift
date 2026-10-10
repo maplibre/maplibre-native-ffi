@@ -27,14 +27,12 @@ struct Viewport: Equatable {
 }
 
 /// The runtime and map, driven by the native scheduler thread the runtime
-/// owns. Camera calls queue commands without waiting for them.
+/// owns. Camera calls submit commands without waiting for their completions.
 @MainActor
 final class MapState {
   private let runtime: RuntimeHandle
   let map: MapHandle
   private var isClosed = false
-  /// The newest queued command, which awaits every command queued before it.
-  private var lastCommand: Task<Void, Never>?
   /// Reports a command that failed after native code accepted it.
   var onFailure: (@MainActor (Error) -> Void)?
 
@@ -87,7 +85,6 @@ final class MapState {
   func close() async throws {
     guard !isClosed else { return }
     isClosed = true
-    await lastCommand?.value
     // Awaiting both release completions lets native teardown finish before the
     // app tears down state that the callbacks use.
     try await map.close()
@@ -161,20 +158,19 @@ final class MapState {
     )) }
   }
 
-  /// Queues one command behind every command queued before it. A generated
-  /// call leaves the main actor before it reaches native code, so tasks that
-  /// start in order can still submit out of order; awaiting the previous
-  /// command keeps a gesture's begin, deltas, and end, and successive resizes,
-  /// in input order.
+  /// Starts `command` in a task on the main actor. The main actor runs its
+  /// tasks in the order that it enqueued them, and a generated operation
+  /// submits to native before it first suspends, so a gesture's begin, deltas,
+  /// and end reach native in input order. A command that starts after the
+  /// map closes does nothing.
   func submit(
     _ command: @escaping @MainActor @Sendable () async throws -> Void
   ) {
     guard !isClosed else { return }
-    let previous = lastCommand
-    lastCommand = Task { @MainActor [weak self] in
-      await previous?.value
+    Task { @MainActor [weak self] in
+      guard let self, !self.isClosed else { return }
       do { try await command() }
-      catch { self?.onFailure?(error) }
+      catch { onFailure?(error) }
     }
   }
 }

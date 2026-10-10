@@ -153,3 +153,56 @@ private struct ConversionFailure: Error {}
     releases.value == 1
   }
 }
+
+/// Commands that tasks on one actor start in order reach native in that order,
+/// because an operation submits on its caller's executor before it first
+/// suspends. Each committed command publishes the next map generation, so the
+/// generations rise with the order the tasks started in. A task that starts
+/// immediately submits before its start returns; an enqueued task submits when
+/// the actor runs it, which is in the order the tasks were enqueued.
+@Test func commandsStartedInOrderOnOneActorSubmitInThatOrder() async throws {
+  try await withMapFixture { fixture in
+    let enqueued = try await generationsOfCommandsStarted(
+      on: fixture.map,
+      immediately: false
+    )
+    #expect(isStrictlyIncreasing(enqueued), "\(enqueued)")
+    let immediate = try await generationsOfCommandsStarted(
+      on: fixture.map,
+      immediately: true
+    )
+    #expect(isStrictlyIncreasing(immediate), "\(immediate)")
+  }
+}
+
+/// Starts one camera command per task on the main actor, in order, and returns
+/// each command's published generation in that order.
+@MainActor
+private func generationsOfCommandsStarted(
+  on map: MapHandle,
+  immediately: Bool
+) async throws -> [UInt64] {
+  var tasks: [Task<CommandCompletion, Error>] = []
+  for index in 0 ..< 32 {
+    let update = CameraUpdate(camera: CameraOptions(zoom: Double(index % 16)))
+    let command: @MainActor () async throws -> CommandCompletion = {
+      try await map.updateCamera(update: update)
+    }
+    if immediately,
+       #available(macOS 26, iOS 26, macCatalyst 26, tvOS 26, *)
+    {
+      tasks.append(Task.immediate(operation: command))
+    } else {
+      tasks.append(Task(operation: command))
+    }
+  }
+  var generations: [UInt64] = []
+  for task in tasks {
+    try await generations.append(task.value.generation)
+  }
+  return generations
+}
+
+private func isStrictlyIncreasing(_ values: [UInt64]) -> Bool {
+  zip(values, values.dropFirst()).allSatisfy { $0 < $1 }
+}

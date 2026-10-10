@@ -15,9 +15,10 @@ final class RenderLoop {
   private let graphics: MetalGraphicsContext
   private let target: MetalRenderTarget
   private var isClosed = false
-  /// Counts resizes, so a queued resize that a newer one supersedes is
-  /// skipped.
-  private var resizeCount = 0
+  /// The newest viewport that no resize has applied yet.
+  private var pendingViewport: Viewport?
+  /// Applies pending viewports while any remain.
+  private var resizing: Task<Void, Never>?
   /// Runs after each frame that reached the layer.
   var onPresented: (@MainActor () -> Void)?
   /// Runs when the loop can no longer render.
@@ -77,19 +78,30 @@ final class RenderLoop {
     return loop
   }
 
-  /// Follows a new viewport. The resize queues behind the map's commands, and
-  /// a live session carries the extent to the map.
+  /// Follows a new viewport. A resize awaits several native steps, so one task
+  /// applies resizes one at a time, and it skips a viewport that a newer one
+  /// replaces before its turn.
   func resize(_ viewport: Viewport) {
     guard !isClosed else { return }
-    resizeCount += 1
-    let count = resizeCount
-    mapState.submit { [weak self] in
-      guard let self, count == self.resizeCount else { return }
-      try await self.target.resize(
-        graphics: self.graphics,
-        viewport: viewport,
-        map: self.mapState.map
-      )
+    pendingViewport = viewport
+    guard resizing == nil else { return }
+    resizing = Task { [weak self] in await self?.applyPendingResizes() }
+  }
+
+  private func applyPendingResizes() async {
+    defer { resizing = nil }
+    while !isClosed, let viewport = pendingViewport {
+      pendingViewport = nil
+      do {
+        try await target.resize(
+          graphics: graphics,
+          viewport: viewport,
+          map: mapState.map
+        )
+      } catch {
+        fail(error)
+        return
+      }
     }
   }
 
@@ -99,6 +111,8 @@ final class RenderLoop {
     guard !isClosed else { return }
     isClosed = true
     defer { onPresented = nil }
+    // The session detaches only after the resize in progress, if any, ends.
+    await resizing?.value
     do {
       try await target.close()
     } catch {
