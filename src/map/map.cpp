@@ -414,6 +414,20 @@ auto queue_map_event(
   );
 }
 
+auto queue_transition_finished(
+  MapEventState& events, uint64_t generation, uint64_t transition_id
+) -> void {
+  auto payload = zeroed_event_payload();
+  payload.camera_transition_finished =
+    mln_runtime_event_camera_transition_finished{
+      .transition_id = transition_id
+    };
+  queue_map_event(
+    events, generation, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
+    MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED, payload
+  );
+}
+
 // Queues the events that a transaction held, all with the generation that it
 // published, ahead of any event that the map raises afterwards. The held
 // vector keeps its capacity for the next transaction.
@@ -481,16 +495,7 @@ class HeadlessObserver final : public mln::MapObserver {
       }
       if (finished) {
         for (const auto transition_id : events.finished_transitions) {
-          auto payload = zeroed_event_payload();
-          payload.camera_transition_finished =
-            mln_runtime_event_camera_transition_finished{
-              .transition_id = transition_id
-            };
-          queue_map_event(
-            events, generation,
-            MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
-            MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED, payload
-          );
+          queue_transition_finished(events, generation, transition_id);
         }
       }
     }
@@ -1779,10 +1784,12 @@ auto from_native_camera(const mln::CameraOptions& camera)
 }
 
 // MapLibre Native owns the returned AnimationOptions for the transition
-// lifetime and invokes transitionFinishFn on the runtime worker, immediately
-// before the camera change that ends the transition. The callback records the
-// ID, and the observer queues it after that camera change. The lambda holds
-// event state by value, so it stays valid for as long as MapLibre keeps it.
+// lifetime and invokes transitionFinishFn on the runtime worker, usually
+// immediately before the camera change that ends the transition. The callback
+// records the ID, and the observer queues it after that camera change. A map
+// transaction queues any finish that no camera change followed. The lambda
+// holds event state by value, so it stays valid for as long as MapLibre keeps
+// it.
 auto to_native_animation(
   const std::shared_ptr<mln::core::MapEventState>& event_state,
   const mln_animation_options* animation
@@ -2253,35 +2260,31 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   // The event is queued before the completion runs, so a host that sees the
   // completion and then drains events, or orders a barrier after it, finds
   // the event. A barrier completes as soon as the request is terminal.
-  // MapLibre finishes a request from renderStill() or from a renderer
-  // callback, never inside a map command, so nothing holds the event.
+  // MapLibre usually finishes a request from renderStill() or from a renderer
+  // callback, but a style error inside a map command finishes it too. That
+  // command's transaction holds the event, so the completion waits until the
+  // transaction queues it.
   auto& events = *live->event_state;
-  assert(!events.in_transaction());
-  if (error) {
-    auto message = exception_message(error);
-    if (event_selected(events.mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED)) {
-      queue_map_event(
-        events, events.published_generation,
-        MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED,
-        MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(), 0, message
-      );
-    }
-    if (operation) {
-      operation->complete(
-        MLN_STATUS_NATIVE_ERROR, message, std::any{std::monostate{}}
-      );
-    }
-    return;
-  }
-  if (event_selected(events.mask, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED)) {
+  const auto status = error ? MLN_STATUS_NATIVE_ERROR : MLN_STATUS_OK;
+  auto message = error ? exception_message(error) : std::string{};
+  const auto type = error ? MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED
+                          : MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED;
+  if (event_selected(events.mask, type)) {
     queue_map_event(
-      events, events.published_generation,
-      MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
+      events, events.published_generation, type, MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+      zeroed_event_payload(), 0, message
     );
   }
-  if (operation) {
-    operation->complete(MLN_STATUS_OK, {}, std::any{std::monostate{}});
+  if (!operation) return;
+  if (events.in_transaction()) {
+    events.held_still_image = HeldStillImageCompletion{
+      .operation = std::move(operation),
+      .status = status,
+      .message = std::move(message),
+    };
+    return;
   }
+  operation->complete(status, std::move(message), std::any{std::monostate{}});
 }
 
 // The caller holds the map handle table's mutex, so it can act on the result
@@ -2372,15 +2375,65 @@ auto open_map_transaction(MapEventState& events) -> void {
   events.transaction_depth += 1;
 }
 
+// Holds a TRANSITION_FINISHED event for each finish that no camera change
+// followed. MapLibre finishes a transition that way only from easeTo() or
+// flyTo(), which only map commands call, so the finish belongs to the
+// command that closes the transaction.
+auto hold_finished_transitions(MapEventState& events) -> void {
+  auto& finished = events.finished_transitions;
+  if (finished.empty()) return;
+  try {
+    if (
+      event_selected(
+        events.mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
+      )
+    ) {
+      for (const auto transition_id : finished) {
+        queue_transition_finished(events, 0, transition_id);
+      }
+    }
+  } catch (...) {
+    finished.clear();
+    throw;
+  }
+  finished.clear();
+}
+
 // Queues the held events with `generation`, then announces the render update
-// that the transaction held, so a command raises at most one.
+// that the transaction held, so a command raises at most one. A still-image
+// request that the transaction finished completes last, after its event. The
+// update and the completion go out even when queueing fails, and the first
+// failure is rethrown afterwards.
 auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
   auto& events = *live.event_state;
+  auto error = std::exception_ptr{};
+  const auto record = [&error] {
+    if (!error) error = std::current_exception();
+  };
+  try {
+    hold_finished_transitions(events);
+  } catch (...) {
+    record();
+  }
   events.transaction_depth -= 1;
-  queue_held_map_events(
-    events, generation != 0 ? generation : events.published_generation
-  );
-  live.frontend->release_held_update();
+  try {
+    queue_held_map_events(
+      events, generation != 0 ? generation : events.published_generation
+    );
+  } catch (...) {
+    record();
+  }
+  try {
+    live.frontend->release_held_update();
+  } catch (...) {
+    record();
+  }
+  if (auto held = std::exchange(events.held_still_image, std::nullopt)) {
+    held->operation->complete(
+      held->status, std::move(held->message), std::any{std::monostate{}}
+    );
+  }
+  if (error) std::rethrow_exception(error);
 }
 
 struct MapCommandOutcome {

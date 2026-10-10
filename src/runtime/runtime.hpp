@@ -50,6 +50,14 @@ struct HeldMapEvent {
   std::string message;
 };
 
+// A still-image request that finished inside a map transaction. Its
+// completion waits until the transaction queues the request's event.
+struct HeldStillImageCompletion {
+  std::shared_ptr<OperationObject> operation;
+  mln_status status = MLN_STATUS_OK;
+  std::string message;
+};
+
 // One map's event state. The runtime keeps a share of it while the map is
 // registered, and the camera transitions of the map hold another.
 struct MapEventState {
@@ -72,8 +80,12 @@ struct MapEventState {
   // until it publishes, and transactions never nest.
   uint32_t transaction_depth = 0;
   std::vector<HeldMapEvent> held;
+  // A style error inside a command can finish a pending still-image request,
+  // and at most one is pending.
+  std::optional<HeldStillImageCompletion> held_still_image;
   // Transition IDs whose finish callbacks ran, waiting for the
-  // MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE that MapLibre raises right after.
+  // MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE that MapLibre usually raises right
+  // after. A transaction flushes any finish that no camera change followed.
   std::vector<uint64_t> finished_transitions;
 
   [[nodiscard]] auto in_transaction() const noexcept -> bool {

@@ -217,7 +217,7 @@ MLN_API mln_status mln_map_update_camera(
  * Submits one copied relative camera update.
  *
  * The completion reports its terminal disposition and the snapshot generation
- * published by a committed update.
+ * that the update published.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.

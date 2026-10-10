@@ -330,6 +330,55 @@ static void a_failed_command_reports_the_generation_of_its_events(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A malformed style fails a pending still image from inside the style
+// command. The image's failure event carries the command's generation, and it
+// is queued before the image's completion runs.
+static void a_command_that_fails_a_still_image_queues_its_event_first(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.map_mode = MLN_MAP_MODE_STATIC;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  recorder_reset(runtime, false);
+  recorder_drain();
+
+  // Without a render session the request stays pending until the style
+  // command fails it.
+  mln_test_completion still = mln_test_completion_default(0);
+  completion_probe still_probe = {.inner = still.descriptor};
+  const mln_completion probed_still = {
+    .size = sizeof(mln_completion),
+    .callback = drain_then_complete,
+    .user_data = &still_probe,
+    .release_user_data = release_probe,
+  };
+  MLN_TEST_OK(mln_map_request_still_image(map, &probed_still, NULL));
+  const probed_result failed = run_probed(map, set_malformed_style);
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, failed.status);
+  TEST_ASSERT_EQUAL_UINT32(MLN_COMMAND_DISPOSITION_FAILED, failed.disposition);
+  MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, mln_test_completion_finish(&still));
+  mln_test_completion_destroy(&still);
+  assert_recorder_complete();
+
+  const recorded_event* still_failed = NULL;
+  for (size_t index = 0; index < still_probe.count_at_completion; index += 1) {
+    const recorded_event* event = &recorder.events[index];
+    if (
+      event->source == map &&
+      event->type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED
+    ) {
+      still_failed = event;
+    }
+  }
+  TEST_ASSERT_NOT_NULL_MESSAGE(
+    still_failed, "the still image completed before its event was queued"
+  );
+  TEST_ASSERT_EQUAL_UINT64(failed.generation, still_failed->generation);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // Render updates that coalesce against the queue tail keep the newest
 // generation, so the one unread update names the later command.
 static void a_coalesced_render_update_carries_the_newest_generation(void) {
@@ -531,6 +580,7 @@ static void state_events_follow_a_snapshot_that_includes_them(void) {
 MLN_TEST_GROUP {
   RUN_TEST(a_command_queues_its_events_before_it_completes);
   RUN_TEST(a_failed_command_reports_the_generation_of_its_events);
+  RUN_TEST(a_command_that_fails_a_still_image_queues_its_event_first);
   RUN_TEST(a_coalesced_render_update_carries_the_newest_generation);
   RUN_TEST(finished_transitions_arrive_without_camera_changes);
   RUN_TEST(state_events_follow_a_snapshot_that_includes_them);
