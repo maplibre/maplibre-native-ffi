@@ -98,6 +98,27 @@ public sealed class LeakReportTests
         return (new WeakReference(runtime), runtime.Id, new WeakReference(map), map.Id);
     }
 
+    // A map that native creates after its wait was cancelled never reaches the caller. The binding
+    // retires it, and the collector then finds no open wrapper to report.
+    [Fact]
+    public async Task AHandleArrivingAfterItsWaitIsCancelledIsRetiredWithoutAReport()
+    {
+        using var standardError = new StandardErrorCapture();
+        var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        var created = runtime.MapCreateAsync(NativeFixture.SmallMap, cancellation.Token);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => created);
+        // The creation completes before the barrier, so the late map has arrived.
+        await runtime.BarrierAsync(TestWaits.Token);
+        Gc.Collect();
+
+        // Runtime release refuses a runtime that still owns a map.
+        await runtime.CloseAsync().WaitAsync(TestWaits.Deadline, TestWaits.Token);
+        Assert.DoesNotContain("Leaked MapHandle", standardError.Text, StringComparison.Ordinal);
+    }
+
     private static int Occurrences(string text, string value)
     {
         var count = 0;
