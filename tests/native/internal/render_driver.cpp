@@ -430,6 +430,117 @@ void an_abandon_during_a_detach_submission_completes_the_detach() {
   destroy_fixture(fixture);
 }
 
+struct SupersedingRequest {
+  const Fixture* fixture;
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+};
+
+void request_superseding_frame(void* argument) {
+  auto& request = *static_cast<SupersedingRequest*>(argument);
+  auto demand = mln_frame_demand_default();
+  demand.flags = 0;
+  demand.token = 122;
+  demand.coalescing_boundary = 9;
+  request.status = request_frame(*request.fixture, demand);
+}
+
+struct Abandon {
+  mln_render_session session;
+  std::atomic_bool returned{false};
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+};
+
+void abandon_session(void* argument) {
+  auto& abandon = *static_cast<Abandon*>(argument);
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  abandon.status =
+    mln_render_session_abandon(abandon.session, &result, nullptr);
+  abandon.returned.store(true);
+  mln_test_pulse();
+}
+
+// A request_frame that supersedes a demand sets the frame wake pending and
+// invokes it after releasing the session's lock. An abandon that runs in that
+// window closes the wake, so the request's late wake does nothing, and the
+// abandon wakes the host for the queued results itself. Holding the request
+// between its lock and its wake is the window no public fence reaches.
+void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  // Results already queued would leave the frame wake pending, so the
+  // superseding request would owe no wake.
+  auto drained = mln_render_frame_batch{MLN_HANDLE_NULL};
+  while (mln_render_session_drain_frame_results(
+           fixture.render.session, &drained, nullptr
+         ) == MLN_STATUS_OK) {
+    mln_render_frame_batch_release(drained);
+    drained = MLN_HANDLE_NULL;
+  }
+  auto first = mln_frame_demand_default();
+  first.flags = 0;
+  first.token = 121;
+  first.coalescing_boundary = 9;
+  MLN_TEST_OK(request_frame(fixture, first));
+  points.hold(SyncPoint::RenderFrameWakeDeferred);
+  auto request = SupersedingRequest{.fixture = &fixture};
+  auto* requesting = mln_test_thread_start(request_superseding_frame, &request);
+  TEST_ASSERT_TRUE(points.wait_for_hits(SyncPoint::RenderFrameWakeDeferred, 1));
+  const auto wakes_before = atomic_load(&fixture.render.frame_wakes);
+
+  auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
+  auto* releasing =
+    mln_test_thread_start(release_blocker_when_abandon_waits, &release);
+  auto abandon = Abandon{.session = fixture.render.session};
+  auto* abandoning = mln_test_thread_start(abandon_session, &abandon);
+  // An abandon that owes the wake parks at the held point before it closes
+  // the wake; one that does not returns without reaching it.
+  TEST_ASSERT_TRUE(await(
+    [&] {
+      return points.hits(SyncPoint::RenderFrameWakeDeferred) > 1 ||
+             abandon.returned.load();
+    },
+    "abandon to reach the frame wake or return"
+  ));
+  points.release(SyncPoint::RenderFrameWakeDeferred);
+  mln_test_thread_join(abandoning);
+  release.abandon_returned.store(true);
+  mln_test_pulse();
+  mln_test_thread_join(releasing);
+  mln_test_thread_join(requesting);
+
+  MLN_TEST_OK(request.status);
+  MLN_TEST_OK(abandon.status);
+  TEST_ASSERT_GREATER_THAN_UINT(
+    wakes_before, atomic_load(&fixture.render.frame_wakes)
+  );
+  auto batch = mln_render_frame_batch{MLN_HANDLE_NULL};
+  MLN_TEST_OK(mln_render_session_drain_frame_results(
+    fixture.render.session, &batch, nullptr
+  ));
+  auto count = std::size_t{0};
+  MLN_TEST_OK(mln_render_frame_batch_count(batch, &count, nullptr));
+  TEST_ASSERT_EQUAL_size_t(2, count);
+  const auto superseded = batch_result(batch, 0);
+  const auto stranded = batch_result(batch, 1);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(121, superseded.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_SUPERSEDED, superseded.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT64(122, stranded.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, stranded.disposition
+  );
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&blocker.completion, -1));
+  mln_test_completion_destroy(&blocker.completion);
+  blocker.submitted = false;
+  destroy_fixture(fixture);
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -440,4 +551,5 @@ MLN_TEST_GROUP {
   );
   RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
+  RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);
 }

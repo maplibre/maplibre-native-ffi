@@ -1030,7 +1030,10 @@ class DeferredWakes final {
   auto operator=(const DeferredWakes&) -> DeferredWakes& = delete;
   auto operator=(DeferredWakes&&) -> DeferredWakes& = delete;
   ~DeferredWakes() {
-    if (frame_ != nullptr) frame_->notify();
+    if (frame_ != nullptr) {
+      mln::testing::hit(mln::testing::SyncPoint::RenderFrameWakeDeferred);
+      frame_->notify();
+    }
     if (driver_ != nullptr) driver_->notify();
   }
 
@@ -3555,6 +3558,15 @@ auto abandon_render_session(
           wakes
         );
       }
+    // Another thread, such as a request_frame that superseded a demand, can
+    // have set the frame wake pending and released the lock without invoking
+    // the wake yet. Closing the wake below makes that late notify do nothing,
+    // so abandon invokes the frame wake for any queued result itself, whatever
+    // the coalescing flag says.
+    if (!live->frame_results.empty() && live->frame_wake != nullptr) {
+      live->frame_wake_pending = true;
+      wakes.frame(live->frame_wake);
+    }
     // The publish and release paths read the wakes and the graphics objects
     // under this lock. Nothing may destroy the graphics objects: the host owns
     // the device behind them and may already have torn it down, so they are

@@ -52,6 +52,10 @@ enum class SyncPoint : std::uint8_t {
   // which the host can drain, and is about to finish the demand. The call
   // stays in flight until the handler returns. No lock is held.
   RenderFrameResultPublished,
+  // A section that published a frame result under a render session's control
+  // lock has released the lock and is about to invoke the frame wake it owes.
+  // No lock is held.
+  RenderFrameWakeDeferred,
   // Abandoning a core-worker session found a driver call in flight and is
   // about to wait for it to end. It fires only when abandon has to wait.
   RenderAbandonWaits,
