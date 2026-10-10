@@ -19,6 +19,10 @@ class Wake final {
 
   auto accept() noexcept -> void;
   auto reject() noexcept -> void;
+  // Ends invocation without waiting: a notify that starts afterwards does
+  // nothing. A call already running finishes, and the destructor still waits
+  // for it before it releases the user data.
+  auto close() noexcept -> void;
   auto notify() noexcept -> void;
 
  private:

@@ -1555,6 +1555,7 @@ public data class RenderSessionAttachOptions(
   public val requestedTextureRingDepth: UInt = 0u,
   public val frameWake: Wake = Wake(),
   public val driverWorkWake: Wake = Wake(),
+  public val queueLock: QueueLock = QueueLock(),
 )
 
 public data class RenderedFeatureQueryOptions(
@@ -2060,6 +2061,13 @@ public typealias LogCallback =
 public data class Wake(public val callback: WakeCallback? = null)
 
 public typealias WakeCallback = () -> Unit
+
+public data class QueueLock(
+  public val lock: QueueLockCallback? = null,
+  public val unlock: QueueLockCallback? = null,
+)
+
+public typealias QueueLockCallback = () -> Unit
 
 public class ResourceTransformResponse
 internal constructor(

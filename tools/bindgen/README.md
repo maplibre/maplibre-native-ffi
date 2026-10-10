@@ -75,7 +75,7 @@ that every handwritten runtime is written against: the status enum, the
 diagnostic, the completion and its result, and the buffer view. No other rule
 reads a declaration's name.
 
-Two keys state what a C shape cannot:
+Three keys state what a C shape cannot:
 
 - `prefix=` on a handle names the prefix of its operations when that differs
   from the handle's type name, as `mln_resource_request` does for
@@ -84,6 +84,11 @@ Two keys state what a C shape cannot:
   of its meaning, as with coordinates, so a binding may construct it
   positionally. The schema rejects it on a record with control, pointer, or
   array members.
+- `synchronous=true` on a callback typedef says that native code relies on the
+  callback's work being done when it returns, as with the queue lock's
+  callbacks. A binding runs the callback on the calling thread and never
+  delivers it later through a port. Dart can only deliver later, so a record
+  with a native default keeps such a registration at its disabled default.
 
 An annotation that names another declaration, such as `reentry_calls`,
 `complete`, `cancel_registration`, or `wait_retired`, must name one that exists;

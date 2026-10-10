@@ -154,6 +154,7 @@ function(mln_ffi_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/map/feature_state.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
       ${PROJECT_SOURCE_DIR}/src/map/style.cpp
+      ${PROJECT_SOURCE_DIR}/src/render/queue_lock.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_query.cpp
       ${PROJECT_SOURCE_DIR}/src/render/surface_session.cpp

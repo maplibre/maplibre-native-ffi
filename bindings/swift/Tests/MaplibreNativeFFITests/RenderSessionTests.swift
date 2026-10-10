@@ -120,10 +120,10 @@ private func withOwnedTextureSession<Result>(
   }
 }
 
-/// A frame view is usable only inside its callback, a second view of the
-/// same frame, a release of the frame, and an abandon of its session are
-/// refused while it is open, and a sibling frame that the host drops inside
-/// the view does not disturb it.
+/// A frame view is usable only inside its callback. A release of the frame
+/// and an abandon of its session are refused while it is open, and neither a
+/// second view of the same frame nor a sibling frame that the host drops
+/// inside the view disturbs it.
 @Test func aFrameViewExpiresWithItsScopeAndHoldsOffAbandon() async throws {
   try await withOwnedTextureSession(ringDepth: 2) { rendered in
     let session = rendered.session
@@ -138,9 +138,8 @@ private func withOwnedTextureSession<Result>(
       #expect(weakSibling == nil)
       #expect(try view.width == 32)
       #expect(try view.height == 32)
-      #expect(throws: MaplibreError.self) {
-        try rendered.graphics.withTextureView(of: first) { _ in }
-      }
+      #expect(try rendered.graphics
+        .withTextureView(of: first) { try $0.width } == 32)
       let inUse = MaplibreError.invalidState("AcquiredFrameHandle is in use")
       #expect(throws: inUse) {
         try first.release(consumerCompletion: .default)
@@ -160,9 +159,9 @@ private func withOwnedTextureSession<Result>(
 }
 
 /// A frame the host drops without releasing is disposed by its finalizer,
-/// which abandons the session, since no consumer synchronization says the
-/// host finished with the texture.
-@Test func droppingAnUnreleasedFrameAbandonsItsSession() async throws {
+/// which hands the frame back to its session without consumer
+/// synchronization.
+@Test func droppingAnUnreleasedFrameDisposesIt() async throws {
   try await withOwnedTextureSession { rendered in
     let session = rendered.session
     try await session.awaitRenderedFrame()
@@ -172,9 +171,6 @@ private func withOwnedTextureSession<Result>(
       withExtendedLifetime(frame) {}
     }
     #expect(try session.getSnapshot().acquiredFrameCount == 0)
-    try await awaitCondition("the dropped frame's session to be abandoned") {
-      try session.getSnapshot().state == .abandoned
-    }
   }
 }
 

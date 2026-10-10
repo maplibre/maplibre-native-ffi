@@ -79,12 +79,12 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   }
 
   // Renders into a different caller-owned image from here on. The caller has
-  // already established that it matches the live render pass, which is kept.
+  // already established that it matches the live render pass, which is kept,
+  // and that the GPU is done with the outgoing image.
   void set_borrowed(
     const mln_vulkan_borrowed_texture_descriptor& descriptor, uint32_t width,
     uint32_t height
   ) {
-    backend.getDevice()->waitIdle(backend.getDispatcher());
     swapchainFramebuffers.clear();
     swapchainImages.clear();
     init_borrowed(descriptor, width, height);
@@ -374,9 +374,10 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
 
 VulkanTextureBackend::VulkanTextureBackend(
   const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-  std::size_t ring_depth
+  std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
 )
-    : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+    : VulkanQueueAccess(std::move(queue_lock)),
+      mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       descriptor_(descriptor),
       ring_(ring_depth) {
@@ -384,9 +385,11 @@ VulkanTextureBackend::VulkanTextureBackend(
 }
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
+  const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size,
+  std::shared_ptr<const QueueLock> queue_lock
 )
-    : mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
+    : VulkanQueueAccess(std::move(queue_lock)),
+      mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
       descriptor_(owned_descriptor_from_borrowed(descriptor)),
       borrowed_descriptor_(descriptor),
@@ -446,6 +449,19 @@ void VulkanTextureBackend::set_borrowed_target(
     borrowed_descriptor_ = descriptor;
     setSize(new_size);
     return;
+  }
+  // Once this wait returns, the session is done with the outgoing image, and
+  // the host may destroy it when set_target completes. With one frame in
+  // flight, the frame fence covers the session's last frame, and every other
+  // submission waits on its own fence before returning. swap() already waits
+  // on the frame fence, so this wait only keeps the guarantee local. A device
+  // wait would also need the host's queues, which the session must not touch.
+  if (context) {
+    // VulkanTextureBackend always constructs a Vulkan renderer context.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+    if (!static_cast<mln::vulkan::Context&>(*context).waitFrame()) {
+      throw std::runtime_error("Vulkan frame fence wait failed");
+    }
   }
   getResource<VulkanTextureRenderableResource>().set_borrowed(
     descriptor, new_size.width, new_size.height
@@ -632,6 +648,9 @@ void VulkanTextureBackend::initDevice() {
     static_cast<int32_t>(descriptor_.context.graphics_queue_family_index);
   presentQueueIndex = -1;
   graphicsQueue = static_cast<VkQueue>(descriptor_.context.graphics_queue);
+  install_queue_access(
+    dispatcher, device.get(), static_cast<VkQueue>(graphicsQueue)
+  );
   physicalDeviceFeatures = physicalDevice.getFeatures(dispatcher);
 }
 

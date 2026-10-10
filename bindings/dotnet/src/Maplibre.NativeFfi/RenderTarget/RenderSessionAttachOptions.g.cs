@@ -6,7 +6,8 @@ public readonly partial record struct RenderSessionAttachOptions(
     RenderDriverKind Driver,
     uint RequestedTextureRingDepth,
     Wake FrameWake,
-    Wake DriverWorkWake
+    Wake DriverWorkWake,
+    QueueLock QueueLock
 )
 {
     public static RenderSessionAttachOptions Default

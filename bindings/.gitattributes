@@ -93,6 +93,7 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenglContextOwnership.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenglContextPlatform.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/OpenglContextProviderFlag.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/RenderTarget/QueueLock.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderDriverKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionAttachOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionCapabilities.g.cs linguist-generated=true

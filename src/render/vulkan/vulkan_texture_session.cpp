@@ -113,20 +113,24 @@ class VulkanTextureSessionBackend final
  public:
   VulkanTextureSessionBackend(
     const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth
+    std::size_t ring_depth,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
   )
-      : backend_(descriptor, size, ring_depth) {}
+      : backend_(descriptor, size, ring_depth, std::move(queue_lock)) {}
 
   VulkanTextureSessionBackend(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
+    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const mln::core::QueueLock> queue_lock
   )
-      : backend_(descriptor, size) {}
+      : backend_(descriptor, size, std::move(queue_lock)) {}
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
 
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
+
+  void quarantine() noexcept override { backend_.release_queue_access(); }
 
   auto set_vulkan_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
@@ -225,6 +229,7 @@ auto vulkan_owned_texture_attach_start(
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->texture.mode = TextureSessionMode::Owned;
+  session->accepts_queue_lock = true;
   const auto copied = *descriptor;
   const auto ring_depth = attach_ring_depth(options);
   session->initialize_backend =
@@ -235,7 +240,7 @@ auto vulkan_owned_texture_attach_start(
       }
       target.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
         copied, mln::Size{target.physical_width, target.physical_height},
-        ring_depth
+        ring_depth, target.queue_lock
       );
       return MLN_STATUS_OK;
     };
@@ -283,6 +288,7 @@ auto vulkan_borrowed_texture_attach_start(
     descriptor->physical_height
   );
   session->texture.mode = TextureSessionMode::Borrowed;
+  session->accepts_queue_lock = true;
   const auto copied = *descriptor;
   session->initialize_backend = [copied](mln_render_session_object& target) {
     const auto handles = mln_vulkan_owned_texture_descriptor{
@@ -295,7 +301,8 @@ auto vulkan_borrowed_texture_attach_start(
       return handles_status;
     }
     target.texture.backend = std::make_unique<VulkanTextureSessionBackend>(
-      copied, mln::Size{target.physical_width, target.physical_height}
+      copied, mln::Size{target.physical_width, target.physical_height},
+      target.queue_lock
     );
     return MLN_STATUS_OK;
   };

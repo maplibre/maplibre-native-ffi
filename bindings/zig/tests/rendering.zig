@@ -74,9 +74,8 @@ test "a caller-driven session is serviced from a thread the test spawns" {
 
 // A scoped view leases its frame for the callback. Inside the scope, releasing
 // that frame or abandoning its session reports busy, and a host error passes
-// through. Disposing a sibling frame, which has no consumer fence, abandons the
-// session, so the view's next read reports the lost target. Once the scope
-// returns, the frame releases normally.
+// through. Disposing a sibling frame, which has no consumer fence, leaves the
+// view readable. Once the scope returns, the frame releases normally.
 test "a scoped frame view holds its frame until the scope returns" {
     const fixture = try createFixture();
     defer fixture.destroy();
@@ -109,17 +108,14 @@ test "a scoped frame view holds its frame until the scope returns" {
             try testing.expectEqualStrings("AcquiredFrame is in use", diagnostic.message());
             try testing.expectError(error.Busy, maplibre.renderSessionAbandon(self.session, null));
             self.sibling.deinit();
-            try testing.expectError(error.TargetLost, maplibre.acquiredFrameGetProducerSync(void, self.frame, {}, struct {
+            try maplibre.acquiredFrameGetProducerSync(void, self.frame, {}, struct {
                 fn use(_: void, _: maplibre.GpuSync) anyerror!void {}
-            }.use, null));
+            }.use, null);
             return error.HostConsumerFailed;
         }
     };
     try testing.expectError(error.HostConsumerFailed, maplibre.acquiredFrameGetProducerSync(void, frame, Probe{ .frame = frame, .sibling = &sibling, .session = owned.session }, Probe.inspect, null));
     try maplibre.acquiredFrameRelease(testing.allocator, frame, .{ .kind = .cpu_complete }, null);
-    // The abandoned session has no target left to detach.
-    try maplibre.renderSessionDestroy(owned.session, null);
-    owned.attached = false;
 }
 
 // A frame anchors its session and a session its map. Disposing the map first

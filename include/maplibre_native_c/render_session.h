@@ -205,8 +205,13 @@ MLN_API mln_status mln_render_session_get_snapshot(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, demand is
  *   null or undersized, or demand->flags carries a bit outside
  *   mln_frame_demand_flag.
- * - MLN_STATUS_INVALID_STATE when session has been released or is not attached.
+ * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
+ *   or every slot of its texture ring is quarantined.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * A slot is quarantined when its frame is disposed, or when its release fails
+ * to wait for consumer synchronization. A demand accepted before the last
+ * usable slot was quarantined receives MLN_RENDER_RESULT_TARGET_NOT_READY.
  */
 MLN_API mln_status mln_render_session_request_frame(
   mln_render_session session, const mln_frame_demand* demand,
@@ -334,7 +339,9 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * A synchronization kind the backend does not support fails with
  * MLN_STATUS_UNSUPPORTED before the handle is consumed, so the caller keeps
  * frame ownership. After abandonment the call closes the handle without
- * graphics work.
+ * graphics work. When the driver fails to wait for the consumer
+ * synchronization, the host's GPU may still read the frame's texture, so the
+ * frame's slot is quarantined as mln_acquired_frame_dispose() quarantines it.
  *
  * Returns:
  * - MLN_STATUS_OK when the frame is consumed and its slot retirement queued.
@@ -537,6 +544,12 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * leave the session attached. Once accepted, earlier mailbox operations reach
  * a terminal result before graphics resources are destroyed.
  *
+ * When a disposed frame or a failed release quarantined a slot of the texture
+ * ring, the host's GPU may still read that slot's texture. Detach then releases
+ * the ring and its graphics context without destroying them, and they stay
+ * allocated until the process exits. Detach waits for the map's in-flight tile
+ * work in that case, so the host may destroy its device once detach completes.
+ *
  * Returns:
  * - MLN_STATUS_OK when the detach is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
@@ -594,8 +607,8 @@ MLN_API mln_status mln_render_session_abandon(
 /**
  * Retires a detached or abandoned session handle. The call is CPU-only and may
  * run on any native thread, including from one of the session's own
- * completions. If frame disposal already started abandonment, this waits for
- * that abandonment to finish before consuming the session owner.
+ * completions. If an abandonment is still in progress on another thread, this
+ * waits for it to finish before consuming the session owner.
  *
  * Returns:
  * - MLN_STATUS_OK when the handle is retired.
@@ -630,13 +643,20 @@ MLN_API mln_status mln_render_session_dispose(
 ) MLN_NOEXCEPT;
 
 /**
- * Consumes an acquired frame and schedules abandonment of its session.
+ * Consumes an acquired frame and quarantines its slot of the texture ring.
  *
- * This cleanup path quarantines the target because the caller supplies no
- * consumer GPU synchronization. Explicit synchronized release preserves the
- * session for further rendering. Admission requires no allocation or new
- * thread. The session owner remains independently owned and must be released
- * or disposed after abandonment.
+ * This cleanup path supplies no consumer GPU synchronization, so the host's
+ * GPU may still read the frame's texture. The session keeps that texture and
+ * never renders into its slot again. Rendering continues on the other slots,
+ * and a view already open on the frame stays valid until it ends. Once every
+ * slot is quarantined, frame requests return MLN_STATUS_INVALID_STATE. Detach
+ * of a session with a quarantined slot keeps the ring allocated until the
+ * process exits; see mln_render_session_detach(). An explicit release with
+ * consumer synchronization returns the slot to the ring instead.
+ *
+ * The call is CPU-only and may run on any native thread. It starts no thread.
+ * It allocates only when it quarantines the last slot while a frame demand
+ * waits for one, to give that demand its terminal result.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
  * invalid handle, or MLN_STATUS_INVALID_STATE for a frame that has been

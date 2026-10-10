@@ -2276,6 +2276,29 @@ func copyQueriedFeature(raw C.mln_queried_feature) QueriedFeature {
 	return result
 }
 
+type QueueLock struct {
+	Lock   func()
+	Unlock func()
+}
+
+func copyQueueLock(raw C.mln_queue_lock) QueueLock { var result QueueLock; ; return result }
+
+func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
+	raw := C.mln_queue_lock{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.Lock != nil || input.Unlock != nil {
+		raw.user_data = arena.register(input, 0)
+		raw.release_user_data = C.mln_queue_lock_release(C.binding_release)
+		if input.Lock != nil {
+			raw.lock = C.mln_queue_lock_callback(C.binding_mln_queue_lock_lock)
+		}
+		if input.Unlock != nil {
+			raw.unlock = C.mln_queue_lock_callback(C.binding_mln_queue_lock_unlock)
+		}
+	}
+	return raw
+}
+
 type RenderAbandonResult struct {
 	Disposition              RenderAbandonDisposition
 	QuarantinedResourceCount uint32
@@ -2313,6 +2336,7 @@ type RenderSessionAttachOptions struct {
 	RequestedTextureRingDepth uint32
 	FrameWake                 Wake
 	DriverWorkWake            Wake
+	QueueLock                 QueueLock
 }
 
 func copyRenderSessionAttachOptions(raw C.mln_render_session_attach_options) RenderSessionAttachOptions {
@@ -2321,6 +2345,7 @@ func copyRenderSessionAttachOptions(raw C.mln_render_session_attach_options) Ren
 	result.RequestedTextureRingDepth = uint32(raw.requested_texture_ring_depth)
 	result.FrameWake = copyWake(raw.frame_wake)
 	result.DriverWorkWake = copyWake(raw.driver_work_wake)
+	result.QueueLock = copyQueueLock(raw.queue_lock)
 	return result
 }
 
@@ -2331,6 +2356,7 @@ func nativeRenderSessionAttachOptions(input RenderSessionAttachOptions, arena *b
 	raw.requested_texture_ring_depth = C.uint32_t(input.RequestedTextureRingDepth)
 	raw.frame_wake = nativeWake(input.FrameWake, arena)
 	raw.driver_work_wake = nativeWake(input.DriverWorkWake, arena)
+	raw.queue_lock = nativeQueueLock(input.QueueLock, arena)
 	return raw
 }
 
@@ -6154,6 +6180,38 @@ func mlnGo_mln_wake_callback(native_user_data unsafe.Pointer) {
 		return
 	}
 	callbacks.Callback()
+	return
+}
+
+//export mlnGo_mln_queue_lock_lock
+func mlnGo_mln_queue_lock_lock(native_user_data unsafe.Pointer) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	defer func() {
+		if recover() != nil {
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
+	if !ok || callbacks.Lock == nil {
+		return
+	}
+	callbacks.Lock()
+	return
+}
+
+//export mlnGo_mln_queue_lock_unlock
+func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	defer func() {
+		if recover() != nil {
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
+	if !ok || callbacks.Unlock == nil {
+		return
+	}
+	callbacks.Unlock()
 	return
 }
 

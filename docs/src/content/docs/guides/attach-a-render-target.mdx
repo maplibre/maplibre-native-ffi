@@ -38,6 +38,17 @@ session in the attaching state, and accepts a one-shot completion. A caller
 driver must service ready driver work before attachment can complete. Await the
 completion before using the attached session for ordinary work.
 
+### Share a Vulkan queue
+
+A Vulkan session submits to the graphics queue in its context descriptor, from
+its driver's thread. Vulkan requires the host to synchronize every call on a
+queue, so a host that also submits to that queue passes a queue lock in the
+attach options. The session takes the lock around each of its calls on the
+queue, and the host takes the same lock around its own. The host releases the
+lock before it calls the C API, because the driver may need the lock to finish
+that call. With the lock, one queue serves both the host and a core-worker
+session, even on a device whose graphics family has a single queue.
+
 ## Attach to a target
 
 This snippet uses OpenGL through EGL and therefore selects the caller driver.
@@ -86,7 +97,10 @@ the new session.
 Normal detach completes asynchronously. The selected driver destroys graphics
 resources on its graphics thread and detaches the map. Continue servicing a
 caller driver until the completion runs, then destroy the detached session
-handle from any thread.
+handle from any thread. A session-owned texture ring is the exception when a
+frame was disposed instead of released with consumer synchronization: the host's
+GPU may still read that frame's texture, so detach keeps the ring allocated
+until the process exits.
 
 Abandon is the failure path for a host that can no longer service graphics
 work. It closes control and mailboxes, invalidates graphics accessors, detaches

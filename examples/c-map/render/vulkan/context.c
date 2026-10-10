@@ -80,9 +80,7 @@ static app_error create_instance(vulkan_context* context) {
   return error;
 }
 
-static app_error pick_device(
-  vulkan_context* context, uint32_t* out_family_queue_count
-) {
+static app_error pick_device(vulkan_context* context) {
   uint32_t count = 0;
   MAP_TRY(
     expect_vk(vkEnumeratePhysicalDevices(context->instance, &count, nullptr))
@@ -125,7 +123,6 @@ static app_error pick_device(
       }
       context->physical_device = device;
       context->queue_family_index = family_index;
-      *out_family_queue_count = families[family_index].queueCount;
       error = APP_OK;
       break;
     }
@@ -163,13 +160,13 @@ static app_error has_device_extension(
   return error;
 }
 
-static app_error create_device(vulkan_context* context, uint32_t queue_count) {
-  const float priorities[] = {1.0f, 1.0f};
+static app_error create_device(vulkan_context* context) {
+  const float priority = 1.0f;
   const VkDeviceQueueCreateInfo queue_info = {
     .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
     .queueFamilyIndex = context->queue_family_index,
-    .queueCount = queue_count,
-    .pQueuePriorities = priorities,
+    .queueCount = 1,
+    .pQueuePriorities = &priority,
   };
   // A device that exposes the portability subset requires enabling it. The name
   // is spelled out because its constant lives behind vulkan_beta.h.
@@ -197,33 +194,25 @@ static app_error create_device(vulkan_context* context, uint32_t queue_count) {
   vkGetDeviceQueue(
     context->device, context->queue_family_index, 0, &context->queue
   );
-  vkGetDeviceQueue(
-    context->device, context->queue_family_index, queue_count - 1,
-    &context->session_queue
-  );
   return APP_OK;
 }
 
-static app_error context_create(
-  vulkan_context* context, SDL_Window* window, bool separate_session_queue
-) {
+static app_error context_create(vulkan_context* context, SDL_Window* window) {
+  context->queue_mutex = SDL_CreateMutex();
+  if (context->queue_mutex == nullptr) {
+    return APP_ERROR_BACKEND_SETUP_FAILED;
+  }
   MAP_TRY(create_instance(context));
   MAP_TRY(expect_sdl(SDL_Vulkan_CreateSurface(
     window, context->instance, nullptr, &context->surface
   )));
-  uint32_t family_queue_count = 0;
-  MAP_TRY(pick_device(context, &family_queue_count));
-  return create_device(
-    context, separate_session_queue && family_queue_count >= 2 ? 2 : 1
-  );
+  MAP_TRY(pick_device(context));
+  return create_device(context);
 }
 
-app_error vulkan_context_init(
-  vulkan_context* context, SDL_Window* window, bool separate_session_queue
-) {
+app_error vulkan_context_init(vulkan_context* context, SDL_Window* window) {
   *context = (vulkan_context){};
-  const app_error error =
-    context_create(context, window, separate_session_queue);
+  const app_error error = context_create(context, window);
   if (error != APP_OK) {
     vulkan_context_deinit(context);
   }
@@ -240,11 +229,29 @@ void vulkan_context_deinit(vulkan_context* context) {
   if (context->instance != VK_NULL_HANDLE) {
     vkDestroyInstance(context->instance, nullptr);
   }
+  if (context->queue_mutex != nullptr) {
+    SDL_DestroyMutex(context->queue_mutex);
+  }
   *context = (vulkan_context){};
 }
 
 void vulkan_context_wait_idle(vulkan_context* context) {
   if (context->device != VK_NULL_HANDLE) {
+    SDL_LockMutex(context->queue_mutex);
     vkDeviceWaitIdle(context->device);
+    SDL_UnlockMutex(context->queue_mutex);
   }
+}
+
+static void lock_queue(void* user_data) { SDL_LockMutex(user_data); }
+
+static void unlock_queue(void* user_data) { SDL_UnlockMutex(user_data); }
+
+mln_queue_lock vulkan_context_queue_lock(const vulkan_context* context) {
+  return (mln_queue_lock){
+    .size = sizeof(mln_queue_lock),
+    .lock = lock_queue,
+    .unlock = unlock_queue,
+    .user_data = context->queue_mutex,
+  };
 }

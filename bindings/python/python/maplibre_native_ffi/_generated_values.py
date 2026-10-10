@@ -1772,6 +1772,26 @@ class QueriedFeature:
 
 
 @dataclass(frozen=True, slots=True)
+class QueueLock:
+    lock: Callable[[], None] | None = None
+    unlock: Callable[[], None] | None = None
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(lock=raw["lock"], unlock=raw["unlock"])
+
+    def _invoke_lock(self):
+        callback = self.lock
+        assert callback is not None
+        return callback()
+
+    def _invoke_unlock(self):
+        callback = self.unlock
+        assert callback is not None
+        return callback()
+
+
+@dataclass(frozen=True, slots=True)
 class RenderAbandonResult:
     disposition: RenderAbandonDisposition
     quarantined_resource_count: int
@@ -1811,6 +1831,7 @@ class RenderSessionAttachOptions:
     requested_texture_ring_depth: int
     frame_wake: Wake
     driver_work_wake: Wake
+    queue_lock: QueueLock
 
     @classmethod
     def _from_native(cls, raw):
@@ -1819,6 +1840,7 @@ class RenderSessionAttachOptions:
             requested_texture_ring_depth=raw["requested_texture_ring_depth"],
             frame_wake=Wake._from_native(raw["frame_wake"]),
             driver_work_wake=Wake._from_native(raw["driver_work_wake"]),
+            queue_lock=QueueLock._from_native(raw["queue_lock"]),
         )
 
     @classmethod

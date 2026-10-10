@@ -36,7 +36,6 @@ class HandlePlan:
     release_inputs: tuple[str, ...] = ()
     finalize: tuple[str, ...] = ()
     parent_retention: str = "strong"
-    dispose_invalidates: str = "self"
     view_begin: str | None = None
     view_end: str | None = None
     # The name that the handle's operations begin with: its `prefix=` metadata,
@@ -239,6 +238,10 @@ class CallbackPlan:
     deferred: str | None = None
     # Whether the callback returns the status enum.
     status: bool = False
+    # Whether native code relies on the callback's work being done when it
+    # returns, so a binding must run it on the calling thread rather than
+    # deliver it later, even when it returns nothing.
+    synchronous: bool = False
 
 
 @dataclass(frozen=True)
@@ -564,7 +567,6 @@ class Binder:
                         (typedef.metadata.get("abandon"), typedef.metadata["release"]),
                     )
                 ),
-                dispose_invalidates=typedef.metadata.get("dispose_invalidates", "self"),
                 view_begin=typedef.metadata.get("view_begin"),
                 view_end=typedef.metadata.get("view_end"),
                 prefix=typedef.metadata.get("prefix", name),
@@ -1428,6 +1430,7 @@ class Binder:
             self.callback_reentry(typedef),
             typedef.metadata.get("deferred"),
             is_status(function.result),
+            typedef.metadata.get("synchronous") == "true",
         )
 
     def callback_reentry(self, typedef) -> CallbackReentryPlan | None:

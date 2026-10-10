@@ -52,7 +52,7 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
     else:
         finalize = f"|raw| maplibre_core::check(|out_diagnostic| unsafe {{ sys::{dispose.name}(raw, out_diagnostic) }})"
     must_use = ""
-    if handle.release_inputs or handle.dispose_invalidates == "parent":
+    if handle.release_inputs:
         release = handle.release.removeprefix(native + "_")
         must_use = f'    #[must_use = "`{owner}` must be released with `{owner}::{release}`"]\n'
     return (

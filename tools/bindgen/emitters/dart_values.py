@@ -115,6 +115,8 @@ class Values:
                 return
             if callback.result.native != "void" or not callback.context:
                 raise Unsupported("callback requires a synchronous native adapter")
+            if callback.synchronous:
+                raise Unsupported("callback must finish on its native thread")
             for parameter in callback.parameters:
                 if parameter.name != callback.context:
                     if native_ports.flattened(parameter.value, parameter.name) is None:
@@ -255,7 +257,26 @@ class Values:
         deferred = self.deferred_field(value)
         if deferred:
             controls.add(deferred[1])
+        if value.default:
+            controls |= {f.name for f in value.fields if self.left_disabled(f.value)}
         return tuple(f for f in value.fields if f.name not in controls)
+
+    def left_disabled(self, value):
+        """Whether a field keeps its native default, a disabled registration.
+
+        Dart runs host code only on its isolate, so it cannot run a synchronous
+        callback that native code calls on its own thread. A registration with
+        one has no Dart form. A record that holds it and has a native default
+        value keeps the field disabled, as that default provides it.
+        """
+        if not value.registration:
+            return False
+        callbacks = [
+            f.value for f in value.fields if f.name in value.registration.callbacks
+        ]
+        return all(callback.nullable for callback in callbacks) and any(
+            self.bound.callbacks[callback.native].synchronous for callback in callbacks
+        )
 
     def public(self, value):
         self.check(value)

@@ -12,7 +12,6 @@ import kotlinx.coroutines.withTimeout
 import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.denyingProvider
-import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.FrameDemand
@@ -202,18 +201,7 @@ internal suspend fun <T> withOwnedTexture(
 /** Leaves a session closed: an attached session is abandoned rather than leaked. */
 internal fun RenderSessionHandle.abandonAndClose() {
   if (isClosed) return
-  if (!hasReleasedTarget()) {
-    try {
-      abandon()
-    } catch (error: InvalidStateException) {
-      // A disposed frame can abandon the session between the check and the call.
-      if (!hasReleasedTarget()) throw error
-    }
-  }
-  close()
-}
-
-private fun RenderSessionHandle.hasReleasedTarget(): Boolean {
   val state = getSnapshot().state
-  return state == RenderSessionState.DETACHED || state == RenderSessionState.ABANDONED
+  if (state != RenderSessionState.DETACHED && state != RenderSessionState.ABANDONED) abandon()
+  close()
 }

@@ -4,6 +4,8 @@ import unittest
 
 from support import parse
 
+from tools.bindgen import native_ports
+from tools.bindgen.emitters import dart
 from tools.bindgen.model import ModelError
 from tools.bindgen.semantic import DefaultSupport, DisposeSupport, ViewSupport, bind
 
@@ -698,6 +700,47 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
                 "typedef void (*cancel)(void *context);",
                 'typedef void (*cancel)(void *context) BIND("deferred=0");',
                 "callback with a result",
+            ),
+        ):
+            with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
+                bind(
+                    self.parse(source.replace(before, after, 1)), require_complete=True
+                )
+
+    def test_synchronous_callbacks_run_on_their_thread(self):
+        source = """
+BIND("synchronous=true") typedef void (*gate)(void *context);
+typedef void (*notify)(void *context);
+typedef void (*release)(void *context);
+typedef struct gates { unsigned size; gate enter BIND("nullable=true"); gate leave BIND("nullable=true"); void *context BIND("kind=context"); release retire; } gates BIND("kind=callback_registration;release=retire");
+typedef struct signals { unsigned size; notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct settings { unsigned size; signals wake; gates guard; } settings;
+settings settings_default(void);
+mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);
+"""
+        api = self.parse(source)
+        model = bind(api, require_complete=True)
+        self.assertTrue(model.callbacks["gate"].synchronous)
+        self.assertFalse(model.callbacks["notify"].synchronous)
+        # A port message arrives after the call returns, so only the
+        # notification has one.
+        self.assertEqual(
+            [entry[0].native for entry in native_ports.callbacks(model)],
+            ["signals"],
+        )
+        # Dart keeps the synchronous registration at its disabled default and
+        # still lowers the call.
+        self.assertIn("attach", dart.coverage(api)["generated"])
+        for before, after, error in (
+            (
+                "signals wake; gates guard; } settings;",
+                'signals wake; gates guard; } settings BIND("synchronous=true");',
+                "synchronous requires a callback",
+            ),
+            (
+                'BIND("synchronous=true") typedef void (*gate)(void *context);',
+                'BIND("synchronous=true") typedef unsigned (*gate)(void *context) BIND("failure=0;deferred=1");',
+                "cannot be deferred",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):

@@ -37,6 +37,7 @@
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
 #include "render/discard_present.hpp"
+#include "render/queue_lock.hpp"
 #include "wake/wake.hpp"
 
 struct mln_render_session_object;
@@ -76,6 +77,12 @@ class SurfaceSessionBackend {
 
   virtual auto renderer_backend() -> mln::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
+
+  // Abandon calls this on a backend it quarantines, once nothing can reach the
+  // backend again. A quarantined backend is never destroyed, so one that
+  // registered the host's graphics handles process-wide releases them here: the
+  // host may destroy its device and reuse those handles.
+  virtual void quarantine() noexcept {}
 
   // Whether the surface can take a frame right now. Not ready skips the frame
   // and reports nothing rendered, so a minimized or occluded window is a retry
@@ -150,6 +157,12 @@ class TextureSessionBackend {
   // rebuilds it lazily; a backend whose renderer keys cached GPU state on that
   // resource overrides this to rebuild only what the size changed.
   virtual void resize(mln::Size size) { headless_backend().setSize(size); }
+
+  // Abandon calls this on a backend it quarantines, once nothing can reach the
+  // backend again. A quarantined backend is never destroyed, so one that
+  // registered the host's graphics handles process-wide releases them here: the
+  // host may destroy its device and reuse those handles.
+  virtual void quarantine() noexcept {}
 
   // Renders into a new caller-owned texture, keeping the graphics context and
   // every resource the renderer holds against it. The descriptor must name the
@@ -337,6 +350,10 @@ struct RenderTextureSlot {
   bool available = false;
   bool acquired = false;
   bool rendering = false;
+  // Set by a frame disposed without consumer synchronization, or by a release
+  // whose wait failed. The host's GPU may still read the slot's texture, so the
+  // ring never renders into it again and detach never destroys it.
+  bool quarantined = false;
 };
 
 // The renderable resources a session-owned texture backend cycles through. The
@@ -651,6 +668,13 @@ struct mln_render_session_object
   std::function<mln_status(mln_render_session_object&)> initialize_backend;
   std::shared_ptr<mln::core::Wake> frame_wake;
   std::shared_ptr<mln::core::Wake> driver_wake;
+  // The host's lock on the queue the backend submits to. initialize_backend
+  // shares it with a backend that takes it around its queue calls. Null when
+  // the host passed no lock.
+  std::shared_ptr<mln::core::QueueLock> queue_lock;
+  // Set before attach by a backend whose driver takes queue_lock. Attach
+  // rejects an enabled lock on any other backend.
+  bool accepts_queue_lock = false;
   bool frame_wake_pending = false;
   bool driver_wake_pending = false;
 
@@ -674,8 +698,6 @@ struct mln_render_frame_batch_object {
 struct mln_acquired_frame_object {
   std::size_t active_views = 0;
   std::shared_ptr<mln_acquired_frame_object> view_owner;
-  mln::core::RetirementTask disposal_task;
-  std::shared_ptr<mln_acquired_frame_object> disposal_owner;
   std::shared_ptr<mln_render_session_object> session;
   std::any backend_metadata;
   std::size_t slot = 0;

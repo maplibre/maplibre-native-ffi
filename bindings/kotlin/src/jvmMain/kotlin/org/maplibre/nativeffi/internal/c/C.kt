@@ -4476,6 +4476,15 @@ internal val mln_wake: GroupLayout =
     ADDRESS.withName("user_data"),
     ADDRESS.withName("release_user_data"),
   )
+internal val mln_queue_lock: GroupLayout =
+  Ffm.struct(
+    JAVA_INT.withName("size"),
+    Ffm.pad(4),
+    ADDRESS.withName("lock"),
+    ADDRESS.withName("unlock"),
+    ADDRESS.withName("user_data"),
+    ADDRESS.withName("release_user_data"),
+  )
 internal val mln_render_session_attach_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
@@ -4484,6 +4493,7 @@ internal val mln_render_session_attach_options: GroupLayout =
     JAVA_INT.withName("reserved"),
     mln_wake.withName("frame_wake"),
     mln_wake.withName("driver_work_wake"),
+    mln_queue_lock.withName("queue_lock"),
   )
 internal val mln_rendered_feature_query_options: GroupLayout =
   Ffm.struct(

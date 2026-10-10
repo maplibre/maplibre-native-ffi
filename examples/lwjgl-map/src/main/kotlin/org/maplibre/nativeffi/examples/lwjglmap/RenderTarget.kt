@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.QueueLock
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderResult
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
@@ -21,9 +22,13 @@ import org.maplibre.nativeffi.generated.Wake
 
 /**
  * Where a session's graphics work runs. A core worker runs it on its own thread. A caller driver
- * queues it for the GLFW thread, which services it after the driver-work wake.
+ * queues it for the GLFW thread, which services it after the driver-work wake. [queueLock] is the
+ * host's lock on a queue that the session shares with it.
  */
-internal class SessionDriver(val kind: RenderDriverKind) {
+internal class SessionDriver(
+  val kind: RenderDriverKind,
+  private val queueLock: QueueLock = QueueLock(),
+) {
   private val caller = kind == RenderDriverKind.CALLER_GRAPHICS_THREAD
 
   /** The driver-work wake, which only a caller driver has. */
@@ -38,6 +43,7 @@ internal class SessionDriver(val kind: RenderDriverKind) {
       requestedTextureRingDepth = ringDepth,
       frameWake = frames.wake,
       driverWorkWake = work?.wake ?: Wake(),
+      queueLock = queueLock,
     )
 
   /** Runs every queued item after the driver-work wake. */
@@ -217,20 +223,15 @@ internal open class RenderTarget(
     const val RETRY_DELAY_NANOS = 16_000_000L
 
     /**
-     * Selects the driver from the graphics API and the mode: a core worker wherever the target
-     * accepts one. OpenGL on a WGL or EGL context requires the caller driver. A Vulkan core worker
-     * in a texture mode needs a queue of its own, because the compositor submits to the host's.
+     * Selects the driver from the graphics API: a core worker wherever the target accepts one.
+     * OpenGL on a WGL or EGL context requires the caller driver. A Vulkan core worker shares the
+     * host's queue and takes the host's queue lock around each call on it.
      */
-    fun driverFor(graphics: GraphicsContext, mode: RenderTargetMode): RenderDriverKind =
+    fun driverFor(graphics: GraphicsContext): SessionDriver =
       when (graphics) {
-        is MetalContext -> RenderDriverKind.CORE_WORKER
-        is VulkanContext ->
-          if (mode == RenderTargetMode.NATIVE_SURFACE || graphics.hasSessionQueue()) {
-            RenderDriverKind.CORE_WORKER
-          } else {
-            RenderDriverKind.CALLER_GRAPHICS_THREAD
-          }
-        else -> RenderDriverKind.CALLER_GRAPHICS_THREAD
+        is MetalContext -> SessionDriver(RenderDriverKind.CORE_WORKER)
+        is VulkanContext -> SessionDriver(RenderDriverKind.CORE_WORKER, graphics.queueLock())
+        else -> SessionDriver(RenderDriverKind.CALLER_GRAPHICS_THREAD)
       }
 
     /** Attaches a render session for the active graphics API and mode, and awaits it. */
@@ -240,7 +241,7 @@ internal open class RenderTarget(
       viewport: Viewport,
       mode: RenderTargetMode,
     ): RenderTarget {
-      val driver = SessionDriver(driverFor(graphics, mode))
+      val driver = driverFor(graphics)
       return when (graphics) {
         is MetalContext -> MetalRenderTarget.attach(graphics, map, viewport, mode, driver)
         is VulkanContext -> VulkanRenderTarget.attach(graphics, map, viewport, mode, driver)

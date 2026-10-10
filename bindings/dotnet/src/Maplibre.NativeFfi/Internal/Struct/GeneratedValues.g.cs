@@ -1568,6 +1568,56 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static QueueLock CopyQueueLock(mln_queue_lock value) =>
+        new(
+            value.@lock == null
+                ? null
+                : throw new InvalidOperationException(
+                    "Native callback cannot be copied into a managed delegate."
+                ),
+            value.unlock == null
+                ? null
+                : throw new InvalidOperationException(
+                    "Native callback cannot be copied into a managed delegate."
+                )
+        );
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void InvokeQueueLockLock(void* user_data)
+    {
+        try
+        {
+            using var restriction = NativeCallbackGuard.ForbidReentry();
+            ((QueueLock)NativeCallbackRoot.Value(user_data)).Lock?.Invoke();
+        }
+        catch { }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void InvokeQueueLockUnlock(void* user_data)
+    {
+        try
+        {
+            using var restriction = NativeCallbackGuard.ForbidReentry();
+            ((QueueLock)NativeCallbackRoot.Value(user_data)).Unlock?.Invoke();
+        }
+        catch { }
+    }
+
+    internal static mln_queue_lock NativeQueueLock(QueueLock value, NativeCallScope scope)
+    {
+        var native = new mln_queue_lock();
+        native.size = (uint)sizeof(mln_queue_lock);
+        if (value.Lock is not null || value.Unlock is not null)
+        {
+            native.user_data = scope.Register(value with { });
+            native.release_user_data = &NativeCallbackRoot.Release;
+            native.@lock = value.Lock is null ? null : &InvokeQueueLockLock;
+            native.unlock = value.Unlock is null ? null : &InvokeQueueLockUnlock;
+        }
+        return native;
+    }
+
     internal static RenderAbandonResult CopyRenderAbandonResult(mln_render_abandon_result value) =>
         new((RenderAbandonDisposition)value.disposition, value.quarantined_resource_count);
 
@@ -1610,7 +1660,8 @@ internal static unsafe class GeneratedValues
             (RenderDriverKind)value.driver,
             value.requested_texture_ring_depth,
             CopyWake(value.frame_wake),
-            CopyWake(value.driver_work_wake)
+            CopyWake(value.driver_work_wake),
+            CopyQueueLock(value.queue_lock)
         );
 
     internal static mln_render_session_attach_options NativeRenderSessionAttachOptions(
@@ -1624,6 +1675,7 @@ internal static unsafe class GeneratedValues
         native.requested_texture_ring_depth = value.RequestedTextureRingDepth;
         native.frame_wake = NativeWake(value.FrameWake, scope);
         native.driver_work_wake = NativeWake(value.DriverWorkWake, scope);
+        native.queue_lock = NativeQueueLock(value.QueueLock, scope);
         return native;
     }
 

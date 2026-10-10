@@ -137,6 +137,20 @@ internal object Upcalls {
       val invoke = value.callback ?: return@upcall Unit
       invoke()
     }
+
+  @JvmStatic
+  fun queueLockLock(userData: Long): Unit =
+    upcall<QueueLock, Unit>(userData, Unit, setOf()) { value, scope ->
+      val invoke = value.lock ?: return@upcall Unit
+      invoke()
+    }
+
+  @JvmStatic
+  fun queueLockUnlock(userData: Long): Unit =
+    upcall<QueueLock, Unit>(userData, Unit, setOf()) { value, scope ->
+      val invoke = value.unlock ?: return@upcall Unit
+      invoke()
+    }
 }
 
 /** The C function pointer that calls each [Upcalls] method. */
@@ -154,4 +168,6 @@ internal expect object UpcallStubs {
   val resourceProviderCallback: Long
   val resourceTransformCallback: Long
   val wakeCallback: Long
+  val queueLockLock: Long
+  val queueLockUnlock: Long
 }

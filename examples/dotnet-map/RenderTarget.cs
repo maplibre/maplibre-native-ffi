@@ -6,8 +6,13 @@ namespace Maplibre.NativeFfi.Examples.DotnetMap;
 /// <summary>
 /// Where a session's graphics work runs. A core worker runs it on its own thread. A caller driver
 /// queues it for the GLFW thread, which services it after the driver-work wake.
+/// <paramref name="queueLock" /> is the host's lock on a queue that the session shares with it.
 /// </summary>
-internal sealed class SessionDriver(RenderDriverKind kind, GlfwWindow window)
+internal sealed class SessionDriver(
+    RenderDriverKind kind,
+    GlfwWindow window,
+    QueueLock queueLock = default
+)
 {
     /// <summary>The driver-work wake, which only a caller driver has.</summary>
     private readonly GlfwWake? work =
@@ -27,6 +32,7 @@ internal sealed class SessionDriver(RenderDriverKind kind, GlfwWindow window)
             RequestedTextureRingDepth = ringDepth,
             FrameWake = frames.Wake,
             DriverWorkWake = work?.Wake ?? default,
+            QueueLock = queueLock,
         };
 
     /// <summary>Runs every queued item after the driver-work wake.</summary>
@@ -65,22 +71,21 @@ internal sealed class SessionDriver(RenderDriverKind kind, GlfwWindow window)
     }
 
     /// <summary>
-    /// Selects the driver from the graphics API and the mode: a core worker wherever the target
-    /// accepts one. OpenGL on a WGL or EGL context requires the caller driver. A Vulkan core worker
-    /// in a texture mode needs a queue of its own, because the compositor submits to the host's.
+    /// Selects the driver from the graphics API: a core worker wherever the target accepts one.
+    /// OpenGL on a WGL or EGL context requires the caller driver. A Vulkan core worker shares the
+    /// host's queue and takes the host's queue lock around each call on it.
     /// </summary>
-    public static SessionDriver For(IGraphicsContext graphics, RenderTargetMode mode)
-    {
-        var kind = graphics switch
+    public static SessionDriver For(IGraphicsContext graphics) =>
+        graphics switch
         {
-            MetalContext => RenderDriverKind.CoreWorker,
-            VulkanContext vulkan
-                when mode.Kind == RenderTargetModeKind.NativeSurface || vulkan.HasSessionQueue =>
+            MetalContext => new(RenderDriverKind.CoreWorker, graphics.Window),
+            VulkanContext vulkan => new(
                 RenderDriverKind.CoreWorker,
-            _ => RenderDriverKind.CallerGraphicsThread,
+                graphics.Window,
+                vulkan.QueueLock
+            ),
+            _ => new(RenderDriverKind.CallerGraphicsThread, graphics.Window),
         };
-        return new SessionDriver(kind, graphics.Window);
-    }
 }
 
 /// <summary>
@@ -166,7 +171,7 @@ internal abstract class RenderTarget : IDisposable
         RenderTargetMode mode
     )
     {
-        var driver = SessionDriver.For(graphics, mode);
+        var driver = SessionDriver.For(graphics);
         if (graphics is OpenGLContext openGl)
         {
             openGl.MakeCurrentForRendering();
@@ -398,9 +403,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
                             new VulkanOwnedTextureDescriptor
                             {
                                 Extent = viewport.RenderTargetExtent,
-                                Context = vulkan.Descriptor(
-                                    sessionQueue: driver.Kind == RenderDriverKind.CoreWorker
-                                ),
+                                Context = vulkan.Descriptor(),
                             },
                             options
                         ),
@@ -731,7 +734,7 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
             Extent = viewport.RenderTargetExtent,
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
-            Context = context.Descriptor(sessionQueue: driver.Kind == RenderDriverKind.CoreWorker),
+            Context = context.Descriptor(),
             Image = image.ImageHandle,
             ImageView = image.ViewHandle,
             Format = (uint)VulkanBorrowedImage.ImageFormat,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include <mln/gfx/headless_backend.hpp>
@@ -13,6 +14,7 @@
 
 #include "maplibre_native_c/texture.h"
 #include "render/render_session_common.hpp"
+#include "render/vulkan/vulkan_queue_access.hpp"
 
 namespace mln::core {
 
@@ -23,24 +25,30 @@ struct VulkanTextureFrameResources {
   VkFormat format = VK_FORMAT_UNDEFINED;
 };
 
-class VulkanTextureBackend final : public mln::vulkan::RendererBackend,
+// VulkanQueueAccess comes first so that it outlives mbgl's teardown.
+class VulkanTextureBackend final : private VulkanQueueAccess,
+                                   public mln::vulkan::RendererBackend,
                                    public mln::gfx::HeadlessBackend {
  private:
   class VulkanTextureRenderableResource;
 
  public:
+  // `queue_lock` is the host's lock on the graphics queue, or null.
   VulkanTextureBackend(
     const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
-    std::size_t ring_depth
+    std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
   );
   VulkanTextureBackend(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size
+    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size,
+    std::shared_ptr<const QueueLock> queue_lock
   );
   VulkanTextureBackend(const VulkanTextureBackend&) = delete;
   auto operator=(const VulkanTextureBackend&) -> VulkanTextureBackend& = delete;
   VulkanTextureBackend(VulkanTextureBackend&&) = delete;
   auto operator=(VulkanTextureBackend&&) -> VulkanTextureBackend& = delete;
   ~VulkanTextureBackend() override;
+
+  using VulkanQueueAccess::release_queue_access;
 
   auto getDefaultRenderable() -> mln::gfx::Renderable& override;
   // Follows a new physical size. Each ring slot keeps its resource until the

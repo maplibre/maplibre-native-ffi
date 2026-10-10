@@ -602,10 +602,11 @@ internal fun NativeCall.putRenderSessionAttachOptions(
   writeU32(target + 8, value.requestedTextureRingDepth)
   putWake(target + 16, value.frameWake)
   putWake(target + w(32, 48), value.driverWorkWake)
+  putQueueLock(target + w(48, 80), value.queueLock)
 }
 
 internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
-  allocate(w(48, 80), w(4, 8)).also { putRenderSessionAttachOptions(it, value) }
+  allocate(w(68, 120), w(4, 8)).also { putRenderSessionAttachOptions(it, value) }
 
 internal fun NativeArena.putMetalOwnedTextureDescriptor(
   target: Long,
@@ -1255,6 +1256,7 @@ internal fun readRenderSessionAttachOptions(source: Long): RenderSessionAttachOp
     requestedTextureRingDepth = readU32(source + 8),
     frameWake = readWake(source + 16),
     driverWorkWake = readWake(source + w(32, 48)),
+    queueLock = readQueueLock(source + w(48, 80)),
   )
 
 internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQueryOptions =
@@ -1702,6 +1704,18 @@ internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
 internal fun NativeArena.writeImageContent(value: ImageContent): Long =
   allocate(16, 4).also { putImageContent(it, value) }
 
+internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
+  writeU32(target, w(20, 40).toUInt())
+  if (value.lock == null && value.unlock == null) return
+  writeAddress(target + w(12, 24), registrations.register(value))
+  writeAddress(target + w(4, 8), if (value.lock == null) 0L else UpcallStubs.queueLockLock)
+  writeAddress(target + w(8, 16), if (value.unlock == null) 0L else UpcallStubs.queueLockUnlock)
+  writeAddress(target + w(16, 32), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeQueueLock(value: QueueLock): Long =
+  allocate(w(20, 40), w(4, 8)).also { putQueueLock(it, value) }
+
 internal fun NativeArena.putMetalContextDescriptor(target: Long, value: MetalContextDescriptor) {
   writeU32(target, w(8, 16).toUInt())
   writeAddress(target + w(4, 8), value.device.address)
@@ -1890,6 +1904,13 @@ internal fun readOpenglContextDescriptor(source: Long): OpenglContextDescriptor 
 internal fun readWake(source: Long): Wake {
   check(!(readAddress(source + w(4, 8)) != 0L)) { "cannot copy an installed callback descriptor" }
   return Wake(callback = null)
+}
+
+internal fun readQueueLock(source: Long): QueueLock {
+  check(!(readAddress(source + w(4, 8)) != 0L || readAddress(source + w(8, 16)) != 0L)) {
+    "cannot copy an installed callback descriptor"
+  }
+  return QueueLock(lock = null, unlock = null)
 }
 
 internal fun readScreenBox(source: Long): ScreenBox =

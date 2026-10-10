@@ -147,7 +147,7 @@ typedef uint64_t mln_event_batch MLN_BINDING(
 );
 typedef uint64_t mln_acquired_frame MLN_BINDING(
   "kind=handle;release=mln_acquired_frame_release;parent=mln_render_session;"
-  "dispose=mln_acquired_frame_dispose;dispose_invalidates=parent;"
+  "dispose=mln_acquired_frame_dispose;"
   "view_begin=mln_acquired_frame_view_begin;"
   "view_end=mln_acquired_frame_view_end"
 );

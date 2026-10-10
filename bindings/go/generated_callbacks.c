@@ -70,6 +70,22 @@ extern void mlnGo_mln_wake_callback(void* user_data);
 void binding_mln_wake_callback(void* user_data) {
   mlnGo_mln_wake_callback((void*)user_data);
 }
+extern void mlnGo_mln_queue_lock_lock(void* user_data);
+void binding_mln_queue_lock_lock(void* user_data) {
+  static const uint32_t operations[] = {0};
+  binding_policy policy = {NULL, operations, 0, 0};
+  binding_policy_enter(&policy);
+  mlnGo_mln_queue_lock_lock((void*)user_data);
+  binding_policy_leave(&policy);
+}
+extern void mlnGo_mln_queue_lock_unlock(void* user_data);
+void binding_mln_queue_lock_unlock(void* user_data) {
+  static const uint32_t operations[] = {0};
+  binding_policy policy = {NULL, operations, 0, 0};
+  binding_policy_enter(&policy);
+  mlnGo_mln_queue_lock_unlock((void*)user_data);
+  binding_policy_leave(&policy);
+}
 extern void
 mlnGo_mln_resource_request_set_cancel_callback_registration_callback(
   void* user_data

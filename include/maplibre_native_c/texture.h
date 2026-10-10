@@ -381,9 +381,11 @@ mln_texture_image_info_default(void) MLN_NOEXCEPT;
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or
+ *   options enable a queue lock.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -418,9 +420,11 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
- * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend.
+ * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or
+ *   options enable a queue lock.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -454,7 +458,8 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -494,7 +499,8 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -539,11 +545,12 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
- *   context provider is unavailable, or the requested driver does not match the
- *   context placement.
+ *   context provider is unavailable; the requested driver does not match the
+ *   context placement; or options enable a queue lock.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -578,11 +585,12 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
- *   context provider is unavailable, or the requested driver is not
- *   MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
+ *   context provider is unavailable; the requested driver is not
+ *   MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD; or options enable a queue lock.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -615,10 +623,12 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
- *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
+ *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
+ *   options enable a queue lock.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
@@ -654,10 +664,12 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
  *   options, or completion is null or undersized; a required backend handle is
  *   null; the stated extent is not positive or scales past uint32_t;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown.
+ *   driver kind is unknown, or options carry a
+ *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
- *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
+ *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
+ *   options enable a queue lock.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:

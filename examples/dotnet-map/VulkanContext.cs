@@ -21,10 +21,18 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     private SurfaceKHR surface;
     private PhysicalDevice physicalDevice;
     private Device device;
+
+    /// <summary>The one queue that the host and a core-worker session both submit to.</summary>
     private Queue graphicsQueue;
-    private Queue sessionQueue;
+
+    /// <summary>
+    /// Held around every call on <see cref="graphicsQueue" />. A core worker submits from its own
+    /// thread, and Vulkan requires the calls on one queue to be externally synchronized, so the
+    /// session takes it too. A semaphore has no owner thread, so the session's lock and unlock
+    /// callbacks may run as separate upcalls.
+    /// </summary>
+    private readonly SemaphoreSlim queueMutex = new(1, 1);
     private uint graphicsQueueFamilyIndex;
-    private uint graphicsQueueCount;
     private bool closed;
 
     static VulkanContext()
@@ -62,12 +70,13 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public uint GraphicsQueueFamilyIndex => graphicsQueueFamilyIndex;
 
-    /// <summary>
-    /// Whether the device has a second graphics queue for a core-worker session. The worker submits
-    /// from its own thread, so in the texture modes, where the compositor also submits, it needs a
-    /// queue that the host never touches.
-    /// </summary>
-    public bool HasSessionQueue => sessionQueue.Handle != 0;
+    /// <summary>The session's lock on <see cref="GraphicsQueue" />.</summary>
+    public QueueLock QueueLock => new(() => queueMutex.Wait(), () => queueMutex.Release());
+
+    /// <summary>Holds the graphics queue for one call on it.</summary>
+    public void LockQueue() => queueMutex.Wait();
+
+    public void UnlockQueue() => queueMutex.Release();
 
     public static VulkanContext Create(string title, int width, int height, bool visible)
     {
@@ -156,19 +165,14 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     private string PlatformStatus() =>
         OperatingSystem.IsLinux() ? $", platform {GlfwNativeAccess.GetPlatform()}" : "";
 
-    /// <summary>
-    /// The session's view of the device. With <paramref name="sessionQueue" />, the session submits
-    /// to the queue that the host never touches; otherwise it shares the host's queue.
-    /// </summary>
-    public VulkanContextDescriptor Descriptor(bool sessionQueue = false) =>
+    /// <summary>The session's view of the device.</summary>
+    public VulkanContextDescriptor Descriptor() =>
         new()
         {
             Instance = NativePointer.FromBorrowedAddress(instance.Handle),
             PhysicalDevice = NativePointer.FromBorrowedAddress(physicalDevice.Handle),
             Device = NativePointer.FromBorrowedAddress(device.Handle),
-            GraphicsQueue = NativePointer.FromBorrowedAddress(
-                sessionQueue ? this.sessionQueue.Handle : graphicsQueue.Handle
-            ),
+            GraphicsQueue = NativePointer.FromBorrowedAddress(graphicsQueue.Handle),
             GraphicsQueueFamilyIndex = graphicsQueueFamilyIndex,
             GetInstanceProcAddr = NativePointer.FromBorrowedAddress(
                 (nint)vk.GetInstanceProcAddr(instance, "vkGetInstanceProcAddr")
@@ -184,15 +188,22 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public void FinishFrame() { }
 
-    /// <summary>
-    /// Waits for the host's own submissions. A core-worker session may be submitting to its queue
-    /// meanwhile, so the host waits on its queue rather than the whole device.
-    /// </summary>
-    public void WaitHostQueueIdle()
+    /// <summary>Waits for every submission to the queue, the session's included.</summary>
+    public void WaitQueueIdle()
     {
-        if (graphicsQueue.Handle != 0)
+        if (graphicsQueue.Handle == 0)
+        {
+            return;
+        }
+
+        LockQueue();
+        try
         {
             Check(vk.QueueWaitIdle(graphicsQueue), "vkQueueWaitIdle");
+        }
+        finally
+        {
+            UnlockQueue();
         }
     }
 
@@ -206,7 +217,9 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         closed = true;
         if (device.Handle != 0)
         {
+            LockQueue();
             vk.DeviceWaitIdle(device);
+            UnlockQueue();
             vk.DestroyDevice(device, null);
             device = default;
         }
@@ -322,22 +335,12 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
             physicalDevice = devices[i];
             graphicsQueueFamilyIndex = checked((uint)queueFamily);
-            graphicsQueueCount = QueueCount(devices[i], graphicsQueueFamilyIndex);
             return;
         }
 
         throw new InvalidOperationException(
             "No Vulkan device has a graphics queue that can present."
         );
-    }
-
-    private uint QueueCount(PhysicalDevice candidate, uint family)
-    {
-        uint count = 0;
-        vk.GetPhysicalDeviceQueueFamilyProperties(candidate, &count, null);
-        var families = stackalloc QueueFamilyProperties[checked((int)count)];
-        vk.GetPhysicalDeviceQueueFamilyProperties(candidate, &count, families);
-        return families[family].QueueCount;
     }
 
     private int FindGraphicsPresentQueueFamily(PhysicalDevice candidate)
@@ -395,14 +398,13 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         );
         try
         {
-            var queueCount = Math.Min(graphicsQueueCount, 2u);
-            var priorities = stackalloc float[] { 1.0f, 1.0f };
+            var priority = 1.0f;
             var queueInfo = new DeviceQueueCreateInfo
             {
                 SType = StructureType.DeviceQueueCreateInfo,
                 QueueFamilyIndex = graphicsQueueFamilyIndex,
-                QueueCount = queueCount,
-                PQueuePriorities = priorities,
+                QueueCount = 1,
+                PQueuePriorities = &priority,
             };
             var createInfo = new DeviceCreateInfo
             {
@@ -415,10 +417,6 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
             Check(vk.CreateDevice(physicalDevice, &createInfo, null, out device), "vkCreateDevice");
             vk.GetDeviceQueue(device, graphicsQueueFamilyIndex, 0, out graphicsQueue);
-            if (queueCount > 1)
-            {
-                vk.GetDeviceQueue(device, graphicsQueueFamilyIndex, 1, out sessionQueue);
-            }
             Console.WriteLine("Enabled Vulkan device extensions: " + string.Join(", ", extensions));
         }
         finally

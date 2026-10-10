@@ -640,6 +640,174 @@ static void parent_first_disposal_retires_a_native_render_attachment(void) {
   mln_test_render_fixture_destroy(&fixture);
 }
 
+static void lock_nothing(void* context) { (void)context; }
+
+// A queue lock names both of its callbacks or neither, a disabled one retains
+// no user data, and only a Vulkan target takes one, because only the Vulkan
+// driver submits to a queue that the host names.
+static void attach_checks_the_queue_lock(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.queue_lock.release_user_data = lock_nothing;
+  mln_test_completion attach = mln_test_completion_default(0);
+  mln_test_render_fixture fixture = {0};
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
+                                   map, &options, &attach.descriptor, &fixture
+                                 )
+  );
+  options.queue_lock.release_user_data = NULL;
+  options.queue_lock.lock = lock_nothing;
+  MLN_TEST_STATUS(
+    MLN_STATUS_INVALID_ARGUMENT, mln_test_render_fixture_start_attach(
+                                   map, &options, &attach.descriptor, &fixture
+                                 )
+  );
+#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  options.queue_lock.unlock = lock_nothing;
+  MLN_TEST_STATUS(
+    MLN_STATUS_UNSUPPORTED, mln_test_render_fixture_start_attach(
+                              map, &options, &attach.descriptor, &fixture
+                            )
+  );
+#endif
+  mln_test_completion_reject(&attach);
+  mln_test_completion_destroy(&attach);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A host whose wakes call back into the session instead of scheduling. It has
+// file scope because a wake fired on another thread can outlast the case.
+typedef struct reentrant_host {
+  mln_render_session session;
+  uint64_t token;
+  atomic_bool armed;
+  atomic_bool rendered;
+  atomic_bool service_requested;
+  atomic_uint inline_services;
+  atomic_uint failures;
+} reentrant_host;
+
+static reentrant_host reentrant;
+static MLN_TEST_THREAD_LOCAL bool on_graphics_thread;
+
+static void drain_inside_frame_wake(void* context) {
+  reentrant_host* host = context;
+  if (atomic_load(&host->armed)) {
+    mln_render_frame_batch batch = MLN_HANDLE_NULL;
+    mln_status status = MLN_STATUS_OK;
+    while ((status = mln_render_session_drain_frame_results(
+              host->session, &batch, NULL
+            )) == MLN_STATUS_OK) {
+      size_t count = 0;
+      if (mln_render_frame_batch_count(batch, &count, NULL) != MLN_STATUS_OK)
+        atomic_fetch_add(&host->failures, 1U);
+      for (size_t index = 0; index < count; index += 1) {
+        mln_render_frame_result result = {
+          .size = sizeof(mln_render_frame_result)
+        };
+        if (
+          mln_render_frame_batch_get(batch, index, &result, NULL) ==
+            MLN_STATUS_OK &&
+          result.token == host->token &&
+          result.disposition == MLN_RENDER_RESULT_RENDERED
+        )
+          atomic_store(&host->rendered, true);
+      }
+      mln_render_frame_batch_release(batch);
+      batch = MLN_HANDLE_NULL;
+    }
+    if (status != MLN_STATUS_NOT_READY) atomic_fetch_add(&host->failures, 1U);
+  }
+  mln_test_pulse();
+}
+
+static mln_status service_on_graphics_thread(reentrant_host* host) {
+  size_t serviced = 0;
+  const mln_status status = mln_render_session_service_driver_work(
+    host->session, SIZE_MAX, &serviced, NULL
+  );
+  if (status != MLN_STATUS_OK && status != MLN_STATUS_BUSY)
+    atomic_fetch_add(&host->failures, 1U);
+  return status;
+}
+
+// Services inline on the graphics thread, the one thread that a caller driver
+// takes service from. A wake on that thread while a service runs further up its
+// stack finds the driver busy, and the running service takes the work. A wake
+// on another thread leaves the service to the case's wait.
+static void service_inside_driver_wake(void* context) {
+  reentrant_host* host = context;
+  if (atomic_load(&host->armed)) {
+    if (!on_graphics_thread)
+      atomic_store(&host->service_requested, true);
+    else if (service_on_graphics_thread(host) == MLN_STATUS_OK)
+      atomic_fetch_add(&host->inline_services, 1U);
+  }
+  mln_test_pulse();
+}
+
+static bool reentrant_frame_rendered(void* context) {
+  reentrant_host* host = context;
+  if (atomic_exchange(&host->service_requested, false))
+    (void)service_on_graphics_thread(host);
+  return atomic_load(&host->rendered) || atomic_load(&host->failures) != 0;
+}
+
+// Native code invokes wakes outside the session's locks, so a host may drain
+// results inside its frame wake and service a caller driver inside its
+// driver-work wake. A caller driver's demand then renders and reports from
+// inside request_frame on the graphics thread; a core worker reports from its
+// own thread.
+static void wakes_may_call_back_into_the_session(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  reentrant = (reentrant_host){.token = 7};
+  on_graphics_thread = true;
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.requested_texture_ring_depth = 2;
+  options.frame_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = drain_inside_frame_wake,
+    .user_data = &reentrant,
+  };
+  options.driver_work_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = service_inside_driver_wake,
+    .user_data = &reentrant,
+  };
+  mln_test_completion attach = mln_test_completion_default(0);
+  mln_test_render_fixture fixture = {0};
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &options, &attach.descriptor, &fixture
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
+  mln_test_completion_destroy(&attach);
+  reentrant.session = fixture.session;
+  atomic_store(&reentrant.armed, true);
+
+  mln_test_render_request_forced(&fixture, reentrant.token);
+  TEST_ASSERT_TRUE(mln_test_await(
+    reentrant_frame_rendered, &reentrant, mln_test_deadline_default(),
+    "a frame result drained inside the frame wake"
+  ));
+  atomic_store(&reentrant.armed, false);
+  on_graphics_thread = false;
+  TEST_ASSERT_EQUAL_UINT(0, atomic_load(&reentrant.failures));
+  if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
+    TEST_ASSERT_NOT_EQUAL_UINT(0, atomic_load(&reentrant.inline_services));
+  }
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(an_attached_session_holds_its_map_and_refuses_destroy);
   RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
@@ -649,4 +817,6 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_from_an_attach_completion_is_busy);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
+  RUN_TEST(wakes_may_call_back_into_the_session);
+  RUN_TEST(attach_checks_the_queue_lock);
 }

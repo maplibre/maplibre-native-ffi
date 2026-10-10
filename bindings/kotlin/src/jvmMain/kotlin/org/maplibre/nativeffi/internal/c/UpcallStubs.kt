@@ -26,4 +26,6 @@ internal actual object UpcallStubs {
   actual val resourceTransformCallback: Long =
     Ffm.upcall("resourceTransformCallback", JAVA_INT, JAVA_LONG, JAVA_INT, JAVA_LONG, JAVA_LONG)
   actual val wakeCallback: Long = Ffm.upcall("wakeCallback", null, JAVA_LONG)
+  actual val queueLockLock: Long = Ffm.upcall("queueLockLock", null, JAVA_LONG)
+  actual val queueLockUnlock: Long = Ffm.upcall("queueLockUnlock", null, JAVA_LONG)
 }

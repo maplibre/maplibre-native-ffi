@@ -31,6 +31,9 @@ auto mln_render_session_attach_options_default() noexcept
     .reserved = 0,
     .frame_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
     .driver_work_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
+    .queue_lock = mln_queue_lock{
+      sizeof(mln_queue_lock), nullptr, nullptr, nullptr, nullptr
+    },
   };
 }
 

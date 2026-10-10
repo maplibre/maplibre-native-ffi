@@ -1921,6 +1921,68 @@ pub const QueriedFeatureField = struct {
     pub const unionWith = methods.unionWith;
 };
 
+pub const QueueLock = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    lock: ?*const fn (?*anyopaque) status.Error!void = null,
+    unlock: ?*const fn (?*anyopaque) status.Error!void = null,
+    pub fn toNative(self: QueueLock, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_queue_lock {
+        _ = allocator;
+        var raw = std.mem.zeroes(c.mln_queue_lock);
+        raw.size = @sizeOf(c.mln_queue_lock);
+        raw.lock = if (self.lock != null) lockTrampoline else null;
+        raw.unlock = if (self.unlock != null) unlockTrampoline else null;
+        if (!(self.lock == null and self.unlock == null)) {
+            const retained = try roots.retain(QueueLock, self);
+            raw.user_data = retained;
+            raw.release_user_data = callback.Registration(QueueLock).releaseNative;
+        }
+        return raw;
+    }
+    fn lockTrampoline(native_arg_0: marshal.CallbackArg(c.mln_queue_lock_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_queue_lock_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_queue_lock_callback, 0)) status.Error!marshal.CallbackResult(c.mln_queue_lock_callback) {
+                const state = callback.Registration(QueueLock).get(callback_arg_0);
+                const host = state.value.lock orelse {
+                    return;
+                };
+                var scope: callback.Scope = .{};
+                scope.enter(&.{}, 0);
+                defer scope.leave();
+                host(state.value.context) catch return;
+            }
+        }.invoke(native_arg_0) catch {
+            return;
+        };
+    }
+    fn unlockTrampoline(native_arg_0: marshal.CallbackArg(c.mln_queue_lock_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_queue_lock_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_queue_lock_callback, 0)) status.Error!marshal.CallbackResult(c.mln_queue_lock_callback) {
+                const state = callback.Registration(QueueLock).get(callback_arg_0);
+                const host = state.value.unlock orelse {
+                    return;
+                };
+                var scope: callback.Scope = .{};
+                scope.enter(&.{}, 0);
+                defer scope.leave();
+                host(state.value.context) catch return;
+            }
+        }.invoke(native_arg_0) catch {
+            return;
+        };
+    }
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_queue_lock) status.Error!QueueLock {
+        _ = allocator;
+        _ = raw;
+        return .{
+            .context = null,
+            .release_context = null,
+            .lock = null,
+            .unlock = null,
+        };
+    }
+};
+
 pub const RenderAbandonDisposition = enum(u32) {
     quarantined = 1,
     clean = 0,
@@ -2025,6 +2087,7 @@ pub const RenderSessionAttachOptions = struct {
     requested_texture_ring_depth: u32 = std.mem.zeroes(u32),
     frame_wake: Wake = .{},
     driver_work_wake: Wake = .{},
+    queue_lock: QueueLock = .{},
     pub fn toNative(self: RenderSessionAttachOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_render_session_attach_options {
         var raw = c.mln_render_session_attach_options_default();
         raw.size = @sizeOf(c.mln_render_session_attach_options);
@@ -2032,6 +2095,7 @@ pub const RenderSessionAttachOptions = struct {
         raw.requested_texture_ring_depth = self.requested_texture_ring_depth;
         raw.frame_wake = try self.frame_wake.toNative(allocator, roots);
         raw.driver_work_wake = try self.driver_work_wake.toNative(allocator, roots);
+        raw.queue_lock = try self.queue_lock.toNative(allocator, roots);
         return raw;
     }
 
@@ -2041,6 +2105,7 @@ pub const RenderSessionAttachOptions = struct {
             .requested_texture_ring_depth = raw.requested_texture_ring_depth,
             .frame_wake = try Wake.fromNative(allocator, raw.frame_wake),
             .driver_work_wake = try Wake.fromNative(allocator, raw.driver_work_wake),
+            .queue_lock = try QueueLock.fromNative(allocator, raw.queue_lock),
         };
     }
 };

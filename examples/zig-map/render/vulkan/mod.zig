@@ -27,25 +27,20 @@ pub const VulkanRenderTarget = union(types.RenderTargetMode) {
         return switch (mode) {
             .owned_texture => .{ .owned_texture = .{ .compositor = try VulkanTextureCompositor.init(allocator, window, viewport) } },
             .borrowed_texture => .{ .borrowed_texture = try VulkanBorrowedTextureBackend.init(allocator, window, viewport) },
-            // The host submits nothing here, so the session shares its queue.
-            .native_surface => .{ .native_surface = .{ .context = try Context.init(allocator, window, false) } },
+            .native_surface => .{ .native_surface = .{ .context = try Context.init(allocator, window) } },
         };
     }
 
-    /// Attaches the render session. A core worker drives every target,
-    /// except a texture target whose device gave the session no queue of its
-    /// own. That one shares the host's queue, so it renders on the render loop
-    /// through a caller driver.
+    /// Attaches the render session. Its core worker submits to the host's
+    /// queue, so it takes the host's queue lock around each call on it.
     pub fn attach(self: *VulkanRenderTarget, map: *maplibre.Map, viewport: types.Viewport) !void {
-        const driver: maplibre.RenderDriverKind = switch (self.*) {
-            .native_surface => .core_worker,
-            inline else => |*backend| if (backend.compositor.context.session_queue != backend.compositor.context.queue)
-                .core_worker
-            else
-                .caller_graphics_thread,
+        var options = render_target.attachOptions(self.*, .core_worker);
+        options.queue_lock = switch (self.*) {
+            .native_surface => |*backend| backend.context.queueLock(),
+            inline else => |*backend| backend.compositor.context.queueLock(),
         };
         switch (self.*) {
-            inline else => |*backend| try backend.attach(map, viewport, render_target.attachOptions(self.*, driver)),
+            inline else => |*backend| try backend.attach(map, viewport, options),
         }
     }
 
@@ -116,7 +111,7 @@ const VulkanTextureCompositor = struct {
         window: *c.SDL_Window,
         viewport: types.Viewport,
     ) !VulkanTextureCompositor {
-        var context = try Context.init(allocator, window, true);
+        var context = try Context.init(allocator, window);
         errdefer context.deinit();
 
         var swapchain = try Swapchain.init(allocator, &context, viewport, null);
@@ -158,8 +153,10 @@ const VulkanTextureCompositor = struct {
     }
 
     fn recreateSwapchain(self: *VulkanTextureCompositor) !void {
-        // Only the host's own queue reads the swapchain images.
-        try util.expectVk(c.vkQueueWaitIdle(self.context.queue));
+        self.context.lockQueue();
+        const idle = c.vkQueueWaitIdle(self.context.queue);
+        self.context.unlockQueue();
+        try util.expectVk(idle);
         // Create the replacement naming the retired swapchain as oldSwapchain
         // before destroying it: on MoltenVK, destroying first leaves presents
         // that succeed but reach no drawable the window shows.
@@ -247,7 +244,11 @@ const VulkanTextureCompositor = struct {
             &self.pipeline,
             image_index,
         );
-        try self.commands.submit(self.context.queue, image_index);
+        {
+            self.context.lockQueue();
+            defer self.context.unlockQueue();
+            try self.commands.submit(self.context.queue, image_index);
+        }
 
         const present_info = c.VkPresentInfoKHR{
             .sType = c.VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -259,7 +260,9 @@ const VulkanTextureCompositor = struct {
             .pImageIndices = &image_index,
             .pResults = null,
         };
+        self.context.lockQueue();
         const present = c.vkQueuePresentKHR(self.context.queue, &present_info);
+        self.context.unlockQueue();
         if (present == c.VK_ERROR_OUT_OF_DATE_KHR) {
             // Nothing reached the screen, but the sampling pass was submitted;
             // wait it out before the caller releases its frame.
@@ -527,7 +530,7 @@ fn vulkanContextDescriptor(context: *const Context) maplibre.VulkanContextDescri
         .instance = (@ptrCast(context.instance.?)),
         .physical_device = (@ptrCast(context.physical_device.?)),
         .device = (@ptrCast(context.device.?)),
-        .graphics_queue = (@ptrCast(context.session_queue.?)),
+        .graphics_queue = (@ptrCast(context.queue.?)),
         .graphics_queue_family_index = context.queue_family_index,
         .get_instance_proc_addr = nativeFunctionPointer(c.vkGetInstanceProcAddr),
         .get_device_proc_addr = nativeFunctionPointer(c.vkGetDeviceProcAddr),
