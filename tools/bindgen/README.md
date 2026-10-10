@@ -53,9 +53,11 @@ every object uses `list_`, and a predicate uses `is_`. A callback helper names
 the record that it fills, as in `mln_resource_transform_response_set_url`. A
 function with no handle parameter names the subsystem or record that it belongs
 to: `mln_log_set_callback`, `mln_network_get_status`,
-`mln_camera_options_default`. A coordinate conversion names its result and its
-input, as in `mln_map_pixel_for_lat_lng`, and a function that reports a fixed
-fact of the library is a noun, as in `mln_c_version`.
+`mln_camera_options_default`. A computation from one record names the record and
+its result, as in `mln_logical_extent_physical_size`. A coordinate conversion
+names its result and its input, as in `mln_map_pixel_for_lat_lng`, and a
+function that reports a fixed fact of the library is a noun, as in
+`mln_c_version`.
 
 ## Follow the ABI rules
 
