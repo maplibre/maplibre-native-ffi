@@ -386,7 +386,10 @@ public data class GesturePhase(public val rawValue: UInt) {
  */
 public data class GpuSyncKind(public val rawValue: UInt) {
   public companion object {
-    /** The producer or consumer has completed before the API call returns. */
+    /**
+     * The host needs no synchronization object. The work completed, or on WebGPU was submitted to
+     * the device's queue, before the frame became acquirable or before the release call.
+     */
     public val CPU_COMPLETE: GpuSyncKind = GpuSyncKind(0u)
     /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
     public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(1u)

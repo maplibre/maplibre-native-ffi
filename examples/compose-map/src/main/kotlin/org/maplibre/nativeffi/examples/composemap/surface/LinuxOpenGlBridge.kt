@@ -152,7 +152,6 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
     renderedGeneration = frame.target.generation
-    runOnProducerThread { egl.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
@@ -378,7 +377,7 @@ internal class LinuxEglContext private constructor() : AutoCloseable {
     ensureLwjglOpenGlCapabilities()
   }
 
-  fun waitIdle() {
+  private fun waitIdle() {
     if (shareContext == EGL_NO_CONTEXT) {
       return
     }

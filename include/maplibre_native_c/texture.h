@@ -387,7 +387,14 @@ typedef struct mln_opengl_texture_frame {
    * texture in the descriptor's textures array.
    */
   uint32_t slot;
-  /** Borrowed OpenGL texture object name. Valid until frame release. */
+  /**
+   * Borrowed OpenGL texture object name. Valid until frame release.
+   *
+   * The session's context wrote the texture. A host that samples it from
+   * another context of the share group binds it again after acquisition,
+   * because OpenGL makes another context's completed writes visible only
+   * through a new bind.
+   */
   uint32_t texture;
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   uint32_t target;

@@ -167,7 +167,20 @@ typedef struct mln_render_session_capabilities {
 
 /** Synchronization payload kind for acquired texture frames. */
 typedef enum mln_gpu_sync_kind : uint32_t {
-  /** The producer or consumer has completed before the API call returns. */
+  /**
+   * The host needs no synchronization object. The work completed, or on WebGPU
+   * was submitted to the device's queue, before the frame became acquirable or
+   * before the release call.
+   *
+   * As producer synchronization of an acquired frame: on Metal, Vulkan, and
+   * OpenGL, the producer's GPU writes to the frame's texture completed before
+   * the frame became acquirable. On WebGPU, they were submitted to the
+   * device's queue, which orders them before any work that the host submits
+   * afterwards.
+   *
+   * As consumer synchronization: the host's GPU reads completed before the
+   * release call, or on WebGPU were submitted to the device's queue before it.
+   */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
   /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,

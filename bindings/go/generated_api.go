@@ -315,7 +315,9 @@ const (
 type GpuSyncKind uint32
 
 const (
-	// The producer or consumer has completed before the API call returns.
+	// The host needs no synchronization object. The work completed, or on WebGPU
+	// was submitted to the device's queue, before the frame became acquirable or
+	// before the release call.
 	GpuSyncKindCpuComplete GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
 	// id<MTLSharedEvent> plus a monotonically increasing signal value.
 	GpuSyncKindMetalSharedEvent GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)

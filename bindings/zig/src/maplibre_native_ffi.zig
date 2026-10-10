@@ -1113,7 +1113,9 @@ pub const GpuSyncKind = enum(u32) {
     vulkan_timeline_semaphore = 2,
     /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
     metal_shared_event = 1,
-    /// The producer or consumer has completed before the API call returns.
+    /// The host needs no synchronization object. The work completed, or on
+    /// WebGPU was submitted to the device's queue, before the frame became
+    /// acquirable or before the release call.
     cpu_complete = 0,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;

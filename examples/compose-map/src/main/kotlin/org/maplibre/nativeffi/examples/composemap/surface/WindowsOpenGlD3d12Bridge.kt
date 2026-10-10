@@ -127,7 +127,6 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
     renderedGeneration = frame.target.generation
-    runOnProducerThread { wgl?.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
@@ -384,7 +383,7 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
     }
   }
 
-  fun waitIdle() {
+  private fun waitIdle() {
     if (deviceContext != NULL && shareContext != NULL) {
       makeCurrent()
       glFinish()

@@ -41,7 +41,12 @@ MLN_API mln_status mln_render_session_projection_create(
 
 /** Terminal disposition of one accepted frame demand. */
 typedef enum mln_render_result : uint32_t {
-  /** A frame was rendered for acquisition, presentation, or ordered readback.
+  /**
+   * A frame was rendered for acquisition, presentation, or ordered readback.
+   *
+   * The result states nothing about GPU completion. On a texture ring, the
+   * acquired frame's producer synchronization states when the GPU writes to
+   * its texture are complete. See mln_acquired_frame_get_producer_sync().
    */
   MLN_RENDER_RESULT_RENDERED = 0,
   /**
@@ -336,6 +341,11 @@ MLN_API mln_status mln_acquired_frame_get_result(
 
 /**
  * Copies the producer synchronization for an acquired texture frame.
+ *
+ * The synchronization states when the producer's GPU writes to the frame's
+ * texture are complete, for frames of session-owned and borrowed rings alike.
+ * The host waits on it before it reads the texture. See mln_gpu_sync_kind for
+ * what each kind promises.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

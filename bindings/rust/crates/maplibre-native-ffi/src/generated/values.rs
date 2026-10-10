@@ -1404,7 +1404,9 @@ native_enum! {
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum GpuSyncKind: u32 {
-    /// The producer or consumer has completed before the API call returns.
+    /// The host needs no synchronization object. The work completed, or on
+    /// WebGPU was submitted to the device's queue, before the frame became
+    /// acquirable or before the release call.
     CpuComplete = 0,
     /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
     MetalSharedEvent = 1,

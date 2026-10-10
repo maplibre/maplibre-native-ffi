@@ -135,7 +135,6 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
     ring.markRendered(frame.target.generation)
-    rendererDispatcher.run { egl.waitIdle() }
   }
 
   override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
@@ -238,7 +237,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
       ?: run { glesCapabilities = GLES.createCapabilities() }
   }
 
-  fun waitIdle() {
+  private fun waitIdle() {
     if (shareContext == EGL_NO_CONTEXT) {
       return
     }

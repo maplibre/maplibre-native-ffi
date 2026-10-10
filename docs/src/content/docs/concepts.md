@@ -170,11 +170,13 @@ follow what that call reports.
 Host-acquirable owned texture targets negotiate a ring of one to three slots,
 and a borrowed texture target lends one to three textures, one per slot.
 Acquiring a frame leases one slot and returns producer-completion
-synchronization. Releasing the frame supplies consumer-completion
-synchronization when the host submitted GPU reads. The driver reuses the slot
-only after the host released the handle and those reads completed. A private
-OpenGL owned texture target fixes its ring depth at one and exposes CPU readback
-instead of frame acquisition.
+synchronization, for borrowed and owned rings alike. The host waits on that
+synchronization, not on a rendered result, before it reads the frame's texture,
+and needs no GPU fence of its own. Releasing the frame supplies
+consumer-completion synchronization when the host submitted GPU reads. The
+driver reuses the slot only after the host released the handle and those reads
+completed. A private OpenGL owned texture target fixes its ring depth at one and
+exposes CPU readback instead of frame acquisition.
 
 ### OpenGL context ownership
 

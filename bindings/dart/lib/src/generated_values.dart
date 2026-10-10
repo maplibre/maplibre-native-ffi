@@ -280,7 +280,9 @@ final class GesturePhase extends _Enum {
 final class GpuSyncKind extends _Enum {
   const GpuSyncKind.fromRawValue(super.rawValue);
 
-  /// The producer or consumer has completed before the API call returns.
+  /// The host needs no synchronization object. The work completed, or on WebGPU
+  /// was submitted to the device's queue, before the frame became acquirable or
+  /// before the release call.
   static const cpuComplete = GpuSyncKind.fromRawValue(0);
 
   /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.

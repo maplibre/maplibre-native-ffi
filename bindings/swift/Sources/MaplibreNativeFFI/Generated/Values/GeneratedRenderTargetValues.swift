@@ -124,7 +124,9 @@ public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
-  /// The producer or consumer has completed before the API call returns.
+  /// The host needs no synchronization object. The work completed, or on WebGPU
+  /// was submitted to the device's queue, before the frame became acquirable or
+  /// before the release call.
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
   /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
   public static let metalSharedEvent: GpuSyncKind = .init(rawValue: 1)

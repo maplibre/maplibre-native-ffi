@@ -96,13 +96,19 @@ static void paint_background_blue(mln_runtime runtime, mln_map map) {
 }
 
 // Acquires the frame that a demand just rendered, and checks that it names the
-// ring texture of its slot. Returns that slot.
+// ring texture of its slot and needs no producer synchronization object, so
+// the case reads that texture with no fence of its own. Returns that slot.
 static uint32_t acquire_ring_frame(
   const mln_test_render_fixture* fixture, mln_acquired_frame* out_frame
 ) {
   MLN_TEST_OK(
     mln_render_session_acquire_frame(fixture->session, out_frame, NULL)
   );
+  mln_gpu_sync producer = {.size = sizeof(mln_gpu_sync)};
+  MLN_TEST_OK(
+    mln_acquired_frame_get_producer_sync(*out_frame, &producer, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_GPU_SYNC_CPU_COMPLETE, producer.kind);
   uint32_t slot = UINT32_MAX;
   const uint64_t texture = mln_test_frame_texture_handle(*out_frame, &slot);
   TEST_ASSERT_LESS_THAN_UINT32(2, slot);
