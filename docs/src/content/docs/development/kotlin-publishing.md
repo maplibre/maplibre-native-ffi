@@ -266,17 +266,21 @@ mise run //:kotlin:publish local macos-arm64-metal macos-arm64-vulkan macos-arm6
 ```
 
 The repository is `build/packages/kotlin/maven-local`. The default version is
-`0.1.0-local.<commit>`, with `.dirty` appended when the worktree has uncommitted
-changes, and the `MAPLIBRE_MAVEN_VERSION` environment variable overrides it. The
+`0.1.0-local.<commit>`. When the worktree has uncommitted changes, the task
+appends `.dirty-<hash>`, a hash of the worktree's tracked and untracked files,
+so each edit publishes at its own version. The `MAPLIBRE_MAVEN_VERSION`
+environment variable overrides the version; a host that keeps one version across
+edits must republish every preset it uses after each change to native code. The
 task rejects a preset that the host cannot build before it builds anything.
 Android presets build against `ANDROID_HOME`; to use the pinned SDK, run
 `mise -E android run //:kotlin:publish local <preset>...`.
 
 The repository holds only the targets that the named presets feed, although each
-root module still names every target. Later runs add targets and backends to the
-repository. Each publish rewrites a backend's JVM runtime module, so that module
-holds only the classifiers from its latest publish; name every classifier of a
-backend in one run.
+root module still names every target. Later runs at the same version add
+Kotlin/Native targets and backends to the repository. Each publish rewrites a
+backend's JVM runtime module and Android AAR, and the binding's AAR, so they
+hold only the classifiers and ABIs from their latest publish. Name every
+classifier and Android ABI of a backend in one run.
 
 A pull request with complete coverage publishes its verified repository the same
 way. The version is `0.1.0-pr<number>.<run id>`, where the run id is the one
@@ -291,8 +295,8 @@ gh run download <run id> --repo maplibre/maplibre-native-ffi \
 
 Gradle takes each module from the first repository that holds it. `mavenLocal()`
 can hold a stale module at the same version, for example from an earlier
-publication of the same uncommitted worktree. Declare the downloaded or local
-repository as the exclusive source of the group:
+publication at the same `MAPLIBRE_MAVEN_VERSION`. Declare the downloaded or
+local repository as the exclusive source of the group:
 
 ```kotlin
 repositories {

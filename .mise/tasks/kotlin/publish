@@ -15,7 +15,21 @@ usage() {
   echo "       $(basename "$0") verify <maven-staging> [version]" >&2
   echo "       $(basename "$0") local <preset>..." >&2
   echo "local publishes at \$MAPLIBRE_MAVEN_VERSION, or by default at" >&2
-  echo "0.1.0-local.<commit>, with .dirty appended for uncommitted changes." >&2
+  echo "0.1.0-local.<commit>, with .dirty-<hash> of the worktree appended for" >&2
+  echo "uncommitted changes." >&2
+}
+
+# Prints a short hash of the worktree's tracked and untracked content, so each
+# uncommitted state publishes at its own version and the repository never mixes
+# modules built from different edits under one version.
+worktree_tree() {
+  local index tree
+  index="$(mktemp)"
+  cp "$(git rev-parse --git-path index)" "$index"
+  GIT_INDEX_FILE="$index" git add --all
+  tree="$(GIT_INDEX_FILE="$index" git write-tree)"
+  rm -f "$index"
+  printf '%s' "${tree:0:12}"
 }
 
 extract_preset() {
@@ -52,9 +66,11 @@ prepare_native_inputs() {
       )
       ;;
     apple)
-      # macOS enables every Kotlin/Native target, so cinterop commonization can
-      # schedule cinterop tasks for the Android and Linux targets even though
-      # the Linux partition publishes them; their install dirs must exist here.
+      # The Linux installs feed the JVM runtime classifiers. The Android
+      # installs date from when runtime cinterop commonization scheduled
+      # cinterop for every Kotlin/Native target. The runtimes' gradle.properties
+      # now disable it; prune these once full coverage confirms the apple
+      # partition publishes without them.
       presets=(
         android-arm-egl
         android-arm-vulkan
@@ -120,10 +136,10 @@ publish_linux_leaves() {
   local common=(
     -Pmaplibre.android.prebuiltInstallRoot="$install_root"
   )
-  # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
-  # target of a runtime module that the host supports, not just the
-  # publications named on the command line, so each invocation configures
-  # install dirs for all of them.
+  # Each invocation configures install dirs for every Kotlin/Native target of a
+  # runtime module, not just its named publications. This dates from runtime
+  # cinterop commonization, which the runtimes' gradle.properties now disable;
+  # narrow it once full coverage confirms the publications pass without it.
   local opengl=(
     -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
@@ -225,9 +241,8 @@ publish_linux_leaves() {
 publish_apple_leaves() {
   local repository="$1"
   shift
-  # Cinterop commonization can schedule cinterop tasks for every Kotlin/Native
-  # target of a runtime module, not just the publications named on the command
-  # line, so each invocation configures install dirs for all of them.
+  # Each invocation configures install dirs for every target of a runtime
+  # module, as in publish_linux_leaves; narrow it with that list.
   local opengl=(
     -Pmaplibre.runtime.opengl.androidNativeArm32.installDir="$install_root/android-arm-egl"
     -Pmaplibre.runtime.opengl.androidNativeArm64.installDir="$install_root/android-arm64-egl"
@@ -496,7 +511,7 @@ publish_local() {
     base="$(sed -n 's/^maplibre\.maven\.version=//p' "${MISE_MONOREPO_ROOT}/gradle.properties")"
     version="${base%-SNAPSHOT}-local.$(git rev-parse --short=12 HEAD)"
     if [[ -n "$(git status --porcelain)" ]]; then
-      version="${version}.dirty"
+      version="${version}.dirty-$(worktree_tree)"
     fi
   fi
 
