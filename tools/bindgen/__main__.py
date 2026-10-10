@@ -222,18 +222,54 @@ def format_outputs(outputs: dict[str, str], staging: Path) -> dict[str, str]:
     return {path: (staging / path).read_text() for path in outputs}
 
 
+CONFLICT_MARKERS = ("<<<<<<<", "|||||||", "=======", ">>>>>>>")
+
+
+def recorded_files(text: str) -> list[str] | None:
+    """Return the `files` entries of a coverage report, or None without one.
+
+    A report that a merge left with conflict markers is not JSON, so this
+    reads the one entry per line that the report holds instead, and keeps the
+    entries from every side of each conflict.
+    """
+    try:
+        recorded = json.loads(text)
+    except ValueError:
+        pass
+    else:
+        files = recorded.get("files") if isinstance(recorded, dict) else None
+        if isinstance(files, list) and all(isinstance(path, str) for path in files):
+            return files
+        return None
+    lines = iter(text.splitlines())
+    if not any(line.strip() == '"files": [' for line in lines):
+        return None
+    files = []
+    for line in lines:
+        entry = line.strip()
+        if entry in ("]", "],"):
+            return files
+        if entry.startswith(CONFLICT_MARKERS):
+            continue
+        try:
+            path = json.loads(entry.removesuffix(","))
+        except ValueError:
+            return None
+        if not isinstance(path, str):
+            return None
+        files.append(path)
+    return None
+
+
 def previous_outputs(root: Path) -> set[str]:
     """Read the outputs that the last run recorded in its coverage report."""
     manifest = root / COVERAGE
     if not manifest.is_file():
         return set()
-    try:
-        recorded = json.loads(manifest.read_text())
-    except ValueError:
-        recorded = None
-    files = recorded.get("files") if isinstance(recorded, dict) else None
-    if not isinstance(files, list) or not all(isinstance(path, str) for path in files):
-        raise ModelError([f"{COVERAGE}: cannot read the previous output list"])
+    files = recorded_files(manifest.read_text())
+    if files is None:
+        message = "cannot read the previous output list; resolve or restore the file"
+        raise ModelError([f"{COVERAGE}: {message}, then regenerate"])
     unsafe = [
         path for path in files if Path(path).is_absolute() or ".." in Path(path).parts
     ]

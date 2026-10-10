@@ -75,6 +75,46 @@ class GenerateCommandTests(unittest.TestCase):
             self.assertTrue((root / handwritten).is_file())
             self.assertEqual(self.generate(root, ("keywords",), check=True), (0, ""))
 
+    def test_a_conflicted_output_list_keeps_the_outputs_of_every_side(self):
+        # A merge leaves conflict markers in the report whenever two branches
+        # change its output list, and generation then resolves the conflict.
+        removed = "bindings/dotnet/src/Maplibre.NativeFfi/Api/Label.g.cs"
+        theirs = "bindings/rust/src/theirs.rs"
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(self.generate(root, ("keywords", "conventions"))[0], 0)
+            (root / theirs).parent.mkdir(parents=True, exist_ok=True)
+            (root / theirs).write_text("// generated on the other branch\n")
+            manifest = root / cli.COVERAGE
+            entry = f'    "{removed}",\n'
+            self.assertIn(entry, manifest.read_text())
+            manifest.write_text(
+                manifest.read_text().replace(
+                    entry,
+                    f'<<<<<<< ours\n{entry}=======\n    "{theirs}",\n>>>>>>> theirs\n',
+                )
+            )
+
+            status, errors = self.generate(root, ("keywords",), check=True)
+            self.assertEqual(status, 1)
+            self.assertIn(f"stale generated file: {removed}", errors)
+            self.assertIn(f"stale generated file: {theirs}", errors)
+
+            self.assertEqual(self.generate(root, ("keywords",)), (0, ""))
+            self.assertFalse((root / removed).exists())
+            self.assertFalse((root / theirs).exists())
+            self.assertEqual(self.generate(root, ("keywords",), check=True), (0, ""))
+
+    def test_an_unreadable_output_list_fails_before_writing_output(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / cli.COVERAGE
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text("<<<<<<< ours\n{}\n=======\n>>>>>>> theirs\n")
+            with self.assertRaisesRegex(cli.ModelError, "resolve or restore"):
+                self.generate(root, ("keywords",))
+            self.assertEqual(sorted(root.rglob("*")), [manifest.parent, manifest])
+
     def test_require_complete_fails_while_a_declaration_is_unsupported(self):
         # The values group declares a nullable counted input that some emitters
         # report unsupported.
