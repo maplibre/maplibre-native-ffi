@@ -50,16 +50,22 @@ abandon the session, or detach it and wait for the detach completion. For a
 session that a host graphics thread drives, stop driver service first. Abandon
 is synchronous, so an exit path can use it on a session that is mid-frame. The
 Python binding abandons every session that it still holds when the interpreter
-shuts down. The Kotlin binding on the JVM and Android abandons every session
-that it still holds from a shutdown hook, so `System.exit` and a return from
-`main` need no host step. It skips this when exit starts inside a MapLibre
-callback. The JVM runs a host's own shutdown hooks concurrently with this one,
-so a host hook that still uses a session can find it abandoned. A Kotlin/Native
-host, a host whose own graphics thread is inside driver service at exit, and a
-host that exits from a callback still end those sessions themselves. A Dart
-isolate's shutdown finalizes its open sessions without starting graphics calls,
-but a driver call already in flight can outlast it, so a Dart host ends its
-sessions' graphics calls itself before exit.
+shuts down. A Dart isolate's shutdown finalizes its open sessions without
+starting graphics calls, but a driver call already in flight can outlast it, so
+a Dart host ends its sessions' graphics calls itself before exit.
+
+The Kotlin binding on the JVM and Android abandons the sessions that it still
+holds from a shutdown hook, unless exit starts inside a MapLibre callback. The
+hook abandons every session that a core worker drives. It abandons a session
+that a graphics thread drives only when that thread is outside driver service as
+the hook runs, because abandon during driver service returns a busy status. A
+host whose sessions a core worker drives can therefore call `System.exit` or
+return from `main` directly. A host that services a session on its own graphics
+thread stops that service and then abandons or detaches the session before it
+starts exit. A shutdown hook is too late for this step: the JVM runs every
+shutdown hook concurrently with the binding's hook and keeps the graphics thread
+running. A Kotlin/Native host and a host that exits from a callback end every
+session's graphics calls themselves.
 
 ## Map
 
