@@ -912,7 +912,7 @@ final class Status extends _Enum {
   /// A nonblocking acquisition or service call has no result yet.
   static const notReady = Status.fromRawValue(-9);
 
-  /// A command or operation named an ID with no live object behind it.
+  /// A call named an ID with no live object behind it.
   static const notFound = Status.fromRawValue(-10);
 }
 

@@ -967,7 +967,7 @@ const (
 	StatusTargetLost Status = Status(C.MLN_STATUS_TARGET_LOST)
 	// A nonblocking acquisition or service call has no result yet.
 	StatusNotReady Status = Status(C.MLN_STATUS_NOT_READY)
-	// A command or operation named an ID with no live object behind it.
+	// A call named an ID with no live object behind it.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
 )
 

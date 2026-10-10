@@ -53,6 +53,6 @@ public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   public static let targetLost: Status = .init(rawValue: -8)
   /// A nonblocking acquisition or service call has no result yet.
   public static let notReady: Status = .init(rawValue: -9)
-  /// A command or operation named an ID with no live object behind it.
+  /// A call named an ID with no live object behind it.
   public static let notFound: Status = .init(rawValue: -10)
 }

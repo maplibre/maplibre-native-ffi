@@ -1151,7 +1151,7 @@ public data class Status(public val rawValue: Int) {
     public val TARGET_LOST: Status = Status(-8)
     /** A nonblocking acquisition or service call has no result yet. */
     public val NOT_READY: Status = Status(-9)
-    /** A command or operation named an ID with no live object behind it. */
+    /** A call named an ID with no live object behind it. */
     public val NOT_FOUND: Status = Status(-10)
   }
 }

@@ -4997,7 +4997,7 @@ pub enum Status: i32 {
     TargetLost = -8,
     /// A nonblocking acquisition or service call has no result yet.
     NotReady = -9,
-    /// A command or operation named an ID with no live object behind it.
+    /// A call named an ID with no live object behind it.
     NotFound = -10,
 } Unknown
 }

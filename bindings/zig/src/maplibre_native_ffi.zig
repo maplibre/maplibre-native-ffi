@@ -3806,7 +3806,7 @@ pub const SourceFeatureQueryOptions = struct {
 /// See `mln_status` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const Status = enum(i32) {
-    /// A command or operation named an ID with no live object behind it.
+    /// A call named an ID with no live object behind it.
     not_found = -10,
     /// A nonblocking acquisition or service call has no result yet.
     not_ready = -9,
