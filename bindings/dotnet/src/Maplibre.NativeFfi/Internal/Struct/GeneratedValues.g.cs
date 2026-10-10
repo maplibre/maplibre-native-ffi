@@ -86,28 +86,42 @@ internal static unsafe class GeneratedValues
     internal static CameraDelta CopyCameraDelta(mln_camera_delta value) =>
         new()
         {
-            Kind = (CameraDeltaKind)value.kind,
-            Offset = CopyScreenPoint(value.offset),
-            Amount = value.amount,
-            Anchor = value.has_anchor != 0 ? CopyScreenPoint(value.anchor) : null,
+            Offset = value.fields.HasFlag(MLN_CAMERA_DELTA_OFFSET)
+                ? CopyScreenPoint(value.offset)
+                : null,
+            Scale = value.fields.HasFlag(MLN_CAMERA_DELTA_SCALE) ? value.scale : null,
+            Bearing = value.fields.HasFlag(MLN_CAMERA_DELTA_BEARING) ? value.bearing : null,
+            Pitch = value.fields.HasFlag(MLN_CAMERA_DELTA_PITCH) ? value.pitch : null,
+            Anchor = value.fields.HasFlag(MLN_CAMERA_DELTA_ANCHOR)
+                ? CopyScreenPoint(value.anchor)
+                : null,
             Animation = CopyAnimationOptions(value.animation),
+            GesturePhase = (GesturePhase)value.gesture_phase,
         };
 
     internal static mln_camera_delta NativeCameraDelta(CameraDelta value)
     {
         Required(value.Animation, "CameraDelta.Animation must not be null.");
         var native = NativeMethods.mln_camera_delta_default();
-        native.has_anchor = 0;
+        native.fields = 0;
         native.size = (uint)sizeof(mln_camera_delta);
-        native.kind = (uint)value.Kind;
-        native.offset = NativeScreenPoint(value.Offset);
-        native.amount = value.Amount;
-        if (value.Anchor is { } fieldAnchor)
-        {
-            native.has_anchor = 1;
-            native.anchor = NativeScreenPoint(fieldAnchor);
-        }
+        native.fields |= Put(
+            value.Offset,
+            ref native.offset,
+            MLN_CAMERA_DELTA_OFFSET,
+            NativeScreenPoint
+        );
+        native.fields |= Put(value.Scale, ref native.scale, MLN_CAMERA_DELTA_SCALE);
+        native.fields |= Put(value.Bearing, ref native.bearing, MLN_CAMERA_DELTA_BEARING);
+        native.fields |= Put(value.Pitch, ref native.pitch, MLN_CAMERA_DELTA_PITCH);
+        native.fields |= Put(
+            value.Anchor,
+            ref native.anchor,
+            MLN_CAMERA_DELTA_ANCHOR,
+            NativeScreenPoint
+        );
         native.animation = NativeAnimationOptions(value.Animation);
+        native.gesture_phase = (uint)value.GesturePhase;
         return native;
     }
 

@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Gesture boundary carried atomically with a camera update.
+/// Gesture boundary carried atomically with a camera update or delta.
 /// </summary>
 /// <remarks>
 /// See <c>mln_gesture_phase</c> in the <see

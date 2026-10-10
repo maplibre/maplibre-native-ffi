@@ -239,23 +239,49 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
 ) {
   final result = arena<raw.mln_camera_delta>();
   result.ref = raw.mln_camera_delta_default();
-  result.ref.kind = value.kind.rawValue;
-  result.ref.offset = _writeScreenPoint(value.offset, arena).ref;
-  result.ref.amount = value.amount;
+  if (value.offset != null) {
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_OFFSET;
+    result.ref.offset = _writeScreenPoint(value.offset!, arena).ref;
+  }
+  if (value.scale != null) {
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_SCALE;
+    result.ref.scale = value.scale!;
+  }
+  if (value.bearing != null) {
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_BEARING;
+    result.ref.bearing = value.bearing!;
+  }
+  if (value.pitch != null) {
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_PITCH;
+    result.ref.pitch = value.pitch!;
+  }
   if (value.anchor != null) {
-    result.ref.has_anchor = true;
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_ANCHOR;
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
   }
   result.ref.animation = _writeAnimationOptions(value.animation, arena).ref;
+  result.ref.gesture_phase = value.gesturePhase.rawValue;
   return result;
 }
 
 CameraDelta _readCameraDelta(raw.mln_camera_delta source) => CameraDelta(
-  kind: CameraDeltaKind.fromRawValue(source.kind),
-  offset: _readScreenPoint(source.offset),
-  amount: source.amount,
-  anchor: source.has_anchor ? _readScreenPoint(source.anchor) : null,
+  offset: (source.fields & raw.MLN_CAMERA_DELTA_OFFSET) != 0
+      ? _readScreenPoint(source.offset)
+      : null,
+  scale: (source.fields & raw.MLN_CAMERA_DELTA_SCALE) != 0
+      ? source.scale
+      : null,
+  bearing: (source.fields & raw.MLN_CAMERA_DELTA_BEARING) != 0
+      ? source.bearing
+      : null,
+  pitch: (source.fields & raw.MLN_CAMERA_DELTA_PITCH) != 0
+      ? source.pitch
+      : null,
+  anchor: (source.fields & raw.MLN_CAMERA_DELTA_ANCHOR) != 0
+      ? _readScreenPoint(source.anchor)
+      : null,
   animation: _readAnimationOptions(source.animation),
+  gesturePhase: GesturePhase.fromRawValue(source.gesture_phase),
 );
 
 Pointer<raw.mln_edge_insets> _writeEdgeInsets(EdgeInsets value, Arena arena) {
@@ -4500,7 +4526,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Submits one copied relative camera update.
+  /// Submits one atomic relative camera update.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

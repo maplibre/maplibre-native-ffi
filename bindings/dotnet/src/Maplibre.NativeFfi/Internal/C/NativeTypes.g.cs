@@ -54,12 +54,15 @@ internal unsafe struct mln_buffer_view
 internal unsafe struct mln_camera_delta
 {
     public uint size;
-    public uint kind;
+    public mln_camera_delta_field fields;
     public mln_screen_point offset;
-    public double amount;
-    public byte has_anchor;
+    public double scale;
+    public double bearing;
+    public double pitch;
     public mln_screen_point anchor;
     public mln_animation_options animation;
+    public uint gesture_phase;
+    public uint reserved;
 }
 
 internal unsafe struct mln_camera_fit_options
@@ -1226,12 +1229,13 @@ internal enum mln_camera_change_mode : uint
     MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
 }
 
-internal enum mln_camera_delta_kind : uint
+internal enum mln_camera_delta_field : uint
 {
-    MLN_CAMERA_DELTA_MOVE = 0,
-    MLN_CAMERA_DELTA_SCALE = 1,
-    MLN_CAMERA_DELTA_BEARING = 2,
-    MLN_CAMERA_DELTA_PITCH = 3,
+    MLN_CAMERA_DELTA_OFFSET = 1,
+    MLN_CAMERA_DELTA_SCALE = 2,
+    MLN_CAMERA_DELTA_BEARING = 4,
+    MLN_CAMERA_DELTA_PITCH = 8,
+    MLN_CAMERA_DELTA_ANCHOR = 16,
 }
 
 internal enum mln_camera_fit_option_field : uint

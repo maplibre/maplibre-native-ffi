@@ -3,6 +3,7 @@ global using Maplibre.NativeFfi.Internal;
 global using Maplibre.NativeFfi.Internal.C;
 global using static Maplibre.NativeFfi.Internal.C.mln_animation_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_bound_option_field;
+global using static Maplibre.NativeFfi.Internal.C.mln_camera_delta_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_camera_fit_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_camera_option_field;
 global using static Maplibre.NativeFfi.Internal.C.mln_custom_geometry_source_option_field;

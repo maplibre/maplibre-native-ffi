@@ -266,49 +266,68 @@ pub const CameraChangeMode = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-/// One relative camera operation.
+/// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraDelta = struct {
-    kind: CameraDeltaKind = std.mem.zeroes(CameraDeltaKind),
-    offset: ScreenPoint = .{},
-    amount: f64 = std.mem.zeroes(f64),
+    /// Pan in logical map pixels; the content moves by this offset.
+    offset: ?ScreenPoint = null,
+    /// Positive zoom factor; 2 zooms in one level.
+    scale: ?f64 = null,
+    /// Degrees added to the bearing. An animated bearing change takes the
+    /// shorter way around, as `mln_camera_update` does.
+    bearing: ?f64 = null,
+    /// Degrees added to the pitch; positive tilts further from straight down.
+    pitch: ?f64 = null,
+    /// Screen point in logical map pixels that scale, bearing, and pitch keep
+    /// fixed.
     anchor: ?ScreenPoint = null,
     animation: AnimationOptions = .{},
+    gesture_phase: GesturePhase = std.mem.zeroes(GesturePhase),
     pub fn toNative(self: CameraDelta) c.mln_camera_delta {
         var raw = c.mln_camera_delta_default();
-        raw.has_anchor = false;
-        raw.kind = self.kind.toNative();
-        raw.offset = self.offset.toNative();
-        raw.amount = self.amount;
-        marshal.present(&raw.has_anchor, true, &raw.anchor, self.anchor);
+        raw.fields = 0;
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_OFFSET, &raw.offset, self.offset);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_SCALE, &raw.scale, self.scale);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_BEARING, &raw.bearing, self.bearing);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_PITCH, &raw.pitch, self.pitch);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, self.anchor);
         raw.animation = self.animation.toNative();
+        raw.gesture_phase = self.gesture_phase.toNative();
         return raw;
     }
     pub fn fromNative(raw: c.mln_camera_delta) CameraDelta {
         return .{
-            .kind = CameraDeltaKind.fromNative(raw.kind),
-            .offset = ScreenPoint.fromNative(raw.offset),
-            .amount = raw.amount,
-            .anchor = if (raw.has_anchor) ScreenPoint.fromNative(raw.anchor) else null,
+            .offset = if (raw.fields & c.MLN_CAMERA_DELTA_OFFSET != 0) ScreenPoint.fromNative(raw.offset) else null,
+            .scale = if (raw.fields & c.MLN_CAMERA_DELTA_SCALE != 0) raw.scale else null,
+            .bearing = if (raw.fields & c.MLN_CAMERA_DELTA_BEARING != 0) raw.bearing else null,
+            .pitch = if (raw.fields & c.MLN_CAMERA_DELTA_PITCH != 0) raw.pitch else null,
+            .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
             .animation = AnimationOptions.fromNative(raw.animation),
+            .gesture_phase = GesturePhase.fromNative(raw.gesture_phase),
         };
     }
 };
 
-/// Relative camera operation carried by `mln_camera_delta`.
+/// Field mask values for `mln_camera_delta`.
 ///
-/// See `mln_camera_delta_kind` in the
+/// See `mln_camera_delta_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub const CameraDeltaKind = enum(u32) {
-    pitch = 3,
-    bearing = 2,
-    scale = 1,
-    move = 0,
-    _,
-    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
-    pub const toNative = marshal.EnumMethods(@This()).toNative;
+pub const CameraDeltaField = struct {
+    offset: bool = false,
+    scale: bool = false,
+    bearing: bool = false,
+    pitch: bool = false,
+    anchor: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// Field mask values for `mln_camera_fit_options`.
@@ -1050,7 +1069,7 @@ pub const GeojsonSourceOptions = struct {
     }
 };
 
-/// Gesture boundary carried atomically with a camera update.
+/// Gesture boundary carried atomically with a camera update or delta.
 ///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -5735,7 +5754,7 @@ pub fn mapAddVectorSourceUrl(allocator: std.mem.Allocator, map: Map, source_id: 
     return call.submit("mln_map_add_vector_source_url", .lease, map, call.command, allocator, diagnostic, .{ source_id, url, options });
 }
 
-/// Submits one copied relative camera update.
+/// Submits one atomic relative camera update.
 ///
 /// See `mln_map_apply_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

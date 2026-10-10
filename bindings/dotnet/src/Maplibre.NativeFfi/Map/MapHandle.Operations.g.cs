@@ -543,7 +543,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Submits one copied relative camera update.
+    /// Submits one atomic relative camera update.
     /// </summary>
     /// <remarks>
     /// See <c>mln_map_apply_camera_delta</c> in the <see

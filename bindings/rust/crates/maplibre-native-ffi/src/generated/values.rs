@@ -201,17 +201,26 @@ pub enum CameraChangeMode: u32 {
 } Unknown
 }
 
-/// One relative camera operation.
+/// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CameraDelta {
-    pub kind: CameraDeltaKind,
-    pub offset: ScreenPoint,
-    pub amount: f64,
+    /// Pan in logical map pixels; the content moves by this offset.
+    pub offset: Option<ScreenPoint>,
+    /// Positive zoom factor; 2 zooms in one level.
+    pub scale: Option<f64>,
+    /// Degrees added to the bearing. An animated bearing change takes the
+    /// shorter way around, as `mln_camera_update` does.
+    pub bearing: Option<f64>,
+    /// Degrees added to the pitch; positive tilts further from straight down.
+    pub pitch: Option<f64>,
+    /// Screen point in logical map pixels that scale, bearing, and pitch keep
+    /// fixed.
     pub anchor: Option<ScreenPoint>,
     pub animation: AnimationOptions,
+    pub gesture_phase: GesturePhase,
 }
 impl Default for CameraDelta {
     fn default() -> Self {
@@ -222,41 +231,62 @@ impl ToNative<sys::mln_camera_delta> for CameraDelta {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera_delta> {
         let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
         raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
-        raw.has_anchor = false;
-        raw.kind = to_native(&self.kind, arena)?;
-        raw.offset = to_native(&self.offset, arena)?;
-        raw.amount = self.amount;
+        raw.fields = 0;
+        if let Some(item) = &self.offset {
+            raw.fields |= sys::MLN_CAMERA_DELTA_OFFSET;
+            raw.offset = to_native(&*item, arena)?;
+        }
+        if let Some(item) = &self.scale {
+            raw.fields |= sys::MLN_CAMERA_DELTA_SCALE;
+            raw.scale = *item;
+        }
+        if let Some(item) = &self.bearing {
+            raw.fields |= sys::MLN_CAMERA_DELTA_BEARING;
+            raw.bearing = *item;
+        }
+        if let Some(item) = &self.pitch {
+            raw.fields |= sys::MLN_CAMERA_DELTA_PITCH;
+            raw.pitch = *item;
+        }
         if let Some(item) = &self.anchor {
-            raw.has_anchor = true;
+            raw.fields |= sys::MLN_CAMERA_DELTA_ANCHOR;
             raw.anchor = to_native(&*item, arena)?;
         }
         raw.animation = to_native(&self.animation, arena)?;
+        raw.gesture_phase = to_native(&self.gesture_phase, arena)?;
         Ok(raw)
     }
 }
 impl FromNative<sys::mln_camera_delta> for CameraDelta {
     unsafe fn from_native(raw: sys::mln_camera_delta) -> Result<Self> {
         Ok(Self {
-            kind: unsafe { from_native(raw.kind) }?,
-            offset: unsafe { from_native(raw.offset) }?,
-            amount: raw.amount,
-            anchor: unsafe { convert::present(raw.has_anchor, true, raw.anchor) }?,
+            offset: unsafe {
+                convert::present(raw.fields, sys::MLN_CAMERA_DELTA_OFFSET, raw.offset)
+            }?,
+            scale: (raw.fields & sys::MLN_CAMERA_DELTA_SCALE != 0).then_some(raw.scale),
+            bearing: (raw.fields & sys::MLN_CAMERA_DELTA_BEARING != 0).then_some(raw.bearing),
+            pitch: (raw.fields & sys::MLN_CAMERA_DELTA_PITCH != 0).then_some(raw.pitch),
+            anchor: unsafe {
+                convert::present(raw.fields, sys::MLN_CAMERA_DELTA_ANCHOR, raw.anchor)
+            }?,
             animation: unsafe { from_native(raw.animation) }?,
+            gesture_phase: unsafe { from_native(raw.gesture_phase) }?,
         })
     }
 }
 
-native_enum! {
-/// Relative camera operation carried by `mln_camera_delta`.
+native_flags! {
+/// Field mask values for `mln_camera_delta`.
 ///
-/// See `mln_camera_delta_kind` in the
+/// See `mln_camera_delta_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-pub enum CameraDeltaKind: u32 {
-    Move = 0,
-    Scale = 1,
-    Bearing = 2,
-    Pitch = 3,
-} Unknown
+pub struct CameraDeltaField: u32 {
+    const OFFSET = 1;
+    const SCALE = 2;
+    const BEARING = 4;
+    const PITCH = 8;
+    const ANCHOR = 16;
+}
 }
 
 native_flags! {
@@ -1330,7 +1360,7 @@ impl FromNative<sys::mln_geojson_source_options> for GeojsonSourceOptions {
 }
 
 native_enum! {
-/// Gesture boundary carried atomically with a camera update.
+/// Gesture boundary carried atomically with a camera update or delta.
 ///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).

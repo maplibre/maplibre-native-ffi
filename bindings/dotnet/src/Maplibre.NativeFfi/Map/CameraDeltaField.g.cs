@@ -2,16 +2,18 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Relative camera operation carried by <c>mln_camera_delta</c>.
+/// Field mask values for <c>mln_camera_delta</c>.
 /// </summary>
 /// <remarks>
-/// See <c>mln_camera_delta_kind</c> in the <see
+/// See <c>mln_camera_delta_field</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
-public enum CameraDeltaKind : uint
+[Flags]
+public enum CameraDeltaField : uint
 {
-    Move = 0,
-    Scale = 1,
-    Bearing = 2,
-    Pitch = 3,
+    Offset = 1,
+    Scale = 2,
+    Bearing = 4,
+    Pitch = 8,
+    Anchor = 16,
 }

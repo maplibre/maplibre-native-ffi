@@ -65,16 +65,19 @@ final class CameraChangeMode extends _Enum {
   static const animated = CameraChangeMode.fromRawValue(1);
 }
 
-/// Relative camera operation carried by `mln_camera_delta`.
+/// Field mask values for `mln_camera_delta`.
 ///
-/// See `mln_camera_delta_kind` in the
+/// See `mln_camera_delta_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class CameraDeltaKind extends _Enum {
-  const CameraDeltaKind.fromRawValue(super.rawValue);
-  static const move = CameraDeltaKind.fromRawValue(0);
-  static const scale = CameraDeltaKind.fromRawValue(1);
-  static const bearing = CameraDeltaKind.fromRawValue(2);
-  static const pitch = CameraDeltaKind.fromRawValue(3);
+final class CameraDeltaField extends _Flags<CameraDeltaField> {
+  const CameraDeltaField.fromRawValue(super.rawValue);
+  static const offset = CameraDeltaField.fromRawValue(1);
+  static const scale = CameraDeltaField.fromRawValue(2);
+  static const bearing = CameraDeltaField.fromRawValue(4);
+  static const pitch = CameraDeltaField.fromRawValue(8);
+  static const anchor = CameraDeltaField.fromRawValue(16);
+  @override
+  CameraDeltaField _of(int rawValue) => CameraDeltaField.fromRawValue(rawValue);
 }
 
 /// Field mask values for `mln_camera_fit_options`.
@@ -248,7 +251,7 @@ final class GeojsonSourceOptionField extends _Flags<GeojsonSourceOptionField> {
       GeojsonSourceOptionField.fromRawValue(rawValue);
 }
 
-/// Gesture boundary carried atomically with a camera update.
+/// Gesture boundary carried atomically with a camera update or delta.
 ///
 /// See `mln_gesture_phase` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1563,26 +1566,50 @@ final class ScreenPoint extends _Value {
   List<Object?> get _members => [x, y];
 }
 
-/// One relative camera operation.
+/// One atomic relative camera update.
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 final class CameraDelta extends _Value {
   const CameraDelta({
-    this.kind = const CameraDeltaKind.fromRawValue(0),
-    this.offset = const ScreenPoint(0, 0),
-    this.amount = 0,
+    this.offset,
+    this.scale,
+    this.bearing,
+    this.pitch,
     this.anchor,
     this.animation = const AnimationOptions(),
+    this.gesturePhase = const GesturePhase.fromRawValue(0),
   });
-  final CameraDeltaKind kind;
-  final ScreenPoint offset;
-  final double amount;
+
+  /// Pan in logical map pixels; the content moves by this offset.
+  final ScreenPoint? offset;
+
+  /// Positive zoom factor; 2 zooms in one level.
+  final double? scale;
+
+  /// Degrees added to the bearing. An animated bearing change takes the shorter
+  /// way around, as `mln_camera_update` does.
+  final double? bearing;
+
+  /// Degrees added to the pitch; positive tilts further from straight down.
+  final double? pitch;
+
+  /// Screen point in logical map pixels that scale, bearing, and pitch keep
+  /// fixed.
   final ScreenPoint? anchor;
   final AnimationOptions animation;
+  final GesturePhase gesturePhase;
 
   @override
-  List<Object?> get _members => [kind, offset, amount, anchor, animation];
+  List<Object?> get _members => [
+    offset,
+    scale,
+    bearing,
+    pitch,
+    anchor,
+    animation,
+    gesturePhase,
+  ];
 }
 
 /// Screen-space inset in logical map pixels.

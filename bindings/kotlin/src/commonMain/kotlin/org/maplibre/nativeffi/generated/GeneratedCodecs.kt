@@ -263,19 +263,33 @@ internal fun NativeArena.writeStyleTileSourceOptions(value: StyleTileSourceOptio
 
 internal fun NativeArena.putCameraDelta(target: Long, value: CameraDelta) {
   C.mln_camera_delta_default(target)
-  writeBool(target + 32, false)
-  writeU32(target + 4, value.kind.rawValue)
-  putScreenPoint(target + 8, value.offset)
-  writeF64(target + 24, value.amount)
-  value.anchor?.let {
-    writeBool(target + 32, true)
-    putScreenPoint(target + 40, it)
+  writeU32(target + 4, 0u)
+  value.offset?.let {
+    markPresent(target + 4, 1u)
+    putScreenPoint(target + 8, it)
   }
-  putAnimationOptions(target + 56, value.animation)
+  value.scale?.let {
+    markPresent(target + 4, 2u)
+    writeF64(target + 24, it)
+  }
+  value.bearing?.let {
+    markPresent(target + 4, 4u)
+    writeF64(target + 32, it)
+  }
+  value.pitch?.let {
+    markPresent(target + 4, 8u)
+    writeF64(target + 40, it)
+  }
+  value.anchor?.let {
+    markPresent(target + 4, 16u)
+    putScreenPoint(target + 48, it)
+  }
+  putAnimationOptions(target + 64, value.animation)
+  writeU32(target + 136, value.gesturePhase.rawValue)
 }
 
 internal fun NativeArena.writeCameraDelta(value: CameraDelta): Long =
-  allocate(128, 8).also { putCameraDelta(it, value) }
+  allocate(144, 8).also { putCameraDelta(it, value) }
 
 internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptions) {
   C.mln_camera_fit_options_default(target)
@@ -1057,11 +1071,13 @@ internal fun readBoundOptions(source: Long): BoundOptions =
 
 internal fun readCameraDelta(source: Long): CameraDelta =
   CameraDelta(
-    kind = CameraDeltaKind(readU32(source + 4)),
-    offset = readScreenPoint(source + 8),
-    amount = readF64(source + 24),
-    anchor = if (readBool(source + 32)) readScreenPoint(source + 40) else null,
-    animation = readAnimationOptions(source + 56),
+    offset = if ((readU32(source + 4) and 1u) != 0u) readScreenPoint(source + 8) else null,
+    scale = if ((readU32(source + 4) and 2u) != 0u) readF64(source + 24) else null,
+    bearing = if ((readU32(source + 4) and 4u) != 0u) readF64(source + 32) else null,
+    pitch = if ((readU32(source + 4) and 8u) != 0u) readF64(source + 40) else null,
+    anchor = if ((readU32(source + 4) and 16u) != 0u) readScreenPoint(source + 48) else null,
+    animation = readAnimationOptions(source + 64),
+    gesturePhase = GesturePhase(readU32(source + 136)),
   )
 
 internal fun readCameraFitOptions(source: Long): CameraFitOptions =

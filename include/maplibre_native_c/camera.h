@@ -214,16 +214,25 @@ MLN_API mln_status mln_map_update_camera(
 ) MLN_NOEXCEPT;
 
 /**
- * Submits one copied relative camera update.
+ * Submits one atomic relative camera update.
  *
- * The completion reports its terminal disposition and the snapshot generation
- * that the update published.
+ * The delta is copied before return. Its components and gesture phase apply in
+ * one command: render sessions receive one render update for the whole delta,
+ * and the completion reports its terminal disposition and the one snapshot
+ * generation that the delta published. The command completion reports
+ * application of the delta; when delta->animation carries a transition ID, one
+ * transition-finished event reports the end of all its animations.
+ *
+ * Validation reads only the fields that delta->fields selects.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, delta is null or
- *   undersized, delta->kind is out of range, the offset, scale, or anchor the
- *   kind uses is not finite, or completion is invalid.
+ *   undersized, delta->fields carries an unknown bit, delta->gesture_phase is
+ *   out of range, a selected offset, bearing, pitch, or anchor is not finite, a
+ *   selected scale is not finite and positive, ANCHOR is selected without
+ *   SCALE, BEARING, or PITCH or together with OFFSET, delta->animation is
+ *   invalid, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *

@@ -234,17 +234,18 @@ class CameraChangeMode(UnknownIntEnum):
     ANIMATED = 1
 
 
-class CameraDeltaKind(UnknownIntEnum):
-    """Relative camera operation carried by `mln_camera_delta`.
+class CameraDeltaField(IntFlag):
+    """Field mask values for `mln_camera_delta`.
 
-    See `mln_camera_delta_kind` in the
+    See `mln_camera_delta_field` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    MOVE = 0
-    SCALE = 1
-    BEARING = 2
-    PITCH = 3
+    OFFSET = 1
+    SCALE = 2
+    BEARING = 4
+    PITCH = 8
+    ANCHOR = 16
 
 
 class CameraFitOptionField(IntFlag):
@@ -398,7 +399,7 @@ class GeojsonSourceOptionField(IntFlag):
 
 
 class GesturePhase(UnknownIntEnum):
-    """Gesture boundary carried atomically with a camera update.
+    """Gesture boundary carried atomically with a camera update or delta.
 
     See `mln_gesture_phase` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1193,26 +1194,30 @@ class BoundOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraDelta:
-    """One relative camera operation.
+    """One atomic relative camera update.
 
     See `mln_camera_delta` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
     """
 
-    kind: CameraDeltaKind
-    offset: ScreenPoint
-    amount: float
     animation: AnimationOptions
+    gesture_phase: GesturePhase
+    offset: ScreenPoint | None = None
+    scale: float | None = None
+    bearing: float | None = None
+    pitch: float | None = None
     anchor: ScreenPoint | None = None
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            kind=CameraDeltaKind(raw["kind"]),
-            offset=ScreenPoint._from_native(raw["offset"]),
-            amount=raw["amount"],
+            offset=_maybe(ScreenPoint._from_native, raw["offset"]),
+            scale=raw["scale"],
+            bearing=raw["bearing"],
+            pitch=raw["pitch"],
             anchor=_maybe(ScreenPoint._from_native, raw["anchor"]),
             animation=AnimationOptions._from_native(raw["animation"]),
+            gesture_phase=GesturePhase(raw["gesture_phase"]),
         )
 
     @classmethod

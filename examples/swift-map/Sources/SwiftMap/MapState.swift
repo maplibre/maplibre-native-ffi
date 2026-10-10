@@ -127,25 +127,22 @@ final class MapState {
     animation: AnimationOptions? = nil
   ) {
     submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
-      kind: .scale,
-      amount: scale,
+      scale: scale,
       anchor: anchor,
       animation: animation ?? AnimationOptions()
     )) }
   }
 
-  func adjustBearing(delta: Double, animation: AnimationOptions? = nil) {
+  /// Adds bearing and pitch degrees in one delta. A nil value leaves that
+  /// component unchanged.
+  func adjustOrientation(
+    bearing: Double? = nil,
+    pitch: Double? = nil,
+    animation: AnimationOptions? = nil
+  ) {
     submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
-      kind: .bearing,
-      amount: delta,
-      animation: animation ?? AnimationOptions()
-    )) }
-  }
-
-  func adjustPitch(delta: Double, animation: AnimationOptions? = nil) {
-    submit { [map] in _ = try await map.applyCameraDelta(delta: CameraDelta(
-      kind: .pitch,
-      amount: delta,
+      bearing: bearing,
+      pitch: pitch,
       animation: animation ?? AnimationOptions()
     )) }
   }

@@ -4,7 +4,6 @@ import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
-import org.maplibre.nativeffi.generated.CameraDeltaKind
 import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.CameraUpdateMode
@@ -98,42 +97,28 @@ internal class MapState(initialExtent: SurfaceExtent, eventWake: Wake, styleJson
   }
 
   fun scaleBy(scale: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
+    map.applyCameraDelta(CameraDelta(scale = scale, anchor = anchor))
   }
 
   fun scaleByAnimated(scale: Double, anchor: ScreenPoint) {
     map.applyCameraDelta(
-      CameraDelta(
-        kind = CameraDeltaKind.SCALE,
-        amount = scale,
-        anchor = anchor,
-        animation = animation(KEYBOARD_ANIMATION_MS),
-      )
+      CameraDelta(scale = scale, anchor = anchor, animation = animation(KEYBOARD_ANIMATION_MS))
     )
   }
 
   fun adjustBearingAndPitch(bearingDegrees: Double, pitchDegrees: Double) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.BEARING, amount = bearingDegrees))
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.PITCH, amount = pitchDegrees))
+    map.applyCameraDelta(CameraDelta(bearing = bearingDegrees, pitch = pitchDegrees))
   }
 
   fun adjustBearingAnimated(bearingDegrees: Double) {
     map.applyCameraDelta(
-      CameraDelta(
-        kind = CameraDeltaKind.BEARING,
-        amount = bearingDegrees,
-        animation = animation(KEYBOARD_ANIMATION_MS),
-      )
+      CameraDelta(bearing = bearingDegrees, animation = animation(KEYBOARD_ANIMATION_MS))
     )
   }
 
   fun adjustPitchAnimated(pitchDegrees: Double) {
     map.applyCameraDelta(
-      CameraDelta(
-        kind = CameraDeltaKind.PITCH,
-        amount = pitchDegrees,
-        animation = animation(KEYBOARD_ANIMATION_MS),
-      )
+      CameraDelta(pitch = pitchDegrees, animation = animation(KEYBOARD_ANIMATION_MS))
     )
   }
 

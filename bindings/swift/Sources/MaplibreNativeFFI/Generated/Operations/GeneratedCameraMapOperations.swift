@@ -4,7 +4,7 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Submits one copied relative camera update.
+  /// Submits one atomic relative camera update.
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).

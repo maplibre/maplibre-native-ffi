@@ -22,11 +22,12 @@ pub const MLN_BOUND_OPTION_UNBOUNDED: mln_bound_option_field = 32;
 pub type mln_camera_change_mode = u32;
 pub const MLN_CAMERA_CHANGE_MODE_IMMEDIATE: mln_camera_change_mode = 0;
 pub const MLN_CAMERA_CHANGE_MODE_ANIMATED: mln_camera_change_mode = 1;
-pub type mln_camera_delta_kind = u32;
-pub const MLN_CAMERA_DELTA_MOVE: mln_camera_delta_kind = 0;
-pub const MLN_CAMERA_DELTA_SCALE: mln_camera_delta_kind = 1;
-pub const MLN_CAMERA_DELTA_BEARING: mln_camera_delta_kind = 2;
-pub const MLN_CAMERA_DELTA_PITCH: mln_camera_delta_kind = 3;
+pub type mln_camera_delta_field = u32;
+pub const MLN_CAMERA_DELTA_OFFSET: mln_camera_delta_field = 1;
+pub const MLN_CAMERA_DELTA_SCALE: mln_camera_delta_field = 2;
+pub const MLN_CAMERA_DELTA_BEARING: mln_camera_delta_field = 4;
+pub const MLN_CAMERA_DELTA_PITCH: mln_camera_delta_field = 8;
+pub const MLN_CAMERA_DELTA_ANCHOR: mln_camera_delta_field = 16;
 pub type mln_camera_fit_option_field = u32;
 pub const MLN_CAMERA_FIT_OPTION_PADDING: mln_camera_fit_option_field = 1;
 pub const MLN_CAMERA_FIT_OPTION_BEARING: mln_camera_fit_option_field = 2;
@@ -460,12 +461,15 @@ pub struct mln_buffer_view {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_camera_delta {
     pub size: u32,
-    pub kind: u32,
+    pub fields: u32,
     pub offset: mln_screen_point,
-    pub amount: f64,
-    pub has_anchor: bool,
+    pub scale: f64,
+    pub bearing: f64,
+    pub pitch: f64,
     pub anchor: mln_screen_point,
     pub animation: mln_animation_options,
+    pub gesture_phase: u32,
+    pub reserved: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

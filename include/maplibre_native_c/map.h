@@ -311,33 +311,6 @@ typedef struct mln_animation_options {
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_TRANSITION_ID");
 } mln_animation_options;
 
-/** Relative camera operation carried by mln_camera_delta. */
-typedef enum mln_camera_delta_kind : uint32_t {
-  MLN_CAMERA_DELTA_MOVE = 0,
-  MLN_CAMERA_DELTA_SCALE = 1,
-  MLN_CAMERA_DELTA_BEARING = 2,
-  MLN_CAMERA_DELTA_PITCH = 3,
-} mln_camera_delta_kind;
-
-/**
- * One relative camera operation.
- *
- * MOVE reads offset. SCALE reads amount as a positive factor. BEARING and
- * PITCH read amount as degrees, added to the current value: a positive PITCH
- * amount tilts the camera further from straight down, the opposite of
- * MapLibre Native's Map::pitchBy(). SCALE and BEARING apply anchor when
- * has_anchor is true. Every operation reads animation.
- */
-typedef struct mln_camera_delta {
-  uint32_t size;
-  uint32_t kind MLN_BINDING("enum=mln_camera_delta_kind");
-  mln_screen_point offset;
-  double amount;
-  bool has_anchor;
-  mln_screen_point anchor MLN_BINDING("mask=has_anchor");
-  mln_animation_options animation;
-} mln_camera_delta;
-
 /** Camera transition behavior for mln_camera_update. */
 typedef enum mln_camera_update_mode : uint32_t {
   MLN_CAMERA_UPDATE_MODE_JUMP = 0,
@@ -346,7 +319,7 @@ typedef enum mln_camera_update_mode : uint32_t {
 } mln_camera_update_mode;
 
 /**
- * Gesture boundary carried atomically with a camera update.
+ * Gesture boundary carried atomically with a camera update or delta.
  *
  * The phase is applied around the camera write and is reported by
  * mln_map_snapshot.gesture_in_progress.
@@ -369,6 +342,62 @@ typedef enum mln_gesture_phase : uint32_t {
    */
   MLN_GESTURE_PHASE_CANCEL = 4,
 } mln_gesture_phase;
+
+/** Field mask values for mln_camera_delta. */
+typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
+  MLN_CAMERA_DELTA_OFFSET = 1U << 0U,
+  MLN_CAMERA_DELTA_SCALE = 1U << 1U,
+  MLN_CAMERA_DELTA_BEARING = 1U << 2U,
+  MLN_CAMERA_DELTA_PITCH = 1U << 3U,
+  MLN_CAMERA_DELTA_ANCHOR = 1U << 4U,
+} mln_camera_delta_field;
+
+/**
+ * One atomic relative camera update.
+ *
+ * Each selected component resolves against the camera as it stands when the
+ * command runs. Immediate deltas therefore compose exactly, however many are
+ * queued. An animated delta starts from the value a running transition has
+ * reached and replaces that component's transition, so queue animated deltas
+ * only after the previous one has rendered or finished.
+ *
+ * OFFSET pans first, in the current camera's logical pixels: the map content
+ * moves by offset, so positive x moves it right and positive y moves it down,
+ * and a pointer drag delta passes through unchanged. The pan stops short of the
+ * horizon. SCALE, BEARING, and PITCH then change the camera about anchor when
+ * ANCHOR is set, keeping the coordinate under anchor fixed, or about the center
+ * otherwise. ANCHOR requires SCALE, BEARING, or PITCH, and cannot be combined
+ * with OFFSET; submit a pan as its own delta.
+ *
+ * fields may be zero, in which case the delta changes only the gesture phase.
+ * gesture_phase is applied around the camera write, as in mln_camera_update.
+ * The command copies this struct before returning.
+ */
+typedef struct mln_camera_delta {
+  uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_camera_delta_field");
+  /** Pan in logical map pixels; the content moves by this offset. */
+  mln_screen_point offset
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_OFFSET");
+  /** Positive zoom factor; 2 zooms in one level. */
+  double scale MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_SCALE");
+  /**
+   * Degrees added to the bearing. An animated bearing change takes the shorter
+   * way around, as mln_camera_update does.
+   */
+  double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_BEARING");
+  /** Degrees added to the pitch; positive tilts further from straight down. */
+  double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_PITCH");
+  /**
+   * Screen point in logical map pixels that scale, bearing, and pitch keep
+   * fixed.
+   */
+  mln_screen_point anchor
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_ANCHOR");
+  mln_animation_options animation;
+  uint32_t gesture_phase MLN_BINDING("enum=mln_gesture_phase");
+  uint32_t reserved MLN_BINDING("kind=reserved");
+} mln_camera_delta;
 
 /**
  * One atomic absolute camera update.
@@ -904,7 +933,7 @@ typedef struct mln_map_snapshot {
   /**
    * True while the map is inside a gesture.
    *
-   * A camera update whose gesture_phase is MLN_GESTURE_PHASE_BEGIN or
+   * A camera update or delta whose gesture_phase is MLN_GESTURE_PHASE_BEGIN or
    * MLN_GESTURE_PHASE_UPDATE sets it; MLN_GESTURE_PHASE_END and
    * MLN_GESTURE_PHASE_CANCEL clear it.
    */

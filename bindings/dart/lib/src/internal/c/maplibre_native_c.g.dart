@@ -261,14 +261,20 @@ final class mln_camera_delta extends Struct {
   @Uint32()
   external int size;
   @Uint32()
-  external int kind;
+  external int fields;
   external mln_screen_point offset;
   @Double()
-  external double amount;
-  @Bool()
-  external bool has_anchor;
+  external double scale;
+  @Double()
+  external double bearing;
+  @Double()
+  external double pitch;
   external mln_screen_point anchor;
   external mln_animation_options animation;
+  @Uint32()
+  external int gesture_phase;
+  @Uint32()
+  external int reserved;
 }
 
 final class mln_camera_fit_options extends Struct {
@@ -1756,11 +1762,12 @@ const MLN_BOUND_OPTION_UNBOUNDED = 32;
 const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
 const MLN_CAMERA_CHANGE_MODE_ANIMATED = 1;
 
-// mln_camera_delta_kind
-const MLN_CAMERA_DELTA_MOVE = 0;
-const MLN_CAMERA_DELTA_SCALE = 1;
-const MLN_CAMERA_DELTA_BEARING = 2;
-const MLN_CAMERA_DELTA_PITCH = 3;
+// mln_camera_delta_field
+const MLN_CAMERA_DELTA_OFFSET = 1;
+const MLN_CAMERA_DELTA_SCALE = 2;
+const MLN_CAMERA_DELTA_BEARING = 4;
+const MLN_CAMERA_DELTA_PITCH = 8;
+const MLN_CAMERA_DELTA_ANCHOR = 16;
 
 // mln_camera_fit_option_field
 const MLN_CAMERA_FIT_OPTION_PADDING = 1;

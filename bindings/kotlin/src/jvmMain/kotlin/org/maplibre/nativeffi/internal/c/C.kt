@@ -4180,13 +4180,15 @@ internal val mln_screen_point: GroupLayout =
 internal val mln_camera_delta: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
-    JAVA_INT.withName("kind"),
+    JAVA_INT.withName("fields"),
     mln_screen_point.withName("offset"),
-    JAVA_DOUBLE.withName("amount"),
-    JAVA_BOOLEAN.withName("has_anchor"),
-    Ffm.pad(7),
+    JAVA_DOUBLE.withName("scale"),
+    JAVA_DOUBLE.withName("bearing"),
+    JAVA_DOUBLE.withName("pitch"),
     mln_screen_point.withName("anchor"),
     mln_animation_options.withName("animation"),
+    JAVA_INT.withName("gesture_phase"),
+    JAVA_INT.withName("reserved"),
   )
 internal val mln_edge_insets: GroupLayout =
   Ffm.struct(

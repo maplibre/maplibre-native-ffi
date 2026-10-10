@@ -87,8 +87,7 @@ internal sealed unsafe class InputController : IDisposable
         lastY = y;
         if (rightDown || (leftDown && ctrlDown))
         {
-            state.AdjustBearing(dx * DragRotateFactor);
-            state.AdjustPitch(dy * DragPitchFactor);
+            state.AdjustOrientation(bearing: dx * DragRotateFactor, pitch: dy * DragPitchFactor);
         }
         else if (leftDown)
         {
@@ -189,16 +188,16 @@ internal sealed unsafe class InputController : IDisposable
                 state.ScaleBy(1.0 / KeyboardZoom, null, KeyboardAnimation);
                 break;
             case Keys.Q:
-                state.AdjustBearing(-KeyboardBearing, KeyboardAnimation);
+                state.AdjustOrientation(bearing: -KeyboardBearing, animation: KeyboardAnimation);
                 break;
             case Keys.E:
-                state.AdjustBearing(KeyboardBearing, KeyboardAnimation);
+                state.AdjustOrientation(bearing: KeyboardBearing, animation: KeyboardAnimation);
                 break;
             case Keys.RightBracket:
-                state.AdjustPitch(KeyboardPitch, KeyboardAnimation);
+                state.AdjustOrientation(pitch: KeyboardPitch, animation: KeyboardAnimation);
                 break;
             case Keys.LeftBracket:
-                state.AdjustPitch(-KeyboardPitch, KeyboardAnimation);
+                state.AdjustOrientation(pitch: -KeyboardPitch, animation: KeyboardAnimation);
                 break;
             case Keys.Number0:
                 state.ResetOrientation(ResetAnimation);

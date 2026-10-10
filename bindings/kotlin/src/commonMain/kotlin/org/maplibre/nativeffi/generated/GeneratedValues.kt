@@ -90,17 +90,27 @@ public data class CameraChangeMode(public val rawValue: UInt) {
 }
 
 /**
- * Relative camera operation carried by `mln_camera_delta`.
+ * Field mask values for `mln_camera_delta`.
  *
- * See `mln_camera_delta_kind` in the
+ * See `mln_camera_delta_field` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
-public data class CameraDeltaKind(public val rawValue: UInt) {
+public data class CameraDeltaField(public val rawValue: UInt) {
+  public infix fun or(other: CameraDeltaField): CameraDeltaField =
+    CameraDeltaField(rawValue or other.rawValue)
+
+  public infix fun and(other: CameraDeltaField): CameraDeltaField =
+    CameraDeltaField(rawValue and other.rawValue)
+
+  public operator fun contains(other: CameraDeltaField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
   public companion object {
-    public val MOVE: CameraDeltaKind = CameraDeltaKind(0u)
-    public val SCALE: CameraDeltaKind = CameraDeltaKind(1u)
-    public val BEARING: CameraDeltaKind = CameraDeltaKind(2u)
-    public val PITCH: CameraDeltaKind = CameraDeltaKind(3u)
+    public val OFFSET: CameraDeltaField = CameraDeltaField(1u)
+    public val SCALE: CameraDeltaField = CameraDeltaField(2u)
+    public val BEARING: CameraDeltaField = CameraDeltaField(4u)
+    public val PITCH: CameraDeltaField = CameraDeltaField(8u)
+    public val ANCHOR: CameraDeltaField = CameraDeltaField(16u)
   }
 }
 
@@ -355,7 +365,7 @@ public data class GeojsonSourceOptionField(public val rawValue: UInt) {
 }
 
 /**
- * Gesture boundary carried atomically with a camera update.
+ * Gesture boundary carried atomically with a camera update or delta.
  *
  * See `mln_gesture_phase` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1948,17 +1958,27 @@ public data class BoundOptions(
 public data class ScreenPoint(public val x: Double = 0.0, public val y: Double = 0.0)
 
 /**
- * One relative camera operation.
+ * One atomic relative camera update.
  *
  * See `mln_camera_delta` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
  */
 public data class CameraDelta(
-  public val kind: CameraDeltaKind = CameraDeltaKind(0u),
-  public val offset: ScreenPoint = ScreenPoint(),
-  public val amount: Double = 0.0,
+  /** Pan in logical map pixels; the content moves by this offset. */
+  public val offset: ScreenPoint? = null,
+  /** Positive zoom factor; 2 zooms in one level. */
+  public val scale: Double? = null,
+  /**
+   * Degrees added to the bearing. An animated bearing change takes the shorter way around, as
+   * `mln_camera_update` does.
+   */
+  public val bearing: Double? = null,
+  /** Degrees added to the pitch; positive tilts further from straight down. */
+  public val pitch: Double? = null,
+  /** Screen point in logical map pixels that scale, bearing, and pitch keep fixed. */
   public val anchor: ScreenPoint? = null,
   public val animation: AnimationOptions = AnimationOptions(),
+  public val gesturePhase: GesturePhase = GesturePhase(0u),
 )
 
 /**

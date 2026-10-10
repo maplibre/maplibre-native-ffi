@@ -1,4 +1,4 @@
-// Applying relative drag and pinch input within one gesture.
+// Applying relative drag, pinch, and rotate input within one gesture.
 
 #include <maplibre_native_c.h>
 
@@ -21,6 +21,7 @@ void drag_by(
 ) {
   // #region drag
   mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields = MLN_CAMERA_DELTA_OFFSET;
   delta.offset = offset;
   mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion drag
@@ -32,27 +33,40 @@ void pinch_by(
 ) {
   // #region pinch
   mln_camera_delta delta = mln_camera_delta_default();
-  delta.kind = MLN_CAMERA_DELTA_SCALE;
-  delta.amount = scale;
-  delta.has_anchor = true;
+  delta.fields = MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR;
+  delta.scale = scale;
   delta.anchor = focus;
   mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion pinch
 }
 
+void rotate_by(
+  mln_map map, double bearing, double pitch, mln_screen_point focus,
+  const mln_completion* completion
+) {
+  // #region rotate
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields =
+    MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_PITCH | MLN_CAMERA_DELTA_ANCHOR;
+  delta.bearing = bearing;
+  delta.pitch = pitch;
+  delta.anchor = focus;
+  mln_map_apply_camera_delta(map, &delta, completion, NULL);
+  // #endregion rotate
+}
+
 void end_gesture(
   mln_map map, double residual_scale, mln_screen_point focus,
-  const mln_completion* inertia_completion, const mln_completion* end_completion
+  const mln_completion* completion
 ) {
   // #region release
   mln_camera_delta delta = mln_camera_delta_default();
-  delta.kind = MLN_CAMERA_DELTA_SCALE;
-  delta.amount = residual_scale;
-  delta.has_anchor = true;
+  delta.fields = MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR;
+  delta.scale = residual_scale;
   delta.anchor = focus;
   delta.animation.fields = MLN_ANIMATION_OPTION_DURATION;
   delta.animation.duration_ms = 250.0;
-  mln_map_apply_camera_delta(map, &delta, inertia_completion, NULL);
-  submit_gesture_phase(map, MLN_GESTURE_PHASE_END, end_completion);
+  delta.gesture_phase = MLN_GESTURE_PHASE_END;
+  mln_map_apply_camera_delta(map, &delta, completion, NULL);
   // #endregion release
 }

@@ -80,19 +80,22 @@ const (
 	CameraChangeModeAnimated CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_ANIMATED)
 )
 
-// CameraDeltaKind corresponds to mln_camera_delta_kind. Relative camera
-// operation carried by mln_camera_delta.
+// CameraDeltaField corresponds to mln_camera_delta_field. Field mask values for
+// mln_camera_delta.
 //
-// See mln_camera_delta_kind in the C API reference:
+// See mln_camera_delta_field in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-type CameraDeltaKind uint32
+type CameraDeltaField uint32
 
 const (
-	CameraDeltaKindMove    CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_MOVE)
-	CameraDeltaKindScale   CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_SCALE)
-	CameraDeltaKindBearing CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_BEARING)
-	CameraDeltaKindPitch   CameraDeltaKind = CameraDeltaKind(C.MLN_CAMERA_DELTA_PITCH)
+	CameraDeltaFieldOffset  CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_OFFSET)
+	CameraDeltaFieldScale   CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_SCALE)
+	CameraDeltaFieldBearing CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_BEARING)
+	CameraDeltaFieldPitch   CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_PITCH)
+	CameraDeltaFieldAnchor  CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_ANCHOR)
 )
+
+func (value CameraDeltaField) Has(flags CameraDeltaField) bool { return value&flags == flags }
 
 // CameraFitOptionField corresponds to mln_camera_fit_option_field. Field mask
 // values for mln_camera_fit_options.
@@ -286,7 +289,7 @@ func (value GeojsonSourceOptionField) Has(flags GeojsonSourceOptionField) bool {
 }
 
 // GesturePhase corresponds to mln_gesture_phase. Gesture boundary carried
-// atomically with a camera update.
+// atomically with a camera update or delta.
 //
 // See mln_gesture_phase in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
@@ -1415,37 +1418,50 @@ func nativeBoundOptions(input BoundOptions, arena *bindingArena) C.mln_bound_opt
 
 func DefaultBoundOptions() BoundOptions { return copyBoundOptions(C.mln_bound_options_default()) }
 
-// CameraDelta corresponds to mln_camera_delta. One relative camera operation.
+// CameraDelta corresponds to mln_camera_delta. One atomic relative camera
+// update.
 //
 // See mln_camera_delta in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
 type CameraDelta struct {
-	Kind      CameraDeltaKind
-	Offset    ScreenPoint
-	Amount    float64
-	Anchor    *ScreenPoint
-	Animation AnimationOptions
+	// Pan in logical map pixels; the content moves by this offset.
+	Offset *ScreenPoint
+	// Positive zoom factor; 2 zooms in one level.
+	Scale *float64
+	// Degrees added to the bearing. An animated bearing change takes the shorter
+	// way around, as mln_camera_update does.
+	Bearing *float64
+	// Degrees added to the pitch; positive tilts further from straight down.
+	Pitch *float64
+	// Screen point in logical map pixels that scale, bearing, and pitch keep fixed.
+	Anchor       *ScreenPoint
+	Animation    AnimationOptions
+	GesturePhase GesturePhase
 }
 
 func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
 	var result CameraDelta
-	result.Kind = CameraDeltaKind(raw.kind)
-	result.Offset = copyScreenPoint(raw.offset)
-	result.Amount = float64(raw.amount)
-	result.Anchor = bindingPresent(bool(raw.has_anchor), func() ScreenPoint { return copyScreenPoint(raw.anchor) })
+	result.Offset = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_OFFSET != 0, func() ScreenPoint { return copyScreenPoint(raw.offset) })
+	result.Scale = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_SCALE != 0, func() float64 { return float64(raw.scale) })
+	result.Bearing = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_BEARING != 0, func() float64 { return float64(raw.bearing) })
+	result.Pitch = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_PITCH != 0, func() float64 { return float64(raw.pitch) })
+	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
 	result.Animation = copyAnimationOptions(raw.animation)
+	result.GesturePhase = GesturePhase(raw.gesture_phase)
 	return result
 }
 
 func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delta {
 	raw := C.mln_camera_delta_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_anchor = false
-	raw.kind = C.uint32_t(input.Kind)
-	raw.offset = nativeScreenPoint(input.Offset, arena)
-	raw.amount = C.double(input.Amount)
-	bindingFlagged(&raw.has_anchor, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
+	raw.fields = 0
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_OFFSET, &raw.offset, input.Offset, arena, nativeScreenPoint)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_SCALE, &raw.scale, input.Scale, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_BEARING, &raw.bearing, input.Bearing, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_PITCH, &raw.pitch, input.Pitch, arena, bindingNumber[float64, C.double])
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
+	raw.gesture_phase = C.uint32_t(input.GesturePhase)
 	return raw
 }
 
@@ -6185,7 +6201,7 @@ func (receiver *MapHandle) AddVectorSourceUrl(sourceId string, url string, optio
 	}, completionCommand)
 }
 
-// ApplyCameraDelta submits one copied relative camera update.
+// ApplyCameraDelta submits one atomic relative camera update.
 //
 // See mln_map_apply_camera_delta in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html

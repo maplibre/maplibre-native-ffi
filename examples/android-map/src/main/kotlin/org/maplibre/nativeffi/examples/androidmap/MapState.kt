@@ -5,7 +5,6 @@ import kotlin.math.round
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
-import org.maplibre.nativeffi.generated.CameraDeltaKind
 import org.maplibre.nativeffi.generated.CameraOptions
 import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.GeneratedApi
@@ -83,17 +82,15 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
   }
 
   fun scaleBy(scale: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.SCALE, amount = scale, anchor = anchor))
+    map.applyCameraDelta(CameraDelta(scale = scale, anchor = anchor))
   }
 
   fun adjustBearing(degrees: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(
-      CameraDelta(kind = CameraDeltaKind.BEARING, amount = degrees, anchor = anchor)
-    )
+    map.applyCameraDelta(CameraDelta(bearing = degrees, anchor = anchor))
   }
 
   fun adjustPitch(degrees: Double) {
-    map.applyCameraDelta(CameraDelta(kind = CameraDeltaKind.PITCH, amount = degrees))
+    map.applyCameraDelta(CameraDelta(pitch = degrees))
   }
 
   /** Eases to the next whole zoom level, as `round(zoom) + 1`, about [anchor]. */
@@ -101,8 +98,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
     val zoom = map.cameraSnapshotGet().camera.zoom ?: 0.0
     map.applyCameraDelta(
       CameraDelta(
-        kind = CameraDeltaKind.SCALE,
-        amount = 2.0.pow(round(zoom) + 1.0 - zoom),
+        scale = 2.0.pow(round(zoom) + 1.0 - zoom),
         anchor = anchor,
         animation = animation(DOUBLE_TAP_DURATION_MS),
       )

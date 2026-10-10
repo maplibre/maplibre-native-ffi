@@ -54,7 +54,8 @@ signals that more frames are required.
 
 A camera update takes a destination. Gestures instead provide relative
 input: a drag provides a distance, and a pinch provides a scale factor and a
-screen position. Relative moves apply those values to the current camera.
+screen position. A camera delta applies those values to the current camera,
+and one delta can pan, scale, rotate, and tilt in one atomic command.
 
 Submit the begin phase when the interaction starts and the end phase when it
 finishes. While a gesture is open, a drag across the antimeridian continues in
@@ -62,9 +63,9 @@ the same direction, and the map snapshot reports the gesture as in progress.
 
 <Code code={region(gestureSnippet, "bracket")} lang="c" title="camera-gesture.c" />
 
-A drag applies screen-space deltas in logical pixels. Send the movement since
-the last frame rather than a running total, because each call composes with the
-camera it finds.
+A drag applies screen-space deltas in logical pixels, and the map content moves
+with the pointer. Send the movement since the last frame rather than a running
+total, because each delta composes with the camera it finds.
 
 <Code code={region(gestureSnippet, "drag")} lang="c" title="camera-gesture.c" />
 
@@ -73,16 +74,25 @@ moves around it.
 
 <Code code={region(gestureSnippet, "pinch")} lang="c" title="camera-gesture.c" />
 
+A two-finger rotation or tilt changes the bearing and the pitch about the same
+anchor. One delta carries both changes, so no frame shows one without the other.
+
+<Code code={region(gestureSnippet, "rotate")} lang="c" title="camera-gesture.c" />
+
+A delta also carries a gesture phase, so the last delta of a gesture can end it.
 Submit the end phase for a completed gesture and the cancel phase for a
-cancelled one; the cancel phase also stops a running transition. The animated
-variants continue the gesture's momentum and take the same animation options as
+cancelled one; the cancel phase also stops a running transition. An animated
+delta continues the gesture's momentum and takes the same animation options as
 an ease.
 
 <Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
 
 Submit relative gesture deltas instead of a camera computed from an earlier
-snapshot. The scheduler applies each command atomically to the committed camera
-state in runtime submission order.
+snapshot. The scheduler applies each delta atomically to the camera as it stands
+when the delta runs, in runtime submission order. Immediate deltas compose
+exactly, however many are queued. An animated delta replaces the running
+animation of each component that it changes, so submit the next animated delta
+after the previous one finishes.
 
 ## Fit the camera to bounds
 

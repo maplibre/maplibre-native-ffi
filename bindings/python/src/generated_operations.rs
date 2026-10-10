@@ -103,15 +103,35 @@ fn generated_copy_mln_camera_delta(
     value: &sys::mln_camera_delta,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("kind", generated_value(py, value.kind)?)?;
     dict.set_item(
         "offset",
-        generated_copy_mln_screen_point(py, &value.offset)?,
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_OFFSET != 0, || {
+            generated_copy_mln_screen_point(py, &value.offset)
+        })?,
     )?;
-    dict.set_item("amount", generated_value(py, value.amount)?)?;
+    dict.set_item(
+        "scale",
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_SCALE != 0, || {
+            generated_value(py, value.scale)
+        })?,
+    )?;
+    dict.set_item(
+        "bearing",
+        generated_optional(
+            py,
+            value.fields & sys::MLN_CAMERA_DELTA_BEARING != 0,
+            || generated_value(py, value.bearing),
+        )?,
+    )?;
+    dict.set_item(
+        "pitch",
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_PITCH != 0, || {
+            generated_value(py, value.pitch)
+        })?,
+    )?;
     dict.set_item(
         "anchor",
-        generated_optional(py, value.has_anchor, || {
+        generated_optional(py, value.fields & sys::MLN_CAMERA_DELTA_ANCHOR != 0, || {
             generated_copy_mln_screen_point(py, &value.anchor)
         })?,
     )?;
@@ -119,6 +139,7 @@ fn generated_copy_mln_camera_delta(
         "animation",
         generated_copy_mln_animation_options(py, &value.animation)?,
     )?;
+    dict.set_item("gesture_phase", generated_value(py, value.gesture_phase)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2785,17 +2806,32 @@ fn generated_input_mln_camera_delta<'py>(
     }
     let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
     raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
-    raw.has_anchor = false;
-    raw.kind = value
-        .getattr("kind")?
-        .extract::<sys::mln_camera_delta_kind>()?;
-    raw.offset = generated_input_mln_screen_point(&value.getattr("offset")?, storage)?;
-    raw.amount = value.getattr("amount")?.extract::<f64>()?;
+    raw.fields = 0;
+    raw.reserved = 0;
+    if let Some(field) = generated_present(value, "offset")? {
+        raw.offset = generated_input_mln_screen_point(&field, storage)?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_OFFSET;
+    }
+    if let Some(field) = generated_present(value, "scale")? {
+        raw.scale = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_SCALE;
+    }
+    if let Some(field) = generated_present(value, "bearing")? {
+        raw.bearing = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_BEARING;
+    }
+    if let Some(field) = generated_present(value, "pitch")? {
+        raw.pitch = field.extract::<f64>()?;
+        raw.fields |= sys::MLN_CAMERA_DELTA_PITCH;
+    }
     if let Some(field) = generated_present(value, "anchor")? {
         raw.anchor = generated_input_mln_screen_point(&field, storage)?;
-        raw.has_anchor = true;
+        raw.fields |= sys::MLN_CAMERA_DELTA_ANCHOR;
     }
     raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
+    raw.gesture_phase = value
+        .getattr("gesture_phase")?
+        .extract::<sys::mln_gesture_phase>()?;
     Ok(raw)
 }
 

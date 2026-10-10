@@ -1783,31 +1783,55 @@ auto from_native_camera(const mln::CameraOptions& camera)
   return result;
 }
 
+// Records one map command's transition ID once every MapLibre transition that
+// the command started has finished. MapLibre invokes transitionFinishFn on the
+// runtime worker, usually immediately before the camera change that ends the
+// transition, and the observer queues the recorded ID after that camera change.
+// A map transaction queues any finish that no camera change followed.
+//
+// A command that starts several transitions, such as a camera delta that pans
+// and zooms, gives each of them a copy of one instance. MapLibre copies the
+// function into every transition, so the copies share the remaining count, and
+// the command reports its ID once, after the last of them ends. Each copy
+// carries the ID, so code that inspects a transition's finish function through
+// std::function::target() can tell which command started it. The instance holds
+// event state by value, so it stays valid for as long as MapLibre keeps it.
+struct CommandTransitionFinish {
+  std::shared_ptr<mln::core::MapEventState> event_state;
+  uint64_t transition_id = 0;
+  // The command's transitions that have not finished yet.
+  std::shared_ptr<uint32_t> remaining;
+
+  auto operator()() const -> void {
+    if (*remaining == 0) return;
+    *remaining -= 1;
+    if (*remaining != 0) return;
+    if (
+      mln::core::event_selected(
+        event_state->mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
+      )
+    ) {
+      event_state->finished_transitions.push_back(transition_id);
+    }
+  }
+};
+
 // MapLibre Native owns the returned AnimationOptions for the transition
-// lifetime and invokes transitionFinishFn on the runtime worker, usually
-// immediately before the camera change that ends the transition. The callback
-// records the ID, and the observer queues it after that camera change. A map
-// transaction queues any finish that no camera change followed. The lambda
-// holds event state by value, so it stays valid for as long as MapLibre keeps
-// it.
+// lifetime. `transitions` is the number of MapLibre transitions that the
+// command starts with these options; see CommandTransitionFinish.
 auto to_native_animation(
   const std::shared_ptr<mln::core::MapEventState>& event_state,
-  const mln_animation_options* animation
+  const mln_animation_options* animation, uint32_t transitions = 1
 ) -> mln::AnimationOptions {
   auto result = mln::AnimationOptions{};
   if (animation == nullptr) {
     return result;
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
-    result.transitionFinishFn = [event_state,
-                                 transition_id = animation->transition_id] {
-      if (
-        mln::core::event_selected(
-          event_state->mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
-        )
-      ) {
-        event_state->finished_transitions.push_back(transition_id);
-      }
+    result.transitionFinishFn = CommandTransitionFinish{
+      .event_state = event_state,
+      .transition_id = animation->transition_id,
+      .remaining = std::make_shared<uint32_t>(transitions),
     };
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
@@ -2546,12 +2570,15 @@ auto animation_options_default() noexcept -> mln_animation_options {
 auto camera_delta_default() noexcept -> mln_camera_delta {
   return mln_camera_delta{
     .size = sizeof(mln_camera_delta),
-    .kind = MLN_CAMERA_DELTA_MOVE,
+    .fields = 0,
     .offset = {},
-    .amount = 0,
-    .has_anchor = false,
+    .scale = 0,
+    .bearing = 0,
+    .pitch = 0,
     .anchor = {},
-    .animation = animation_options_default()
+    .animation = animation_options_default(),
+    .gesture_phase = MLN_GESTURE_PHASE_NONE,
+    .reserved = 0
   };
 }
 
@@ -3905,6 +3932,25 @@ auto submit_camera_command(
   );
 }
 
+// BEGIN and UPDATE mark the gesture before the camera write, so MapLibre
+// applies its gesture rules to that write.
+auto apply_gesture_phase_before(MapObject& live, uint32_t phase) -> void {
+  if (phase == MLN_GESTURE_PHASE_BEGIN || phase == MLN_GESTURE_PHASE_UPDATE) {
+    live.map->setGestureInProgress(true);
+  }
+}
+
+// CANCEL ends the transitions still running after the camera write, and END
+// and CANCEL then clear the gesture.
+auto apply_gesture_phase_after(MapObject& live, uint32_t phase) -> void {
+  if (phase == MLN_GESTURE_PHASE_CANCEL) {
+    live.map->cancelTransitions();
+  }
+  if (phase == MLN_GESTURE_PHASE_END || phase == MLN_GESTURE_PHASE_CANCEL) {
+    live.map->setGestureInProgress(false);
+  }
+}
+
 }  // namespace
 
 auto map_update_camera(
@@ -3933,12 +3979,7 @@ auto map_update_camera(
   return submit_camera_command(
     map,
     [copied](MapObject& live) -> void {
-      if (
-        copied.gesture_phase == MLN_GESTURE_PHASE_BEGIN ||
-        copied.gesture_phase == MLN_GESTURE_PHASE_UPDATE
-      ) {
-        live.map->setGestureInProgress(true);
-      }
+      apply_gesture_phase_before(live, copied.gesture_phase);
       switch (copied.mode) {
         case MLN_CAMERA_UPDATE_MODE_JUMP:
           live.map->jumpTo(to_native_camera(copied.camera));
@@ -3958,103 +3999,130 @@ auto map_update_camera(
         default:
           break;
       }
-      if (copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL) {
-        live.map->cancelTransitions();
-      }
-      if (
-        copied.gesture_phase == MLN_GESTURE_PHASE_END ||
-        copied.gesture_phase == MLN_GESTURE_PHASE_CANCEL
-      ) {
-        live.map->setGestureInProgress(false);
-      }
+      apply_gesture_phase_after(live, copied.gesture_phase);
     },
     completion
   );
 }
 
-auto map_apply_camera_delta(
-  mln_map map, const mln_camera_delta* delta, const mln_completion* completion
-) -> mln_status {
+namespace {
+
+constexpr auto camera_delta_anchored_fields =
+  static_cast<uint32_t>(MLN_CAMERA_DELTA_SCALE) | MLN_CAMERA_DELTA_BEARING |
+  MLN_CAMERA_DELTA_PITCH;
+
+auto validate_camera_delta(const mln_camera_delta* delta) -> mln_status {
   if (delta == nullptr || delta->size < sizeof(mln_camera_delta)) {
     set_thread_error("camera delta must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (delta->kind > MLN_CAMERA_DELTA_PITCH) {
-    set_thread_error("camera delta kind is invalid");
+  constexpr auto known_fields = static_cast<uint32_t>(MLN_CAMERA_DELTA_OFFSET) |
+                                camera_delta_anchored_fields |
+                                MLN_CAMERA_DELTA_ANCHOR;
+  const auto fields = delta->fields;
+  if ((fields & ~known_fields) != 0U) {
+    set_thread_error("mln_camera_delta.fields contains unknown bits");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (delta->gesture_phase > MLN_GESTURE_PHASE_CANCEL) {
+    set_thread_error("camera delta gesture phase is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    delta->kind == MLN_CAMERA_DELTA_MOVE &&
+    (fields & MLN_CAMERA_DELTA_OFFSET) != 0U &&
     validate_screen_point(delta->offset) != MLN_STATUS_OK
   ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    delta->kind == MLN_CAMERA_DELTA_SCALE &&
-    (!std::isfinite(delta->amount) || delta->amount <= 0)
+    (fields & MLN_CAMERA_DELTA_SCALE) != 0U &&
+    (!std::isfinite(delta->scale) || delta->scale <= 0)
   ) {
-    set_thread_error("camera scale must be finite and positive");
+    set_thread_error("camera delta scale must be finite and positive");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    (delta->kind == MLN_CAMERA_DELTA_BEARING ||
-     delta->kind == MLN_CAMERA_DELTA_PITCH) &&
-    !std::isfinite(delta->amount)
+    ((fields & MLN_CAMERA_DELTA_BEARING) != 0U &&
+     !std::isfinite(delta->bearing)) ||
+    ((fields & MLN_CAMERA_DELTA_PITCH) != 0U && !std::isfinite(delta->pitch))
   ) {
-    set_thread_error("camera angle delta must be finite");
+    set_thread_error("camera delta bearing and pitch must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    delta->has_anchor && delta->kind != MLN_CAMERA_DELTA_SCALE &&
-    delta->kind != MLN_CAMERA_DELTA_BEARING
-  ) {
-    set_thread_error("only scale and bearing camera deltas accept an anchor");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if ((fields & MLN_CAMERA_DELTA_ANCHOR) != 0U) {
+    if ((fields & camera_delta_anchored_fields) == 0U) {
+      set_thread_error(
+        "a camera delta anchor requires scale, bearing, or pitch"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if ((fields & MLN_CAMERA_DELTA_OFFSET) != 0U) {
+      set_thread_error("a camera delta anchor cannot be combined with offset");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (validate_screen_point(delta->anchor) != MLN_STATUS_OK) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
-  if (
-    delta->has_anchor && validate_screen_point(delta->anchor) != MLN_STATUS_OK
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+  return validate_animation_options(&delta->animation);
+}
+
+// The camera that a delta's scale, bearing, and pitch reach from the camera as
+// it stands. Map::scaleBy() adds log2(scale) to the zoom the same way.
+auto camera_delta_target(const mln::Map& map, const mln_camera_delta& delta)
+  -> mln::CameraOptions {
+  const auto current = map.getCameraOptions();
+  auto camera = mln::CameraOptions{};
+  if ((delta.fields & MLN_CAMERA_DELTA_SCALE) != 0U) {
+    camera.withZoom(current.zoom.value_or(0) + std::log2(delta.scale));
   }
-  if (validate_animation_options(&delta->animation) != MLN_STATUS_OK) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if ((delta.fields & MLN_CAMERA_DELTA_BEARING) != 0U) {
+    camera.withBearing(current.bearing.value_or(0) + delta.bearing);
   }
+  if ((delta.fields & MLN_CAMERA_DELTA_PITCH) != 0U) {
+    camera.withPitch(current.pitch.value_or(0) + delta.pitch);
+  }
+  if ((delta.fields & MLN_CAMERA_DELTA_ANCHOR) != 0U) {
+    camera.withAnchor(to_native_screen_point(delta.anchor));
+  }
+  return camera;
+}
+
+}  // namespace
+
+auto map_apply_camera_delta(
+  mln_map map, const mln_camera_delta* delta, const mln_completion* completion
+) -> mln_status {
+  const auto delta_status = validate_camera_delta(delta);
+  if (delta_status != MLN_STATUS_OK) return delta_status;
   const auto copied = *delta;
   return submit_camera_command(
     map,
     [copied](MapObject& live) -> void {
-      const auto animation =
-        to_native_animation(live.event_state, &copied.animation);
-      const auto anchor =
-        copied.has_anchor
-          ? std::optional<mln::ScreenCoordinate>{to_native_screen_point(
-              copied.anchor
-            )}
-          : std::nullopt;
-      switch (copied.kind) {
-        case MLN_CAMERA_DELTA_MOVE:
-          live.map->moveBy(to_native_screen_point(copied.offset), animation);
-          break;
-        case MLN_CAMERA_DELTA_SCALE:
-          live.map->scaleBy(copied.amount, anchor, animation);
-          break;
-        case MLN_CAMERA_DELTA_BEARING: {
-          const auto current = live.map->getCameraOptions();
-          auto camera = mln::CameraOptions{}.withBearing(
-            current.bearing.value_or(0) + copied.amount
-          );
-          if (anchor.has_value()) camera.withAnchor(*anchor);
-          live.map->easeTo(camera, animation);
-          break;
-        }
-        case MLN_CAMERA_DELTA_PITCH:
-          // Map::pitchBy() subtracts its argument, so the amount is negated to
-          // give PITCH the same current-plus-amount sense as BEARING.
-          live.map->pitchBy(-copied.amount, animation);
-          break;
-        default:
-          break;
+      // The pan and the scale, bearing, and pitch change are separate MapLibre
+      // transitions, because an explicit center overrides an anchor. The
+      // transaction around this work publishes both in one snapshot and
+      // announces one render update for them.
+      const auto pans = (copied.fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
+      const auto eases = (copied.fields & camera_delta_anchored_fields) != 0U;
+      const auto transitions =
+        static_cast<uint32_t>(pans) + static_cast<uint32_t>(eases);
+      const auto animation = to_native_animation(
+        live.event_state, &copied.animation, std::max(transitions, 1U)
+      );
+      apply_gesture_phase_before(live, copied.gesture_phase);
+      if (pans) {
+        live.map->moveBy(to_native_screen_point(copied.offset), animation);
       }
+      if (eases) {
+        live.map->easeTo(camera_delta_target(*live.map, copied), animation);
+      }
+      // A delta without components starts no transition, so it reports its
+      // transition ID here, as an empty camera update does.
+      if (transitions == 0 && animation.transitionFinishFn) {
+        animation.transitionFinishFn();
+      }
+      apply_gesture_phase_after(live, copied.gesture_phase);
     },
     completion
   );

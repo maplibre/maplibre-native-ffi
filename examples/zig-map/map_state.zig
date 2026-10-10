@@ -94,38 +94,31 @@ pub const MapState = struct {
     }
 
     pub fn scaleBy(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .scale, .amount = scale, .anchor = anchor }, &self.diagnostic));
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .scale = scale, .anchor = anchor }, &self.diagnostic));
     }
 
     pub fn scaleByAnimated(self: *MapState, scale: f64, anchor: maplibre.ScreenPoint, duration_ms: f64) !void {
         try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .kind = .scale,
-            .amount = scale,
+            .scale = scale,
             .anchor = anchor,
             .animation = .{ .duration_ms = duration_ms },
         }, &self.diagnostic));
     }
 
-    pub fn pitchBy(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .pitch, .amount = delta }, &self.diagnostic));
-    }
-
-    pub fn adjustBearing(self: *MapState, delta: f64) !void {
-        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .kind = .bearing, .amount = delta }, &self.diagnostic));
+    pub fn adjustOrientation(self: *MapState, bearing: f64, pitch: f64) !void {
+        try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{ .bearing = bearing, .pitch = pitch }, &self.diagnostic));
     }
 
     pub fn adjustBearingAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
         try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .kind = .bearing,
-            .amount = delta,
+            .bearing = delta,
             .animation = .{ .duration_ms = duration_ms },
         }, &self.diagnostic));
     }
 
     pub fn adjustPitchAnimated(self: *MapState, delta: f64, duration_ms: f64) !void {
         try self.cameraMutation(maplibre.mapApplyCameraDelta(self.allocator, self.map, .{
-            .kind = .pitch,
-            .amount = delta,
+            .pitch = delta,
             .animation = .{ .duration_ms = duration_ms },
         }, &self.diagnostic));
     }

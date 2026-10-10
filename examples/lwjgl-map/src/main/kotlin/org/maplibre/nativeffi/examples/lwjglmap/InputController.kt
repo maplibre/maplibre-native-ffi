@@ -60,8 +60,7 @@ internal class InputController(
       return
     }
     if (rightDown || (leftDown && ctrlDown)) {
-      mapState.adjustBearing(dx * DRAG_ROTATE_FACTOR)
-      mapState.adjustPitch(dy * DRAG_PITCH_FACTOR)
+      mapState.adjustOrientation(bearing = dx * DRAG_ROTATE_FACTOR, pitch = dy * DRAG_PITCH_FACTOR)
     } else if (leftDown) {
       mapState.moveBy(dx, dy)
     }
@@ -119,10 +118,14 @@ internal class InputController(
       GLFW_KEY_MINUS ->
         mapState.scaleBy(1.0 / KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
 
-      GLFW_KEY_Q -> mapState.adjustBearing(-KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
-      GLFW_KEY_E -> mapState.adjustBearing(KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
-      GLFW_KEY_RIGHT_BRACKET -> mapState.adjustPitch(KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
-      GLFW_KEY_LEFT_BRACKET -> mapState.adjustPitch(-KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_Q ->
+        mapState.adjustOrientation(bearing = -KEYBOARD_BEARING, durationMs = KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_E ->
+        mapState.adjustOrientation(bearing = KEYBOARD_BEARING, durationMs = KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_RIGHT_BRACKET ->
+        mapState.adjustOrientation(pitch = KEYBOARD_PITCH, durationMs = KEYBOARD_ANIMATION_MS)
+      GLFW_KEY_LEFT_BRACKET ->
+        mapState.adjustOrientation(pitch = -KEYBOARD_PITCH, durationMs = KEYBOARD_ANIMATION_MS)
       GLFW_KEY_0 -> mapState.resetOrientation(RESET_ANIMATION_MS)
     }
   }

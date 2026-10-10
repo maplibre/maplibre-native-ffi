@@ -72,7 +72,7 @@ public object GeneratedApi {
    */
   public fun cameraDeltaDefault(): CameraDelta =
     nativeCall(null, null, "mln_camera_delta_default") {
-      val out = sized(128, 8)
+      val out = sized(144, 8)
       C.mln_camera_delta_default(out)
       readCameraDelta(out)
     }

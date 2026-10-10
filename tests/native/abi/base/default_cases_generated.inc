@@ -41,19 +41,7 @@ static void mln_camera_delta_default_holds_its_annotated_values(void) {
     "mln_camera_delta.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.kind, "mln_camera_delta.kind"
-  );
-  TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-    0, (double)value.offset.x, "mln_camera_delta.offset.x"
-  );
-  TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-    0, (double)value.offset.y, "mln_camera_delta.offset.y"
-  );
-  TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-    0, (double)value.amount, "mln_camera_delta.amount"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_anchor, "mln_camera_delta.has_anchor"
+    (uint64_t)0, (uint64_t)value.fields, "mln_camera_delta.fields"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_animation_options), (uint64_t)value.animation.size,
@@ -62,6 +50,12 @@ static void mln_camera_delta_default_holds_its_annotated_values(void) {
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.animation.fields,
     "mln_camera_delta.animation.fields"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.gesture_phase, "mln_camera_delta.gesture_phase"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.reserved, "mln_camera_delta.reserved"
   );
 }
 
