@@ -30,6 +30,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
+#include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"
 
 namespace {
@@ -799,9 +800,23 @@ extern "C" MLN_API void mln_adapter_owner_token_destroy(void* token) noexcept {
 extern "C" MLN_API void mln_adapter_owner_finalize(void* token) noexcept {
   auto* owner = static_cast<AdapterOwnerToken*>(token);
   if (owner != nullptr) {
-    const auto* type =
-      mln::core::handle_kind_name(mln::core::handle_kind_of(owner->handle));
-    const auto status = mln::capture::dispose_owner(type, owner->handle);
+    const auto kind = mln::core::handle_kind_of(owner->handle);
+    // An isolate's shutdown finalizes its owners while the process exits, and
+    // nothing waits for a session's wake releases then, so a finalized session
+    // quarantines rather than detaching through graphics calls.
+    const auto status =
+      kind == static_cast<std::uint8_t>(mln::core::HandleKind::RenderSession)
+        ? mln::c_api::status_boundary(
+            nullptr,
+            [&] {
+              return mln::core::render_session_dispose_quarantined(
+                static_cast<mln_render_session>(owner->handle)
+              );
+            }
+          )
+        : mln::capture::dispose_owner(
+            mln::core::handle_kind_name(kind), owner->handle
+          );
     if (status != MLN_STATUS_OK) {
       static_cast<void>(std::fprintf(
         stderr,

@@ -927,6 +927,13 @@ auto render_session_projection_create(
 
 auto render_session_destroy(mln_render_session session) -> mln_status;
 auto render_session_dispose(mln_render_session session) -> mln_status;
+// Disposes a session as render_session_dispose does, except that retirement
+// quarantines its graphics resources instead of detaching it, so it makes no
+// graphics call after the one in flight. A finalizer that can run while the
+// process exits, when nothing waits for the session's wake releases, disposes
+// through this.
+auto render_session_dispose_quarantined(mln_render_session session)
+  -> mln_status;
 auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status;
 // Features a query copied out of the renderer. The completion borrows views of
 // these strings, so the list stays alive until the callback returns.

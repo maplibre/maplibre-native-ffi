@@ -3643,19 +3643,25 @@ auto detach_disposed_session(
   session_teardown_lane().submit(session->disposal_task);
 }
 
+// Whether disposal may detach an eligible session, which frees its graphics
+// resources, or quarantines every session, which makes no graphics call.
+enum class DisposalTeardown : std::uint8_t { DetachOnWorker, Quarantine };
+
 // Admission owns an embedded node and a self-reference and allocates nothing.
-// An attached core-worker session with no acquired frame detaches on its
-// worker, which then hands it to the teardown lane. Any other session goes to
-// the lane directly, which waits for an existing driver call outside registry
-// locks before abandoning the target.
+// Unless the caller asks for quarantine, an attached core-worker session with
+// no acquired frame detaches on its worker, which then hands it to the
+// teardown lane. Any other session goes to the lane directly, which waits for
+// an existing driver call outside registry locks before abandoning the target.
 auto dispose_render_session(
-  const std::shared_ptr<mln_render_session_object>& live
+  const std::shared_ptr<mln_render_session_object>& live,
+  DisposalTeardown teardown
 ) -> void {
   auto detach_on_worker = false;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->disposal_requested.exchange(true)) return;
     detach_on_worker =
+      teardown == DisposalTeardown::DetachOnWorker &&
       live->capabilities.driver == MLN_RENDER_DRIVER_CORE_WORKER &&
       live->state == MLN_RENDER_SESSION_STATE_ATTACHED &&
       !live->views_invalidated && live->acquired_frame_count == 0 &&
@@ -3698,7 +3704,15 @@ auto dispose_render_session(
 auto render_session_dispose(mln_render_session session) -> mln_status {
   auto live = lease_render_session(session);
   if (live == nullptr) return recorded_handle_fault_status();
-  dispose_render_session(live);
+  dispose_render_session(live, DisposalTeardown::DetachOnWorker);
+  return MLN_STATUS_OK;
+}
+
+auto render_session_dispose_quarantined(mln_render_session session)
+  -> mln_status {
+  auto live = lease_render_session(session);
+  if (live == nullptr) return recorded_handle_fault_status();
+  dispose_render_session(live, DisposalTeardown::Quarantine);
   return MLN_STATUS_OK;
 }
 

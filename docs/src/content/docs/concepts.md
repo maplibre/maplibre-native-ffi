@@ -43,7 +43,11 @@ tear down their own state at exit before the library's exit handler runs. So
 before the process exits, end the graphics calls of every render session:
 abandon the session, or detach it and wait for the detach completion. For a
 session that a host graphics thread drives, stop driver service first. Abandon
-is synchronous, so an exit path can use it on a session that is mid-frame.
+is synchronous, so an exit path can use it on a session that is mid-frame. The
+Python binding abandons every session that it still holds when the interpreter
+shuts down. A Dart isolate's shutdown finalizes its open sessions without
+starting graphics calls, but a driver call already in flight can outlast it, so
+a Dart host ends its sessions' graphics calls itself before exit.
 
 ## Map
 

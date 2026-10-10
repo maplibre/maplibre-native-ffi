@@ -108,6 +108,14 @@ final class TestGraphics {
   /// after every session the test attaches to it. A build whose backend has
   /// no context here fails, rather than skipping.
   factory TestGraphics.open() {
+    final graphics = TestGraphics.create();
+    addTearDown(graphics.close);
+    return graphics;
+  }
+
+  /// Creates the build's backend context, which the caller closes, for code
+  /// that runs outside a test, such as a fixture process.
+  factory TestGraphics.create() {
     final handle = _library.create(_buildBackend());
     if (handle == nullptr) {
       fail('mln_test_graphics_create: ${_library.lastError().toDartString()}');
@@ -119,9 +127,7 @@ final class TestGraphics {
       _library.destroy(handle);
       fail('mln_test_graphics_get_context: $error');
     }
-    final graphics = TestGraphics._(handle, context);
-    addTearDown(graphics.close);
-    return graphics;
+    return TestGraphics._(handle, context);
   }
 
   final Pointer<Void> _handle;

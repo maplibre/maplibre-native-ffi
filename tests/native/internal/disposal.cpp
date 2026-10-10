@@ -577,6 +577,29 @@ void disposal_abandons_a_session_with_an_acquired_frame() {
   mln_test_destroy_runtime(runtime);
 }
 
+// A finalizer can run while the process exits, when nothing waits for the
+// wake releases, so a finalized core-worker session quarantines its graphics
+// resources rather than detaching through graphics calls.
+void finalization_abandons_an_attached_session() {
+  auto sync_points = SyncPointScope{};
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  auto released = std::atomic_bool{false};
+  auto fixture = mln_test_render_fixture{};
+  attach_observed(map, fixture, released);
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+  auto* const token = mln_adapter_owner_token_create(fixture.session);
+  TEST_ASSERT_NOT_NULL(token);
+  mln_adapter_owner_finalize(token);
+  TEST_ASSERT_TRUE(wake_released(released));
+  TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync() {
   const auto runtime = create_runtime();
   const auto map = create_map(runtime);
@@ -707,6 +730,7 @@ MLN_TEST_GROUP {
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
   RUN_TEST(disposal_detaches_an_attached_core_worker_session);
   RUN_TEST(disposal_abandons_a_session_with_an_acquired_frame);
+  RUN_TEST(finalization_abandons_an_attached_session);
   RUN_TEST(
     abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync
   );
