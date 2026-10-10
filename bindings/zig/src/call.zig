@@ -434,6 +434,31 @@ pub fn invoke(
     return op.outputs(allocator);
 }
 
+/// Calls a status-returning native function like `invoke`, except that the
+/// `absent` status reports that native published no output, which returns null.
+pub fn invokeUnless(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    comptime absent: i32,
+    args: anytype,
+) Error!?Outputs(@TypeOf(args)) {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
+    const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
+    // Only a closing call finds its receiver closed, and a close has no output.
+    var op = (try Op.begin(receiver, allocator, diagnostic)).?;
+    defer op.end();
+    const native = try op.arguments(args);
+    const present = try status.callUnless(@field(c, name), native, diagnostic, absent);
+    op.receiver.succeed(&op.roots);
+    op.settled = true;
+    if (!present) return null;
+    return try op.outputs(allocator);
+}
+
 /// Calls a native function that returns its result rather than a status, and
 /// decodes the result to `T`.
 pub fn direct(

@@ -72,6 +72,17 @@ test "a caller-driven session is serviced from a thread the test spawns" {
     try testing.expectEqual(@as(?maplibre.RenderDriverKind, .caller_graphics_thread), render.driver);
 }
 
+// Before any demand, native reports the drain and the acquire as not ready,
+// which reads as null.
+test "a drain before any demand returns no batch" {
+    const fixture = try createFixture();
+    defer fixture.destroy();
+    const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
+    defer owned.close();
+    try testing.expect(try maplibre.renderSessionDrainFrameResults(owned.session, null) == null);
+    try testing.expect(try maplibre.renderSessionAcquireFrame(owned.session, null) == null);
+}
+
 // A scoped view leases its frame for the callback. Inside the scope, releasing
 // that frame or abandoning its session reports busy, and a host error passes
 // through. Disposing a sibling frame, which has no consumer fence, abandons the
@@ -83,11 +94,11 @@ test "a scoped frame view holds its frame until the scope returns" {
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
     _ = try owned.renderUntilRendered();
-    var frame = try maplibre.renderSessionAcquireFrame(owned.session, null);
+    var frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
     defer frame.deinit();
     try support.expectCommitted(try maplibre.mapRequestRepaint(fixture.map, null));
     _ = try owned.renderUntilRendered();
-    var sibling = try maplibre.renderSessionAcquireFrame(owned.session, null);
+    var sibling = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
     defer sibling.deinit();
 
     const width = try support.getOwnedTexture(u32, frame, {}, struct {
@@ -130,7 +141,7 @@ test "disposing a parent graph retires its acquired frame and session" {
     const owned = try support.OwnedTexture.attach(fixture.map, extent, support.OwnedTexture.default_driver);
     defer owned.close();
     _ = try owned.renderUntilRendered();
-    var frame = try maplibre.renderSessionAcquireFrame(owned.session, null);
+    var frame = (try maplibre.renderSessionAcquireFrame(owned.session, null)).?;
 
     fixture.map.deinit();
     fixture.map_open = false;

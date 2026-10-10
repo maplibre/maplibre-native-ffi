@@ -18,15 +18,16 @@ public extension RenderSessionHandle {
   }
 
   /// Calls `mln_render_session_acquire_frame`.
-  func acquireFrame() throws -> AcquiredFrameHandle {
+  func acquireFrame() throws -> AcquiredFrameHandle? {
     var value0: mln_acquired_frame = 0
-    return try nativeInvoke("mln_render_session_acquire_frame") { raw, _, diagnostic in
-      mln_render_session_acquire_frame(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { try AcquiredFrameHandle(adopting: value0, parent: self) }
+    return try nativeInvoke(
+      "mln_render_session_acquire_frame",
+      absentOn: MLN_STATUS_NOT_READY
+    ) { raw, _, diagnostic in mln_render_session_acquire_frame(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { try AcquiredFrameHandle(adopting: value0, parent: self) }
   }
 
   /// Calls `mln_render_session_barrier`.
@@ -81,15 +82,16 @@ public extension RenderSessionHandle {
   }
 
   /// Calls `mln_render_session_drain_frame_results`.
-  func drainFrameResults() throws -> RenderFrameBatchHandle {
+  func drainFrameResults() throws -> RenderFrameBatchHandle? {
     var value0: mln_render_frame_batch = 0
-    return try nativeInvoke("mln_render_session_drain_frame_results") { raw, _, diagnostic in
-      mln_render_session_drain_frame_results(
-        raw,
-        &value0,
-        diagnostic
-      )
-    } result: { try RenderFrameBatchHandle(adopting: value0) }
+    return try nativeInvoke(
+      "mln_render_session_drain_frame_results",
+      absentOn: MLN_STATUS_NOT_READY
+    ) { raw, _, diagnostic in mln_render_session_drain_frame_results(
+      raw,
+      &value0,
+      diagnostic
+    ) } result: { try RenderFrameBatchHandle(adopting: value0) }
   }
 
   /// Calls `mln_render_session_dump_debug_logs`.

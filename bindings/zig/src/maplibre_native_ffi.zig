@@ -4958,8 +4958,8 @@ pub fn renderSessionAbandon(session: RenderSession, diagnostic: ?*diagnostics.Di
     return call.invoke("mln_render_session_abandon", .lease, session, null, diagnostic, .{call.sizedOut(RenderAbandonResult)});
 }
 
-pub fn renderSessionAcquireFrame(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!AcquiredFrame {
-    return call.invoke("mln_render_session_acquire_frame", .lease, session, null, diagnostic, .{call.adopt(AcquiredFrame, .receiver)});
+pub fn renderSessionAcquireFrame(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!?AcquiredFrame {
+    return call.invokeUnless("mln_render_session_acquire_frame", .lease, session, null, diagnostic, c.MLN_STATUS_NOT_READY, .{call.adopt(AcquiredFrame, .receiver)});
 }
 
 pub fn renderSessionAttachOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(RenderSessionAttachOptions) {
@@ -4986,8 +4986,8 @@ pub fn renderSessionDispose(session: RenderSession, diagnostic: ?*diagnostics.Di
     return call.invoke("mln_render_session_dispose", .close, session, null, diagnostic, .{});
 }
 
-pub fn renderSessionDrainFrameResults(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!RenderFrameBatch {
-    return call.invoke("mln_render_session_drain_frame_results", .lease, session, null, diagnostic, .{call.adopt(RenderFrameBatch, .none)});
+pub fn renderSessionDrainFrameResults(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!?RenderFrameBatch {
+    return call.invokeUnless("mln_render_session_drain_frame_results", .lease, session, null, diagnostic, c.MLN_STATUS_NOT_READY, .{call.adopt(RenderFrameBatch, .none)});
 }
 
 pub fn renderSessionDumpDebugLogs(session: RenderSession, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(void) {

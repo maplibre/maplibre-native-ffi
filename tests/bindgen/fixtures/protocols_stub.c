@@ -8,6 +8,7 @@
 #define MLN_PROTOCOL_KEYWORDS
 #define MLN_PROTOCOL_DEFAULTS
 #define MLN_PROTOCOL_DEFAULT_REGISTRATION
+#define MLN_PROTOCOL_ABSENCE
 #include <stdlib.h>
 #include <string.h>
 
@@ -105,4 +106,34 @@ mln_probe_hooks mln_probe_hooks_default(void) {
     .limit = 4,
     .signal = {.size = sizeof(mln_probe_signal)},
   };
+}
+
+// Reports the output of call `count` of an absence probe: none on the first,
+// `published` on the second, and a failure after that.
+static mln_status absence_status(
+  unsigned int count, mln_diagnostic* out_diagnostic
+) {
+  if (count == 0) return MLN_STATUS_NOT_READY;
+  if (count == 1) return MLN_STATUS_OK;
+  return fail(out_diagnostic, "exhausted");
+}
+
+void mln_probe_parcel_release(mln_probe_parcel parcel) { (void)parcel; }
+
+mln_status mln_probe_take_parcel(
+  mln_probe_parcel* out_parcel, mln_diagnostic* out_diagnostic
+) {
+  static unsigned int count = 0;
+  const mln_status status = absence_status(count++, out_diagnostic);
+  if (status == MLN_STATUS_OK) *out_parcel = 42;
+  return status;
+}
+
+mln_status mln_probe_read_level(
+  double* out_level, mln_diagnostic* out_diagnostic
+) {
+  static unsigned int count = 0;
+  const mln_status status = absence_status(count++, out_diagnostic);
+  if (status == MLN_STATUS_OK) *out_level = 0.5;
+  return status;
 }

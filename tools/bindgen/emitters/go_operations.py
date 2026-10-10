@@ -345,7 +345,23 @@ def operation(plan, values):
             invocation = f"_, err := bindingDirect({target}, func(arena *bindingArena, raw uint64) struct{{}} {{\n{closure_setup}{call}\nreturn struct{{}}{{}}\n}})\nreturn err"
     else:
         check = f"func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {{\n{closure_setup}return int32({call})\n}}"
-        if outputs:
+        if plan.absence:
+            if plan.consumes or plan.registrations or len(outputs) != 1:
+                values.fail(
+                    outputs[0][1], "absence requires one output that the caller owns"
+                )
+            # A handle is absent as nil; a value becomes a pointer that is.
+            if outputs[0][1].kind != "handle":
+                returned = "*" + returned
+                adoptions.append(f"value := {converted}")
+                converted = "&value"
+            result_closure = (
+                f"func(arena *bindingArena) {returned} {{\n"
+                + "".join(line + "\n" for line in adoptions)
+                + f"return {converted}\n}}"
+            )
+            invocation = f"return bindingGetUnless({target}, int32(C.{plan.absence.status}), {check}, {result_closure})"
+        elif outputs:
             result_closure = (
                 f"func(arena *bindingArena) {returned} {{\n"
                 + "".join(line + "\n" for line in adoptions)

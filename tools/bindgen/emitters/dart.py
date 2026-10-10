@@ -468,8 +468,14 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             if returns
             else None
         )
+        if plan.absence:
+            if plan.registrations or len(returns) != 1:
+                raise Unsupported("absence requires one output without registrations")
+            public += "?"
         body = setup + [
-            f"_check({call});"
+            f"if (!_present({call}, raw.{plan.absence.status})) return null;"
+            if plan.absence
+            else f"_check({call});"
             if status_return
             else f"final nativeResult = {call};"
             if plan.result

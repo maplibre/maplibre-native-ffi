@@ -175,6 +175,12 @@ def checked_call(function: Function, arguments: str) -> str:
     return f"Check({native_call(function, arguments, 'Diagnostic')});"
 
 
+def present_call(plan: OperationPlan, arguments: str) -> str:
+    """Returns null for the absence status, and checks every other status."""
+    call = native_call(plan.function, arguments, "Diagnostic")
+    return f"if (!Present({call}, mln_status.{plan.absence.status})) return null;"
+
+
 def submission(function: Function, arguments: str) -> str:
     """A completion-taking C call as the submission that NativeCallScope runs."""
     return (
@@ -727,6 +733,14 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
                 f"    (handle, attachment) => {result_type}.Adopt({parent}handle, attachment)",
                 ");",
             ]
+        elif plan.absence:
+            if plan.registrations or scoped:
+                raise Unsupported("absence requires an output without registrations")
+            body = prologue + [
+                present_call(plan, arguments),
+                f"return {result_type}.Adopt({parent}{local});",
+            ]
+            result_type += "?"
         else:
             body = prologue + [checked_call(function, arguments)]
             constructor = f"{result_type}.Adopt({parent}{local})"
@@ -807,7 +821,15 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             )
         else:
             result_type, result = "void", None
-        body = prologue + [checked_call(function, arguments)]
+        if plan.absence:
+            if scoped or decision_completion or len(outputs) != 1:
+                raise Unsupported("absence requires one output without registrations")
+            result_type += "?"
+        body = prologue + [
+            present_call(plan, arguments)
+            if plan.absence
+            else checked_call(function, arguments)
+        ]
         if scoped:
             accept = (
                 "scope.Accept(CallbackOwner);"

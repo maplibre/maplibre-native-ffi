@@ -56,3 +56,15 @@ test "generated default copies keep values and leave registrations unset" {
     try std.testing.expectEqual(@as(u32, 4), hooks.value.limit);
     try std.testing.expect(hooks.value.signal.callback == null);
 }
+
+test "generated absence returns null and other failures still report" {
+    try std.testing.expect(try api.probeTakeParcel(null) == null);
+    var parcel = (try api.probeTakeParcel(null)).?;
+    try std.testing.expectEqual(@as(u64, 42), parcel.raw);
+    parcel.deinit();
+    var diagnostic: api.Diagnostic = .{};
+    try std.testing.expectError(error.InvalidArgument, api.probeTakeParcel(&diagnostic));
+    try std.testing.expectEqualStrings("exhausted", diagnostic.message());
+    try std.testing.expect(try api.probeReadLevel(null) == null);
+    try std.testing.expectEqual(@as(?f64, 0.5), try api.probeReadLevel(null));
+}

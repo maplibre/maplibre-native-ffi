@@ -413,17 +413,13 @@ impl Session {
         loop {
             let seen = self.wakes.signal.seen();
             self.service();
-            match self.handle.drain_frame_results() {
-                Ok(batch) => {
-                    let found = (0..batch.count().unwrap())
-                        .map(|index| batch.get(index).unwrap())
-                        .find(|result| result.token == token);
-                    if let Some(result) = found {
-                        return result;
-                    }
+            if let Some(batch) = self.handle.drain_frame_results().unwrap() {
+                let found = (0..batch.count().unwrap())
+                    .map(|index| batch.get(index).unwrap())
+                    .find(|result| result.token == token);
+                if let Some(result) = found {
+                    return result;
                 }
-                Err(error) if error.kind() == ErrorKind::NotReady => {}
-                Err(error) => panic!("draining frame results failed: {error}"),
             }
             self.wakes
                 .signal

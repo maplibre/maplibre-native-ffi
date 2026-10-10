@@ -60,7 +60,9 @@ class RustEmitterTests(unittest.TestCase):
             "MLN_PROTOCOL_ABI_VERSION",
         )
         api = parse(
-            COLLISIONS, groups=("keywords", "default_registration"), defines=defines
+            COLLISIONS,
+            groups=("keywords", "default_registration", "absence"),
+            defines=defines,
         )
         validate(api)
         self.assertEqual(
@@ -72,6 +74,9 @@ class RustEmitterTests(unittest.TestCase):
                 "mln_map_move",
                 "mln_map_release",
                 "mln_probe_hooks_default",
+                "mln_probe_parcel_release",
+                "mln_probe_read_level",
+                "mln_probe_take_parcel",
             },
         )
         with TemporaryDirectory() as directory:

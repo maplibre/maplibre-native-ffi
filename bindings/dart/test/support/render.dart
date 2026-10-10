@@ -112,12 +112,8 @@ BigInt _requestFrame(RenderSessionHandle session, int value) {
 /// Drains the session's frame results and returns the one for [token], or
 /// null while it has not arrived.
 RenderFrameResult? _takeResult(RenderSessionHandle session, BigInt token) {
-  final RenderFrameBatchHandle batch;
-  try {
-    batch = session.drainFrameResults();
-  } on NotReadyException {
-    return null;
-  }
+  final batch = session.drainFrameResults();
+  if (batch == null) return null;
   try {
     for (var index = 0; index < batch.count(); index++) {
       final result = batch.getValue(index);

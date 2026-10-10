@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using Maplibre.NativeFfi.Error;
 
 namespace Maplibre.NativeFfi.Examples.DotnetMap;
 
@@ -276,12 +275,8 @@ internal abstract class RenderTarget : IDisposable
     /// <returns>Whether a frame reached the window.</returns>
     protected bool DrainFrameResults()
     {
-        RenderFrameBatchHandle results;
-        try
-        {
-            results = Session.DrainFrameResults();
-        }
-        catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
+        var results = Session.DrainFrameResults();
+        if (results is null)
         {
             return false;
         }
@@ -428,17 +423,8 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
     protected override bool Present()
     {
         AcquiredFrameHandle? newest = null;
-        while (true)
+        while (Session.AcquireFrame() is { } frame)
         {
-            AcquiredFrameHandle frame;
-            try
-            {
-                frame = Session.AcquireFrame();
-            }
-            catch (MaplibreException error) when (error.Status == MaplibreStatus.NotReady)
-            {
-                break;
-            }
             // Nothing read an older frame, so it releases CPU-complete.
             Release(newest);
             newest = frame;

@@ -80,7 +80,7 @@ that every handwritten runtime is written against: the status enum, the
 diagnostic, the completion and its result, and the buffer view. No other rule
 reads a declaration's name.
 
-Three keys state what a C shape cannot:
+Four keys state what a C shape cannot:
 
 - `prefix=` on a handle names the prefix of its operations when that differs
   from the handle's type name, as `mln_resource_request` does for
@@ -89,6 +89,12 @@ Three keys state what a C shape cannot:
   of its meaning, as with coordinates, so a binding may construct it
   positionally. The schema rejects it on a record with control, pointer, or
   array members.
+- `absent_on=` on a function names a failure status of `mln_status` that reports
+  its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
+  for a drain with nothing queued. A binding returns its language's empty form
+  for that status, such as `None`, `nil`, or `null`, and reads or adopts the
+  output only on success. The schema accepts the key only on a function that
+  returns a status, takes no completion, and has exactly one output.
 - `default=` on a field states the nonzero value that the field holds in its
   record's native default: a decimal integer, a decimal with a point, `true`, or
   a constant of the field's enum. Dart, Kotlin, and Zig build a record from
@@ -146,6 +152,7 @@ case and escapes keywords:
 | `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
 | `OperationPlan.status`  | Whether the function returns the status enum                                                |
 | `OperationPlan.support` | The record default or handle disposal that the operation backs                              |
+| `OperationPlan.absence` | The `absent_on=` status, its value, and the output that it reports absent                   |
 | `FieldPlan.initial`     | The field's `default=`, resolved to a typed value and enum member, or none for zero         |
 
 ## Test a change

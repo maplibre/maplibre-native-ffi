@@ -213,10 +213,8 @@ impl Session {
 
     /// Drains every queued frame result.
     pub fn drain_results(&mut self) -> maplibre_native_ffi::Result<FrameResults> {
-        let batch = match self.session.drain_frame_results() {
-            Ok(batch) => batch,
-            Err(error) if error.kind() == ErrorKind::NotReady => return Ok(FrameResults::default()),
-            Err(error) => return Err(error),
+        let Some(batch) = self.session.drain_frame_results()? else {
+            return Ok(FrameResults::default());
         };
         let count = batch.count()?;
         let mut results = FrameResults {
@@ -255,16 +253,10 @@ impl Session {
     /// returning, so CPU-complete release is accurate.
     pub fn acquire_newest(&mut self) -> maplibre_native_ffi::Result<Option<&AcquiredFrameHandle>> {
         let mut acquired = false;
-        loop {
-            match self.session.acquire_frame() {
-                Ok(frame) => {
-                    self.release_held()?;
-                    self.held = Some(frame);
-                    acquired = true;
-                }
-                Err(error) if error.kind() == ErrorKind::NotReady => break,
-                Err(error) => return Err(error),
-            }
+        while let Some(frame) = self.session.acquire_frame()? {
+            self.release_held()?;
+            self.held = Some(frame);
+            acquired = true;
         }
         Ok(if acquired { self.held.as_ref() } else { None })
     }

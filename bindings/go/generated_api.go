@@ -5534,7 +5534,7 @@ func (receiver *RenderSessionHandle) Abandon() (RenderAbandonResult, error) {
 
 func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error) {
 	var outFrame C.mln_acquired_frame
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_acquire_frame), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGetUnless(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_acquire_frame), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_acquire_frame(C.mln_render_session(raw), &outFrame, diagnostic))
 	}, func(arena *bindingArena) *AcquiredFrameHandle {
 		adopted := adoptAcquiredFrameHandle(uint64(outFrame), receiver)
@@ -5568,7 +5568,7 @@ func (receiver *RenderSessionHandle) Detach() (*Future[struct{}], error) {
 
 func (receiver *RenderSessionHandle) DrainFrameResults() (*RenderFrameBatchHandle, error) {
 	var outBatch C.mln_render_frame_batch
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_drain_frame_results), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+	return bindingGetUnless(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_drain_frame_results), int32(C.MLN_STATUS_NOT_READY), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_drain_frame_results(C.mln_render_session(raw), &outBatch, diagnostic))
 	}, func(arena *bindingArena) *RenderFrameBatchHandle {
 		adopted := adoptRenderFrameBatchHandle(uint64(outBatch), nil)

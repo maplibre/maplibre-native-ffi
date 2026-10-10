@@ -61,7 +61,8 @@ static bool frame_woke(void* context) {
   return atomic_load(&wait->fixture->frame_wakes) != wait->before;
 }
 
-// The frame wake runs when the result queue goes from empty to nonempty, and
+// A drain of an empty result queue reports not ready and leaves its output
+// null. The frame wake runs when the queue goes from empty to nonempty, and
 // not again for a drain. A drained batch is an owned handle: releasing it
 // twice is a no-op, releasing the null handle is a no-op, and a released
 // handle names no batch.
@@ -70,6 +71,12 @@ static void frame_results_wake_the_host_and_drain_into_an_owned_batch(void) {
   mln_map map;
   mln_test_render_fixture fixture = {0};
   attach(&runtime, &map, &fixture);
+  mln_render_frame_batch empty = MLN_HANDLE_NULL;
+  MLN_TEST_STATUS(
+    MLN_STATUS_NOT_READY,
+    mln_render_session_drain_frame_results(fixture.session, &empty, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, empty);
   frame_wake_wait wake = {
     .fixture = &fixture, .before = atomic_load(&fixture.frame_wakes)
   };
@@ -213,6 +220,7 @@ static void sustained_demands_past_the_ring_depth_keep_the_newest_frames(void) {
     MLN_STATUS_NOT_READY,
     mln_render_session_acquire_frame(fixture.session, &extra, NULL)
   );
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, extra);
   mln_test_render_release_frame(&frames[0]);
   mln_test_render_release_frame(&frames[1]);
   detach(runtime, map, &fixture);

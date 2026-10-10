@@ -6,6 +6,7 @@
 [cases]
 "ERR-01" = "bindings/zig/src/status.zig::statuses map both ways, keep an unknown code, and carry the diagnostic"
 "ERR-02" = "bindings/zig/src/status.zig::ABI version validation reports mismatch diagnostics"
+"ERR-03" = "bindings/zig/tests/rendering.zig::a drain before any demand returns no batch"
 "LIFE-01" = "bindings/zig/tests/lifecycle.zig::copied handles share one close and close twice safely"
 "LIFE-02" = "bindings/zig/tests/lifecycle.zig::a refused close leaves the handle usable and a later close succeeds"
 "LIFE-03" = "bindings/zig/src/owner.zig::a borrow on another thread holds off disposal until it ends"

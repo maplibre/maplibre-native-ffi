@@ -4,8 +4,6 @@ import android.util.Log
 import java.util.concurrent.Semaphore
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.LogicalExtent
@@ -67,13 +65,7 @@ private constructor(
 
   /** Drains every frame result. */
   fun drainFrameResults(): Drained {
-    val batch =
-      try {
-        session.drainFrameResults()
-      } catch (error: MaplibreException) {
-        if (error.status == MaplibreStatus.NOT_READY) return Drained(false, false, false)
-        throw error
-      }
+    val batch = session.drainFrameResults() ?: return Drained(false, false, false)
     return batch.use { results ->
       var rendered = false
       var needsRepaint = false

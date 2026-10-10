@@ -23,6 +23,7 @@
 [cases]
 "ERR-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/error/StatusMappingTest.kt::everyStatusMapsToItsExceptionAndAnUnknownCodeSurvives"
 "ERR-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/internal/loader/AbiVersionTest.kt::abiVersionMismatchReportsActualAndExpectedVersions"
+"ERR-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aDrainBeforeAnyDemandReturnsNull"
 "LIFE-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::closingAHandleTwiceIsSafeAndLaterUseIsRefused"
 "LIFE-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/lifecycle/HandleLifecycleTest.kt::aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds"
 "LIFE-03" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowOnAnotherThreadHoldsOffTheFramesReleaseUntilItEnds"

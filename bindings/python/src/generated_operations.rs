@@ -8353,11 +8353,14 @@ impl RenderSessionHandle {
             GeneratedCall::new(py, "mln_render_session_acquire_frame", self.admission())?;
         let handle = self.live()?;
         let mut out_frame: sys::mln_acquired_frame = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
+        let result = unsafe {
+            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
                 sys::mln_render_session_acquire_frame(handle, &mut out_frame, diagnostic)
             })
-        }?;
+        };
+        if !result? {
+            return Ok(py.None());
+        }
         unsafe { AcquiredFrameHandle::adopt(py, out_frame, Vec::new()) }
     }
     #[pyo3(signature = ())]
@@ -8422,11 +8425,14 @@ impl RenderSessionHandle {
         )?;
         let handle = self.live()?;
         let mut out_batch: sys::mln_render_frame_batch = unsafe { std::mem::zeroed() };
-        unsafe {
-            call.status(|diagnostic| {
+        let result = unsafe {
+            call.status_unless(sys::MLN_STATUS_NOT_READY, |diagnostic| {
                 sys::mln_render_session_drain_frame_results(handle, &mut out_batch, diagnostic)
             })
-        }?;
+        };
+        if !result? {
+            return Ok(py.None());
+        }
         unsafe { RenderFrameBatchHandle::adopt(py, out_batch, Vec::new()) }
     }
     #[pyo3(signature = ())]

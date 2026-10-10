@@ -500,4 +500,23 @@ mln_status mln_notice_set_callback(
 );
 #endif
 
+#ifdef MLN_PROTOCOL_ABSENCE
+// Outputs that a failure status reports as absent: each call first finds
+// nothing, then publishes its output, and then fails.
+typedef unsigned long long mln_probe_parcel BIND(
+  "kind=handle;release=mln_probe_parcel_release;dispose=mln_probe_parcel_"
+  "release"
+);
+void mln_probe_parcel_release(mln_probe_parcel parcel);
+BIND("absent_on=MLN_STATUS_NOT_READY")
+mln_status mln_probe_take_parcel(
+  mln_probe_parcel* out_parcel BIND("direction=out"),
+  mln_diagnostic* out_diagnostic
+);
+BIND("absent_on=MLN_STATUS_NOT_READY")
+mln_status mln_probe_read_level(
+  double* out_level BIND("direction=out"), mln_diagnostic* out_diagnostic
+);
+#endif
+
 #endif

@@ -6,6 +6,7 @@
 [cases]
 "ERR-01" = "bindings/python/tests/test_errors.py::test_native_statuses_raise_their_exception_with_code_and_diagnostic"
 "ERR-02" = { na = "The extension links the native archive in when the wheel is built, so no other library can load in its place; the import checks the version it linked against" }
+"ERR-03" = "bindings/python/tests/test_render.py::test_a_drain_before_any_demand_returns_none"
 "LIFE-01" = "bindings/python/tests/test_lifecycle.py::test_closing_twice_is_safe_and_a_closed_handle_refuses_use"
 "LIFE-02" = "bindings/python/tests/test_lifecycle.py::test_a_refused_close_leaves_the_handle_usable"
 "LIFE-03" = "bindings/python/tests/test_render.py::test_a_borrow_on_another_thread_holds_off_close"

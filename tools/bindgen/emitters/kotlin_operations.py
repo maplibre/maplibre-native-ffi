@@ -43,6 +43,14 @@ class Native:
             return self.call(function, arguments)
         return f"check({self.call(function, [*arguments, 'diagnostic'])})"
 
+    def present(self, plan, arguments):
+        """A call whose absence status returns false and whose other failures throw.
+
+        Kotlin has no C constants, so the call passes the status's value.
+        """
+        call = self.call(plan.function, [*arguments, "diagnostic"])
+        return f"present({call}, absent = {plan.absence.value})"
+
     def status(self, function, arguments):
         """The status-returning call for a runtime helper that checks it."""
         if not function.diagnostic:
@@ -387,6 +395,9 @@ def immediate(plan, values, native):
     elif result and not plan.outputs:
         setup.append("val raw = " + native.call(plan.function, arguments))
         decoded = result_value(result, values).replace("{raw}", "raw")
+    elif plan.absence:
+        decoded = f"if ({native.present(plan, arguments)}) {decoded} else null"
+        result_type += "?"
     else:
         setup.append(native.checked(plan.function, arguments))
     if decoded:
@@ -488,7 +499,13 @@ def owned(plan, values, native):
             for p in plan.function.parameters
             if p.name == plan.owned_outputs[0].parameter
         )
-        body = f"val out = {values.storage(slot)}; {native.checked(plan.function, arguments)}; {adopted}"
+        if plan.absence:
+            if registered:
+                raise Unsupported("absence requires an output without registrations")
+            body = f"val out = {values.storage(slot)}; if ({native.present(plan, arguments)}) {adopted} else null"
+            head = head.removesuffix(" =") + "? ="
+        else:
+            body = f"val out = {values.storage(slot)}; {native.checked(plan.function, arguments)}; {adopted}"
     return f'{head} nativeCall({owners}, "{plan.name}") {{ {encodings(plan)}{body} }}\n'
 
 

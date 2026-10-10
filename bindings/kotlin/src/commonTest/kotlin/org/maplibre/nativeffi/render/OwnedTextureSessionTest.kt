@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.CompletableDeferred
@@ -41,7 +42,7 @@ class OwnedTextureSessionTest {
       )
 
       // The typed texture view of the acquired frame names the texture the session rendered.
-      val frame = session.acquireFrame()
+      val frame = assertNotNull(session.acquireFrame())
       assertEquals(32u to 16u, TestGraphics.frameTextureSize(frame))
       frame.release()
 
@@ -51,14 +52,23 @@ class OwnedTextureSessionTest {
   }
 
   @Test
+  fun aDrainBeforeAnyDemandReturnsNull(): Unit = runSuspendTest {
+    withOwnedTexture {
+      // Native reports both calls as not ready, which reads as null.
+      assertNull(session.drainFrameResults())
+      assertNull(session.acquireFrame())
+    }
+  }
+
+  @Test
   fun aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease(): Unit = runSuspendTest {
     withOwnedTexture(textureRingDepth = 2u) {
       setStyle(RED_BACKGROUND_STYLE)
       renderStill()
       assertEquals(RenderResult.RENDERED, renderFrame().disposition)
-      val frame = session.acquireFrame()
+      val frame = assertNotNull(session.acquireFrame())
       assertEquals(RenderResult.RENDERED, renderFrame().disposition)
-      val sibling = session.acquireFrame()
+      val sibling = assertNotNull(session.acquireFrame())
 
       var escaped: GpuSync? = null
       frame.withProducerSync { sync ->
@@ -86,7 +96,7 @@ class OwnedTextureSessionTest {
       setStyle(RED_BACKGROUND_STYLE)
       renderStill()
       assertEquals(RenderResult.RENDERED, renderFrame().disposition)
-      val frame = session.acquireFrame()
+      val frame = assertNotNull(session.acquireFrame())
       val entered = CompletableDeferred<Unit>()
       val leave = CompletableDeferred<Unit>()
       val borrower = TestThread {

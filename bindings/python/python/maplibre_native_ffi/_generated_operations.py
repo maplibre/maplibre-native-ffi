@@ -1200,9 +1200,12 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """Call mln_render_session_abandon."""
         return RenderAbandonResult._from_native(self._native.abandon())
 
-    def acquire_frame(self) -> AcquiredFrameHandle:
+    def acquire_frame(self) -> AcquiredFrameHandle | None:
         """Call mln_render_session_acquire_frame."""
-        return _adopt_value(self._native.acquire_frame(), "AcquiredFrameHandle", self)
+        return _maybe(
+            lambda raw: _adopt_value(raw, "AcquiredFrameHandle", self),
+            self._native.acquire_frame(),
+        )
 
     def barrier(self) -> Future[None]:
         """Call mln_render_session_barrier."""
@@ -1220,10 +1223,11 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """Call mln_render_session_detach."""
         return self._native.detach()
 
-    def drain_frame_results(self) -> RenderFrameBatchHandle:
+    def drain_frame_results(self) -> RenderFrameBatchHandle | None:
         """Call mln_render_session_drain_frame_results."""
-        return _adopt_value(
-            self._native.drain_frame_results(), "RenderFrameBatchHandle", None
+        return _maybe(
+            lambda raw: _adopt_value(raw, "RenderFrameBatchHandle", None),
+            self._native.drain_frame_results(),
         )
 
     def dump_debug_logs(self) -> Future[None]:

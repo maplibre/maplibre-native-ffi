@@ -10,7 +10,13 @@ import re
 from dataclasses import replace
 
 from .model import Api, CType, Function, ModelError
-from .protocol import BUFFER_VIEW, is_buffer_view, is_completion, is_status
+from .protocol import (
+    BUFFER_VIEW,
+    STATUS,
+    is_buffer_view,
+    is_completion,
+    is_status,
+)
 
 EXECUTIONS = frozenset(
     {
@@ -62,6 +68,7 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "user_data",
         "release_callback",
         "accepted_unless",
+        "absent_on",
         "view_owner",
         "callback_adapter",
         "context_type",
@@ -724,6 +731,8 @@ def validate(api: Api) -> None:
                         f"{context}: a function without a return value takes no "
                         f"value metadata ({', '.join(extra)})"
                     )
+        if "absent_on" in metadata:
+            errors.extend(absence_errors(api, function, context))
         if function.variadic:
             errors.append(
                 f"{context}: variadic public functions cannot be generated safely"
@@ -1487,6 +1496,34 @@ def reference_errors(api: Api) -> list[str]:
         check("function", function, f"{function.location}: {function.name}")
     for typedef in api.typedefs:
         check("typedef", typedef, f"{typedef.location}: {typedef.name}")
+    return errors
+
+
+def absence_errors(api: Api, function: Function, context: str) -> list[str]:
+    """Check `absent_on`: a failure status that reports the one output absent.
+
+    A binding returns its language's empty form for that status instead of an
+    error, so the function must report its outcome synchronously through a
+    status and publish exactly one output.
+    """
+    errors = []
+    if not is_status(function.return_type) or has_completion(function):
+        errors.append(
+            f"{context}: absent_on requires a status return without a completion"
+        )
+    directions = [
+        parameter.metadata.get("direction", "in") for parameter in function.parameters
+    ]
+    if directions.count("out") != 1 or "inout" in directions:
+        errors.append(f"{context}: absent_on requires exactly one output")
+    statuses = {
+        value.name: value.value
+        for enum in api.enums
+        if enum.name == STATUS
+        for value in enum.values
+    }
+    if statuses.get(function.metadata["absent_on"], 0) == 0:
+        errors.append(f"{context}: absent_on requires a failure enumerator of {STATUS}")
     return errors
 
 

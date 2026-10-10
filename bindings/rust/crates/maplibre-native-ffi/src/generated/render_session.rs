@@ -101,14 +101,19 @@ impl RenderSessionHandle {
     }
 
     /// Calls `mln_render_session_acquire_frame`.
-    pub fn acquire_frame(&self) -> Result<AcquiredFrameHandle> {
+    pub fn acquire_frame(&self) -> Result<Option<AcquiredFrameHandle>> {
         let mut call = self.inner.call("mln_render_session_acquire_frame")?;
-        let parent = self.inner.parent();
         let mut out_frame = sys::mln_acquired_frame(0);
-        call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_acquire_frame(session, &mut out_frame, out_diagnostic)
-        })?;
-        Ok(AcquiredFrameHandle::adopt(out_frame, parent)?)
+        if !call.status_unless(
+            sys::MLN_STATUS_NOT_READY,
+            |session, out_diagnostic| unsafe {
+                sys::mln_render_session_acquire_frame(session, &mut out_frame, out_diagnostic)
+            },
+        )? {
+            return Ok(None);
+        }
+        let parent = self.inner.parent();
+        Ok(Some(AcquiredFrameHandle::adopt(out_frame, parent)?))
     }
 
     /// Calls `mln_render_session_barrier`.
@@ -165,13 +170,18 @@ impl RenderSessionHandle {
     }
 
     /// Calls `mln_render_session_drain_frame_results`.
-    pub fn drain_frame_results(&self) -> Result<RenderFrameBatchHandle> {
+    pub fn drain_frame_results(&self) -> Result<Option<RenderFrameBatchHandle>> {
         let mut call = self.inner.call("mln_render_session_drain_frame_results")?;
         let mut out_batch = sys::mln_render_frame_batch(0);
-        call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_drain_frame_results(session, &mut out_batch, out_diagnostic)
-        })?;
-        Ok(RenderFrameBatchHandle::adopt(out_batch, None)?)
+        if !call.status_unless(
+            sys::MLN_STATUS_NOT_READY,
+            |session, out_diagnostic| unsafe {
+                sys::mln_render_session_drain_frame_results(session, &mut out_batch, out_diagnostic)
+            },
+        )? {
+            return Ok(None);
+        }
+        Ok(Some(RenderFrameBatchHandle::adopt(out_batch, None)?))
     }
 
     /// Calls `mln_render_session_dump_debug_logs`.

@@ -151,10 +151,7 @@ func (driver *callerDriver) HandleWakes() (bool, error) {
 // one refresh.
 func (driver *callerDriver) drainFrameResults() (bool, error) {
 	batch, err := driver.session.DrainFrameResults()
-	if errors.Is(err, maplibre.ErrNotReady) {
-		return false, nil
-	}
-	if err != nil {
+	if err != nil || batch == nil {
 		return false, err
 	}
 	defer batch.Close()
@@ -337,11 +334,11 @@ func (target *openGLOwnedTextureTarget) drawFrame() (bool, error) {
 	var newest *maplibre.AcquiredFrameHandle
 	for {
 		frame, err := target.session.AcquireFrame()
-		if errors.Is(err, maplibre.ErrNotReady) {
-			break
-		}
 		if err != nil {
 			return false, errors.Join(err, releaseFrame(newest))
+		}
+		if frame == nil {
+			break
 		}
 		if err := releaseFrame(newest); err != nil {
 			return false, errors.Join(err, releaseFrame(frame))

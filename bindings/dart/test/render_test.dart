@@ -46,6 +46,13 @@ void main() {
     );
   }, skip: _wglSkip);
 
+  test('a drain before any demand returns no batch', () async {
+    final map = await openRenderMap(_redStyleJson);
+    final worker = await WorkerSession.attach(map);
+    // Native reports the drain as not ready, which reads as null.
+    expect(worker.session.drainFrameResults(), isNull);
+  }, skip: _wglSkip);
+
   test(
     'a frame view expires with its scope and holds off release inside it',
     () async {
@@ -53,7 +60,7 @@ void main() {
       final worker = await WorkerSession.attach(map);
       await worker.renderFrame();
       final session = worker.session;
-      final frame = session.acquireFrame();
+      final frame = session.acquireFrame()!;
 
       final readEscapedWidth = _openFrameView(frame, (width) {
         expect(width, renderSize);

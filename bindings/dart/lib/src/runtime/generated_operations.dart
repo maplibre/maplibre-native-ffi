@@ -5636,15 +5636,17 @@ final class RenderSessionHandle implements Finalizable {
     );
     return _readRenderAbandonResult(outResult.ref);
   });
-  AcquiredFrameHandle acquireFrame() => withNativeArena((arena) {
+  AcquiredFrameHandle? acquireFrame() => withNativeArena((arena) {
     final outFrame = arena<Uint64>();
-    _check(
+    if (!_present(
       raw.mln_render_session_acquire_frame(
         _handle.raw,
         outFrame,
         nativeDiagnostic,
       ),
-    );
+      raw.MLN_STATUS_NOT_READY,
+    ))
+      return null;
     return _adoptOwned(
       outFrame.value,
       () => AcquiredFrameHandle._(this, NativeAcquiredFrame(outFrame.value)),
@@ -5680,15 +5682,17 @@ final class RenderSessionHandle implements Finalizable {
   void dispose() => _state.close(
     (handle) => raw.mln_render_session_dispose(handle.raw, nativeDiagnostic),
   );
-  RenderFrameBatchHandle drainFrameResults() => withNativeArena((arena) {
+  RenderFrameBatchHandle? drainFrameResults() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
-    _check(
+    if (!_present(
       raw.mln_render_session_drain_frame_results(
         _handle.raw,
         outBatch,
         nativeDiagnostic,
       ),
-    );
+      raw.MLN_STATUS_NOT_READY,
+    ))
+      return null;
     return _adoptOwned(
       outBatch.value,
       () => RenderFrameBatchHandle._(NativeRenderFrameBatch(outBatch.value)),

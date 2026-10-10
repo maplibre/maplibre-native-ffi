@@ -10,6 +10,7 @@
 # generator's Swift probe checks against a stub that reports another version.
 # A value's generated default reads native defaults without the check.
 "ERR-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ErrorTests.swift::aLibraryWithAnotherCAbiVersionIsRejected"
+"ERR-03" = "bindings/swift/Tests/MaplibreNativeFFITests/RenderSessionTests.swift::aDrainBeforeAnyDemandReturnsNil"
 "LIFE-01" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::closingAHandleTwiceDoesNothingTheSecondTime"
 "LIFE-02" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aRefusedCloseLeavesTheRuntimeUsableAndALaterCloseSucceeds"
 "LIFE-03" = "bindings/swift/Tests/MaplibreNativeFFITests/LifecycleTests.swift::aBorrowOnAnotherThreadHoldsOffAClose"

@@ -444,10 +444,7 @@ pub const OwnedTexture = struct {
         try self.wakes.waitUntil(&context, struct {
             fn ready(ctx: *Context) anyerror!bool {
                 try ctx.owner.service();
-                var batch = maplibre.renderSessionDrainFrameResults(ctx.owner.session, null) catch |err| switch (err) {
-                    error.NotReady => return false,
-                    else => return err,
-                };
+                var batch = try maplibre.renderSessionDrainFrameResults(ctx.owner.session, null) orelse return false;
                 defer batch.deinit();
                 for (0..try maplibre.renderFrameBatchCount(batch, null)) |index| {
                     const result = try maplibre.renderFrameBatchGet(batch, index, null);

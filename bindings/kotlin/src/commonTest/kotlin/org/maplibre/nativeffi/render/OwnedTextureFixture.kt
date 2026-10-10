@@ -13,8 +13,6 @@ import org.maplibre.nativeffi.MapFixture
 import org.maplibre.nativeffi.WAIT_TIMEOUT
 import org.maplibre.nativeffi.denyingProvider
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.GeneratedApi
@@ -99,13 +97,7 @@ internal class OwnedTextureFixture(
 
   private fun releaseFrames() {
     while (true) {
-      val frame =
-        try {
-          session.acquireFrame()
-        } catch (error: MaplibreException) {
-          if (error.status == MaplibreStatus.NOT_READY) return
-          throw error
-        }
+      val frame = session.acquireFrame() ?: return
       frame.release()
     }
   }
@@ -117,13 +109,7 @@ internal class OwnedTextureFixture(
   }
 
   private fun drainResults(): List<RenderFrameResult> {
-    val batch =
-      try {
-        session.drainFrameResults()
-      } catch (error: MaplibreException) {
-        if (error.status == MaplibreStatus.NOT_READY) return emptyList()
-        throw error
-      }
+    val batch = session.drainFrameResults() ?: return emptyList()
     return batch.use { owner -> List(owner.count().toInt()) { owner.get(it.toULong()) } }
   }
 

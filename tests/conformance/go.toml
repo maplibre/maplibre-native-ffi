@@ -19,6 +19,7 @@
 [cases]
 "ERR-01" = "bindings/go/errors_test.go::TestNativeStatusMapsToTypedErrors"
 "ERR-02" = "bindings/go/errors_test.go::TestMismatchedCABIVersionIsRejected"
+"ERR-03" = "bindings/go/render_test.go::TestDrainBeforeAnyDemandReturnsNoBatch"
 "LIFE-01" = "bindings/go/lifecycle_test.go::TestClosingTwiceIsSafe"
 "LIFE-02" = "bindings/go/lifecycle_test.go::TestRefusedCloseLeavesTheHandleUsable"
 "LIFE-03" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"

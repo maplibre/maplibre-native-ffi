@@ -7,6 +7,7 @@
 # Status and diagnostics
 "ERR-01" = "A failed call maps its status to the language's error, keeps an unknown status code, and carries the call's diagnostic message"
 "ERR-02" = "Loading a library with a different C ABI version fails before any other call"
+"ERR-03" = "A status that the C API declares as absence returns the language's empty form instead of an error"
 
 # Handle lifecycle
 "LIFE-01" = "Closing a handle twice is safe and the second close does nothing"

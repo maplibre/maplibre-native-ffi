@@ -6,6 +6,7 @@
 [cases]
 "ERR-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeStatusTests.cs::NativeStatusesMapToPublicExceptionCategories"
 "ERR-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeLibraryLoaderTests.cs::ALibraryWithAnotherAbiVersionIsRejected"
+"ERR-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ADrainBeforeAnyDemandReturnsNull"
 "LIFE-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ClosingAHandleTwiceClosesItOnce"
 "LIFE-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds"
 "LIFE-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeHandleStateTests.cs::ABorrowHoldsOffACloseFromAnotherThreadUntilItEnds"

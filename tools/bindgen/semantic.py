@@ -12,7 +12,7 @@ from typing import TypedDict
 
 from .model import Api, CType, Function, ModelError
 from .names import type_name
-from .protocol import BUFFER_VIEW, is_completion, is_status
+from .protocol import BUFFER_VIEW, STATUS, is_completion, is_status
 from .schema import validate
 
 
@@ -292,6 +292,20 @@ class DisposeSupport:
 
 
 @dataclass(frozen=True)
+class AbsencePlan:
+    """A failure status that reports the operation's one output as absent.
+
+    A binding returns its language's empty form for this status instead of an
+    error, and adopts or copies the output only on success.
+    """
+
+    # The status enumerator, and its value.
+    status: str
+    value: int
+    output: ParameterPlan
+
+
+@dataclass(frozen=True)
 class OperationPlan:
     function: Function
     execution: str
@@ -314,6 +328,7 @@ class OperationPlan:
     # The operation's language-neutral member name, which every binding only
     # case-converts and escapes; see `Binder.member`.
     member: str = ""
+    absence: AbsencePlan | None = None
 
     @property
     def name(self) -> str:
@@ -1215,6 +1230,23 @@ class Binder:
                 handle.view_end,
                 member.removeprefix("get_"),
             )
+        absence = None
+        if "absent_on" in metadata:
+            if view or consumes:
+                raise ModelError(
+                    [f"{context}: absent_on requires an output that the caller owns"]
+                )
+            absence = AbsencePlan(
+                metadata["absent_on"],
+                next(
+                    value.value
+                    for enum in self.api.enums
+                    if enum.name == STATUS
+                    for value in enum.values
+                    if value.name == metadata["absent_on"]
+                ),
+                outputs[0],
+            )
         # A runtime export's caller reads its outputs itself, so only a
         # generated operation and a default copy what native writes.
         if function.name not in self.api.runtime_exports or isinstance(
@@ -1263,6 +1295,7 @@ class Binder:
             ),
             is_status(function.return_type),
             member,
+            absence,
         )
 
     def copied(

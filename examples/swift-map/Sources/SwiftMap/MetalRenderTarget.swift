@@ -194,10 +194,9 @@ final class MetalRenderTarget {
 
   /// Drains every queued frame result.
   func drainResults() throws -> FrameResults {
-    let batch: RenderFrameBatchHandle
-    do { batch = try session.drainFrameResults() }
-    catch let error as MaplibreError
-      where error.kind == .notReady { return FrameResults() }
+    guard let batch = try session.drainFrameResults() else {
+      return FrameResults()
+    }
     defer { try? batch.close() }
     let count = try batch.count()
     var results = FrameResults(any: count > 0)
@@ -291,16 +290,12 @@ final class MetalRenderTarget {
   /// so CPU-complete release is accurate.
   private func acquireNewestFrame() throws -> AcquiredFrameHandle? {
     var acquired = false
-    while true {
-      do {
-        let frame = try session.acquireFrame()
-        try releaseHeldFrame()
-        heldFrame = frame
-        acquired = true
-      } catch let error as MaplibreError where error.kind == .notReady {
-        return acquired ? heldFrame : nil
-      }
+    while let frame = try session.acquireFrame() {
+      try releaseHeldFrame()
+      heldFrame = frame
+      acquired = true
     }
+    return acquired ? heldFrame : nil
   }
 
   private func releaseHeldFrame() throws {

@@ -822,6 +822,40 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
                 bind(self.parse(source.replace(before, after)), require_complete=True)
 
+    def test_an_absence_status_names_the_one_output_it_reports_absent(self):
+        model = bind(parse(groups=("absence",)), require_complete=True)
+        self.assertEqual(
+            {
+                name: (
+                    plan.absence.status,
+                    plan.absence.value,
+                    plan.absence.output.name,
+                )
+                for name, plan in model.operations_by_name.items()
+                if plan.absence
+            },
+            {
+                "mln_probe_take_parcel": ("MLN_STATUS_NOT_READY", -9, "out_parcel"),
+                "mln_probe_read_level": ("MLN_STATUS_NOT_READY", -9, "out_level"),
+            },
+        )
+        one = 'double *value BIND("direction=out"), mln_diagnostic *out_diagnostic'
+        two = 'double *first BIND("direction=out"), ' + one
+        later = "mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic"
+        for annotation, parameters, error in (
+            ("absent_on=MLN_STATUS_NOT_READY", two, "exactly one output"),
+            (
+                "execution=query;result=double;absent_on=MLN_STATUS_NOT_READY",
+                later,
+                "without a completion",
+            ),
+            ("absent_on=MLN_STATUS_MISSING", one, "failure enumerator"),
+            ("absent_on=MLN_STATUS_OK", one, "failure enumerator"),
+        ):
+            source = f'BIND("{annotation}") mln_status read({parameters});'
+            with self.subTest(source=source), self.assertRaisesRegex(ModelError, error):
+                bind(self.parse(source), require_complete=True)
+
     def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):
         source = """
 typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;

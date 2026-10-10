@@ -73,13 +73,14 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       readRenderAbandonResult(out)
     }
 
-  public fun acquireFrame(): AcquiredFrameHandle =
+  public fun acquireFrame(): AcquiredFrameHandle? =
     nativeCall(this, binding, "mln_render_session_acquire_frame") {
       val out = allocate(8, 8)
-      check(C.mln_render_session_acquire_frame(handle, out, diagnostic))
-      adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
-        AcquiredFrameHandle(it, this@GeneratedRenderSessionOperations as RenderSessionHandle)
-      }
+      if (present(C.mln_render_session_acquire_frame(handle, out, diagnostic), absent = -9))
+        adopt(out, GeneratedOwnerDisposal::acquiredFrame) {
+          AcquiredFrameHandle(it, this@GeneratedRenderSessionOperations as RenderSessionHandle)
+        }
+      else null
     }
 
   public fun barrier(): Deferred<Unit> =
@@ -107,11 +108,12 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       check(C.mln_render_session_dispose(handle, diagnostic))
     }
 
-  public fun drainFrameResults(): RenderFrameBatchHandle =
+  public fun drainFrameResults(): RenderFrameBatchHandle? =
     nativeCall(this, binding, "mln_render_session_drain_frame_results") {
       val out = allocate(8, 8)
-      check(C.mln_render_session_drain_frame_results(handle, out, diagnostic))
-      adopt(out, GeneratedOwnerDisposal::renderFrameBatch) { RenderFrameBatchHandle(it) }
+      if (present(C.mln_render_session_drain_frame_results(handle, out, diagnostic), absent = -9))
+        adopt(out, GeneratedOwnerDisposal::renderFrameBatch) { RenderFrameBatchHandle(it) }
+      else null
     }
 
   public fun dumpDebugLogs(): Deferred<Unit> =

@@ -120,6 +120,17 @@ private func withOwnedTextureSession<Result>(
   }
 }
 
+/// Before any demand, native reports the drain and the acquire as not ready,
+/// which reads as nil.
+@Test func aDrainBeforeAnyDemandReturnsNil() async throws {
+  try await withOwnedTextureSession { rendered in
+    let batch = try rendered.session.drainFrameResults()
+    let frame = try rendered.session.acquireFrame()
+    #expect(batch == nil)
+    #expect(frame == nil)
+  }
+}
+
 /// A frame view is usable only inside its callback, a second view of the
 /// same frame, a release of the frame, and an abandon of its session are
 /// refused while it is open, and a sibling frame that the host drops inside
@@ -128,9 +139,9 @@ private func withOwnedTextureSession<Result>(
   try await withOwnedTextureSession(ringDepth: 2) { rendered in
     let session = rendered.session
     try await session.awaitRenderedFrame()
-    let first = try session.acquireFrame()
+    let first = try #require(try session.acquireFrame())
     try await session.awaitRenderedFrame()
-    var sibling: AcquiredFrameHandle? = try session.acquireFrame()
+    var sibling = try Optional(#require(try session.acquireFrame()))
     weak let weakSibling = sibling
 
     let escaped = try rendered.graphics.withTextureView(of: first) { view in
@@ -167,7 +178,7 @@ private func withOwnedTextureSession<Result>(
     let session = rendered.session
     try await session.awaitRenderedFrame()
     do {
-      let frame = try session.acquireFrame()
+      let frame = try #require(try session.acquireFrame())
       #expect(try session.getSnapshot().acquiredFrameCount == 1)
       withExtendedLifetime(frame) {}
     }

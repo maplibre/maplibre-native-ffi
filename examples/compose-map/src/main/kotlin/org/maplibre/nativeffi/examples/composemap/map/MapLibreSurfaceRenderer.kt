@@ -4,8 +4,6 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
-import org.maplibre.nativeffi.error.MaplibreException
-import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderResult
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
@@ -160,16 +158,10 @@ internal class MapLibreSurfaceRenderer(
   private fun awaitResult(session: RenderSessionHandle, token: ULong): RenderFrameResult {
     while (true) {
       if (callerDriver) session.serviceDriverWork(0uL)
-      val batch =
-        try {
-          session.drainFrameResults()
-        } catch (error: MaplibreException) {
-          if (error.status != MaplibreStatus.NOT_READY) throw error
-          null
+      val result =
+        session.drainFrameResults()?.use { results ->
+          (0uL until results.count()).map(results::get).lastOrNull { it.token == token }
         }
-      val result = batch?.use { results ->
-        (0uL until results.count()).map(results::get).lastOrNull { it.token == token }
-      }
       if (result != null) return result
       sessionWork.acquire()
     }

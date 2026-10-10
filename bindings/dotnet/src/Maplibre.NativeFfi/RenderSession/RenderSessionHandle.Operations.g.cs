@@ -145,11 +145,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         return CopyRenderAbandonResult(outResult);
     }
 
-    public AcquiredFrameHandle AcquireFrame()
+    public AcquiredFrameHandle? AcquireFrame()
     {
         using var call = Enter(this, "mln_render_session_acquire_frame");
         MlnAcquiredFrame outFrame = default;
-        Check(NativeMethods.mln_render_session_acquire_frame(Handle, &outFrame, Diagnostic));
+        if (
+            !Present(
+                NativeMethods.mln_render_session_acquire_frame(Handle, &outFrame, Diagnostic),
+                mln_status.MLN_STATUS_NOT_READY
+            )
+        )
+            return null;
         return AcquiredFrameHandle.Adopt(this, outFrame);
     }
 
@@ -189,11 +195,17 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
         );
     }
 
-    public RenderFrameBatchHandle DrainFrameResults()
+    public RenderFrameBatchHandle? DrainFrameResults()
     {
         using var call = Enter(this, "mln_render_session_drain_frame_results");
         MlnRenderFrameBatch outBatch = default;
-        Check(NativeMethods.mln_render_session_drain_frame_results(Handle, &outBatch, Diagnostic));
+        if (
+            !Present(
+                NativeMethods.mln_render_session_drain_frame_results(Handle, &outBatch, Diagnostic),
+                mln_status.MLN_STATUS_NOT_READY
+            )
+        )
+            return null;
         return RenderFrameBatchHandle.Adopt(outBatch);
     }
 

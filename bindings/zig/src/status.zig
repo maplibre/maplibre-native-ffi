@@ -66,13 +66,26 @@ pub fn call(
     arguments: anytype,
     diagnostic: ?*diagnostics.Diagnostic,
 ) Error!void {
+    _ = try callUnless(function, arguments, diagnostic, null);
+}
+
+/// Calls a status-returning native function like `call`, except that the
+/// `absent` status reports that native published no output. Returns whether
+/// the output holds a value.
+pub fn callUnless(
+    comptime function: anytype,
+    arguments: anytype,
+    diagnostic: ?*diagnostics.Diagnostic,
+    comptime absent: ?i32,
+) Error!bool {
     var out_diagnostic: [*c]c.mln_diagnostic = null;
     if (diagnostic) |target| {
         target.native.size = @sizeOf(c.mln_diagnostic);
         out_diagnostic = &target.native;
     }
     const raw_status: i32 = @call(.auto, function, arguments ++ .{out_diagnostic});
-    if (raw_status == c.MLN_STATUS_OK) return;
+    if (raw_status == c.MLN_STATUS_OK) return true;
+    if (absent) |status| if (raw_status == status) return false;
     if (diagnostic) |target| {
         target.raw_status = raw_status;
         target.recorded = true;
