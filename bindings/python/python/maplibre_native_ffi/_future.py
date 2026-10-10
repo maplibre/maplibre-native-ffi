@@ -8,6 +8,7 @@ import weakref
 from collections import deque
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures._base import CANCELLED
 from threading import Lock
 
 _callback_executor = ThreadPoolExecutor(thread_name_prefix="maplibre-callback")
@@ -53,6 +54,32 @@ class NativeFuture[T](Future[T]):
     def _add_internal_callback(self, fn: Callable[[Future[T]], object]) -> None:
         super().add_done_callback(fn)
 
+    def cancel(self) -> bool:
+        """Abandon the wait, and wake every waiter at once.
+
+        Native work continues to its terminal disposition. A plain future
+        counts as done for ``wait()`` and ``as_completed()`` only once its
+        runner claims it, which native work may not reach for a long time, so
+        a successful cancellation notifies them now.
+        """
+        if not super().cancel():
+            return False
+        with self._condition:
+            if self._state == CANCELLED:
+                self.set_running_or_notify_cancel()
+        return True
+
+    def _claim(self) -> bool:
+        """Claim the future for a result, or return False once it is cancelled.
+
+        A cancelled future takes no result, so the caller disposes any value
+        that the result transfers.
+        """
+        with self._condition:
+            if self.cancelled():
+                return False
+            return self.set_running_or_notify_cancel()
+
 
 def map_future[T, U](
     source: Future[T],
@@ -72,7 +99,7 @@ def map_future[T, U](
     source_ref = weakref.ref(source)
 
     def complete(completed: Future[T]) -> None:
-        if not result.set_running_or_notify_cancel():
+        if not result._claim():
             # A cancelled source released its value natively, and a failed
             # one carries none.
             if (

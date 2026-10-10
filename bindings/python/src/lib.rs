@@ -159,8 +159,10 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
     }
 }
 
-impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
-    fn drop(&mut self) {
+impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
+    /// Hands the live handle to the finalizer's silent disposal, which reports
+    /// a leak if native refuses it.
+    fn dispose_abandoned(&mut self) {
         let (Some(id), Some(dispose)) = (self.id, self.dispose_abandoned) else {
             return;
         };
@@ -176,6 +178,12 @@ impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
                 });
             }
         });
+    }
+}
+
+impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
+    fn drop(&mut self) {
+        self.dispose_abandoned();
     }
 }
 
@@ -395,7 +403,7 @@ unsafe extern "C" fn complete_python_future(
             let claimed = bridge
                 .future
                 .bind(py)
-                .call_method0("set_running_or_notify_cancel")
+                .call_method0("_claim")
                 .and_then(|claimed| claimed.is_truthy());
             match claimed {
                 Ok(true) => {}

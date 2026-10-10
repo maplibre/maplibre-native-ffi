@@ -72,11 +72,15 @@ one-shot work through their normal future, promise, task, suspension, or
 explicit async idiom.
 
 Cancelling or timing out a binding's wait ends only that wait. The native work
-continues to its terminal disposition, and its completion still runs. When a
-created handle arrives after the host abandoned its wait, the binding releases
-that handle. A Go context ends one wait, and dropping the future abandons it.
-Dart futures have no cancellation, so a Dart wait can only time out, and the
-future still delivers its result.
+continues to its terminal disposition, and its completion still runs. When the
+host cancels the wait in the language's idiom, such as task cancellation, a
+cancellation token, cancelling the future, or dropping it, the binding releases
+a created handle that arrives afterward. A timeout that leaves the future
+uncancelled keeps the handle in the future for its other listeners. If the host
+then drops that future, the collector reclaims the handle and reports a leak
+where the binding reports leaks. A Go context ends one wait, and the collector
+retires the handle of a dropped Go future. Dart futures have no cancellation, so
+a Dart wait can only time out, and the future still delivers its result.
 
 Published snapshots provide synchronous copies of state needed by UI and display
 threads. Snapshot reads never call into mutable MapLibre map state. Each

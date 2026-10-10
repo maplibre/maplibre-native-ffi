@@ -77,12 +77,11 @@ func TestFailedCommandDispositionIsData(t *testing.T) {
 	}
 }
 
-// Await returns the context's error when the context ends first, and a nil
-// Future reports an error rather than blocking. A creation whose wait ended
-// and whose Future is dropped retires the map it creates, whether it arrives
-// before or after the Future is collected.
+// Await returns the context's error when the context ends first, even when the
+// result has already arrived, and a later Await still returns that result. A
+// nil Future reports an error rather than blocking.
 func TestAwaitEndsWithItsContext(t *testing.T) {
-	pending, _ := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
+	pending, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := pending.Await(cancelled); !errors.Is(err, context.Canceled) {
@@ -93,21 +92,18 @@ func TestAwaitEndsWithItsContext(t *testing.T) {
 	if _, err := pending.Await(expired); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Await(expired) = %v, want context.DeadlineExceeded", err)
 	}
+	value := int32(7)
+	deliver(0, &value)
+	if _, err := pending.Await(cancelled); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Await(cancelled) after delivery = %v, want context.Canceled", err)
+	}
+	if got := await(t, pending); got != value {
+		t.Fatalf("Await() after a cancelled wait = %d, want %d", got, value)
+	}
 
 	var missing *Future[int32]
 	<-missing.Done()
 	if _, err := missing.Await(context.Background()); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil Future Await = %v, want ErrInvalidArgument", err)
 	}
-
-	f := newRuntimeFixture(t)
-	creation, err := f.runtime.MapCreate(DefaultMapOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := creation.Await(cancelled); !errors.Is(err, context.Canceled) {
-		t.Fatalf("MapCreate Await(cancelled) = %v, want context.Canceled", err)
-	}
-	creation = nil
-	closeOnceCollected(t, f.runtime, "the disposal of the map whose wait was cancelled")
 }

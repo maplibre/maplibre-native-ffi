@@ -1,7 +1,7 @@
 import asyncio
 import gc
 import weakref
-from concurrent.futures import CancelledError, Future
+from concurrent.futures import CancelledError, Future, as_completed, wait
 from threading import Event
 
 import pytest
@@ -57,6 +57,12 @@ def test_cancelling_a_derived_future_cancels_a_pending_source() -> None:
     assert source.cancelled()
     with pytest.raises(CancelledError):
         result.result(timeout=0)
+    # Both futures notify their waiters at once, though no completion has
+    # claimed the source.
+    assert wait([source, result], timeout=0).done == {source, result}
+    assert set(as_completed([source, result], timeout=0)) == {source, result}
+    # A late completion finds the source cancelled and takes no result.
+    assert source._claim() is False
 
 
 def test_a_value_that_arrives_after_cancellation_is_discarded() -> None:
@@ -69,6 +75,7 @@ def test_a_value_that_arrives_after_cancellation_is_discarded() -> None:
 
     assert result.cancel() is True
     assert source.cancel() is False
+    assert wait([result], timeout=0).done == {result}
     source.set_result(42)
 
     assert discarded == [42]

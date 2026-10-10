@@ -3,11 +3,12 @@
 import asyncio
 import gc
 import threading
-from concurrent.futures import CancelledError, Future
+from concurrent.futures import CancelledError, Future, wait
 
 import maplibre_native_ffi as mln
 import pytest
 from maplibre_native_ffi._future import NativeFuture
+from maplibre_native_ffi._operation import _adopt_future
 from support import EMPTY_STYLE, TIMEOUT, Harness, leak_reports, result
 
 
@@ -113,6 +114,8 @@ def test_cancelling_a_wait_abandons_it_and_releases_the_late_map(
     assert created.cancel() is True
     with pytest.raises(CancelledError):
         created.result(timeout=0)
+    # A waiter wakes at once, though native has not reached the creation.
+    assert wait([created], timeout=0).done == {created}
 
     async def wait_briefly() -> None:
         # The timeout cancels the asyncio wait, which cancels its future.
@@ -130,6 +133,27 @@ def test_cancelling_a_wait_abandons_it_and_releases_the_late_map(
         # to the cancelled futures. Runtime retirement waits for every map,
         # so the close resolves only once both late maps have retired.
         result(harness.runtime.barrier())
+        assert result(harness.runtime.close()) is None
+        gc.collect()
+    assert reports == []
+
+
+def test_a_map_that_arrives_after_its_claimed_wait_is_cancelled_is_disposed(
+    harness: Harness,
+) -> None:
+    raw = result(harness.runtime._native.map_create())
+    # The native completion has claimed the source, so cancelling the public
+    # future leaves the map to arrive with nothing to adopt it.
+    source: NativeFuture[object] = NativeFuture()
+    assert source._claim()
+    created = _adopt_future(source, "MapHandle", harness.runtime)
+    assert created.cancel() is True
+
+    with leak_reports() as reports:
+        source.set_result(raw)
+        assert raw.closed
+        # Runtime retirement waits for every map, so this resolves only once
+        # the discarded map has retired.
         assert result(harness.runtime.close()) is None
         gc.collect()
     assert reports == []

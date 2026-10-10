@@ -243,6 +243,17 @@ macro_rules! generated_owner {
                 drop(callbacks);
             }
 
+            /// Disposes the handle as collecting this owner would, for a value
+            /// that a completion delivered and nothing adopted.
+            fn _dispose(&self) -> PyResult<()> {
+                let mut state = self.state();
+                if state.closing || state.active_reads != 0 {
+                    return Err(state.lifecycle_error("is in use"));
+                }
+                state.dispose_abandoned();
+                Ok(())
+            }
+
             fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
                 generated_check_reentry()?;
                 let read_scope: fn(Python<'_>, &Self) -> PyResult<GeneratedReadScope> = $read_scope;

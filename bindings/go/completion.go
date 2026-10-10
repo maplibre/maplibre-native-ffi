@@ -8,7 +8,6 @@ import "C"
 
 import (
 	"context"
-	"runtime"
 	"runtime/cgo"
 	"sync"
 	"unsafe"
@@ -32,40 +31,6 @@ type futureState[T any] struct {
 	mu        sync.Mutex
 	result    futureResult[T]
 	completed bool
-	// claimed records that Await returned the value, which the caller then
-	// owns. abandoned records that the Future became unreachable first.
-	claimed   bool
-	abandoned bool
-}
-
-// unclaimedRetirer is a result that owns a native handle, which the binding
-// retires when no caller claims it.
-type unclaimedRetirer interface {
-	retireUnclaimed()
-}
-
-// abandon runs once the Future is unreachable. An owned value that no Await
-// claimed retires now, or on arrival if it is still pending.
-func (state *futureState[T]) abandon() {
-	state.mu.Lock()
-	state.abandoned = true
-	var value T
-	retire := state.completed && !state.claimed && state.result.err == nil
-	if retire {
-		value, state.result.value = state.result.value, value
-	}
-	state.mu.Unlock()
-	if retire {
-		retireUnclaimed(value)
-	}
-}
-
-// retireUnclaimed retires a value that converted without error, which for an
-// owned result is never nil.
-func retireUnclaimed[T any](value T) {
-	if owned, ok := any(value).(unclaimedRetirer); ok {
-		owned.retireUnclaimed()
-	}
 }
 
 // Future is a one-shot native result. Await may be called from any goroutine.
@@ -97,8 +62,8 @@ func (future *Future[T]) Done() <-chan struct{} {
 // Await blocks until native completes the work or the context is cancelled.
 // A cancelled context ends only this wait: native work continues, and a later
 // Await still returns its result. A handle that a creation delivers belongs to
-// the caller once Await returns it. Dropping a Future whose handle no Await
-// returned retires that handle when the Future is collected.
+// the caller once Await returns it. The owner's cleanup retires the handle of a
+// Future that is dropped before any Await returns it.
 func (future *Future[T]) Await(ctx context.Context) (T, error) {
 	var zero T
 	if future == nil || future.state == nil {
@@ -113,7 +78,6 @@ func (future *Future[T]) Await(ctx context.Context) (T, error) {
 	case <-future.state.ready:
 		future.state.mu.Lock()
 		defer future.state.mu.Unlock()
-		future.state.claimed = true
 		return future.state.result.value, future.state.result.err
 	case <-ctx.Done():
 		return zero, ctx.Err()
@@ -147,16 +111,10 @@ func (bridge *completionBridge[T]) complete(raw *C.mln_completion_result) {
 			bridge.state.mu.Unlock()
 			return
 		}
-		abandoned := bridge.state.abandoned
-		if !abandoned {
-			bridge.state.result = result
-		}
+		bridge.state.result = result
 		bridge.state.completed = true
 		bridge.state.mu.Unlock()
 		close(bridge.state.ready)
-		if abandoned && result.err == nil {
-			retireUnclaimed(result.value)
-		}
 	}()
 	if raw == nil {
 		result.err = newBindingError(ErrInvalidState, "native completion returned nil")
@@ -187,12 +145,7 @@ func startCompletion[T any](start func(*C.mln_completion, *C.mln_diagnostic) int
 		return nil, err
 	}
 	submitted = true
-	future := &Future[T]{state: state}
-	if _, owned := any(*new(T)).(unclaimedRetirer); owned {
-		// The cleanup holds the state, never the Future, so it can run.
-		runtime.AddCleanup(future, (*futureState[T]).abandon, state)
-	}
-	return future, nil
+	return &Future[T]{state: state}, nil
 }
 
 func completionUnit(result *C.mln_completion_result) (struct{}, error) {

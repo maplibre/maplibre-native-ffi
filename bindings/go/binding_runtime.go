@@ -301,19 +301,6 @@ func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64))
 	return owner
 }
 
-// retireUnclaimed disposes a handle that a creation delivered to a Future no
-// caller claimed, without waiting for the owner to be collected.
-func (owner *bindingOwner) retireUnclaimed() {
-	state := owner.state
-	state.mu.Lock()
-	raw := state.raw
-	state.raw = 0
-	state.mu.Unlock()
-	if raw != 0 {
-		state.dispose(raw)
-	}
-}
-
 type bindingClose struct {
 	state     *bindingState
 	raw       uint64
