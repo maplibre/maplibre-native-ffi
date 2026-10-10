@@ -197,6 +197,14 @@ Foundation decimal and currency formatters while retaining omitted defaults.
 Apple locale expressions reject malformed UTF-8 as expression errors and
 preserve embedded null characters during string conversion.
 
+`0039-color-ramp-global-state.patch` builds line gradient, heatmap color, and
+color relief ramps during layer evaluation, using the global state of the
+current update. Before, an added or changed layer built its ramp from the
+previous update's state. Evaluation rebuilt it only when a state key that the
+ramp reads had changed. A write to an unrelated key in the same update therefore
+left an added layer with an empty ramp, and a changed layer with outdated
+colors. Native map pixel regressions cover both cases for all three layer types.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy
