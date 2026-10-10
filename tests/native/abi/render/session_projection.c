@@ -179,15 +179,17 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
 }
 
-// Requests render-if-needed frames until one renders an update at or past
-// `generation`, as a host gates presentation on a command, and returns that
-// frame's result.
-static mln_render_frame_result render_through_update(
+// Requests render-if-needed demands that wait for a map update until one
+// renders an update at or past `generation`, as a host gates presentation on a
+// command.
+static void render_through_update(
   const mln_test_render_fixture* fixture, uint64_t generation
 ) {
   const mln_test_deadline deadline = mln_test_deadline_default();
   for (uint64_t token = 1; !mln_test_deadline_passed(deadline); token += 1) {
     mln_frame_demand demand = mln_frame_demand_default();
+    demand.flags =
+      MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
     demand.token = token;
     demand.coalescing_boundary = token;
     MLN_TEST_OK(
@@ -202,11 +204,10 @@ static mln_render_frame_result render_through_update(
       result.disposition == MLN_RENDER_RESULT_RENDERED &&
       result.map_update_generation >= generation
     ) {
-      return result;
+      return;
     }
   }
   TEST_FAIL_MESSAGE("no frame rendered the command's render update");
-  return (mln_render_frame_result){0};
 }
 
 // A committed command's snapshot names the latest render update, and the
@@ -218,6 +219,10 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   render_one_frame(&fixture);
+  mln_render_session_snapshot before = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
 
   mln_camera_update update = mln_camera_update_default();
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
@@ -235,12 +240,12 @@ static void a_frame_at_a_commands_render_update_draws_the_command(void) {
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(committed, snapshot.generation);
-
-  const mln_render_frame_result frame =
-    render_through_update(&fixture, snapshot.latest_render_update_generation);
-  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(
-    snapshot.latest_render_update_generation, frame.map_update_generation
+  // The command published its render update before it completed.
+  TEST_ASSERT_GREATER_THAN_UINT64(
+    before.rendered_update_generation, snapshot.latest_render_update_generation
   );
+
+  render_through_update(&fixture, snapshot.latest_render_update_generation);
   mln_map_projection projection = create_session_projection(&fixture);
   expect_center(projection, -21.0, 43.0, 2.0);
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));

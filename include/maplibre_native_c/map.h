@@ -920,10 +920,9 @@ typedef struct mln_map_snapshot {
    * a map_update_generation at or past this value was rendered from map state
    * that includes the command. For a camera command with a duration, that
    * state is the transition's first step; the commanded camera appears in the
-   * update after the transition's last frame. A paint property change starts
-   * its style transition in that state, and frames report needs_repaint until
-   * the transition ends. Resources a command starts loading, such as a style
-   * or source URL, appear in later updates as they load.
+   * update after the transition's last frame. Resources a command starts
+   * loading, such as a style or source URL, appear in later updates as they
+   * load.
    */
   uint64_t latest_render_update_generation;
   mln_map_tile_options tile;
