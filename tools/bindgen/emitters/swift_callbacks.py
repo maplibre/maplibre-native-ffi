@@ -60,7 +60,7 @@ def raw_type(type_):
 
 
 def descriptor(values, plan):
-    from .swift_dynamic_values import decode, encode
+    from .swift_dynamic_values import decode, encode, zero
 
     registration = plan.registration
     public = values.public(plan)
@@ -98,7 +98,14 @@ def descriptor(values, plan):
             optional = field.presence and field.presence.mask
             typ = values.public(field.value) + ("?" if optional else "")
             fields.append(f"  public var {local}: {typ}")
-            arguments.append(f"{local}: {typ} = {public}.default.{local}")
+            arguments.append(
+                f"{local}: {typ} = "
+                + (
+                    f"{public}.default.{local}"
+                    if plan.default
+                    else zero(field.value, typ)
+                )
+            )
             assignments.append(f"    self.{local} = {local}")
             captured = decode(values, field.value, "raw." + identifier(field.name))
             if optional:
@@ -126,16 +133,23 @@ def descriptor(values, plan):
         if any(field.role == "size" for field in plan.fields)
         else ""
     )
+    # Native returns a registration only as its own default, so a registration
+    # without one has no copy.
+    copy = (
+        f"""  public static var `default`: Self {{ try! Self(raw: {initial}) }}
+  init(raw: {plan.native}) throws {{
+{chr(10).join(defaults)}
+  }}
+"""
+        if plan.native in values.bound.returned
+        else "  public static var `default`: Self { Self() }\n"
+    )
     declarations = f"""public struct {public}: Sendable {{
 {chr(10).join(fields)}
   public init({", ".join(arguments)}) {{
 {chr(10).join(assignments)}
   }}
-  public static var `default`: Self {{ try! Self(raw: {initial}) }}
-  init(raw: {plan.native}) throws {{
-{chr(10).join(defaults)}
-  }}
-  func nativeValue(arena: NativeInputArena) throws -> {plan.native} {{
+{copy}  func nativeValue(arena: NativeInputArena) throws -> {plan.native} {{
     var raw = {initial}{sized}
 {chr(10).join(materialize)}
     if {root_needed} {{

@@ -110,6 +110,27 @@ def encode(values, value, source):
     )
 
 
+def zero(value, typ):
+    """The initial value of a field of a record without a native default."""
+    if typ.endswith("?"):
+        return "nil"
+    if typ == "String":
+        return '""'
+    if typ == "Data":
+        return "Data()"
+    if typ.startswith("["):
+        return "[]"
+    if typ == "Bool":
+        return "false"
+    if value.kind == "scalar":
+        return "0"
+    if value.kind == "enum":
+        return ".init(rawValue: 0)"
+    if value.kind == "native_pointer":
+        return ".null"
+    return ".default"
+
+
 def decode(values, value, source, context="raw"):
     if value.registration and value.native not in values.bound.returned:
         # Native never returns callbacks, so a copy leaves a registration
@@ -353,25 +374,7 @@ def declaration(values, value):
             )
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")
-        default = (
-            "nil"
-            if optional or field_type.endswith("?")
-            else '""'
-            if field_type == "String"
-            else "Data()"
-            if field_type == "Data"
-            else "[]"
-            if field_type.startswith("[")
-            else "false"
-            if field_type == "Bool"
-            else "0"
-            if f.value.kind == "scalar"
-            else ".init(rawValue: 0)"
-            if f.value.kind == "enum"
-            else ".null"
-            if f.value.kind == "native_pointer"
-            else ".default"
-        )
+        default = zero(f.value, field_type)
         fields.append(f"  public var {local}: {field_type}")
         args.append(
             f"{local}: {field_type} = {typ}.default.{local}"

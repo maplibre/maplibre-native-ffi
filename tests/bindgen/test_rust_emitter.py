@@ -59,7 +59,9 @@ class RustEmitterTests(unittest.TestCase):
             "MLN_PROTOCOL_COMPLETION_RUNTIME",
             "MLN_PROTOCOL_ABI_VERSION",
         )
-        api = parse(COLLISIONS, groups=("keywords",), defines=defines)
+        api = parse(
+            COLLISIONS, groups=("keywords", "default_registration"), defines=defines
+        )
         validate(api)
         self.assertEqual(
             set(rust.coverage(api)["generated"]),
@@ -69,6 +71,7 @@ class RustEmitterTests(unittest.TestCase):
                 "mln_map_match",
                 "mln_map_move",
                 "mln_map_release",
+                "mln_probe_hooks_default",
             },
         )
         with TemporaryDirectory() as directory:

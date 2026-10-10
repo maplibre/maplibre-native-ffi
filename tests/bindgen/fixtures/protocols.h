@@ -14,10 +14,11 @@
 #if defined(MLN_PROTOCOL_CONVENTIONS) || defined(MLN_PROTOCOL_PLAN_NAMES)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
-#if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) || \
-  defined(MLN_PROTOCOL_PRESENCE_MASK) ||                              \
-  defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                         \
-  defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS)
+#if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) ||    \
+  defined(MLN_PROTOCOL_PRESENCE_MASK) ||                                 \
+  defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                            \
+  defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) || \
+  defined(MLN_PROTOCOL_DEFAULT_REGISTRATION)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -187,6 +188,25 @@ mln_probe_settings mln_probe_settings_default(void);
 mln_status mln_probe_settings_check(
   mln_probe_settings settings, mln_diagnostic* out_diagnostic
 );
+#endif
+
+#ifdef MLN_PROTOCOL_DEFAULT_REGISTRATION
+// A record default that holds a callback registration with its callback null.
+// A copy of the default keeps the limit and leaves the registration unset.
+typedef void (*mln_probe_notify)(void* user_data, uint32_t count);
+typedef void (*mln_probe_notify_release)(void* user_data);
+typedef struct mln_probe_signal {
+  uint32_t size;
+  mln_probe_notify callback BIND("nullable=true");
+  void* user_data BIND("kind=context");
+  mln_probe_notify_release release_user_data;
+} mln_probe_signal BIND("kind=callback_registration;release=release_user_data");
+typedef struct mln_probe_hooks {
+  uint32_t size;
+  uint32_t limit BIND("default=4");
+  mln_probe_signal signal;
+} mln_probe_hooks;
+mln_probe_hooks mln_probe_hooks_default(void);
 #endif
 
 #ifdef MLN_PROTOCOL_KEYWORDS

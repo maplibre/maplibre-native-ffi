@@ -44,11 +44,7 @@ public struct HttpHeaderTransform: Sendable {
   }
 
   public static var `default`: Self {
-    try! Self(raw: mln_http_header_transform())
-  }
-
-  init(raw _: mln_http_header_transform) throws {
-    callback = nil
+    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -340,11 +336,7 @@ public struct ResourceProvider: Sendable {
   }
 
   public static var `default`: Self {
-    try! Self(raw: mln_resource_provider())
-  }
-
-  init(raw _: mln_resource_provider) throws {
-    callback = nil
+    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_provider {
@@ -645,11 +637,7 @@ public struct ResourceTransform: Sendable {
   }
 
   public static var `default`: Self {
-    try! Self(raw: mln_resource_transform())
-  }
-
-  init(raw _: mln_resource_transform) throws {
-    callback = nil
+    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_transform {

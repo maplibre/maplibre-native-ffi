@@ -42,6 +42,14 @@ void main() {
   // A record built from its constructor defaults equals the native default.
   probeSettingsCheck(const ProbeSettings());
 
+  // A copy of a native default keeps its values and leaves a registration
+  // unset.
+  final hooks = probeHooksDefault();
+  check(
+    hooks.limit == 4 && hooks.signal == const ProbeSignal(),
+    'hooks default: ${hooks.limit} ${hooks.signal}',
+  );
+
   try {
     probeRoundtrip(ProbeOptions(right: List.filled(9, point)));
     check(false, 'native failure was not reported');

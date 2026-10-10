@@ -49,3 +49,10 @@ test "generated calls report native failures through the diagnostic" {
 test "generated record defaults equal the native default" {
     try api.probeSettingsCheck(.{}, null);
 }
+
+test "generated default copies keep values and leave registrations unset" {
+    var hooks = try api.probeHooksDefault(std.testing.allocator);
+    defer hooks.deinit();
+    try std.testing.expectEqual(@as(u32, 4), hooks.value.limit);
+    try std.testing.expect(hooks.value.signal.callback == null);
+}

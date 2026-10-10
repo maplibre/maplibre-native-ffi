@@ -59,6 +59,12 @@ check(
   entry == KeywordEntry(type: 3, defer: 7, raw: 11),
   "keyword parameters: \(entry)"
 )
+/// A copy of a native default keeps its values and leaves a registration unset.
+let hooks = ProbeHooks.default
+check(
+  hooks.limit == 4 && hooks.signal.callback == nil,
+  "hooks default: \(hooks)"
+)
 do {
   _ = try Maplibre.probeRoundtrip(input: ProbeOptions(right: Array(
     repeating: point,

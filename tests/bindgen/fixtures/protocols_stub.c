@@ -7,6 +7,7 @@
 #define MLN_PROTOCOL_VALUES
 #define MLN_PROTOCOL_KEYWORDS
 #define MLN_PROTOCOL_DEFAULTS
+#define MLN_PROTOCOL_DEFAULT_REGISTRATION
 #include <stdlib.h>
 #include <string.h>
 
@@ -96,4 +97,12 @@ mln_status mln_probe_settings_check(
   }
   if (settings.count != expected.count) return fail(out_diagnostic, "count");
   return MLN_STATUS_OK;
+}
+
+mln_probe_hooks mln_probe_hooks_default(void) {
+  return (mln_probe_hooks){
+    .size = sizeof(mln_probe_hooks),
+    .limit = 4,
+    .signal = {.size = sizeof(mln_probe_signal)},
+  };
 }

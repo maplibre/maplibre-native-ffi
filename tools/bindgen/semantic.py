@@ -1276,17 +1276,27 @@ class Binder:
 
         A binding builds a callback registration from host callbacks and never
         adopts one from native. Only a record default holds one, with null
-        callbacks. A copy of the default leaves a registration field unset, and
-        the copy of a registration's own default copies only its other fields.
+        callbacks, in a record field without presence. A copy of the default
+        leaves a registration field unset, and the copy of a registration's own
+        default copies only its other fields. A registration that is optional,
+        referenced, or a union variant would need a copy of its presence, so
+        the plan rejects one.
         """
         found: set[str] = set()
 
-        def visit(value: ValuePlan, path: str, root: bool = False) -> None:
+        def visit(
+            value: ValuePlan, path: str, root: bool = False, field: bool = False
+        ) -> None:
             if value.registration and not (default and root):
-                if default:
+                if default and field:
                     return
                 raise ModelError(
-                    [f"{path}: native cannot return a callback registration"]
+                    [
+                        f"{path}: a record default holds a callback registration "
+                        "only in a field without presence"
+                        if default
+                        else f"{path}: native cannot return a callback registration"
+                    ]
                 )
             if value.response:
                 return
@@ -1296,7 +1306,11 @@ class Binder:
                 return
             found.add(value.native)
             for member in value.fields:
-                visit(member.value, f"{path}.{member.name}")
+                visit(
+                    member.value,
+                    f"{path}.{member.name}",
+                    field=value.kind == "record" and member.presence is None,
+                )
             for group in value.presence_groups:
                 if group.type:
                     visit(self.values[group.type], path)

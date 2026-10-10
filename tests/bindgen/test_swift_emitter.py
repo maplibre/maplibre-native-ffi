@@ -25,7 +25,7 @@ class SwiftEmitterTests(unittest.TestCase):
         swiftc = require_tool(self, "swiftc", ROOT / "bindings/swift")
         clang = require_tool(self, "clang")
         header = protocol_header(
-            groups=("values", "keywords"),
+            groups=("values", "keywords", "default_registration"),
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME", "MLN_PROTOCOL_ABI_VERSION"),
         )
         api = parse_sources({"api.h": header})

@@ -17,6 +17,12 @@ pub fn run() {
     let entry = keyword_combine(5.0, 2.0, 7.0, 11.0).unwrap();
     assert_eq!(entry, KeywordEntry::new(3.0, 7.0, 11.0));
 
+    // A copy of a native default keeps its values and leaves a registration
+    // unset.
+    let hooks = probe_hooks_default().unwrap();
+    assert_eq!(hooks.limit, 4);
+    assert!(hooks.signal.callback.is_none());
+
     // An owner releases its handle once.
     let map = MapHandle::adopt(maplibre_native_ffi_sys::mln_map(7), None).unwrap();
     assert_eq!(map.id(), 7);

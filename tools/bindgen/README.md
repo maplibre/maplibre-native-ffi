@@ -126,10 +126,12 @@ they never invent ownership.
 `BoundApi.returned` holds the records and unions that a binding copies from
 native: those that an operation's output or result, a callback's argument, or a
 record default reaches. A binding builds a callback registration from host
-callbacks, so native returns one only in a record default, with null callbacks.
-A copy of such a default leaves a registration field unset, and the copy of a
-registration's own default copies only its other fields. The plan rejects every
-other operation or callback that returns a registration.
+callbacks, so native returns one only in a record default, with null callbacks,
+in a field without presence. A copy of such a default leaves a registration
+field unset, and the copy of a registration's own default copies only its other
+fields. A copy of an optional or referenced registration would have to keep its
+presence, so the plan rejects one in a default, along with every other operation
+or callback that returns a registration.
 
 The plan also names each public member once, and an emitter only converts its
 case and escapes keywords:

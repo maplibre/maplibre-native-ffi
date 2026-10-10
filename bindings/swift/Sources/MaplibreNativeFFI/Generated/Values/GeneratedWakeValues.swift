@@ -10,11 +10,7 @@ public struct Wake: Sendable {
   }
 
   public static var `default`: Self {
-    try! Self(raw: mln_wake())
-  }
-
-  init(raw _: mln_wake) throws {
-    callback = nil
+    Self()
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_wake {

@@ -340,6 +340,11 @@ mln_status configure(const settings *options, const hook *events, const request 
         )
         for rejected in (
             'mln_status inspect(settings *out_settings BIND("direction=out"), mln_diagnostic *out_diagnostic);',
+            'mln_status refresh(settings *options BIND("direction=inout"), mln_diagnostic *out_diagnostic);',
+            (
+                'BIND("execution=query;result=settings")\n'
+                "mln_status mln_map_settings(mln_map map, const mln_completion *completion, mln_diagnostic *out_diagnostic);"
+            ),
             (
                 "typedef void (*observe)(void *state, settings current);\n"
                 'mln_status watch(observe callback, void *state BIND("kind=context"), mln_diagnostic *out_diagnostic);'
@@ -352,6 +357,30 @@ mln_status configure(const settings *options, const hook *events, const request 
                 ),
             ):
                 bind(self.parse(source + rejected), require_complete=True)
+
+    def test_defaults_hold_registrations_only_in_fields_without_presence(self):
+        # A copy would have to keep an optional registration's presence, so a
+        # default holds a registration only as a field without presence.
+        source = """
+typedef void (*notify)(void *state);
+typedef void (*release)(void *state);
+typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct settings { bool has_wake; FIELD } settings;
+settings settings_default(void);
+"""
+        for field in (
+            'signals wake BIND("mask=has_wake");',
+            'const signals *wake BIND("nullable=true");',
+        ):
+            with (
+                self.subTest(field=field),
+                self.assertRaisesRegex(
+                    ModelError,
+                    "settings_default result.wake: a record default holds a "
+                    "callback registration only in a field without presence",
+                ),
+            ):
+                bind(self.parse(source.replace("FIELD", field)), require_complete=True)
 
     def test_nested_registration_and_callback_context_are_resolved(self):
         api = bind(
