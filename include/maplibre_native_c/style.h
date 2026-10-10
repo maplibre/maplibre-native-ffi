@@ -670,6 +670,7 @@ typedef struct mln_style_image_info {
   /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
   uint32_t text_fit_height
     MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_height");
+  /** Sprite pixel ratio. Defaults to 1.0. */
   float pixel_ratio MLN_BINDING("default=1.0");
   bool sdf;
   bool has_content;

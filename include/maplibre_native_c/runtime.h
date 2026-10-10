@@ -397,7 +397,7 @@ typedef struct mln_runtime_options {
    *
    * This field is always read. MLN_RUNTIME_EVENT_MASK_ALL selects every event
    * type this library reports, and MLN_RUNTIME_EVENT_MASK_NONE queues none.
-   * See mln_runtime_set_event_mask().
+   * Defaults to MLN_RUNTIME_EVENT_MASK_ALL. See mln_runtime_set_event_mask().
    */
   uint64_t event_mask MLN_BINDING(
     "enum=mln_runtime_event_mask;default=MLN_RUNTIME_EVENT_MASK_ALL"

@@ -81,7 +81,10 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
 /** One nonblocking request for a frame. */
 typedef struct mln_frame_demand {
   uint32_t size;
-  /** A bitwise OR of mln_frame_demand_flag values. */
+  /**
+   * A bitwise OR of mln_frame_demand_flag values. Defaults to
+   * MLN_FRAME_DEMAND_IF_NEEDED.
+   */
   uint32_t flags MLN_BINDING(
     "enum=mln_frame_demand_flag;default=MLN_FRAME_DEMAND_IF_NEEDED"
   );
