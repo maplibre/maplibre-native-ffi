@@ -7,6 +7,9 @@ public readonly partial record struct WebgpuOwnedTextureDescriptor(
     WebgpuContextDescriptor Context
 )
 {
+    public WebgpuOwnedTextureDescriptor()
+        : this(new RenderTargetExtent(), default) { }
+
     public static WebgpuOwnedTextureDescriptor Default
     {
         get

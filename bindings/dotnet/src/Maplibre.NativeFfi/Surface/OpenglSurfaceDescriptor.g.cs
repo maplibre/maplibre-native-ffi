@@ -8,6 +8,9 @@ public readonly partial record struct OpenglSurfaceDescriptor(
     NativePointer Surface
 )
 {
+    public OpenglSurfaceDescriptor()
+        : this(new RenderTargetExtent(), default, default) { }
+
     public static OpenglSurfaceDescriptor Default
     {
         get

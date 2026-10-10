@@ -7,6 +7,9 @@ public readonly partial record struct VulkanOwnedTextureDescriptor(
     VulkanContextDescriptor Context
 )
 {
+    public VulkanOwnedTextureDescriptor()
+        : this(new RenderTargetExtent(), default) { }
+
     public static VulkanOwnedTextureDescriptor Default
     {
         get

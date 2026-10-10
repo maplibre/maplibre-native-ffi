@@ -81,6 +81,15 @@ public sealed class GeneratedValueTests
         Assert.Equal(["provider-test://tiles/{z}/{x}/{y}.pbf"], urls.Value.TileUrls);
     }
 
+    // A parameterless constructor starts each member at the header's annotated default, so the
+    // record it builds matches what the native default function returns.
+    [Fact]
+    public void ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault()
+    {
+        Assert.Equal(MapOptions.Default, new MapOptions());
+        Assert.Equal(StyleImageInfo.Default, new StyleImageInfo());
+    }
+
     [Fact]
     public unsafe void AnInputUnionWritesTheArmItHolds()
     {

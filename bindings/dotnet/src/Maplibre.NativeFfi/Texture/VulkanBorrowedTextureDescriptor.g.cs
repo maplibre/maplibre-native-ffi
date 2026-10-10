@@ -14,6 +14,10 @@ public readonly partial record struct VulkanBorrowedTextureDescriptor(
     uint FinalLayout
 )
 {
+    public VulkanBorrowedTextureDescriptor()
+        : this(new RenderTargetExtent(), 256, 256, default, default, default, default, default, 5)
+    { }
+
     public static VulkanBorrowedTextureDescriptor Default
     {
         get

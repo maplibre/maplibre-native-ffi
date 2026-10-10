@@ -10,6 +10,9 @@ public readonly partial record struct RuntimeOptions(
     Wake EventWake
 )
 {
+    public RuntimeOptions()
+        : this(default, default, default, RuntimeEventMask.All, default!) { }
+
     public static RuntimeOptions Default
     {
         get

@@ -8,6 +8,9 @@ public readonly partial record struct MetalSurfaceDescriptor(
     NativePointer Layer
 )
 {
+    public MetalSurfaceDescriptor()
+        : this(new RenderTargetExtent(), default, default) { }
+
     public static MetalSurfaceDescriptor Default
     {
         get

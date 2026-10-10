@@ -9,6 +9,9 @@ public readonly partial record struct FrameDemand(
     ulong TimeoutNs
 )
 {
+    public FrameDemand()
+        : this(FrameDemandFlag.IfNeeded, default, default, default) { }
+
     public static FrameDemand Default
     {
         get

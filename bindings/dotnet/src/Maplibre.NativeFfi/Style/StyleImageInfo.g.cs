@@ -13,7 +13,7 @@ public sealed record StyleImageInfo
     public ImageContent? Content { get; set; }
     public StyleImageTextFit? TextFitWidth { get; set; }
     public StyleImageTextFit? TextFitHeight { get; set; }
-    public float PixelRatio { get; set; }
+    public float PixelRatio { get; set; } = 1.0f;
     public bool Sdf { get; set; }
     public static StyleImageInfo Default
     {

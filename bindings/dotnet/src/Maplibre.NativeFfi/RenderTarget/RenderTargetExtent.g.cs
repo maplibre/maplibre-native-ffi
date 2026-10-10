@@ -6,4 +6,8 @@ public readonly partial record struct RenderTargetExtent(
     uint Width,
     uint Height,
     double ScaleFactor
-);
+)
+{
+    public RenderTargetExtent()
+        : this(256, 256, 1.0) { }
+}

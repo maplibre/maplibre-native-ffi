@@ -9,6 +9,9 @@ public readonly partial record struct RenderSessionAttachOptions(
     Wake DriverWorkWake
 )
 {
+    public RenderSessionAttachOptions()
+        : this(RenderDriverKind.CallerGraphicsThread, 1, default!, default!) { }
+
     public static RenderSessionAttachOptions Default
     {
         get

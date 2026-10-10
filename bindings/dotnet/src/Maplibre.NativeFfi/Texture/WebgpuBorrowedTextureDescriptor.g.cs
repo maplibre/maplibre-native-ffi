@@ -12,6 +12,9 @@ public readonly partial record struct WebgpuBorrowedTextureDescriptor(
     uint Format
 )
 {
+    public WebgpuBorrowedTextureDescriptor()
+        : this(new RenderTargetExtent(), 256, 256, default, default, default, default) { }
+
     public static WebgpuBorrowedTextureDescriptor Default
     {
         get

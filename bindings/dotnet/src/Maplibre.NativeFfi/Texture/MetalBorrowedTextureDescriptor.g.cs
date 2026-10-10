@@ -9,6 +9,9 @@ public readonly partial record struct MetalBorrowedTextureDescriptor(
     NativePointer Texture
 )
 {
+    public MetalBorrowedTextureDescriptor()
+        : this(new RenderTargetExtent(), 256, 256, default) { }
+
     public static MetalBorrowedTextureDescriptor Default
     {
         get

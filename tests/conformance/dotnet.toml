@@ -29,7 +29,7 @@
 "VAL-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTests.cs::UnknownEventDomainsKeepRawValuesAndCopyThePayloadWindow"
 "VAL-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RuntimeEventTests.cs::NumbersAreCheckedWhenNarrowedAndKeptWhenOpen"
 "VAL-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::AnArrayIsCopiedWhenTheCallIsSubmitted"
-"VAL-06" = { na = "A record struct's parameterless constructor is its zero value, and MapOptions.Default returns a copy of the native default" }
+"VAL-06" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/GeneratedValueTests.cs::ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault"
 "VIEW-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ABorrowedFrameViewExpiresWithItsScope"
 "REND-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::AnOwnedTextureSessionRendersPixelsTheBindingReadsBack"
 "REND-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/RenderTests.cs::ACallerDrivenSessionIsServicedFromAManagedThread"

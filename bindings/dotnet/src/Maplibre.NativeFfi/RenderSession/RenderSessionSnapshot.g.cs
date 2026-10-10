@@ -17,4 +17,23 @@ public readonly partial record struct RenderSessionSnapshot(
     uint AcquiredFrameCount,
     bool TargetReady,
     bool PendingChanges
-);
+)
+{
+    public RenderSessionSnapshot()
+        : this(
+            default,
+            default,
+            default,
+            new RenderTargetExtent(),
+            default,
+            default,
+            default,
+            default,
+            default,
+            default,
+            default,
+            default,
+            default,
+            default
+        ) { }
+}

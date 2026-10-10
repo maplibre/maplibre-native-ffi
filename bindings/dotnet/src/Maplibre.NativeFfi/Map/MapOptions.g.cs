@@ -9,6 +9,9 @@ public readonly partial record struct MapOptions(
     RuntimeEventMask EventMask
 )
 {
+    public MapOptions()
+        : this(new LogicalExtent(), default, default, RuntimeEventMask.All) { }
+
     public static MapOptions Default
     {
         get

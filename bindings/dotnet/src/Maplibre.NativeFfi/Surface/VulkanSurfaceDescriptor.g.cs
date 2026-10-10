@@ -8,6 +8,9 @@ public readonly partial record struct VulkanSurfaceDescriptor(
     ulong Surface
 )
 {
+    public VulkanSurfaceDescriptor()
+        : this(new RenderTargetExtent(), default, default) { }
+
     public static VulkanSurfaceDescriptor Default
     {
         get

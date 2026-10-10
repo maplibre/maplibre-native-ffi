@@ -18,4 +18,24 @@ public readonly partial record struct MapSnapshot(
     MapTileOptions Tile,
     BoundOptions Bounds,
     FreeCameraOptions FreeCamera
-);
+)
+{
+    public MapSnapshot()
+        : this(
+            default,
+            default,
+            default!,
+            new LogicalExtent(),
+            default!,
+            default!,
+            default,
+            default,
+            default,
+            default,
+            default,
+            default,
+            default!,
+            default!,
+            default!
+        ) { }
+}

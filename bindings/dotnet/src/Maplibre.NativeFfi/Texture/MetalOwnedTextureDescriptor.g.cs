@@ -7,6 +7,9 @@ public readonly partial record struct MetalOwnedTextureDescriptor(
     MetalContextDescriptor Context
 )
 {
+    public MetalOwnedTextureDescriptor()
+        : this(new RenderTargetExtent(), default) { }
+
     public static MetalOwnedTextureDescriptor Default
     {
         get

@@ -7,6 +7,9 @@ public readonly partial record struct OpenglOwnedTextureDescriptor(
     OpenglContextDescriptor Context
 )
 {
+    public OpenglOwnedTextureDescriptor()
+        : this(new RenderTargetExtent(), default) { }
+
     public static OpenglOwnedTextureDescriptor Default
     {
         get

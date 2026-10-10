@@ -11,6 +11,9 @@ public readonly partial record struct OpenglBorrowedTextureDescriptor(
     uint Target
 )
 {
+    public OpenglBorrowedTextureDescriptor()
+        : this(new RenderTargetExtent(), 256, 256, default, default, default) { }
+
     public static OpenglBorrowedTextureDescriptor Default
     {
         get

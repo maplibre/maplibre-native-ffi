@@ -9,6 +9,9 @@ public readonly partial record struct WebgpuSurfaceDescriptor(
     uint Format
 )
 {
+    public WebgpuSurfaceDescriptor()
+        : this(new RenderTargetExtent(), default, default, default) { }
+
     public static WebgpuSurfaceDescriptor Default
     {
         get
