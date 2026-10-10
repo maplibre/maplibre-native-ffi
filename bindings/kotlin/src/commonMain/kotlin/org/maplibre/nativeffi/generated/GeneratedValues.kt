@@ -297,6 +297,18 @@ public data class FrameDemandFlag(public val rawValue: UInt) {
      * without presentation.
      */
     public val PRESENT: FrameDemandFlag = FrameDemandFlag(2u)
+    /**
+     * With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+     * `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits instead, and runs
+     * again after the map's next update, a target replacement, or an applied resize. A waiting
+     * demand holds no ring slot. A later demand with the same flags and coalescing boundary
+     * supersedes it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach,
+     * abandon, or the quarantine of the ring's last usable slot end it with
+     * `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow the results of
+     * demands accepted after it. The flag does not pace: a host that re-arms a waiting demand as
+     * each result arrives renders every update the map publishes.
+     */
+    public val WAIT_FOR_UPDATE: FrameDemandFlag = FrameDemandFlag(4u)
   }
 }
 
@@ -817,12 +829,15 @@ public data class RenderResult(public val rawValue: UInt) {
     public val RENDERED: RenderResult = RenderResult(0u)
     /**
      * No newer map update was available, or the map had no complete frame to draw yet. The map
-     * publishes another update when it has one.
+     * publishes another update when it has one. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE`
+     * waits for that update instead, and finishes with this result only when a barrier ends its
+     * wait.
      */
     public val NO_UPDATE: RenderResult = RenderResult(1u)
     /**
      * An ordered extent change had not reached the map. The map publishes an update at the new
-     * extent.
+     * extent, which a demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing
+     * with this result.
      */
     public val SIZE_PENDING: RenderResult = RenderResult(2u)
     /**
@@ -1690,7 +1705,9 @@ public data class RenderFrameResult(
    * carries in its needs_repaint field, delivered with the frame result so a host can re-arm its
    * frame loop without the runtime event round trip. A camera transition does not set it by itself:
    * the map publishes a new update after each of the transition's frames instead, which a
-   * render-if-needed demand renders.
+   * render-if-needed demand renders. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each
+   * transition update without a runtime-event round trip; the host re-arms the demand as each
+   * result arrives.
    */
   public val needsRepaint: Boolean = false,
 )
@@ -2101,7 +2118,11 @@ public data class FrameDemand(
   public val token: ULong = 0uL,
   /** Demands coalesce only when this value and their flags match. */
   public val coalescingBoundary: ULong = 0uL,
-  /** Positive time allowed before driver work begins, in nanoseconds; zero has no limit. */
+  /**
+   * Positive time allowed before driver work begins, in nanoseconds; zero has no limit. A demand
+   * that waits, for a free texture slot or for a map update, is checked against its timeout when it
+   * runs again; a wait has no timer of its own.
+   */
   public val timeoutNs: ULong = 0uL,
 )
 

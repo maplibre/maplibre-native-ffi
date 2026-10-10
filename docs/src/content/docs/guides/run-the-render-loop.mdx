@@ -37,6 +37,11 @@ that the driver used.
 
 A host that renders on demand derives that demand from runtime events: an
 update-available event, or a frame-finished event whose repaint flag is set.
+Alternatively, keep one demand armed with the if-needed and wait-for-update
+flags, and re-arm it as each result arrives. The driver then renders each map
+update, including each step of a camera transition, without a runtime-event
+round trip. The flag does not pace, so pace the re-arm to the display. A
+waiting demand's result can arrive after the results of later demands.
 
 <Code code={region(frameLoopSnippet, "wants")} lang="c" title="frame-loop.c" />
 

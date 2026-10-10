@@ -57,6 +57,10 @@ enum class SyncPoint : std::uint8_t {
   // returned a frame demand to the front of the session's demands, and is
   // about to finish the work item. No lock is held.
   RenderFrameDemandParked,
+  // A render session's driver found nothing to render for a demand that waits
+  // for a map update, and is about to take the session's control lock to
+  // decide whether the demand waits or runs again. No lock is held.
+  RenderDemandWaits,
   // A section that published a frame result under a render session's control
   // lock has released the lock and is about to invoke the frame wake it owes.
   // No lock is held.

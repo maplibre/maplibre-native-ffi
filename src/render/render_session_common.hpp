@@ -735,6 +735,11 @@ struct mln_render_session_object
 
   std::deque<mln_render_frame_result> frame_results;
   std::deque<mln::core::PendingFrameDemand> demands;
+  // Demands with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE that found nothing to render,
+  // in acceptance order. Each is older than every entry of `demands`. They
+  // keep no work item: whatever can make them renderable moves them back to
+  // the front of `demands` and queues one.
+  std::deque<mln::core::PendingFrameDemand> update_waiting_demands;
   // Barrier epochs of the demands currently running on the driver.
   std::vector<uint64_t> active_demand_epochs;
   std::deque<mln::core::PendingBarrier> barriers;

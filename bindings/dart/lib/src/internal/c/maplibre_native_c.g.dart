@@ -1846,6 +1846,7 @@ const MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 4;
 // mln_frame_demand_flag
 const MLN_FRAME_DEMAND_IF_NEEDED = 1;
 const MLN_FRAME_DEMAND_PRESENT = 2;
+const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 
 // mln_free_camera_option_field
 const MLN_FREE_CAMERA_OPTION_POSITION = 1;

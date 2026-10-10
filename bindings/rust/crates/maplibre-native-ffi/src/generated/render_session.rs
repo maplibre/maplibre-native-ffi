@@ -144,7 +144,9 @@ impl RenderSessionHandle {
     }
 
     /// Starts a barrier that completes after all render work accepted before it
-    /// has a terminal result. A barrier does not request a frame.
+    /// has a terminal result. A barrier does not request a frame. Accepting a
+    /// barrier ends the wait of every earlier demand that waits for a map
+    /// update.
     ///
     /// See `mln_render_session_barrier` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

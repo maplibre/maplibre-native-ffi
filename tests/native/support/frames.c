@@ -92,6 +92,72 @@ mln_render_frame_result mln_test_render_batch_result(
   return result;
 }
 
+typedef struct idle_wait {
+  mln_runtime runtime;
+  const mln_test_render_fixture* fixture;
+  bool updated;
+  bool idle;
+} idle_wait;
+
+// An update clears an earlier idle, and an idle after it ends the wait.
+static bool note_update_or_idle(
+  const mln_runtime_event* event, const char* messages, void* context
+) {
+  (void)messages;
+  idle_wait* wait = context;
+  if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
+    wait->updated = true;
+    wait->idle = false;
+  } else if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
+    wait->idle = true;
+  }
+  return false;
+}
+
+static bool update_or_idle_arrived(void* context) {
+  idle_wait* wait = context;
+  (void)mln_test_render_fixture_service(wait->fixture);
+  (void)mln_test_drain_counting_matching(
+    wait->runtime, note_update_or_idle, wait
+  );
+  return wait->updated || wait->idle;
+}
+
+void mln_test_render_until_idle(
+  mln_runtime runtime, const mln_test_render_fixture* fixture
+) {
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  idle_wait wait = {.runtime = runtime, .fixture = fixture};
+  const mln_test_deadline deadline = mln_test_deadline_default();
+  for (;;) {
+    wait.updated = false;
+    TEST_ASSERT_TRUE_MESSAGE(
+      mln_test_await(
+        update_or_idle_arrived, &wait, deadline, "a render update or idle"
+      ),
+      "the map never reported idle"
+    );
+    if (wait.idle) {
+      mln_render_session_snapshot snapshot = {
+        .size = sizeof(mln_render_session_snapshot)
+      };
+      MLN_TEST_OK(
+        mln_render_session_get_snapshot(fixture->session, &snapshot, NULL)
+      );
+      if (!snapshot.pending_changes) {
+        return;
+      }
+    }
+    mln_frame_demand demand = mln_frame_demand_default();
+    MLN_TEST_OK(
+      mln_render_session_request_frame(fixture->session, &demand, NULL)
+    );
+    mln_render_frame_batch_release(
+      mln_test_render_wait_for_results(fixture, 1)
+    );
+  }
+}
+
 mln_acquired_frame mln_test_render_and_acquire(
   const mln_test_render_fixture* fixture, uint64_t token
 ) {

@@ -5,6 +5,7 @@
 // The targets come from tests/graphics for the preset's backend, so the
 // browser presets, whose canvases JavaScript owns, have no cases here.
 
+#include "support/frames.h"
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
@@ -496,6 +497,55 @@ static void frames_published_before_a_retarget_cannot_be_acquired(void) {
   close_map(&map);
 }
 
+// A replacement holds no frame of the map's latest update, so a demand that
+// waits for an update renders into it with no update to wait for.
+static void a_borrowed_retarget_renders_a_waiting_demand(void) {
+  retarget_map map = {0};
+  open_map(TARGET_BORROWED, &map);
+  const mln_test_render_fixture* fixture = &map.fixture;
+  mln_test_render_until_idle(map.runtime, fixture);
+  mln_test_graphics_texture* replacement =
+    mln_test_render_fixture_new_texture(fixture);
+  TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());
+  restore_fixture_context(fixture);
+
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.token = 3000;
+  MLN_TEST_OK(
+    mln_render_session_request_frame(fixture->session, &demand, NULL)
+  );
+  // The fence runs after the driver evaluated the demand, which then waits.
+  // Dumping debug logs publishes no map update, which would end the wait.
+  mln_test_completion fence = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_dump_debug_logs(
+    fixture->session, &fence.descriptor, NULL
+  ));
+  finish(fixture, &fence, MLN_STATUS_OK, "the fence");
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_NOT_READY,
+    mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
+  );
+
+  mln_test_completion completion = mln_test_completion_default(0);
+  MLN_TEST_OK_MESSAGE(
+    mln_test_render_fixture_set_textures(
+      fixture, mln_test_render_fixture_graphics(fixture), &replacement, 1,
+      &completion.descriptor
+    ),
+    mln_test_last_error()
+  );
+  finish(fixture, &completion, MLN_STATUS_OK, "the texture replacement");
+  batch = mln_test_render_wait_for_results(fixture, 1);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(3000, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  expect_texture_color(fixture, replacement, red, "the replacement");
+  close_map(&map);
+}
+
 static void a_surface_retarget_presents_through_the_new_surface(void) {
   retarget_map map = {0};
   open_map(TARGET_SURFACE, &map);
@@ -774,6 +824,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_borrowed_retarget_is_refused_while_a_frame_is_acquired);
   RUN_TEST(a_borrowed_retarget_returns_quarantined_slots_to_service);
   RUN_TEST(frames_published_before_a_retarget_cannot_be_acquired);
+  RUN_TEST(a_borrowed_retarget_renders_a_waiting_demand);
   RUN_TEST(a_surface_retarget_presents_through_the_new_surface);
   RUN_TEST(refused_retargets_leave_the_old_target_rendering);
 #endif

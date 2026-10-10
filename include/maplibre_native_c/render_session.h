@@ -51,12 +51,16 @@ typedef enum mln_render_result : uint32_t {
   MLN_RENDER_RESULT_RENDERED = 0,
   /**
    * No newer map update was available, or the map had no complete frame to
-   * draw yet. The map publishes another update when it has one.
+   * draw yet. The map publishes another update when it has one. A demand
+   * with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for that update instead, and
+   * finishes with this result only when a barrier ends its wait.
    */
   MLN_RENDER_RESULT_NO_UPDATE = 1,
   /**
    * An ordered extent change had not reached the map. The map publishes an
-   * update at the new extent.
+   * update at the new extent, which a demand with
+   * MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for instead of finishing with this
+   * result.
    */
   MLN_RENDER_RESULT_SIZE_PENDING = 2,
   /**
@@ -92,6 +96,20 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
    * whatever it presented last. Ignored by targets without presentation.
    */
   MLN_FRAME_DEMAND_PRESENT = 1U << 1U,
+  /**
+   * With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
+   * MLN_RENDER_RESULT_NO_UPDATE or MLN_RENDER_RESULT_SIZE_PENDING waits
+   * instead, and runs again after the map's next update, a target
+   * replacement, or an applied resize. A waiting demand holds no ring slot. A
+   * later demand with the same flags and coalescing boundary supersedes it, a
+   * barrier ends its wait with MLN_RENDER_RESULT_NO_UPDATE, and detach,
+   * abandon, or the quarantine of the ring's last usable slot end it with
+   * MLN_RENDER_RESULT_TARGET_NOT_READY. A waiting demand's result can follow
+   * the results of demands accepted after it. The flag does not pace: a host
+   * that re-arms a waiting demand as each result arrives renders every update
+   * the map publishes.
+   */
+  MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 1U << 2U,
 } mln_frame_demand_flag;
 
 /** One nonblocking request for a frame. */
@@ -108,8 +126,12 @@ typedef struct mln_frame_demand {
   uint64_t token;
   /** Demands coalesce only when this value and their flags match. */
   uint64_t coalescing_boundary;
-  /** Positive time allowed before driver work begins, in nanoseconds; zero has
-   * no limit. */
+  /**
+   * Positive time allowed before driver work begins, in nanoseconds; zero has
+   * no limit. A demand that waits, for a free texture slot or for a map
+   * update, is checked against its timeout when it runs again; a wait has no
+   * timer of its own.
+   */
   uint64_t timeout_ns;
 } mln_frame_demand;
 
@@ -132,7 +154,9 @@ typedef struct mln_render_frame_result {
    * re-arm its frame loop without the runtime event round trip. A camera
    * transition does not set it by itself: the map publishes a new update
    * after each of the transition's frames instead, which a render-if-needed
-   * demand renders.
+   * demand renders. A demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE renders
+   * each transition update without a runtime-event round trip; the host
+   * re-arms the demand as each result arrives.
    */
   bool needs_repaint;
 } mln_render_frame_result;
@@ -225,7 +249,8 @@ MLN_API mln_status mln_render_session_get_snapshot(
  * - MLN_STATUS_OK when the demand is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, demand is
  *   null or undersized, or demand->flags carries a bit outside
- *   mln_frame_demand_flag.
+ *   mln_frame_demand_flag, or carries MLN_FRAME_DEMAND_WAIT_FOR_UPDATE without
+ *   MLN_FRAME_DEMAND_IF_NEEDED.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or every slot of its texture ring is quarantined.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -456,7 +481,8 @@ MLN_API mln_status mln_render_session_resize(
 
 /**
  * Starts a barrier that completes after all render work accepted before it has
- * a terminal result. A barrier does not request a frame.
+ * a terminal result. A barrier does not request a frame. Accepting a barrier
+ * ends the wait of every earlier demand that waits for a map update.
  *
  * Returns:
  * - MLN_STATUS_OK when the barrier is accepted.

@@ -884,7 +884,9 @@ pub const FrameDemand = struct {
     /// Demands coalesce only when this value and their flags match.
     coalescing_boundary: u64 = std.mem.zeroes(u64),
     /// Positive time allowed before driver work begins, in nanoseconds; zero
-    /// has no limit.
+    /// has no limit. A demand that waits, for a free texture slot or for a map
+    /// update, is checked against its timeout when it runs again; a wait has no
+    /// timer of its own.
     timeout_ns: u64 = std.mem.zeroes(u64),
     pub fn toNative(self: FrameDemand) c.mln_frame_demand {
         var raw = c.mln_frame_demand_default();
@@ -915,8 +917,20 @@ pub const FrameDemandFlag = struct {
     /// presenting target whose demand clears this bit still renders and keeps
     /// whatever it presented last. Ignored by targets without presentation.
     present: bool = false,
+    /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+    /// `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits
+    /// instead, and runs again after the map's next update, a target
+    /// replacement, or an applied resize. A waiting demand holds no ring slot.
+    /// A later demand with the same flags and coalescing boundary supersedes
+    /// it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and
+    /// detach, abandon, or the quarantine of the ring's last usable slot end it
+    /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
+    /// follow the results of demands accepted after it. The flag does not pace:
+    /// a host that re-arms a waiting demand as each result arrives renders
+    /// every update the map publishes.
+    wait_for_update: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2 };
+    pub const native_bits = [_]u32{ 1, 2, 4 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -2646,7 +2660,10 @@ pub const RenderFrameResult = struct {
     /// host can re-arm its frame loop without the runtime event round trip. A
     /// camera transition does not set it by itself: the map publishes a new
     /// update after each of the transition's frames instead, which a
-    /// render-if-needed demand renders.
+    /// render-if-needed demand renders. A demand with
+    /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each transition update
+    /// without a runtime-event round trip; the host re-arms the demand as each
+    /// result arrives.
     needs_repaint: bool = std.mem.zeroes(bool),
     pub fn toNative(self: RenderFrameResult) c.mln_render_frame_result {
         var raw = std.mem.zeroes(c.mln_render_frame_result);
@@ -2698,10 +2715,14 @@ pub const RenderResult = enum(u32) {
     /// target can be ready, such as after a paced delay.
     target_not_ready = 3,
     /// An ordered extent change had not reached the map. The map publishes an
-    /// update at the new extent.
+    /// update at the new extent, which a demand with
+    /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing with
+    /// this result.
     size_pending = 2,
     /// No newer map update was available, or the map had no complete frame to
-    /// draw yet. The map publishes another update when it has one.
+    /// draw yet. The map publishes another update when it has one. A demand
+    /// with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead,
+    /// and finishes with this result only when a barrier ends its wait.
     no_update = 1,
     /// A frame was rendered for acquisition, presentation, or ordered readback.
     rendered = 0,
@@ -6955,7 +6976,8 @@ pub fn renderSessionAttachOptionsDefault(allocator: std.mem.Allocator) status.Er
 }
 
 /// Starts a barrier that completes after all render work accepted before it has
-/// a terminal result. A barrier does not request a frame.
+/// a terminal result. A barrier does not request a frame. Accepting a barrier
+/// ends the wait of every earlier demand that waits for a map update.
 ///
 /// See `mln_render_session_barrier` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

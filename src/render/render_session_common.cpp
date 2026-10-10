@@ -1165,6 +1165,48 @@ auto push_driver_work_locked(
     publish_driver_work_locked(session, wakes);
 }
 
+auto run_frame_demand(
+  const std::shared_ptr<mln_render_session_object>& session
+) noexcept -> void;
+
+// Moves every demand that waits for a map update back to the front of the
+// queue, ahead of the later demands there, in acceptance order. Returns how
+// many moved.
+auto requeue_update_waiting_demands_locked(mln_render_session_object& session)
+  -> std::size_t {
+  auto& waiting = session.update_waiting_demands;
+  const auto count = waiting.size();
+  while (!waiting.empty()) {
+    session.demands.push_front(waiting.back());
+    waiting.pop_back();
+  }
+  return count;
+}
+
+// Runs every demand that waits for a map update again. Called wherever an
+// if-needed demand can become renderable without a newer map update reaching
+// it first: the update itself, a target replacement, and an applied resize.
+auto resume_update_waiting_demands_locked(
+  mln_render_session_object& session, DeferredWakes& wakes
+) -> void {
+  const auto count = requeue_update_waiting_demands_locked(session);
+  if (count == 0) return;
+  const auto owner = session.shared_from_this();
+  for (auto index = std::size_t{0}; index < count; ++index) {
+    push_driver_work_locked(
+      session, RenderDriverWork{[owner]() { run_frame_demand(owner); }, {}},
+      wakes
+    );
+  }
+}
+
+// Gives every demand that waits for a map update the terminal `disposition`,
+// in acceptance order.
+auto finish_update_waiting_demands_locked(
+  mln_render_session_object& session, mln_render_result disposition,
+  DeferredWakes& wakes
+) noexcept -> void;
+
 auto splice_work(
   std::deque<RenderDriverWork>& from, std::deque<RenderDriverWork>& into
 ) noexcept -> void {
@@ -1686,6 +1728,7 @@ auto notify_render_session_map_update(
     splice_work(session->waiting_update_work, session->driver_work);
     publish_driver_work_locked(*session, wakes);
   }
+  resume_update_waiting_demands_locked(*session, wakes);
   if (
     !session->demands.empty() &&
     session->capabilities.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD
@@ -1839,6 +1882,7 @@ auto render_session_set_target(
   {
     // Snapshot readers see the extent and its generation together, as they do
     // across the sibling resize path.
+    auto wakes = DeferredWakes{};
     const auto lock = std::scoped_lock{live->control_mutex};
     live->rendered_generation = 0;
     live->rendered_target_generation = 0;
@@ -1856,6 +1900,9 @@ auto render_session_set_target(
     if (kind == RetargetTargetKind::BorrowedTexture) {
       for (auto& slot : live->texture.slots) slot = RenderTextureSlot{};
     }
+    // The new target holds no frame of the latest update, so a demand that
+    // waits for an update has one to render now.
+    resume_update_waiting_demands_locked(*live, wakes);
   }
 
   // Target replacement changes only the graphics resource. Map creation and
@@ -2510,6 +2557,24 @@ auto publish_frame_result_locked(
   }
 }
 
+auto finish_update_waiting_demands_locked(
+  mln_render_session_object& session, mln_render_result disposition,
+  DeferredWakes& wakes
+) noexcept -> void {
+  auto waiting = std::deque<PendingFrameDemand>{};
+  waiting.swap(session.update_waiting_demands);
+  for (const auto& pending : waiting) {
+    publish_frame_result_locked(
+      session,
+      mln_render_frame_result{
+        sizeof(mln_render_frame_result), disposition, pending.demand.token,
+        session.map_update_generation, session.extent_generation, 0, false
+      },
+      wakes
+    );
+  }
+}
+
 auto publish_frame_result(
   const std::shared_ptr<mln_render_session_object>& session,
   mln_render_frame_result result
@@ -2523,13 +2588,17 @@ auto publish_frame_result(
 }
 
 // The barriers whose earlier demands have all reached a terminal result.
-// Demands run and are queued in acceptance order, so the lowest outstanding
-// epoch is the oldest one either running or still queued.
+// Demands run, wait, and are queued in acceptance order, so the lowest
+// outstanding epoch is the oldest one running, waiting, or still queued.
 auto take_settled_barriers_locked(mln_render_session_object& session)
   -> std::vector<std::shared_ptr<OperationObject>> {
   auto oldest = std::numeric_limits<std::uint64_t>::max();
   for (const auto epoch : session.active_demand_epochs) {
     oldest = std::min(oldest, epoch);
+  }
+  if (!session.update_waiting_demands.empty()) {
+    oldest =
+      std::min(oldest, session.update_waiting_demands.front().barrier_epoch);
   }
   if (!session.demands.empty()) {
     oldest = std::min(oldest, session.demands.front().barrier_epoch);
@@ -2601,6 +2670,53 @@ auto service_scheduler_work(
   run_frame_demand(session);
 }
 
+// A demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE found nothing to render in
+// the map update of `evaluated` generation. It waits for the next update
+// unless a barrier accepted after it ends the wait or no ring slot can take a
+// frame. Returns whether the caller publishes `result`, which this sets to the
+// terminal disposition when the demand finishes.
+auto wait_for_map_update(
+  const std::shared_ptr<mln_render_session_object>& session,
+  const PendingFrameDemand& pending, std::uint64_t evaluated,
+  mln_render_frame_result& result
+) noexcept -> bool {
+  mln::testing::hit(mln::testing::SyncPoint::RenderDemandWaits);
+  auto wakes = DeferredWakes{};
+  const auto lock = std::scoped_lock{session->control_mutex};
+  if (every_slot_quarantined_locked(*session)) {
+    result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
+    return true;
+  }
+  if (
+    !session->barriers.empty() &&
+    session->barriers.back().epoch > pending.barrier_epoch
+  ) {
+    result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
+    return true;
+  }
+  try {
+    // Read from the map under the lock that notify takes after the map
+    // stores an update, so an update this read misses finds the demand
+    // waiting. The session's own generation can lag the map's, and comparing
+    // with it would run the demand again until notify catches up.
+    if (map_latest_update_generation(session->map) == evaluated) {
+      session->update_waiting_demands.push_back(pending);
+    } else {
+      // An update landed after the demand looked, so the demand runs again
+      // ahead of the demands accepted after it.
+      auto work =
+        RenderDriverWork{[session]() { run_frame_demand(session); }, {}};
+      session->demands.push_front(pending);
+      push_driver_work_locked(*session, std::move(work), wakes);
+    }
+  } catch (...) {
+    // Queueing allocates. A demand that cannot wait finishes as it found the
+    // map.
+    return true;
+  }
+  return false;
+}
+
 auto run_frame_demand(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
@@ -2662,6 +2778,8 @@ auto run_frame_demand(
     publish_frame_result(session, result);
     return;
   }
+  const auto waits_for_update =
+    (demand.flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0;
   if ((demand.flags & MLN_FRAME_DEMAND_IF_NEEDED) != 0) {
     auto unchanged = false;
     {
@@ -2675,6 +2793,13 @@ auto run_frame_demand(
       // demand during an animation publishes a new update, which bumps the
       // generation and sets pending_changes before the next demand runs.
       result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
+      if (
+        waits_for_update &&
+        !wait_for_map_update(
+          session, pending, result.map_update_generation, result
+        )
+      )
+        return;
       publish_frame_result(session, result);
       return;
     }
@@ -2690,7 +2815,11 @@ auto run_frame_demand(
     if (ring_quarantined) {
       // No slot can ever take a frame again, so waiting for a release would
       // park every queued demand until detach. Parked demands keep no work
-      // item, so this one resolves them all.
+      // item, so this one resolves them all, and those that wait for a map
+      // update with them.
+      finish_update_waiting_demands_locked(
+        *session, MLN_RENDER_RESULT_TARGET_NOT_READY, wakes
+      );
       auto stranded = std::deque<PendingFrameDemand>{};
       stranded.swap(session->demands);
       result.disposition = MLN_RENDER_RESULT_TARGET_NOT_READY;
@@ -2818,6 +2947,13 @@ auto run_frame_demand(
     const auto lock = std::scoped_lock{session->control_mutex};
     session->texture.slots[*selected_slot].rendering = false;
   }
+  if (
+    waits_for_update &&
+    (result.disposition == MLN_RENDER_RESULT_NO_UPDATE ||
+     result.disposition == MLN_RENDER_RESULT_SIZE_PENDING) &&
+    !wait_for_map_update(session, pending, rendered_map_generation, result)
+  )
+    return;
   publish_frame_result(session, result);
 }
 }  // namespace
@@ -2871,7 +3007,8 @@ auto render_session_get_snapshot(
     .frame_generation = live->frame_generation,
     .latest_demand_token = live->latest_demand_token,
     .pending_demand_count = static_cast<uint32_t>(
-      live->demands.size() + live->active_demand_epochs.size()
+      live->demands.size() + live->update_waiting_demands.size() +
+      live->active_demand_epochs.size()
     ),
     .acquired_frame_count = live->acquired_frame_count,
     .target_ready = live->target_ready,
@@ -2889,9 +3026,20 @@ auto render_session_request_frame(
   }
   constexpr auto known_flags =
     static_cast<uint32_t>(MLN_FRAME_DEMAND_IF_NEEDED) |
-    static_cast<uint32_t>(MLN_FRAME_DEMAND_PRESENT);
+    static_cast<uint32_t>(MLN_FRAME_DEMAND_PRESENT) |
+    static_cast<uint32_t>(MLN_FRAME_DEMAND_WAIT_FOR_UPDATE);
   if ((demand->flags & ~known_flags) != 0) {
     set_thread_error("frame demand carries unknown policy flags");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    (demand->flags & MLN_FRAME_DEMAND_WAIT_FOR_UPDATE) != 0 &&
+    (demand->flags & MLN_FRAME_DEMAND_IF_NEEDED) == 0
+  ) {
+    set_thread_error(
+      "a frame demand that waits for a map update must also render only if "
+      "needed"
+    );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto live = lease_render_session(session);
@@ -2906,24 +3054,36 @@ auto render_session_request_frame(
     set_thread_error("every texture slot of the render session is quarantined");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (
-    !live->demands.empty() &&
-    live->demands.back().barrier_epoch == live->barrier_epoch &&
-    live->demands.back().demand.flags == demand->flags &&
-    live->demands.back().demand.coalescing_boundary ==
-      demand->coalescing_boundary
-  ) {
-    const auto replaced = live->demands.back().demand;
-    live->demands.pop_back();
+  const auto supersedes = [&](const PendingFrameDemand& pending) {
+    return pending.barrier_epoch == live->barrier_epoch &&
+           pending.demand.flags == demand->flags &&
+           pending.demand.coalescing_boundary == demand->coalescing_boundary;
+  };
+  const auto supersede = [&](const PendingFrameDemand& pending) {
     publish_frame_result_locked(
       *live,
       mln_render_frame_result{
         sizeof(mln_render_frame_result), MLN_RENDER_RESULT_SUPERSEDED,
-        replaced.token, live->map_update_generation, live->extent_generation, 0,
-        false
+        pending.demand.token, live->map_update_generation,
+        live->extent_generation, 0, false
       },
       wakes
     );
+  };
+  // Waiting demands are older than every queued one, so their results come
+  // first.
+  auto& waiting = live->update_waiting_demands;
+  for (auto entry = waiting.begin(); entry != waiting.end();) {
+    if (supersedes(*entry)) {
+      supersede(*entry);
+      entry = waiting.erase(entry);
+    } else {
+      ++entry;
+    }
+  }
+  if (!live->demands.empty() && supersedes(live->demands.back())) {
+    supersede(live->demands.back());
+    live->demands.pop_back();
   }
   live->demands.push_back(
     PendingFrameDemand{
@@ -3441,6 +3601,7 @@ auto make_ordered_resize_work(
       // across the resize. Its pixel ratio is baked into compiled shaders,
       // which is why an accepted resize cannot change the scale factor.
       {
+        auto wakes = DeferredWakes{};
         const auto lock = std::scoped_lock{session->control_mutex};
         session->width = extent.width;
         session->height = extent.height;
@@ -3450,6 +3611,10 @@ auto make_ordered_resize_work(
         session->pending_extent.reset();
         ++session->extent_generation;
         ++session->generation;
+        // The resize retired every unacquired frame. A resize to the extent
+        // the map already has publishes no update, so a demand that waits for
+        // one renders at the applied extent now.
+        resume_update_waiting_demands_locked(*session, wakes);
       }
       operation->complete(MLN_STATUS_OK, {}, {});
     },
@@ -3607,6 +3772,11 @@ auto render_session_barrier_start(
     // Accepted before the driver can settle the barrier, so the driver, rather
     // than this thread, delivers its completion.
     async.completion->accept();
+    // Every demand that waits for a map update was accepted before the
+    // barrier, which would otherwise wait for an update that may never come.
+    finish_update_waiting_demands_locked(
+      *live, MLN_RENDER_RESULT_NO_UPDATE, wakes
+    );
     const auto epoch = ++live->barrier_epoch;
     // The barrier waits for the demands accepted before it, not merely for the
     // queue position it takes: a demand parked by a full texture ring gives up
@@ -3688,8 +3858,10 @@ auto finish_detach(const std::shared_ptr<mln_render_session_object>& live)
                     ? MLN_RENDER_SESSION_STATE_DETACHED
                     : MLN_RENDER_SESSION_STATE_TARGET_LOST;
     ++live->generation;
-    // A demand parked by a full texture ring keeps no work item, so detach is
-    // the last place that can give it its terminal result.
+    // A demand parked by a full texture ring, or waiting for a map update,
+    // keeps no work item, so detach is the last place that can give it its
+    // terminal result.
+    requeue_update_waiting_demands_locked(*live);
     stranded.swap(live->demands);
     if (disposed) {
       lost_barriers.swap(live->barriers);
@@ -3946,6 +4118,7 @@ auto abandon_render_session(
     live->stop_worker = true;
     discarded.swap(live->driver_work);
     waiting.swap(live->waiting_update_work);
+    requeue_update_waiting_demands_locked(*live);
     pending_demands.swap(live->demands);
     pending_barriers.swap(live->barriers);
     if (!live->disposal_requested.load())
@@ -4210,15 +4383,20 @@ auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
   auto& slot = session.texture.slots[live->slot];
   slot = RenderTextureSlot{};
   slot.quarantined = true;
+  if (
+    session.state != MLN_RENDER_SESSION_STATE_ATTACHED ||
+    !every_slot_quarantined_locked(session)
+  )
+    return MLN_STATUS_OK;
+  // A demand that waits for a map update could never render one now.
+  finish_update_waiting_demands_locked(
+    session, MLN_RENDER_RESULT_TARGET_NOT_READY, wakes
+  );
   // A demand parked behind a full ring waits for a release. Once no slot can
   // take a frame, no release can come, so the driver gives the demand its
   // terminal result now. Queueing allocates; if it fails, detach resolves the
   // demand instead. The queue choice matches push_driver_work_locked().
-  if (
-    session.state != MLN_RENDER_SESSION_STATE_ATTACHED ||
-    session.demands.empty() || !every_slot_quarantined_locked(session)
-  )
-    return MLN_STATUS_OK;
+  if (session.demands.empty()) return MLN_STATUS_OK;
   auto& queue = session.waiting_update_work.empty()
                   ? session.driver_work
                   : session.waiting_update_work;

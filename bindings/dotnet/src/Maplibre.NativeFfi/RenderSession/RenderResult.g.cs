@@ -17,13 +17,18 @@ public enum RenderResult : uint
 
     /// <summary>
     /// No newer map update was available, or the map had no complete frame to
-    /// draw yet. The map publishes another update when it has one.
+    /// draw yet. The map publishes another update when it has one. A demand
+    /// with <c>MLN_FRAME_DEMAND_WAIT_FOR_UPDATE</c> waits for that update
+    /// instead, and finishes with this result only when a barrier ends its
+    /// wait.
     /// </summary>
     NoUpdate = 1,
 
     /// <summary>
     /// An ordered extent change had not reached the map. The map publishes an
-    /// update at the new extent.
+    /// update at the new extent, which a demand with
+    /// <c>MLN_FRAME_DEMAND_WAIT_FOR_UPDATE</c> waits for instead of finishing
+    /// with this result.
     /// </summary>
     SizePending = 2,
 

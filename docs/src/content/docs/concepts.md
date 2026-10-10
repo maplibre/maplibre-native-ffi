@@ -154,8 +154,11 @@ presentation callbacks are paused.
 A frame demand carries a host token, an optional timeout, and a coalescing
 boundary. Every accepted demand produces one terminal result. Result records
 identify the token and the map-update, extent, and frame generations that the
-driver used. A direct frame-result wake callback remains armed until the host
-drains all frame results, so coalesced wakeups do not lose results.
+driver used. A render-if-needed demand can also wait for the map's next update
+instead of finishing without a frame, so a host that keeps one such demand armed
+renders each update without a runtime-event round trip. A direct frame-result
+wake callback remains armed until the host drains all frame results, so
+coalesced wakeups do not lose results.
 
 Disposing a session, as a binding does for a handle that it reclaims, ends the
 session without a completion. A core-worker session that is attached and has no

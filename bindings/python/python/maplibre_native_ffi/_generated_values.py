@@ -363,6 +363,7 @@ class FrameDemandFlag(IntFlag):
 
     IF_NEEDED = 1
     PRESENT = 2
+    WAIT_FOR_UPDATE = 4
 
 
 class FreeCameraOptionField(IntFlag):

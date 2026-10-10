@@ -1332,6 +1332,7 @@ internal enum mln_frame_demand_flag : uint
 {
     MLN_FRAME_DEMAND_IF_NEEDED = 1,
     MLN_FRAME_DEMAND_PRESENT = 2,
+    MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4,
 }
 
 internal enum mln_free_camera_option_field : uint

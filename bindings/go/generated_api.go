@@ -241,6 +241,17 @@ const (
 	// presenting target whose demand clears this bit still renders and keeps
 	// whatever it presented last. Ignored by targets without presentation.
 	FrameDemandFlagPresent FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_PRESENT)
+	// With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
+	// MLN_RENDER_RESULT_NO_UPDATE or MLN_RENDER_RESULT_SIZE_PENDING waits instead,
+	// and runs again after the map's next update, a target replacement, or an
+	// applied resize. A waiting demand holds no ring slot. A later demand with the
+	// same flags and coalescing boundary supersedes it, a barrier ends its wait
+	// with MLN_RENDER_RESULT_NO_UPDATE, and detach, abandon, or the quarantine of
+	// the ring's last usable slot end it with MLN_RENDER_RESULT_TARGET_NOT_READY. A
+	// waiting demand's result can follow the results of demands accepted after it.
+	// The flag does not pace: a host that re-arms a waiting demand as each result
+	// arrives renders every update the map publishes.
+	FrameDemandFlagWaitForUpdate FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_WAIT_FOR_UPDATE)
 )
 
 func (value FrameDemandFlag) Has(flags FrameDemandFlag) bool { return value&flags == flags }
@@ -669,10 +680,13 @@ const (
 	// A frame was rendered for acquisition, presentation, or ordered readback.
 	RenderResultRendered RenderResult = RenderResult(C.MLN_RENDER_RESULT_RENDERED)
 	// No newer map update was available, or the map had no complete frame to draw
-	// yet. The map publishes another update when it has one.
+	// yet. The map publishes another update when it has one. A demand with
+	// MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for that update instead, and finishes
+	// with this result only when a barrier ends its wait.
 	RenderResultNoUpdate RenderResult = RenderResult(C.MLN_RENDER_RESULT_NO_UPDATE)
 	// An ordered extent change had not reached the map. The map publishes an update
-	// at the new extent.
+	// at the new extent, which a demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits
+	// for instead of finishing with this result.
 	RenderResultSizePending RenderResult = RenderResult(C.MLN_RENDER_RESULT_SIZE_PENDING)
 	// The target could not produce a frame. The attempt consumes nothing, so a
 	// later demand with the same flags renders what this one would have. This
@@ -1852,7 +1866,9 @@ type FrameDemand struct {
 	// Demands coalesce only when this value and their flags match.
 	CoalescingBoundary uint64
 	// Positive time allowed before driver work begins, in nanoseconds; zero has no
-	// limit.
+	// limit. A demand that waits, for a free texture slot or for a map update, is
+	// checked against its timeout when it runs again; a wait has no timer of its
+	// own.
 	TimeoutNs uint64
 }
 
@@ -3203,7 +3219,10 @@ type RenderFrameResult struct {
 	// needs_repaint field, delivered with the frame result so a host can re-arm its
 	// frame loop without the runtime event round trip. A camera transition does not
 	// set it by itself: the map publishes a new update after each of the
-	// transition's frames instead, which a render-if-needed demand renders.
+	// transition's frames instead, which a render-if-needed demand renders. A
+	// demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE renders each transition update
+	// without a runtime-event round trip; the host re-arms the demand as each
+	// result arrives.
 	NeedsRepaint bool
 }
 
@@ -7775,7 +7794,8 @@ func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error
 }
 
 // Barrier starts a barrier that completes after all render work accepted before
-// it has a terminal result. A barrier does not request a frame.
+// it has a terminal result. A barrier does not request a frame. Accepting a
+// barrier ends the wait of every earlier demand that waits for a map update.
 //
 // See mln_render_session_barrier in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html

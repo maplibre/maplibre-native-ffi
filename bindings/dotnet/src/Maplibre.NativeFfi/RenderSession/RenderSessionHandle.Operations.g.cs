@@ -214,7 +214,9 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
 
     /// <summary>
     /// Starts a barrier that completes after all render work accepted before it
-    /// has a terminal result. A barrier does not request a frame.
+    /// has a terminal result. A barrier does not request a frame. Accepting a
+    /// barrier ends the wait of every earlier demand that waits for a map
+    /// update.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_barrier</c> in the <see
