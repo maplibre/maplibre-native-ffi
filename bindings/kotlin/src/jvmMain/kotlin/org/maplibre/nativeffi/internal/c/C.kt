@@ -283,6 +283,8 @@ internal actual object C {
     )
   private val mln_map_apply_camera_delta =
     Ffm.downcall("mln_map_apply_camera_delta", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_begin_command_group =
+    Ffm.downcall("mln_map_begin_command_group", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_camera_for_geometry =
     Ffm.downcall(
       "mln_map_camera_for_geometry",
@@ -332,6 +334,8 @@ internal actual object C {
   private val mln_map_dispose = Ffm.downcall("mln_map_dispose", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_dump_debug_logs =
     Ffm.downcall("mln_map_dump_debug_logs", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_map_end_command_group =
+    Ffm.downcall("mln_map_end_command_group", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_get_feature_state =
     Ffm.downcall("mln_map_get_feature_state", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_get_global_state =
@@ -2038,6 +2042,9 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int = mln_map_apply_camera_delta.invokeExact(map, delta, completion, outDiagnostic) as Int
 
+  actual fun mln_map_begin_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
+    mln_map_begin_command_group.invokeExact(map, completion, outDiagnostic) as Int
+
   actual fun mln_map_camera_for_geometry(
     map: Long,
     geometry: Long,
@@ -2111,6 +2118,9 @@ internal actual object C {
 
   actual fun mln_map_dump_debug_logs(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_dump_debug_logs.invokeExact(map, completion, outDiagnostic) as Int
+
+  actual fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
+    mln_map_end_command_group.invokeExact(map, completion, outDiagnostic) as Int
 
   actual fun mln_map_get_feature_state(
     map: Long,

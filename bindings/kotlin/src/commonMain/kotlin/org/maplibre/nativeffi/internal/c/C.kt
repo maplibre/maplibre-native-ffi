@@ -248,6 +248,8 @@ internal expect object C {
 
   fun mln_map_apply_camera_delta(map: Long, delta: Long, completion: Long, outDiagnostic: Long): Int
 
+  fun mln_map_begin_command_group(map: Long, completion: Long, outDiagnostic: Long): Int
+
   fun mln_map_camera_for_geometry(
     map: Long,
     geometry: Long,
@@ -289,6 +291,8 @@ internal expect object C {
   fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
 
   fun mln_map_dump_debug_logs(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_get_feature_state(
     map: Long,

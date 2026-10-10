@@ -3042,6 +3042,15 @@ external int mln_map_apply_camera_delta(
 );
 
 @Native<
+  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+>()
+external int mln_map_begin_command_group(
+  int map,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
   Int32 Function(
     mln_map,
     mln_buffer_view,
@@ -3149,6 +3158,15 @@ external int mln_map_dispose(int map, Pointer<mln_diagnostic> out_diagnostic);
   Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
 >()
 external int mln_map_dump_debug_logs(
+  int map,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(mln_map, Pointer<mln_completion>, Pointer<mln_diagnostic>)
+>()
+external int mln_map_end_command_group(
   int map,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,

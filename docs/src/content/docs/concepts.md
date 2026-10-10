@@ -97,6 +97,13 @@ threads. Snapshot reads never call into mutable MapLibre map state. Each
 committed command completion reports the snapshot generation that its commit
 published, so a host can fence a snapshot read on it.
 
+A command publishes at most one render update, so no frame shows a command
+partly applied. A command group extends this to several commands, such as a
+layer and its filter. Between `mln_map_begin_command_group()` and the matching
+end, each command still commits and completes on its own, while the map holds
+its render updates. The end publishes the latest held update, so a frame shows
+either none of the group or all of it.
+
 ## Render session
 
 A render session renders one map to one render target. A map carries at most one

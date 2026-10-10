@@ -543,6 +543,15 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.apply_camera_delta(delta)
 
+    def begin_command_group(self) -> Future[CommandCompletion]:
+        """Begins a command group, which holds this map's render updates until
+        the group ends.
+
+        See `mln_map_begin_command_group` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.begin_command_group()
+
     def camera_for_geometry(
         self, geometry: bytes, fit_options: CameraFitOptions | None = None
     ) -> Future[CameraOptions]:
@@ -622,6 +631,15 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
         return self._native.dump_debug_logs()
+
+    def end_command_group(self) -> Future[CommandCompletion]:
+        """Ends the innermost command group that `mln_map_begin_command_group()`
+        began.
+
+        See `mln_map_end_command_group` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.end_command_group()
 
     def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
         """Starts an ordered read of per-feature state from this map.

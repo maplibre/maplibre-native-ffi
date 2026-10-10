@@ -4,6 +4,22 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
+  /// Begins a command group, which holds this map's render updates until the
+  /// group ends.
+  ///
+  /// See `mln_map_begin_command_group` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  @discardableResult
+  func beginCommandGroup() async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_begin_command_group") { raw, _, completion, diagnostic in
+      mln_map_begin_command_group(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
   /// Consumes a map handle without observing its asynchronous retirement.
   ///
   /// See `mln_map_dispose` in the
@@ -13,6 +29,22 @@ public extension MapHandle {
       raw,
       diagnostic
     ) }
+  }
+
+  /// Ends the innermost command group that `mln_map_begin_command_group()`
+  /// began.
+  ///
+  /// See `mln_map_end_command_group` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  @discardableResult
+  func endCommandGroup() async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_end_command_group") { raw, _, completion, diagnostic in
+      mln_map_end_command_group(
+        raw,
+        completion,
+        diagnostic
+      )
+    }
   }
 
   /// Starts an ordered read of per-feature state from this map.

@@ -6073,6 +6073,17 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 	}, completionCommand)
 }
 
+// BeginCommandGroup begins a command group, which holds this map's render
+// updates until the group ends.
+//
+// See mln_map_begin_command_group in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_begin_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_begin_command_group(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
+}
+
 // CameraForGeometry starts an ordered query for a camera that fits a GeoJSON
 // geometry.
 //
@@ -6164,6 +6175,17 @@ func (receiver *RuntimeHandle) MapCreate(options MapOptions) (*Future[*MapHandle
 func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_dump_debug_logs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_dump_debug_logs(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
+}
+
+// EndCommandGroup ends the innermost command group that
+// mln_map_begin_command_group() began.
+//
+// See mln_map_end_command_group in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_end_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_end_command_group(C.mln_map(raw), completion, diagnostic))
 	}, completionCommand)
 }
 

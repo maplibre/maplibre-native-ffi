@@ -5207,6 +5207,16 @@ impl MapHandle {
             })
         }
     }
+    #[pyo3(signature = ())]
+    fn begin_command_group(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_map_begin_command_group", self.admission())?;
+        let handle = self.live()?;
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_begin_command_group(handle, completion, diagnostic)
+            })
+        }
+    }
     #[pyo3(signature = (geometry, fit_options=None))]
     fn camera_for_geometry(
         &self,
@@ -5370,6 +5380,16 @@ impl MapHandle {
         unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_dump_debug_logs(handle, completion, diagnostic)
+            })
+        }
+    }
+    #[pyo3(signature = ())]
+    fn end_command_group(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let mut call = GeneratedCall::new(py, "mln_map_end_command_group", self.admission())?;
+        let handle = self.live()?;
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_end_command_group(handle, completion, diagnostic)
             })
         }
     }

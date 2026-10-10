@@ -455,6 +455,18 @@ impl MapHandle {
         })
     }
 
+    /// Begins a command group, which holds this map's render updates until the
+    /// group ends.
+    ///
+    /// See `mln_map_begin_command_group` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn begin_command_group(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_begin_command_group")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_begin_command_group(map, completion, out_diagnostic)
+        })
+    }
+
     /// Starts an ordered query for a camera that fits a GeoJSON geometry.
     ///
     /// See `mln_map_camera_for_geometry` in the
@@ -599,6 +611,18 @@ impl MapHandle {
         let call = self.inner.call("mln_map_dump_debug_logs")?;
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_dump_debug_logs(map, completion, out_diagnostic)
+        })
+    }
+
+    /// Ends the innermost command group that `mln_map_begin_command_group()`
+    /// began.
+    ///
+    /// See `mln_map_end_command_group` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn end_command_group(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_end_command_group")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_end_command_group(map, completion, out_diagnostic)
         })
     }
 

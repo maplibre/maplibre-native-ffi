@@ -4433,6 +4433,19 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
+  /// Begins a command group, which holds this map's render updates until the
+  /// group ends.
+  ///
+  /// See `mln_map_begin_command_group` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<CommandCompletion> beginCommandGroup() => _command(
+    (arena, completion) => raw.mln_map_begin_command_group(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
+  );
+
   /// Starts an ordered query for a camera that fits a GeoJSON geometry.
   ///
   /// See `mln_map_camera_for_geometry` in the
@@ -4552,6 +4565,19 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   Future<CommandCompletion> dumpDebugLogs() => _command(
     (arena, completion) =>
         raw.mln_map_dump_debug_logs(_handle.raw, completion, nativeDiagnostic),
+  );
+
+  /// Ends the innermost command group that `mln_map_begin_command_group()`
+  /// began.
+  ///
+  /// See `mln_map_end_command_group` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+  Future<CommandCompletion> endCommandGroup() => _command(
+    (arena, completion) => raw.mln_map_end_command_group(
+      _handle.raw,
+      completion,
+      nativeDiagnostic,
+    ),
   );
 
   /// Starts an ordered read of per-feature state from this map.

@@ -1846,6 +1846,11 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_begin_command_group(
+        map: mln_map,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_camera_for_geometry(
         map: mln_map,
         geometry: mln_buffer_view,
@@ -1892,6 +1897,11 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_dispose(map: mln_map, out_diagnostic: *mut mln_diagnostic) -> mln_status;
     pub fn mln_map_dump_debug_logs(
+        map: mln_map,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_end_command_group(
         map: mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,

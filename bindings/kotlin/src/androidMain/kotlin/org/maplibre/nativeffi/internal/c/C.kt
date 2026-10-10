@@ -329,6 +329,13 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_begin_command_group(
+    map: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_camera_for_geometry(
     map: Long,
     geometry: Long,
@@ -386,6 +393,13 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_map_dump_debug_logs(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  @JvmStatic
+  actual external fun mln_map_end_command_group(
+    map: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
 
   @JvmStatic
   actual external fun mln_map_get_feature_state(

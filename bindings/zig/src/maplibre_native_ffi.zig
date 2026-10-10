@@ -5588,6 +5588,15 @@ pub fn mapApplyCameraDelta(allocator: std.mem.Allocator, map: Map, delta: Camera
     return call.submit("mln_map_apply_camera_delta", .lease, map, call.command, allocator, diagnostic, .{delta});
 }
 
+/// Begins a command group, which holds this map's render updates until the
+/// group ends.
+///
+/// See `mln_map_begin_command_group` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn mapBeginCommandGroup(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_begin_command_group", .lease, map, call.command, null, diagnostic, .{});
+}
+
 /// Starts an ordered query for a camera that fits a GeoJSON geometry.
 ///
 /// See `mln_map_camera_for_geometry` in the
@@ -5659,6 +5668,14 @@ pub fn mapDispose(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!v
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn mapDumpDebugLogs(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
     return call.submit("mln_map_dump_debug_logs", .lease, map, call.command, null, diagnostic, .{});
+}
+
+/// Ends the innermost command group that `mln_map_begin_command_group()` began.
+///
+/// See `mln_map_end_command_group` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub fn mapEndCommandGroup(map: Map, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_end_command_group", .lease, map, call.command, null, diagnostic, .{});
 }
 
 /// Starts an ordered read of per-feature state from this map.

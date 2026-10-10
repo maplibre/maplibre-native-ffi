@@ -568,6 +568,26 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
+    /// Begins a command group, which holds this map's render updates until the
+    /// group ends.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_begin_command_group</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> BeginCommandGroupAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_begin_command_group");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_begin_command_group(Handle, completion, diagnostic),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
     /// Starts an ordered query for a camera that fits a GeoJSON geometry.
     /// </summary>
     /// <remarks>
@@ -725,6 +745,26 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         return scope.Command(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_dump_debug_logs(Handle, completion, diagnostic),
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Ends the innermost command group that
+    /// <c>mln_map_begin_command_group()</c> began.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_end_command_group</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> EndCommandGroupAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_end_command_group");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_end_command_group(Handle, completion, diagnostic),
             cancellationToken
         );
     }

@@ -258,6 +258,10 @@ auto map_resize(
 ) -> mln_status;
 auto map_request_repaint(mln_map map, const mln_completion* completion)
   -> mln_status;
+auto map_begin_command_group(mln_map map, const mln_completion* completion)
+  -> mln_status;
+auto map_end_command_group(mln_map map, const mln_completion* completion)
+  -> mln_status;
 auto map_request_still_image_start(
   mln_map map, const mln_completion* completion
 ) -> mln_status;

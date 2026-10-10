@@ -513,6 +513,15 @@ static jint mln_map_apply_camera_delta_jni(
   );
 }
 
+static jint mln_map_begin_command_group_jni(
+  JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_begin_command_group(
+    (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_map_camera_for_geometry_jni(
   JNIEnv* env, jclass type, jlong map, jlong geometry, jlong fit_options,
   jlong completion, jlong out_diagnostic
@@ -603,6 +612,15 @@ static jint mln_map_dump_debug_logs_jni(
   JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
   return (jint)mln_map_dump_debug_logs(
+    (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
+static jint mln_map_end_command_group_jni(
+  JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
+) {
+  return (jint)mln_map_end_command_group(
     (mln_map)map, MLN_JNI_POINTER(const mln_completion*, completion),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
@@ -2730,6 +2748,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_add_vector_source_url_jni},
   {"mln_map_apply_camera_delta", "(JJJJ)I",
    (void*)mln_map_apply_camera_delta_jni},
+  {"mln_map_begin_command_group", "(JJJ)I",
+   (void*)mln_map_begin_command_group_jni},
   {"mln_map_camera_for_geometry", "(JJJJJ)I",
    (void*)mln_map_camera_for_geometry_jni},
   {"mln_map_camera_for_lat_lng_bounds", "(JJJJJ)I",
@@ -2744,6 +2764,7 @@ const JNINativeMethod mln_jni_methods[] = {
   {"mln_map_create", "(JJJJ)I", (void*)mln_map_create_jni},
   {"mln_map_dispose", "(JJ)I", (void*)mln_map_dispose_jni},
   {"mln_map_dump_debug_logs", "(JJJ)I", (void*)mln_map_dump_debug_logs_jni},
+  {"mln_map_end_command_group", "(JJJ)I", (void*)mln_map_end_command_group_jni},
   {"mln_map_get_feature_state", "(JJJJ)I",
    (void*)mln_map_get_feature_state_jni},
   {"mln_map_get_global_state", "(JJJ)I", (void*)mln_map_get_global_state_jni},

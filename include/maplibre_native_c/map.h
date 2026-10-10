@@ -1024,6 +1024,58 @@ MLN_API mln_status mln_map_request_repaint(
 ) MLN_NOEXCEPT;
 
 /**
+ * Begins a command group, which holds this map's render updates until the
+ * group ends.
+ *
+ * Each command publishes at most one render update. A group combines several
+ * commands, such as adding a layer and setting its filter, so that no frame
+ * shows only some of them. Commands accepted between this call and the
+ * matching mln_map_end_command_group() still commit one at a time, and each
+ * completion and snapshot reports its own commit. The render updates of those
+ * commands, and of loading and transitions meanwhile, stay unpublished, and
+ * the end of the outermost group publishes the latest one. Groups nest. A
+ * command that fails inside a group leaves the group open and leaves the
+ * other commands applied.
+ *
+ * An operation that waits for a render update finishes only after the group
+ * ends: a render-session resize, and a still-image request that was already in
+ * flight. Do not wait for such an operation between the begin and the end.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_begin_command_group(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Ends the innermost command group that mln_map_begin_command_group() began.
+ *
+ * Ending the outermost group publishes the latest render update that the group
+ * held, and the snapshot that this command publishes reports that update in
+ * latest_render_update_generation.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command was accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
+ * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.
+ *
+ * Completes with:
+ * - MLN_STATUS_INVALID_STATE when map has no open command group.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_end_command_group(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
  * Submits a copied per-feature-state command.
  *
  * selector->source_id, selector->feature_id, and state are copied before
@@ -1123,7 +1175,9 @@ MLN_API mln_status mln_map_remove_feature_state(
  *
  * Completes with:
  * - MLN_STATUS_INVALID_STATE when a still-image request was already pending
- *   when this one reached the map worker.
+ *   when this one reached the map worker, or when the map was inside a command
+ *   group, whose held update would leave the request bound to a stale update
+ *   generation.
  * - MLN_STATUS_CANCELLED when the map closes before the image is produced.
  * - MLN_STATUS_NATIVE_ERROR when rendering the image fails.
  */

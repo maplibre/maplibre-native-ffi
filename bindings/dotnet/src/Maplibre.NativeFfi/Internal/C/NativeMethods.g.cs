@@ -360,6 +360,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_begin_command_group(
+        MlnMap map,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_camera_for_geometry(
         MlnMap map,
         mln_buffer_view geometry,
@@ -422,6 +429,13 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_dump_debug_logs(
+        MlnMap map,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_end_command_group(
         MlnMap map,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic

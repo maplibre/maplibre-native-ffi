@@ -574,6 +574,13 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_begin_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_begin_command_group(
+      map.toULong(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_camera_for_geometry(
     map: Long,
     geometry: Long,
@@ -669,6 +676,13 @@ internal actual object C {
 
   actual fun mln_map_dump_debug_logs(map: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_dump_debug_logs(
+      map.toULong(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
+  actual fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_end_command_group(
       map.toULong(),
       completion.toCPointer(),
       outDiagnostic.toCPointer(),
