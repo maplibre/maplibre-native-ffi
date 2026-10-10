@@ -58,7 +58,8 @@ val packagedAndroidRuntimeLibs = layout.buildDirectory.dir("generated/jniLibs/ru
 @Suppress("UNCHECKED_CAST")
 val packagedAndroidBindingLibs =
   extensions.extraProperties["maplibreAndroidBindingLibsDirectory"] as Provider<Directory>
-// Snapshot publishing extracts the Android CMake packages produced by target CI here.
+// Publishing puts each Android preset's packaged components here, one directory per preset:
+// staging extracts the packages that target CI produced, and a local publish installs them.
 val prebuiltAndroidInstallRoot =
   providers.gradleProperty("maplibre.android.prebuiltInstallRoot").map(rootProject::file)
 // Target CI round-trips packages into each CMake preset's install directory.

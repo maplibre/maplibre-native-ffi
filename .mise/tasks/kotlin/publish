@@ -9,6 +9,7 @@ input_root="${MISE_MONOREPO_ROOT}/build/packages/native/maven-input"
 install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
 staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
 local_repository="${staging_base}/maven-local"
+local_install_root="${staging_base}/local-install"
 
 usage() {
   echo "usage: $(basename "$0") stage <linux|apple> [version]" >&2
@@ -21,7 +22,9 @@ usage() {
 
 # Prints a short hash of the worktree's tracked and untracked content, so each
 # uncommitted state publishes at its own version and the repository never mixes
-# modules built from different edits under one version.
+# modules built from different edits under one version. The MapLibre Native
+# submodule's own edits need no part: before every task, the submodules
+# dependency resets it to the pinned commit and patches, which this tree holds.
 worktree_tree() {
   local index tree
   index="$(mktemp)"
@@ -450,8 +453,14 @@ publish_local() {
     fi
   fi
 
+  # The build task also installs the loader and test-graphics components into
+  # each build tree, which the package leaves out, so each preset installs anew
+  # into a prefix of its own with only the components the package carries.
   for preset in "$@"; do
     mise run build "$preset"
+    rm -rf "${local_install_root:?}/${preset}"
+    cmake --install "${MISE_MONOREPO_ROOT}/build/${preset}" \
+      --prefix "${local_install_root}/${preset}"
   done
 
   local binding=:bindings:kotlin
@@ -465,7 +474,7 @@ publish_local() {
   tasks+=("$(publication_task "$binding" KotlinMultiplatform "$repository")")
   for preset in "$@"; do
     describe_local_preset "$preset"
-    install="${MISE_MONOREPO_ROOT}/build/${preset}/install"
+    install="${local_install_root}/${preset}"
     runtime="${binding}:runtimes:${preset_backend}"
     # Gradle runs a task named twice once, so presets may repeat publications.
     tasks+=("$(publication_task "$runtime" KotlinMultiplatform "$repository")")
@@ -526,7 +535,7 @@ publish_local() {
       done
     fi
     ./gradlew "${tasks[@]}" "${common[@]}" \
-      -Pmaplibre.android.prebuiltBuildRoot="${MISE_MONOREPO_ROOT}/build" \
+      -Pmaplibre.android.prebuiltInstallRoot="$local_install_root" \
       -Pmaplibre.android.abis="$abis" \
       -Pmaplibre.android.backend="$backend"
   done

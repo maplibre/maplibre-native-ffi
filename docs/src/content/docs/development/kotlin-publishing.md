@@ -258,8 +258,9 @@ leaf-first/root-last ordering on Central's mutable snapshot endpoint.
 ## Local and pull-request publications
 
 A host under development can consume unreleased publications from a local Maven
-repository. The `local` operation builds each named native preset, then
-publishes the binding and the runtimes that those presets feed:
+repository. The `local` operation builds each named native preset and installs
+the components that its package carries, then publishes the binding and the
+runtimes that those presets feed:
 
 ```bash
 mise run //:kotlin:publish local macos-arm64-metal macos-arm64-vulkan macos-arm64-egl
@@ -268,19 +269,21 @@ mise run //:kotlin:publish local macos-arm64-metal macos-arm64-vulkan macos-arm6
 The repository is `build/packages/kotlin/maven-local`. The default version is
 `0.1.0-local.<commit>`. When the worktree has uncommitted changes, the task
 appends `.dirty-<hash>`, a hash of the worktree's tracked and untracked files,
-so each edit publishes at its own version. The `MAPLIBRE_MAVEN_VERSION`
-environment variable overrides the version; a host that keeps one version across
-edits must republish every preset it uses after each change to native code. The
-task rejects a preset that the host cannot build before it builds anything.
-Android presets build against `ANDROID_HOME`; to use the pinned SDK, run
-`mise -E android run //:kotlin:publish local <preset>...`.
+so each edit publishes at its own version. Every task run resets the MapLibre
+Native submodule to its pinned commit and patches, which the hash covers. The
+`MAPLIBRE_MAVEN_VERSION` environment variable overrides the version; a host that
+keeps one version across edits must republish every preset it uses after each
+change to native code. The task rejects a preset that the host cannot build
+before it builds anything. Android presets build against `ANDROID_HOME`; to use
+the pinned SDK, run `mise -E android run //:kotlin:publish local <preset>...`.
 
 The repository holds only the targets that the named presets feed, although each
 root module still names every target. Later runs at the same version add
 Kotlin/Native targets and backends to the repository. Each publish rewrites a
 backend's JVM runtime module and Android AAR, and the binding's AAR, so they
-hold only the classifiers and ABIs from their latest publish. Name every
-classifier and Android ABI of a backend in one run.
+hold only the classifiers and ABIs from their latest publish. Both backends
+share the binding's AAR, which carries the JNI shim. Name every classifier of a
+backend, and every Android preset of both backends, in one run.
 
 A pull request with complete coverage publishes its verified repository the same
 way. The version is `0.1.0-pr<number>.<run id>`, where the run id is the one
@@ -294,9 +297,9 @@ gh run download <run id> --repo maplibre/maplibre-native-ffi \
 ```
 
 Gradle takes each module from the first repository that holds it. `mavenLocal()`
-can hold a stale module at the same version, for example from an earlier
-publication at the same `MAPLIBRE_MAVEN_VERSION`. Declare the downloaded or
-local repository as the exclusive source of the group:
+can hold stale or partial modules of this group, for example `0.1.0-SNAPSHOT`
+modules that `publishToMavenLocal` left behind. Declare the downloaded or local
+repository as the exclusive source of the group:
 
 ```kotlin
 repositories {
