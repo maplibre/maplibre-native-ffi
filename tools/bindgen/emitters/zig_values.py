@@ -178,9 +178,7 @@ class Values:
         fields, copies, writes = [], [], []
         for field in value.fields:
             if field.role == "presence_mask":
-                writes.append(
-                    f"        raw.{field.name} = {'false' if field.value.ctype.canonical in {'_Bool', 'bool'} else '0'};"
-                )
+                writes.append(f"        raw.{field.name} = 0;")
         for flag in value.mask_flags:
             local = identifier(flag.member)
             fields.append(
@@ -237,12 +235,12 @@ class Values:
             copy = self.capture(field.value, f"raw.{local}")
             if optional:
                 mask, bit = identifier(field.presence.mask), field.presence.bit
-                present = f"raw.{mask} & c.{bit} != 0" if bit else f"raw.{mask}"
+                present = f"raw.{mask} & c.{bit} != 0"
                 copies.append(
                     f"            .{local} = if ({present}) {copy} else null,"
                 )
                 writes.append(
-                    f"        marshal.present(&raw.{mask}, {'c.' + bit if bit else 'true'}, &raw.{local}, self.{local});"
+                    f"        marshal.present(&raw.{mask}, c.{bit}, &raw.{local}, self.{local});"
                 )
             else:
                 copies.append(f"            .{local} = {copy},")

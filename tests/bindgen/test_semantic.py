@@ -204,15 +204,17 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
 typedef enum mode : unsigned { MODE_OFF = 0, MODE_ON = 1 } mode;
 typedef struct extent { unsigned width; } extent;
 typedef struct turn { double w; } turn;
+typedef enum BIND("kind=bitmask") settings_field : unsigned {
+  SETTINGS_TURN = 1, SETTINGS_ZOOM = 2
+} settings_field;
 typedef struct settings {
   unsigned size;
-  bool has_zoom;
-  bool has_turn;
+  unsigned fields BIND("enum=settings_field");
   extent area;
-  turn orientation BIND("mask=has_turn");
+  turn orientation BIND("mask=fields;bit=SETTINGS_TURN");
   unsigned level;
   unsigned mode BIND("enum=mode");
-  double zoom BIND("mask=has_zoom");
+  double zoom BIND("mask=fields;bit=SETTINGS_ZOOM");
   unsigned reserved BIND("kind=reserved");
 } settings;
 settings settings_default(void);
@@ -236,8 +238,8 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
             ('BIND("enum=mode")', 'BIND("enum=mode;default=ON")', "names no mode"),
             ("unsigned level;", 'unsigned level BIND("default=1.0");', "decimal"),
             (
-                'BIND("mask=has_zoom")',
-                'BIND("mask=has_zoom;default=1.0")',
+                'BIND("mask=fields;bit=SETTINGS_ZOOM")',
+                'BIND("mask=fields;bit=SETTINGS_ZOOM;default=1.0")',
                 "plain value",
             ),
             ("extent area;", 'extent area BIND("default=1");', "plain value"),
@@ -299,28 +301,6 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
                 require_complete=True,
             )
 
-    def test_boolean_presence_preserves_optional_groups(self):
-        source = """
-typedef struct range_value {
-  bool has_range;
-  unsigned start BIND("mask=has_range");
-  unsigned end BIND("mask=has_range");
-} range_value;
-mln_status write_range(const range_value *value, mln_diagnostic *out_diagnostic);
-"""
-        api = bind(self.parse(source), require_complete=True)
-        value = api.operations[0].inputs[0].value.element
-        group = value.presence_groups[0]
-        self.assertEqual(
-            (group.mask, group.bit, group.fields), ("has_range", None, ("start", "end"))
-        )
-        self.assertEqual(value.fields[0].role, "presence_mask")
-        with self.assertRaisesRegex(ModelError, "boolean mask"):
-            bind(
-                self.parse(source.replace("bool has_range", "unsigned has_range")),
-                require_complete=True,
-            )
-
     def test_copied_values_hold_registrations_only_in_defaults(self):
         source = """
 typedef void (*notify)(void *state);
@@ -372,11 +352,12 @@ mln_status configure(const settings *options, const hook *events, const request 
 typedef void (*notify)(void *state);
 typedef void (*release)(void *state);
 typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
-typedef struct settings { bool has_wake; FIELD } settings;
+typedef enum BIND("kind=bitmask") settings_field : unsigned { SETTINGS_WAKE = 1 } settings_field;
+typedef struct settings { unsigned fields BIND("enum=settings_field"); FIELD } settings;
 settings settings_default(void);
 """
         for field in (
-            'signals wake BIND("mask=has_wake");',
+            'signals wake BIND("mask=fields;bit=SETTINGS_WAKE");',
             'const signals *wake BIND("nullable=true");',
         ):
             with (

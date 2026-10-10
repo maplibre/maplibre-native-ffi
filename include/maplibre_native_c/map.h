@@ -317,22 +317,29 @@ typedef enum mln_camera_delta_kind : uint32_t {
   MLN_CAMERA_DELTA_PITCH = 3,
 } mln_camera_delta_kind;
 
+/** Field mask values for mln_camera_delta. */
+typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
+  MLN_CAMERA_DELTA_FIELD_ANCHOR = 1U << 0U,
+} mln_camera_delta_field;
+
 /**
  * One relative camera operation.
  *
  * MOVE reads offset. SCALE reads amount as a positive factor. BEARING and
  * PITCH read amount as degrees, added to the current value: a positive PITCH
  * amount tilts the camera further from straight down, the opposite of
- * MapLibre Native's Map::pitchBy(). SCALE and BEARING apply anchor when
- * has_anchor is true. Every operation reads animation.
+ * MapLibre Native's Map::pitchBy(). SCALE and BEARING apply anchor when fields
+ * contains MLN_CAMERA_DELTA_FIELD_ANCHOR, which no other kind accepts. Every
+ * operation reads animation.
  */
 typedef struct mln_camera_delta {
   uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_camera_delta_field");
   uint32_t kind MLN_BINDING("enum=mln_camera_delta_kind");
   mln_screen_point offset;
   double amount;
-  bool has_anchor;
-  mln_screen_point anchor MLN_BINDING("mask=has_anchor");
+  mln_screen_point anchor
+    MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_FIELD_ANCHOR");
   mln_animation_options animation;
 } mln_camera_delta;
 

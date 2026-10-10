@@ -166,8 +166,8 @@ def declaration(values, value):
         )
         fields.append(f"    {local}: ?{name} = null,")
         mask = ".".join(identifier(part) for part in group.mask.split("."))
-        present = f"raw.{mask} & c.{group.bit} != 0" if group.bit else f"raw.{mask}"
-        mark = f"raw.{mask} |= c.{group.bit}" if group.bit else f"raw.{mask} = true"
+        present = f"raw.{mask} & c.{group.bit} != 0"
+        mark = f"raw.{mask} |= c.{group.bit}"
         assigned = " ".join(
             f"raw.{identifier(f.name)} = {encode(values, f.value, 'item.' + identifier(f.name))};"
             for f in members
@@ -249,10 +249,10 @@ def declaration(values, value):
         if optional:
             path = ".".join(identifier(part) for part in field.presence.mask.split("."))
             bit = field.presence.bit
-            present = f"raw.{path} & c.{bit} != 0" if bit else f"raw.{path}"
-            mark = f"raw.{path} |= c.{bit}" if bit else f"raw.{path} = true"
+            present = f"raw.{path} & c.{bit} != 0"
+            mark = f"raw.{path} |= c.{bit}"
             writes.append(
-                f"        marshal.present(&raw.{path}, {'c.' + bit if bit else 'true'}, &{raw}, self.{local});"
+                f"        marshal.present(&raw.{path}, c.{bit}, &{raw}, self.{local});"
                 if not dynamic(field.value)
                 else f"        if (self.{local}) |item| {{ {mark}; {raw} = {encode(values, field.value, 'item')}; }}"
             )

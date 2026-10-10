@@ -80,6 +80,19 @@ const (
 	CameraChangeModeAnimated CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_ANIMATED)
 )
 
+// CameraDeltaField corresponds to mln_camera_delta_field. Field mask values for
+// mln_camera_delta.
+//
+// See mln_camera_delta_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type CameraDeltaField uint32
+
+const (
+	CameraDeltaFieldAnchor CameraDeltaField = CameraDeltaField(C.MLN_CAMERA_DELTA_FIELD_ANCHOR)
+)
+
+func (value CameraDeltaField) Has(flags CameraDeltaField) bool { return value&flags == flags }
+
 // CameraDeltaKind corresponds to mln_camera_delta_kind. Relative camera
 // operation carried by mln_camera_delta.
 //
@@ -726,7 +739,8 @@ const (
 type RenderedFeatureQueryOptionField uint32
 
 const (
-	RenderedFeatureQueryOptionFieldIds RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
+	RenderedFeatureQueryOptionFieldLayerIds RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
+	RenderedFeatureQueryOptionFieldFilter   RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER)
 )
 
 func (value RenderedFeatureQueryOptionField) Has(flags RenderedFeatureQueryOptionField) bool {
@@ -791,6 +805,42 @@ const (
 	ResourceProviderDecisionPassThrough ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
 	ResourceProviderDecisionHandle      ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
 )
+
+// ResourceRequestField corresponds to mln_resource_request_field. Field mask
+// values for mln_resource_request.
+//
+// See mln_resource_request_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRequestField uint32
+
+const (
+	// The request asks for the inclusive byte range range_start to range_end.
+	ResourceRequestFieldRange ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_RANGE)
+	// The cached copy being revalidated carries a modification time.
+	ResourceRequestFieldPriorModified ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
+	// The cached copy being revalidated carries an expiration time.
+	ResourceRequestFieldPriorExpires ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES)
+)
+
+func (value ResourceRequestField) Has(flags ResourceRequestField) bool { return value&flags == flags }
+
+// ResourceResponseField corresponds to mln_resource_response_field. Field mask
+// values for mln_resource_response.
+//
+// See mln_resource_response_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceResponseField uint32
+
+const (
+	// The response carries a modification time.
+	ResourceResponseFieldModified ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_MODIFIED)
+	// The response carries an expiration time.
+	ResourceResponseFieldExpires ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_EXPIRES)
+	// An ERROR response carries the earliest time to retry the request.
+	ResourceResponseFieldRetryAfter ResourceResponseField = ResourceResponseField(C.MLN_RESOURCE_RESPONSE_RETRY_AFTER)
+)
+
+func (value ResourceResponseField) Has(flags ResourceResponseField) bool { return value&flags == flags }
 
 // ResourceResponseStatus corresponds to mln_resource_response_status. How a
 // resource provider answered a request.
@@ -933,7 +983,8 @@ const (
 type SourceFeatureQueryOptionField uint32
 
 const (
-	SourceFeatureQueryOptionFieldIds SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
+	SourceFeatureQueryOptionFieldSourceLayerIds SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
+	SourceFeatureQueryOptionFieldFilter         SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER)
 )
 
 func (value SourceFeatureQueryOptionField) Has(flags SourceFeatureQueryOptionField) bool {
@@ -970,6 +1021,24 @@ const (
 	// A command or operation named an ID with no live object behind it.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
 )
+
+// StyleImageInfoField corresponds to mln_style_image_info_field. Field mask
+// values for mln_style_image_info.
+//
+// See mln_style_image_info_field in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+type StyleImageInfoField uint32
+
+const (
+	// The image declares a content box.
+	StyleImageInfoFieldContent StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_CONTENT)
+	// The image declares a horizontal text-fit mode.
+	StyleImageInfoFieldTextFitWidth StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH)
+	// The image declares a vertical text-fit mode.
+	StyleImageInfoFieldTextFitHeight StyleImageInfoField = StyleImageInfoField(C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT)
+)
+
+func (value StyleImageInfoField) Has(flags StyleImageInfoField) bool { return value&flags == flags }
 
 // StyleImageOptionField corresponds to mln_style_image_option_field. Field mask
 // values for mln_style_image_options.
@@ -1047,6 +1116,8 @@ const (
 	StyleSourceInfoFieldVectorEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
 	// The source exposes a DEM raster encoding.
 	StyleSourceInfoFieldRasterEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
+	// The source declares an attribution string.
+	StyleSourceInfoFieldAttribution StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
 )
 
 func (value StyleSourceInfoField) Has(flags StyleSourceInfoField) bool { return value&flags == flags }
@@ -1432,7 +1503,7 @@ func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
 	result.Kind = CameraDeltaKind(raw.kind)
 	result.Offset = copyScreenPoint(raw.offset)
 	result.Amount = float64(raw.amount)
-	result.Anchor = bindingPresent(bool(raw.has_anchor), func() ScreenPoint { return copyScreenPoint(raw.anchor) })
+	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_DELTA_FIELD_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
 	result.Animation = copyAnimationOptions(raw.animation)
 	return result
 }
@@ -1440,11 +1511,11 @@ func copyCameraDelta(raw C.mln_camera_delta) CameraDelta {
 func nativeCameraDelta(input CameraDelta, arena *bindingArena) C.mln_camera_delta {
 	raw := C.mln_camera_delta_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_anchor = false
+	raw.fields = 0
 	raw.kind = C.uint32_t(input.Kind)
 	raw.offset = nativeScreenPoint(input.Offset, arena)
 	raw.amount = C.double(input.Amount)
-	bindingFlagged(&raw.has_anchor, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
+	bindingMasked(&raw.fields, C.MLN_CAMERA_DELTA_FIELD_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
 	raw.animation = nativeAnimationOptions(input.Animation, arena)
 	return raw
 }
@@ -3332,7 +3403,7 @@ func nativeRenderTargetExtent(input RenderTargetExtent, arena *bindingArena) C.m
 type RenderedFeatureQueryOptions struct {
 	// Optional style layer IDs. When absent, all rendered layers are queried.
 	LayerIds []string
-	// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
 	Filter *[]byte
 }
 
@@ -3349,13 +3420,7 @@ func copyRenderedFeatureQueryOptions(raw C.mln_rendered_feature_query_options) R
 			return result
 		}()
 	}
-	result.Filter = func() *[]byte {
-		if raw.filter == nil {
-			return nil
-		}
-		value := bindingBytes((*raw.filter).data, uint64((*raw.filter).size))
-		return &value
-	}()
+	result.Filter = bindingPresent(raw.fields&C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0, func() []byte { return bindingBytes(raw.filter.data, uint64(raw.filter.size)) })
 	return result
 }
 
@@ -3375,9 +3440,8 @@ func nativeRenderedFeatureQueryOptions(input RenderedFeatureQueryOptions, arena 
 		raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 	}
 	if input.Filter != nil {
-		pointer := (*C.mln_buffer_view)(arena.allocate(unsafe.Sizeof(*raw.filter)))
-		*pointer = C.mln_buffer_view{data: arena.bytes(*input.Filter), size: C.size_t(len(*input.Filter))}
-		raw.filter = pointer
+		raw.filter = C.mln_buffer_view{data: arena.bytes((*input.Filter)), size: C.size_t(len((*input.Filter)))}
+		raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER
 	}
 	return raw
 }
@@ -3513,7 +3577,7 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	result.Priority = ResourcePriority(raw.priority)
 	result.Usage = ResourceUsage(raw.usage)
 	result.StoragePolicy = ResourceStoragePolicy(raw.storage_policy)
-	result.Range = bindingPresent(bool(raw.has_range), func() ResourceRequestRange {
+	result.Range = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_RANGE != 0, func() ResourceRequestRange {
 		return func() ResourceRequestRange {
 			var inner ResourceRequestRange
 			inner.Start = uint64(raw.range_start)
@@ -3521,8 +3585,8 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 			return inner
 		}()
 	})
-	result.PriorModifiedUnixMs = bindingPresent(bool(raw.has_prior_modified), func() int64 { return int64(raw.prior_modified_unix_ms) })
-	result.PriorExpiresUnixMs = bindingPresent(bool(raw.has_prior_expires), func() int64 { return int64(raw.prior_expires_unix_ms) })
+	result.PriorModifiedUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0, func() int64 { return int64(raw.prior_modified_unix_ms) })
+	result.PriorExpiresUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0, func() int64 { return int64(raw.prior_expires_unix_ms) })
 	result.PriorEtag = func() *string {
 		if raw.prior_etag == nil {
 			return nil
@@ -3541,6 +3605,11 @@ type ResourceRequestRange struct {
 
 type ResourceRequestSetCancelCallbackRegistration struct{ Callback func() }
 
+// ResourceResponse corresponds to mln_resource_response. A resource provider's
+// answer to one request.
+//
+// See mln_resource_response in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type ResourceResponse struct {
 	Status      ResourceResponseStatus
 	ErrorReason ResourceErrorReason
@@ -3557,9 +3626,7 @@ type ResourceResponse struct {
 func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_resource_response {
 	raw := C.mln_resource_response{}
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_modified = false
-	raw.has_expires = false
-	raw.has_retry_after = false
+	raw.fields = 0
 	raw.status = C.uint32_t(input.Status)
 	raw.error_reason = C.uint32_t(input.ErrorReason)
 	raw.bytes = (*C.uint8_t)(arena.bytes(input.Bytes))
@@ -3568,12 +3635,12 @@ func nativeResourceResponse(input ResourceResponse, arena *bindingArena) C.mln_r
 		raw.error_message = arena.cstring((*input.ErrorMessage))
 	}
 	raw.must_revalidate = C.bool(input.MustRevalidate)
-	bindingFlagged(&raw.has_modified, &raw.modified_unix_ms, input.ModifiedUnixMs, arena, bindingNumber[int64, C.int64_t])
-	bindingFlagged(&raw.has_expires, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
+	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, input.ModifiedUnixMs, arena, bindingNumber[int64, C.int64_t])
+	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, input.ExpiresUnixMs, arena, bindingNumber[int64, C.int64_t])
 	if input.Etag != nil {
 		raw.etag = arena.cstring((*input.Etag))
 	}
-	bindingFlagged(&raw.has_retry_after, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
+	bindingMasked(&raw.fields, C.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, input.RetryAfterUnixMs, arena, bindingNumber[int64, C.int64_t])
 	return raw
 }
 
@@ -3943,7 +4010,7 @@ func nativeScreenPoint(input ScreenPoint, arena *bindingArena) C.mln_screen_poin
 type SourceFeatureQueryOptions struct {
 	// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
 	SourceLayerIds []string
-	// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+	// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
 	Filter *[]byte
 }
 
@@ -3960,13 +4027,7 @@ func copySourceFeatureQueryOptions(raw C.mln_source_feature_query_options) Sourc
 			return result
 		}()
 	}
-	result.Filter = func() *[]byte {
-		if raw.filter == nil {
-			return nil
-		}
-		value := bindingBytes((*raw.filter).data, uint64((*raw.filter).size))
-		return &value
-	}()
+	result.Filter = bindingPresent(raw.fields&C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0, func() []byte { return bindingBytes(raw.filter.data, uint64(raw.filter.size)) })
 	return result
 }
 
@@ -3986,9 +4047,8 @@ func nativeSourceFeatureQueryOptions(input SourceFeatureQueryOptions, arena *bin
 		raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 	}
 	if input.Filter != nil {
-		pointer := (*C.mln_buffer_view)(arena.allocate(unsafe.Sizeof(*raw.filter)))
-		*pointer = C.mln_buffer_view{data: arena.bytes(*input.Filter), size: C.size_t(len(*input.Filter))}
-		raw.filter = pointer
+		raw.filter = C.mln_buffer_view{data: arena.bytes((*input.Filter)), size: C.size_t(len((*input.Filter)))}
+		raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER
 	}
 	return raw
 }
@@ -4011,11 +4071,13 @@ type StyleImageInfo struct {
 	// Interval counts for the stretchable axes.
 	StretchXCount uint
 	StretchYCount uint
-	// Content box, meaningful only when has_content is true.
+	// Content box, meaningful when fields contains CONTENT.
 	Content *ImageContent
-	// One of mln_style_image_text_fit, meaningful only when its flag is true.
+	// One of mln_style_image_text_fit, meaningful when fields contains
+	// TEXT_FIT_WIDTH.
 	TextFitWidth *StyleImageTextFit
-	// One of mln_style_image_text_fit, meaningful only when its flag is true.
+	// One of mln_style_image_text_fit, meaningful when fields contains
+	// TEXT_FIT_HEIGHT.
 	TextFitHeight *StyleImageTextFit
 	// Sprite pixel ratio. Defaults to 1.0.
 	PixelRatio float32
@@ -4030,9 +4092,9 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 	result.ByteLength = uint(raw.byte_length)
 	result.StretchXCount = uint(raw.stretch_x_count)
 	result.StretchYCount = uint(raw.stretch_y_count)
-	result.Content = bindingPresent(bool(raw.has_content), func() ImageContent { return copyImageContent(raw.content) })
-	result.TextFitWidth = bindingPresent(bool(raw.has_text_fit_width), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
-	result.TextFitHeight = bindingPresent(bool(raw.has_text_fit_height), func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
+	result.Content = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_CONTENT != 0, func() ImageContent { return copyImageContent(raw.content) })
+	result.TextFitWidth = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
+	result.TextFitHeight = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
 	result.PixelRatio = float32(raw.pixel_ratio)
 	result.Sdf = bool(raw.sdf)
 	return result
@@ -4041,18 +4103,16 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 func nativeStyleImageInfo(input StyleImageInfo, arena *bindingArena) C.mln_style_image_info {
 	raw := C.mln_style_image_info_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.has_content = false
-	raw.has_text_fit_width = false
-	raw.has_text_fit_height = false
+	raw.fields = 0
 	raw.width = C.uint32_t(input.Width)
 	raw.height = C.uint32_t(input.Height)
 	raw.stride = C.uint32_t(input.Stride)
 	raw.byte_length = C.size_t(input.ByteLength)
 	raw.stretch_x_count = C.size_t(input.StretchXCount)
 	raw.stretch_y_count = C.size_t(input.StretchYCount)
-	bindingFlagged(&raw.has_content, &raw.content, input.Content, arena, nativeImageContent)
-	bindingFlagged(&raw.has_text_fit_width, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	bindingFlagged(&raw.has_text_fit_height, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_INFO_CONTENT, &raw.content, input.Content, arena, nativeImageContent)
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
+	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
 	raw.pixel_ratio = C.float(input.PixelRatio)
 	raw.sdf = C.bool(input.Sdf)
 	return raw
@@ -4330,7 +4390,8 @@ type StyleSourceInfo struct {
 	IdSize uint
 	// Whether the source is marked volatile.
 	IsVolatile bool
-	// Attribution byte length, excluding any null terminator.
+	// Attribution byte length, excluding any null terminator, meaningful when
+	// fields contains ATTRIBUTION.
 	AttributionSize *uint
 	// URL byte length, meaningful when fields contains URL.
 	UrlSize  *uint
@@ -4350,7 +4411,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	result.Type = StyleSourceType(raw._type)
 	result.IdSize = uint(raw.id_size)
 	result.IsVolatile = bool(raw.is_volatile)
-	result.AttributionSize = bindingPresent(bool(raw.has_attribution), func() uint { return uint(raw.attribution_size) })
+	result.AttributionSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() uint { return uint(raw.attribution_size) })
 	result.UrlSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() uint { return uint(raw.url_size) })
 	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo {
 		return func() StyleSourceTileInfo {
@@ -4384,7 +4445,7 @@ type StyleSourceResult struct {
 func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 	var result StyleSourceResult
 	result.Info = copyStyleSourceInfo(raw.info)
-	result.Attribution = bindingPresent(bool(raw.info.has_attribution), func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
+	result.Attribution = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
 	result.Url = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
 	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
 		result.TileUrls = func() []string {

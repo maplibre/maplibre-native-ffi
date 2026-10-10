@@ -1167,8 +1167,17 @@ auto to_native_premultiplied_rgba8_image(
 auto style_image_info_from_native(const mln::style::Image& image)
   -> mln_style_image_info {
   const auto& pixels = image.getImage();
+  auto fields = std::uint32_t{0};
+  if (image.getContent().has_value()) fields |= MLN_STYLE_IMAGE_INFO_CONTENT;
+  if (image.getTextFitWidth().has_value()) {
+    fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;
+  }
+  if (image.getTextFitHeight().has_value()) {
+    fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;
+  }
   return mln_style_image_info{
     .size = sizeof(mln_style_image_info),
+    .fields = fields,
     .width = pixels.size.width,
     .height = pixels.size.height,
     .stride = static_cast<uint32_t>(pixels.stride()),
@@ -1193,10 +1202,7 @@ auto style_image_info_from_native(const mln::style::Image& image)
         ? from_native_text_fit(*image.getTextFitHeight())
         : static_cast<uint32_t>(MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK),
     .pixel_ratio = image.getPixelRatio(),
-    .sdf = image.isSdf(),
-    .has_content = image.getContent().has_value(),
-    .has_text_fit_width = image.getTextFitWidth().has_value(),
-    .has_text_fit_height = image.getTextFitHeight().has_value()
+    .sdf = image.isSdf()
   };
 }
 
@@ -1470,6 +1476,7 @@ auto style_image_options_default() noexcept -> mln_style_image_options {
 auto style_image_info_default() noexcept -> mln_style_image_info {
   return mln_style_image_info{
     .size = sizeof(mln_style_image_info),
+    .fields = 0,
     .width = 0,
     .height = 0,
     .stride = 0,
@@ -1480,10 +1487,7 @@ auto style_image_info_default() noexcept -> mln_style_image_info {
     .text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
     .pixel_ratio = 1.0F,
-    .sdf = false,
-    .has_content = false,
-    .has_text_fit_width = false,
-    .has_text_fit_height = false
+    .sdf = false
   };
 }
 
@@ -1612,8 +1616,10 @@ auto map_get_style_source_info(
   out_info->type = to_c_source_type(source->getType());
   out_info->id_size = source->getID().size();
   out_info->is_volatile = source->isVolatile();
-  out_info->has_attribution = attribution.has_value();
-  out_info->attribution_size = attribution ? attribution->size() : 0;
+  if (attribution) {
+    out_info->fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+    out_info->attribution_size = attribution->size();
+  }
 
   const auto url = source_url(*source);
   if (url) {

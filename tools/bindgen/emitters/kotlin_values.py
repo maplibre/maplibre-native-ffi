@@ -766,8 +766,6 @@ class Values:
     def mark(self, record, mask, bit):
         mask_field = self.field_plan(record, mask)
         address = self.at("target", record, mask)
-        if not bit:
-            return f"writeBool({address}, true)"
         typ = self.scalar(mask_field.value)[0]
         number = next(
             number
@@ -987,8 +985,6 @@ class Values:
     def present(self, base, record, mask, bit):
         mask_field = self.field_plan(record, mask)
         address = self.at(base, record, mask)
-        if not bit:
-            return f"readBool({address})"
         suffix, typ = self.accessor(mask_field.value)
         number = self.enum_number(bit)
         zero = literal(0, typ)

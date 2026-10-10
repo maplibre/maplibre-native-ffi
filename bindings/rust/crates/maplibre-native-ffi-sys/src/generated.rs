@@ -22,6 +22,8 @@ pub const MLN_BOUND_OPTION_UNBOUNDED: mln_bound_option_field = 32;
 pub type mln_camera_change_mode = u32;
 pub const MLN_CAMERA_CHANGE_MODE_IMMEDIATE: mln_camera_change_mode = 0;
 pub const MLN_CAMERA_CHANGE_MODE_ANIMATED: mln_camera_change_mode = 1;
+pub type mln_camera_delta_field = u32;
+pub const MLN_CAMERA_DELTA_FIELD_ANCHOR: mln_camera_delta_field = 1;
 pub type mln_camera_delta_kind = u32;
 pub const MLN_CAMERA_DELTA_MOVE: mln_camera_delta_kind = 0;
 pub const MLN_CAMERA_DELTA_SCALE: mln_camera_delta_kind = 1;
@@ -232,6 +234,7 @@ pub const MLN_RENDER_SESSION_STATE_TARGET_LOST: mln_render_session_state = 5;
 pub const MLN_RENDER_SESSION_STATE_ABANDONED: mln_render_session_state = 6;
 pub type mln_rendered_feature_query_option_field = u32;
 pub const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS: mln_rendered_feature_query_option_field = 1;
+pub const MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER: mln_rendered_feature_query_option_field = 2;
 pub type mln_rendered_query_geometry_type = u32;
 pub const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT: mln_rendered_query_geometry_type = 1;
 pub const MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX: mln_rendered_query_geometry_type = 2;
@@ -262,6 +265,14 @@ pub const MLN_RESOURCE_PRIORITY_LOW: mln_resource_priority = 1;
 pub type mln_resource_provider_decision = u32;
 pub const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH: mln_resource_provider_decision = 0;
 pub const MLN_RESOURCE_PROVIDER_DECISION_HANDLE: mln_resource_provider_decision = 1;
+pub type mln_resource_request_field = u32;
+pub const MLN_RESOURCE_REQUEST_RANGE: mln_resource_request_field = 1;
+pub const MLN_RESOURCE_REQUEST_PRIOR_MODIFIED: mln_resource_request_field = 2;
+pub const MLN_RESOURCE_REQUEST_PRIOR_EXPIRES: mln_resource_request_field = 4;
+pub type mln_resource_response_field = u32;
+pub const MLN_RESOURCE_RESPONSE_MODIFIED: mln_resource_response_field = 1;
+pub const MLN_RESOURCE_RESPONSE_EXPIRES: mln_resource_response_field = 2;
+pub const MLN_RESOURCE_RESPONSE_RETRY_AFTER: mln_resource_response_field = 4;
 pub type mln_resource_response_status = u32;
 pub const MLN_RESOURCE_RESPONSE_STATUS_OK: mln_resource_response_status = 0;
 pub const MLN_RESOURCE_RESPONSE_STATUS_ERROR: mln_resource_response_status = 1;
@@ -341,6 +352,7 @@ pub const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED: mln_runtime_event_ty
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
+pub const MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER: mln_source_feature_query_option_field = 2;
 pub type mln_status = i32;
 pub const MLN_STATUS_OK: mln_status = 0;
 pub const MLN_STATUS_INVALID_ARGUMENT: mln_status = -1;
@@ -353,6 +365,10 @@ pub const MLN_STATUS_BUSY: mln_status = -7;
 pub const MLN_STATUS_TARGET_LOST: mln_status = -8;
 pub const MLN_STATUS_NOT_READY: mln_status = -9;
 pub const MLN_STATUS_NOT_FOUND: mln_status = -10;
+pub type mln_style_image_info_field = u32;
+pub const MLN_STYLE_IMAGE_INFO_CONTENT: mln_style_image_info_field = 1;
+pub const MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH: mln_style_image_info_field = 2;
+pub const MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT: mln_style_image_info_field = 4;
 pub type mln_style_image_option_field = u32;
 pub const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO: mln_style_image_option_field = 1;
 pub const MLN_STYLE_IMAGE_OPTION_SDF: mln_style_image_option_field = 2;
@@ -378,6 +394,7 @@ pub const MLN_STYLE_SOURCE_INFO_BOUNDS: mln_style_source_info_field = 4;
 pub const MLN_STYLE_SOURCE_INFO_TILE_SIZE: mln_style_source_info_field = 8;
 pub const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING: mln_style_source_info_field = 16;
 pub const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING: mln_style_source_info_field = 32;
+pub const MLN_STYLE_SOURCE_INFO_ATTRIBUTION: mln_style_source_info_field = 64;
 pub type mln_style_source_type = u32;
 pub const MLN_STYLE_SOURCE_TYPE_UNKNOWN: mln_style_source_type = 0;
 pub const MLN_STYLE_SOURCE_TYPE_VECTOR: mln_style_source_type = 1;
@@ -460,10 +477,10 @@ pub struct mln_buffer_view {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_camera_delta {
     pub size: u32,
+    pub fields: u32,
     pub kind: u32,
     pub offset: mln_screen_point,
     pub amount: f64,
-    pub has_anchor: bool,
     pub anchor: mln_screen_point,
     pub animation: mln_animation_options,
 }
@@ -1040,7 +1057,7 @@ pub struct mln_rendered_feature_query_options {
     pub fields: u32,
     pub layer_ids: *const mln_buffer_view,
     pub layer_id_count: usize,
-    pub filter: *const mln_buffer_view,
+    pub filter: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -1077,6 +1094,7 @@ pub struct mln_resource_provider {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_request {
     pub size: u32,
+    pub fields: u32,
     pub requested_url: *const std::ffi::c_char,
     pub resolved_url: *const std::ffi::c_char,
     pub kind: u32,
@@ -1084,12 +1102,9 @@ pub struct mln_resource_request {
     pub priority: u32,
     pub usage: u32,
     pub storage_policy: u32,
-    pub has_range: bool,
     pub range_start: u64,
     pub range_end: u64,
-    pub has_prior_modified: bool,
     pub prior_modified_unix_ms: i64,
-    pub has_prior_expires: bool,
     pub prior_expires_unix_ms: i64,
     pub prior_etag: *const std::ffi::c_char,
     pub prior_data: *const u8,
@@ -1099,18 +1114,16 @@ pub struct mln_resource_request {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_resource_response {
     pub size: u32,
+    pub fields: u32,
     pub status: u32,
     pub error_reason: u32,
     pub bytes: *const u8,
     pub byte_count: usize,
     pub error_message: *const std::ffi::c_char,
     pub must_revalidate: bool,
-    pub has_modified: bool,
     pub modified_unix_ms: i64,
-    pub has_expires: bool,
     pub expires_unix_ms: i64,
     pub etag: *const std::ffi::c_char,
-    pub has_retry_after: bool,
     pub retry_after_unix_ms: i64,
 }
 #[repr(C)]
@@ -1228,12 +1241,13 @@ pub struct mln_source_feature_query_options {
     pub fields: u32,
     pub source_layer_ids: *const mln_buffer_view,
     pub source_layer_id_count: usize,
-    pub filter: *const mln_buffer_view,
+    pub filter: mln_buffer_view,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_info {
     pub size: u32,
+    pub fields: u32,
     pub width: u32,
     pub height: u32,
     pub stride: u32,
@@ -1245,9 +1259,6 @@ pub struct mln_style_image_info {
     pub text_fit_height: u32,
     pub pixel_ratio: f32,
     pub sdf: bool,
-    pub has_content: bool,
-    pub has_text_fit_width: bool,
-    pub has_text_fit_height: bool,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1322,7 +1333,6 @@ pub struct mln_style_source_info {
     pub fields: u32,
     pub id_size: usize,
     pub is_volatile: bool,
-    pub has_attribution: bool,
     pub attribution_size: usize,
     pub url_size: usize,
     pub tile_count: usize,

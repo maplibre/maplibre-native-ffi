@@ -222,12 +222,12 @@ impl ToNative<sys::mln_camera_delta> for CameraDelta {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera_delta> {
         let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
         raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
-        raw.has_anchor = false;
+        raw.fields = 0;
         raw.kind = to_native(&self.kind, arena)?;
         raw.offset = to_native(&self.offset, arena)?;
         raw.amount = self.amount;
         if let Some(item) = &self.anchor {
-            raw.has_anchor = true;
+            raw.fields |= sys::MLN_CAMERA_DELTA_FIELD_ANCHOR;
             raw.anchor = to_native(&*item, arena)?;
         }
         raw.animation = to_native(&self.animation, arena)?;
@@ -240,10 +240,22 @@ impl FromNative<sys::mln_camera_delta> for CameraDelta {
             kind: unsafe { from_native(raw.kind) }?,
             offset: unsafe { from_native(raw.offset) }?,
             amount: raw.amount,
-            anchor: unsafe { convert::present(raw.has_anchor, true, raw.anchor) }?,
+            anchor: unsafe {
+                convert::present(raw.fields, sys::MLN_CAMERA_DELTA_FIELD_ANCHOR, raw.anchor)
+            }?,
             animation: unsafe { from_native(raw.animation) }?,
         })
     }
+}
+
+native_flags! {
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub struct CameraDeltaField: u32 {
+    const ANCHOR = 1;
+}
 }
 
 native_enum! {
@@ -3769,7 +3781,8 @@ native_flags! {
 /// See `mln_rendered_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct RenderedFeatureQueryOptionField: u32 {
-    const IDS = 1;
+    const LAYER_IDS = 1;
+    const FILTER = 2;
 }
 }
 
@@ -3781,7 +3794,7 @@ pub struct RenderedFeatureQueryOptionField: u32 {
 pub struct RenderedFeatureQueryOptions {
     /// Optional style layer IDs. When absent, all rendered layers are queried.
     pub layer_ids: Option<Vec<String>>,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for RenderedFeatureQueryOptions {
@@ -3801,7 +3814,10 @@ impl ToNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQueryO
         }
         raw.layer_id_count =
             convert::count(self.layer_ids.as_ref().map_or(0, |items| items.len()))?;
-        raw.filter = convert::optional_reference(self.filter.as_ref(), arena)?;
+        if let Some(item) = &self.filter {
+            raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -3813,7 +3829,13 @@ impl FromNative<sys::mln_rendered_feature_query_options> for RenderedFeatureQuer
             } else {
                 None
             },
-            filter: unsafe { convert::copy_optional_reference(raw.filter) }?,
+            filter: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER,
+                    raw.filter,
+                )
+            }?,
         })
     }
 }
@@ -4133,7 +4155,7 @@ pub struct ResourceRequest {
 impl FromNative<sys::mln_resource_request> for ResourceRequest {
     unsafe fn from_native(raw: sys::mln_resource_request) -> Result<Self> {
         Ok(Self {
-            range: if raw.has_range {
+            range: if raw.fields & sys::MLN_RESOURCE_REQUEST_RANGE != 0 {
                 Some(ResourceRequestRange {
                     range_start: raw.range_start,
                     range_end: raw.range_end,
@@ -4148,12 +4170,29 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
             priority: unsafe { from_native(raw.priority) }?,
             usage: unsafe { from_native(raw.usage) }?,
             storage_policy: unsafe { from_native(raw.storage_policy) }?,
-            prior_modified_unix_ms: (raw.has_prior_modified).then_some(raw.prior_modified_unix_ms),
-            prior_expires_unix_ms: (raw.has_prior_expires).then_some(raw.prior_expires_unix_ms),
+            prior_modified_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0)
+                .then_some(raw.prior_modified_unix_ms),
+            prior_expires_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0)
+                .then_some(raw.prior_expires_unix_ms),
             prior_etag: unsafe { from_native(raw.prior_etag) }?,
             prior_data: unsafe { convert::counted(raw.prior_data, raw.prior_data_size) }?,
         })
     }
+}
+
+native_flags! {
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct ResourceRequestField: u32 {
+    /// The request asks for the inclusive byte range range_start to range_end.
+    const RANGE = 1;
+    /// The cached copy being revalidated carries a modification time.
+    const PRIOR_MODIFIED = 2;
+    /// The cached copy being revalidated carries an expiration time.
+    const PRIOR_EXPIRES = 4;
+}
 }
 
 /// A resource request that a resource provider handles.
@@ -4230,6 +4269,10 @@ impl ResourceRequestHandle {
     }
 }
 
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceResponse {
     pub status: ResourceResponseStatus,
@@ -4247,9 +4290,7 @@ impl ToNative<sys::mln_resource_response> for ResourceResponse {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_resource_response> {
         let mut raw: sys::mln_resource_response = unsafe { std::mem::zeroed() };
         raw.size = std::mem::size_of::<sys::mln_resource_response>() as _;
-        raw.has_modified = false;
-        raw.has_expires = false;
-        raw.has_retry_after = false;
+        raw.fields = 0;
         raw.status = to_native(&self.status, arena)?;
         raw.error_reason = to_native(&self.error_reason, arena)?;
         raw.bytes = self.bytes.as_ptr().cast();
@@ -4257,20 +4298,35 @@ impl ToNative<sys::mln_resource_response> for ResourceResponse {
         raw.error_message = to_native(&self.error_message, arena)?;
         raw.must_revalidate = self.must_revalidate;
         if let Some(item) = &self.modified_unix_ms {
-            raw.has_modified = true;
+            raw.fields |= sys::MLN_RESOURCE_RESPONSE_MODIFIED;
             raw.modified_unix_ms = *item;
         }
         if let Some(item) = &self.expires_unix_ms {
-            raw.has_expires = true;
+            raw.fields |= sys::MLN_RESOURCE_RESPONSE_EXPIRES;
             raw.expires_unix_ms = *item;
         }
         raw.etag = to_native(&self.etag, arena)?;
         if let Some(item) = &self.retry_after_unix_ms {
-            raw.has_retry_after = true;
+            raw.fields |= sys::MLN_RESOURCE_RESPONSE_RETRY_AFTER;
             raw.retry_after_unix_ms = *item;
         }
         Ok(raw)
     }
+}
+
+native_flags! {
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub struct ResourceResponseField: u32 {
+    /// The response carries a modification time.
+    const MODIFIED = 1;
+    /// The response carries an expiration time.
+    const EXPIRES = 2;
+    /// An ERROR response carries the earliest time to retry the request.
+    const RETRY_AFTER = 4;
+}
 }
 
 native_enum! {
@@ -4936,7 +4992,8 @@ native_flags! {
 /// See `mln_source_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub struct SourceFeatureQueryOptionField: u32 {
-    const IDS = 1;
+    const SOURCE_LAYER_IDS = 1;
+    const FILTER = 2;
 }
 }
 
@@ -4949,7 +5006,7 @@ pub struct SourceFeatureQueryOptions {
     /// Optional source-layer IDs. Required by vector sources; ignored by
     /// GeoJSON.
     pub source_layer_ids: Option<Vec<String>>,
-    /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+    /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
     pub filter: Option<Vec<u8>>,
 }
 impl Default for SourceFeatureQueryOptions {
@@ -4972,7 +5029,10 @@ impl ToNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOptio
                 .as_ref()
                 .map_or(0, |items| items.len()),
         )?;
-        raw.filter = convert::optional_reference(self.filter.as_ref(), arena)?;
+        if let Some(item) = &self.filter {
+            raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = to_native(&*item, arena)?;
+        }
         Ok(raw)
     }
 }
@@ -4988,7 +5048,13 @@ impl FromNative<sys::mln_source_feature_query_options> for SourceFeatureQueryOpt
             } else {
                 None
             },
-            filter: unsafe { convert::copy_optional_reference(raw.filter) }?,
+            filter: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER,
+                    raw.filter,
+                )
+            }?,
         })
     }
 }
@@ -5037,13 +5103,13 @@ pub struct StyleImageInfo {
     /// Interval counts for the stretchable axes.
     pub stretch_x_count: usize,
     pub stretch_y_count: usize,
-    /// Content box, meaningful only when has_content is true.
+    /// Content box, meaningful when fields contains CONTENT.
     pub content: Option<ImageContent>,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_WIDTH.
     pub text_fit_width: Option<StyleImageTextFit>,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_HEIGHT.
     pub text_fit_height: Option<StyleImageTextFit>,
     /// Sprite pixel ratio. Defaults to 1.0.
     pub pixel_ratio: f32,
@@ -5063,17 +5129,42 @@ impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
             byte_length: raw.byte_length,
             stretch_x_count: raw.stretch_x_count,
             stretch_y_count: raw.stretch_y_count,
-            content: unsafe { convert::present(raw.has_content, true, raw.content) }?,
+            content: unsafe {
+                convert::present(raw.fields, sys::MLN_STYLE_IMAGE_INFO_CONTENT, raw.content)
+            }?,
             text_fit_width: unsafe {
-                convert::present(raw.has_text_fit_width, true, raw.text_fit_width)
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH,
+                    raw.text_fit_width,
+                )
             }?,
             text_fit_height: unsafe {
-                convert::present(raw.has_text_fit_height, true, raw.text_fit_height)
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
+                    raw.text_fit_height,
+                )
             }?,
             pixel_ratio: raw.pixel_ratio,
             sdf: raw.sdf,
         })
     }
+}
+
+native_flags! {
+/// Field mask values for `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub struct StyleImageInfoField: u32 {
+    /// The image declares a content box.
+    const CONTENT = 1;
+    /// The image declares a horizontal text-fit mode.
+    const TEXT_FIT_WIDTH = 2;
+    /// The image declares a vertical text-fit mode.
+    const TEXT_FIT_HEIGHT = 4;
+}
 }
 
 native_flags! {
@@ -5356,7 +5447,8 @@ pub struct StyleSourceInfo {
     pub id_size: usize,
     /// Whether the source is marked volatile.
     pub is_volatile: bool,
-    /// Attribution byte length, excluding any null terminator.
+    /// Attribution byte length, excluding any null terminator, meaningful when
+    /// fields contains ATTRIBUTION.
     pub attribution_size: Option<usize>,
     /// URL byte length, meaningful when fields contains URL.
     pub url_size: Option<usize>,
@@ -5385,7 +5477,8 @@ impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
             r#type: unsafe { from_native(raw.type_) }?,
             id_size: raw.id_size,
             is_volatile: raw.is_volatile,
-            attribution_size: (raw.has_attribution).then_some(raw.attribution_size),
+            attribution_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0)
+                .then_some(raw.attribution_size),
             url_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0).then_some(raw.url_size),
             bounds: unsafe {
                 convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_BOUNDS, raw.bounds)
@@ -5428,6 +5521,8 @@ pub struct StyleSourceInfoField: u32 {
     const VECTOR_ENCODING = 16;
     /// The source exposes a DEM raster encoding.
     const RASTER_ENCODING = 32;
+    /// The source declares an attribution string.
+    const ATTRIBUTION = 64;
 }
 }
 
@@ -5447,7 +5542,11 @@ impl FromNative<sys::mln_style_source_result> for StyleSourceResult {
         Ok(Self {
             info: unsafe { from_native(raw.info) }?,
             attribution: unsafe {
-                convert::present(raw.info.has_attribution, true, raw.attribution)
+                convert::present(
+                    raw.info.fields,
+                    sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION,
+                    raw.attribution,
+                )
             }?,
             url: unsafe {
                 convert::present(raw.info.fields, sys::MLN_STYLE_SOURCE_INFO_URL, raw.url)

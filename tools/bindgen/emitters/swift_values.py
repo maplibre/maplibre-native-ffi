@@ -158,9 +158,7 @@ class Values:
         fields, init, assignments, captures, materialize = [], [], [], [], []
         for field in value.fields:
             if field.role == "presence_mask":
-                materialize.append(
-                    f"    raw.{field.name} = {'false' if field.value.ctype.canonical in {'_Bool', 'bool'} else '0'}"
-                )
+                materialize.append(f"    raw.{field.name} = 0")
         for flag in value.mask_flags:
             local = identifier(camel(flag.member))
             fields.append(
@@ -226,10 +224,8 @@ class Values:
             capture = self.copy(field.value, raw)
             if optional:
                 mask, bit = identifier(field.presence.mask), field.presence.bit
-                present = f"raw.{mask} & {bit}.rawValue != 0" if bit else f"raw.{mask}"
-                set_presence = (
-                    f"raw.{mask} |= {bit}.rawValue" if bit else f"raw.{mask} = true"
-                )
+                present = f"raw.{mask} & {bit}.rawValue != 0"
+                set_presence = f"raw.{mask} |= {bit}.rawValue"
                 captures.append(f"    self.{local} = {present} ? {capture} : nil")
                 materialize.append(
                     f"    if let item = self.{local} {{ {set_presence}; {raw} = {self.native(field.value, 'item')} }}"

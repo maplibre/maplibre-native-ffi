@@ -212,8 +212,8 @@ int main() {
   char url[] = "retained URL";
   mln_buffer_view views[] = {{url, sizeof(url) - 1}, {url, 3}};
   mln_style_source_result source{};
-  source.info.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
-  source.info.has_attribution = true;
+  source.info.fields =
+    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
   source.tile_urls = views;
   source.tile_url_count = 2;
   source.attribution = {url, 5};

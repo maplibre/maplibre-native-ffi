@@ -21,6 +21,8 @@ from .schema import validate
 
 @dataclass(frozen=True)
 class Presence:
+    # A field behind a presence mask names the mask and its bit, which the
+    # schema requires together; a union member names its tag and variant.
     mask: str | None = None
     bit: str | None = None
     tag: str | None = None
@@ -82,11 +84,11 @@ class DecisionPlan:
 @dataclass(frozen=True)
 class PresenceGroup:
     mask: str
-    bit: str | None
+    bit: str
     fields: tuple[str, ...]
     type: str | None = None
-    # The group's public member name, from what its presence bit or boolean
-    # mask guards; see `presence_member`.
+    # The group's public member name, from its presence bit; see
+    # `presence_member`.
     member: str = ""
 
 
@@ -522,15 +524,10 @@ def enum_member_prefix(constants) -> str:
     return os.path.commonprefix(names).rsplit("_", 1)[0] + "_" if names else ""
 
 
-def presence_member(group_bit: str | None, mask: str, enum_constants) -> str:
-    """Name a presence group after what its mask guards.
-
-    A bit group takes its bit constant without the prefix that its enum's
-    constants share; a boolean mask names its group `has_<member>`.
-    """
-    if group_bit:
-        return group_bit.removeprefix(enum_member_prefix(enum_constants)).lower()
-    return mask.rsplit(".", 1)[-1].removeprefix("has_")
+def presence_member(group_bit: str, enum_constants) -> str:
+    """Name a presence group after its bit constant, without the prefix that
+    its enum's constants share."""
+    return group_bit.removeprefix(enum_member_prefix(enum_constants)).lower()
 
 
 SCALAR_CANONICAL_TYPES = frozenset(
@@ -632,7 +629,7 @@ class Binder:
             and is_completion(release.parameters[1].type)
         )
 
-    def enum_constants(self, constant: str | None) -> tuple[str, ...]:
+    def enum_constants(self, constant: str) -> tuple[str, ...]:
         """The constants of the enum that declares `constant`."""
         for enum in self.api.enums:
             if any(item.name == constant for item in enum.values):
@@ -907,7 +904,7 @@ class Binder:
                                 ),
                                 None,
                             ),
-                            presence_member(bit, mask, self.enum_constants(bit)),
+                            presence_member(bit, self.enum_constants(bit)),
                         )
                         for mask, bit in dict.fromkeys(
                             (member.presence.mask, member.presence.bit)

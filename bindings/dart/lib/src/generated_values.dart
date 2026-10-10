@@ -65,6 +65,17 @@ final class CameraChangeMode extends _Enum {
   static const animated = CameraChangeMode.fromRawValue(1);
 }
 
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraDeltaField extends _Flags<CameraDeltaField> {
+  const CameraDeltaField.fromRawValue(super.rawValue);
+  static const anchor = CameraDeltaField.fromRawValue(1);
+  @override
+  CameraDeltaField _of(int rawValue) => CameraDeltaField.fromRawValue(rawValue);
+}
+
 /// Relative camera operation carried by `mln_camera_delta`.
 ///
 /// See `mln_camera_delta_kind` in the
@@ -670,7 +681,8 @@ final class RenderSessionState extends _Enum {
 final class RenderedFeatureQueryOptionField
     extends _Flags<RenderedFeatureQueryOptionField> {
   const RenderedFeatureQueryOptionField.fromRawValue(super.rawValue);
-  static const ids = RenderedFeatureQueryOptionField.fromRawValue(1);
+  static const layerIds = RenderedFeatureQueryOptionField.fromRawValue(1);
+  static const filter = RenderedFeatureQueryOptionField.fromRawValue(2);
   @override
   RenderedFeatureQueryOptionField _of(int rawValue) =>
       RenderedFeatureQueryOptionField.fromRawValue(rawValue);
@@ -726,6 +738,46 @@ final class ResourceProviderDecision extends _Enum {
   const ResourceProviderDecision.fromRawValue(super.rawValue);
   static const passThrough = ResourceProviderDecision.fromRawValue(0);
   static const handle = ResourceProviderDecision.fromRawValue(1);
+}
+
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRequestField extends _Flags<ResourceRequestField> {
+  const ResourceRequestField.fromRawValue(super.rawValue);
+
+  /// The request asks for the inclusive byte range range_start to range_end.
+  static const range = ResourceRequestField.fromRawValue(1);
+
+  /// The cached copy being revalidated carries a modification time.
+  static const priorModified = ResourceRequestField.fromRawValue(2);
+
+  /// The cached copy being revalidated carries an expiration time.
+  static const priorExpires = ResourceRequestField.fromRawValue(4);
+  @override
+  ResourceRequestField _of(int rawValue) =>
+      ResourceRequestField.fromRawValue(rawValue);
+}
+
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceResponseField extends _Flags<ResourceResponseField> {
+  const ResourceResponseField.fromRawValue(super.rawValue);
+
+  /// The response carries a modification time.
+  static const modified = ResourceResponseField.fromRawValue(1);
+
+  /// The response carries an expiration time.
+  static const expires = ResourceResponseField.fromRawValue(2);
+
+  /// An ERROR response carries the earliest time to retry the request.
+  static const retryAfter = ResourceResponseField.fromRawValue(4);
+  @override
+  ResourceResponseField _of(int rawValue) =>
+      ResourceResponseField.fromRawValue(rawValue);
 }
 
 /// How a resource provider answered a request.
@@ -871,7 +923,8 @@ final class RuntimeEventType extends _Enum {
 final class SourceFeatureQueryOptionField
     extends _Flags<SourceFeatureQueryOptionField> {
   const SourceFeatureQueryOptionField.fromRawValue(super.rawValue);
-  static const ids = SourceFeatureQueryOptionField.fromRawValue(1);
+  static const sourceLayerIds = SourceFeatureQueryOptionField.fromRawValue(1);
+  static const filter = SourceFeatureQueryOptionField.fromRawValue(2);
   @override
   SourceFeatureQueryOptionField _of(int rawValue) =>
       SourceFeatureQueryOptionField.fromRawValue(rawValue);
@@ -914,6 +967,26 @@ final class Status extends _Enum {
 
   /// A command or operation named an ID with no live object behind it.
   static const notFound = Status.fromRawValue(-10);
+}
+
+/// Field mask values for `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+final class StyleImageInfoField extends _Flags<StyleImageInfoField> {
+  const StyleImageInfoField.fromRawValue(super.rawValue);
+
+  /// The image declares a content box.
+  static const content = StyleImageInfoField.fromRawValue(1);
+
+  /// The image declares a horizontal text-fit mode.
+  static const textFitWidth = StyleImageInfoField.fromRawValue(2);
+
+  /// The image declares a vertical text-fit mode.
+  static const textFitHeight = StyleImageInfoField.fromRawValue(4);
+  @override
+  StyleImageInfoField _of(int rawValue) =>
+      StyleImageInfoField.fromRawValue(rawValue);
 }
 
 /// Field mask values for `mln_style_image_options`.
@@ -989,6 +1062,9 @@ final class StyleSourceInfoField extends _Flags<StyleSourceInfoField> {
 
   /// The source exposes a DEM raster encoding.
   static const rasterEncoding = StyleSourceInfoField.fromRawValue(32);
+
+  /// The source declares an attribution string.
+  static const attribution = StyleSourceInfoField.fromRawValue(64);
   @override
   StyleSourceInfoField _of(int rawValue) =>
       StyleSourceInfoField.fromRawValue(rawValue);
@@ -2510,13 +2586,15 @@ final class StyleImageInfo extends _Value {
   final int stretchXCount;
   final int stretchYCount;
 
-  /// Content box, meaningful only when has_content is true.
+  /// Content box, meaningful when fields contains CONTENT.
   final ImageContent? content;
 
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// One of `mln_style_image_text_fit`, meaningful when fields contains
+  /// TEXT_FIT_WIDTH.
   final StyleImageTextFit? textFitWidth;
 
-  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
+  /// One of `mln_style_image_text_fit`, meaningful when fields contains
+  /// TEXT_FIT_HEIGHT.
   final StyleImageTextFit? textFitHeight;
 
   /// Sprite pixel ratio. Defaults to 1.0.
@@ -2657,7 +2735,8 @@ final class StyleSourceInfo extends _Value {
   /// Whether the source is marked volatile.
   final bool isVolatile;
 
-  /// Attribution byte length, excluding any null terminator.
+  /// Attribution byte length, excluding any null terminator, meaningful when
+  /// fields contains ATTRIBUTION.
   final int? attributionSize;
 
   /// URL byte length, meaningful when fields contains URL.
@@ -3582,7 +3661,7 @@ final class RenderedFeatureQueryOptions extends _Value {
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   final List<String>? layerIds;
 
-  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   final Uint8List? filter;
 
   @override
@@ -3630,13 +3709,17 @@ final class SourceFeatureQueryOptions extends _Value {
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   final List<String>? sourceLayerIds;
 
-  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   final Uint8List? filter;
 
   @override
   List<Object?> get _members => [sourceLayerIds, filter];
 }
 
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class ResourceResponse extends _Value {
   ResourceResponse({
     this.status = const ResourceResponseStatus.fromRawValue(0),

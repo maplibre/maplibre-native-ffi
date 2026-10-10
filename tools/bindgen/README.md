@@ -74,6 +74,14 @@ Each declaration follows these rules, which every binding relies on:
 - A versioned struct embedded by value cannot grow within an epoch, because
   growing it moves every later member of its parent. Native validates the size
   of both, as it does for the `camera` member of `mln_camera_update`.
+- An optional scalar or aggregate member of a struct names its bit in the
+  struct's `fields` mask, a `uint32_t` whose `enum=` names a `kind=bitmask`
+  enum: `MLN_BINDING("mask=fields;bit=<constant>")`. Each optional member or
+  group has its own bit. Native treats an unknown bit in an input mask as
+  invalid. A pointer-shaped value, such as a callback, an owned handle, a
+  nul-terminated string, or a by-pointer parameter, is optional through
+  `nullable=true`. A buffer-view parameter, result, or member that treats an
+  empty view as absent is `optional=empty`.
 - A reserved member is `kind=reserved`, and every writer sets it to zero.
 - A handle output parameter owns the handle that it receives, and `*out_handle`
   must equal `MLN_HANDLE_NULL` on entry. Every other pointer is borrowed for the
@@ -223,7 +231,7 @@ case and escapes keywords:
 | `OperationPlan.member`  | The name without its receiver's prefix, or else without `mln_`                              |
 | `HandlePlan.stem`       | The handle's operation prefix without `mln_`, which owner type names extend                 |
 | `BorrowedViewPlan.stem` | The view operation's member without a leading `get_`, read as `with_<stem>`                 |
-| `PresenceGroup.member`  | A bit without its enum's shared prefix, or a boolean mask without `has_`                    |
+| `PresenceGroup.member`  | A bit without its enum's shared prefix                                                      |
 | `MaskFlag.member`       | The flag constant without its enum's shared prefix                                          |
 | `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
 | `OperationPlan.status`  | Whether the function returns the status enum                                                |

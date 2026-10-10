@@ -52,10 +52,10 @@ internal unsafe struct mln_buffer_view
 internal unsafe struct mln_camera_delta
 {
     public uint size;
+    public mln_camera_delta_field fields;
     public uint kind;
     public mln_screen_point offset;
     public double amount;
-    public byte has_anchor;
     public mln_screen_point anchor;
     public mln_animation_options animation;
 }
@@ -653,7 +653,7 @@ internal unsafe struct mln_rendered_feature_query_options
     public mln_rendered_feature_query_option_field fields;
     public mln_buffer_view* layer_ids;
     public nuint layer_id_count;
-    public mln_buffer_view* filter;
+    public mln_buffer_view filter;
 }
 
 internal unsafe struct mln_rendered_query_geometry
@@ -700,6 +700,7 @@ internal unsafe struct mln_resource_provider
 internal unsafe struct mln_resource_request
 {
     public uint size;
+    public mln_resource_request_field fields;
     public sbyte* requested_url;
     public sbyte* resolved_url;
     public uint kind;
@@ -707,12 +708,9 @@ internal unsafe struct mln_resource_request
     public uint priority;
     public uint usage;
     public uint storage_policy;
-    public byte has_range;
     public ulong range_start;
     public ulong range_end;
-    public byte has_prior_modified;
     public long prior_modified_unix_ms;
-    public byte has_prior_expires;
     public long prior_expires_unix_ms;
     public sbyte* prior_etag;
     public byte* prior_data;
@@ -722,18 +720,16 @@ internal unsafe struct mln_resource_request
 internal unsafe struct mln_resource_response
 {
     public uint size;
+    public mln_resource_response_field fields;
     public uint status;
     public uint error_reason;
     public byte* bytes;
     public nuint byte_count;
     public sbyte* error_message;
     public byte must_revalidate;
-    public byte has_modified;
     public long modified_unix_ms;
-    public byte has_expires;
     public long expires_unix_ms;
     public sbyte* etag;
-    public byte has_retry_after;
     public long retry_after_unix_ms;
 }
 
@@ -870,12 +866,13 @@ internal unsafe struct mln_source_feature_query_options
     public mln_source_feature_query_option_field fields;
     public mln_buffer_view* source_layer_ids;
     public nuint source_layer_id_count;
-    public mln_buffer_view* filter;
+    public mln_buffer_view filter;
 }
 
 internal unsafe struct mln_style_image_info
 {
     public uint size;
+    public mln_style_image_info_field fields;
     public uint width;
     public uint height;
     public uint stride;
@@ -887,9 +884,6 @@ internal unsafe struct mln_style_image_info
     public uint text_fit_height;
     public float pixel_ratio;
     public byte sdf;
-    public byte has_content;
-    public byte has_text_fit_width;
-    public byte has_text_fit_height;
 }
 
 internal unsafe struct mln_style_image_options
@@ -964,7 +958,6 @@ internal unsafe struct mln_style_source_info
     public mln_style_source_info_field fields;
     public nuint id_size;
     public byte is_volatile;
-    public byte has_attribution;
     public nuint attribution_size;
     public nuint url_size;
     public nuint tile_count;
@@ -1229,6 +1222,11 @@ internal enum mln_camera_change_mode : uint
 {
     MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
     MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
+}
+
+internal enum mln_camera_delta_field : uint
+{
+    MLN_CAMERA_DELTA_FIELD_ANCHOR = 1,
 }
 
 internal enum mln_camera_delta_kind : uint
@@ -1557,6 +1555,7 @@ internal enum mln_render_session_state : uint
 internal enum mln_rendered_feature_query_option_field : uint
 {
     MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1,
+    MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 2,
 }
 
 internal enum mln_rendered_query_geometry_type : uint
@@ -1605,6 +1604,20 @@ internal enum mln_resource_provider_decision : uint
 {
     MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0,
     MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1,
+}
+
+internal enum mln_resource_request_field : uint
+{
+    MLN_RESOURCE_REQUEST_RANGE = 1,
+    MLN_RESOURCE_REQUEST_PRIOR_MODIFIED = 2,
+    MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 4,
+}
+
+internal enum mln_resource_response_field : uint
+{
+    MLN_RESOURCE_RESPONSE_MODIFIED = 1,
+    MLN_RESOURCE_RESPONSE_EXPIRES = 2,
+    MLN_RESOURCE_RESPONSE_RETRY_AFTER = 4,
 }
 
 internal enum mln_resource_response_status : uint
@@ -1704,6 +1717,7 @@ internal enum mln_runtime_event_type : uint
 internal enum mln_source_feature_query_option_field : uint
 {
     MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1,
+    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 2,
 }
 
 internal enum mln_status : int
@@ -1719,6 +1733,13 @@ internal enum mln_status : int
     MLN_STATUS_TARGET_LOST = -8,
     MLN_STATUS_NOT_READY = -9,
     MLN_STATUS_NOT_FOUND = -10,
+}
+
+internal enum mln_style_image_info_field : uint
+{
+    MLN_STYLE_IMAGE_INFO_CONTENT = 1,
+    MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 2,
+    MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 4,
 }
 
 internal enum mln_style_image_option_field : uint
@@ -1759,6 +1780,7 @@ internal enum mln_style_source_info_field : uint
     MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8,
     MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16,
     MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32,
+    MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 64,
 }
 
 internal enum mln_style_source_type : uint

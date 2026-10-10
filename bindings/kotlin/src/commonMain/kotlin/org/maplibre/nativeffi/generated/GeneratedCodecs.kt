@@ -263,12 +263,12 @@ internal fun NativeArena.writeStyleTileSourceOptions(value: StyleTileSourceOptio
 
 internal fun NativeArena.putCameraDelta(target: Long, value: CameraDelta) {
   C.mln_camera_delta_default(target)
-  writeBool(target + 32, false)
-  writeU32(target + 4, value.kind.rawValue)
-  putScreenPoint(target + 8, value.offset)
-  writeF64(target + 24, value.amount)
+  writeU32(target + 4, 0u)
+  writeU32(target + 8, value.kind.rawValue)
+  putScreenPoint(target + 16, value.offset)
+  writeF64(target + 32, value.amount)
   value.anchor?.let {
-    writeBool(target + 32, true)
+    markPresent(target + 4, 1u)
     putScreenPoint(target + 40, it)
   }
   putAnimationOptions(target + 56, value.animation)
@@ -865,12 +865,15 @@ internal fun NativeArena.putRenderedFeatureQueryOptions(
     )
     writeSize(target + w(12, 16), it.size.toULong())
   }
-  writeAddress(target + w(16, 24), value.filter?.let { view(it) } ?: 0L)
+  value.filter?.let {
+    markPresent(target + 4, 2u)
+    putView(target + w(16, 24), it)
+  }
 }
 
 internal fun NativeArena.writeRenderedFeatureQueryOptions(
   value: RenderedFeatureQueryOptions
-): Long = allocate(w(20, 32), w(4, 8)).also { putRenderedFeatureQueryOptions(it, value) }
+): Long = allocate(w(24, 40), w(4, 8)).also { putRenderedFeatureQueryOptions(it, value) }
 
 internal fun NativeArena.putSourceFeatureQueryOptions(
   target: Long,
@@ -888,11 +891,14 @@ internal fun NativeArena.putSourceFeatureQueryOptions(
     )
     writeSize(target + w(12, 16), it.size.toULong())
   }
-  writeAddress(target + w(16, 24), value.filter?.let { view(it) } ?: 0L)
+  value.filter?.let {
+    markPresent(target + 4, 2u)
+    putView(target + w(16, 24), it)
+  }
 }
 
 internal fun NativeArena.writeSourceFeatureQueryOptions(value: SourceFeatureQueryOptions): Long =
-  allocate(w(20, 32), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
+  allocate(w(24, 40), w(4, 8)).also { putSourceFeatureQueryOptions(it, value) }
 
 internal fun NativeArena.putFrameDemand(target: Long, value: FrameDemand) {
   C.mln_frame_demand_default(target)
@@ -906,30 +912,30 @@ internal fun NativeArena.writeFrameDemand(value: FrameDemand): Long =
   allocate(32, 8).also { putFrameDemand(it, value) }
 
 internal fun NativeArena.putResourceResponse(target: Long, value: ResourceResponse) {
-  writeU32(target, w(72, 96).toUInt())
-  writeU32(target + 4, value.status.rawValue)
-  writeU32(target + 8, value.errorReason.rawValue)
-  writeAddress(target + w(12, 16), bytes(value.bytes))
-  writeSize(target + w(16, 24), value.bytes.size.toULong())
-  writeAddress(target + w(20, 32), value.errorMessage?.let { cString(it) } ?: 0L)
-  writeBool(target + w(24, 40), value.mustRevalidate)
+  writeU32(target, w(64, 80).toUInt())
+  writeU32(target + 8, value.status.rawValue)
+  writeU32(target + 12, value.errorReason.rawValue)
+  writeAddress(target + 16, bytes(value.bytes))
+  writeSize(target + w(20, 24), value.bytes.size.toULong())
+  writeAddress(target + w(24, 32), value.errorMessage?.let { cString(it) } ?: 0L)
+  writeBool(target + w(28, 40), value.mustRevalidate)
   value.modifiedUnixMs?.let {
-    writeBool(target + w(25, 41), true)
+    markPresent(target + 4, 1u)
     writeI64(target + w(32, 48), it)
   }
   value.expiresUnixMs?.let {
-    writeBool(target + w(40, 56), true)
-    writeI64(target + w(48, 64), it)
+    markPresent(target + 4, 2u)
+    writeI64(target + w(40, 56), it)
   }
-  writeAddress(target + w(56, 72), value.etag?.let { cString(it) } ?: 0L)
+  writeAddress(target + w(48, 64), value.etag?.let { cString(it) } ?: 0L)
   value.retryAfterUnixMs?.let {
-    writeBool(target + w(60, 80), true)
-    writeI64(target + w(64, 88), it)
+    markPresent(target + 4, 4u)
+    writeI64(target + w(56, 72), it)
   }
 }
 
 internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long =
-  allocate(w(72, 96), 8).also { putResourceResponse(it, value) }
+  allocate(w(64, 80), 8).also { putResourceResponse(it, value) }
 
 internal fun readMetalOwnedTextureFrame(
   source: Long,
@@ -1057,10 +1063,10 @@ internal fun readBoundOptions(source: Long): BoundOptions =
 
 internal fun readCameraDelta(source: Long): CameraDelta =
   CameraDelta(
-    kind = CameraDeltaKind(readU32(source + 4)),
-    offset = readScreenPoint(source + 8),
-    amount = readF64(source + 24),
-    anchor = if (readBool(source + 32)) readScreenPoint(source + 40) else null,
+    kind = CameraDeltaKind(readU32(source + 8)),
+    offset = readScreenPoint(source + 16),
+    amount = readF64(source + 32),
+    anchor = if ((readU32(source + 4) and 1u) != 0u) readScreenPoint(source + 40) else null,
     animation = readAnimationOptions(source + 56),
   )
 
@@ -1263,7 +1269,7 @@ internal fun readRenderedFeatureQueryOptions(source: Long): RenderedFeatureQuery
           readViewString(item)
         }
       else null,
-    filter = readAddress(source + w(16, 24)).takeIf { it != 0L }?.let { readView(it) },
+    filter = if ((readU32(source + 4) and 2u) != 0u) readView(source + w(16, 24)) else null,
   )
 
 internal fun readRenderedQueryGeometry(source: Long): RenderedQueryGeometry =
@@ -1300,24 +1306,27 @@ internal fun readSourceFeatureQueryOptions(source: Long): SourceFeatureQueryOpti
           readViewString(item)
         }
       else null,
-    filter = readAddress(source + w(16, 24)).takeIf { it != 0L }?.let { readView(it) },
+    filter = if ((readU32(source + 4) and 2u) != 0u) readView(source + w(16, 24)) else null,
   )
 
 internal fun readStyleImageInfo(source: Long): StyleImageInfo =
   StyleImageInfo(
-    width = readU32(source + 4),
-    height = readU32(source + 8),
-    stride = readU32(source + 12),
-    byteLength = readSize(source + 16),
-    stretchXCount = readSize(source + w(20, 24)),
-    stretchYCount = readSize(source + w(24, 32)),
-    content = if (readBool(source + w(57, 69))) readImageContent(source + w(28, 40)) else null,
+    width = readU32(source + 8),
+    height = readU32(source + 12),
+    stride = readU32(source + 16),
+    byteLength = readSize(source + w(20, 24)),
+    stretchXCount = readSize(source + w(24, 32)),
+    stretchYCount = readSize(source + w(28, 40)),
+    content =
+      if ((readU32(source + 4) and 1u) != 0u) readImageContent(source + w(32, 48)) else null,
     textFitWidth =
-      if (readBool(source + w(58, 70))) StyleImageTextFit(readU32(source + w(44, 56))) else null,
+      if ((readU32(source + 4) and 2u) != 0u) StyleImageTextFit(readU32(source + w(48, 64)))
+      else null,
     textFitHeight =
-      if (readBool(source + w(59, 71))) StyleImageTextFit(readU32(source + w(48, 60))) else null,
-    pixelRatio = readF32(source + w(52, 64)),
-    sdf = readBool(source + w(56, 68)),
+      if ((readU32(source + 4) and 4u) != 0u) StyleImageTextFit(readU32(source + w(52, 68)))
+      else null,
+    pixelRatio = readF32(source + w(56, 72)),
+    sdf = readBool(source + w(60, 76)),
   )
 
 internal fun readStyleImageOptions(source: Long): StyleImageOptions =
@@ -1473,14 +1482,14 @@ internal fun readStyleImageStretchesResult(source: Long): StyleImageStretchesRes
 internal fun readStyleImageResult(source: Long): StyleImageResult =
   StyleImageResult(
     info = readStyleImageInfo(source + 8),
-    pixels = readView(source + w(68, 80)),
+    pixels = readView(source + w(72, 88)),
     stretchX =
-      readArray(readAddress(source + w(76, 96)), readSize(source + w(80, 104)), 8.toLong()) { item
+      readArray(readAddress(source + w(80, 104)), readSize(source + w(84, 112)), 8.toLong()) { item
         ->
         readImageStretch(item)
       },
     stretchY =
-      readArray(readAddress(source + w(84, 112)), readSize(source + w(88, 120)), 8.toLong()) { item
+      readArray(readAddress(source + w(88, 120)), readSize(source + w(92, 128)), 8.toLong()) { item
         ->
         readImageStretch(item)
       },
@@ -1496,7 +1505,8 @@ internal fun readStyleLayerResult(source: Long): StyleLayerResult =
 internal fun readStyleSourceResult(source: Long): StyleSourceResult =
   StyleSourceResult(
     info = readStyleSourceInfo(source + 8),
-    attribution = if (readBool(source + w(25, 33))) readViewString(source + w(112, 136)) else null,
+    attribution =
+      if ((readU32(source + 16) and 64u) != 0u) readViewString(source + w(112, 136)) else null,
     url = if ((readU32(source + 16) and 1u) != 0u) readViewString(source + w(120, 152)) else null,
     tileUrls =
       if ((readU32(source + 16) and 2u) != 0u)
@@ -1824,24 +1834,26 @@ internal fun readCanonicalTileId(source: Long): CanonicalTileId =
 
 internal fun readResourceRequest(source: Long): ResourceRequest =
   ResourceRequest(
-    requestedUrl = readCStringOrNull(readAddress(source + w(4, 8))),
-    resolvedUrl = readCStringOrNull(readAddress(source + w(8, 16))),
-    kind = ResourceKind(readU32(source + w(12, 24))),
-    loadingMethod = ResourceLoadingMethod(readU32(source + w(16, 28))),
-    priority = ResourcePriority(readU32(source + w(20, 32))),
-    usage = ResourceUsage(readU32(source + w(24, 36))),
-    storagePolicy = ResourceStoragePolicy(readU32(source + w(28, 40))),
+    requestedUrl = readCStringOrNull(readAddress(source + 8)),
+    resolvedUrl = readCStringOrNull(readAddress(source + w(12, 16))),
+    kind = ResourceKind(readU32(source + w(16, 24))),
+    loadingMethod = ResourceLoadingMethod(readU32(source + w(20, 28))),
+    priority = ResourcePriority(readU32(source + w(24, 32))),
+    usage = ResourceUsage(readU32(source + w(28, 36))),
+    storagePolicy = ResourceStoragePolicy(readU32(source + w(32, 40))),
     range =
-      if (readBool(source + w(32, 44)))
+      if ((readU32(source + 4) and 1u) != 0u)
         ResourceRequestRange(
           rangeStart = readU64(source + w(40, 48)),
           rangeEnd = readU64(source + w(48, 56)),
         )
       else null,
-    priorModifiedUnixMs = if (readBool(source + w(56, 64))) readI64(source + w(64, 72)) else null,
-    priorExpiresUnixMs = if (readBool(source + w(72, 80))) readI64(source + w(80, 88)) else null,
-    priorEtag = readCStringOrNull(readAddress(source + w(88, 96))),
-    priorData = readBytes(readAddress(source + w(92, 104)), readSize(source + w(96, 112))),
+    priorModifiedUnixMs =
+      if ((readU32(source + 4) and 2u) != 0u) readI64(source + w(56, 64)) else null,
+    priorExpiresUnixMs =
+      if ((readU32(source + 4) and 4u) != 0u) readI64(source + w(64, 72)) else null,
+    priorEtag = readCStringOrNull(readAddress(source + w(72, 80))),
+    priorData = readBytes(readAddress(source + w(76, 88)), readSize(source + w(80, 96))),
   )
 
 internal fun readUnitBezier(source: Long): UnitBezier =
@@ -1994,7 +2006,8 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
     type = StyleSourceType(readU32(source + 4)),
     idSize = readSize(source + w(12, 16)),
     isVolatile = readBool(source + w(16, 24)),
-    attributionSize = if (readBool(source + w(17, 25))) readSize(source + w(20, 32)) else null,
+    attributionSize =
+      if ((readU32(source + 8) and 64u) != 0u) readSize(source + w(20, 32)) else null,
     urlSize = if ((readU32(source + 8) and 1u) != 0u) readSize(source + w(24, 40)) else null,
     tilejson =
       if ((readU32(source + 8) and 2u) != 0u)

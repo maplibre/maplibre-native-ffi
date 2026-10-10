@@ -260,12 +260,12 @@ final class mln_camera_delta extends Struct {
   @Uint32()
   external int size;
   @Uint32()
+  external int fields;
+  @Uint32()
   external int kind;
   external mln_screen_point offset;
   @Double()
   external double amount;
-  @Bool()
-  external bool has_anchor;
   external mln_screen_point anchor;
   external mln_animation_options animation;
 }
@@ -1024,7 +1024,7 @@ final class mln_rendered_feature_query_options extends Struct {
   external Pointer<mln_buffer_view> layer_ids;
   @Size()
   external int layer_id_count;
-  external Pointer<mln_buffer_view> filter;
+  external mln_buffer_view filter;
 }
 
 final class mln_rendered_query_geometry extends Struct {
@@ -1065,6 +1065,8 @@ final class mln_resource_provider extends Struct {
 final class mln_resource_request extends Struct {
   @Uint32()
   external int size;
+  @Uint32()
+  external int fields;
   external Pointer<Char> requested_url;
   external Pointer<Char> resolved_url;
   @Uint32()
@@ -1077,18 +1079,12 @@ final class mln_resource_request extends Struct {
   external int usage;
   @Uint32()
   external int storage_policy;
-  @Bool()
-  external bool has_range;
   @Uint64()
   external int range_start;
   @Uint64()
   external int range_end;
-  @Bool()
-  external bool has_prior_modified;
   @Int64()
   external int prior_modified_unix_ms;
-  @Bool()
-  external bool has_prior_expires;
   @Int64()
   external int prior_expires_unix_ms;
   external Pointer<Char> prior_etag;
@@ -1101,6 +1097,8 @@ final class mln_resource_response extends Struct {
   @Uint32()
   external int size;
   @Uint32()
+  external int fields;
+  @Uint32()
   external int status;
   @Uint32()
   external int error_reason;
@@ -1110,17 +1108,11 @@ final class mln_resource_response extends Struct {
   external Pointer<Char> error_message;
   @Bool()
   external bool must_revalidate;
-  @Bool()
-  external bool has_modified;
   @Int64()
   external int modified_unix_ms;
-  @Bool()
-  external bool has_expires;
   @Int64()
   external int expires_unix_ms;
   external Pointer<Char> etag;
-  @Bool()
-  external bool has_retry_after;
   @Int64()
   external int retry_after_unix_ms;
 }
@@ -1255,12 +1247,14 @@ final class mln_source_feature_query_options extends Struct {
   external Pointer<mln_buffer_view> source_layer_ids;
   @Size()
   external int source_layer_id_count;
-  external Pointer<mln_buffer_view> filter;
+  external mln_buffer_view filter;
 }
 
 final class mln_style_image_info extends Struct {
   @Uint32()
   external int size;
+  @Uint32()
+  external int fields;
   @Uint32()
   external int width;
   @Uint32()
@@ -1282,12 +1276,6 @@ final class mln_style_image_info extends Struct {
   external double pixel_ratio;
   @Bool()
   external bool sdf;
-  @Bool()
-  external bool has_content;
-  @Bool()
-  external bool has_text_fit_width;
-  @Bool()
-  external bool has_text_fit_height;
 }
 
 final class mln_style_image_options extends Struct {
@@ -1384,8 +1372,6 @@ final class mln_style_source_info extends Struct {
   external int id_size;
   @Bool()
   external bool is_volatile;
-  @Bool()
-  external bool has_attribution;
   @Size()
   external int attribution_size;
   @Size()
@@ -1763,6 +1749,9 @@ const MLN_BOUND_OPTION_UNBOUNDED = 32;
 const MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0;
 const MLN_CAMERA_CHANGE_MODE_ANIMATED = 1;
 
+// mln_camera_delta_field
+const MLN_CAMERA_DELTA_FIELD_ANCHOR = 1;
+
 // mln_camera_delta_kind
 const MLN_CAMERA_DELTA_MOVE = 0;
 const MLN_CAMERA_DELTA_SCALE = 1;
@@ -2010,6 +1999,7 @@ const MLN_RENDER_SESSION_STATE_ABANDONED = 6;
 
 // mln_rendered_feature_query_option_field
 const MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1;
+const MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 2;
 
 // mln_rendered_query_geometry_type
 const MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT = 1;
@@ -2046,6 +2036,16 @@ const MLN_RESOURCE_PRIORITY_LOW = 1;
 // mln_resource_provider_decision
 const MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH = 0;
 const MLN_RESOURCE_PROVIDER_DECISION_HANDLE = 1;
+
+// mln_resource_request_field
+const MLN_RESOURCE_REQUEST_RANGE = 1;
+const MLN_RESOURCE_REQUEST_PRIOR_MODIFIED = 2;
+const MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 4;
+
+// mln_resource_response_field
+const MLN_RESOURCE_RESPONSE_MODIFIED = 1;
+const MLN_RESOURCE_RESPONSE_EXPIRES = 2;
+const MLN_RESOURCE_RESPONSE_RETRY_AFTER = 4;
 
 // mln_resource_response_status
 const MLN_RESOURCE_RESPONSE_STATUS_OK = 0;
@@ -2129,6 +2129,7 @@ const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22;
 
 // mln_source_feature_query_option_field
 const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;
+const MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 2;
 
 // mln_status
 const MLN_STATUS_OK = 0;
@@ -2142,6 +2143,11 @@ const MLN_STATUS_BUSY = -7;
 const MLN_STATUS_TARGET_LOST = -8;
 const MLN_STATUS_NOT_READY = -9;
 const MLN_STATUS_NOT_FOUND = -10;
+
+// mln_style_image_info_field
+const MLN_STYLE_IMAGE_INFO_CONTENT = 1;
+const MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 2;
+const MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 4;
 
 // mln_style_image_option_field
 const MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1;
@@ -2172,6 +2178,7 @@ const MLN_STYLE_SOURCE_INFO_BOUNDS = 4;
 const MLN_STYLE_SOURCE_INFO_TILE_SIZE = 8;
 const MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 16;
 const MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 32;
+const MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 64;
 
 // mln_style_source_type
 const MLN_STYLE_SOURCE_TYPE_UNKNOWN = 0;

@@ -510,8 +510,6 @@ class Values:
             if field.presence and field.presence.mask:
                 statements.append(
                     f"raw.{rust_field(field.presence.mask)} |= sys::{field.presence.bit};"
-                    if field.presence.bit
-                    else f"raw.{rust_field(field.presence.mask)} = true;"
                 )
                 lines[-1] = (
                     f'if let Some(field) = generated_present(value, "{member}")? {{ '
@@ -649,11 +647,7 @@ class Values:
             else:
                 copy = self.copy(field.value, "value." + rust_field(field.name))
             if field.presence and field.presence.mask:
-                present = (
-                    f"value.{rust_field(field.presence.mask)} & sys::{field.presence.bit} != 0"
-                    if field.presence.bit
-                    else f"value.{rust_field(field.presence.mask)}"
-                )
+                present = f"value.{rust_field(field.presence.mask)} & sys::{field.presence.bit} != 0"
                 copy = optional_copy(present, copy)
             copies.append(f'dict.set_item("{member}", {copy})?;')
             public_copies.append(

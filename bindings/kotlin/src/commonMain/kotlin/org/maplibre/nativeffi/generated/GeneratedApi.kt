@@ -544,7 +544,7 @@ public object GeneratedApi {
    */
   public fun renderedFeatureQueryOptionsDefault(): RenderedFeatureQueryOptions =
     nativeCall(null, null, "mln_rendered_feature_query_options_default") {
-      val out = sized(w(20, 32), w(4, 8))
+      val out = sized(w(24, 40), w(4, 8))
       C.mln_rendered_feature_query_options_default(out)
       readRenderedFeatureQueryOptions(out)
     }
@@ -658,7 +658,7 @@ public object GeneratedApi {
    */
   public fun sourceFeatureQueryOptionsDefault(): SourceFeatureQueryOptions =
     nativeCall(null, null, "mln_source_feature_query_options_default") {
-      val out = sized(w(20, 32), w(4, 8))
+      val out = sized(w(24, 40), w(4, 8))
       C.mln_source_feature_query_options_default(out)
       readSourceFeatureQueryOptions(out)
     }
@@ -671,7 +671,7 @@ public object GeneratedApi {
    */
   public fun styleImageInfoDefault(): StyleImageInfo =
     nativeCall(null, null, "mln_style_image_info_default") {
-      val out = sized(w(60, 72), w(4, 8))
+      val out = sized(w(64, 80), w(4, 8))
       C.mln_style_image_info_default(out)
       readStyleImageInfo(out)
     }

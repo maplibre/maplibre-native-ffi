@@ -770,8 +770,19 @@ typedef struct mln_http_header_transform {
   "kind=callback_registration;release=release_user_data"
 );
 
+/** Field mask values for mln_resource_request. */
+typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {
+  /** The request asks for the inclusive byte range range_start to range_end. */
+  MLN_RESOURCE_REQUEST_RANGE = 1U << 0U,
+  /** The cached copy being revalidated carries a modification time. */
+  MLN_RESOURCE_REQUEST_PRIOR_MODIFIED = 1U << 1U,
+  /** The cached copy being revalidated carries an expiration time. */
+  MLN_RESOURCE_REQUEST_PRIOR_EXPIRES = 1U << 2U,
+} mln_resource_request_field;
+
 typedef struct mln_resource_request {
   uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_resource_request_field");
   /**
    * URL entering the network layer, before tile server normalization.
    *
@@ -799,21 +810,40 @@ typedef struct mln_resource_request {
   uint32_t priority MLN_BINDING("enum=mln_resource_priority");
   uint32_t usage MLN_BINDING("enum=mln_resource_usage");
   uint32_t storage_policy MLN_BINDING("enum=mln_resource_storage_policy");
-  bool has_range;
-  uint64_t range_start MLN_BINDING("mask=has_range");
-  uint64_t range_end MLN_BINDING("mask=has_range");
-  bool has_prior_modified;
-  int64_t prior_modified_unix_ms MLN_BINDING("mask=has_prior_modified");
-  bool has_prior_expires;
-  int64_t prior_expires_unix_ms MLN_BINDING("mask=has_prior_expires");
+  uint64_t range_start
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_RANGE");
+  uint64_t range_end MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_RANGE");
+  int64_t prior_modified_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_MODIFIED");
+  int64_t prior_expires_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_EXPIRES");
   const char* prior_etag MLN_BINDING("nullable=true");
   const uint8_t* prior_data
     MLN_BINDING("length=prior_data_size;encoding=bytes");
   size_t prior_data_size;
 } mln_resource_request;
 
+/** Field mask values for mln_resource_response. */
+typedef enum MLN_BINDING(
+  "kind=bitmask"
+) mln_resource_response_field : uint32_t {
+  /** The response carries a modification time. */
+  MLN_RESOURCE_RESPONSE_MODIFIED = 1U << 0U,
+  /** The response carries an expiration time. */
+  MLN_RESOURCE_RESPONSE_EXPIRES = 1U << 1U,
+  /** An ERROR response carries the earliest time to retry the request. */
+  MLN_RESOURCE_RESPONSE_RETRY_AFTER = 1U << 2U,
+} mln_resource_response_field;
+
+/**
+ * A resource provider's answer to one request.
+ *
+ * A fields value with bits outside mln_resource_response_field is malformed,
+ * and mln_resource_request_complete() converts it to a provider error response.
+ */
 typedef struct mln_resource_response {
   uint32_t size;
+  uint32_t fields MLN_BINDING("enum=mln_resource_response_field");
   uint32_t status MLN_BINDING("enum=mln_resource_response_status");
   uint32_t error_reason MLN_BINDING("enum=mln_resource_error_reason");
   /** Response bytes. May be null only when byte_count is 0. */
@@ -821,13 +851,13 @@ typedef struct mln_resource_response {
   size_t byte_count;
   const char* error_message MLN_BINDING("nullable=true");
   bool must_revalidate;
-  bool has_modified;
-  int64_t modified_unix_ms MLN_BINDING("mask=has_modified");
-  bool has_expires;
-  int64_t expires_unix_ms MLN_BINDING("mask=has_expires");
+  int64_t modified_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_MODIFIED");
+  int64_t expires_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_EXPIRES");
   const char* etag MLN_BINDING("nullable=true");
-  bool has_retry_after;
-  int64_t retry_after_unix_ms MLN_BINDING("mask=has_retry_after");
+  int64_t retry_after_unix_ms
+    MLN_BINDING("mask=fields;bit=MLN_RESOURCE_RESPONSE_RETRY_AFTER");
 } mln_resource_response;
 
 /**

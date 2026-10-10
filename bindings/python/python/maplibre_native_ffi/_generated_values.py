@@ -234,6 +234,16 @@ class CameraChangeMode(UnknownIntEnum):
     ANIMATED = 1
 
 
+class CameraDeltaField(IntFlag):
+    """Field mask values for `mln_camera_delta`.
+
+    See `mln_camera_delta_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    ANCHOR = 1
+
+
 class CameraDeltaKind(UnknownIntEnum):
     """Relative camera operation carried by `mln_camera_delta`.
 
@@ -742,7 +752,8 @@ class RenderedFeatureQueryOptionField(IntFlag):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    IDS = 1
+    LAYER_IDS = 1
+    FILTER = 2
 
 
 class RenderedQueryGeometryType(UnknownIntEnum):
@@ -791,6 +802,30 @@ class ResourcePriority(UnknownIntEnum):
 class ResourceProviderDecision(UnknownIntEnum):
     PASS_THROUGH = 0
     HANDLE = 1
+
+
+class ResourceRequestField(IntFlag):
+    """Field mask values for `mln_resource_request`.
+
+    See `mln_resource_request_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    RANGE = 1
+    PRIOR_MODIFIED = 2
+    PRIOR_EXPIRES = 4
+
+
+class ResourceResponseField(IntFlag):
+    """Field mask values for `mln_resource_response`.
+
+    See `mln_resource_response_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    MODIFIED = 1
+    EXPIRES = 2
+    RETRY_AFTER = 4
 
 
 class ResourceResponseStatus(UnknownIntEnum):
@@ -917,7 +952,8 @@ class SourceFeatureQueryOptionField(IntFlag):
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
     """
 
-    IDS = 1
+    SOURCE_LAYER_IDS = 1
+    FILTER = 2
 
 
 class Status(UnknownIntEnum):
@@ -938,6 +974,18 @@ class Status(UnknownIntEnum):
     TARGET_LOST = -8
     NOT_READY = -9
     NOT_FOUND = -10
+
+
+class StyleImageInfoField(IntFlag):
+    """Field mask values for `mln_style_image_info`.
+
+    See `mln_style_image_info_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
+    CONTENT = 1
+    TEXT_FIT_WIDTH = 2
+    TEXT_FIT_HEIGHT = 4
 
 
 class StyleImageOptionField(IntFlag):
@@ -1003,6 +1051,7 @@ class StyleSourceInfoField(IntFlag):
     TILE_SIZE = 8
     VECTOR_ENCODING = 16
     RASTER_ENCODING = 32
+    ATTRIBUTION = 64
 
 
 class StyleSourceType(UnknownIntEnum):
@@ -2765,6 +2814,12 @@ class ResourceRequestRange:
 
 @dataclass(frozen=True, slots=True)
 class ResourceResponse:
+    """A resource provider's answer to one request.
+
+    See `mln_resource_response` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     status: ResourceResponseStatus
     error_reason: ResourceErrorReason
     bytes: bytes

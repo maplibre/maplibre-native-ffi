@@ -222,8 +222,9 @@ MLN_API mln_status mln_map_update_camera(
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, delta is null or
- *   undersized, delta->kind is out of range, the offset, scale, or anchor the
- *   kind uses is not finite, or completion is invalid.
+ *   undersized, delta->fields contains unknown bits, delta->kind is out of
+ *   range, the offset, scale, or anchor the kind uses is not finite, an anchor
+ *   accompanies a kind other than SCALE or BEARING, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *

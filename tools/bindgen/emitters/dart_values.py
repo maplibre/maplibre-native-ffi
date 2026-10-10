@@ -568,18 +568,10 @@ class Values:
         return f"raw.{bit}"
 
     def present(self, mask, bit):
-        return (
-            f"(source.{mask} & {self.enum_constant(bit)}) != 0"
-            if bit
-            else f"source.{mask}"
-        )
+        return f"(source.{mask} & {self.enum_constant(bit)}) != 0"
 
     def set_present(self, mask, bit):
-        return (
-            f"result.ref.{mask} |= {self.enum_constant(bit)};"
-            if bit
-            else f"result.ref.{mask} = true;"
-        )
+        return f"result.ref.{mask} |= {self.enum_constant(bit)};"
 
     def field_default(self, field):
         """A field's default: its annotated initial value, or its type's."""

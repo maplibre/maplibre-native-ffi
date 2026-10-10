@@ -117,9 +117,9 @@ public sealed class ResourceProviderTests
         var request = new mln_resource_request
         {
             size = (uint)sizeof(mln_resource_request),
+            fields = mln_resource_request_field.MLN_RESOURCE_REQUEST_RANGE,
             requested_url = scope.CString(StyleUrl),
             resolved_url = scope.CString("provider-test://resolved/é"),
-            has_range = 1,
             range_start = 0,
             range_end = 7,
             prior_data = (byte*)bytes.data,

@@ -103,7 +103,9 @@ public struct RenderedFeatureQueryOptionField: OptionSet, NativeOpenValue,
     self.rawValue = rawValue
   }
 
-  public static let ids: RenderedFeatureQueryOptionField = .init(rawValue: 1)
+  public static let layerIds: RenderedFeatureQueryOptionField =
+    .init(rawValue: 1)
+  public static let filter: RenderedFeatureQueryOptionField = .init(rawValue: 2)
 }
 
 /// Options for rendered feature queries.
@@ -113,7 +115,7 @@ public struct RenderedFeatureQueryOptionField: OptionSet, NativeOpenValue,
 public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   public var layerIds: [String]?
-  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   public var filter: Data?
   public static var `default`: Self {
     try! Self(raw: mln_rendered_feature_query_options_default())
@@ -136,10 +138,11 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
         raw.layer_ids,
         count: Int(raw.layer_id_count)
       ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = raw.filter == nil ? nil : try NativeInputArena.copyArray(
-      raw.filter,
-      count: 1
-    ).map { try NativeString.copyData(data: $0.data, size: $0.size) }[0]
+    filter = raw.fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER
+      .rawValue != 0 ? try NativeString.copyData(
+        data: raw.filter.data,
+        size: raw.filter.size
+      ) : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -153,7 +156,10 @@ public struct RenderedFeatureQueryOptions: Equatable, Hashable, Sendable {
         .layer_ids = arena.array(item.map { arena.view($0) })
     }
     raw.layer_id_count = try NativeInputArena.count(layerIds?.count ?? 0)
-    raw.filter = filter.map { arena.store(arena.view($0)) }
+    if let item = filter {
+      raw.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER.rawValue; raw
+        .filter = arena.view(item)
+    }
     return raw
   }
 }
@@ -346,7 +352,9 @@ public struct SourceFeatureQueryOptionField: OptionSet, NativeOpenValue,
     self.rawValue = rawValue
   }
 
-  public static let ids: SourceFeatureQueryOptionField = .init(rawValue: 1)
+  public static let sourceLayerIds: SourceFeatureQueryOptionField =
+    .init(rawValue: 1)
+  public static let filter: SourceFeatureQueryOptionField = .init(rawValue: 2)
 }
 
 /// Options for source feature queries.
@@ -356,7 +364,7 @@ public struct SourceFeatureQueryOptionField: OptionSet, NativeOpenValue,
 public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   public var sourceLayerIds: [String]?
-  /// Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter.
+  /// Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter.
   public var filter: Data?
   public static var `default`: Self {
     try! Self(raw: mln_source_feature_query_options_default())
@@ -381,10 +389,11 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
         raw.source_layer_ids,
         count: Int(raw.source_layer_id_count)
       ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } : nil
-    filter = raw.filter == nil ? nil : try NativeInputArena.copyArray(
-      raw.filter,
-      count: 1
-    ).map { try NativeString.copyData(data: $0.data, size: $0.size) }[0]
+    filter = raw.fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER
+      .rawValue != 0 ? try NativeString.copyData(
+        data: raw.filter.data,
+        size: raw.filter.size
+      ) : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws
@@ -400,7 +409,10 @@ public struct SourceFeatureQueryOptions: Equatable, Hashable, Sendable {
     }
     raw.source_layer_id_count = try NativeInputArena
       .count(sourceLayerIds?.count ?? 0)
-    raw.filter = filter.map { arena.store(arena.view($0)) }
+    if let item = filter {
+      raw.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER.rawValue; raw
+        .filter = arena.view(item)
+    }
     return raw
   }
 }

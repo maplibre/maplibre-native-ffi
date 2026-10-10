@@ -90,6 +90,27 @@ public data class CameraChangeMode(public val rawValue: UInt) {
 }
 
 /**
+ * Field mask values for `mln_camera_delta`.
+ *
+ * See `mln_camera_delta_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraDeltaField(public val rawValue: UInt) {
+  public infix fun or(other: CameraDeltaField): CameraDeltaField =
+    CameraDeltaField(rawValue or other.rawValue)
+
+  public infix fun and(other: CameraDeltaField): CameraDeltaField =
+    CameraDeltaField(rawValue and other.rawValue)
+
+  public operator fun contains(other: CameraDeltaField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    public val ANCHOR: CameraDeltaField = CameraDeltaField(1u)
+  }
+}
+
+/**
  * Relative camera operation carried by `mln_camera_delta`.
  *
  * See `mln_camera_delta_kind` in the
@@ -893,7 +914,8 @@ public data class RenderedFeatureQueryOptionField(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
-    public val IDS: RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(1u)
+    public val LAYER_IDS: RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(1u)
+    public val FILTER: RenderedFeatureQueryOptionField = RenderedFeatureQueryOptionField(2u)
   }
 }
 
@@ -954,6 +976,58 @@ public data class ResourceProviderDecision(public val rawValue: UInt) {
   public companion object {
     public val PASS_THROUGH: ResourceProviderDecision = ResourceProviderDecision(0u)
     public val HANDLE: ResourceProviderDecision = ResourceProviderDecision(1u)
+  }
+}
+
+/**
+ * Field mask values for `mln_resource_request`.
+ *
+ * See `mln_resource_request_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceRequestField(public val rawValue: UInt) {
+  public infix fun or(other: ResourceRequestField): ResourceRequestField =
+    ResourceRequestField(rawValue or other.rawValue)
+
+  public infix fun and(other: ResourceRequestField): ResourceRequestField =
+    ResourceRequestField(rawValue and other.rawValue)
+
+  public operator fun contains(other: ResourceRequestField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    /** The request asks for the inclusive byte range range_start to range_end. */
+    public val RANGE: ResourceRequestField = ResourceRequestField(1u)
+    /** The cached copy being revalidated carries a modification time. */
+    public val PRIOR_MODIFIED: ResourceRequestField = ResourceRequestField(2u)
+    /** The cached copy being revalidated carries an expiration time. */
+    public val PRIOR_EXPIRES: ResourceRequestField = ResourceRequestField(4u)
+  }
+}
+
+/**
+ * Field mask values for `mln_resource_response`.
+ *
+ * See `mln_resource_response_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceResponseField(public val rawValue: UInt) {
+  public infix fun or(other: ResourceResponseField): ResourceResponseField =
+    ResourceResponseField(rawValue or other.rawValue)
+
+  public infix fun and(other: ResourceResponseField): ResourceResponseField =
+    ResourceResponseField(rawValue and other.rawValue)
+
+  public operator fun contains(other: ResourceResponseField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    /** The response carries a modification time. */
+    public val MODIFIED: ResourceResponseField = ResourceResponseField(1u)
+    /** The response carries an expiration time. */
+    public val EXPIRES: ResourceResponseField = ResourceResponseField(2u)
+    /** An ERROR response carries the earliest time to retry the request. */
+    public val RETRY_AFTER: ResourceResponseField = ResourceResponseField(4u)
   }
 }
 
@@ -1120,7 +1194,8 @@ public data class SourceFeatureQueryOptionField(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
-    public val IDS: SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(1u)
+    public val SOURCE_LAYER_IDS: SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(1u)
+    public val FILTER: SourceFeatureQueryOptionField = SourceFeatureQueryOptionField(2u)
   }
 }
 
@@ -1153,6 +1228,32 @@ public data class Status(public val rawValue: Int) {
     public val NOT_READY: Status = Status(-9)
     /** A command or operation named an ID with no live object behind it. */
     public val NOT_FOUND: Status = Status(-10)
+  }
+}
+
+/**
+ * Field mask values for `mln_style_image_info`.
+ *
+ * See `mln_style_image_info_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class StyleImageInfoField(public val rawValue: UInt) {
+  public infix fun or(other: StyleImageInfoField): StyleImageInfoField =
+    StyleImageInfoField(rawValue or other.rawValue)
+
+  public infix fun and(other: StyleImageInfoField): StyleImageInfoField =
+    StyleImageInfoField(rawValue and other.rawValue)
+
+  public operator fun contains(other: StyleImageInfoField): Boolean =
+    (rawValue and other.rawValue) == other.rawValue
+
+  public companion object {
+    /** The image declares a content box. */
+    public val CONTENT: StyleImageInfoField = StyleImageInfoField(1u)
+    /** The image declares a horizontal text-fit mode. */
+    public val TEXT_FIT_WIDTH: StyleImageInfoField = StyleImageInfoField(2u)
+    /** The image declares a vertical text-fit mode. */
+    public val TEXT_FIT_HEIGHT: StyleImageInfoField = StyleImageInfoField(4u)
   }
 }
 
@@ -1252,6 +1353,8 @@ public data class StyleSourceInfoField(public val rawValue: UInt) {
     public val VECTOR_ENCODING: StyleSourceInfoField = StyleSourceInfoField(16u)
     /** The source exposes a DEM raster encoding. */
     public val RASTER_ENCODING: StyleSourceInfoField = StyleSourceInfoField(32u)
+    /** The source declares an attribution string. */
+    public val ATTRIBUTION: StyleSourceInfoField = StyleSourceInfoField(64u)
   }
 }
 
@@ -2506,7 +2609,7 @@ public data class RenderSessionAttachOptions(
 public data class RenderedFeatureQueryOptions(
   /** Optional style layer IDs. When absent, all rendered layers are queried. */
   public val layerIds: List<String>? = null,
-  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
+  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
   public val filter: ByteArray? = null,
 )
 
@@ -2591,7 +2694,7 @@ public data class RuntimeOptions(
 public data class SourceFeatureQueryOptions(
   /** Optional source-layer IDs. Required by vector sources; ignored by GeoJSON. */
   public val sourceLayerIds: List<String>? = null,
-  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
+  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
   public val filter: ByteArray? = null,
 )
 
@@ -2623,11 +2726,11 @@ public data class StyleImageInfo(
   /** Interval counts for the stretchable axes. */
   public val stretchXCount: ULong = 0uL,
   public val stretchYCount: ULong = 0uL,
-  /** Content box, meaningful only when has_content is true. */
+  /** Content box, meaningful when fields contains CONTENT. */
   public val content: ImageContent? = null,
-  /** One of `mln_style_image_text_fit`, meaningful only when its flag is true. */
+  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_WIDTH. */
   public val textFitWidth: StyleImageTextFit? = null,
-  /** One of `mln_style_image_text_fit`, meaningful only when its flag is true. */
+  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_HEIGHT. */
   public val textFitHeight: StyleImageTextFit? = null,
   /** Sprite pixel ratio. Defaults to 1.0. */
   public val pixelRatio: Float = 1.0f,
@@ -3220,7 +3323,10 @@ public data class StyleSourceInfo(
   public val idSize: ULong = 0uL,
   /** Whether the source is marked volatile. */
   public val isVolatile: Boolean = false,
-  /** Attribution byte length, excluding any null terminator. */
+  /**
+   * Attribution byte length, excluding any null terminator, meaningful when fields contains
+   * ATTRIBUTION.
+   */
   public val attributionSize: ULong? = null,
   /** URL byte length, meaningful when fields contains URL. */
   public val urlSize: ULong? = null,
@@ -3479,6 +3585,12 @@ public data class RenderFrameBatchView(
   public val results: List<RenderFrameResult> = emptyList()
 )
 
+/**
+ * A resource provider's answer to one request.
+ *
+ * See `mln_resource_response` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class ResourceResponse(
   public val status: ResourceResponseStatus = ResourceResponseStatus(0u),
   public val errorReason: ResourceErrorReason = ResourceErrorReason(0u),

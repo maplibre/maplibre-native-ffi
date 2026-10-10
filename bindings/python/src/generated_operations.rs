@@ -111,9 +111,11 @@ fn generated_copy_mln_camera_delta(
     dict.set_item("amount", generated_value(py, value.amount)?)?;
     dict.set_item(
         "anchor",
-        generated_optional(py, value.has_anchor, || {
-            generated_copy_mln_screen_point(py, &value.anchor)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_CAMERA_DELTA_FIELD_ANCHOR != 0,
+            || generated_copy_mln_screen_point(py, &value.anchor),
+        )?,
     )?;
     dict.set_item(
         "animation",
@@ -1532,12 +1534,11 @@ fn generated_copy_mln_rendered_feature_query_options(
     )?;
     dict.set_item(
         "filter",
-        generated_optional(py, !value.filter.is_null(), || {
-            Ok({
-                let referenced = unsafe { *value.filter };
-                unsafe { generated_bytes(py, referenced) }?
-            })
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0,
+            || unsafe { generated_bytes(py, value.filter) },
+        )?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1659,26 +1660,34 @@ fn generated_copy_mln_resource_request(
     dict.set_item("storage_policy", generated_value(py, value.storage_policy)?)?;
     dict.set_item(
         "range",
-        generated_optional(py, value.has_range, || {
-            Ok({
-                let inner = PyDict::new(py);
-                inner.set_item("start", generated_value(py, value.range_start)?)?;
-                inner.set_item("end", generated_value(py, value.range_end)?)?;
-                inner.into_any().unbind()
-            })
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RESOURCE_REQUEST_RANGE != 0,
+            || {
+                Ok({
+                    let inner = PyDict::new(py);
+                    inner.set_item("start", generated_value(py, value.range_start)?)?;
+                    inner.set_item("end", generated_value(py, value.range_end)?)?;
+                    inner.into_any().unbind()
+                })
+            },
+        )?,
     )?;
     dict.set_item(
         "prior_modified_unix_ms",
-        generated_optional(py, value.has_prior_modified, || {
-            generated_value(py, value.prior_modified_unix_ms)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0,
+            || generated_value(py, value.prior_modified_unix_ms),
+        )?,
     )?;
     dict.set_item(
         "prior_expires_unix_ms",
-        generated_optional(py, value.has_prior_expires, || {
-            generated_value(py, value.prior_expires_unix_ms)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0,
+            || generated_value(py, value.prior_expires_unix_ms),
+        )?,
     )?;
     dict.set_item("prior_etag", unsafe {
         generated_c_string(py, value.prior_etag, true)
@@ -1951,12 +1960,11 @@ fn generated_copy_mln_source_feature_query_options(
     )?;
     dict.set_item(
         "filter",
-        generated_optional(py, !value.filter.is_null(), || {
-            Ok({
-                let referenced = unsafe { *value.filter };
-                unsafe { generated_bytes(py, referenced) }?
-            })
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0,
+            || unsafe { generated_bytes(py, value.filter) },
+        )?,
     )?;
     Ok(dict.into_any().unbind())
 }
@@ -1980,21 +1988,27 @@ fn generated_copy_mln_style_image_info(
     )?;
     dict.set_item(
         "content",
-        generated_optional(py, value.has_content, || {
-            generated_copy_mln_image_content(py, &value.content)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_CONTENT != 0,
+            || generated_copy_mln_image_content(py, &value.content),
+        )?,
     )?;
     dict.set_item(
         "text_fit_width",
-        generated_optional(py, value.has_text_fit_width, || {
-            generated_value(py, value.text_fit_width)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0,
+            || generated_value(py, value.text_fit_width),
+        )?,
     )?;
     dict.set_item(
         "text_fit_height",
-        generated_optional(py, value.has_text_fit_height, || {
-            generated_value(py, value.text_fit_height)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0,
+            || generated_value(py, value.text_fit_height),
+        )?,
     )?;
     dict.set_item("pixel_ratio", generated_value(py, value.pixel_ratio)?)?;
     dict.set_item("sdf", generated_value(py, value.sdf)?)?;
@@ -2198,9 +2212,11 @@ fn generated_copy_mln_style_source_info(
     dict.set_item("is_volatile", generated_value(py, value.is_volatile)?)?;
     dict.set_item(
         "attribution_size",
-        generated_optional(py, value.has_attribution, || {
-            generated_value(py, value.attribution_size)
-        })?,
+        generated_optional(
+            py,
+            value.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0,
+            || generated_value(py, value.attribution_size),
+        )?,
     )?;
     dict.set_item(
         "url_size",
@@ -2273,9 +2289,11 @@ fn generated_copy_mln_style_source_result(
     )?;
     dict.set_item(
         "attribution",
-        generated_optional(py, value.info.has_attribution, || {
-            generated_text(py, value.attribution)
-        })?,
+        generated_optional(
+            py,
+            value.info.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0,
+            || generated_text(py, value.attribution),
+        )?,
     )?;
     dict.set_item(
         "url",
@@ -2802,7 +2820,7 @@ fn generated_input_mln_camera_delta<'py>(
     }
     let mut raw: sys::mln_camera_delta = unsafe { sys::mln_camera_delta_default() };
     raw.size = std::mem::size_of::<sys::mln_camera_delta>() as _;
-    raw.has_anchor = false;
+    raw.fields = 0;
     raw.kind = value
         .getattr("kind")?
         .extract::<sys::mln_camera_delta_kind>()?;
@@ -2810,7 +2828,7 @@ fn generated_input_mln_camera_delta<'py>(
     raw.amount = value.getattr("amount")?.extract::<f64>()?;
     if let Some(field) = generated_present(value, "anchor")? {
         raw.anchor = generated_input_mln_screen_point(&field, storage)?;
-        raw.has_anchor = true;
+        raw.fields |= sys::MLN_CAMERA_DELTA_FIELD_ANCHOR;
     }
     raw.animation = generated_input_mln_animation_options(&value.getattr("animation")?, storage)?;
     Ok(raw)
@@ -3715,15 +3733,10 @@ fn generated_input_mln_rendered_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
     }
-    let field = value.getattr("filter")?;
-    raw.filter = if field.is_none() {
-        std::ptr::null()
-    } else {
-        {
-            let value = storage.buffer(field, false)?;
-            storage.keep_one(value)
-        }
-    };
+    if let Some(field) = generated_present(value, "filter")? {
+        raw.filter = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+    }
     Ok(raw)
 }
 
@@ -3778,9 +3791,7 @@ fn generated_input_mln_resource_response<'py>(
 ) -> PyResult<sys::mln_resource_response> {
     let mut raw: sys::mln_resource_response = unsafe { std::mem::zeroed() };
     raw.size = std::mem::size_of::<sys::mln_resource_response>() as _;
-    raw.has_modified = false;
-    raw.has_expires = false;
-    raw.has_retry_after = false;
+    raw.fields = 0;
     raw.status = value
         .getattr("status")?
         .extract::<sys::mln_resource_response_status>()?;
@@ -3801,11 +3812,11 @@ fn generated_input_mln_resource_response<'py>(
     raw.must_revalidate = value.getattr("must_revalidate")?.extract::<bool>()?;
     if let Some(field) = generated_present(value, "modified_unix_ms")? {
         raw.modified_unix_ms = field.extract::<i64>()?;
-        raw.has_modified = true;
+        raw.fields |= sys::MLN_RESOURCE_RESPONSE_MODIFIED;
     }
     if let Some(field) = generated_present(value, "expires_unix_ms")? {
         raw.expires_unix_ms = field.extract::<i64>()?;
-        raw.has_expires = true;
+        raw.fields |= sys::MLN_RESOURCE_RESPONSE_EXPIRES;
     }
     let field = value.getattr("etag")?;
     raw.etag = if field.is_none() {
@@ -3815,7 +3826,7 @@ fn generated_input_mln_resource_response<'py>(
     };
     if let Some(field) = generated_present(value, "retry_after_unix_ms")? {
         raw.retry_after_unix_ms = field.extract::<i64>()?;
-        raw.has_retry_after = true;
+        raw.fields |= sys::MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     }
     Ok(raw)
 }
@@ -3924,15 +3935,10 @@ fn generated_input_mln_source_feature_query_options<'py>(
         };
         raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
     }
-    let field = value.getattr("filter")?;
-    raw.filter = if field.is_none() {
-        std::ptr::null()
-    } else {
-        {
-            let value = storage.buffer(field, false)?;
-            storage.keep_one(value)
-        }
-    };
+    if let Some(field) = generated_present(value, "filter")? {
+        raw.filter = storage.buffer(field, false)?;
+        raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+    }
     Ok(raw)
 }
 

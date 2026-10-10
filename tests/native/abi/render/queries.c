@@ -145,10 +145,10 @@ static void rendered_queries_select_by_geometry_layer_and_filter(void) {
       options.layer_ids = &layer;
       options.layer_id_count = 1;
     }
-    const mln_buffer_view filter = row->filter == NULL
-                                     ? (mln_buffer_view){0}
-                                     : mln_test_view_of(row->filter);
-    options.filter = row->filter == NULL ? NULL : &filter;
+    if (row->filter != NULL) {
+      options.fields |= MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+      options.filter = mln_test_view_of(row->filter);
+    }
     const mln_test_feature_list list =
       mln_test_style_query_rendered_with(&fixture, &row->geometry, &options);
     MLN_TEST_OK_MESSAGE(list.status, row->label);
@@ -223,7 +223,9 @@ static void layer_id_without_bytes(void* call) {
   query->rendered.layer_id_count = 1;
 }
 static void unparsable_rendered_filter(void* call) {
-  ((query_call*)call)->rendered.filter = &unparsable_filter;
+  query_call* query = call;
+  query->rendered.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+  query->rendered.filter = unparsable_filter;
 }
 static void source_query(void* call) {
   ((query_call*)call)->source_query = true;
@@ -258,7 +260,8 @@ static void source_layer_without_bytes(void* call) {
 static void unparsable_source_filter(void* call) {
   query_call* query = call;
   query->source_query = true;
-  query->source.filter = &unparsable_filter;
+  query->source.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+  query->source.filter = unparsable_filter;
 }
 
 static mln_status submit_query(
@@ -405,10 +408,10 @@ static void source_queries_read_the_named_source_layers(void) {
       query.source_layer_ids = layers;
       query.source_layer_id_count = row->layer_count;
     }
-    const mln_buffer_view filter = row->filter == NULL
-                                     ? (mln_buffer_view){0}
-                                     : mln_test_view_of(row->filter);
-    query.filter = row->filter == NULL ? NULL : &filter;
+    if (row->filter != NULL) {
+      query.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+      query.filter = mln_test_view_of(row->filter);
+    }
     const mln_test_feature_list list =
       mln_test_style_query_source_with(&fixture, "tiles", &query);
     MLN_TEST_OK_MESSAGE(list.status, row->label);

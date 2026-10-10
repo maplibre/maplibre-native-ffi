@@ -69,7 +69,7 @@ static app_error zoom(
   mln_camera_delta delta = mln_camera_delta_default();
   delta.kind = MLN_CAMERA_DELTA_SCALE;
   delta.amount = scale;
-  delta.has_anchor = true;
+  delta.fields |= MLN_CAMERA_DELTA_FIELD_ANCHOR;
   delta.anchor = anchor;
   if (mode != MLN_CAMERA_UPDATE_MODE_JUMP)
     delta.animation = animation(duration_ms);

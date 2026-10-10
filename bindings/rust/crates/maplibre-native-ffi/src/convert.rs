@@ -237,8 +237,7 @@ pub(crate) unsafe fn counted<P, T: FromNative<sys::mln_buffer_view>>(
     unsafe { T::from_native(view) }
 }
 
-/// A C mask that records which optional fields are present: a bit mask, or a
-/// boolean for a record with one optional field.
+/// A C bit mask that records which optional fields are present.
 pub(crate) trait Presence: Copy {
     fn has(self, bit: Self) -> bool;
     fn mark(&mut self, bit: Self);
@@ -258,15 +257,6 @@ macro_rules! mask {
 }
 
 mask!(u32, u64);
-
-impl Presence for bool {
-    fn has(self, _: Self) -> bool {
-        self
-    }
-    fn mark(&mut self, _: Self) {
-        *self = true;
-    }
-}
 
 /// Copies an optional field when `mask` has `bit`.
 ///
@@ -482,21 +472,6 @@ pub(crate) unsafe fn copy_reference<N: Copy, T: FromNative<N>>(pointer: *const N
         unsafe { pointer.as_ref() }.ok_or_else(|| Error::invalid_argument("null record value"))?;
     // SAFETY: as above.
     unsafe { T::from_native(*value) }
-}
-
-/// Copies the value a C pointer addresses, or `None` for a null pointer.
-///
-/// # Safety
-///
-/// As for [`copy_reference`].
-pub(crate) unsafe fn copy_optional_reference<N: Copy, T: FromNative<N>>(
-    pointer: *const N,
-) -> Result<Option<T>> {
-    if pointer.is_null() {
-        return Ok(None);
-    }
-    // SAFETY: the caller upholds the pointer contract.
-    unsafe { copy_reference(pointer) }.map(Some)
 }
 
 /// Owns temporary C input allocations through native submission.

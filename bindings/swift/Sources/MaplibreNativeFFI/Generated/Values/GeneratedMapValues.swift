@@ -229,22 +229,39 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
     kind = CameraDeltaKind(rawValue: raw.kind)
     offset = ScreenPoint(raw: raw.offset)
     amount = raw.amount
-    anchor = raw.has_anchor ? ScreenPoint(raw: raw.anchor) : nil
+    anchor = raw.fields & MLN_CAMERA_DELTA_FIELD_ANCHOR
+      .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
     animation = AnimationOptions(raw: raw.animation)
   }
 
   func nativeValue() -> mln_camera_delta {
     var raw = mln_camera_delta_default()
-    raw.has_anchor = false
+    raw.fields = 0
     raw.kind = kind.rawValue
     raw.offset = offset.nativeValue()
     raw.amount = amount
     if let item = anchor {
-      raw.has_anchor = true; raw.anchor = item.nativeValue()
+      raw.fields |= MLN_CAMERA_DELTA_FIELD_ANCHOR.rawValue; raw.anchor = item
+        .nativeValue()
     }
     raw.animation = animation.nativeValue()
     return raw
   }
+}
+
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraDeltaField: OptionSet, NativeOpenValue, Equatable, Hashable,
+  Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  public static let anchor: CameraDeltaField = .init(rawValue: 1)
 }
 
 /// Relative camera operation carried by `mln_camera_delta`.

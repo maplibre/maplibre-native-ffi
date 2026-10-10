@@ -113,20 +113,18 @@ auto complete_query_buffer(
 
 // Copies a query filter once it parses, so the submission rejects a filter
 // that the driver could not apply.
-auto copy_filter(const mln_buffer_view* filter, std::optional<std::string>& out)
+auto copy_filter(const mln_buffer_view& filter, std::string& out)
   -> mln_status {
-  if (filter == nullptr) return MLN_STATUS_OK;
-  out.emplace();
-  const auto status = copy_view(*filter, *out);
+  const auto status = copy_view(filter, out);
   if (status != MLN_STATUS_OK) return status;
-  if (!to_native_style_filter(filter)) return MLN_STATUS_INVALID_ARGUMENT;
+  if (!to_native_style_filter(&filter)) return MLN_STATUS_INVALID_ARGUMENT;
   return MLN_STATUS_OK;
 }
 
 struct CopiedRenderedOptions {
   mln_rendered_feature_query_options value{};
   std::vector<std::string> layer_ids;
-  std::optional<std::string> filter;
+  std::string filter;
 };
 
 auto copy_rendered_options(
@@ -140,7 +138,8 @@ auto copy_rendered_options(
     set_thread_error("rendered feature query options size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS |
+                                MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
   if ((input->fields & ~known_fields) != 0) {
     set_thread_error("rendered feature query options have unknown fields");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -163,13 +162,16 @@ auto copy_rendered_options(
       if (status != MLN_STATUS_OK) return status;
     }
   }
+  if ((input->fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) == 0) {
+    return MLN_STATUS_OK;
+  }
   return copy_filter(input->filter, out->filter);
 }
 
 struct CopiedSourceOptions {
   mln_source_feature_query_options value{};
   std::vector<std::string> layer_ids;
-  std::optional<std::string> filter;
+  std::string filter;
 };
 
 auto copy_source_options(
@@ -182,7 +184,8 @@ auto copy_source_options(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   constexpr auto known_fields =
-    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS |
+    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
   if ((input->fields & ~known_fields) != 0) {
     set_thread_error("source feature query options have unknown fields");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -205,6 +208,9 @@ auto copy_source_options(
         copy_view(input->source_layer_ids[i], out->layer_ids[i]);
       if (status != MLN_STATUS_OK) return status;
     }
+  }
+  if ((input->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) == 0) {
+    return MLN_STATUS_OK;
   }
   return copy_filter(input->filter, out->filter);
 }
@@ -287,16 +293,12 @@ auto render_session_query_rendered_features_start(
       }
       const mln_rendered_feature_query_options* option_pointer = nullptr;
       auto views = std::vector<mln_buffer_view>{};
-      auto filter_view = mln_buffer_view{};
       if (copied_options) {
         views = make_views(copied_options->layer_ids);
         copied_options->value.layer_ids = views.data();
-        if (copied_options->filter) {
-          filter_view = mln_buffer_view{
-            copied_options->filter->data(), copied_options->filter->size()
-          };
-          copied_options->value.filter = &filter_view;
-        }
+        copied_options->value.filter = mln_buffer_view{
+          copied_options->filter.data(), copied_options->filter.size()
+        };
         option_pointer = &copied_options->value;
       }
       auto list = OwnedQueriedFeatureList{};
@@ -333,16 +335,12 @@ auto render_session_query_source_features_start(
     ) mutable {
       const mln_source_feature_query_options* option_pointer = nullptr;
       auto views = std::vector<mln_buffer_view>{};
-      auto filter_view = mln_buffer_view{};
       if (copied_options) {
         views = make_views(copied_options->layer_ids);
         copied_options->value.source_layer_ids = views.data();
-        if (copied_options->filter) {
-          filter_view = mln_buffer_view{
-            copied_options->filter->data(), copied_options->filter->size()
-          };
-          copied_options->value.filter = &filter_view;
-        }
+        copied_options->value.filter = mln_buffer_view{
+          copied_options->filter.data(), copied_options->filter.size()
+        };
         option_pointer = &copied_options->value;
       }
       auto list = OwnedQueriedFeatureList{};

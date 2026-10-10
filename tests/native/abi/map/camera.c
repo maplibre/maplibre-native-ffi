@@ -379,7 +379,7 @@ static void relative_camera_commands_compose_in_runtime_order(void) {
   );
   delta.kind = MLN_CAMERA_DELTA_SCALE;
   delta.amount = 2.0;
-  delta.has_anchor = true;
+  delta.fields = MLN_CAMERA_DELTA_FIELD_ANCHOR;
   delta.anchor = anchor;
   MLN_TEST_AWAIT_OK(
     mln_map_apply_camera_delta(map, &delta, &completion.descriptor, NULL)
@@ -391,7 +391,7 @@ static void relative_camera_commands_compose_in_runtime_order(void) {
   );
   delta.kind = MLN_CAMERA_DELTA_PITCH;
   delta.amount = 5.0;
-  delta.has_anchor = false;
+  delta.fields = 0;
   MLN_TEST_AWAIT_OK(
     mln_map_apply_camera_delta(map, &delta, &completion.descriptor, NULL)
   );
@@ -491,7 +491,7 @@ static void every_camera_delta_kind_follows_its_convention(void) {
     delta.kind = row->kind;
     delta.offset = row->offset;
     delta.amount = row->amount;
-    delta.has_anchor = row->has_anchor;
+    delta.fields = row->has_anchor ? MLN_CAMERA_DELTA_FIELD_ANCHOR : 0;
     delta.anchor = row->anchor;
     mln_test_completion completion = mln_test_completion_default(0);
     MLN_TEST_OK_MESSAGE(
@@ -594,20 +594,23 @@ static void delta_nan_pitch(void* descriptor) {
   delta->kind = MLN_CAMERA_DELTA_PITCH;
   delta->amount = NAN;
 }
+static void delta_unknown_field(void* descriptor) {
+  ((mln_camera_delta*)descriptor)->fields = UINT32_C(1) << 31;
+}
 static void delta_anchored_move(void* descriptor) {
-  ((mln_camera_delta*)descriptor)->has_anchor = true;
+  ((mln_camera_delta*)descriptor)->fields = MLN_CAMERA_DELTA_FIELD_ANCHOR;
 }
 static void delta_anchored_pitch(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->kind = MLN_CAMERA_DELTA_PITCH;
   delta->amount = 5.0;
-  delta->has_anchor = true;
+  delta->fields = MLN_CAMERA_DELTA_FIELD_ANCHOR;
 }
 static void delta_nan_anchor(void* descriptor) {
   mln_camera_delta* delta = descriptor;
   delta->kind = MLN_CAMERA_DELTA_BEARING;
   delta->amount = 5.0;
-  delta->has_anchor = true;
+  delta->fields = MLN_CAMERA_DELTA_FIELD_ANCHOR;
   delta->anchor.x = NAN;
 }
 static void delta_undersized_animation(void* descriptor) {
@@ -616,6 +619,8 @@ static void delta_undersized_animation(void* descriptor) {
 
 static const mln_test_validation_case delta_cases[] = {
   {"undersized", delta_undersized, MLN_STATUS_INVALID_ARGUMENT, "valid size"},
+  {"unknown field", delta_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
+   "unknown bits"},
   {"kind out of range", delta_bad_kind, MLN_STATUS_INVALID_ARGUMENT,
    "kind is invalid"},
   {"infinite move offset", delta_infinite_offset, MLN_STATUS_INVALID_ARGUMENT,

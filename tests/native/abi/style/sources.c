@@ -435,7 +435,7 @@ static void sources_copy_their_url_and_attribution(void) {
   TEST_ASSERT_EQUAL_STRING("Fixture tiles", text);
   mln_style_source_result result;
   TEST_ASSERT_TRUE(read_source(map, "inline", &result));
-  TEST_ASSERT_TRUE(result.info.has_attribution);
+  TEST_ASSERT_BITS_HIGH(MLN_STYLE_SOURCE_INFO_ATTRIBUTION, result.info.fields);
   TEST_ASSERT_EQUAL_size_t(strlen(text), result.info.attribution_size);
 
   TEST_ASSERT_FALSE(read_source_text(map, "inline", false, text));

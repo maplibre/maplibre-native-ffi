@@ -89,7 +89,9 @@ internal static unsafe class GeneratedValues
             Kind = (CameraDeltaKind)value.kind,
             Offset = CopyScreenPoint(value.offset),
             Amount = value.amount,
-            Anchor = value.has_anchor != 0 ? CopyScreenPoint(value.anchor) : null,
+            Anchor = value.fields.HasFlag(MLN_CAMERA_DELTA_FIELD_ANCHOR)
+                ? CopyScreenPoint(value.anchor)
+                : null,
             Animation = CopyAnimationOptions(value.animation),
         };
 
@@ -97,16 +99,17 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Animation, "CameraDelta.Animation must not be null.");
         var native = NativeMethods.mln_camera_delta_default();
-        native.has_anchor = 0;
+        native.fields = 0;
         native.size = (uint)sizeof(mln_camera_delta);
         native.kind = (uint)value.Kind;
         native.offset = NativeScreenPoint(value.Offset);
         native.amount = value.Amount;
-        if (value.Anchor is { } fieldAnchor)
-        {
-            native.has_anchor = 1;
-            native.anchor = NativeScreenPoint(fieldAnchor);
-        }
+        native.fields |= Put(
+            value.Anchor,
+            ref native.anchor,
+            MLN_CAMERA_DELTA_FIELD_ANCHOR,
+            NativeScreenPoint
+        );
         native.animation = NativeAnimationOptions(value.Animation);
         return native;
     }
@@ -1774,9 +1777,9 @@ internal static unsafe class GeneratedValues
                     : null
             ),
             FilterStorage = ValueArray.Optional(
-                value.filter == null
-                    ? null
-                    : ValueStructs.CopyBufferView(NativeCallScope.Read(value.filter))
+                value.fields.HasFlag(MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER)
+                    ? ValueStructs.CopyBufferView(value.filter)
+                    : null
             ),
         };
 
@@ -1797,8 +1800,12 @@ internal static unsafe class GeneratedValues
             );
             native.layer_id_count = checked((nuint)fieldLayerIds.Length);
         }
-        var fieldFilter = value.FilterStorage?.Items;
-        native.filter = fieldFilter is null ? null : scope.Value(scope.Buffer(fieldFilter));
+        native.fields |= Put(
+            value.FilterStorage?.Items,
+            ref native.filter,
+            MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER,
+            present => scope.Buffer(present)
+        );
         return native;
     }
 
@@ -1954,13 +1961,15 @@ internal static unsafe class GeneratedValues
             Priority = (ResourcePriority)value.priority,
             Usage = (ResourceUsage)value.usage,
             StoragePolicy = (ResourceStoragePolicy)value.storage_policy,
-            Range =
-                value.has_range != 0
-                    ? new ResourceRequest.RangeValue(value.range_start, value.range_end)
-                    : null,
-            PriorModifiedUnixMs =
-                value.has_prior_modified != 0 ? value.prior_modified_unix_ms : null,
-            PriorExpiresUnixMs = value.has_prior_expires != 0 ? value.prior_expires_unix_ms : null,
+            Range = value.fields.HasFlag(MLN_RESOURCE_REQUEST_RANGE)
+                ? new ResourceRequest.RangeValue(value.range_start, value.range_end)
+                : null,
+            PriorModifiedUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
+                ? value.prior_modified_unix_ms
+                : null,
+            PriorExpiresUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_EXPIRES)
+                ? value.prior_expires_unix_ms
+                : null,
             PriorEtag =
                 value.prior_etag == null ? null : NativeCallScope.CopyCString(value.prior_etag),
             PriorDataStorage = new(
@@ -1977,9 +1986,7 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_resource_request();
-        native.has_range = 0;
-        native.has_prior_modified = 0;
-        native.has_prior_expires = 0;
+        native.fields = 0;
         native.size = (uint)sizeof(mln_resource_request);
         native.requested_url = value.RequestedUrl is null
             ? null
@@ -1992,20 +1999,20 @@ internal static unsafe class GeneratedValues
         native.storage_policy = (uint)value.StoragePolicy;
         if (value.Range is { } fieldRange)
         {
-            native.has_range = 1;
+            native.fields |= MLN_RESOURCE_REQUEST_RANGE;
             native.range_start = fieldRange.RangeStart;
             native.range_end = fieldRange.RangeEnd;
         }
-        if (value.PriorModifiedUnixMs is { } fieldPriorModifiedUnixMs)
-        {
-            native.has_prior_modified = 1;
-            native.prior_modified_unix_ms = fieldPriorModifiedUnixMs;
-        }
-        if (value.PriorExpiresUnixMs is { } fieldPriorExpiresUnixMs)
-        {
-            native.has_prior_expires = 1;
-            native.prior_expires_unix_ms = fieldPriorExpiresUnixMs;
-        }
+        native.fields |= Put(
+            value.PriorModifiedUnixMs,
+            ref native.prior_modified_unix_ms,
+            MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
+        );
+        native.fields |= Put(
+            value.PriorExpiresUnixMs,
+            ref native.prior_expires_unix_ms,
+            MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
+        );
         native.prior_etag = value.PriorEtag is null ? null : scope.CString(value.PriorEtag);
         var bufferPriorData = scope.Buffer(value.PriorDataStorage.Items);
         native.prior_data = (byte*)bufferPriorData.data;
@@ -2019,9 +2026,7 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_resource_response();
-        native.has_modified = 0;
-        native.has_expires = 0;
-        native.has_retry_after = 0;
+        native.fields = 0;
         native.size = (uint)sizeof(mln_resource_response);
         native.status = (uint)value.Status;
         native.error_reason = (uint)value.ErrorReason;
@@ -2032,22 +2037,22 @@ internal static unsafe class GeneratedValues
             ? null
             : scope.CString(value.ErrorMessage);
         native.must_revalidate = (byte)(value.MustRevalidate ? 1 : 0);
-        if (value.ModifiedUnixMs is { } fieldModifiedUnixMs)
-        {
-            native.has_modified = 1;
-            native.modified_unix_ms = fieldModifiedUnixMs;
-        }
-        if (value.ExpiresUnixMs is { } fieldExpiresUnixMs)
-        {
-            native.has_expires = 1;
-            native.expires_unix_ms = fieldExpiresUnixMs;
-        }
+        native.fields |= Put(
+            value.ModifiedUnixMs,
+            ref native.modified_unix_ms,
+            MLN_RESOURCE_RESPONSE_MODIFIED
+        );
+        native.fields |= Put(
+            value.ExpiresUnixMs,
+            ref native.expires_unix_ms,
+            MLN_RESOURCE_RESPONSE_EXPIRES
+        );
         native.etag = value.Etag is null ? null : scope.CString(value.Etag);
-        if (value.RetryAfterUnixMs is { } fieldRetryAfterUnixMs)
-        {
-            native.has_retry_after = 1;
-            native.retry_after_unix_ms = fieldRetryAfterUnixMs;
-        }
+        native.fields |= Put(
+            value.RetryAfterUnixMs,
+            ref native.retry_after_unix_ms,
+            MLN_RESOURCE_RESPONSE_RETRY_AFTER
+        );
         return native;
     }
 
@@ -2372,9 +2377,9 @@ internal static unsafe class GeneratedValues
                     : null
             ),
             FilterStorage = ValueArray.Optional(
-                value.filter == null
-                    ? null
-                    : ValueStructs.CopyBufferView(NativeCallScope.Read(value.filter))
+                value.fields.HasFlag(MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER)
+                    ? ValueStructs.CopyBufferView(value.filter)
+                    : null
             ),
         };
 
@@ -2395,8 +2400,12 @@ internal static unsafe class GeneratedValues
             );
             native.source_layer_id_count = checked((nuint)fieldSourceLayerIds.Length);
         }
-        var fieldFilter = value.FilterStorage?.Items;
-        native.filter = fieldFilter is null ? null : scope.Value(scope.Buffer(fieldFilter));
+        native.fields |= Put(
+            value.FilterStorage?.Items,
+            ref native.filter,
+            MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER,
+            present => scope.Buffer(present)
+        );
         return native;
     }
 
@@ -2409,11 +2418,15 @@ internal static unsafe class GeneratedValues
             ByteLength = (ulong)value.byte_length,
             StretchXCount = (ulong)value.stretch_x_count,
             StretchYCount = (ulong)value.stretch_y_count,
-            Content = value.has_content != 0 ? CopyImageContent(value.content) : null,
-            TextFitWidth =
-                value.has_text_fit_width != 0 ? (StyleImageTextFit)value.text_fit_width : null,
-            TextFitHeight =
-                value.has_text_fit_height != 0 ? (StyleImageTextFit)value.text_fit_height : null,
+            Content = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_CONTENT)
+                ? CopyImageContent(value.content)
+                : null,
+            TextFitWidth = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH)
+                ? (StyleImageTextFit)value.text_fit_width
+                : null,
+            TextFitHeight = value.fields.HasFlag(MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT)
+                ? (StyleImageTextFit)value.text_fit_height
+                : null,
             PixelRatio = value.pixel_ratio,
             Sdf = value.sdf != 0,
         };
@@ -2421,9 +2434,7 @@ internal static unsafe class GeneratedValues
     internal static mln_style_image_info NativeStyleImageInfo(StyleImageInfo value)
     {
         var native = NativeMethods.mln_style_image_info_default();
-        native.has_content = 0;
-        native.has_text_fit_width = 0;
-        native.has_text_fit_height = 0;
+        native.fields = 0;
         native.size = (uint)sizeof(mln_style_image_info);
         native.width = value.Width;
         native.height = value.Height;
@@ -2431,21 +2442,24 @@ internal static unsafe class GeneratedValues
         native.byte_length = checked((nuint)value.ByteLength);
         native.stretch_x_count = checked((nuint)value.StretchXCount);
         native.stretch_y_count = checked((nuint)value.StretchYCount);
-        if (value.Content is { } fieldContent)
-        {
-            native.has_content = 1;
-            native.content = NativeImageContent(fieldContent);
-        }
-        if (value.TextFitWidth is { } fieldTextFitWidth)
-        {
-            native.has_text_fit_width = 1;
-            native.text_fit_width = (uint)fieldTextFitWidth;
-        }
-        if (value.TextFitHeight is { } fieldTextFitHeight)
-        {
-            native.has_text_fit_height = 1;
-            native.text_fit_height = (uint)fieldTextFitHeight;
-        }
+        native.fields |= Put(
+            value.Content,
+            ref native.content,
+            MLN_STYLE_IMAGE_INFO_CONTENT,
+            NativeImageContent
+        );
+        native.fields |= Put(
+            value.TextFitWidth,
+            ref native.text_fit_width,
+            MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH,
+            static present => (uint)present
+        );
+        native.fields |= Put(
+            value.TextFitHeight,
+            ref native.text_fit_height,
+            MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
+            static present => (uint)present
+        );
         native.pixel_ratio = value.PixelRatio;
         native.sdf = (byte)(value.Sdf ? 1 : 0);
         return native;
@@ -2711,7 +2725,9 @@ internal static unsafe class GeneratedValues
             Type = (StyleSourceType)value.type,
             IdSize = (ulong)value.id_size,
             IsVolatile = value.is_volatile != 0,
-            AttributionSize = value.has_attribution != 0 ? (ulong)value.attribution_size : null,
+            AttributionSize = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
+                ? (ulong)value.attribution_size
+                : null,
             UrlSize = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_URL)
                 ? (ulong)value.url_size
                 : null,
@@ -2741,16 +2757,16 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_style_source_info();
         native.fields = 0;
-        native.has_attribution = 0;
         native.size = (uint)sizeof(mln_style_source_info);
         native.type = (uint)value.Type;
         native.id_size = checked((nuint)value.IdSize);
         native.is_volatile = (byte)(value.IsVolatile ? 1 : 0);
-        if (value.AttributionSize is { } fieldAttributionSize)
-        {
-            native.has_attribution = 1;
-            native.attribution_size = checked((nuint)fieldAttributionSize);
-        }
+        native.fields |= Put(
+            value.AttributionSize,
+            ref native.attribution_size,
+            MLN_STYLE_SOURCE_INFO_ATTRIBUTION,
+            static present => checked((nuint)present)
+        );
         native.fields |= Put(
             value.UrlSize,
             ref native.url_size,
@@ -2791,13 +2807,9 @@ internal static unsafe class GeneratedValues
         new()
         {
             Info = CopyStyleSourceInfo(value.info),
-            Attribution =
-                value.info.has_attribution != 0
-                    ? RuntimeStructs.CopyUtf8(
-                        (sbyte*)value.attribution.data,
-                        value.attribution.size
-                    )
-                    : null,
+            Attribution = value.info.fields.HasFlag(MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
+                ? RuntimeStructs.CopyUtf8((sbyte*)value.attribution.data, value.attribution.size)
+                : null,
             Url = value.info.fields.HasFlag(MLN_STYLE_SOURCE_INFO_URL)
                 ? RuntimeStructs.CopyUtf8((sbyte*)value.url.data, value.url.size)
                 : null,
@@ -2821,12 +2833,13 @@ internal static unsafe class GeneratedValues
         var native = new mln_style_source_result();
         native.size = (uint)sizeof(mln_style_source_result);
         native.info = NativeStyleSourceInfo(value.Info);
-        native.info.has_attribution = 0;
-        if (value.Attribution is { } fieldAttribution)
-        {
-            native.info.has_attribution = 1;
-            native.attribution = scope.Utf8(fieldAttribution);
-        }
+        native.info.fields &= ~MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+        native.info.fields |= Put(
+            value.Attribution,
+            ref native.attribution,
+            MLN_STYLE_SOURCE_INFO_ATTRIBUTION,
+            present => scope.Utf8(present)
+        );
         native.info.fields &= ~MLN_STYLE_SOURCE_INFO_URL;
         native.info.fields |= Put(
             value.Url,

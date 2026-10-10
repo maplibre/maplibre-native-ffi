@@ -41,6 +41,9 @@ static void mln_camera_delta_default_holds_its_annotated_values(void) {
     "mln_camera_delta.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.fields, "mln_camera_delta.fields"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.kind, "mln_camera_delta.kind"
   );
   TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
@@ -51,9 +54,6 @@ static void mln_camera_delta_default_holds_its_annotated_values(void) {
   );
   TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
     0, (double)value.amount, "mln_camera_delta.amount"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_anchor, "mln_camera_delta.has_anchor"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_animation_options), (uint64_t)value.animation.size,
@@ -654,9 +654,6 @@ mln_rendered_feature_query_options_default_holds_its_annotated_values(void) {
     (uint64_t)0, (uint64_t)value.layer_id_count,
     "mln_rendered_feature_query_options.layer_id_count"
   );
-  TEST_ASSERT_TRUE_MESSAGE(
-    value.filter == NULL, "mln_rendered_feature_query_options.filter"
-  );
 }
 
 static void mln_runtime_options_default_holds_its_annotated_values(void) {
@@ -712,9 +709,6 @@ static void mln_source_feature_query_options_default_holds_its_annotated_values(
     (uint64_t)0, (uint64_t)value.source_layer_id_count,
     "mln_source_feature_query_options.source_layer_id_count"
   );
-  TEST_ASSERT_TRUE_MESSAGE(
-    value.filter == NULL, "mln_source_feature_query_options.filter"
-  );
 }
 
 static void mln_style_image_info_default_holds_its_annotated_values(void) {
@@ -722,6 +716,9 @@ static void mln_style_image_info_default_holds_its_annotated_values(void) {
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_style_image_info), (uint64_t)value.size,
     "mln_style_image_info.size"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.fields, "mln_style_image_info.fields"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.width, "mln_style_image_info.width"
@@ -748,17 +745,6 @@ static void mln_style_image_info_default_holds_its_annotated_values(void) {
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.sdf, "mln_style_image_info.sdf"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_content, "mln_style_image_info.has_content"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_text_fit_width,
-    "mln_style_image_info.has_text_fit_width"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.has_text_fit_height,
-    "mln_style_image_info.has_text_fit_height"
   );
 }
 

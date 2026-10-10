@@ -533,10 +533,11 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     raw: mln_resource_request,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    range = raw.has_range ? ResourceRequestRange(
-      rangeStart: raw.range_start,
-      rangeEnd: raw.range_end
-    ) : nil
+    range = raw.fields & MLN_RESOURCE_REQUEST_RANGE
+      .rawValue != 0 ? ResourceRequestRange(
+        rangeStart: raw.range_start,
+        rangeEnd: raw.range_end
+      ) : nil
     requestedUrl = raw.requested_url == nil ? nil : try NativeString
       .copyCString(raw.requested_url)
     resolvedUrl = raw.resolved_url == nil ? nil : try NativeString
@@ -546,9 +547,10 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     priority = ResourcePriority(rawValue: raw.priority)
     usage = ResourceUsage(rawValue: raw.usage)
     storagePolicy = ResourceStoragePolicy(rawValue: raw.storage_policy)
-    priorModifiedUnixMs = raw.has_prior_modified ? raw
-      .prior_modified_unix_ms : nil
-    priorExpiresUnixMs = raw.has_prior_expires ? raw.prior_expires_unix_ms : nil
+    priorModifiedUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
+      .rawValue != 0 ? raw.prior_modified_unix_ms : nil
+    priorExpiresUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
+      .rawValue != 0 ? raw.prior_expires_unix_ms : nil
     priorEtag = raw.prior_etag == nil ? nil : try NativeString
       .copyCString(raw.prior_etag)
     priorData = try NativeString.copyData(
@@ -559,12 +561,10 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_request {
     var raw = mln_resource_request()
-    raw.has_range = false
-    raw.has_prior_modified = false
-    raw.has_prior_expires = false
+    raw.fields = 0
     if let item = range {
-      raw.has_range = true; raw.range_start = item.rangeStart; raw
-        .range_end = item.rangeEnd
+      raw.fields |= MLN_RESOURCE_REQUEST_RANGE.rawValue; raw.range_start = item
+        .rangeStart; raw.range_end = item.rangeEnd
     }
     raw.size = UInt32(MemoryLayout<mln_resource_request>.size)
     raw.requested_url = try requestedUrl.map { try arena.cString($0) }
@@ -575,10 +575,12 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     raw.usage = usage.rawValue
     raw.storage_policy = storagePolicy.rawValue
     if let item = priorModifiedUnixMs {
-      raw.has_prior_modified = true; raw.prior_modified_unix_ms = item
+      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED.rawValue; raw
+        .prior_modified_unix_ms = item
     }
     if let item = priorExpiresUnixMs {
-      raw.has_prior_expires = true; raw.prior_expires_unix_ms = item
+      raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_EXPIRES.rawValue; raw
+        .prior_expires_unix_ms = item
     }
     raw.prior_etag = try priorEtag.map { try arena.cString($0) }
     raw.prior_data = arena.view(priorData).data?
@@ -588,6 +590,30 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRequestField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// The request asks for the inclusive byte range range_start to range_end.
+  public static let range: ResourceRequestField = .init(rawValue: 1)
+  /// The cached copy being revalidated carries a modification time.
+  public static let priorModified: ResourceRequestField = .init(rawValue: 2)
+  /// The cached copy being revalidated carries an expiration time.
+  public static let priorExpires: ResourceRequestField = .init(rawValue: 4)
+}
+
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceResponse: Equatable, Hashable, Sendable {
   public var status: ResourceResponseStatus
   public var errorReason: ResourceErrorReason
@@ -638,17 +664,18 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     errorMessage = raw.error_message == nil ? nil : try NativeString
       .copyCString(raw.error_message)
     mustRevalidate = raw.must_revalidate
-    modifiedUnixMs = raw.has_modified ? raw.modified_unix_ms : nil
-    expiresUnixMs = raw.has_expires ? raw.expires_unix_ms : nil
+    modifiedUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_MODIFIED
+      .rawValue != 0 ? raw.modified_unix_ms : nil
+    expiresUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_EXPIRES
+      .rawValue != 0 ? raw.expires_unix_ms : nil
     etag = raw.etag == nil ? nil : try NativeString.copyCString(raw.etag)
-    retryAfterUnixMs = raw.has_retry_after ? raw.retry_after_unix_ms : nil
+    retryAfterUnixMs = raw.fields & MLN_RESOURCE_RESPONSE_RETRY_AFTER
+      .rawValue != 0 ? raw.retry_after_unix_ms : nil
   }
 
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_response {
     var raw = mln_resource_response()
-    raw.has_modified = false
-    raw.has_expires = false
-    raw.has_retry_after = false
+    raw.fields = 0
     raw.size = UInt32(MemoryLayout<mln_resource_response>.size)
     raw.status = status.rawValue
     raw.error_reason = errorReason.rawValue
@@ -657,17 +684,40 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
     raw.error_message = try errorMessage.map { try arena.cString($0) }
     raw.must_revalidate = mustRevalidate
     if let item = modifiedUnixMs {
-      raw.has_modified = true; raw.modified_unix_ms = item
+      raw.fields |= MLN_RESOURCE_RESPONSE_MODIFIED.rawValue; raw
+        .modified_unix_ms = item
     }
     if let item = expiresUnixMs {
-      raw.has_expires = true; raw.expires_unix_ms = item
+      raw.fields |= MLN_RESOURCE_RESPONSE_EXPIRES.rawValue; raw
+        .expires_unix_ms = item
     }
     raw.etag = try etag.map { try arena.cString($0) }
     if let item = retryAfterUnixMs {
-      raw.has_retry_after = true; raw.retry_after_unix_ms = item
+      raw.fields |= MLN_RESOURCE_RESPONSE_RETRY_AFTER.rawValue; raw
+        .retry_after_unix_ms = item
     }
     return raw
   }
+}
+
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceResponseField: OptionSet, NativeOpenValue, Equatable,
+  Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// The response carries a modification time.
+  public static let modified: ResourceResponseField = .init(rawValue: 1)
+  /// The response carries an expiration time.
+  public static let expires: ResourceResponseField = .init(rawValue: 2)
+  /// An ERROR response carries the earliest time to retry the request.
+  public static let retryAfter: ResourceResponseField = .init(rawValue: 4)
 }
 
 /// How a resource provider answered a request.

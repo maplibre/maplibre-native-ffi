@@ -27,19 +27,19 @@ public sealed record StyleImageInfo
     public ulong StretchYCount { get; set; }
 
     /// <summary>
-    /// Content box, meaningful only when has_content is true.
+    /// Content box, meaningful when fields contains CONTENT.
     /// </summary>
     public ImageContent? Content { get; set; }
 
     /// <summary>
-    /// One of <c>mln_style_image_text_fit</c>, meaningful only when its flag is
-    /// true.
+    /// One of <c>mln_style_image_text_fit</c>, meaningful when fields contains
+    /// TEXT_FIT_WIDTH.
     /// </summary>
     public StyleImageTextFit? TextFitWidth { get; set; }
 
     /// <summary>
-    /// One of <c>mln_style_image_text_fit</c>, meaningful only when its flag is
-    /// true.
+    /// One of <c>mln_style_image_text_fit</c>, meaningful when fields contains
+    /// TEXT_FIT_HEIGHT.
     /// </summary>
     public StyleImageTextFit? TextFitHeight { get; set; }
 

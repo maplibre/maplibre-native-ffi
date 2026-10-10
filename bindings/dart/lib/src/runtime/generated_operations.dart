@@ -243,7 +243,7 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
   result.ref.offset = _writeScreenPoint(value.offset, arena).ref;
   result.ref.amount = value.amount;
   if (value.anchor != null) {
-    result.ref.has_anchor = true;
+    result.ref.fields |= raw.MLN_CAMERA_DELTA_FIELD_ANCHOR;
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
   }
   result.ref.animation = _writeAnimationOptions(value.animation, arena).ref;
@@ -254,7 +254,9 @@ CameraDelta _readCameraDelta(raw.mln_camera_delta source) => CameraDelta(
   kind: CameraDeltaKind.fromRawValue(source.kind),
   offset: _readScreenPoint(source.offset),
   amount: source.amount,
-  anchor: source.has_anchor ? _readScreenPoint(source.anchor) : null,
+  anchor: (source.fields & raw.MLN_CAMERA_DELTA_FIELD_ANCHOR) != 0
+      ? _readScreenPoint(source.anchor)
+      : null,
   animation: _readAnimationOptions(source.animation),
 );
 
@@ -1205,24 +1207,27 @@ ImageContent _readImageContent(raw.mln_image_content source) => ImageContent(
   bottom: source.bottom,
 );
 
-StyleImageInfo _readStyleImageInfo(raw.mln_style_image_info source) =>
-    StyleImageInfo(
-      width: source.width,
-      height: source.height,
-      stride: source.stride,
-      byteLength: source.byte_length,
-      stretchXCount: source.stretch_x_count,
-      stretchYCount: source.stretch_y_count,
-      content: source.has_content ? _readImageContent(source.content) : null,
-      textFitWidth: source.has_text_fit_width
-          ? StyleImageTextFit.fromRawValue(source.text_fit_width)
-          : null,
-      textFitHeight: source.has_text_fit_height
-          ? StyleImageTextFit.fromRawValue(source.text_fit_height)
-          : null,
-      pixelRatio: source.pixel_ratio,
-      sdf: source.sdf,
-    );
+StyleImageInfo _readStyleImageInfo(
+  raw.mln_style_image_info source,
+) => StyleImageInfo(
+  width: source.width,
+  height: source.height,
+  stride: source.stride,
+  byteLength: source.byte_length,
+  stretchXCount: source.stretch_x_count,
+  stretchYCount: source.stretch_y_count,
+  content: (source.fields & raw.MLN_STYLE_IMAGE_INFO_CONTENT) != 0
+      ? _readImageContent(source.content)
+      : null,
+  textFitWidth: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_width)
+      : null,
+  textFitHeight: (source.fields & raw.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0
+      ? StyleImageTextFit.fromRawValue(source.text_fit_height)
+      : null,
+  pixelRatio: source.pixel_ratio,
+  sdf: source.sdf,
+);
 
 StyleImageResult _readStyleImageResult(raw.mln_style_image_result source) =>
     StyleImageResult(
@@ -1266,7 +1271,10 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
       type: StyleSourceType.fromRawValue(source.type),
       idSize: source.id_size,
       isVolatile: source.is_volatile,
-      attributionSize: source.has_attribution ? source.attribution_size : null,
+      attributionSize:
+          (source.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
+          ? source.attribution_size
+          : null,
       urlSize: (source.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
           ? source.url_size
           : null,
@@ -1297,7 +1305,8 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
 StyleSourceResult _readStyleSourceResult(raw.mln_style_source_result source) =>
     StyleSourceResult(
       info: _readStyleSourceInfo(source.info),
-      attribution: source.info.has_attribution
+      attribution:
+          (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0
           ? utf8.decode(_copyBufferView(source.attribution))
           : null,
       url: (source.info.fields & raw.MLN_STYLE_SOURCE_INFO_URL) != 0
@@ -2158,13 +2167,10 @@ _writeRenderedFeatureQueryOptions(
       ).value;
     }
   }
-  result.ref.filter = value.filter == null
-      ? nullptr
-      : (() {
-          final storage = arena<raw.mln_buffer_view>();
-          storage.ref = nativeBufferView(value.filter!, arena);
-          return storage;
-        })();
+  if (value.filter != null) {
+    result.ref.fields |= raw.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+    result.ref.filter = nativeBufferView(value.filter!, arena);
+  }
   return result;
 }
 
@@ -2180,7 +2186,9 @@ RenderedFeatureQueryOptions _readRenderedFeatureQueryOptions(
           ),
         )
       : null,
-  filter: source.filter == nullptr ? null : _copyBufferView(source.filter.ref),
+  filter: (source.fields & raw.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) != 0
+      ? _copyBufferView(source.filter)
+      : null,
 );
 
 QueriedFeature _readQueriedFeature(raw.mln_queried_feature source) =>
@@ -2217,13 +2225,10 @@ Pointer<raw.mln_source_feature_query_options> _writeSourceFeatureQueryOptions(
       ).value;
     }
   }
-  result.ref.filter = value.filter == null
-      ? nullptr
-      : (() {
-          final storage = arena<raw.mln_buffer_view>();
-          storage.ref = nativeBufferView(value.filter!, arena);
-          return storage;
-        })();
+  if (value.filter != null) {
+    result.ref.fields |= raw.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+    result.ref.filter = nativeBufferView(value.filter!, arena);
+  }
   return result;
 }
 
@@ -2241,7 +2246,9 @@ SourceFeatureQueryOptions _readSourceFeatureQueryOptions(
           ),
         )
       : null,
-  filter: source.filter == nullptr ? null : _copyBufferView(source.filter.ref),
+  filter: (source.fields & raw.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) != 0
+      ? _copyBufferView(source.filter)
+      : null,
 );
 
 Pointer<raw.mln_resource_response> _writeResourceResponse(
@@ -2260,18 +2267,18 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
       : nativeUtf8CString(value.errorMessage!, arena).pointer.cast<Char>();
   result.ref.must_revalidate = value.mustRevalidate;
   if (value.modifiedUnixMs != null) {
-    result.ref.has_modified = true;
+    result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_MODIFIED;
     result.ref.modified_unix_ms = value.modifiedUnixMs!;
   }
   if (value.expiresUnixMs != null) {
-    result.ref.has_expires = true;
+    result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_EXPIRES;
     result.ref.expires_unix_ms = value.expiresUnixMs!;
   }
   result.ref.etag = value.etag == null
       ? nullptr
       : nativeUtf8CString(value.etag!, arena).pointer.cast<Char>();
   if (value.retryAfterUnixMs != null) {
-    result.ref.has_retry_after = true;
+    result.ref.fields |= raw.MLN_RESOURCE_RESPONSE_RETRY_AFTER;
     result.ref.retry_after_unix_ms = value.retryAfterUnixMs!;
   }
   return result;
@@ -2579,16 +2586,18 @@ ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
       priority: ResourcePriority.fromRawValue(source.priority),
       usage: ResourceUsage.fromRawValue(source.usage),
       storagePolicy: ResourceStoragePolicy.fromRawValue(source.storage_policy),
-      range: source.has_range
+      range: (source.fields & raw.MLN_RESOURCE_REQUEST_RANGE) != 0
           ? (
               rangeStart: uint64FromNative(source.range_start),
               rangeEnd: uint64FromNative(source.range_end),
             )
           : null,
-      priorModifiedUnixMs: source.has_prior_modified
+      priorModifiedUnixMs:
+          (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0
           ? source.prior_modified_unix_ms
           : null,
-      priorExpiresUnixMs: source.has_prior_expires
+      priorExpiresUnixMs:
+          (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES) != 0
           ? source.prior_expires_unix_ms
           : null,
       priorEtag: source.prior_etag == nullptr

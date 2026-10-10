@@ -269,11 +269,11 @@ pub const CameraDelta = struct {
     animation: AnimationOptions = .{},
     pub fn toNative(self: CameraDelta) c.mln_camera_delta {
         var raw = c.mln_camera_delta_default();
-        raw.has_anchor = false;
+        raw.fields = 0;
         raw.kind = self.kind.toNative();
         raw.offset = self.offset.toNative();
         raw.amount = self.amount;
-        marshal.present(&raw.has_anchor, true, &raw.anchor, self.anchor);
+        marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_FIELD_ANCHOR, &raw.anchor, self.anchor);
         raw.animation = self.animation.toNative();
         return raw;
     }
@@ -282,10 +282,26 @@ pub const CameraDelta = struct {
             .kind = CameraDeltaKind.fromNative(raw.kind),
             .offset = ScreenPoint.fromNative(raw.offset),
             .amount = raw.amount,
-            .anchor = if (raw.has_anchor) ScreenPoint.fromNative(raw.anchor) else null,
+            .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_FIELD_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
             .animation = AnimationOptions.fromNative(raw.animation),
         };
     }
+};
+
+/// Field mask values for `mln_camera_delta`.
+///
+/// See `mln_camera_delta_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraDeltaField = struct {
+    anchor: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{1};
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// Relative camera operation carried by `mln_camera_delta`.
@@ -2896,9 +2912,10 @@ pub const RenderTargetExtent = struct {
 /// See `mln_rendered_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const RenderedFeatureQueryOptionField = struct {
-    ids: bool = false,
+    layer_ids: bool = false,
+    filter: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{1};
+    pub const native_bits = [_]u32{ 1, 2 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -2928,7 +2945,10 @@ pub const RenderedFeatureQueryOptions = struct {
             };
         }
         raw.layer_id_count = std.math.cast(@TypeOf(raw.layer_id_count), if (self.layer_ids) |items| items.len else 0) orelse return error.InvalidArgument;
-        raw.filter = if (self.filter) |array_item_0| try marshal.store(allocator, marshal.view(array_item_0)) else null;
+        if (self.filter) |item| {
+            raw.fields |= c.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = marshal.view(item);
+        }
         return raw;
     }
 
@@ -2939,7 +2959,7 @@ pub const RenderedFeatureQueryOptions = struct {
                 for (try marshal.nativeSlice(c.mln_buffer_view, raw.layer_ids, raw.layer_id_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
                 break :blk copied;
             } else null,
-            .filter = if (raw.filter == null) null else try marshal.copyView(allocator, (raw.filter orelse return error.NativeError).*),
+            .filter = if (raw.fields & c.MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER != 0) try marshal.copyView(allocator, raw.filter) else null,
         };
     }
 };
@@ -3154,11 +3174,9 @@ pub const ResourceRequest = struct {
     pub fn toNative(self: ResourceRequest, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_request {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_request);
-        raw.has_prior_expires = false;
-        raw.has_prior_modified = false;
-        raw.has_range = false;
+        raw.fields = 0;
         if (self.range) |item| {
-            raw.has_range = true;
+            raw.fields |= c.MLN_RESOURCE_REQUEST_RANGE;
             raw.range_start = item.range_start;
             raw.range_end = item.range_end;
         }
@@ -3170,8 +3188,8 @@ pub const ResourceRequest = struct {
         raw.priority = self.priority.toNative();
         raw.usage = self.usage.toNative();
         raw.storage_policy = self.storage_policy.toNative();
-        marshal.present(&raw.has_prior_modified, true, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
-        marshal.present(&raw.has_prior_expires, true, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
         raw.prior_etag = if (self.prior_etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.prior_data = @ptrCast(self.prior_data.ptr);
         raw.prior_data_size = std.math.cast(@TypeOf(raw.prior_data_size), self.prior_data.len) orelse return error.InvalidArgument;
@@ -3180,7 +3198,7 @@ pub const ResourceRequest = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request) status.Error!ResourceRequest {
         return .{
-            .range = if (raw.has_range) .{ .range_start = raw.range_start, .range_end = raw.range_end } else null,
+            .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) .{ .range_start = raw.range_start, .range_end = raw.range_end } else null,
             .requested_url = if (raw.requested_url == null) null else try allocator.dupe(u8, std.mem.span(raw.requested_url orelse return error.NativeError)),
             .resolved_url = if (raw.resolved_url == null) null else try allocator.dupe(u8, std.mem.span(raw.resolved_url orelse return error.NativeError)),
             .kind = ResourceKind.fromNative(raw.kind),
@@ -3188,14 +3206,39 @@ pub const ResourceRequest = struct {
             .priority = ResourcePriority.fromNative(raw.priority),
             .usage = ResourceUsage.fromNative(raw.usage),
             .storage_policy = ResourceStoragePolicy.fromNative(raw.storage_policy),
-            .prior_modified_unix_ms = if (raw.has_prior_modified) raw.prior_modified_unix_ms else null,
-            .prior_expires_unix_ms = if (raw.has_prior_expires) raw.prior_expires_unix_ms else null,
+            .prior_modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0) raw.prior_modified_unix_ms else null,
+            .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
             .prior_etag = if (raw.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(raw.prior_etag orelse return error.NativeError)),
             .prior_data = try marshal.copyView(allocator, .{ .data = raw.prior_data, .size = raw.prior_data_size }),
         };
     }
 };
 
+/// Field mask values for `mln_resource_request`.
+///
+/// See `mln_resource_request_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRequestField = struct {
+    /// The request asks for the inclusive byte range range_start to range_end.
+    range: bool = false,
+    /// The cached copy being revalidated carries a modification time.
+    prior_modified: bool = false,
+    /// The cached copy being revalidated carries an expiration time.
+    prior_expires: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
+};
+
+/// A resource provider's answer to one request.
+///
+/// See `mln_resource_response` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceResponse = struct {
     status: ResourceResponseStatus = std.mem.zeroes(ResourceResponseStatus),
     error_reason: ResourceErrorReason = std.mem.zeroes(ResourceErrorReason),
@@ -3209,9 +3252,7 @@ pub const ResourceResponse = struct {
     pub fn toNative(self: ResourceResponse, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_response {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_response);
-        raw.has_retry_after = false;
-        raw.has_expires = false;
-        raw.has_modified = false;
+        raw.fields = 0;
         raw.size = @sizeOf(c.mln_resource_response);
         raw.status = self.status.toNative();
         raw.error_reason = self.error_reason.toNative();
@@ -3219,10 +3260,10 @@ pub const ResourceResponse = struct {
         raw.byte_count = std.math.cast(@TypeOf(raw.byte_count), self.bytes.len) orelse return error.InvalidArgument;
         raw.error_message = if (self.error_message) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.must_revalidate = self.must_revalidate;
-        marshal.present(&raw.has_modified, true, &raw.modified_unix_ms, self.modified_unix_ms);
-        marshal.present(&raw.has_expires, true, &raw.expires_unix_ms, self.expires_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_MODIFIED, &raw.modified_unix_ms, self.modified_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_EXPIRES, &raw.expires_unix_ms, self.expires_unix_ms);
         raw.etag = if (self.etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
-        marshal.present(&raw.has_retry_after, true, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
+        marshal.present(&raw.fields, c.MLN_RESOURCE_RESPONSE_RETRY_AFTER, &raw.retry_after_unix_ms, self.retry_after_unix_ms);
         return raw;
     }
 
@@ -3233,12 +3274,33 @@ pub const ResourceResponse = struct {
             .bytes = try marshal.copyView(allocator, .{ .data = raw.bytes, .size = raw.byte_count }),
             .error_message = if (raw.error_message == null) null else try allocator.dupe(u8, std.mem.span(raw.error_message orelse return error.NativeError)),
             .must_revalidate = raw.must_revalidate,
-            .modified_unix_ms = if (raw.has_modified) raw.modified_unix_ms else null,
-            .expires_unix_ms = if (raw.has_expires) raw.expires_unix_ms else null,
+            .modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_MODIFIED != 0) raw.modified_unix_ms else null,
+            .expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_EXPIRES != 0) raw.expires_unix_ms else null,
             .etag = if (raw.etag == null) null else try allocator.dupe(u8, std.mem.span(raw.etag orelse return error.NativeError)),
-            .retry_after_unix_ms = if (raw.has_retry_after) raw.retry_after_unix_ms else null,
+            .retry_after_unix_ms = if (raw.fields & c.MLN_RESOURCE_RESPONSE_RETRY_AFTER != 0) raw.retry_after_unix_ms else null,
         };
     }
+};
+
+/// Field mask values for `mln_resource_response`.
+///
+/// See `mln_resource_response_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceResponseField = struct {
+    /// The response carries a modification time.
+    modified: bool = false,
+    /// The response carries an expiration time.
+    expires: bool = false,
+    /// An ERROR response carries the earliest time to retry the request.
+    retry_after: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// How a resource provider answered a request.
@@ -3778,9 +3840,10 @@ pub const ScreenPoint = struct {
 /// See `mln_source_feature_query_option_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 pub const SourceFeatureQueryOptionField = struct {
-    ids: bool = false,
+    source_layer_ids: bool = false,
+    filter: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{1};
+    pub const native_bits = [_]u32{ 1, 2 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -3810,7 +3873,10 @@ pub const SourceFeatureQueryOptions = struct {
             };
         }
         raw.source_layer_id_count = std.math.cast(@TypeOf(raw.source_layer_id_count), if (self.source_layer_ids) |items| items.len else 0) orelse return error.InvalidArgument;
-        raw.filter = if (self.filter) |array_item_0| try marshal.store(allocator, marshal.view(array_item_0)) else null;
+        if (self.filter) |item| {
+            raw.fields |= c.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
+            raw.filter = marshal.view(item);
+        }
         return raw;
     }
 
@@ -3821,7 +3887,7 @@ pub const SourceFeatureQueryOptions = struct {
                 for (try marshal.nativeSlice(c.mln_buffer_view, raw.source_layer_ids, raw.source_layer_id_count), 0..) |item, index| copied[index] = try marshal.copyView(allocator, item);
                 break :blk copied;
             } else null,
-            .filter = if (raw.filter == null) null else try marshal.copyView(allocator, (raw.filter orelse return error.NativeError).*),
+            .filter = if (raw.fields & c.MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER != 0) try marshal.copyView(allocator, raw.filter) else null,
         };
     }
 };
@@ -3870,31 +3936,29 @@ pub const StyleImageInfo = struct {
     /// Interval counts for the stretchable axes.
     stretch_x_count: usize = std.mem.zeroes(usize),
     stretch_y_count: usize = std.mem.zeroes(usize),
-    /// Content box, meaningful only when has_content is true.
+    /// Content box, meaningful when fields contains CONTENT.
     content: ?ImageContent = null,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_WIDTH.
     text_fit_width: ?StyleImageTextFit = null,
-    /// One of `mln_style_image_text_fit`, meaningful only when its flag is
-    /// true.
+    /// One of `mln_style_image_text_fit`, meaningful when fields contains
+    /// TEXT_FIT_HEIGHT.
     text_fit_height: ?StyleImageTextFit = null,
     /// Sprite pixel ratio. Defaults to 1.0.
     pixel_ratio: f32 = 1.0,
     sdf: bool = std.mem.zeroes(bool),
     pub fn toNative(self: StyleImageInfo) c.mln_style_image_info {
         var raw = c.mln_style_image_info_default();
-        raw.has_content = false;
-        raw.has_text_fit_width = false;
-        raw.has_text_fit_height = false;
+        raw.fields = 0;
         raw.width = self.width;
         raw.height = self.height;
         raw.stride = self.stride;
         raw.byte_length = self.byte_length;
         raw.stretch_x_count = self.stretch_x_count;
         raw.stretch_y_count = self.stretch_y_count;
-        marshal.present(&raw.has_content, true, &raw.content, self.content);
-        marshal.present(&raw.has_text_fit_width, true, &raw.text_fit_width, self.text_fit_width);
-        marshal.present(&raw.has_text_fit_height, true, &raw.text_fit_height, self.text_fit_height);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_CONTENT, &raw.content, self.content);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH, &raw.text_fit_width, self.text_fit_width);
+        marshal.present(&raw.fields, c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT, &raw.text_fit_height, self.text_fit_height);
         raw.pixel_ratio = self.pixel_ratio;
         raw.sdf = self.sdf;
         return raw;
@@ -3907,13 +3971,34 @@ pub const StyleImageInfo = struct {
             .byte_length = raw.byte_length,
             .stretch_x_count = raw.stretch_x_count,
             .stretch_y_count = raw.stretch_y_count,
-            .content = if (raw.has_content) ImageContent.fromNative(raw.content) else null,
-            .text_fit_width = if (raw.has_text_fit_width) StyleImageTextFit.fromNative(raw.text_fit_width) else null,
-            .text_fit_height = if (raw.has_text_fit_height) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
+            .content = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_CONTENT != 0) ImageContent.fromNative(raw.content) else null,
+            .text_fit_width = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0) StyleImageTextFit.fromNative(raw.text_fit_width) else null,
+            .text_fit_height = if (raw.fields & c.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0) StyleImageTextFit.fromNative(raw.text_fit_height) else null,
             .pixel_ratio = raw.pixel_ratio,
             .sdf = raw.sdf,
         };
     }
+};
+
+/// Field mask values for `mln_style_image_info`.
+///
+/// See `mln_style_image_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+pub const StyleImageInfoField = struct {
+    /// The image declares a content box.
+    content: bool = false,
+    /// The image declares a horizontal text-fit mode.
+    text_fit_width: bool = false,
+    /// The image declares a vertical text-fit mode.
+    text_fit_height: bool = false,
+    unknown_bits: u32 = 0,
+    pub const native_bits = [_]u32{ 1, 2, 4 };
+    const methods = marshal.FlagMethods(@This());
+    pub const fromNative = methods.fromNative;
+    pub const toNative = methods.toNative;
+    pub const contains = methods.contains;
+    pub const isEmpty = methods.isEmpty;
+    pub const unionWith = methods.unionWith;
 };
 
 /// Field mask values for `mln_style_image_options`.
@@ -4229,7 +4314,8 @@ pub const StyleSourceInfo = struct {
     id_size: usize = std.mem.zeroes(usize),
     /// Whether the source is marked volatile.
     is_volatile: bool = std.mem.zeroes(bool),
-    /// Attribution byte length, excluding any null terminator.
+    /// Attribution byte length, excluding any null terminator, meaningful when
+    /// fields contains ATTRIBUTION.
     attribution_size: ?usize = null,
     /// URL byte length, meaningful when fields contains URL.
     url_size: ?usize = null,
@@ -4244,7 +4330,6 @@ pub const StyleSourceInfo = struct {
     pub fn toNative(self: StyleSourceInfo) c.mln_style_source_info {
         var raw = std.mem.zeroes(c.mln_style_source_info);
         raw.fields = 0;
-        raw.has_attribution = false;
         if (self.tilejson) |item| {
             raw.fields |= c.MLN_STYLE_SOURCE_INFO_TILEJSON;
             raw.tile_count = item.tile_count;
@@ -4256,7 +4341,7 @@ pub const StyleSourceInfo = struct {
         raw.type = self.type.toNative();
         raw.id_size = self.id_size;
         raw.is_volatile = self.is_volatile;
-        marshal.present(&raw.has_attribution, true, &raw.attribution_size, self.attribution_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION, &raw.attribution_size, self.attribution_size);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_URL, &raw.url_size, self.url_size);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_BOUNDS, &raw.bounds, self.bounds);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILE_SIZE, &raw.tile_size, self.tile_size);
@@ -4270,7 +4355,7 @@ pub const StyleSourceInfo = struct {
             .type = StyleSourceType.fromNative(raw.type),
             .id_size = raw.id_size,
             .is_volatile = raw.is_volatile,
-            .attribution_size = if (raw.has_attribution) raw.attribution_size else null,
+            .attribution_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) raw.attribution_size else null,
             .url_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) raw.url_size else null,
             .bounds = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS != 0) LatLngBounds.fromNative(raw.bounds) else null,
             .tile_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0) raw.tile_size else null,
@@ -4297,8 +4382,10 @@ pub const StyleSourceInfoField = struct {
     vector_encoding: bool = false,
     /// The source exposes a DEM raster encoding.
     raster_encoding: bool = false,
+    /// The source declares an attribution string.
+    attribution: bool = false,
     unknown_bits: u32 = 0,
-    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32 };
+    pub const native_bits = [_]u32{ 1, 2, 4, 8, 16, 32, 64 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -4322,7 +4409,7 @@ pub const StyleSourceResult = struct {
         raw.size = @sizeOf(c.mln_style_source_result);
         raw.info = self.info.toNative();
         if (self.attribution) |item| {
-            raw.info.has_attribution = true;
+            raw.info.fields |= c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
             raw.attribution = marshal.view(item);
         }
         if (self.url) |item| {
@@ -4344,7 +4431,7 @@ pub const StyleSourceResult = struct {
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_style_source_result) status.Error!StyleSourceResult {
         return .{
             .info = StyleSourceInfo.fromNative(raw.info),
-            .attribution = if (raw.info.has_attribution) try marshal.copyView(allocator, raw.attribution) else null,
+            .attribution = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) try marshal.copyView(allocator, raw.attribution) else null,
             .url = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) try marshal.copyView(allocator, raw.url) else null,
             .tile_urls = if (raw.info.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) blk: {
                 const copied = try allocator.alloc([]const u8, raw.tile_url_count);

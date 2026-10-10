@@ -27,7 +27,8 @@ public sealed record StyleSourceInfo
     public bool IsVolatile { get; set; }
 
     /// <summary>
-    /// Attribution byte length, excluding any null terminator.
+    /// Attribution byte length, excluding any null terminator, meaningful when
+    /// fields contains ATTRIBUTION.
     /// </summary>
     public ulong? AttributionSize { get; set; }
 

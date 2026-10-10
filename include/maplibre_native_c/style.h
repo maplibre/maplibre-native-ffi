@@ -107,6 +107,8 @@ typedef enum MLN_BINDING(
   MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING = 1U << 4U,
   /** The source exposes a DEM raster encoding. */
   MLN_STYLE_SOURCE_INFO_RASTER_ENCODING = 1U << 5U,
+  /** The source declares an attribution string. */
+  MLN_STYLE_SOURCE_INFO_ATTRIBUTION = 1U << 6U,
 } mln_style_source_info_field;
 
 /** Field mask values for mln_style_tile_source_options. */
@@ -251,6 +253,16 @@ typedef enum MLN_BINDING(
   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 1U << 6U,
 } mln_style_image_option_field;
 
+/** Field mask values for mln_style_image_info. */
+typedef enum MLN_BINDING("kind=bitmask") mln_style_image_info_field : uint32_t {
+  /** The image declares a content box. */
+  MLN_STYLE_IMAGE_INFO_CONTENT = 1U << 0U,
+  /** The image declares a horizontal text-fit mode. */
+  MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH = 1U << 1U,
+  /** The image declares a vertical text-fit mode. */
+  MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT = 1U << 2U,
+} mln_style_image_info_field;
+
 /** Field mask values for mln_style_transition_options. */
 typedef enum MLN_BINDING(
   "kind=bitmask"
@@ -286,9 +298,12 @@ typedef struct mln_style_source_info {
   size_t id_size;
   /** Whether the source is marked volatile. */
   bool is_volatile;
-  bool has_attribution;
-  /** Attribution byte length, excluding any null terminator. */
-  size_t attribution_size MLN_BINDING("mask=has_attribution");
+  /**
+   * Attribution byte length, excluding any null terminator, meaningful when
+   * fields contains ATTRIBUTION.
+   */
+  size_t attribution_size
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
   /** URL byte length, meaningful when fields contains URL. */
   size_t url_size MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_URL");
   /** Inline tile URL count, meaningful when fields contains TILEJSON. */
@@ -349,7 +364,8 @@ typedef struct mln_style_source_result {
   uint32_t size;
   uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_source_info info;
-  mln_buffer_view attribution MLN_BINDING("mask=info.has_attribution");
+  mln_buffer_view attribution
+    MLN_BINDING("mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
   mln_buffer_view url
     MLN_BINDING("mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_URL");
   const mln_buffer_view* tile_urls MLN_BINDING(
@@ -655,6 +671,8 @@ typedef struct mln_style_image_options {
 /** Fixed metadata for one runtime style image. */
 typedef struct mln_style_image_info {
   uint32_t size;
+  /** Bitwise combination of mln_style_image_info_field values. */
+  uint32_t fields MLN_BINDING("enum=mln_style_image_info_field");
   uint32_t width;
   uint32_t height;
   /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
@@ -665,20 +683,28 @@ typedef struct mln_style_image_info {
    */
   size_t stretch_x_count;
   size_t stretch_y_count;
-  /** Content box, meaningful only when has_content is true. */
-  mln_image_content content MLN_BINDING("mask=has_content");
-  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
-  uint32_t text_fit_width
-    MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_width");
-  /** One of mln_style_image_text_fit, meaningful only when its flag is true. */
-  uint32_t text_fit_height
-    MLN_BINDING("enum=mln_style_image_text_fit;mask=has_text_fit_height");
+  /** Content box, meaningful when fields contains CONTENT. */
+  mln_image_content content
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_IMAGE_INFO_CONTENT");
+  /**
+   * One of mln_style_image_text_fit, meaningful when fields contains
+   * TEXT_FIT_WIDTH.
+   */
+  uint32_t text_fit_width MLN_BINDING(
+    "enum=mln_style_image_text_fit;mask=fields;"
+    "bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH"
+  );
+  /**
+   * One of mln_style_image_text_fit, meaningful when fields contains
+   * TEXT_FIT_HEIGHT.
+   */
+  uint32_t text_fit_height MLN_BINDING(
+    "enum=mln_style_image_text_fit;mask=fields;"
+    "bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT"
+  );
   /** Sprite pixel ratio. Defaults to 1.0. */
   float pixel_ratio MLN_BINDING("default=1.0");
   bool sdf;
-  bool has_content;
-  bool has_text_fit_width;
-  bool has_text_fit_height;
 } mln_style_image_info;
 
 /** Complete style image borrowed for a completion callback. */

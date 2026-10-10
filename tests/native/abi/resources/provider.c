@@ -681,13 +681,13 @@ static void a_pmtiles_request_carries_its_byte_range(void) {
     mln_test_provider_request_at(provider, style_url, 0);
   TEST_ASSERT_NOT_NULL(style);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_STYLE, style->kind);
-  TEST_ASSERT_FALSE(style->has_range);
+  TEST_ASSERT_BITS_LOW(MLN_RESOURCE_REQUEST_RANGE, style->fields);
 
   const mln_test_provider_request* archive =
     mln_test_provider_request_at(provider, archive_url, 0);
   TEST_ASSERT_NOT_NULL(archive);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_SOURCE, archive->kind);
-  TEST_ASSERT_TRUE(archive->has_range);
+  TEST_ASSERT_BITS_HIGH(MLN_RESOURCE_REQUEST_RANGE, archive->fields);
   TEST_ASSERT_EQUAL_UINT64(0, archive->range_start);
   TEST_ASSERT_GREATER_THAN_UINT64(archive->range_start, archive->range_end);
   mln_test_destroy_map(map);
@@ -786,7 +786,8 @@ static void a_tile_answer_decides_whether_the_map_renders(void) {
 }
 
 // A provider error for the style becomes the map's loading failure, carrying
-// the provider's message, or a generic one when it gave none.
+// the provider's message, or a generic one when it gave none. A response whose
+// fields carry an unknown bit is malformed, and fails the same way.
 static void a_style_error_reaches_the_loading_failure(void) {
   static const mln_test_provided_resource resources[] = {
     {.url = "custom://described.json",
@@ -797,19 +798,29 @@ static void a_style_error_reaches_the_loading_failure(void) {
          .error_message = "the style server is down",
        }},
     {.url = "custom://undescribed.json",
+     .response =
+       {
+         .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
+         .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
+       }},
+    {.url = "custom://unknown-field.json",
      .response = {
-       .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-       .error_reason = MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
+       .fields = UINT32_C(1) << 31,
+       .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+       .bytes = (const uint8_t*)tiled_style_json,
+       .byte_count = sizeof(tiled_style_json) - 1,
      }},
   };
   static const char* const expected[] = {
     "loading style failed: the style server is down",
     "loading style failed: resource provider failed",
+    "loading style failed: mln_resource_response.fields contains unknown bits",
   };
-  mln_test_provider* provider = mln_test_provider_create(resources, 2);
+  const size_t count = sizeof(resources) / sizeof(resources[0]);
+  mln_test_provider* provider = mln_test_provider_create(resources, count);
   mln_runtime runtime = mln_test_create_runtime();
   mln_test_provider_install(runtime, provider);
-  for (size_t index = 0; index < 2; index += 1) {
+  for (size_t index = 0; index < count; index += 1) {
     mln_map map = mln_test_create_map(runtime);
     MLN_TEST_OK(mln_test_map_set_style_url(map, resources[index].url));
     char message[512];
@@ -842,13 +853,12 @@ static const int64_t style_expired_unix_ms = 1700000060000;
 static mln_resource_response cacheable_style(bool must_revalidate) {
   return (mln_resource_response){
     .size = sizeof(mln_resource_response),
+    .fields = MLN_RESOURCE_RESPONSE_MODIFIED | MLN_RESOURCE_RESPONSE_EXPIRES,
     .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
     .bytes = (const uint8_t*)inline_style_json,
     .byte_count = sizeof(inline_style_json) - 1,
     .must_revalidate = must_revalidate,
-    .has_modified = true,
     .modified_unix_ms = style_modified_unix_ms,
-    .has_expires = true,
     .expires_unix_ms = style_expired_unix_ms,
     .etag = "\"v1\"",
   };
@@ -860,11 +870,13 @@ static void expect_revalidation_of_cached_style(
   TEST_ASSERT_NOT_NULL(request);
   TEST_ASSERT_TRUE(request->has_prior_etag);
   TEST_ASSERT_EQUAL_STRING("\"v1\"", request->prior_etag);
-  TEST_ASSERT_TRUE(request->has_prior_modified);
+  TEST_ASSERT_BITS_HIGH(
+    MLN_RESOURCE_REQUEST_PRIOR_MODIFIED | MLN_RESOURCE_REQUEST_PRIOR_EXPIRES,
+    request->fields
+  );
   TEST_ASSERT_EQUAL_INT64(
     style_modified_unix_ms, request->prior_modified_unix_ms
   );
-  TEST_ASSERT_TRUE(request->has_prior_expires);
   TEST_ASSERT_EQUAL_INT64(
     style_expired_unix_ms, request->prior_expires_unix_ms
   );
@@ -895,7 +907,7 @@ static void a_not_modified_answer_delivers_the_cached_style(void) {
     mln_test_provider_request_at(provider, cached_style_url, 0);
   TEST_ASSERT_NOT_NULL(initial);
   TEST_ASSERT_FALSE(initial->has_prior_etag);
-  TEST_ASSERT_FALSE(initial->has_prior_modified);
+  TEST_ASSERT_BITS_LOW(MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, initial->fields);
   TEST_ASSERT_EQUAL_size_t(0, initial->prior_data_size);
 
   mln_map second = load_style(runtime, cached_style_url);

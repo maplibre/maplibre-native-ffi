@@ -13,7 +13,7 @@ auto mln_rendered_feature_query_options_default(void) noexcept
     .fields = 0,
     .layer_ids = nullptr,
     .layer_id_count = 0,
-    .filter = nullptr
+    .filter = {.data = nullptr, .size = 0}
   };
 }
 
@@ -24,7 +24,7 @@ auto mln_source_feature_query_options_default(void) noexcept
     .fields = 0,
     .source_layer_ids = nullptr,
     .source_layer_id_count = 0,
-    .filter = nullptr
+    .filter = {.data = nullptr, .size = 0}
   };
 }
 

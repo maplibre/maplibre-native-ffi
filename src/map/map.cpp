@@ -2332,10 +2332,10 @@ auto animation_options_default() noexcept -> mln_animation_options {
 auto camera_delta_default() noexcept -> mln_camera_delta {
   return mln_camera_delta{
     .size = sizeof(mln_camera_delta),
+    .fields = 0,
     .kind = MLN_CAMERA_DELTA_MOVE,
     .offset = {},
     .amount = 0,
-    .has_anchor = false,
     .anchor = {},
     .animation = animation_options_default()
   };
@@ -3828,10 +3828,15 @@ auto map_apply_camera_delta(
     set_thread_error("camera delta must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  if ((delta->fields & ~MLN_CAMERA_DELTA_FIELD_ANCHOR) != 0U) {
+    set_thread_error("mln_camera_delta.fields contains unknown bits");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   if (delta->kind > MLN_CAMERA_DELTA_PITCH) {
     set_thread_error("camera delta kind is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto has_anchor = (delta->fields & MLN_CAMERA_DELTA_FIELD_ANCHOR) != 0U;
   if (
     delta->kind == MLN_CAMERA_DELTA_MOVE &&
     validate_screen_point(delta->offset) != MLN_STATUS_OK
@@ -3854,33 +3859,30 @@ auto map_apply_camera_delta(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    delta->has_anchor && delta->kind != MLN_CAMERA_DELTA_SCALE &&
+    has_anchor && delta->kind != MLN_CAMERA_DELTA_SCALE &&
     delta->kind != MLN_CAMERA_DELTA_BEARING
   ) {
     set_thread_error("only scale and bearing camera deltas accept an anchor");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    delta->has_anchor && validate_screen_point(delta->anchor) != MLN_STATUS_OK
-  ) {
+  if (has_anchor && validate_screen_point(delta->anchor) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (validate_animation_options(&delta->animation) != MLN_STATUS_OK) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto copied = *delta;
+  const auto anchor =
+    has_anchor ? std::optional<mln::ScreenCoordinate>{to_native_screen_point(
+                   delta->anchor
+                 )}
+               : std::nullopt;
   return submit_camera_command(
     map,
-    [copied](MapObject& live, mln_map map_handle) -> void {
+    [copied, anchor](MapObject& live, mln_map map_handle) -> void {
       const auto animation = to_native_animation(
         live.runtime, map_handle, live.event_state, &copied.animation
       );
-      const auto anchor =
-        copied.has_anchor
-          ? std::optional<mln::ScreenCoordinate>{to_native_screen_point(
-              copied.anchor
-            )}
-          : std::nullopt;
       switch (copied.kind) {
         case MLN_CAMERA_DELTA_MOVE:
           live.map->moveBy(to_native_screen_point(copied.offset), animation);

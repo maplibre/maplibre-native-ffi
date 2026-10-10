@@ -65,6 +65,7 @@ typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_rendered_feature_query_option_field : uint32_t {
   MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS = 1U << 0U,
+  MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER = 1U << 1U,
 } mln_rendered_feature_query_option_field;
 
 /** Options for rendered feature queries. */
@@ -77,8 +78,10 @@ typedef struct mln_rendered_feature_query_options {
     "bit=MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS"
   );
   size_t layer_id_count;
-  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
-  const mln_buffer_view* filter MLN_BINDING("nullable=true;encoding=json");
+  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
+  mln_buffer_view filter MLN_BINDING(
+    "encoding=json;mask=fields;bit=MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER"
+  );
 } mln_rendered_feature_query_options;
 
 /** Optional fields for mln_source_feature_query_options. */
@@ -86,6 +89,7 @@ typedef enum MLN_BINDING(
   "kind=bitmask"
 ) mln_source_feature_query_option_field : uint32_t {
   MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1U << 0U,
+  MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER = 1U << 1U,
 } mln_source_feature_query_option_field;
 
 /** Options for source feature queries. */
@@ -99,8 +103,10 @@ typedef struct mln_source_feature_query_options {
     "bit=MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS"
   );
   size_t source_layer_id_count;
-  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
-  const mln_buffer_view* filter MLN_BINDING("nullable=true;encoding=json");
+  /** Optional UTF-8 MapLibre style-spec filter JSON. When absent, no filter. */
+  mln_buffer_view filter MLN_BINDING(
+    "encoding=json;mask=fields;bit=MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER"
+  );
 } mln_source_feature_query_options;
 
 /** Optional fields for mln_queried_feature. */

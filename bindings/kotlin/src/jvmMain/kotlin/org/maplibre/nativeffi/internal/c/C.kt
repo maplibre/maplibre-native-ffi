@@ -4161,11 +4161,11 @@ internal val mln_screen_point: GroupLayout =
 internal val mln_camera_delta: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
+    JAVA_INT.withName("fields"),
     JAVA_INT.withName("kind"),
+    Ffm.pad(4),
     mln_screen_point.withName("offset"),
     JAVA_DOUBLE.withName("amount"),
-    JAVA_BOOLEAN.withName("has_anchor"),
-    Ffm.pad(7),
     mln_screen_point.withName("anchor"),
     mln_animation_options.withName("animation"),
   )
@@ -4482,7 +4482,7 @@ internal val mln_rendered_feature_query_options: GroupLayout =
     JAVA_INT.withName("fields"),
     ADDRESS.withName("layer_ids"),
     JAVA_LONG.withName("layer_id_count"),
-    ADDRESS.withName("filter"),
+    mln_buffer_view.withName("filter"),
   )
 internal val mln_screen_box: GroupLayout =
   Ffm.struct(mln_screen_point.withName("min"), mln_screen_point.withName("max"))
@@ -4515,7 +4515,7 @@ internal val mln_source_feature_query_options: GroupLayout =
     JAVA_INT.withName("fields"),
     ADDRESS.withName("source_layer_ids"),
     JAVA_LONG.withName("source_layer_id_count"),
-    ADDRESS.withName("filter"),
+    mln_buffer_view.withName("filter"),
   )
 internal val mln_image_content: GroupLayout =
   Ffm.struct(
@@ -4527,9 +4527,11 @@ internal val mln_image_content: GroupLayout =
 internal val mln_style_image_info: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
+    JAVA_INT.withName("fields"),
     JAVA_INT.withName("width"),
     JAVA_INT.withName("height"),
     JAVA_INT.withName("stride"),
+    Ffm.pad(4),
     JAVA_LONG.withName("byte_length"),
     JAVA_LONG.withName("stretch_x_count"),
     JAVA_LONG.withName("stretch_y_count"),
@@ -4538,9 +4540,7 @@ internal val mln_style_image_info: GroupLayout =
     JAVA_INT.withName("text_fit_height"),
     JAVA_FLOAT.withName("pixel_ratio"),
     JAVA_BOOLEAN.withName("sdf"),
-    JAVA_BOOLEAN.withName("has_content"),
-    JAVA_BOOLEAN.withName("has_text_fit_width"),
-    JAVA_BOOLEAN.withName("has_text_fit_height"),
+    Ffm.pad(3),
   )
 internal val mln_style_image_options: GroupLayout =
   Ffm.struct(

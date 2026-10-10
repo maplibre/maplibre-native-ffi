@@ -192,15 +192,15 @@ auto capture_mln_style_image_result(
   [[maybe_unused]] Arena<Writing>& arena, mln_style_image_result source
 ) -> mln_style_image_result {
   auto result = source;
-  if (source.info.has_content) {
+  if ((source.info.fields & MLN_STYLE_IMAGE_INFO_CONTENT) != 0) {
   } else {
     result.info.content = {};
   }
-  if (source.info.has_text_fit_width) {
+  if ((source.info.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH) != 0) {
   } else {
     result.info.text_fit_width = {};
   }
-  if (source.info.has_text_fit_height) {
+  if ((source.info.fields & MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT) != 0) {
   } else {
     result.info.text_fit_height = {};
   }
@@ -269,7 +269,7 @@ auto capture_mln_style_source_result(
   [[maybe_unused]] Arena<Writing>& arena, mln_style_source_result source
 ) -> mln_style_source_result {
   auto result = source;
-  if (source.info.has_attribution) {
+  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
   } else {
     result.info.attribution_size = {};
   }
@@ -309,7 +309,7 @@ auto capture_mln_style_source_result(
   } else {
     result.info.raster_encoding = {};
   }
-  if (source.info.has_attribution) {
+  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_ATTRIBUTION) != 0) {
     result.attribution = buffer(arena, source.attribution);
   } else {
     result.attribution = {};
@@ -701,19 +701,19 @@ auto capture_mln_adapter_resource_provider_callback_arguments(
       auto copied_1 = element_1;
       copied_1.requested_url = string(arena, element_1.requested_url);
       copied_1.resolved_url = string(arena, element_1.resolved_url);
-      if (element_1.has_range) {
+      if ((element_1.fields & MLN_RESOURCE_REQUEST_RANGE) != 0) {
       } else {
         copied_1.range_start = {};
       }
-      if (element_1.has_range) {
+      if ((element_1.fields & MLN_RESOURCE_REQUEST_RANGE) != 0) {
       } else {
         copied_1.range_end = {};
       }
-      if (element_1.has_prior_modified) {
+      if ((element_1.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0) {
       } else {
         copied_1.prior_modified_unix_ms = {};
       }
-      if (element_1.has_prior_expires) {
+      if ((element_1.fields & MLN_RESOURCE_REQUEST_PRIOR_EXPIRES) != 0) {
       } else {
         copied_1.prior_expires_unix_ms = {};
       }

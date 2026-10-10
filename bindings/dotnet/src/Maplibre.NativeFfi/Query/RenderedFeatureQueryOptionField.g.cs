@@ -11,5 +11,6 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum RenderedFeatureQueryOptionField : uint
 {
-    Ids = 1,
+    LayerIds = 1,
+    Filter = 2,
 }

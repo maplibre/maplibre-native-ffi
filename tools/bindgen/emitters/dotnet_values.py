@@ -610,12 +610,7 @@ class Values:
             )
             presence = fields[0].presence
             if presence and presence.mask:
-                assert presence.mask
-                condition = (
-                    self.has_bit(plan, presence.mask, presence.bit)
-                    if presence.bit
-                    else f"value.{member(presence.mask)} != 0"
-                )
+                condition = self.has_bit(plan, presence.mask, presence.bit)
                 expression = f"{condition} ? {expression} : null"
             values.append(expression)
         arrays = {
@@ -777,12 +772,9 @@ class Values:
             indent = "        "
             if presence and presence.mask:
                 if "." in presence.mask:
-                    reset = (
-                        f" &= ~{self.bit(plan, presence.mask, presence.bit)}"
-                        if presence.bit
-                        else " = 0"
+                    lines.append(
+                        f"        native.{member(presence.mask)} &= ~{self.bit(plan, presence.mask, presence.bit)};"
                     )
-                    lines.append(f"        native.{member(presence.mask)}{reset};")
                 if put := self.put(plan, presence, fields, expression):
                     lines.append(put)
                     continue
@@ -791,9 +783,7 @@ class Values:
                     [
                         f"        if ({expression} is {{ }} {local})",
                         "        {",
-                        f"            native.{member(presence.mask)} |= {self.bit(plan, presence.mask, presence.bit)};"
-                        if presence.bit
-                        else f"            native.{member(presence.mask)} = 1;",
+                        f"            native.{member(presence.mask)} |= {self.bit(plan, presence.mask, presence.bit)};",
                     ]
                 )
                 expression = local
@@ -871,7 +861,7 @@ class Values:
         A member that spans several fields, a union, or a counted buffer keeps
         its explicit branch.
         """
-        if len(fields) != 1 or not presence.bit:
+        if len(fields) != 1:
             return None
         field = fields[0]
         value = field.value

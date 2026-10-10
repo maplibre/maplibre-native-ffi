@@ -834,7 +834,9 @@ static void a_download_completes_from_provider_served_resources(void) {
   const mln_test_provider_request* revalidation =
     mln_test_provider_request_at(provider, offline_style_url, 1);
   TEST_ASSERT_NOT_NULL(revalidation);
-  TEST_ASSERT_FALSE(revalidation->has_prior_expires);
+  TEST_ASSERT_BITS_LOW(
+    MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, revalidation->fields
+  );
   TEST_ASSERT_EQUAL_size_t(0, revalidation->prior_data_size);
   // An answer would refresh the cached copy, and could land after the
   // invalidation, so the revalidation ends unanswered with its map.
@@ -852,7 +854,7 @@ static void a_download_completes_from_provider_served_resources(void) {
   const mln_test_provider_request* refetch =
     mln_test_provider_request_at(provider, offline_style_url, 2);
   TEST_ASSERT_NOT_NULL(refetch);
-  TEST_ASSERT_TRUE(refetch->has_prior_expires);
+  TEST_ASSERT_BITS_HIGH(MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, refetch->fields);
   TEST_ASSERT_EQUAL_INT64(0, refetch->prior_expires_unix_ms);
   TEST_ASSERT_EQUAL_size_t(
     sizeof(offline_style_json) - 1, refetch->prior_data_size

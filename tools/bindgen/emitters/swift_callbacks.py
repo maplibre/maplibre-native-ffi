@@ -117,8 +117,8 @@ def descriptor(values, plan):
                     identifier(part) for part in field.presence.mask.split(".")
                 )
                 bit = field.presence.bit
-                present = f"raw.{path} & {bit}.rawValue != 0" if bit else f"raw.{path}"
-                mark = f"raw.{path} |= {bit}.rawValue" if bit else f"raw.{path} = true"
+                present = f"raw.{path} & {bit}.rawValue != 0"
+                mark = f"raw.{path} |= {bit}.rawValue"
                 defaults.append(f"    self.{local} = {present} ? {captured} : nil")
                 materialize.append(
                     f"    if let item = {local} {{ {mark}; raw.{identifier(field.name)} = {encode(values, field.value, 'item')} }}"

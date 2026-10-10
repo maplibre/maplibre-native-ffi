@@ -478,8 +478,6 @@ class Values:
                     if f.presence and f.presence.mask:
                         condition = (
                             f"raw.{field(f.presence.mask)} & C.{f.presence.bit} != 0"
-                            if f.presence.bit
-                            else f"bool(raw.{field(f.presence.mask)})"
                         )
                         if v.kind == "array":
                             lines.append(
@@ -508,9 +506,7 @@ class Values:
                             f"raw.{field(f.name)} = bindingCountLike(raw.{field(f.name)}, int(unsafe.Sizeof(raw)))"
                         )
                     elif f.role == "presence_mask":
-                        lines.append(
-                            f"raw.{field(f.name)} = {'false' if f.value.ctype.canonical in {'bool', '_Bool'} else '0'}"
-                        )
+                        lines.append(f"raw.{field(f.name)} = 0")
                 for member, v, f, group in members:
                     expr = "input." + member
                     if v is None:
@@ -555,19 +551,11 @@ class Values:
                             "raw." + field(f.name),
                         )
                     if f.presence and f.presence.mask:
-                        mask = (
-                            f"raw.{field(f.presence.mask)} |= C.{f.presence.bit}"
-                            if f.presence.bit
-                            else f"raw.{field(f.presence.mask)} = true"
-                        )
+                        mask = f"raw.{field(f.presence.mask)} |= C.{f.presence.bit}"
                         convert = None if group else self.converter(f.value)
-                        if convert and f.presence.bit:
+                        if convert:
                             lines.append(
                                 f"bindingMasked(&raw.{field(f.presence.mask)}, C.{f.presence.bit}, &raw.{field(f.name)}, {expr}, arena, {convert})"
-                            )
-                        elif convert:
-                            lines.append(
-                                f"bindingFlagged(&raw.{field(f.presence.mask)}, &raw.{field(f.name)}, {expr}, arena, {convert})"
                             )
                         else:
                             lines.append(f"if {expr} != nil {{ {body}; {mask} }}")

@@ -133,15 +133,17 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   TEST_ASSERT_EQUAL_size_t(sizeof(packed), info.byte_length);
   TEST_ASSERT_EQUAL_FLOAT(2.0f, info.pixel_ratio);
   TEST_ASSERT_TRUE(info.sdf);
-  TEST_ASSERT_TRUE(info.has_content);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_IMAGE_INFO_CONTENT | MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH |
+      MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT,
+    info.fields
+  );
   TEST_ASSERT_EQUAL_MEMORY(
     &options.content, &info.content, sizeof(info.content)
   );
-  TEST_ASSERT_TRUE(info.has_text_fit_width);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_width
   );
-  TEST_ASSERT_TRUE(info.has_text_fit_height);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY, info.text_fit_height
   );
@@ -156,15 +158,14 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   const mln_style_image_info defaults = mln_style_image_info_default();
   TEST_ASSERT_EQUAL_FLOAT(defaults.pixel_ratio, info.pixel_ratio);
   TEST_ASSERT_EQUAL(defaults.sdf, info.sdf);
-  TEST_ASSERT_EQUAL(defaults.has_content, info.has_content);
+  TEST_ASSERT_EQUAL_UINT32(defaults.fields, info.fields);
 
   options = mln_style_image_options_default();
   options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
   options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
   set_image(map, "label", &image, &options);
   info = read_image_info(map, "label");
-  TEST_ASSERT_FALSE(info.has_text_fit_width);
-  TEST_ASSERT_TRUE(info.has_text_fit_height);
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT, info.fields);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_height
   );

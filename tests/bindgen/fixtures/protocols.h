@@ -122,7 +122,7 @@ typedef unsigned long long mln_map;
 #endif
 
 #ifdef MLN_PROTOCOL_VALUES
-// Copied values: a nested record, boolean presence, nullable and required
+// Copied values: a nested record behind a presence bit, nullable and required
 // counted arrays with narrow counts, and nullable UTF-8 with explicit length.
 #ifndef MLN_PROTOCOL_GAIN_TYPE
 #define MLN_PROTOCOL_GAIN_TYPE double
@@ -131,10 +131,13 @@ typedef struct mln_probe_point {
   double type;
   MLN_PROTOCOL_GAIN_TYPE gain;
 } mln_probe_point;
+typedef enum BIND("kind=bitmask") mln_probe_option_field : uint32_t {
+  MLN_PROBE_OPTION_POINT = 1u << 0u,
+} mln_probe_option_field;
 typedef struct mln_probe_options {
   mln_buffer_view title BIND("nullable=true");
-  bool has_point;
-  mln_probe_point point BIND("mask=has_point");
+  uint32_t fields BIND("enum=mln_probe_option_field");
+  mln_probe_point point BIND("mask=fields;bit=MLN_PROBE_OPTION_POINT");
   const mln_probe_point* left BIND("length=left_count;nullable=true");
   uint16_t left_count;
   const mln_probe_point* right BIND("length=right_count");
@@ -336,6 +339,7 @@ typedef enum BIND("kind=bitmask") mln_frame_window_field : uint32_t {
   MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN = 1u << 0u,
   MLN_FRAME_WINDOW_FIELD_SCALE = 1u << 1u,
   MLN_FRAME_WINDOW_FIELD_LOCKED = 1u << 2u,
+  MLN_FRAME_WINDOW_FIELD_EXTENT = 1u << 3u,
 } mln_frame_window_field;
 typedef struct mln_frame_window {
   uint32_t size;
@@ -347,9 +351,8 @@ typedef struct mln_frame_window {
     "mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN;group_type=mln_point"
   );
   double scale BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_SCALE");
-  bool has_extent;
-  double width BIND("mask=has_extent");
-  double height BIND("mask=has_extent");
+  double width BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_EXTENT");
+  double height BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_EXTENT");
 } mln_frame_window;
 mln_status mln_pass_set_window(
   mln_pass_handle pass, const mln_frame_window* window,

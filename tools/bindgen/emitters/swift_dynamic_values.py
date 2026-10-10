@@ -9,7 +9,7 @@ def dynamic(value):
     return (
         bool(value.registration)
         or any(
-            len(group.fields) > 1 and not group.bit for group in value.presence_groups
+            len(group.fields) > 1 and not group.type for group in value.presence_groups
         )
         or value.kind in {"buffer", "array", "reference", "union"}
         or any(dynamic(f.value) for f in value.fields if f.role == "value")
@@ -266,9 +266,7 @@ def declaration(values, value):
         extra_parameters = f", {local}: {typ_} = {empty}"
     for field in value.fields:
         if field.role == "presence_mask":
-            encode_lines.append(
-                f"    raw.{identifier(field.name)} = {'false' if field.value.ctype.canonical in {'bool', '_Bool'} else '0'}"
-            )
+            encode_lines.append(f"    raw.{identifier(field.name)} = 0")
     group_declarations = []
     grouped = set()
     for group in value.presence_groups:
@@ -302,12 +300,8 @@ def declaration(values, value):
         args.append(f"{local}: {group_type}? = nil")
         init.append(f"    self.{local} = {local}")
         path = ".".join(identifier(part) for part in group.mask.split("."))
-        present = (
-            f"raw.{path} & {group.bit}.rawValue != 0" if group.bit else f"raw.{path}"
-        )
-        mark = (
-            f"raw.{path} |= {group.bit}.rawValue" if group.bit else f"raw.{path} = true"
-        )
+        present = f"raw.{path} & {group.bit}.rawValue != 0"
+        mark = f"raw.{path} |= {group.bit}.rawValue"
         captured = ", ".join(
             f"{identifier(camel(field.name))}: {decode(values, field.value, 'raw.' + identifier(field.name))}"
             for field in members
@@ -396,8 +390,8 @@ def declaration(values, value):
         if optional:
             path = ".".join(identifier(part) for part in f.presence.mask.split("."))
             bit = f.presence.bit
-            present = f"raw.{path} & {bit}.rawValue != 0" if bit else f"raw.{path}"
-            mark = f"raw.{path} |= {bit}.rawValue" if bit else f"raw.{path} = true"
+            present = f"raw.{path} & {bit}.rawValue != 0"
+            mark = f"raw.{path} |= {bit}.rawValue"
             encode_lines.append(
                 f"    if let item = self.{local} {{ {mark}; {raw} = {encode(values, f.value, 'item')} }}"
             )

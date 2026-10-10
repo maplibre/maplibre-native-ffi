@@ -91,7 +91,9 @@ def decode(values, value, source, context="raw"):
         if value.kind == "buffer" and value.length == "nul":
             return TRAIT_COPY.format(source)
         if value.kind == "reference":
-            return f"unsafe {{ convert::copy_optional_reference({source}) }}?"
+            # An optional record member takes a presence bit, so only a
+            # pointer-shaped value is nullable.
+            raise Unsupported(f"{source}: a copied record holds a nullable reference")
         if (
             value.kind == "array"
             and value.ctype.kind != "array"
@@ -160,7 +162,7 @@ def comparable(value):
 
 def presence(mask, bit):
     """The mask place and the bit that marks one optional field."""
-    return mask, (f"sys::{bit}" if bit else "true")
+    return mask, f"sys::{bit}"
 
 
 def declaration(values, value):
@@ -172,8 +174,7 @@ def declaration(values, value):
     extra = []
     for field in value.fields:
         if field.role == "presence_mask":
-            reset = "false" if field.value.ctype.canonical in {"_Bool", "bool"} else "0"
-            writes.append(f"raw.{native_identifier(field.name)} = {reset};")
+            writes.append(f"raw.{native_identifier(field.name)} = 0;")
         elif field.role == "size":
             writes.insert(
                 0,
@@ -372,8 +373,8 @@ def masked_field(values, field, place, local):
 
 
 def mask_mark(mask, bit):
-    return f"{mask} = true" if bit == "true" else f"{mask} |= {bit}"
+    return f"{mask} |= {bit}"
 
 
 def mask_test(mask, bit):
-    return mask if bit == "true" else f"{mask} & {bit} != 0"
+    return f"{mask} & {bit} != 0"

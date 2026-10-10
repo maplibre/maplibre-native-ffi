@@ -919,11 +919,7 @@ def validate(api: Api) -> None:
             }:
                 errors.append(f"{fcontext}: enum names an absent enum")
             if ("mask" in field.metadata) != ("bit" in field.metadata):
-                presence = field_path(record.name, field.metadata.get("mask", ""))
-                if presence is None or presence.type.kind != "bool":
-                    errors.append(
-                        f"{fcontext}: presence requires both mask and bit or a boolean mask"
-                    )
+                errors.append(f"{fcontext}: presence requires both mask and bit")
             if "bit" in field.metadata:
                 constant = enum_constants.get(field.metadata["bit"])
                 if (

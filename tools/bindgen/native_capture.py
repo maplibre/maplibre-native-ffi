@@ -485,11 +485,7 @@ def _capture(plan, source: str, target: str, parent: str, depth: int) -> list[st
                     ]
                 )
             elif selector and selector.mask:
-                condition = (
-                    f"({source}.{selector.mask} & {selector.bit}) != 0"
-                    if selector.bit
-                    else f"{source}.{selector.mask}"
-                )
+                condition = f"({source}.{selector.mask} & {selector.bit}) != 0"
                 lines.append(f"{indent}if ({condition}) {{")
                 lines.extend(
                     _capture(child, child_source, child_target, source, depth + 1)

@@ -638,7 +638,8 @@ auto to_rendered_query_options(
     );
     return std::nullopt;
   }
-  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+  constexpr auto known_fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS |
+                                MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER;
   if ((options->fields & ~known_fields) != 0) {
     mln::core::set_thread_error("rendered feature query has unknown fields");
     return std::nullopt;
@@ -656,8 +657,8 @@ auto to_rendered_query_options(
     }
     layer_ids = make_string_vector(views);
   }
-  if (options->filter != nullptr) {
-    auto converted_filter = mln::core::to_native_style_filter(options->filter);
+  if ((options->fields & MLN_RENDERED_FEATURE_QUERY_OPTION_FILTER) != 0) {
+    auto converted_filter = mln::core::to_native_style_filter(&options->filter);
     if (!converted_filter) {
       return std::nullopt;
     }
@@ -680,7 +681,8 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
     return std::nullopt;
   }
   constexpr auto known_fields =
-    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+    MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS |
+    MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER;
   if ((options->fields & ~known_fields) != 0) {
     mln::core::set_thread_error("source feature query has unknown fields");
     return std::nullopt;
@@ -702,8 +704,8 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
     }
     source_layer_ids = make_string_vector(views);
   }
-  if (options->filter != nullptr) {
-    auto converted_filter = mln::core::to_native_style_filter(options->filter);
+  if ((options->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_FILTER) != 0) {
+    auto converted_filter = mln::core::to_native_style_filter(&options->filter);
     if (!converted_filter) {
       return std::nullopt;
     }

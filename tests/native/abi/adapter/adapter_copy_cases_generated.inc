@@ -561,14 +561,14 @@ static const void* mln_adapter_copy_case_style_image_result_value(
   values[0].info.byte_length = 4;
   values[0].info.stretch_x_count = 5;
   values[0].info.stretch_y_count = 6;
-  values[0].info.has_content = true;
+  values[0].info.fields |= MLN_STYLE_IMAGE_INFO_CONTENT;
   values[0].info.content.left = 7.5;
   values[0].info.content.top = 8.5;
   values[0].info.content.right = 9.5;
   values[0].info.content.bottom = 10.5;
-  values[0].info.has_text_fit_width = true;
+  values[0].info.fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH;
   values[0].info.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
-  values[0].info.has_text_fit_height = true;
+  values[0].info.fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;
   values[0].info.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK;
   values[0].info.pixel_ratio = 11.5;
   values[0].info.sdf = true;
@@ -598,6 +598,7 @@ static bool mln_adapter_copy_case_style_image_result_matches(
   const mln_style_image_result* source =
     (const mln_style_image_result*)source_value;
   for (size_t index = 0; index < count; ++index) {
+    if (copy[index].info.fields != source[index].info.fields) return false;
     if (copy[index].info.width != source[index].info.width) return false;
     if (copy[index].info.height != source[index].info.height) return false;
     if (copy[index].info.stride != source[index].info.stride) return false;
@@ -622,18 +623,6 @@ static bool mln_adapter_copy_case_style_image_result_matches(
     if (copy[index].info.pixel_ratio != source[index].info.pixel_ratio)
       return false;
     if (copy[index].info.sdf != source[index].info.sdf) return false;
-    if (copy[index].info.has_content != source[index].info.has_content)
-      return false;
-    if (
-      copy[index].info.has_text_fit_width !=
-      source[index].info.has_text_fit_width
-    )
-      return false;
-    if (
-      copy[index].info.has_text_fit_height !=
-      source[index].info.has_text_fit_height
-    )
-      return false;
     if (!mln_adapter_copy_case_view(copy[index].pixels, source[index].pixels))
       return false;
     if (
@@ -880,7 +869,7 @@ static const void* mln_adapter_copy_case_style_source_result_value(
   values[0].info.type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
   values[0].info.id_size = 1;
   values[0].info.is_volatile = true;
-  values[0].info.has_attribution = true;
+  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
   values[0].info.attribution_size = 2;
   values[0].info.fields |= MLN_STYLE_SOURCE_INFO_URL;
   values[0].info.url_size = 3;
@@ -903,7 +892,7 @@ static const void* mln_adapter_copy_case_style_source_result_value(
   values[0].info.vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT;
   values[0].info.fields |= MLN_STYLE_SOURCE_INFO_RASTER_ENCODING;
   values[0].info.raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX;
-  values[0].info.has_attribution = true;
+  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
   values[0].attribution.data = text_12;
   values[0].attribution.size = sizeof(text_12) - 1;
   values[0].info.fields |= MLN_STYLE_SOURCE_INFO_URL;
@@ -932,8 +921,6 @@ static bool mln_adapter_copy_case_style_source_result_matches(
     if (copy[index].info.fields != source[index].info.fields) return false;
     if (copy[index].info.id_size != source[index].info.id_size) return false;
     if (copy[index].info.is_volatile != source[index].info.is_volatile)
-      return false;
-    if (copy[index].info.has_attribution != source[index].info.has_attribution)
       return false;
     if (
       copy[index].info.attribution_size != source[index].info.attribution_size

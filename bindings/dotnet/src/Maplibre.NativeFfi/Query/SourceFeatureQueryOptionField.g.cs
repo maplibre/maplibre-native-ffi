@@ -11,5 +11,6 @@ namespace Maplibre.NativeFfi;
 [Flags]
 public enum SourceFeatureQueryOptionField : uint
 {
-    Ids = 1,
+    SourceLayerIds = 1,
+    Filter = 2,
 }

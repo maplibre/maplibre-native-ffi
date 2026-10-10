@@ -19,6 +19,7 @@
 /dotnet/src/Maplibre.NativeFfi/Map/BoundOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/BoundOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraDelta.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/CameraDeltaField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraDeltaKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraFitOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraFitOptions.g.cs linguist-generated=true
@@ -124,8 +125,10 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProvider.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProviderDecision.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequest.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponse.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponseField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponseStatus.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceStoragePolicy.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransform.g.cs linguist-generated=true
@@ -161,6 +164,7 @@
 /dotnet/src/Maplibre.NativeFfi/Style/LocationIndicatorImageKind.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/PremultipliedRgba8Image.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageInfo.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Style/StyleImageInfoField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Style/StyleImageResult.g.cs linguist-generated=true

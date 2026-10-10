@@ -62,12 +62,10 @@ typedef struct mln_test_provider_request {
   char resolved_url[256];
   uint32_t kind;
   uint32_t usage;
-  bool has_range;
+  uint32_t fields;
   uint64_t range_start;
   uint64_t range_end;
-  bool has_prior_modified;
   int64_t prior_modified_unix_ms;
-  bool has_prior_expires;
   int64_t prior_expires_unix_ms;
   bool has_prior_etag;
   char prior_etag[64];
