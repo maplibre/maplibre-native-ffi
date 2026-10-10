@@ -3974,7 +3974,9 @@ auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
   // slot's texture, so the slot never takes another frame. A view already open
   // on the frame keeps reading it, since the ring keeps the texture.
   if (live->slot >= session.texture.slots.size()) return MLN_STATUS_OK;
-  session.texture.slots[live->slot] = RenderTextureSlot{.quarantined = true};
+  auto& slot = session.texture.slots[live->slot];
+  slot = RenderTextureSlot{};
+  slot.quarantined = true;
   // A demand parked behind a full ring waits for a release. Once no slot can
   // take a frame, no release can come, so the driver gives the demand its
   // terminal result now. Queueing allocates; if it fails, detach resolves the
