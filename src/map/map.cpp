@@ -4110,7 +4110,7 @@ auto validate_camera_delta(const mln_camera_delta* delta) -> mln_status {
     animation.duration_ms > 0
   ) {
     set_thread_error(
-      "a camera delta anchor combines with offset only without animation"
+      "a camera delta anchor combines with offset only in an immediate delta"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }

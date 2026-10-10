@@ -904,7 +904,7 @@ static const mln_test_validation_case delta_cases[] = {
   {"anchor alone", delta_anchor_alone, MLN_STATUS_INVALID_ARGUMENT,
    "requires scale, bearing, or pitch"},
   {"animated anchored pan", delta_animated_anchored_pan,
-   MLN_STATUS_INVALID_ARGUMENT, "only without animation"},
+   MLN_STATUS_INVALID_ARGUMENT, "only in an immediate delta"},
   {"NaN anchor", delta_nan_anchor, MLN_STATUS_INVALID_ARGUMENT,
    "must be finite"},
   {"undersized animation", delta_undersized_animation,

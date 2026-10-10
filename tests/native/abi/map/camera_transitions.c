@@ -425,11 +425,9 @@ static void a_delta_carries_its_gesture_phase(void) {
   delta.scale = 2.0;
   delta.gesture_phase = MLN_GESTURE_PHASE_UPDATE;
   apply_delta(map, &delta);
-  TEST_ASSERT_TRUE(read_settled_snapshot(runtime, map).gesture_in_progress);
-
-  TEST_ASSERT_EQUAL_DOUBLE(
-    12.0, read_settled_snapshot(runtime, map).camera.zoom
-  );
+  snapshot = read_settled_snapshot(runtime, map);
+  TEST_ASSERT_TRUE(snapshot.gesture_in_progress);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.camera.zoom);
   mln_test_drain_all(runtime);
 
   delta = mln_camera_delta_default();
