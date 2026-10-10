@@ -185,6 +185,9 @@ internal class HandleStateCore(
       released.store(1)
     }
 
+    /** Whether the owner released its handle, or [report] has claimed it. */
+    fun isReleased(): Boolean = released.load() != 0
+
     /**
      * Disposes a handle nobody released, then reports the leak through [writeLine], with the
      * disposal's failure when it had one. Runs once, and never for a released handle.

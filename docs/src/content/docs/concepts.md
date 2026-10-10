@@ -50,9 +50,14 @@ abandon the session, or detach it and wait for the detach completion. For a
 session that a host graphics thread drives, stop driver service first. Abandon
 is synchronous, so an exit path can use it on a session that is mid-frame. The
 Python binding abandons every session that it still holds when the interpreter
-shuts down. A Dart isolate's shutdown finalizes its open sessions without
-starting graphics calls, but a driver call already in flight can outlast it, so
-a Dart host ends its sessions' graphics calls itself before exit.
+shuts down. The Kotlin binding on the JVM and Android abandons every session
+that it still holds from a shutdown hook, so `System.exit` and a return from
+`main` need no host step. It skips this when exit starts inside a MapLibre
+callback. A Kotlin/Native host, a host whose own graphics thread is inside
+driver service at exit, and a host that exits from a callback still end those
+sessions themselves. A Dart isolate's shutdown finalizes its open sessions
+without starting graphics calls, but a driver call already in flight can outlast
+it, so a Dart host ends its sessions' graphics calls itself before exit.
 
 ## Map
 

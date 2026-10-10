@@ -24,6 +24,10 @@
 # types match the C widths exactly, so only native counts narrow, to Int. Its
 # open-enum half also runs on the way out, in the batch test's unknown event and
 # source types.
+# PLAT-02 names the exit with live runtime and map handles. Its render-session
+# half runs in the child JVMs of jvmTest RenderSessionExitTest: the shutdown
+# hook abandons a live session before exit, and an exit that starts inside a
+# render-session completion still ends the process.
 
 [cases]
 "ERR-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/error/StatusMappingTest.kt::everyStatusMapsToItsExceptionAndAnUnknownCodeSurvives"

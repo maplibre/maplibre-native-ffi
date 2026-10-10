@@ -55,4 +55,10 @@ internal fun libraryProperties(): Map<String, String> =
     .mapNotNull { name -> System.getProperty(name)?.let { name to it } }
     .toMap()
 
+/** The tests/graphics system property this JVM runs with, for a child that renders. */
+internal fun graphicsProperties(): Map<String, String> =
+  listOf("org.maplibre.nativeffi.test.graphics.library")
+    .mapNotNull { name -> System.getProperty(name)?.let { name to it } }
+    .toMap()
+
 private const val CHILD_TIMEOUT_SECONDS = 30L
