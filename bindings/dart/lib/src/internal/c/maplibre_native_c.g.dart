@@ -1125,6 +1125,8 @@ final class mln_runtime_event extends Struct {
   external int source_type;
   @Uint64()
   external int source;
+  @Uint64()
+  external int generation;
   @Int32()
   external int code;
   @Uint32()

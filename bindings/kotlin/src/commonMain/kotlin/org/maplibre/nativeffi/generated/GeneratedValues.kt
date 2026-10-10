@@ -3089,6 +3089,10 @@ public data class RuntimeEvent(
    */
   public val source: ULong = 0uL,
   /**
+   * Map snapshot generation that the event reports, or zero for an event whose source is a runtime.
+   */
+  public val generation: ULong = 0uL,
+  /**
    * Secondary event detail whose meaning type selects. Depending on type it carries an
    * `mln_camera_change_mode`, an `mln_status`, a MapLibre Native error ordinal, or 0. See
    * `mln_runtime_event_type` for the per-type meaning.

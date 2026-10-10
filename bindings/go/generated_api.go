@@ -3568,6 +3568,9 @@ type RuntimeEvent struct {
 	// Source handle selected by source_type: an mln_runtime or an mln_map. Every
 	// handle type is uint64_t, so this needs no cast.
 	Source uint64
+	// Map snapshot generation that the event reports, or zero for an event whose
+	// source is a runtime.
+	Generation uint64
 	// Secondary event detail whose meaning type selects. Depending on type it
 	// carries an mln_camera_change_mode, an mln_status, a MapLibre Native error
 	// ordinal, or 0. See mln_runtime_event_type for the per-type meaning.
@@ -3582,6 +3585,7 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 	result.Type = RuntimeEventType(raw._type)
 	result.SourceType = RuntimeEventSourceType(raw.source_type)
 	result.Source = uint64(raw.source)
+	result.Generation = uint64(raw.generation)
 	result.Code = int32(raw.code)
 	result.Payload = func() RuntimeEventPayload {
 		switch raw.payload_type {

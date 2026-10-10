@@ -297,8 +297,10 @@ typedef struct mln_animation_options {
    * the resulting camera against the requested one.
    *
    * The event is queued on the runtime that owns the map and is drained by
-   * mln_runtime_drain_events(). It is queued immediately before that command's
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event. Other commands can still be
+   * mln_runtime_drain_events(). It is queued immediately after that command's
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event and carries the same
+   * generation, so the published snapshot at that generation already shows
+   * the camera where the transition left it. Other commands can still be
    * animating when these events arrive. A map reports the terminal outcome
    * only while its event mask selects
    * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
@@ -881,10 +883,10 @@ typedef struct mln_map_tile_options {
  * Immutable map state copied from the latest published generation.
  *
  * Every field is unkeyed, fixed-size map state that changes only through this
- * map's own commands or through load progress. Each committed map command
+ * map's own commands or through load progress. Each map command that runs
  * publishes a new generation and reports it through its completion, even when
- * the command changes nothing, so a snapshot whose generation is at or past a
- * completion observes that commit.
+ * the command changes nothing or fails, so a snapshot whose generation is at
+ * or past a completion observes that command.
  */
 typedef struct mln_map_snapshot {
   uint32_t size;
@@ -974,7 +976,7 @@ MLN_API mln_status mln_map_snapshot_get(
  * through mln_render_session_resize(), which submits this command itself; a
  * direct map resize to a different extent leaves the session waiting for an
  * update that the map never publishes. The completion reports terminal
- * disposition and the snapshot generation published by a committed resize. A
+ * disposition and the snapshot generation that the resize published. A
  * resize that a later one replaces before the worker runs it completes as
  * superseded.
  *

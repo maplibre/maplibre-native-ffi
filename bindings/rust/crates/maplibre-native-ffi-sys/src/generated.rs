@@ -1116,6 +1116,7 @@ pub struct mln_runtime_event {
     pub type_: u32,
     pub source_type: u32,
     pub source: u64,
+    pub generation: u64,
     pub code: i32,
     pub payload_type: u32,
     pub message_offset: u64,

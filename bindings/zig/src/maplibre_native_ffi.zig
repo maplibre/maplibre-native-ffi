@@ -3263,6 +3263,7 @@ pub const RuntimeEvent = struct {
     type: RuntimeEventType = std.mem.zeroes(RuntimeEventType),
     source_type: RuntimeEventSourceType = std.mem.zeroes(RuntimeEventSourceType),
     source: u64 = std.mem.zeroes(u64),
+    generation: u64 = std.mem.zeroes(u64),
     code: i32 = std.mem.zeroes(i32),
     payload: RuntimeEventPayload = .{ .unknown = 0 },
     pub fn toNative(self: RuntimeEvent, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_event {
@@ -3272,6 +3273,7 @@ pub const RuntimeEvent = struct {
         raw.type = self.type.toNative();
         raw.source_type = self.source_type.toNative();
         raw.source = self.source;
+        raw.generation = self.generation;
         raw.code = self.code;
         switch (self.payload) {
             .render_frame => |item| {
@@ -3317,6 +3319,7 @@ pub const RuntimeEvent = struct {
             .type = RuntimeEventType.fromNative(raw.type),
             .source_type = RuntimeEventSourceType.fromNative(raw.source_type),
             .source = raw.source,
+            .generation = raw.generation,
             .code = raw.code,
             .payload = switch (raw.payload_type) {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => .{ .render_frame = RuntimeEventRenderFrame.fromNative(raw.payload.render_frame) },

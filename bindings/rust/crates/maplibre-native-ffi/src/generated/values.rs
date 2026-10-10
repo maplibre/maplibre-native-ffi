@@ -4378,6 +4378,9 @@ pub struct RuntimeEvent {
     /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
     /// Every handle type is uint64_t, so this needs no cast.
     pub source: u64,
+    /// Map snapshot generation that the event reports, or zero for an event
+    /// whose source is a runtime.
+    pub generation: u64,
     /// Secondary event detail whose meaning type selects. Depending on type it
     /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
     /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
@@ -4393,6 +4396,7 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
             r#type: unsafe { from_native(raw.type_) }?,
             source_type: unsafe { from_native(raw.source_type) }?,
             source: raw.source,
+            generation: raw.generation,
             code: raw.code,
             payload: match raw.payload_type {
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => {

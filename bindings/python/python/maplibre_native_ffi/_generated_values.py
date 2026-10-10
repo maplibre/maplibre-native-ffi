@@ -2780,6 +2780,7 @@ class RuntimeEvent:
     type: RuntimeEventType
     source_type: RuntimeEventSourceType
     source: int
+    generation: int
     code: int
     payload: (
         RuntimeEventRenderFrameVariant
@@ -2800,6 +2801,7 @@ class RuntimeEvent:
             type=RuntimeEventType(raw["type"]),
             source_type=RuntimeEventSourceType(raw["source_type"]),
             source=raw["source"],
+            generation=raw["generation"],
             code=raw["code"],
             payload=_copy_variant(
                 raw["payload"],

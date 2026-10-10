@@ -2066,6 +2066,7 @@ internal static unsafe class GeneratedValues
             (RuntimeEventType)value.type,
             (RuntimeEventSourceType)value.source_type,
             value.source,
+            value.generation,
             value.code,
             value.payload_type switch
             {

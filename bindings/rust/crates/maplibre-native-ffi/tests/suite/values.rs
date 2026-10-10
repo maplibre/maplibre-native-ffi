@@ -82,6 +82,7 @@ fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
         event.type_ = event_type;
         event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
         event.source = 0xabcd_0000_0000_0000 | index as u64;
+        event.generation = 0x1_0000_0000 + index as u64;
         event.payload_type = payload_type;
         event.message_offset = offset;
         event.message_size = length;
@@ -112,6 +113,7 @@ fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
     assert_eq!(view.events[0].message, "first");
     assert_eq!(view.events[1].r#type, RuntimeEventType::MapStyleLoaded);
     assert_eq!(view.events[1].source, 0xabcd_0000_0000_0001);
+    assert_eq!(view.events[1].generation, 0x1_0000_0001);
     assert_eq!(view.events[1].payload, RuntimeEventPayload::Unknown(0xfff0));
     assert_eq!(view.events[1].message, "second");
 }

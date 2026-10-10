@@ -160,6 +160,9 @@ public sealed unsafe class RuntimeEventTests
             .GetBytes(0x0700_0000_0000_0021UL)
             .CopyTo(records, OffsetOf(nameof(mln_runtime_event.source)));
         BitConverter
+            .GetBytes(0x0000_0001_0000_0005UL)
+            .CopyTo(records, OffsetOf(nameof(mln_runtime_event.generation)));
+        BitConverter
             .GetBytes(999u)
             .CopyTo(records, OffsetOf(nameof(mln_runtime_event.payload_type)));
         for (var index = payloadOffset; index < records.Length; index++)
@@ -175,6 +178,7 @@ public sealed unsafe class RuntimeEventTests
         Assert.Equal(77u, (uint)runtimeEvent.SourceType);
         Assert.Equal((RuntimeEventSourceType)77u, runtimeEvent.SourceType);
         Assert.Equal(0x0700_0000_0000_0021UL, runtimeEvent.Source);
+        Assert.Equal(0x0000_0001_0000_0005UL, runtimeEvent.Generation);
 
         // The window is the batch stride minus the payload offset, so it grows with a stride
         // a later library version widens.

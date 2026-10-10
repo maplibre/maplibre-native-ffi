@@ -182,7 +182,7 @@ MLN_API mln_status mln_map_camera_snapshot_get(
  * Submits one atomic camera update.
  *
  * The update is copied before return. The completion reports its terminal
- * disposition and the snapshot generation published by a committed update.
+ * disposition and the snapshot generation that the update published.
  * update->gesture_phase is applied around the camera write; see
  * mln_gesture_phase.
  *

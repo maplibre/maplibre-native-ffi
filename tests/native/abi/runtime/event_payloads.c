@@ -427,7 +427,8 @@ static size_t log_next(
 
 // A jump reports an immediate change and an ease an animated one. The jump
 // that cancels the running ease ends it, and that transition's finished event
-// comes immediately before the camera change that completed it.
+// comes immediately after the camera change that completed it, with the same
+// generation.
 static void camera_events_carry_their_change_mode_and_transition(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -480,10 +481,13 @@ static void camera_events_carry_their_change_mode_and_transition(void) {
     41,
     log->events[finished].event.payload.camera_transition_finished.transition_id
   );
-  TEST_ASSERT_LESS_THAN_size_t(log->count, finished + 1);
+  TEST_ASSERT_GREATER_THAN_size_t(cancel_start, finished);
+  const mln_runtime_event* ended = &log->events[finished - 1].event;
   TEST_ASSERT_EQUAL_UINT32(
-    MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
-    log->events[finished + 1].event.type
+    MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, ended->type
+  );
+  TEST_ASSERT_EQUAL_UINT64(
+    ended->generation, log->events[finished].event.generation
   );
 
   check_scenario_rows(SCENARIO_CAMERA, log, &context);
@@ -507,7 +511,7 @@ static const zero_duration_case zero_duration_cases[] = {
 };
 
 // A transition with nothing to animate finishes within its command: one
-// finished event, immediately followed by an immediate camera change.
+// finished event, immediately after an immediate camera change.
 static void zero_duration_transitions_finish_within_their_command(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -544,8 +548,8 @@ static void zero_duration_transitions_finish_within_their_command(void) {
         .event.payload.camera_transition_finished.transition_id,
       row->label
     );
-    TEST_ASSERT_LESS_THAN_size_t_MESSAGE(log->count, finished + 1, row->label);
-    const mln_runtime_event* change = &log->events[finished + 1].event;
+    TEST_ASSERT_GREATER_THAN_size_t_MESSAGE(0, finished, row->label);
+    const mln_runtime_event* change = &log->events[finished - 1].event;
     TEST_ASSERT_EQUAL_UINT32_MESSAGE(
       MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, change->type, row->label
     );

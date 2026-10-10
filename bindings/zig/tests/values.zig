@@ -70,6 +70,7 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
     var records = std.mem.zeroes([2]Record);
     records[0].event.type = 999;
     records[0].event.source = 0xfeed_0000_0000_0001;
+    records[0].event.generation = 0x1_0000_0002;
     records[0].event.payload_type = 77;
     records[0].event.message_offset = 0;
     records[0].event.message_size = 6;
@@ -91,6 +92,7 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
     try testing.expectEqual(@as(usize, 2), view.events.len);
     try testing.expectEqual(@as(u32, 999), @intFromEnum(view.events[0].type));
     try testing.expectEqual(@as(u64, 0xfeed_0000_0000_0001), view.events[0].source);
+    try testing.expectEqual(@as(u64, 0x1_0000_0002), view.events[0].generation);
     try testing.expectEqual(@as(u32, 77), view.events[0].payload.unknown);
     try testing.expectEqualStrings("future", view.events[0].message);
     try testing.expectEqual(maplibre.RuntimeEventType.map_style_loaded, view.events[1].type);

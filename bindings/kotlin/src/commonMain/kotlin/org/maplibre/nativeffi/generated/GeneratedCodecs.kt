@@ -1440,15 +1440,15 @@ internal fun readRuntimeEventBatchView(source: Long): RuntimeEventBatchView =
         readAddress(source + 8),
         readSize(source + w(12, 16)),
         readU32(source + 4).toULong(),
-        112,
+        120,
       ) { item ->
         readRuntimeEvent(
           item,
           readItem(
               readAddress(source + w(16, 24)),
               readSize(source + w(20, 32)),
-              readU64(item + 24),
-              readU32(item + 32).toULong(),
+              readU64(item + 32),
+              readU32(item + 40).toULong(),
             )
             .decodeToString(),
         )
@@ -1938,31 +1938,32 @@ internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent 
     type = RuntimeEventType(readU32(source)),
     sourceType = RuntimeEventSourceType(readU32(source + 4)),
     source = readU64(source + 8),
-    code = readI32(source + 16),
+    generation = readU64(source + 16),
+    code = readI32(source + 24),
     payload =
-      readU32(source + 20).let { tag ->
+      readU32(source + 28).let { tag ->
         when (tag) {
-          1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + 40))
-          2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + 40))
-          4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + 40))
+          1u -> RuntimeEventPayload.RenderFrame(readRuntimeEventRenderFrame(source + 48))
+          2u -> RuntimeEventPayload.RenderMap(readRuntimeEventRenderMap(source + 48))
+          4u -> RuntimeEventPayload.TileAction(readRuntimeEventTileAction(source + 48))
           5u ->
             RuntimeEventPayload.OfflineRegionStatus(
-              readRuntimeEventOfflineRegionStatus(source + 40)
+              readRuntimeEventOfflineRegionStatus(source + 48)
             )
           6u ->
             RuntimeEventPayload.OfflineRegionResponseError(
-              readRuntimeEventOfflineRegionResponseError(source + 40)
+              readRuntimeEventOfflineRegionResponseError(source + 48)
             )
           7u ->
             RuntimeEventPayload.OfflineRegionTileCountLimit(
-              readRuntimeEventOfflineRegionTileCountLimit(source + 40)
+              readRuntimeEventOfflineRegionTileCountLimit(source + 48)
             )
           9u ->
             RuntimeEventPayload.CameraTransitionFinished(
-              readRuntimeEventCameraTransitionFinished(source + 40)
+              readRuntimeEventCameraTransitionFinished(source + 48)
             )
           0u -> RuntimeEventPayload.None
-          else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 40, 72))
+          else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 48, 72))
         }
       },
     message = message,

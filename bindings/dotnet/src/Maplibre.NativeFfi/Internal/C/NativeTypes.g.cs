@@ -746,6 +746,7 @@ internal unsafe struct mln_runtime_event
     public uint type;
     public uint source_type;
     public ulong source;
+    public ulong generation;
     public int code;
     public uint payload_type;
     public ulong message_offset;

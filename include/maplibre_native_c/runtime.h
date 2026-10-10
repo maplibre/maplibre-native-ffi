@@ -84,7 +84,8 @@ typedef struct mln_offline_region_status {
  *   Read message for the failure text in both cases; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
  * - MAP_RENDER_UPDATE_AVAILABLE: the map published new render state, which the
- *   next render-if-needed frame demand renders; code is 0; payload NONE.
+ *   next render-if-needed frame demand renders; code is 0; payload NONE. A map
+ *   command raises at most one, after its other events.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
  * - MAP_STILL_IMAGE_FINISHED: code is 0; payload NONE.
  * - MAP_STILL_IMAGE_FAILED: code is 0; message carries the error text; payload
@@ -557,6 +558,23 @@ typedef struct mln_runtime_event {
    * compare it against a handle it holds even after that handle is released.
    */
   uint64_t source;
+  /**
+   * Map snapshot generation that the event reports, or zero for an event whose
+   * source is a runtime.
+   *
+   * A camera, style, loading, or idle event follows the publication of a
+   * snapshot that includes the change it reports and carries that snapshot's
+   * generation. A published snapshot read at or past this generation therefore
+   * shows state at least as new as the event. Every other map event carries the
+   * generation that was current when the map raised it.
+   *
+   * An event that a map command raises carries the generation that the
+   * command's completion reports. An event whose generation is at or past a
+   * command's completion generation was raised by that command or after it;
+   * one below it was raised before the command ran. Events from one map are
+   * queued in non-decreasing generation order.
+   */
+  uint64_t generation;
   /**
    * Secondary event detail whose meaning type selects. Depending on type it
    * carries an mln_camera_change_mode, an mln_status, a MapLibre Native error

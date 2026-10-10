@@ -145,6 +145,7 @@ void main() {
         unknown.type = 0xfeed;
         unknown.source_type = 0xbeef;
         unknown.source = 0xcafe;
+        unknown.generation = 0x100000005;
         unknown.code = 17;
         unknown.payload_type = 0xf00d;
         unknown.message_offset = 0;
@@ -200,6 +201,7 @@ void main() {
         expect(unknownEvent.code, 17);
         expect(unknownEvent.sourceType.rawValue, 0xbeef);
         expect(unknownEvent.source, BigInt.from(0xcafe));
+        expect(unknownEvent.generation, BigInt.from(0x100000005));
         expect(unknownEvent.message, 'copied message');
         final unknownPayload = unknownEvent.payload;
         expect(unknownPayload, isA<RuntimeEventPayloadUnknown>());

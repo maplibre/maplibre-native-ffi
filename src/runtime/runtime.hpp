@@ -34,20 +34,61 @@ class RunLoop;
 
 namespace mln::core {
 
+struct MapObject;
 struct RuntimeObject;
 class Wake;
 class OperationObject;
 class Completion;
 
-// Read on the runtime worker by map event producers, and on the mbgl
-// DatabaseFileSourceThread by offline producers. Held by shared_ptr so a camera
-// transition that outlives its map still reads a live cell.
+// A map event raised inside a map transaction. It waits there for the
+// generation that the transaction publishes.
+struct HeldMapEvent {
+  uint32_t type = 0;
+  uint32_t payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE;
+  mln_runtime_event_payload payload{};
+  int32_t code = 0;
+  std::string message;
+};
+
+// One map's event state. The runtime keeps a share of it while the map is
+// registered, and the camera transitions of the map hold another.
 struct MapEventState {
+  // Any thread reads the mask; map commands write it on the runtime worker.
   std::atomic<uint64_t> mask;
-  // Runtime-worker only. The style setters clear this before a load and read it
-  // after, so a subscription mask can never change their return status.
+
+  // Every field below is runtime-worker only, and only the map that owns this
+  // state calls publish() or queues events through it.
+
+  // The style setters clear this before a load and read it after, so a
+  // subscription mask can never change their return status.
   std::string style_load_failure;
   bool style_load_failed = false;
+  mln_runtime runtime = MLN_HANDLE_NULL;
+  mln_map map = MLN_HANDLE_NULL;
+  std::weak_ptr<MapObject> owner;
+  // Generation of the snapshot that the map published last.
+  uint64_t published_generation = 0;
+  // Open map transactions. A transaction holds the events that the map raises
+  // until it publishes, and transactions never nest.
+  uint32_t transaction_depth = 0;
+  std::vector<HeldMapEvent> held;
+  // Transition IDs whose finish callbacks ran, waiting for the
+  // MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE that MapLibre raises right after.
+  std::vector<uint64_t> finished_transitions;
+
+  [[nodiscard]] auto in_transaction() const noexcept -> bool {
+    return transaction_depth != 0;
+  }
+  // Publishes a snapshot of the owning map and returns its generation, or
+  // zero when that map is gone or being destroyed. Defined with the map.
+  auto publish() -> uint64_t;
+  // The generation for an event that reports a change in map state. Outside a
+  // transaction this publishes first, so the snapshot includes the change.
+  // Inside one it publishes nothing, because the transaction stamps its held
+  // events when it publishes.
+  auto fresh_generation() -> uint64_t {
+    return in_transaction() ? published_generation : publish();
+  }
 };
 
 struct RuntimeEventState {
@@ -415,14 +456,19 @@ auto acquire_resource_provider_for_platform_context(
 auto has_resource_transform_for_platform_context(
   void* platform_context
 ) noexcept -> bool;
-auto push_runtime_map_event(
-  mln_runtime runtime, mln_map map, uint32_t type, int32_t code = 0,
-  const char* message = nullptr
-) -> void;
+// Map producers queue through queue_map_event() in the map module, which
+// holds a transaction's events and stamps every event's generation. Producers
+// test their subscription mask before they build an event.
 auto push_runtime_map_event_payload(
-  mln_runtime runtime, mln_map map, uint32_t type, uint32_t payload_type,
-  const mln_runtime_event_payload& payload, int32_t code = 0,
-  std::string message = {}
+  mln_runtime runtime, mln_map map, uint64_t generation, uint32_t type,
+  uint32_t payload_type, const mln_runtime_event_payload& payload,
+  int32_t code = 0, std::string message = {}
+) -> void;
+// Appends events under one queue lock, all with one generation. Moves each
+// message out and leaves the vector for its owner to clear.
+auto push_runtime_map_events(
+  mln_runtime runtime, mln_map map, uint64_t generation,
+  std::vector<HeldMapEvent>& events
 ) -> void;
 auto register_runtime_map_events(
   mln_runtime runtime, mln_map map, std::shared_ptr<MapEventState> event_state

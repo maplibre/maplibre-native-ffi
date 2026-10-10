@@ -1682,6 +1682,7 @@ fn generated_copy_mln_runtime_event(
     dict.set_item("type", generated_value(py, value.type_)?)?;
     dict.set_item("source_type", generated_value(py, value.source_type)?)?;
     dict.set_item("source", generated_value(py, value.source)?)?;
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
     dict.set_item("code", generated_value(py, value.code)?)?;
     dict.set_item(
         "payload",

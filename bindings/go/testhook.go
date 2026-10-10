@@ -40,6 +40,11 @@ func newRuntimeEventForTest(eventType RuntimeEventType, sourceType RuntimeEventS
 	}}
 }
 
+func (event runtimeEventForTest) withGeneration(generation uint64) runtimeEventForTest {
+	event.raw.generation = C.uint64_t(generation)
+	return event
+}
+
 func (event runtimeEventForTest) withMessage(message string) runtimeEventForTest {
 	event.message = message
 	return event

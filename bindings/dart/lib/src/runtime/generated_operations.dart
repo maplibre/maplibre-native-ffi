@@ -686,6 +686,7 @@ RuntimeEvent _readRuntimeEvent(
   type: RuntimeEventType.fromRawValue(source.type),
   sourceType: RuntimeEventSourceType.fromRawValue(source.source_type),
   source: uint64FromNative(source.source),
+  generation: uint64FromNative(source.generation),
   code: source.code,
   messageOffset: uint64FromNative(source.message_offset),
   messageSize: source.message_size,

@@ -1995,6 +1995,7 @@ final class RuntimeEvent {
     required this.type,
     this.sourceType = const RuntimeEventSourceType.fromRawValue(0),
     required this.source,
+    required this.generation,
     this.code = 0,
     required this.messageOffset,
     this.messageSize = 0,
@@ -2004,6 +2005,7 @@ final class RuntimeEvent {
   final RuntimeEventType type;
   final RuntimeEventSourceType sourceType;
   final BigInt source;
+  final BigInt generation;
   final int code;
   final BigInt messageOffset;
   final int messageSize;

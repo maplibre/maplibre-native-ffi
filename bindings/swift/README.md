@@ -1,7 +1,7 @@
 # MapLibre Native Swift binding
 
 The Swift API is generated from the C headers. A command is an `async` method
-that returns its terminal disposition and committed generation as a
+that returns its terminal disposition and snapshot generation as a
 `CommandCompletion`; a query is an `async` method that returns a copied result.
 Published snapshots return their result synchronously.
 

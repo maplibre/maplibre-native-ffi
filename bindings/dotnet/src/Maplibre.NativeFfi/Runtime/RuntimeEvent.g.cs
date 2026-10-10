@@ -19,6 +19,10 @@ namespace Maplibre.NativeFfi;
 /// Source handle selected by source_type: an <c>mln_runtime</c> or an
 /// <c>mln_map</c>. Every handle type is uint64_t, so this needs no cast.
 /// </param>
+/// <param name="Generation">
+/// Map snapshot generation that the event reports, or zero for an event whose
+/// source is a runtime.
+/// </param>
 /// <param name="Code">
 /// Secondary event detail whose meaning type selects. Depending on type it
 /// carries an <c>mln_camera_change_mode</c>, an <c>mln_status</c>, a MapLibre
@@ -32,6 +36,7 @@ public readonly partial record struct RuntimeEvent(
     RuntimeEventType Type,
     RuntimeEventSourceType SourceType,
     ulong Source,
+    ulong Generation,
     int Code,
     RuntimeEvent.PayloadValue Payload,
     string Message
