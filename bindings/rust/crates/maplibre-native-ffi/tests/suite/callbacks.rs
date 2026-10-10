@@ -51,6 +51,61 @@ fn a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released
 }
 
 #[test]
+fn a_camera_end_handler_inside_a_command_is_rooted_until_it_runs() {
+    let fixture = Fixture::new();
+
+    // The handler sits two records deep in the command's input. Native holds
+    // it while the ease runs, and runs it once when its identity is cancelled.
+    let (probe, released) = release_probe();
+    let (ended, outcomes) = mpsc::channel();
+    let update = CameraUpdate {
+        mode: CameraUpdateMode::Ease,
+        camera: CameraOptions {
+            zoom: Some(4.0),
+            ..Default::default()
+        },
+        animation: AnimationOptions {
+            duration_ms: Some(60_000.0),
+            transition_id: Some(u64::MAX),
+            end_handler: CameraTransitionHandler::new(move |end| {
+                let _ = &probe;
+                ended.send(end).unwrap();
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    wait_for(fixture.map().update_camera(&update));
+    drop(update);
+    assert!(released.try_recv().is_err());
+    wait_for(fixture.map().cancel_camera_transition(u64::MAX));
+    let end = outcomes.recv_timeout(timeout()).unwrap();
+    assert_eq!(end.outcome, CameraTransitionOutcome::Cancelled);
+    assert_ne!(end.generation, 0);
+    await_release(&released);
+    assert!(outcomes.try_recv().is_err());
+
+    // A rejected command releases the handler before the call returns.
+    let (probe, released) = release_probe();
+    let delta = CameraDelta {
+        scale: Some(-1.0),
+        animation: AnimationOptions {
+            end_handler: CameraTransitionHandler::new(move |_| {
+                let _ = &probe;
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let error = fixture.map().apply_camera_delta(&delta).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    drop(delta);
+    released
+        .try_recv()
+        .expect("a rejected command kept its end handler");
+}
+
+#[test]
 fn a_registered_callback_does_not_keep_its_runtime_alive() {
     let (probe, released) = release_probe();
     let runtime = runtime_create(&RuntimeOptions::default()).unwrap();

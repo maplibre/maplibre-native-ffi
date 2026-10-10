@@ -382,6 +382,55 @@ auto tile_action_payload(
 
 namespace mln::core {
 
+// The end handler that one camera command copied. Its callback runs at most
+// once, and release_user_data runs after it. The submission transfers the
+// handler before it commits and takes it back when the submission fails, so
+// a rejected command runs neither. An accepted command that the runtime drops
+// without ending reports itself closed when its last owner lets go.
+class CameraTransitionEnd final {
+ public:
+  explicit CameraTransitionEnd(
+    const mln_camera_transition_handler& handler
+  ) noexcept
+      : handler_(handler) {}
+  CameraTransitionEnd(const CameraTransitionEnd&) = delete;
+  CameraTransitionEnd(CameraTransitionEnd&&) = delete;
+  auto operator=(const CameraTransitionEnd&) -> CameraTransitionEnd& = delete;
+  auto operator=(CameraTransitionEnd&&) -> CameraTransitionEnd& = delete;
+  ~CameraTransitionEnd() { deliver(MLN_CAMERA_TRANSITION_OUTCOME_CLOSED, 0); }
+
+  auto transfer_to_runtime() noexcept -> void {
+    owned_.store(true, std::memory_order_release);
+  }
+  auto return_to_caller() noexcept -> void {
+    owned_.store(false, std::memory_order_release);
+  }
+
+  auto deliver(uint32_t outcome, uint64_t generation) noexcept -> void {
+    if (!owned_.exchange(false, std::memory_order_acq_rel)) return;
+    if (process_exiting()) return;
+    const auto end = mln_camera_transition_end{
+      .size = sizeof(mln_camera_transition_end),
+      .outcome = outcome,
+      .generation = generation,
+    };
+    try {
+      handler_.callback(handler_.user_data, &end);
+    } catch (...) {
+      // Host callbacks must not unwind through the C boundary.
+    }
+    if (handler_.release_user_data == nullptr) return;
+    try {
+      handler_.release_user_data(handler_.user_data);
+    } catch (...) {
+    }
+  }
+
+ private:
+  mln_camera_transition_handler handler_;
+  std::atomic_bool owned_{false};
+};
+
 namespace {
 
 // Queues one event that the map raised on the runtime worker. Inside a map
@@ -420,20 +469,6 @@ auto queue_map_event(
   }
 }
 
-auto queue_transition_finished(
-  MapEventState& events, uint64_t generation, uint64_t transition_id
-) noexcept -> void {
-  auto payload = zeroed_event_payload();
-  payload.camera_transition_finished =
-    mln_runtime_event_camera_transition_finished{
-      .transition_id = transition_id
-    };
-  queue_map_event(
-    events, generation, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
-    MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED, payload
-  );
-}
-
 // Queues the events that a transaction held, all with the generation that it
 // published, ahead of any event that the map raises afterwards. The held
 // vector keeps its capacity for the next transaction.
@@ -449,6 +484,92 @@ auto queue_held_map_events(MapEventState& events, uint64_t generation) -> void {
   }
   events.held.clear();
 }
+
+// Records that the transitions of a camera command with an end handler ended.
+// The end waits for the camera change that MapLibre raises next, or for the
+// transaction around the change, to learn its generation. A command that a
+// map close already reported records nothing.
+auto end_camera_command(
+  MapEventState& events, const std::shared_ptr<CameraTransitionEnd>& end,
+  uint32_t outcome
+) noexcept -> void {
+  auto& running = events.running_transition_ends;
+  const auto found = std::find(running.begin(), running.end(), end);
+  if (found == running.end()) return;
+  running.erase(found);
+  try {
+    events.ended_transitions.push_back(
+      EndedCameraTransition{.end = end, .outcome = outcome}
+    );
+  } catch (...) {
+    // The handler must still run exactly once.
+    end->deliver(outcome, events.published_generation);
+  }
+}
+
+// Runs the handlers of the ended commands with `generation`. Callers run this
+// only from a runtime-worker task, never from inside a MapLibre call.
+auto deliver_ended_transitions(
+  MapEventState& events, uint64_t generation
+) noexcept -> void {
+  auto ended = std::exchange(events.ended_transitions, {});
+  for (const auto& item : ended) item.end->deliver(item.outcome, generation);
+}
+
+// Runs the handlers of the ended commands from a later task on the runtime
+// worker, outside the MapLibre call that ended them. The map keeps its runtime
+// executor running, so the task runs unless allocation fails, in which case
+// the handlers run here rather than never.
+auto post_ended_transitions(MapEventState& events, uint64_t generation) noexcept
+  -> void {
+  if (events.ended_transitions.empty()) return;
+  auto ended = std::exchange(events.ended_transitions, {});
+  try {
+    const auto owner = events.owner.lock();
+    if (owner != nullptr) {
+      owner->runtime_state->executor.invoke([ended, generation]() -> void {
+        for (const auto& item : ended) {
+          item.end->deliver(item.outcome, generation);
+        }
+      });
+      return;
+    }
+  } catch (...) {
+  }
+  for (const auto& item : ended) item.end->deliver(item.outcome, generation);
+}
+
+// Reports the camera commands that a closing map still runs as closed, after
+// the commands that ended before the close.
+auto close_camera_transitions(MapEventState& events) noexcept -> void {
+  deliver_ended_transitions(events, events.published_generation);
+  auto running = std::exchange(events.running_transition_ends, {});
+  for (const auto& end : running) {
+    end->deliver(MLN_CAMERA_TRANSITION_OUTCOME_CLOSED, 0);
+  }
+}
+
+// Marks the transitions that a C API cancellation ends for as long as it
+// runs, so their finish callbacks report them cancelled.
+class TransitionCancellationScope final {
+ public:
+  TransitionCancellationScope(
+    MapEventState& events, CameraTransitionCancellation cancellation
+  ) noexcept
+      : events_(events),
+        previous_(std::exchange(events.cancelling_transitions, cancellation)) {}
+  TransitionCancellationScope(const TransitionCancellationScope&) = delete;
+  TransitionCancellationScope(TransitionCancellationScope&&) = delete;
+  auto operator=(const TransitionCancellationScope&)
+    -> TransitionCancellationScope& = delete;
+  auto operator=(TransitionCancellationScope&&)
+    -> TransitionCancellationScope& = delete;
+  ~TransitionCancellationScope() { events_.cancelling_transitions = previous_; }
+
+ private:
+  MapEventState& events_;
+  CameraTransitionCancellation previous_;
+};
 
 }  // namespace
 
@@ -483,30 +604,24 @@ class HeadlessObserver final : public mln::MapObserver {
   }
 
   // MapLibre calls a transition's finish callback immediately before this, so
-  // the transitions it finished are queued after the camera change, with its
-  // generation. The pending IDs clear whatever the mask selects.
+  // the commands that it ended take this change's generation. A transaction
+  // runs their handlers when it publishes. Outside one, they run from a later
+  // task, after this change's event is queued, whatever the mask selects.
   void onCameraDidChange(CameraChangeMode mode) override {
     auto& events = *event_state_;
     const auto did_change = selected(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE);
-    const auto finished =
-      selected(MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) &&
-      !events.finished_transitions.empty();
-    if (did_change || finished) {
-      const auto generation = events.fresh_generation();
-      if (did_change) {
-        queue_map_event(
-          events, generation, MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
-          MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(),
-          to_c_camera_change_mode(mode)
-        );
-      }
-      if (finished) {
-        for (const auto transition_id : events.finished_transitions) {
-          queue_transition_finished(events, generation, transition_id);
-        }
-      }
+    const auto ended =
+      !events.in_transaction() && !events.ended_transitions.empty();
+    if (!did_change && !ended) return;
+    const auto generation = events.fresh_generation();
+    if (did_change) {
+      queue_map_event(
+        events, generation, MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
+        MLN_RUNTIME_EVENT_PAYLOAD_NONE, zeroed_event_payload(),
+        to_c_camera_change_mode(mode)
+      );
     }
-    events.finished_transitions.clear();
+    if (ended) post_ended_transitions(events, generation);
   }
 
   void onWillStartLoadingMap() override {
@@ -1262,6 +1377,15 @@ auto validate_animation_options(const mln_animation_options* animation)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto& end_handler = animation->end_handler;
+  if (
+    end_handler.callback == nullptr && end_handler.release_user_data != nullptr
+  ) {
+    mln::core::set_thread_error(
+      "a disabled camera transition handler must not retain user data"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   if (
     (animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U &&
     !is_native_duration_ms(animation->duration_ms)
@@ -1826,68 +1950,142 @@ auto from_native_camera(const mln::CameraOptions& camera)
   return result;
 }
 
-// Records one map command's transition ID once every MapLibre transition that
-// the command started has finished. MapLibre invokes transitionFinishFn on the
-// runtime worker, usually immediately before the camera change that ends the
-// transition, and the observer queues the recorded ID after that camera change.
-// A map transaction queues any finish that no camera change followed.
+// The MapLibre transitions that one camera command with an end handler
+// started. A command that starts several transitions, such as a camera delta
+// that pans and zooms, gives each of them a copy of one finish function, and
+// the copies share this state. The command ends once, after the last of its
+// transitions finishes, as cancelled when a C API cancellation finished any of
+// them. MapLibre invokes the finish functions on the runtime worker,
+// immediately before the camera change that ends each transition.
 //
-// A command that starts several transitions, such as a camera delta that pans
-// and zooms, gives each of them a copy of one instance. MapLibre copies the
-// function into every transition, so the copies share the remaining count, and
-// the command reports its ID once, after the last of them ends. Each copy
-// carries the ID, so code that inspects a transition's finish function through
-// std::function::target() can tell which command started it. The instance holds
-// event state by value, so it stays valid for as long as MapLibre keeps it.
-struct CommandTransitionFinish {
+// The state holds event state by value, so it stays valid for as long as
+// MapLibre keeps a copy. When MapLibre drops the last copy without finishing
+// every transition, as when a command fails before it starts them, the
+// command ends as cancelled.
+struct CommandTransitions {
   std::shared_ptr<mln::core::MapEventState> event_state;
-  uint64_t transition_id = 0;
+  std::shared_ptr<mln::core::CameraTransitionEnd> end;
+  std::optional<uint64_t> transition_id;
   // The command's transitions that have not finished yet.
-  std::shared_ptr<uint32_t> remaining;
+  uint32_t remaining = 0;
+  bool cancelled = false;
 
-  auto operator()() const -> void {
-    if (*remaining == 0) return;
-    *remaining -= 1;
-    if (*remaining != 0) return;
+  CommandTransitions(
+    std::shared_ptr<mln::core::MapEventState> events,
+    std::shared_ptr<mln::core::CameraTransitionEnd> handler,
+    std::optional<uint64_t> id, uint32_t transitions
+  )
+      : event_state(std::move(events)),
+        end(std::move(handler)),
+        transition_id(id),
+        remaining(transitions) {}
+  CommandTransitions(const CommandTransitions&) = delete;
+  CommandTransitions(CommandTransitions&&) = delete;
+  auto operator=(const CommandTransitions&) -> CommandTransitions& = delete;
+  auto operator=(CommandTransitions&&) -> CommandTransitions& = delete;
+
+  ~CommandTransitions() {
+    if (remaining == 0) return;
+    mln::core::end_camera_command(
+      *event_state, end, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED
+    );
+  }
+
+  auto finish() -> void {
+    if (remaining == 0) return;
+    const auto& cancellation = event_state->cancelling_transitions;
     if (
-      mln::core::event_selected(
-        event_state->mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
-      )
+      cancellation.active &&
+      (cancellation.all || transition_id == cancellation.transition_id)
     ) {
-      event_state->finished_transitions.push_back(transition_id);
+      cancelled = true;
     }
+    remaining -= 1;
+    if (remaining != 0) return;
+    mln::core::end_camera_command(
+      *event_state, end,
+      cancelled ? MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED
+                : MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED
+    );
   }
 };
 
+struct CommandTransitionFinish {
+  std::shared_ptr<CommandTransitions> command;
+
+  auto operator()() const -> void { command->finish(); }
+};
+
+// Copies an enabled end handler from a camera command's animation, or returns
+// null for a disabled one.
+auto camera_transition_end(const mln_animation_options& animation)
+  -> std::shared_ptr<mln::core::CameraTransitionEnd> {
+  if (animation.end_handler.callback == nullptr) return nullptr;
+  return std::make_shared<mln::core::CameraTransitionEnd>(
+    animation.end_handler
+  );
+}
+
+// Submits a camera command that carries `end`, and leaves the handler with the
+// caller unless the command is accepted.
+template <typename Submit>
+auto submit_with_transition_end(
+  const std::shared_ptr<mln::core::CameraTransitionEnd>& end, Submit submit
+) -> mln_status {
+  if (end == nullptr) return submit();
+  end->transfer_to_runtime();
+  auto status = MLN_STATUS_NATIVE_ERROR;
+  try {
+    status = submit();
+  } catch (...) {
+    end->return_to_caller();
+    throw;
+  }
+  if (status != MLN_STATUS_OK) end->return_to_caller();
+  return status;
+}
+
 // MapLibre Native owns the returned AnimationOptions for the transition
 // lifetime. `transitions` is the number of MapLibre transitions that the
-// command starts with these options; see CommandTransitionFinish.
+// command starts with these options; see CommandTransitions. A command with
+// an end handler builds its options first, before anything that can fail, so
+// that a failure ends the command as cancelled.
 auto to_native_animation(
   const std::shared_ptr<mln::core::MapEventState>& event_state,
-  const mln_animation_options* animation, uint32_t transitions = 1
+  const mln_animation_options& animation,
+  const std::shared_ptr<mln::core::CameraTransitionEnd>& end,
+  uint32_t transitions = 1
 ) -> mln::AnimationOptions {
   auto result = mln::AnimationOptions{};
-  if (animation == nullptr) {
-    return result;
+  if ((animation.fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
+    result.transitionId = animation.transition_id;
   }
-  if ((animation->fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
-    result.transitionFinishFn = CommandTransitionFinish{
-      .event_state = event_state,
-      .transition_id = animation->transition_id,
-      .remaining = std::make_shared<uint32_t>(transitions),
-    };
+  if (end != nullptr) {
+    event_state->running_transition_ends.push_back(end);
+    auto command = std::shared_ptr<CommandTransitions>{};
+    try {
+      command = std::make_shared<CommandTransitions>(
+        event_state, end, result.transitionId, transitions
+      );
+    } catch (...) {
+      mln::core::end_camera_command(
+        *event_state, end, MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED
+      );
+      throw;
+    }
+    result.transitionFinishFn = CommandTransitionFinish{std::move(command)};
   }
-  if ((animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
-    result.duration = duration_from_milliseconds(animation->duration_ms);
+  if ((animation.fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
+    result.duration = duration_from_milliseconds(animation.duration_ms);
   }
-  if ((animation->fields & MLN_ANIMATION_OPTION_VELOCITY) != 0U) {
-    result.velocity = animation->velocity;
+  if ((animation.fields & MLN_ANIMATION_OPTION_VELOCITY) != 0U) {
+    result.velocity = animation.velocity;
   }
-  if ((animation->fields & MLN_ANIMATION_OPTION_MIN_ZOOM) != 0U) {
-    result.minZoom = animation->min_zoom;
+  if ((animation.fields & MLN_ANIMATION_OPTION_MIN_ZOOM) != 0U) {
+    result.minZoom = animation.min_zoom;
   }
-  if ((animation->fields & MLN_ANIMATION_OPTION_EASING) != 0U) {
-    const auto easing = animation->easing;
+  if ((animation.fields & MLN_ANIMATION_OPTION_EASING) != 0U) {
+    const auto easing = animation.easing;
     result.easing.emplace(easing.x1, easing.y1, easing.x2, easing.y2);
   }
   return result;
@@ -2465,37 +2663,19 @@ auto open_map_transaction(MapEventState& events) -> void {
   events.transaction_depth += 1;
 }
 
-// Holds a TRANSITION_FINISHED event for each finish that no camera change
-// followed. MapLibre finishes a transition that way only from easeTo() or
-// flyTo(), which only map commands call, so the finish belongs to the
-// command that closes the transaction.
-auto hold_finished_transitions(MapEventState& events) noexcept -> void {
-  auto& finished = events.finished_transitions;
-  if (finished.empty()) return;
-  if (
-    event_selected(
-      events.mask, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
-    )
-  ) {
-    for (const auto transition_id : finished) {
-      queue_transition_finished(events, 0, transition_id);
-    }
-  }
-  finished.clear();
-}
-
 // Queues the held events with `generation`, then announces the render update
 // that the transaction held, so a command raises at most one. Operations that
-// finished inside the transaction complete last, after their events. The
-// update and the completions go out even when queueing fails, and the first
-// failure is rethrown afterwards.
+// finished inside the transaction complete after their events, and the camera
+// commands whose transitions ended inside it run their end handlers last, with
+// the transaction's generation. The update, the completions, and the handlers
+// go out even when queueing fails, and the first failure is rethrown
+// afterwards.
 auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
   auto& events = *live.event_state;
   auto error = std::exception_ptr{};
   const auto record = [&error] {
     if (!error) error = std::current_exception();
   };
-  hold_finished_transitions(events);
   events.transaction_depth -= 1;
   try {
     queue_held_map_events(
@@ -2517,6 +2697,9 @@ auto close_map_transaction(MapObject& live, uint64_t generation) -> void {
       held.status, std::move(held.message), std::move(held.result)
     );
   }
+  deliver_ended_transitions(
+    events, generation != 0 ? generation : events.published_generation
+  );
   if (error) std::rethrow_exception(error);
 }
 
@@ -2629,7 +2812,10 @@ auto animation_options_default() noexcept -> mln_animation_options {
     .velocity = 0,
     .min_zoom = 0,
     .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1},
-    .transition_id = 0
+    .transition_id = 0,
+    .end_handler = {
+      .callback = nullptr, .user_data = nullptr, .release_user_data = nullptr
+    }
   };
 }
 
@@ -3226,6 +3412,8 @@ auto retire_disposed_map(RetirementTask* task) noexcept -> void {
   static_cast<void>(handle_table<MapObject>().remove(map.self));
   map.callback_sources->detach();
   map.frontend->close_renderer_observer();
+  // Commands that ran after the disposal began can have started transitions.
+  close_camera_transitions(*map.event_state);
   map.map.reset();
   map.callback_sources->release_all();
   {
@@ -3246,6 +3434,7 @@ auto begin_disposed_map_retirement(RetirementTask* task) noexcept -> void {
   if (map.still_image_operation != nullptr) {
     map.still_image_operation->complete(MLN_STATUS_CANCELLED, {}, {});
   }
+  close_camera_transitions(*map.event_state);
   if (auto release = std::exchange(map.still_image_release_submission, {}))
     release();
   task->run = retire_disposed_map;
@@ -3406,6 +3595,7 @@ auto release_map(mln_map map, const mln_completion* completion) -> mln_status {
           MLN_STATUS_CANCELLED, "map closed before still image completed", {}
         );
       }
+      close_camera_transitions(*close->owned_map->event_state);
       if (
         auto release =
           std::exchange(close->owned_map->still_image_release_submission, {})
@@ -4027,6 +4217,9 @@ auto apply_gesture_phase_before(MapObject& live, uint32_t phase) -> void {
 // and CANCEL then clear the gesture.
 auto apply_gesture_phase_after(MapObject& live, uint32_t phase) -> void {
   if (phase == MLN_GESTURE_PHASE_CANCEL) {
+    const auto cancellation = TransitionCancellationScope{
+      *live.event_state, {.active = true, .all = true}
+    };
     live.map->cancelTransitions();
   }
   if (phase == MLN_GESTURE_PHASE_END || phase == MLN_GESTURE_PHASE_CANCEL) {
@@ -4059,33 +4252,35 @@ auto map_update_camera(
     return animation_status;
   }
   const auto copied = *update;
-  return submit_camera_command(
-    map,
-    [copied](MapObject& live) -> void {
-      apply_gesture_phase_before(live, copied.gesture_phase);
-      switch (copied.mode) {
-        case MLN_CAMERA_UPDATE_MODE_JUMP:
-          live.map->jumpTo(to_native_camera(copied.camera));
-          break;
-        case MLN_CAMERA_UPDATE_MODE_EASE:
-          live.map->easeTo(
-            to_native_camera(copied.camera),
-            to_native_animation(live.event_state, &copied.animation)
-          );
-          break;
-        case MLN_CAMERA_UPDATE_MODE_FLY:
-          live.map->flyTo(
-            to_native_camera(copied.camera),
-            to_native_animation(live.event_state, &copied.animation)
-          );
-          break;
-        default:
-          break;
-      }
-      apply_gesture_phase_after(live, copied.gesture_phase);
-    },
-    completion
-  );
+  const auto end = camera_transition_end(copied.animation);
+  return submit_with_transition_end(end, [&]() -> mln_status {
+    return submit_camera_command(
+      map,
+      [copied, end](MapObject& live) -> void {
+        const auto animation =
+          to_native_animation(live.event_state, copied.animation, end);
+        apply_gesture_phase_before(live, copied.gesture_phase);
+        switch (copied.mode) {
+          case MLN_CAMERA_UPDATE_MODE_JUMP:
+            // MapLibre gives a jump no animation options, so the jump ends
+            // its command here, as soon as it applies.
+            live.map->jumpTo(to_native_camera(copied.camera));
+            if (animation.transitionFinishFn) animation.transitionFinishFn();
+            break;
+          case MLN_CAMERA_UPDATE_MODE_EASE:
+            live.map->easeTo(to_native_camera(copied.camera), animation);
+            break;
+          case MLN_CAMERA_UPDATE_MODE_FLY:
+            live.map->flyTo(to_native_camera(copied.camera), animation);
+            break;
+          default:
+            break;
+        }
+        apply_gesture_phase_after(live, copied.gesture_phase);
+      },
+      completion
+    );
+  });
 }
 
 namespace {
@@ -4193,43 +4388,69 @@ auto map_apply_camera_delta(
   const auto delta_status = validate_camera_delta(delta);
   if (delta_status != MLN_STATUS_OK) return delta_status;
   const auto copied = *delta;
-  return submit_camera_command(
-    map,
-    [copied](MapObject& live) -> void {
-      // The pan and the scale, bearing, and pitch change are separate MapLibre
-      // transitions, because an explicit center overrides an anchor. The ease
-      // reads the camera after the pan, so an immediate pan moves the camera
-      // that the anchor refers to. The transaction around this work publishes
-      // both in one snapshot and announces one render update for them.
-      const auto pans = (copied.fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
-      const auto eases = (copied.fields & camera_delta_anchored_fields) != 0U;
-      const auto transitions =
-        static_cast<uint32_t>(pans) + static_cast<uint32_t>(eases);
-      const auto animation = to_native_animation(
-        live.event_state, &copied.animation, std::max(transitions, 1U)
-      );
-      apply_gesture_phase_before(live, copied.gesture_phase);
-      if (pans) {
-        live.map->moveBy(to_native_screen_point(copied.offset), animation);
-      }
-      if (eases) {
-        live.map->easeTo(camera_delta_target(*live.map, copied), animation);
-      }
-      // A delta without components starts no transition, so it reports its
-      // transition ID here, as an empty camera update does.
-      if (transitions == 0 && animation.transitionFinishFn) {
-        animation.transitionFinishFn();
-      }
-      apply_gesture_phase_after(live, copied.gesture_phase);
-    },
-    completion
-  );
+  const auto end = camera_transition_end(copied.animation);
+  return submit_with_transition_end(end, [&]() -> mln_status {
+    return submit_camera_command(
+      map,
+      [copied, end](MapObject& live) -> void {
+        // The pan and the scale, bearing, and pitch change are separate
+        // MapLibre transitions, because an explicit center overrides an anchor.
+        // The ease reads the camera after the pan, so an immediate pan moves
+        // the camera that the anchor refers to. The transaction around this
+        // work publishes both in one snapshot and announces one render update
+        // for them.
+        const auto pans = (copied.fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
+        const auto eases = (copied.fields & camera_delta_anchored_fields) != 0U;
+        const auto transitions =
+          static_cast<uint32_t>(pans) + static_cast<uint32_t>(eases);
+        const auto animation = to_native_animation(
+          live.event_state, copied.animation, end, std::max(transitions, 1U)
+        );
+        apply_gesture_phase_before(live, copied.gesture_phase);
+        if (pans) {
+          live.map->moveBy(to_native_screen_point(copied.offset), animation);
+        }
+        if (eases) {
+          live.map->easeTo(camera_delta_target(*live.map, copied), animation);
+        }
+        // A delta without components starts no transition, so it ends its
+        // command here, as an empty camera update does.
+        if (transitions == 0 && animation.transitionFinishFn) {
+          animation.transitionFinishFn();
+        }
+        apply_gesture_phase_after(live, copied.gesture_phase);
+      },
+      completion
+    );
+  });
 }
 
 auto map_cancel_transitions(mln_map map, const mln_completion* completion)
   -> mln_status {
   return submit_camera_command(
-    map, [](MapObject& live) -> void { live.map->cancelTransitions(); },
+    map,
+    [](MapObject& live) -> void {
+      const auto cancellation = TransitionCancellationScope{
+        *live.event_state, {.active = true, .all = true}
+      };
+      live.map->cancelTransitions();
+    },
+    completion
+  );
+}
+
+auto map_cancel_camera_transition(
+  mln_map map, uint64_t transition_id, const mln_completion* completion
+) -> mln_status {
+  return submit_camera_command(
+    map,
+    [transition_id](MapObject& live) -> void {
+      const auto cancellation = TransitionCancellationScope{
+        *live.event_state,
+        {.active = true, .all = false, .transition_id = transition_id}
+      };
+      live.map->cancelTransitions(transition_id);
+    },
     completion
   );
 }

@@ -174,7 +174,8 @@ MLN_API mln_status mln_map_set_tile_options(
  *
  * Ease duration defaults to zero. Fly duration is derived from flight distance
  * and velocity when omitted. The command completion reports application of the
- * update; transition-finished events report the end of its animations.
+ * update, and update->animation.end_handler reports the end of its
+ * transitions, including for a jump.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -200,8 +201,8 @@ MLN_API mln_status mln_map_update_camera(
  * one command: render sessions receive one render update for the whole delta,
  * and the completion reports its terminal disposition and the one snapshot
  * generation that the delta published. The command completion reports
- * application of the delta; when delta->animation carries a transition ID, one
- * transition-finished event reports the end of all its animations.
+ * application of the delta, and delta->animation.end_handler reports the end of
+ * all its transitions once.
  *
  * Validation reads only the fields that delta->fields selects.
  *
@@ -228,10 +229,9 @@ MLN_API mln_status mln_map_apply_camera_delta(
 /**
  * Cancels the camera transitions running when this command commits.
  *
- * A cancelled transition that carried MLN_ANIMATION_OPTION_TRANSITION_ID
- * reports its end through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
- * the same way a completed one does. Cancelling with no transition running
- * commits and changes nothing.
+ * Each cancelled command's end handler runs with
+ * MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED. Cancelling with no transition
+ * running commits and changes nothing.
  *
  * Returns:
  * - MLN_STATUS_OK when the command is accepted.
@@ -246,6 +246,32 @@ MLN_API mln_status mln_map_apply_camera_delta(
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_map_cancel_transitions(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+) MLN_NOEXCEPT;
+
+/**
+ * Cancels the camera transitions of the commands whose animation carried
+ * transition_id, and leaves every other transition running.
+ *
+ * The command matches the commands running when it commits whose
+ * mln_animation_options selected MLN_ANIMATION_OPTION_TRANSITION_ID with this
+ * value. The transitions stop where they stand, and each matched command's
+ * end handler runs with MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED. Cancelling an
+ * identity that no running command carries commits and changes nothing.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the command is accepted.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, or completion is
+ *   invalid.
+ * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *
+ * Completes with:
+ * - MLN_STATUS_NATIVE_ERROR when the cancellation throws on the map worker.
+ */
+MLN_BINDING("execution=command")
+MLN_API mln_status mln_map_cancel_camera_transition(
+  mln_map map, uint64_t transition_id, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

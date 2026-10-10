@@ -17,5 +17,4 @@ public enum RuntimeEventPayloadType : uint
     OfflineRegionStatus = 5,
     OfflineRegionResponseError = 6,
     OfflineRegionTileCountLimit = 7,
-    CameraTransitionFinished = 9,
 }

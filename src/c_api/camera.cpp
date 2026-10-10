@@ -74,6 +74,17 @@ auto mln_map_cancel_transitions(
   });
 }
 
+auto mln_map_cancel_camera_transition(
+  mln_map map, uint64_t transition_id, const mln_completion* completion,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
+    return mln::core::map_cancel_camera_transition(
+      map, transition_id, completion
+    );
+  });
+}
+
 auto mln_map_get_camera(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {

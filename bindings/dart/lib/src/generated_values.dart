@@ -114,6 +114,26 @@ final class CameraOptionField extends _Flags<CameraOptionField> {
       CameraOptionField.fromRawValue(rawValue);
 }
 
+/// How the transitions of one camera command ended.
+///
+/// See `mln_camera_transition_outcome` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraTransitionOutcome extends _Enum {
+  const CameraTransitionOutcome.fromRawValue(super.rawValue);
+
+  /// Every property of the command reached its target, or a later camera write
+  /// replaced it.
+  static const completed = CameraTransitionOutcome.fromRawValue(0);
+
+  /// `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
+  /// `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed
+  /// before it started them.
+  static const cancelled = CameraTransitionOutcome.fromRawValue(1);
+
+  /// The map closed before the transitions ended.
+  static const closed = CameraTransitionOutcome.fromRawValue(2);
+}
+
 /// Camera transition behavior for `mln_camera_update`.
 ///
 /// See `mln_camera_update_mode` in the
@@ -842,9 +862,6 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
   static const mapRenderMapFinished = RuntimeEventMask.fromRawValue(65536);
   static const mapStyleImageMissing = RuntimeEventMask.fromRawValue(131072);
   static const mapTileAction = RuntimeEventMask.fromRawValue(262144);
-  static const mapCameraTransitionFinished = RuntimeEventMask.fromRawValue(
-    4194304,
-  );
   static const offlineRegionStatusChanged = RuntimeEventMask.fromRawValue(
     524288,
   );
@@ -855,13 +872,13 @@ final class RuntimeEventMask extends _Flags<RuntimeEventMask> {
       RuntimeEventMask.fromRawValue(2097152);
 
   /// Selects every map-originated event type this version defines.
-  static const allMapEvents = RuntimeEventMask.fromRawValue(4718590);
+  static const allMapEvents = RuntimeEventMask.fromRawValue(524286);
 
   /// Selects every runtime-originated event type this version defines.
   static const allRuntimeEvents = RuntimeEventMask.fromRawValue(3670016);
 
   /// Selects every event type this version defines.
-  static const all = RuntimeEventMask.fromRawValue(8388606);
+  static const all = RuntimeEventMask.fromRawValue(4194302);
   @override
   RuntimeEventMask _of(int rawValue) => RuntimeEventMask.fromRawValue(rawValue);
 }
@@ -881,9 +898,6 @@ final class RuntimeEventPayloadType extends _Enum {
       RuntimeEventPayloadType.fromRawValue(6);
   static const offlineRegionTileCountLimit =
       RuntimeEventPayloadType.fromRawValue(7);
-  static const cameraTransitionFinished = RuntimeEventPayloadType.fromRawValue(
-    9,
-  );
 }
 
 /// Source kinds used by `mln_runtime_event.source_type`.
@@ -924,7 +938,6 @@ final class RuntimeEventType extends _Enum {
   static const offlineRegionResponseError = RuntimeEventType.fromRawValue(20);
   static const offlineRegionTileCountLimitExceeded =
       RuntimeEventType.fromRawValue(21);
-  static const mapCameraTransitionFinished = RuntimeEventType.fromRawValue(22);
 }
 
 /// Optional fields for `mln_source_feature_query_options`.
@@ -1563,6 +1576,45 @@ final class UnitBezier extends _Value {
   List<Object?> get _members => [x1, y1, x2, y2];
 }
 
+/// The end of one camera command's transitions, borrowed for the callback.
+///
+/// See `mln_camera_transition_end` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraTransitionEnd extends _Value {
+  const CameraTransitionEnd({
+    this.outcome = const CameraTransitionOutcome.fromRawValue(0),
+    required this.generation,
+  });
+
+  /// One of `mln_camera_transition_outcome`.
+  final CameraTransitionOutcome outcome;
+
+  /// Generation of the published snapshot that shows the camera where the
+  /// transitions left it. The map events of the change that ended them carry
+  /// this generation and are queued before the callback runs. Zero for
+  /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+  final BigInt generation;
+
+  @override
+  List<Object?> get _members => [outcome, generation];
+}
+
+/// Receives the end of one camera command's transitions.
+///
+/// See `mln_camera_transition_end_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+typedef CameraTransitionEndCallback = void Function(CameraTransitionEnd);
+
+/// Callback state that one camera command copies to report the end of its
+/// transitions.
+///
+/// See `mln_camera_transition_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class CameraTransitionHandler {
+  const CameraTransitionHandler({this.callback});
+  final CameraTransitionEndCallback? callback;
+}
+
 /// Optional animation controls for camera transitions.
 ///
 /// See `mln_animation_options` in the
@@ -1574,6 +1626,7 @@ final class AnimationOptions extends _Value {
     this.minZoom,
     this.easing,
     this.transitionId,
+    this.endHandler = const CameraTransitionHandler(),
   });
 
   /// Duration in milliseconds. Must be finite and non-negative. Values that
@@ -1588,8 +1641,12 @@ final class AnimationOptions extends _Value {
   final double? minZoom;
   final UnitBezier? easing;
 
-  /// Caller-chosen identity for the transition this options struct starts.
+  /// Caller-chosen identity of the command that these options animate, which
+  /// `mln_map_cancel_camera_transition()` matches.
   final BigInt? transitionId;
+
+  /// Reports the end of the command's transitions. Disabled by default.
+  final CameraTransitionHandler endHandler;
 
   @override
   List<Object?> get _members => [
@@ -1598,6 +1655,7 @@ final class AnimationOptions extends _Value {
     minZoom,
     easing,
     transitionId,
+    endHandler,
   ];
 }
 
@@ -2108,21 +2166,6 @@ final class RuntimeEventOfflineRegionTileCountLimit extends _Value {
   List<Object?> get _members => [regionId, limit];
 }
 
-/// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
-///
-/// See `mln_runtime_event_camera_transition_finished` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-final class RuntimeEventCameraTransitionFinished extends _Value {
-  const RuntimeEventCameraTransitionFinished({required this.transitionId});
-
-  /// The transition_id the caller set on the `mln_animation_options` that
-  /// started this transition.
-  final BigInt transitionId;
-
-  @override
-  List<Object?> get _members => [transitionId];
-}
-
 /// One drained runtime event.
 ///
 /// See `mln_runtime_event` in the
@@ -2184,12 +2227,6 @@ final class RuntimeEventPayloadOfflineRegionTileCountLimit
     extends RuntimeEventPayload {
   const RuntimeEventPayloadOfflineRegionTileCountLimit(this.value) : super._();
   final RuntimeEventOfflineRegionTileCountLimit value;
-}
-
-final class RuntimeEventPayloadCameraTransitionFinished
-    extends RuntimeEventPayload {
-  const RuntimeEventPayloadCameraTransitionFinished(this.value) : super._();
-  final RuntimeEventCameraTransitionFinished value;
 }
 
 final class RuntimeEventPayloadNone extends RuntimeEventPayload {

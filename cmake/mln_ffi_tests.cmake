@@ -370,6 +370,7 @@ function(mln_native_configure_suite target registry_dir)
       "${support_dir}/env.c"
       "${support_dir}/render.c"
       "${support_dir}/frames.c"
+      "${support_dir}/camera.c"
       "${support_dir}/map.c"
       "${support_dir}/style.c"
       "${support_dir}/resources.c"

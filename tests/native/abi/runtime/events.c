@@ -188,89 +188,6 @@ static void queued_events_outlive_the_map_that_produced_them(void) {
   mln_event_batch_release(batch);
 }
 
-// Counts the transition-finished events in one drain and reports the last
-// transition ID it saw.
-static size_t drain_counting_transitions(
-  mln_runtime runtime, uint64_t* out_last_transition_id
-) {
-  size_t found = 0;
-  mln_test_event_batch batch = mln_test_event_batch_default();
-  MLN_TEST_OK(mln_test_drain_events(runtime, &batch));
-  for (size_t index = 0; index < batch.event_count; index += 1) {
-    const mln_runtime_event* event = batch_event(&batch, index);
-    if (event->type != MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
-      continue;
-    }
-    found += 1;
-    if (out_last_transition_id != NULL) {
-      *out_last_transition_id =
-        event->payload.camera_transition_finished.transition_id;
-    }
-  }
-  return found;
-}
-
-static void submit_camera_update(
-  mln_map map, uint32_t mode, double zoom, uint64_t transition_id
-) {
-  mln_camera_options camera = mln_camera_options_default();
-  camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  camera.zoom = zoom;
-  mln_animation_options animation = mln_animation_options_default();
-  // Long enough that the transition is still running when the next command
-  // ends it, so every outcome below is the one the test named.
-  animation.fields = MLN_ANIMATION_OPTION_DURATION;
-  animation.duration_ms = 60000;
-  if (transition_id != 0) {
-    animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
-    animation.transition_id = transition_id;
-  }
-  mln_camera_update update = mln_camera_update_default();
-  update.mode = mode;
-  update.camera = camera;
-  update.animation = animation;
-  MLN_TEST_AWAIT_OK(
-    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-  );
-}
-
-// A transition ends exactly once, whichever way it ends: replaced by a later
-// transition, cancelled by a jump, or never reported because the caller
-// omitted an ID.
-static void a_transition_reports_one_terminal_outcome(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_drain_all(runtime);
-
-  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_EASE, 4.0, 11);
-  TEST_ASSERT_EQUAL_size_t(0, drain_counting_transitions(runtime, NULL));
-
-  // The second ease replaces the first, which ends the first and reports its
-  // own ID rather than the superseding one.
-  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_EASE, 6.0, 12);
-  uint64_t transition_id = 0;
-  TEST_ASSERT_EQUAL_size_t(
-    1, drain_counting_transitions(runtime, &transition_id)
-  );
-  TEST_ASSERT_EQUAL_UINT64(11, transition_id);
-
-  // A jump cancels the running transition, which reports the cancelled ID.
-  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_JUMP, 8.0, 0);
-  transition_id = 0;
-  TEST_ASSERT_EQUAL_size_t(
-    1, drain_counting_transitions(runtime, &transition_id)
-  );
-  TEST_ASSERT_EQUAL_UINT64(12, transition_id);
-
-  // An ease with no transition ID is silent, and so is the jump that ends it.
-  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_EASE, 10.0, 0);
-  submit_camera_update(map, MLN_CAMERA_UPDATE_MODE_JUMP, 12.0, 0);
-  TEST_ASSERT_EQUAL_size_t(0, drain_counting_transitions(runtime, NULL));
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Two text-bearing events in one batch point at distinct arena ranges, and each
 // range holds that event's own bytes.
 static void the_message_arena_carries_one_range_per_event(void) {
@@ -499,6 +416,5 @@ MLN_TEST_GROUP {
   RUN_TEST(an_empty_drain_publishes_no_batch);
   RUN_TEST(a_drained_batch_is_an_owned_handle);
   RUN_TEST(queued_events_outlive_the_map_that_produced_them);
-  RUN_TEST(a_transition_reports_one_terminal_outcome);
   RUN_TEST(the_message_arena_carries_one_range_per_event);
 }

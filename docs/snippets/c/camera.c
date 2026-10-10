@@ -1,5 +1,5 @@
 // Applying one camera two ways, immediately and over 800 milliseconds, then
-// matching the event that reports the animated transition as finished.
+// learning how the animated transition ended, or stopping it.
 
 #include <maplibre_native_c.h>
 
@@ -26,8 +26,20 @@ mln_status jump_downtown(mln_map map, const mln_completion* completion) {
 }
 // #endregion jump
 
+// #region end
+static void transition_ended(
+  void* user_data, const mln_camera_transition_end* end
+) {
+  // Runs once on the runtime worker. The snapshot at end->generation shows
+  // the camera where the transition stopped.
+  bool* arrived = user_data;
+  *arrived = end->outcome == MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED;
+}
+// #endregion end
+
 mln_status ease_downtown(
-  mln_map map, uint64_t transition_id, const mln_completion* completion
+  mln_map map, uint64_t transition_id, bool* arrived,
+  const mln_completion* completion
 ) {
   // #region ease
   mln_camera_update update = mln_camera_update_default();
@@ -40,24 +52,16 @@ mln_status ease_downtown(
   update.animation.easing =
     (mln_unit_bezier){.x1 = 0.25, .y1 = 0.1, .x2 = 0.25, .y2 = 1.0};
   update.animation.transition_id = transition_id;
+  update.animation.end_handler.callback = transition_ended;
+  update.animation.end_handler.user_data = arrived;
   return mln_map_update_camera(map, &update, completion, NULL);
   // #endregion ease
 }
 
-mln_status select_camera_events(mln_map map, const mln_completion* completion) {
-  return mln_map_set_event_mask(
-    map, MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED, completion, NULL
-  );
-}
-
-bool transition_finished(
-  const mln_runtime_event* event, uint64_t transition_id
+mln_status stop_downtown(
+  mln_map map, uint64_t transition_id, const mln_completion* completion
 ) {
-  // #region finished
-  if (event->type != MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
-    return false;
-  }
-  return event->payload.camera_transition_finished.transition_id ==
-         transition_id;
-  // #endregion finished
+  // #region cancel
+  return mln_map_cancel_camera_transition(map, transition_id, completion, NULL);
+  // #endregion cancel
 }

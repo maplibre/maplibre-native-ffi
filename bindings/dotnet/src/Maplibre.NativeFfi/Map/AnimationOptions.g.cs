@@ -30,9 +30,15 @@ public sealed record AnimationOptions
     public UnitBezier? Easing { get; set; }
 
     /// <summary>
-    /// Caller-chosen identity for the transition this options struct starts.
+    /// Caller-chosen identity of the command that these options animate, which
+    /// <c>mln_map_cancel_camera_transition()</c> matches.
     /// </summary>
     public ulong? TransitionId { get; set; }
+
+    /// <summary>
+    /// Reports the end of the command's transitions. Disabled by default.
+    /// </summary>
+    public CameraTransitionHandler EndHandler { get; set; }
     public static AnimationOptions Default
     {
         get

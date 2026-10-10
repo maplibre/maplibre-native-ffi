@@ -510,6 +510,9 @@ auto map_apply_camera_delta(
 ) -> mln_status;
 auto map_cancel_transitions(mln_map map, const mln_completion* completion)
   -> mln_status;
+auto map_cancel_camera_transition(
+  mln_map map, uint64_t transition_id, const mln_completion* completion
+) -> mln_status;
 auto map_camera_query_start(mln_map map, const mln_completion* completion)
   -> mln_status;
 auto map_set_debug_options(MapObject& live, uint32_t options) -> mln_status;

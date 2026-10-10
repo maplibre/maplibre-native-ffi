@@ -98,9 +98,53 @@ Pointer<raw.mln_unit_bezier> _writeUnitBezier(UnitBezier value, Arena arena) {
 UnitBezier _readUnitBezier(raw.mln_unit_bezier source) =>
     UnitBezier(source.x1, source.y1, source.x2, source.y2);
 
+_NativeRegistration<raw.mln_camera_transition_handler>
+_prepareCameraTransitionHandler(
+  CameraTransitionHandler value,
+  _NativeCallbackPorts roots,
+) {
+  final arena = Arena();
+  _NativeCallbackPort? port;
+  try {
+    final result = arena<raw.mln_camera_transition_handler>();
+    if (value.callback == null) {
+      return _NativeRegistration(result, () {}, arena.releaseAll);
+    }
+    port = roots.register({
+      if (value.callback != null)
+        (raw.MLN_ADAPTER_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
+            0xffffffff): (message) => value.callback!(
+          CameraTransitionEnd(
+            outcome: CameraTransitionOutcome.fromRawValue(message[1] as int),
+            generation: uint64FromNative(message[2] as int),
+          ),
+        ),
+    });
+    result.ref.callback = value.callback == null
+        ? nullptr
+        : raw
+              .mln_adapter_dart_port_function(
+                (raw.MLN_ADAPTER_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK &
+                    0xffffffff),
+              )
+              .cast();
+    result.ref.user_data = port.context;
+    result.ref.release_user_data =
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
+    return _NativeRegistration(result, port.reject, arena.releaseAll);
+  } catch (_) {
+    port?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
+}
+
 Pointer<raw.mln_animation_options> _writeAnimationOptions(
   AnimationOptions value,
   Arena arena,
+  _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_animation_options>();
   result.ref = raw.mln_animation_options_default();
@@ -124,6 +168,11 @@ Pointer<raw.mln_animation_options> _writeAnimationOptions(
     result.ref.fields |= raw.MLN_ANIMATION_OPTION_TRANSITION_ID;
     result.ref.transition_id = uint64ToNative(value.transitionId!, 'uint64_t');
   }
+  result.ref.end_handler = registrations
+      .add(
+        _prepareCameraTransitionHandler(value.endHandler, registrations.ports),
+      )
+      .ref;
   return result;
 }
 
@@ -145,6 +194,7 @@ AnimationOptions _readAnimationOptions(raw.mln_animation_options source) =>
           (source.fields & raw.MLN_ANIMATION_OPTION_TRANSITION_ID) != 0
           ? uint64FromNative(source.transition_id)
           : null,
+      endHandler: const CameraTransitionHandler(),
     );
 
 Pointer<raw.mln_lat_lng> _writeLatLng(LatLng value, Arena arena) {
@@ -239,6 +289,7 @@ ScreenPoint _readScreenPoint(raw.mln_screen_point source) =>
 Pointer<raw.mln_camera_delta> _writeCameraDelta(
   CameraDelta value,
   Arena arena,
+  _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_camera_delta>();
   result.ref = raw.mln_camera_delta_default();
@@ -262,7 +313,11 @@ Pointer<raw.mln_camera_delta> _writeCameraDelta(
     result.ref.fields |= raw.MLN_CAMERA_DELTA_ANCHOR;
     result.ref.anchor = _writeScreenPoint(value.anchor!, arena).ref;
   }
-  result.ref.animation = _writeAnimationOptions(value.animation, arena).ref;
+  result.ref.animation = _writeAnimationOptions(
+    value.animation,
+    arena,
+    registrations,
+  ).ref;
   result.ref.gesture_phase = value.gesturePhase.rawValue;
   return result;
 }
@@ -413,12 +468,17 @@ CameraOptions _readCameraOptions(
 Pointer<raw.mln_camera_update> _writeCameraUpdate(
   CameraUpdate value,
   Arena arena,
+  _NativeRegistrations registrations,
 ) {
   final result = arena<raw.mln_camera_update>();
   result.ref = raw.mln_camera_update_default();
   result.ref.mode = value.mode.rawValue;
   result.ref.camera = _writeCameraOptions(value.camera, arena).ref;
-  result.ref.animation = _writeAnimationOptions(value.animation, arena).ref;
+  result.ref.animation = _writeAnimationOptions(
+    value.animation,
+    arena,
+    registrations,
+  ).ref;
   result.ref.gesture_phase = value.gesturePhase.rawValue;
   return result;
 }
@@ -698,12 +758,6 @@ _readRuntimeEventOfflineRegionTileCountLimit(
   limit: uint64FromNative(source.limit),
 );
 
-RuntimeEventCameraTransitionFinished _readRuntimeEventCameraTransitionFinished(
-  raw.mln_runtime_event_camera_transition_finished source,
-) => RuntimeEventCameraTransitionFinished(
-  transitionId: uint64FromNative(source.transition_id),
-);
-
 RuntimeEvent _readRuntimeEvent(
   raw.mln_runtime_event source, {
   Uint8List Function()? rawRecord,
@@ -740,11 +794,6 @@ RuntimeEvent _readRuntimeEvent(
     7 => RuntimeEventPayloadOfflineRegionTileCountLimit(
       _readRuntimeEventOfflineRegionTileCountLimit(
         source.payload.offline_region_tile_count_limit,
-      ),
-    ),
-    9 => RuntimeEventPayloadCameraTransitionFinished(
-      _readRuntimeEventCameraTransitionFinished(
-        source.payload.camera_transition_finished,
       ),
     ),
     0 => const RuntimeEventPayloadNone(),
@@ -4535,14 +4584,18 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_map_apply_camera_delta` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> applyCameraDelta(CameraDelta delta) => _command(
-    (arena, completion) => raw.mln_map_apply_camera_delta(
-      _handle.raw,
-      _writeCameraDelta(delta, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
+  Future<CommandCompletion> applyCameraDelta(CameraDelta delta) =>
+      _command((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackPorts);
+        return registrations.run(
+          () => raw.mln_map_apply_camera_delta(
+            _handle.raw,
+            _writeCameraDelta(delta, arena, registrations),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
 
   /// Starts attachment of a ring of caller-owned Metal textures.
   ///
@@ -5012,6 +5065,21 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Cancels the camera transitions of the commands whose animation carried
+  /// transition_id, and leaves every other transition running.
+  ///
+  /// See `mln_map_cancel_camera_transition` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  Future<CommandCompletion> cancelCameraTransition(BigInt transitionId) =>
+      _command(
+        (arena, completion) => raw.mln_map_cancel_camera_transition(
+          _handle.raw,
+          uint64ToNative(transitionId, 'uint64_t'),
+          completion,
+          nativeDiagnostic,
+        ),
+      );
 
   /// Cancels the camera transitions running when this command commits.
   ///
@@ -6241,14 +6309,18 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_map_update_camera` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  Future<CommandCompletion> updateCamera(CameraUpdate update) => _command(
-    (arena, completion) => raw.mln_map_update_camera(
-      _handle.raw,
-      _writeCameraUpdate(update, arena),
-      completion,
-      nativeDiagnostic,
-    ),
-  );
+  Future<CommandCompletion> updateCamera(CameraUpdate update) =>
+      _command((arena, completion) {
+        final registrations = _NativeRegistrations(_callbackPorts);
+        return registrations.run(
+          () => raw.mln_map_update_camera(
+            _handle.raw,
+            _writeCameraUpdate(update, arena, registrations),
+            completion,
+            nativeDiagnostic,
+          ),
+        );
+      });
 }
 
 /// Issued `mln_map_projection` handle id.

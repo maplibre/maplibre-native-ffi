@@ -146,18 +146,13 @@ pub const AnimationOptionField = struct {
 /// See `mln_animation_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const AnimationOptions = struct {
-    /// Duration in milliseconds. Must be finite and non-negative. Values that
-    /// would overflow MapLibre Native's internal duration are invalid.
     duration_ms: ?f64 = null,
-    /// Average fly velocity in screenfuls per second. Must be positive and
-    /// defaults to 1.2 when omitted.
     velocity: ?f64 = null,
-    /// Peak zoom for flyTo transitions.
     min_zoom: ?f64 = null,
     easing: ?UnitBezier = null,
-    /// Caller-chosen identity for the transition this options struct starts.
     transition_id: ?u64 = null,
-    pub fn toNative(self: AnimationOptions) c.mln_animation_options {
+    end_handler: CameraTransitionHandler = .{},
+    pub fn toNative(self: AnimationOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_animation_options {
         var raw = c.mln_animation_options_default();
         raw.fields = 0;
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, self.duration_ms);
@@ -165,15 +160,19 @@ pub const AnimationOptions = struct {
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_MIN_ZOOM, &raw.min_zoom, self.min_zoom);
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_EASING, &raw.easing, self.easing);
         marshal.present(&raw.fields, c.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, self.transition_id);
+        raw.end_handler = try self.end_handler.toNative(allocator, roots);
         return raw;
     }
-    pub fn fromNative(raw: c.mln_animation_options) AnimationOptions {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_animation_options) status.Error!AnimationOptions {
+        _ = allocator;
         return .{
             .duration_ms = if (raw.fields & c.MLN_ANIMATION_OPTION_DURATION != 0) raw.duration_ms else null,
             .velocity = if (raw.fields & c.MLN_ANIMATION_OPTION_VELOCITY != 0) raw.velocity else null,
             .min_zoom = if (raw.fields & c.MLN_ANIMATION_OPTION_MIN_ZOOM != 0) raw.min_zoom else null,
             .easing = if (raw.fields & c.MLN_ANIMATION_OPTION_EASING != 0) UnitBezier.fromNative(raw.easing) else null,
             .transition_id = if (raw.fields & c.MLN_ANIMATION_OPTION_TRANSITION_ID != 0) raw.transition_id else null,
+            .end_handler = .{},
         };
     }
 };
@@ -266,39 +265,35 @@ pub const CameraChangeMode = enum(u32) {
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 pub const CameraDelta = struct {
-    /// Pan in logical map pixels; the content moves by this offset.
     offset: ?ScreenPoint = null,
-    /// Positive zoom factor; 2 zooms in one level.
     scale: ?f64 = null,
-    /// Degrees added to the bearing.
     bearing: ?f64 = null,
-    /// Degrees added to the pitch; positive tilts further from straight down.
     pitch: ?f64 = null,
-    /// Screen point in logical map pixels that scale, bearing, and pitch keep
-    /// fixed.
     anchor: ?ScreenPoint = null,
     animation: AnimationOptions = .{},
     gesture_phase: GesturePhase = std.mem.zeroes(GesturePhase),
-    pub fn toNative(self: CameraDelta) c.mln_camera_delta {
+    pub fn toNative(self: CameraDelta, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_camera_delta {
         var raw = c.mln_camera_delta_default();
         raw.fields = 0;
+        raw.size = @sizeOf(c.mln_camera_delta);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_OFFSET, &raw.offset, self.offset);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_SCALE, &raw.scale, self.scale);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_BEARING, &raw.bearing, self.bearing);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_PITCH, &raw.pitch, self.pitch);
         marshal.present(&raw.fields, c.MLN_CAMERA_DELTA_ANCHOR, &raw.anchor, self.anchor);
-        raw.animation = self.animation.toNative();
+        raw.animation = try self.animation.toNative(allocator, roots);
         raw.gesture_phase = self.gesture_phase.toNative();
         return raw;
     }
-    pub fn fromNative(raw: c.mln_camera_delta) CameraDelta {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_camera_delta) status.Error!CameraDelta {
         return .{
             .offset = if (raw.fields & c.MLN_CAMERA_DELTA_OFFSET != 0) ScreenPoint.fromNative(raw.offset) else null,
             .scale = if (raw.fields & c.MLN_CAMERA_DELTA_SCALE != 0) raw.scale else null,
             .bearing = if (raw.fields & c.MLN_CAMERA_DELTA_BEARING != 0) raw.bearing else null,
             .pitch = if (raw.fields & c.MLN_CAMERA_DELTA_PITCH != 0) raw.pitch else null,
             .anchor = if (raw.fields & c.MLN_CAMERA_DELTA_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
-            .animation = AnimationOptions.fromNative(raw.animation),
+            .animation = try AnimationOptions.fromNative(allocator, raw.animation),
             .gesture_phase = GesturePhase.fromNative(raw.gesture_phase),
         };
     }
@@ -456,6 +451,91 @@ pub const CameraQueryResult = struct {
     }
 };
 
+/// The end of one camera command's transitions, borrowed for the callback.
+///
+/// See `mln_camera_transition_end` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraTransitionEnd = struct {
+    /// One of `mln_camera_transition_outcome`.
+    outcome: CameraTransitionOutcome = std.mem.zeroes(CameraTransitionOutcome),
+    /// Generation of the published snapshot that shows the camera where the
+    /// transitions left it. The map events of the change that ended them carry
+    /// this generation and are queued before the callback runs. Zero for
+    /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+    generation: u64 = std.mem.zeroes(u64),
+    pub fn toNative(self: CameraTransitionEnd) c.mln_camera_transition_end {
+        var raw = std.mem.zeroes(c.mln_camera_transition_end);
+        raw.size = @sizeOf(c.mln_camera_transition_end);
+        raw.outcome = self.outcome.toNative();
+        raw.generation = self.generation;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_camera_transition_end) CameraTransitionEnd {
+        return .{
+            .outcome = CameraTransitionOutcome.fromNative(raw.outcome),
+            .generation = raw.generation,
+        };
+    }
+};
+
+/// Callback state that one camera command copies to report the end of its
+/// transitions.
+///
+/// See `mln_camera_transition_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraTransitionHandler = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    callback: ?*const fn (?*anyopaque, CameraTransitionEnd) status.Error!void = null,
+    pub fn toNative(self: CameraTransitionHandler, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_camera_transition_handler {
+        _ = allocator;
+        var raw = std.mem.zeroes(c.mln_camera_transition_handler);
+        raw.callback = if (self.callback != null) callbackTrampoline else null;
+        if (!(self.callback == null)) {
+            const retained = try roots.retain(CameraTransitionHandler, self);
+            raw.user_data = retained;
+            raw.release_user_data = callback.Registration(CameraTransitionHandler).releaseNative;
+        }
+        return raw;
+    }
+    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_camera_transition_end_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_camera_transition_end_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_camera_transition_end_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_camera_transition_end_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_camera_transition_end_callback, 1)) status.Error!marshal.CallbackResult(c.mln_camera_transition_end_callback) {
+                const state = callback.Registration(CameraTransitionHandler).get(callback_arg_0);
+                const host = state.value.callback orelse {
+                    return;
+                };
+                host(state.value.context, CameraTransitionEnd.fromNative((callback_arg_1 orelse return error.NativeError).*)) catch |err| {
+                    callback.reportError("mln_camera_transition_end_callback", err);
+                    return;
+                };
+            }
+        }.invoke(native_arg_0, native_arg_1) catch |err| {
+            callback.reportError("mln_camera_transition_end_callback", err);
+            return;
+        };
+    }
+};
+
+/// How the transitions of one camera command ended.
+///
+/// See `mln_camera_transition_outcome` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub const CameraTransitionOutcome = enum(u32) {
+    /// The map closed before the transitions ended.
+    closed = 2,
+    /// `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
+    /// `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed
+    /// before it started them.
+    cancelled = 1,
+    /// Every property of the command reached its target, or a later camera
+    /// write replaced it.
+    completed = 0,
+    _,
+    pub const fromNative = marshal.EnumMethods(@This()).fromNative;
+    pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
 /// One atomic absolute camera update.
 ///
 /// See `mln_camera_update` in the
@@ -465,19 +545,21 @@ pub const CameraUpdate = struct {
     camera: CameraOptions = .{},
     animation: AnimationOptions = .{},
     gesture_phase: GesturePhase = std.mem.zeroes(GesturePhase),
-    pub fn toNative(self: CameraUpdate) c.mln_camera_update {
+    pub fn toNative(self: CameraUpdate, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_camera_update {
         var raw = c.mln_camera_update_default();
+        raw.size = @sizeOf(c.mln_camera_update);
         raw.mode = self.mode.toNative();
         raw.camera = self.camera.toNative();
-        raw.animation = self.animation.toNative();
+        raw.animation = try self.animation.toNative(allocator, roots);
         raw.gesture_phase = self.gesture_phase.toNative();
         return raw;
     }
-    pub fn fromNative(raw: c.mln_camera_update) CameraUpdate {
+
+    pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_camera_update) status.Error!CameraUpdate {
         return .{
             .mode = CameraUpdateMode.fromNative(raw.mode),
             .camera = CameraOptions.fromNative(raw.camera),
-            .animation = AnimationOptions.fromNative(raw.animation),
+            .animation = try AnimationOptions.fromNative(allocator, raw.animation),
             .gesture_phase = GesturePhase.fromNative(raw.gesture_phase),
         };
     }
@@ -3589,10 +3671,6 @@ pub const RuntimeEvent = struct {
                 raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT;
                 raw.payload.offline_region_tile_count_limit = item.toNative();
             },
-            .camera_transition_finished => |item| {
-                raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
-                raw.payload.camera_transition_finished = item.toNative();
-            },
             .empty => {
                 raw.payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE;
             },
@@ -3617,30 +3695,9 @@ pub const RuntimeEvent = struct {
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => .{ .offline_region_status = RuntimeEventOfflineRegionStatus.fromNative(raw.payload.offline_region_status) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .{ .offline_region_response_error = RuntimeEventOfflineRegionResponseError.fromNative(raw.payload.offline_region_response_error) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => .{ .offline_region_tile_count_limit = RuntimeEventOfflineRegionTileCountLimit.fromNative(raw.payload.offline_region_tile_count_limit) },
-                c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .{ .camera_transition_finished = RuntimeEventCameraTransitionFinished.fromNative(raw.payload.camera_transition_finished) },
                 c.MLN_RUNTIME_EVENT_PAYLOAD_NONE => .empty,
                 else => |tag| .{ .unknown = @intCast(tag) },
             },
-        };
-    }
-};
-
-/// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
-///
-/// See `mln_runtime_event_camera_transition_finished` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub const RuntimeEventCameraTransitionFinished = struct {
-    /// The transition_id the caller set on the `mln_animation_options` that
-    /// started this transition.
-    transition_id: u64 = std.mem.zeroes(u64),
-    pub fn toNative(self: RuntimeEventCameraTransitionFinished) c.mln_runtime_event_camera_transition_finished {
-        var raw = std.mem.zeroes(c.mln_runtime_event_camera_transition_finished);
-        raw.transition_id = self.transition_id;
-        return raw;
-    }
-    pub fn fromNative(raw: c.mln_runtime_event_camera_transition_finished) RuntimeEventCameraTransitionFinished {
-        return .{
-            .transition_id = raw.transition_id,
         };
     }
 };
@@ -3668,12 +3725,11 @@ pub const RuntimeEventMask = struct {
     map_render_map_finished: bool = false,
     map_style_image_missing: bool = false,
     map_tile_action: bool = false,
-    map_camera_transition_finished: bool = false,
     offline_region_status_changed: bool = false,
     offline_region_response_error: bool = false,
     offline_region_tile_count_limit_exceeded: bool = false,
     unknown_bits: u64 = 0,
-    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 4194304, 524288, 1048576, 2097152 };
+    pub const native_bits = [_]u64{ 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152 };
     const methods = marshal.FlagMethods(@This());
     pub const fromNative = methods.fromNative;
     pub const toNative = methods.toNative;
@@ -3681,9 +3737,9 @@ pub const RuntimeEventMask = struct {
     pub const isEmpty = methods.isEmpty;
     pub const unionWith = methods.unionWith;
     pub const none = fromNative(0);
-    pub const all_map_events = fromNative(4718590);
+    pub const all_map_events = fromNative(524286);
     pub const all_runtime_events = fromNative(3670016);
-    pub const all = fromNative(8388606);
+    pub const all = fromNative(4194302);
 };
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -3761,7 +3817,6 @@ pub const RuntimeEventPayload = union(enum) {
     offline_region_status: RuntimeEventOfflineRegionStatus,
     offline_region_response_error: RuntimeEventOfflineRegionResponseError,
     offline_region_tile_count_limit: RuntimeEventOfflineRegionTileCountLimit,
-    camera_transition_finished: RuntimeEventCameraTransitionFinished,
     empty,
     unknown: u32,
 };
@@ -3771,7 +3826,6 @@ pub const RuntimeEventPayload = union(enum) {
 /// See `mln_runtime_event_payload_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventPayloadType = enum(u32) {
-    camera_transition_finished = 9,
     offline_region_tile_count_limit = 7,
     offline_region_response_error = 6,
     offline_region_status = 5,
@@ -3872,7 +3926,6 @@ pub const RuntimeEventTileAction = struct {
 /// See `mln_runtime_event_type` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const RuntimeEventType = enum(u32) {
-    map_camera_transition_finished = 22,
     offline_region_tile_count_limit_exceeded = 21,
     offline_region_response_error = 20,
     offline_region_status_changed = 19,
@@ -5494,8 +5547,8 @@ pub fn androidInit(jni_env: ?*anyopaque, jni_class: ?*anyopaque, context: ?*anyo
 ///
 /// See `mln_animation_options_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn animationOptionsDefault() status.Error!AnimationOptions {
-    return call.direct("mln_animation_options_default", .none, {}, AnimationOptions, null, .{});
+pub fn animationOptionsDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(AnimationOptions) {
+    return call.direct("mln_animation_options_default", .none, {}, OwnedValue(AnimationOptions), allocator, .{});
 }
 
 /// Returns empty map bound options initialized for this C API version.
@@ -5519,8 +5572,8 @@ pub fn cVersion() status.Error!u32 {
 ///
 /// See `mln_camera_delta_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraDeltaDefault() status.Error!CameraDelta {
-    return call.direct("mln_camera_delta_default", .none, {}, CameraDelta, null, .{});
+pub fn cameraDeltaDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(CameraDelta) {
+    return call.direct("mln_camera_delta_default", .none, {}, OwnedValue(CameraDelta), allocator, .{});
 }
 
 /// Returns empty camera fitting options initialized for this C API version.
@@ -5543,8 +5596,8 @@ pub fn cameraOptionsDefault() status.Error!CameraOptions {
 ///
 /// See `mln_camera_update_default` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-pub fn cameraUpdateDefault() status.Error!CameraUpdate {
-    return call.direct("mln_camera_update_default", .none, {}, CameraUpdate, null, .{});
+pub fn cameraUpdateDefault(allocator: std.mem.Allocator) status.Error!OwnedValue(CameraUpdate) {
+    return call.direct("mln_camera_update_default", .none, {}, OwnedValue(CameraUpdate), allocator, .{});
 }
 
 /// Returns default custom geometry source options.
@@ -5959,6 +6012,15 @@ pub fn mapCameraForLatLngBounds(allocator: std.mem.Allocator, map: Map, bounds: 
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 pub fn mapCameraForLatLngs(allocator: std.mem.Allocator, map: Map, coordinates: []const LatLng, fit_options: ?CameraFitOptions, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(CameraOptions) {
     return call.submit("mln_map_camera_for_lat_lngs", .lease, map, call.value(CameraOptions, c.mln_camera_options), allocator, diagnostic, .{ coordinates, coordinates.len, fit_options });
+}
+
+/// Cancels the camera transitions of the commands whose animation carried
+/// transition_id, and leaves every other transition running.
+///
+/// See `mln_map_cancel_camera_transition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+pub fn mapCancelCameraTransition(map: Map, transition_id: u64, diagnostic: ?*diagnostics.Diagnostic) status.Error!completion.Future(completion.CommandCompletion) {
+    return call.submit("mln_map_cancel_camera_transition", .lease, map, call.command, null, diagnostic, .{transition_id});
 }
 
 /// Cancels the camera transitions running when this command commits.

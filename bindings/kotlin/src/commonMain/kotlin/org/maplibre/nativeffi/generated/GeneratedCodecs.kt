@@ -269,7 +269,7 @@ internal fun NativeArena.putStyleTileSourceOptions(target: Long, value: StyleTil
 internal fun NativeArena.writeStyleTileSourceOptions(value: StyleTileSourceOptions): Long =
   allocate(w(88, 96), 8).also { putStyleTileSourceOptions(it, value) }
 
-internal fun NativeArena.putCameraDelta(target: Long, value: CameraDelta) {
+internal fun NativeCall.putCameraDelta(target: Long, value: CameraDelta) {
   C.mln_camera_delta_default(target)
   writeU32(target + 4, 0u)
   value.offset?.let {
@@ -293,11 +293,11 @@ internal fun NativeArena.putCameraDelta(target: Long, value: CameraDelta) {
     putScreenPoint(target + 48, it)
   }
   putAnimationOptions(target + 64, value.animation)
-  writeU32(target + 136, value.gesturePhase.rawValue)
+  writeU32(target + w(152, 160), value.gesturePhase.rawValue)
 }
 
-internal fun NativeArena.writeCameraDelta(value: CameraDelta): Long =
-  allocate(144, 8).also { putCameraDelta(it, value) }
+internal fun NativeCall.writeCameraDelta(value: CameraDelta): Long =
+  allocate(w(160, 168), 8).also { putCameraDelta(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   target: Long,
@@ -771,16 +771,16 @@ internal fun NativeArena.putMapViewportOptions(target: Long, value: MapViewportO
 internal fun NativeArena.writeMapViewportOptions(value: MapViewportOptions): Long =
   allocate(56, 8).also { putMapViewportOptions(it, value) }
 
-internal fun NativeArena.putCameraUpdate(target: Long, value: CameraUpdate) {
+internal fun NativeCall.putCameraUpdate(target: Long, value: CameraUpdate) {
   C.mln_camera_update_default(target)
   writeU32(target + 4, value.mode.rawValue)
   putCameraOptions(target + 8, value.camera)
   putAnimationOptions(target + 128, value.animation)
-  writeU32(target + 200, value.gesturePhase.rawValue)
+  writeU32(target + w(216, 224), value.gesturePhase.rawValue)
 }
 
-internal fun NativeArena.writeCameraUpdate(value: CameraUpdate): Long =
-  allocate(208, 8).also { putCameraUpdate(it, value) }
+internal fun NativeCall.writeCameraUpdate(value: CameraUpdate): Long =
+  allocate(w(224, 232), 8).also { putCameraUpdate(it, value) }
 
 internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
   writeF64(target, value.top)
@@ -1081,6 +1081,7 @@ internal fun readAnimationOptions(source: Long): AnimationOptions =
     minZoom = if ((readU32(source) and 4u) != 0u) readF64(source + 24) else null,
     easing = if ((readU32(source) and 8u) != 0u) readUnitBezier(source + 32) else null,
     transitionId = if ((readU32(source) and 16u) != 0u) readU64(source + 64) else null,
+    endHandler = CameraTransitionHandler(),
   )
 
 internal fun readBoundOptions(source: Long): BoundOptions =
@@ -1101,7 +1102,7 @@ internal fun readCameraDelta(source: Long): CameraDelta =
     pitch = if ((readU32(source + 4) and 8u) != 0u) readF64(source + 40) else null,
     anchor = if ((readU32(source + 4) and 16u) != 0u) readScreenPoint(source + 48) else null,
     animation = readAnimationOptions(source + 64),
-    gesturePhase = GesturePhase(readU32(source + 136)),
+    gesturePhase = GesturePhase(readU32(source + w(152, 160))),
   )
 
 internal fun readCameraFitOptions(source: Long): CameraFitOptions =
@@ -1129,7 +1130,7 @@ internal fun readCameraUpdate(source: Long): CameraUpdate =
     mode = CameraUpdateMode(readU32(source + 4)),
     camera = readCameraOptions(source + 8),
     animation = readAnimationOptions(source + 128),
-    gesturePhase = GesturePhase(readU32(source + 200)),
+    gesturePhase = GesturePhase(readU32(source + w(216, 224))),
   )
 
 internal fun readCustomGeometrySourceOptions(source: Long): CustomGeometrySourceOptions =
@@ -1655,7 +1656,7 @@ internal fun NativeCall.putWake(target: Long, value: Wake) {
 internal fun NativeCall.writeWake(value: Wake): Long =
   allocate(w(12, 24), w(4, 8)).also { putWake(it, value) }
 
-internal fun NativeArena.putAnimationOptions(target: Long, value: AnimationOptions) {
+internal fun NativeCall.putAnimationOptions(target: Long, value: AnimationOptions) {
   C.mln_animation_options_default(target)
   writeU32(target, 0u)
   value.durationMs?.let {
@@ -1678,10 +1679,11 @@ internal fun NativeArena.putAnimationOptions(target: Long, value: AnimationOptio
     markPresent(target, 16u)
     writeU64(target + 64, it)
   }
+  putCameraTransitionHandler(target + 72, value.endHandler)
 }
 
-internal fun NativeArena.writeAnimationOptions(value: AnimationOptions): Long =
-  allocate(72, 8).also { putAnimationOptions(it, value) }
+internal fun NativeCall.writeAnimationOptions(value: AnimationOptions): Long =
+  allocate(w(88, 96), 8).also { putAnimationOptions(it, value) }
 
 internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
   writeAddress(target, value.texture.address)
@@ -2005,10 +2007,6 @@ internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent 
             RuntimeEventPayload.OfflineRegionTileCountLimit(
               readRuntimeEventOfflineRegionTileCountLimit(source + 48)
             )
-          9u ->
-            RuntimeEventPayload.CameraTransitionFinished(
-              readRuntimeEventCameraTransitionFinished(source + 48)
-            )
           0u -> RuntimeEventPayload.None
           else -> RuntimeEventPayload.Unknown(tag, NativeMemory.getBytes(source + 48, 72))
         }
@@ -2064,6 +2062,16 @@ internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
 
 internal fun NativeArena.writeUnitBezier(value: UnitBezier): Long =
   allocate(32, 8).also { putUnitBezier(it, value) }
+
+internal fun NativeCall.putCameraTransitionHandler(target: Long, value: CameraTransitionHandler) {
+  if (value.callback == null) return
+  writeAddress(target + w(4, 8), registrations.register(value))
+  writeAddress(target, UpcallStubs.cameraTransitionHandlerCallback)
+  writeAddress(target + w(8, 16), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeCameraTransitionHandler(value: CameraTransitionHandler): Long =
+  allocate(w(12, 24), w(4, 8)).also { putCameraTransitionHandler(it, value) }
 
 internal fun NativeArena.putWglContextDescriptor(target: Long, value: WglContextDescriptor) {
   writeAddress(target, value.deviceContext.address)
@@ -2156,11 +2164,6 @@ internal fun readRuntimeEventOfflineRegionTileCountLimit(
 ): RuntimeEventOfflineRegionTileCountLimit =
   RuntimeEventOfflineRegionTileCountLimit(regionId = readI64(source), limit = readU64(source + 8))
 
-internal fun readRuntimeEventCameraTransitionFinished(
-  source: Long
-): RuntimeEventCameraTransitionFinished =
-  RuntimeEventCameraTransitionFinished(transitionId = readU64(source))
-
 internal fun readOfflineTilePyramidRegionDefinition(
   source: Long
 ): OfflineTilePyramidRegionDefinition =
@@ -2181,6 +2184,12 @@ internal fun readOfflineGeometryRegionDefinition(source: Long): OfflineGeometryR
     maxZoom = readF64(source + w(24, 32)),
     pixelRatio = readF32(source + w(32, 40)),
     includeIdeographs = readBool(source + w(36, 44)),
+  )
+
+internal fun readCameraTransitionEnd(source: Long): CameraTransitionEnd =
+  CameraTransitionEnd(
+    outcome = CameraTransitionOutcome(readU32(source + 4)),
+    generation = readU64(source + 8),
   )
 
 internal fun readRenderingStats(source: Long): RenderingStats =

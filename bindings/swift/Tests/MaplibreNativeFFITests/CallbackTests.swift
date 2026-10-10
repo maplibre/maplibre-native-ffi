@@ -51,6 +51,54 @@ private func addCustomSource(
   }
 }
 
+/// A camera command's end handler sits two records deep in its input. Native
+/// holds it while the ease runs and runs it once when its identity is
+/// cancelled, and a command that native rejects frees it before it returns.
+@Test func aCameraEndHandlerIsRootedUntilItRuns() async throws {
+  try await withMapFixture { fixture in
+    let ends = LockedBox<[CameraTransitionEnd]>([])
+    let releases = LockedBox(0)
+    do {
+      let sentinel = ReleaseProbe(releases)
+      let update = CameraUpdate(
+        mode: .ease,
+        camera: CameraOptions(zoom: 4),
+        animation: AnimationOptions(
+          durationMs: 60000,
+          transitionId: UInt64.max,
+          endHandler: CameraTransitionHandler { end in
+            withExtendedLifetime(sentinel) {}
+            ends.update { $0.append(end) }
+          }
+        )
+      )
+      #expect(try await fixture.map.updateCamera(update: update)
+        .disposition == .committed)
+    }
+    #expect(releases.value == 0)
+    _ = try await fixture.map.cancelCameraTransition(transitionId: UInt64.max)
+    await awaitCondition("the end handler's release") { releases.value == 1 }
+    #expect(ends.value.count == 1)
+    #expect(ends.value.first?.outcome == .cancelled)
+    #expect(ends.value.first?.generation != 0)
+
+    let rejected = LockedBox(0)
+    do {
+      let sentinel = ReleaseProbe(rejected)
+      let delta = CameraDelta(
+        scale: -1,
+        animation: AnimationOptions(endHandler: CameraTransitionHandler { _ in
+          withExtendedLifetime(sentinel) {}
+        })
+      )
+      await #expect(throws: (any Error).self) {
+        try await fixture.map.applyCameraDelta(delta: delta)
+      }
+    }
+    #expect(rejected.value == 1)
+  }
+}
+
 /// Installs a provider for `url` that hands each of its requests to `body`
 /// and returns `body`'s decision, and denies every other request.
 func installProvider(

@@ -133,6 +133,25 @@ const (
 
 func (value CameraOptionField) Has(flags CameraOptionField) bool { return value&flags == flags }
 
+// CameraTransitionOutcome corresponds to mln_camera_transition_outcome. How the
+// transitions of one camera command ended.
+//
+// See mln_camera_transition_outcome in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type CameraTransitionOutcome uint32
+
+const (
+	// Every property of the command reached its target, or a later camera write
+	// replaced it.
+	CameraTransitionOutcomeCompleted CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED)
+	// mln_map_cancel_transitions(), mln_map_cancel_camera_transition(), or
+	// MLN_GESTURE_PHASE_CANCEL ended the transitions, or the command failed before
+	// it started them.
+	CameraTransitionOutcomeCancelled CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED)
+	// The map closed before the transitions ended.
+	CameraTransitionOutcomeClosed CameraTransitionOutcome = CameraTransitionOutcome(C.MLN_CAMERA_TRANSITION_OUTCOME_CLOSED)
+)
+
 // CameraUpdateMode corresponds to mln_camera_update_mode. Camera transition
 // behavior for mln_camera_update.
 //
@@ -904,7 +923,6 @@ const (
 	RuntimeEventMaskMapRenderMapFinished                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED)
 	RuntimeEventMaskMapStyleImageMissing                RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING)
 	RuntimeEventMaskMapTileAction                       RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION)
-	RuntimeEventMaskMapCameraTransitionFinished         RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED)
 	RuntimeEventMaskOfflineRegionStatusChanged          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventMaskOfflineRegionResponseError          RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventMaskOfflineRegionTileCountLimitExceeded RuntimeEventMask = RuntimeEventMask(C.MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
@@ -933,7 +951,6 @@ const (
 	RuntimeEventPayloadTypeOfflineRegionStatus         RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS)
 	RuntimeEventPayloadTypeOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventPayloadTypeOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
-	RuntimeEventPayloadTypeCameraTransitionFinished    RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED)
 )
 
 // RuntimeEventSourceType corresponds to mln_runtime_event_source_type. Source
@@ -977,7 +994,6 @@ const (
 	RuntimeEventTypeOfflineRegionStatusChanged          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
 	RuntimeEventTypeOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventTypeOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
-	RuntimeEventTypeMapCameraTransitionFinished         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED)
 )
 
 // SourceFeatureQueryOptionField corresponds to
@@ -1391,14 +1407,6 @@ func (RuntimeEventPayloadOfflineRegionTileCountLimitVariant) bindingTag() uint32
 	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 }
 
-type RuntimeEventPayloadCameraTransitionFinishedVariant struct {
-	Value RuntimeEventCameraTransitionFinished
-}
-
-func (RuntimeEventPayloadCameraTransitionFinishedVariant) bindingTag() uint32 {
-	return uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED)
-}
-
 // AnimationOptions corresponds to mln_animation_options. Optional animation
 // controls for camera transitions.
 //
@@ -1414,8 +1422,11 @@ type AnimationOptions struct {
 	// Peak zoom for flyTo transitions.
 	MinZoom *float64
 	Easing  *UnitBezier
-	// Caller-chosen identity for the transition this options struct starts.
+	// Caller-chosen identity of the command that these options animate, which
+	// mln_map_cancel_camera_transition() matches.
 	TransitionId *uint64
+	// Reports the end of the command's transitions. Disabled by default.
+	EndHandler CameraTransitionHandler
 }
 
 func copyAnimationOptions(raw C.mln_animation_options) AnimationOptions {
@@ -1436,6 +1447,7 @@ func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_a
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_MIN_ZOOM, &raw.min_zoom, input.MinZoom, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_EASING, &raw.easing, input.Easing, arena, nativeUnitBezier)
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_TRANSITION_ID, &raw.transition_id, input.TransitionId, arena, bindingNumber[uint64, C.uint64_t])
+	raw.end_handler = nativeCameraTransitionHandler(input.EndHandler, arena)
 	return raw
 }
 
@@ -1637,6 +1649,48 @@ func copyCameraQueryResult(raw C.mln_camera_query_result) CameraQueryResult {
 	result.Generation = uint64(raw.generation)
 	result.Camera = copyCameraOptions(raw.camera)
 	return result
+}
+
+// CameraTransitionEnd corresponds to mln_camera_transition_end. The end of one
+// camera command's transitions, borrowed for the callback.
+//
+// See mln_camera_transition_end in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type CameraTransitionEnd struct {
+	// One of mln_camera_transition_outcome.
+	Outcome CameraTransitionOutcome
+	// Generation of the published snapshot that shows the camera where the
+	// transitions left it. The map events of the change that ended them carry this
+	// generation and are queued before the callback runs. Zero for
+	// MLN_CAMERA_TRANSITION_OUTCOME_CLOSED.
+	Generation uint64
+}
+
+func copyCameraTransitionEnd(raw C.mln_camera_transition_end) CameraTransitionEnd {
+	var result CameraTransitionEnd
+	result.Outcome = CameraTransitionOutcome(raw.outcome)
+	result.Generation = uint64(raw.generation)
+	return result
+}
+
+// CameraTransitionHandler corresponds to mln_camera_transition_handler.
+// Callback state that one camera command copies to report the end of its
+// transitions.
+//
+// See mln_camera_transition_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+type CameraTransitionHandler struct{ Callback func(CameraTransitionEnd) }
+
+func nativeCameraTransitionHandler(input CameraTransitionHandler, arena *bindingArena) C.mln_camera_transition_handler {
+	raw := C.mln_camera_transition_handler{}
+	if input.Callback != nil {
+		raw.user_data = arena.register(input, 0)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
+		if input.Callback != nil {
+			raw.callback = C.mln_camera_transition_end_callback(C.binding_mln_camera_transition_handler_callback)
+		}
+	}
+	return raw
 }
 
 // CameraUpdate corresponds to mln_camera_update. One atomic absolute camera
@@ -3832,31 +3886,11 @@ func copyRuntimeEvent(raw C.mln_runtime_event) RuntimeEvent {
 			return RuntimeEventPayloadOfflineRegionResponseErrorVariant{Value: copyRuntimeEventOfflineRegionResponseError((*(*C.mln_runtime_event_offline_region_response_error)(unsafe.Pointer(&raw.payload))))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
 			return RuntimeEventPayloadOfflineRegionTileCountLimitVariant{Value: copyRuntimeEventOfflineRegionTileCountLimit((*(*C.mln_runtime_event_offline_region_tile_count_limit)(unsafe.Pointer(&raw.payload))))}
-		case C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED:
-			return RuntimeEventPayloadCameraTransitionFinishedVariant{Value: copyRuntimeEventCameraTransitionFinished((*(*C.mln_runtime_event_camera_transition_finished)(unsafe.Pointer(&raw.payload))))}
 		case C.MLN_RUNTIME_EVENT_PAYLOAD_NONE:
 			return nil
 		}
 		return UnknownVariant{Tag: uint32(raw.payload_type)}
 	}()
-	return result
-}
-
-// RuntimeEventCameraTransitionFinished corresponds to
-// mln_runtime_event_camera_transition_finished. Payload for
-// MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
-//
-// See mln_runtime_event_camera_transition_finished in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-type RuntimeEventCameraTransitionFinished struct {
-	// The transition_id the caller set on the mln_animation_options that started
-	// this transition.
-	TransitionId uint64
-}
-
-func copyRuntimeEventCameraTransitionFinished(raw C.mln_runtime_event_camera_transition_finished) RuntimeEventCameraTransitionFinished {
-	var result RuntimeEventCameraTransitionFinished
-	result.TransitionId = uint64(raw.transition_id)
 	return result
 }
 
@@ -6581,6 +6615,17 @@ func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *Ca
 	}, completionOf(copyCameraOptions))
 }
 
+// CancelCameraTransition cancels the camera transitions of the commands whose
+// animation carried transition_id, and leaves every other transition running.
+//
+// See mln_map_cancel_camera_transition in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+func (receiver *MapHandle) CancelCameraTransition(transitionId uint64) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_cancel_camera_transition), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_cancel_camera_transition(C.mln_map(raw), C.uint64_t(transitionId), completion, diagnostic))
+	}, completionCommand)
+}
+
 // CancelTransitions cancels the camera transitions running when this command
 // commits.
 //
@@ -8415,6 +8460,23 @@ func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data uns
 		return
 	}
 	callbacks.CancelTile(copyCanonicalTileId(native_tile_id))
+	return
+}
+
+//export mlnGo_mln_camera_transition_handler_callback
+func mlnGo_mln_camera_transition_handler_callback(native_user_data unsafe.Pointer, native_end *C.mln_camera_transition_end) {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	defer func() {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_camera_transition_end_callback", failure)
+		}
+	}()
+	callbacks, ok := bindingCallbackValue[CameraTransitionHandler](native_user_data)
+	if !ok || callbacks.Callback == nil {
+		return
+	}
+	callbacks.Callback(copyCameraTransitionEnd((*native_end)))
 	return
 }
 

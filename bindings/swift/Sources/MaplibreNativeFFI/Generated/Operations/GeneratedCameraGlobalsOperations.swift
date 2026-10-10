@@ -10,7 +10,7 @@ public extension Maplibre {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func animationOptionsDefault() throws -> AnimationOptions {
     try nativeDirect("mln_animation_options_default") { _ in
-      AnimationOptions(raw: mln_animation_options_default())
+      try AnimationOptions(raw: mln_animation_options_default())
     }
   }
 
@@ -30,7 +30,7 @@ public extension Maplibre {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func cameraDeltaDefault() throws -> CameraDelta {
     try nativeDirect("mln_camera_delta_default") { _ in
-      CameraDelta(raw: mln_camera_delta_default())
+      try CameraDelta(raw: mln_camera_delta_default())
     }
   }
 
@@ -60,7 +60,7 @@ public extension Maplibre {
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   static func cameraUpdateDefault() throws -> CameraUpdate {
     try nativeDirect("mln_camera_update_default") { _ in
-      CameraUpdate(raw: mln_camera_update_default())
+      try CameraUpdate(raw: mln_camera_update_default())
     }
   }
 

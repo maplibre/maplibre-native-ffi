@@ -327,3 +327,33 @@ test "a scoped response rejects use after its callback and from another thread" 
     try testing.expectError(error.InvalidState, maplibre.resourceTransformResponseSetUrl(probe.saved.?, "unsupported://late.json", &diagnostic));
     try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
 }
+
+// A camera command carries its end handler two records deep in its input.
+// Native runs the handler once and releases it when the command's identity is
+// cancelled. A command that native rejects leaves the context with the
+// caller, so neither callback runs.
+test "a camera end handler inside a command is released after it runs" {
+    const fixture = try support.Fixture.create(.{});
+    defer fixture.destroy();
+
+    var ended = support.EndProbe{};
+    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, .{
+        .mode = .ease,
+        .camera = .{ .zoom = 4.0 },
+        .animation = .{ .duration_ms = 60_000, .transition_id = 3, .end_handler = ended.handler() },
+    }, null));
+    try testing.expectEqual(@as(usize, 0), ended.releases.get());
+    try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, 3, null));
+    try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
+    try testing.expectEqual(maplibre.CameraTransitionOutcome.cancelled, ended.outcome);
+    try ended.releases.waitFor(1);
+
+    var rejected = support.EndProbe{};
+    try testing.expectError(error.InvalidArgument, maplibre.mapApplyCameraDelta(testing.allocator, fixture.map, .{
+        .scale = -1,
+        .animation = .{ .end_handler = rejected.handler() },
+    }, null));
+    try fixture.barrier();
+    try testing.expectEqual(@as(usize, 0), rejected.releases.get());
+    try testing.expectEqual(@as(u32, 0), rejected.ends.load(.acquire));
+}

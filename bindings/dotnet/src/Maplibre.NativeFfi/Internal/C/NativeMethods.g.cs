@@ -511,6 +511,14 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_cancel_camera_transition(
+        MlnMap map,
+        ulong transition_id,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_cancel_transitions(
         MlnMap map,
         mln_completion* completion,

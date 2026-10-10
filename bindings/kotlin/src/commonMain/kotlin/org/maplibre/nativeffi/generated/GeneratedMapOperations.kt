@@ -428,7 +428,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun applyCameraDelta(delta: CameraDelta): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_apply_camera_delta") {
+    nativeCommand(this, binding, "mln_map_apply_camera_delta", bindingCallbacks) {
       check(C.mln_map_apply_camera_delta(handle, writeCameraDelta(delta), completion, diagnostic))
     }
 
@@ -882,6 +882,20 @@ public abstract class GeneratedMapOperations internal constructor() {
           completion,
           diagnostic,
         )
+      )
+    }
+
+  /**
+   * Cancels the camera transitions of the commands whose animation carried transition_id, and
+   * leaves every other transition running.
+   *
+   * See `mln_map_cancel_camera_transition` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  public fun cancelCameraTransition(transitionId: ULong): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_cancel_camera_transition") {
+      check(
+        C.mln_map_cancel_camera_transition(handle, transitionId.toLong(), completion, diagnostic)
       )
     }
 
@@ -2366,7 +2380,7 @@ public abstract class GeneratedMapOperations internal constructor() {
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
    */
   public fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_update_camera") {
+    nativeCommand(this, binding, "mln_map_update_camera", bindingCallbacks) {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
     }
 }

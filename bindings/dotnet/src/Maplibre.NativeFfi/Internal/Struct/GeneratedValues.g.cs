@@ -22,9 +22,13 @@ internal static unsafe class GeneratedValues
             TransitionId = value.fields.HasFlag(MLN_ANIMATION_OPTION_TRANSITION_ID)
                 ? value.transition_id
                 : null,
+            EndHandler = default,
         };
 
-    internal static mln_animation_options NativeAnimationOptions(AnimationOptions value)
+    internal static mln_animation_options NativeAnimationOptions(
+        AnimationOptions value,
+        NativeCallScope scope
+    )
     {
         var native = NativeMethods.mln_animation_options_default();
         native.fields = 0;
@@ -46,6 +50,7 @@ internal static unsafe class GeneratedValues
             ref native.transition_id,
             MLN_ANIMATION_OPTION_TRANSITION_ID
         );
+        native.end_handler = NativeCameraTransitionHandler(value.EndHandler, scope);
         return native;
     }
 
@@ -98,7 +103,7 @@ internal static unsafe class GeneratedValues
             GesturePhase = (GesturePhase)value.gesture_phase,
         };
 
-    internal static mln_camera_delta NativeCameraDelta(CameraDelta value)
+    internal static mln_camera_delta NativeCameraDelta(CameraDelta value, NativeCallScope scope)
     {
         Required(value.Animation, "CameraDelta.Animation must not be null.");
         var native = NativeMethods.mln_camera_delta_default();
@@ -119,7 +124,7 @@ internal static unsafe class GeneratedValues
             MLN_CAMERA_DELTA_ANCHOR,
             NativeScreenPoint
         );
-        native.animation = NativeAnimationOptions(value.Animation);
+        native.animation = NativeAnimationOptions(value.Animation, scope);
         native.gesture_phase = (uint)value.GesturePhase;
         return native;
     }
@@ -220,6 +225,53 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static CameraTransitionEnd CopyCameraTransitionEnd(mln_camera_transition_end value) =>
+        new((CameraTransitionOutcome)value.outcome, value.generation);
+
+    internal static mln_camera_transition_end NativeCameraTransitionEnd(CameraTransitionEnd value)
+    {
+        var native = new mln_camera_transition_end();
+        native.size = (uint)sizeof(mln_camera_transition_end);
+        native.outcome = (uint)value.Outcome;
+        native.generation = value.Generation;
+        return native;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void InvokeCameraTransitionHandlerCallback(
+        void* user_data,
+        mln_camera_transition_end* end
+    )
+    {
+        try
+        {
+            ((CameraTransitionHandler)NativeCallbackRoot.Value(user_data)).Callback?.Invoke(
+                CopyCameraTransitionEnd(NativeCallScope.Read(end))
+            );
+        }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_camera_transition_end_callback", error);
+        }
+    }
+
+    internal static mln_camera_transition_handler NativeCameraTransitionHandler(
+        CameraTransitionHandler value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_camera_transition_handler();
+        if (value.Callback is not null)
+        {
+            native.user_data = scope.Register(value with { });
+            native.release_user_data = &NativeCallbackRoot.Release;
+            native.callback = value.Callback is null
+                ? null
+                : &InvokeCameraTransitionHandlerCallback;
+        }
+        return native;
+    }
+
     internal static CameraUpdate CopyCameraUpdate(mln_camera_update value) =>
         new(
             (CameraUpdateMode)value.mode,
@@ -228,7 +280,7 @@ internal static unsafe class GeneratedValues
             (GesturePhase)value.gesture_phase
         );
 
-    internal static mln_camera_update NativeCameraUpdate(CameraUpdate value)
+    internal static mln_camera_update NativeCameraUpdate(CameraUpdate value, NativeCallScope scope)
     {
         Required(value.Camera, "CameraUpdate.Camera must not be null.");
         Required(value.Animation, "CameraUpdate.Animation must not be null.");
@@ -236,7 +288,7 @@ internal static unsafe class GeneratedValues
         native.size = (uint)sizeof(mln_camera_update);
         native.mode = (uint)value.Mode;
         native.camera = NativeCameraOptions(value.Camera);
-        native.animation = NativeAnimationOptions(value.Animation);
+        native.animation = NativeAnimationOptions(value.Animation, scope);
         native.gesture_phase = (uint)value.GesturePhase;
         return native;
     }
@@ -2289,13 +2341,6 @@ internal static unsafe class GeneratedValues
                             value.payload.offline_region_tile_count_limit
                         )
                     ),
-                (uint)
-                    mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED =>
-                    new RuntimeEvent.PayloadValue.CameraTransitionFinished(
-                        CopyRuntimeEventCameraTransitionFinished(
-                            value.payload.camera_transition_finished
-                        )
-                    ),
                 (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_NONE =>
                     new RuntimeEvent.PayloadValue.None(),
                 _ => new RuntimeEvent.PayloadValue.Unknown(
@@ -2318,19 +2363,6 @@ internal static unsafe class GeneratedValues
             },
             message
         );
-
-    internal static RuntimeEventCameraTransitionFinished CopyRuntimeEventCameraTransitionFinished(
-        mln_runtime_event_camera_transition_finished value
-    ) => new(value.transition_id);
-
-    internal static mln_runtime_event_camera_transition_finished NativeRuntimeEventCameraTransitionFinished(
-        RuntimeEventCameraTransitionFinished value
-    )
-    {
-        var native = new mln_runtime_event_camera_transition_finished();
-        native.transition_id = value.TransitionId;
-        return native;
-    }
 
     internal static RuntimeEventOfflineRegionResponseError CopyRuntimeEventOfflineRegionResponseError(
         mln_runtime_event_offline_region_response_error value

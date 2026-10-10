@@ -1003,10 +1003,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
           RuntimeEventOfflineRegionTileCountLimit(raw: raw
             .payload
             .offline_region_tile_count_limit)
-        ) case MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
-        .rawValue: return .cameraTransitionFinished(
-          RuntimeEventCameraTransitionFinished(raw: raw
-            .payload.camera_transition_finished)
         ) case MLN_RUNTIME_EVENT_PAYLOAD_NONE
         .rawValue: return .none default: return .unknown(
           raw.payload_type,
@@ -1024,37 +1020,6 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
 
   func nativeValue(arena _: NativeInputArena) throws -> mln_runtime_event {
     throw NativeStringError("borrowed arena snapshots cannot be submitted")
-  }
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
-///
-/// See `mln_runtime_event_camera_transition_finished` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-public struct RuntimeEventCameraTransitionFinished: Equatable, Hashable,
-  Sendable
-{
-  /// The transition_id the caller set on the `mln_animation_options` that
-  /// started this transition.
-  public var transitionId: UInt64
-  public static var `default`: Self {
-    Self(raw: mln_runtime_event_camera_transition_finished())
-  }
-
-  public init(transitionId: UInt64 = RuntimeEventCameraTransitionFinished
-    .default.transitionId)
-  {
-    self.transitionId = transitionId
-  }
-
-  init(raw: mln_runtime_event_camera_transition_finished) {
-    transitionId = raw.transition_id
-  }
-
-  func nativeValue() -> mln_runtime_event_camera_transition_finished {
-    var raw = mln_runtime_event_camera_transition_finished()
-    raw.transition_id = transitionId
-    return raw
   }
 }
 
@@ -1098,8 +1063,6 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let mapStyleImageMissing: RuntimeEventMask =
     .init(rawValue: 131_072)
   public static let mapTileAction: RuntimeEventMask = .init(rawValue: 262_144)
-  public static let mapCameraTransitionFinished: RuntimeEventMask =
-    .init(rawValue: 4_194_304)
   public static let offlineRegionStatusChanged: RuntimeEventMask =
     .init(rawValue: 524_288)
   public static let offlineRegionResponseError: RuntimeEventMask =
@@ -1107,12 +1070,12 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventMask =
     .init(rawValue: 2_097_152)
   /// Selects every map-originated event type this version defines.
-  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 4_718_590)
+  public static let allMapEvents: RuntimeEventMask = .init(rawValue: 524_286)
   /// Selects every runtime-originated event type this version defines.
   public static let allRuntimeEvents: RuntimeEventMask =
     .init(rawValue: 3_670_016)
   /// Selects every event type this version defines.
-  public static let all: RuntimeEventMask = .init(rawValue: 8_388_606)
+  public static let all: RuntimeEventMask = .init(rawValue: 4_194_302)
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
@@ -1228,7 +1191,6 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   case offlineRegionStatus(RuntimeEventOfflineRegionStatus)
   case offlineRegionResponseError(RuntimeEventOfflineRegionResponseError)
   case offlineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit)
-  case cameraTransitionFinished(RuntimeEventCameraTransitionFinished)
   case none
   case unknown(UInt32, Data)
   public static var `default`: Self {
@@ -1258,8 +1220,6 @@ public struct RuntimeEventPayloadType: RawRepresentable, NativeOpenValue,
     .init(rawValue: 6)
   public static let offlineRegionTileCountLimit: RuntimeEventPayloadType =
     .init(rawValue: 7)
-  public static let cameraTransitionFinished: RuntimeEventPayloadType =
-    .init(rawValue: 9)
 }
 
 /// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
@@ -1422,8 +1382,6 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
     .init(rawValue: 20)
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventType =
     .init(rawValue: 21)
-  public static let mapCameraTransitionFinished: RuntimeEventType =
-    .init(rawValue: 22)
 }
 
 /// Options used when creating a runtime.

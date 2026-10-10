@@ -102,6 +102,10 @@ typedef struct mln_offline_region_status {
  *   error text; payload OFFLINE_REGION_RESPONSE_ERROR.
  * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
  *   OFFLINE_REGION_TILE_COUNT_LIMIT.
+ *
+ * Value 22 is retired and no version reuses it. It reported the end of a
+ * camera transition, which mln_animation_options.end_handler reports to the
+ * command that started the transition.
  */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
@@ -125,7 +129,6 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
-  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22,
 } mln_runtime_event_type;
 
 /**
@@ -179,8 +182,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
     1ULL << MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
   MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 1ULL
                                            << MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
-  MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED =
-    1ULL << MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED =
     1ULL << MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
   MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR =
@@ -206,8 +207,7 @@ typedef enum MLN_BINDING("kind=bitmask") mln_runtime_event_mask : uint64_t {
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED |
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED |
     MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING |
-    MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION |
-    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED,
+    MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION,
   /** Selects every runtime-originated event type this version defines. */
   MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS =
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED |
@@ -232,10 +232,12 @@ typedef enum mln_runtime_event_source_type : uint32_t {
 /**
  * Payload kinds used by mln_runtime_event.payload_type.
  *
- * Values 3 and 8 are retired and no version reuses them. Value 3 was a
+ * Values 3, 8, and 9 are retired and no version reuses them. Value 3 was a
  * style-image-missing payload whose only content was the image ID that the
  * event message carries. Value 8 was an offline-operation completion payload,
- * and one-shot work reports its outcome through a completion.
+ * and one-shot work reports its outcome through a completion. Value 9 carried
+ * the identity of a camera transition that ended, and
+ * mln_animation_options.end_handler reports that end.
  */
 typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0,
@@ -245,7 +247,6 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
-  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
 } mln_runtime_event_payload_type;
 
 /** Camera change kinds reported by camera will-change and did-change events. */
@@ -461,20 +462,6 @@ typedef struct mln_runtime_event_tile_action {
   mln_tile_id tile_id;
 } mln_runtime_event_tile_action;
 
-/**
- * Payload for MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
- *
- * See mln_animation_options.transition_id for how a caller stamps an identity
- * onto a camera transition and what terminal outcomes this event covers.
- */
-typedef struct mln_runtime_event_camera_transition_finished {
-  /**
-   * The transition_id the caller set on the mln_animation_options that started
-   * this transition.
-   */
-  uint64_t transition_id;
-} mln_runtime_event_camera_transition_finished;
-
 /** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
 typedef struct mln_runtime_event_offline_region_status {
   mln_offline_region_id region_id;
@@ -522,8 +509,6 @@ typedef union mln_runtime_event_payload {
     offline_region_tile_count_limit MLN_BINDING(
       "variant=MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT"
     );
-  mln_runtime_event_camera_transition_finished camera_transition_finished
-    MLN_BINDING("variant=MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED");
 } mln_runtime_event_payload;
 
 /**

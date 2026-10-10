@@ -183,6 +183,18 @@ internal object Upcalls {
       val invoke = value.unlock ?: return@upcall Unit
       invoke()
     }
+
+  @JvmStatic
+  fun cameraTransitionHandlerCallback(userData: Long, end: Long): Unit =
+    upcall<CameraTransitionHandler, Unit>(
+      "mln_camera_transition_end_callback",
+      userData,
+      Unit,
+      null,
+    ) { value, scope ->
+      val invoke = value.callback ?: return@upcall Unit
+      invoke(readCameraTransitionEnd(end))
+    }
 }
 
 /** The C function pointer that calls each [Upcalls] method. */
@@ -202,4 +214,5 @@ internal expect object UpcallStubs {
   val wakeCallback: Long
   val queueLockLock: Long
   val queueLockUnlock: Long
+  val cameraTransitionHandlerCallback: Long
 }

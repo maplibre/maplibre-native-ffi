@@ -125,6 +125,28 @@ pub const Counter = struct {
     }
 };
 
+/// Records the calls of a camera end handler and its release.
+pub const EndProbe = struct {
+    ends: std.atomic.Value(u32) = .init(0),
+    outcome: maplibre.CameraTransitionOutcome = .completed,
+    releases: Counter = .{},
+
+    fn record(context: ?*anyopaque, end: maplibre.CameraTransitionEnd) maplibre.Error!void {
+        const self: *EndProbe = @ptrCast(@alignCast(context.?));
+        self.outcome = end.outcome;
+        _ = self.ends.fetchAdd(1, .release);
+    }
+
+    fn released(context: ?*anyopaque) void {
+        const self: *EndProbe = @ptrCast(@alignCast(context.?));
+        self.releases.add();
+    }
+
+    pub fn handler(self: *EndProbe) maplibre.CameraTransitionHandler {
+        return .{ .callback = record, .context = self, .release_context = released };
+    }
+};
+
 /// Waits for a future's terminal value and releases the future.
 pub fn resolve(future_value: anytype) !@TypeOf(future_value).Value {
     var future = future_value;

@@ -42,6 +42,10 @@ pub const MLN_CAMERA_OPTION_PADDING: mln_camera_option_field = 32;
 pub const MLN_CAMERA_OPTION_ANCHOR: mln_camera_option_field = 64;
 pub const MLN_CAMERA_OPTION_ROLL: mln_camera_option_field = 128;
 pub const MLN_CAMERA_OPTION_FOV: mln_camera_option_field = 256;
+pub type mln_camera_transition_outcome = u32;
+pub const MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED: mln_camera_transition_outcome = 0;
+pub const MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED: mln_camera_transition_outcome = 1;
+pub const MLN_CAMERA_TRANSITION_OUTCOME_CLOSED: mln_camera_transition_outcome = 2;
 pub type mln_camera_update_mode = u32;
 pub const MLN_CAMERA_UPDATE_MODE_JUMP: mln_camera_update_mode = 0;
 pub const MLN_CAMERA_UPDATE_MODE_EASE: mln_camera_update_mode = 1;
@@ -304,14 +308,13 @@ pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED: mln_runtime_event_mask 
 pub const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED: mln_runtime_event_mask = 65536;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING: mln_runtime_event_mask = 131072;
 pub const MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION: mln_runtime_event_mask = 262144;
-pub const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED: mln_runtime_event_mask = 4194304;
 pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_mask = 524288;
 pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_mask = 1048576;
 pub const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_mask =
     2097152;
-pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 4718590;
+pub const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS: mln_runtime_event_mask = 524286;
 pub const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS: mln_runtime_event_mask = 3670016;
-pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 8388606;
+pub const MLN_RUNTIME_EVENT_MASK_ALL: mln_runtime_event_mask = 4194302;
 pub type mln_runtime_event_payload_type = u32;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_NONE: mln_runtime_event_payload_type = 0;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME: mln_runtime_event_payload_type = 1;
@@ -322,7 +325,6 @@ pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_e
     6;
 pub const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT:
     mln_runtime_event_payload_type = 7;
-pub const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED: mln_runtime_event_payload_type = 9;
 pub type mln_runtime_event_source_type = u32;
 pub const MLN_RUNTIME_EVENT_SOURCE_RUNTIME: mln_runtime_event_source_type = 0;
 pub const MLN_RUNTIME_EVENT_SOURCE_MAP: mln_runtime_event_source_type = 1;
@@ -348,7 +350,6 @@ pub const MLN_RUNTIME_EVENT_MAP_TILE_ACTION: mln_runtime_event_type = 18;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED: mln_runtime_event_type = 19;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR: mln_runtime_event_type = 20;
 pub const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: mln_runtime_event_type = 21;
-pub const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED: mln_runtime_event_type = 22;
 pub type mln_source_feature_query_option_field = u32;
 pub const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS: mln_source_feature_query_option_field =
     1;
@@ -454,6 +455,7 @@ pub struct mln_animation_options {
     pub min_zoom: f64,
     pub easing: mln_unit_bezier,
     pub transition_id: u64,
+    pub end_handler: mln_camera_transition_handler,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -515,6 +517,20 @@ pub struct mln_camera_options {
 pub struct mln_camera_query_result {
     pub generation: u64,
     pub camera: mln_camera_options,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_camera_transition_end {
+    pub size: u32,
+    pub outcome: u32,
+    pub generation: u64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_camera_transition_handler {
+    pub callback: mln_camera_transition_end_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1173,11 +1189,6 @@ pub struct mln_runtime_event {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_runtime_event_camera_transition_finished {
-    pub transition_id: u64,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_event_offline_region_response_error {
     pub region_id: mln_offline_region_id,
     pub reason: u32,
@@ -1203,7 +1214,6 @@ pub union mln_runtime_event_payload {
     pub offline_region_status: mln_runtime_event_offline_region_status,
     pub offline_region_response_error: mln_runtime_event_offline_region_response_error,
     pub offline_region_tile_count_limit: mln_runtime_event_offline_region_tile_count_limit,
-    pub camera_transition_finished: mln_runtime_event_camera_transition_finished,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1530,6 +1540,9 @@ pub struct mln_wgl_context_descriptor {
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_acquired_frame(pub u64);
+pub type mln_camera_transition_end_callback = Option<
+    unsafe extern "C" fn(user_data: *mut std::ffi::c_void, end: *const mln_camera_transition_end),
+>;
 pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
@@ -1977,6 +1990,12 @@ unsafe extern "C" {
         coordinates: *const mln_lat_lng,
         coordinate_count: usize,
         fit_options: *const mln_camera_fit_options,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_cancel_camera_transition(
+        map: mln_map,
+        transition_id: u64,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

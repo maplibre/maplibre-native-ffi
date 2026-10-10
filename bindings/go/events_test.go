@@ -29,11 +29,9 @@ func TestEventDecoderReadsAStridedBatchWithUnknownValues(t *testing.T) {
 		newRuntimeEventForTest(RuntimeEventType(0x7fff_0001), RuntimeEventSourceType(0x7fff_0002), 0x7fff_0004).
 			withGeneration(0x1_0000_0003).
 			withRawPayload(RuntimeEventPayloadType(0x7fff_0003), window),
-		newRuntimeEventForTest(RuntimeEventTypeMapCameraTransitionFinished, RuntimeEventSourceTypeMap, 1).
-			withCameraTransitionFinished(RuntimeEventCameraTransitionFinished{TransitionId: 7}),
 	})
-	if len(decoded) != 4 {
-		t.Fatalf("decoded %d events, want 4", len(decoded))
+	if len(decoded) != 3 {
+		t.Fatalf("decoded %d events, want 3", len(decoded))
 	}
 	if frame, ok := decoded[0].Payload.(RuntimeEventPayloadRenderFrameVariant); !ok || frame.Value.Mode != RenderModeFull || !frame.Value.NeedsRepaint {
 		t.Fatalf("render frame payload = %+v", decoded[0].Payload)
@@ -51,9 +49,6 @@ func TestEventDecoderReadsAStridedBatchWithUnknownValues(t *testing.T) {
 	}
 	if payload, ok := unknown.Payload.(UnknownVariant); !ok || payload.Tag != 0x7fff_0003 {
 		t.Fatalf("unknown payload = %#v, want UnknownVariant with the raw tag", unknown.Payload)
-	}
-	if transition, ok := decoded[3].Payload.(RuntimeEventPayloadCameraTransitionFinishedVariant); !ok || transition.Value.TransitionId != 7 {
-		t.Fatalf("camera transition payload = %+v", decoded[3].Payload)
 	}
 }
 

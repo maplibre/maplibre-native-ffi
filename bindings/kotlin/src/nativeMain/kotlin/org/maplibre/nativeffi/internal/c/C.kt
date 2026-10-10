@@ -827,6 +827,19 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
+  actual fun mln_map_cancel_camera_transition(
+    map: Long,
+    transitionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    org.maplibre.nativeffi.internal.cinterop.mln_map_cancel_camera_transition(
+      map.toULong(),
+      transitionId.toULong(),
+      completion.toCPointer(),
+      outDiagnostic.toCPointer(),
+    )
+
   actual fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_map_cancel_transitions(
       map.toULong(),

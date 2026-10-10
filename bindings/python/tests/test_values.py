@@ -113,17 +113,23 @@ def test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip
     assert unknown.is_unknown
     assert unknown.native_code == 777
 
+    # Cancelling the largest identity ends the ease that carries it, so the
+    # identity crossed whole both times.
     largest = 2**64 - 1
+    ends: list[mln.CameraTransitionEnd] = []
     ease = replace(
         mln.CameraUpdate.default(),
         mode=mln.CameraUpdateMode.EASE,
         camera=mln.CameraOptions(zoom=2.0),
-        animation=mln.AnimationOptions(duration_ms=0.0, transition_id=largest),
+        animation=mln.AnimationOptions(
+            duration_ms=60000.0,
+            transition_id=largest,
+            end_handler=mln.CameraTransitionHandler(ends.append),
+        ),
     )
     result(map_handle.update_camera(ease))
-    finished = harness.wait_event(mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED)
-    assert isinstance(finished.payload, mln.RuntimeEventCameraTransitionFinishedVariant)
-    assert finished.payload.value.transition_id == largest
+    result(map_handle.cancel_camera_transition(largest))
+    assert [end.outcome for end in ends] == [mln.CameraTransitionOutcome.CANCELLED]
 
 
 def test_an_array_input_is_copied_when_it_is_submitted(

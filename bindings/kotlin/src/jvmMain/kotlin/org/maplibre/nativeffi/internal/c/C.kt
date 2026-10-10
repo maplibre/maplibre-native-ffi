@@ -454,6 +454,15 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
     )
+  private val mln_map_cancel_camera_transition =
+    Ffm.downcall(
+      "mln_map_cancel_camera_transition",
+      JAVA_INT,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_cancel_transitions =
     Ffm.downcall("mln_map_cancel_transitions", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_create_projection =
@@ -2286,6 +2295,15 @@ internal actual object C {
       outDiagnostic,
     ) as Int
 
+  actual fun mln_map_cancel_camera_transition(
+    map: Long,
+    transitionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_map_cancel_camera_transition.invokeExact(map, transitionId, completion, outDiagnostic)
+      as Int
+
   actual fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_cancel_transitions.invokeExact(map, completion, outDiagnostic) as Int
 
@@ -3977,6 +3995,12 @@ internal val mln_unit_bezier: GroupLayout =
     JAVA_DOUBLE.withName("x2"),
     JAVA_DOUBLE.withName("y2"),
   )
+internal val mln_camera_transition_handler: GroupLayout =
+  Ffm.struct(
+    ADDRESS.withName("callback"),
+    ADDRESS.withName("user_data"),
+    ADDRESS.withName("release_user_data"),
+  )
 internal val mln_animation_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("fields"),
@@ -3986,6 +4010,7 @@ internal val mln_animation_options: GroupLayout =
     JAVA_DOUBLE.withName("min_zoom"),
     mln_unit_bezier.withName("easing"),
     JAVA_LONG.withName("transition_id"),
+    mln_camera_transition_handler.withName("end_handler"),
   )
 internal val mln_lat_lng: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("latitude"), JAVA_DOUBLE.withName("longitude"))

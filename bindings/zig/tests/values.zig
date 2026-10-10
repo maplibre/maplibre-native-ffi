@@ -101,7 +101,7 @@ test "a strided event batch with an unknown payload arm decodes without loss" {
 }
 
 // An enum value the binding does not name crosses unchanged, so native is the
-// one that rejects it, and a 64-bit identifier keeps its high bits both ways.
+// one that rejects it, and a 64-bit identifier keeps its high bits.
 // Zig integer types mirror the C widths, so a narrowing would not compile.
 test "open enums keep unknown values and 64-bit carriers round-trip" {
     const fixture = try support.Fixture.create(.{});
@@ -112,17 +112,23 @@ test "open enums keep unknown values and 64-bit carriers round-trip" {
     try testing.expectEqual(maplibre.CommandDisposition.failed, rejected.disposition);
     try testing.expectError(error.InvalidArgument, rejected.statusError());
 
-    // A jump supersedes the ease, which reports its identifier as it ends.
+    // Cancelling the identifier ends only the ease that carries it, so the
+    // identifier crossed whole both times. The end handler sits two records
+    // deep in the command's input and runs once, before the cancellation
+    // completes.
     const transition_id: u64 = 0x8000_0000_0000_0029;
+    var ended = support.EndProbe{};
     try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, .{
         .mode = .ease,
         .camera = .{ .zoom = 4.0 },
-        .animation = .{ .duration_ms = 60_000, .transition_id = transition_id },
+        .animation = .{ .duration_ms = 60_000, .transition_id = transition_id, .end_handler = ended.handler() },
     }, null));
-    try support.expectCommitted(try maplibre.mapUpdateCamera(testing.allocator, fixture.map, .{ .mode = .jump, .camera = .{ .zoom = 8.0 } }, null));
-    var finished = try fixture.waitForEvent(.map_camera_transition_finished);
-    defer finished.deinit();
-    try testing.expectEqual(transition_id, finished.value.payload.camera_transition_finished.transition_id);
+    try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id & 0x7fff_ffff_ffff_ffff, null));
+    try testing.expectEqual(@as(u32, 0), ended.ends.load(.acquire));
+    try support.expectCommitted(try maplibre.mapCancelCameraTransition(fixture.map, transition_id, null));
+    try ended.releases.waitFor(1);
+    try testing.expectEqual(@as(u32, 1), ended.ends.load(.acquire));
+    try testing.expectEqual(maplibre.CameraTransitionOutcome.cancelled, ended.outcome);
 }
 
 // The binding lowers an array input into storage native copies during the

@@ -26,6 +26,9 @@
 /dotnet/src/Maplibre.NativeFfi/Map/CameraOptionField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraQueryResult.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionEnd.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionHandler.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionOutcome.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraUpdate.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/CameraUpdateMode.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/ConstrainMode.g.cs linguist-generated=true
@@ -137,7 +140,6 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCameraTransitionFinished.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventMask.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionResponseError.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionStatus.g.cs linguist-generated=true

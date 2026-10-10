@@ -25,6 +25,7 @@
 "CB-06" = { na = "A transform's response borrows the callback's frame through a lifetime and holds a raw pointer, so it is neither 'static nor Send: the compiler rejects a use after the callback returns or from another thread" }
 "CB-07" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::replacing_the_log_callback_releases_the_one_it_replaced"
 "CB-08" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::registering_for_an_already_cancelled_request_reports_it_and_roots_nothing"
+"CB-09" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_camera_end_handler_inside_a_command_is_rooted_until_it_runs"
 "VAL-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected"
 "VAL-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::presence_fields_keep_a_present_zero_apart_from_an_absent_value"
 "VAL-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data"

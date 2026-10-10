@@ -13,9 +13,9 @@ public extension MapHandle {
     -> CommandCompletion
   {
     try await nativeCommand("mln_map_apply_camera_delta") { raw, arena, completion, diagnostic in
-      mln_map_apply_camera_delta(
+      try mln_map_apply_camera_delta(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
         diagnostic
       )
@@ -81,6 +81,25 @@ public extension MapHandle {
       completion,
       diagnostic
     ) }
+  }
+
+  /// Cancels the camera transitions of the commands whose animation carried
+  /// transition_id, and leaves every other transition running.
+  ///
+  /// See `mln_map_cancel_camera_transition` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  @discardableResult
+  func cancelCameraTransition(transitionId bindingArg0: UInt64) async throws
+    -> CommandCompletion
+  {
+    try await nativeCommand("mln_map_cancel_camera_transition") { raw, _, completion, diagnostic in
+      mln_map_cancel_camera_transition(
+        raw,
+        bindingArg0,
+        completion,
+        diagnostic
+      )
+    }
   }
 
   /// Cancels the camera transitions running when this command commits.
@@ -447,9 +466,9 @@ public extension MapHandle {
     -> CommandCompletion
   {
     try await nativeCommand("mln_map_update_camera") { raw, arena, completion, diagnostic in
-      mln_map_update_camera(
+      try mln_map_update_camera(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
         diagnostic
       )

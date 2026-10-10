@@ -111,18 +111,21 @@ the update mode that provides the required timing.
 
 ## Know when a transition ends
 
-Set a transition ID on the animation options to identify its completion event.
-The runtime queues one transition-finished event with that value while the map's
-subscription selects that type. The event arrives after completion, replacement
-by another camera command, or cancellation. Drain
-it from the runtime that owns the map, as described in
+Set an end handler on the animation options to learn how the transition ended.
+The handler runs once for each accepted command, on the runtime that owns the
+map, and reports whether the transition completed, was cancelled, or ended
+because the map closed. A transition completes when it reaches its target or
+when a later camera command replaces it.
+
+<Code code={region(cameraSnippet, "end")} lang="c" title="camera.c" />
+
+The handler also reports the generation of the published snapshot that shows
+where the transition left the camera. The map events of that change are queued
+before the handler runs, as described in
 [Handle events](/maplibre-native-ffi/guides/handle-events/).
 
-<Code code={region(cameraSnippet, "finished")} lang="c" title="camera.c" />
+`mln_map_cancel_transitions` stops every running transition. To stop one
+command and leave the others running, give its animation options a transition
+ID and cancel that ID.
 
-The event identifies the transition but has no completion reason. To distinguish
-completion from cancellation, compare the resulting camera with the requested
-camera.
-
-`mln_map_cancel_transitions` stops every transition running when it commits, and
-a cancelled transition reports its end through the same event.
+<Code code={region(cameraSnippet, "cancel")} lang="c" title="camera.c" />

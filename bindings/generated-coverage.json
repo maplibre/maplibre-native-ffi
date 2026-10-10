@@ -27,6 +27,9 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraOptionField.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraOptions.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraQueryResult.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionEnd.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionHandler.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraTransitionOutcome.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraUpdate.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/CameraUpdateMode.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/ConstrainMode.g.cs",
@@ -138,7 +141,6 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceTransformResponse.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceUsage.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEvent.g.cs",
-    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventCameraTransitionFinished.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventMask.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionResponseError.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/RuntimeEventOfflineRegionStatus.g.cs",
@@ -319,7 +321,7 @@
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc"
   ],
-  "function_count": 284,
+  "function_count": 285,
   "languages": {
     "dart": {
       "callback_adapters": {
@@ -392,6 +394,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dispose",
@@ -651,6 +654,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dispose",
@@ -911,6 +915,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dispose",
@@ -1171,6 +1176,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dispose",
@@ -1418,6 +1424,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dump_debug_logs",
@@ -1741,6 +1748,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dispose",
@@ -2001,6 +2009,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dispose",
@@ -2261,6 +2270,7 @@
         "mln_map_camera_for_geometry",
         "mln_map_camera_for_lat_lng_bounds",
         "mln_map_camera_for_lat_lngs",
+        "mln_map_cancel_camera_transition",
         "mln_map_cancel_transitions",
         "mln_map_create_projection",
         "mln_map_dispose",
@@ -2454,7 +2464,7 @@
       "unsupported": {}
     }
   },
-  "public_function_count": 253,
+  "public_function_count": 254,
   "runtime_exports": [
     "mln_adapter_arena_adopt_handle",
     "mln_adapter_arena_adopt_release",
@@ -2490,8 +2500,8 @@
   ],
   "schema_version": 1,
   "semantic": {
-    "resolved_callbacks": 12,
-    "resolved_operations": 251,
+    "resolved_callbacks": 13,
+    "resolved_operations": 252,
     "support_relations": {
       "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },
       "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },

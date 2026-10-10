@@ -35,6 +35,7 @@ class RunLoop;
 
 namespace mln::core {
 
+class CameraTransitionEnd;
 struct MapObject;
 struct RuntimeObject;
 class Wake;
@@ -59,6 +60,22 @@ struct DeferredOperationCompletion {
   mln_status status = MLN_STATUS_OK;
   std::string message;
   std::any result;
+};
+
+// A camera command whose transitions ended with `outcome`, waiting for the
+// generation of the snapshot that shows where they left the camera.
+struct EndedCameraTransition {
+  std::shared_ptr<CameraTransitionEnd> end;
+  uint32_t outcome = MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED;
+};
+
+// The camera transitions that the C API is cancelling, so that their finish
+// callbacks report MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED.
+struct CameraTransitionCancellation {
+  bool active = false;
+  // Every transition, or only the commands that carry `transition_id`.
+  bool all = false;
+  uint64_t transition_id = 0;
 };
 
 // One map's event state. The runtime keeps a share of it while the map is
@@ -86,10 +103,14 @@ struct MapEventState {
   // Operations that finished inside the open transaction, such as a pending
   // still image that a style error inside a command fails.
   std::vector<DeferredOperationCompletion> deferred_completions;
-  // Transition IDs whose finish callbacks ran, waiting for the
-  // MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE that MapLibre usually raises right
-  // after. A transaction flushes any finish that no camera change followed.
-  std::vector<uint64_t> finished_transitions;
+  // Camera commands with an end handler whose transitions are still running,
+  // so that a map close can report them closed.
+  std::vector<std::shared_ptr<CameraTransitionEnd>> running_transition_ends;
+  // Camera commands whose transitions ended, waiting for the
+  // MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE that MapLibre raises right after
+  // a finish. A transaction takes every end that its work produced.
+  std::vector<EndedCameraTransition> ended_transitions;
+  CameraTransitionCancellation cancelling_transitions;
 
   [[nodiscard]] auto in_transaction() const noexcept -> bool {
     return transaction_depth != 0;
@@ -127,7 +148,7 @@ static_assert(
   "every event type needs a mask bit in one of the two groups"
 );
 static_assert(
-  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED < 64,
+  MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED < 64,
   "an event type value past 63 needs a wider subscription mask"
 );
 // runtime.h promises that a later payload member widens the event stride

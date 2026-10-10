@@ -68,6 +68,74 @@ public sealed class CallbackLifetimeTests
         return (rejection, new WeakReference(captured));
     }
 
+    // A camera command's end handler sits two records deep in its input. The binding roots it while
+    // the ease runs, and native runs it once and releases it when its identity is cancelled.
+    [Fact]
+    public async Task ACameraEndHandlerIsRootedUntilItRuns()
+    {
+        await using var fixture = await NativeFixture.WithEmptyStyleAsync();
+        var ends = new System.Collections.Concurrent.ConcurrentQueue<CameraTransitionEnd>();
+        var (started, captured) = StartCapturingEase(fixture.Map, ends);
+        Assert.Equal(CommandDisposition.Committed, (await started).Disposition);
+        Assert.True(Gc.IsAlive(captured));
+
+        // The handler runs before the cancellation completes.
+        await fixture.Map.CancelCameraTransitionAsync(ulong.MaxValue, TestWaits.Token);
+        var end = Assert.Single(ends);
+        Assert.Equal(CameraTransitionOutcome.Cancelled, end.Outcome);
+        Assert.NotEqual(0UL, end.Generation);
+        Assert.False(Gc.IsAlive(captured));
+
+        var (rejection, rejected) = ApplyRejectedCapturingDelta(fixture.Map);
+        Assert.IsType<InvalidArgumentException>(rejection);
+        Assert.False(Gc.IsAlive(rejected));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (Task<CommandCompletion> Started, WeakReference Captured) StartCapturingEase(
+        MapHandle map,
+        System.Collections.Concurrent.ConcurrentQueue<CameraTransitionEnd> ends
+    )
+    {
+        var captured = new object();
+        var animation = AnimationOptions.Default;
+        animation.DurationMs = 60000;
+        animation.TransitionId = ulong.MaxValue;
+        animation.EndHandler = new CameraTransitionHandler(end =>
+        {
+            GC.KeepAlive(captured);
+            ends.Enqueue(end);
+        });
+        var started = map.UpdateCameraAsync(
+            CameraUpdate.Default with
+            {
+                Mode = CameraUpdateMode.Ease,
+                Camera = new CameraOptions { Zoom = 4 },
+                Animation = animation,
+            },
+            TestWaits.Token
+        );
+        return (started, new WeakReference(captured));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (Exception? Rejection, WeakReference Captured) ApplyRejectedCapturingDelta(
+        MapHandle map
+    )
+    {
+        var captured = new object();
+        var animation = AnimationOptions.Default;
+        animation.EndHandler = new CameraTransitionHandler(_ => GC.KeepAlive(captured));
+        var delta = CameraDelta.Default;
+        delta.Scale = -1;
+        delta.Animation = animation;
+        var rejection = Record.Exception(() =>
+        {
+            _ = map.ApplyCameraDeltaAsync(delta, TestWaits.Token);
+        });
+        return (rejection, new WeakReference(captured));
+    }
+
     // A callback that captures the map it is registered on forms a cycle through the map's
     // callback roots, which the collector reclaims once nothing else holds the map.
     [Fact]

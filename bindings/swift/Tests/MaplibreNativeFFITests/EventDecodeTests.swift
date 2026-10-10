@@ -104,20 +104,22 @@ import Testing
   tile.payload.tile_action.tile_id.canonical_x = 7
   tile.payload.tile_action.tile_id.wrap = -1
 
-  var transition = rawRuntimeEvent(
-    type: MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.rawValue,
-    payloadType: MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED.rawValue
+  var limit = rawRuntimeEvent(
+    type: MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED.rawValue,
+    payloadType: MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
+      .rawValue
   )
-  transition.payload.camera_transition_finished.transition_id = 99
+  limit.payload.offline_region_tile_count_limit.region_id = 5
+  limit.payload.offline_region_tile_count_limit.limit = 99
 
   let batch = try withSynthesizedEventBatch(
-    events: [frame, tile, transition]
+    events: [frame, tile, limit]
   ) { synthesized in
     try EventBatchView(raw: synthesized.batch)
   }
   let decoded = batch.events
   let payloads = decoded.map(\.payload)
-  #expect(decoded[2].type == .mapCameraTransitionFinished)
+  #expect(decoded[2].type == .offlineRegionTileCountLimitExceeded)
 
   guard case let .renderFrame(decodedFrame) = payloads[0] else {
     Issue.record("expected a render frame payload, got \(payloads[0])")
@@ -137,9 +139,10 @@ import Testing
   #expect(decodedTile.tileId.canonicalX == 7)
   #expect(decodedTile.tileId.wrap == -1)
 
-  guard case let .cameraTransitionFinished(finished) = payloads[2] else {
-    Issue.record("expected a transition payload, got \(payloads[2])")
+  guard case let .offlineRegionTileCountLimit(decodedLimit) = payloads[2] else {
+    Issue.record("expected a tile count limit payload, got \(payloads[2])")
     return
   }
-  #expect(finished.transitionId == 99)
+  #expect(decodedLimit.regionId == 5)
+  #expect(decodedLimit.limit == 99)
 }

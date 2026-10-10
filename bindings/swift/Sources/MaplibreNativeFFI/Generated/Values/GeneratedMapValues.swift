@@ -26,7 +26,7 @@ public struct AnimationOptionField: OptionSet, NativeOpenValue, Equatable,
 ///
 /// See `mln_animation_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct AnimationOptions: Equatable, Hashable, Sendable {
+public struct AnimationOptions: Sendable {
   /// Duration in milliseconds. Must be finite and non-negative. Values that
   /// would overflow MapLibre Native's internal duration are invalid.
   public var durationMs: Double?
@@ -36,10 +36,13 @@ public struct AnimationOptions: Equatable, Hashable, Sendable {
   /// Peak zoom for flyTo transitions.
   public var minZoom: Double?
   public var easing: UnitBezier?
-  /// Caller-chosen identity for the transition this options struct starts.
+  /// Caller-chosen identity of the command that these options animate, which
+  /// `mln_map_cancel_camera_transition()` matches.
   public var transitionId: UInt64?
+  /// Reports the end of the command's transitions. Disabled by default.
+  public var endHandler: CameraTransitionHandler
   public static var `default`: Self {
-    Self(raw: mln_animation_options_default())
+    try! Self(raw: mln_animation_options_default())
   }
 
   public init(
@@ -47,16 +50,21 @@ public struct AnimationOptions: Equatable, Hashable, Sendable {
     velocity: Double? = AnimationOptions.default.velocity,
     minZoom: Double? = AnimationOptions.default.minZoom,
     easing: UnitBezier? = AnimationOptions.default.easing,
-    transitionId: UInt64? = AnimationOptions.default.transitionId
+    transitionId: UInt64? = AnimationOptions.default.transitionId,
+    endHandler: CameraTransitionHandler = AnimationOptions.default.endHandler
   ) {
     self.durationMs = durationMs
     self.velocity = velocity
     self.minZoom = minZoom
     self.easing = easing
     self.transitionId = transitionId
+    self.endHandler = endHandler
   }
 
-  init(raw: mln_animation_options) {
+  init(
+    raw: mln_animation_options,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
     durationMs = raw.fields & MLN_ANIMATION_OPTION_DURATION.rawValue != 0 ? raw
       .duration_ms : nil
     velocity = raw.fields & MLN_ANIMATION_OPTION_VELOCITY.rawValue != 0 ? raw
@@ -67,9 +75,10 @@ public struct AnimationOptions: Equatable, Hashable, Sendable {
       .rawValue != 0 ? UnitBezier(raw: raw.easing) : nil
     transitionId = raw.fields & MLN_ANIMATION_OPTION_TRANSITION_ID
       .rawValue != 0 ? raw.transition_id : nil
+    endHandler = CameraTransitionHandler()
   }
 
-  func nativeValue() -> mln_animation_options {
+  func nativeValue(arena: NativeInputArena) throws -> mln_animation_options {
     var raw = mln_animation_options_default()
     raw.fields = 0
     if let item = durationMs {
@@ -90,6 +99,7 @@ public struct AnimationOptions: Equatable, Hashable, Sendable {
       raw.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID.rawValue; raw
         .transition_id = item
     }
+    raw.end_handler = try endHandler.nativeValue(arena: arena)
     return raw
   }
 }
@@ -201,7 +211,7 @@ public struct BoundOptions: Equatable, Hashable, Sendable {
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraDelta: Equatable, Hashable, Sendable {
+public struct CameraDelta: Sendable {
   /// Pan in logical map pixels; the content moves by this offset.
   public var offset: ScreenPoint?
   /// Positive zoom factor; 2 zooms in one level.
@@ -216,7 +226,7 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
   public static var `default`: Self {
-    Self(raw: mln_camera_delta_default())
+    try! Self(raw: mln_camera_delta_default())
   }
 
   public init(
@@ -237,7 +247,10 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
     self.gesturePhase = gesturePhase
   }
 
-  init(raw: mln_camera_delta) {
+  init(
+    raw: mln_camera_delta,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
     offset = raw.fields & MLN_CAMERA_DELTA_OFFSET
       .rawValue != 0 ? ScreenPoint(raw: raw.offset) : nil
     scale = raw.fields & MLN_CAMERA_DELTA_SCALE.rawValue != 0 ? raw.scale : nil
@@ -246,13 +259,14 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
     pitch = raw.fields & MLN_CAMERA_DELTA_PITCH.rawValue != 0 ? raw.pitch : nil
     anchor = raw.fields & MLN_CAMERA_DELTA_ANCHOR
       .rawValue != 0 ? ScreenPoint(raw: raw.anchor) : nil
-    animation = AnimationOptions(raw: raw.animation)
+    animation = try AnimationOptions(raw: raw.animation)
     gesturePhase = GesturePhase(rawValue: raw.gesture_phase)
   }
 
-  func nativeValue() -> mln_camera_delta {
+  func nativeValue(arena: NativeInputArena) throws -> mln_camera_delta {
     var raw = mln_camera_delta_default()
     raw.fields = 0
+    raw.size = UInt32(MemoryLayout<mln_camera_delta>.size)
     if let item = offset {
       raw.fields |= MLN_CAMERA_DELTA_OFFSET.rawValue; raw.offset = item
         .nativeValue()
@@ -270,7 +284,7 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
       raw.fields |= MLN_CAMERA_DELTA_ANCHOR.rawValue; raw.anchor = item
         .nativeValue()
     }
-    raw.animation = animation.nativeValue()
+    raw.animation = try animation.nativeValue(arena: arena)
     raw.gesture_phase = gesturePhase.rawValue
     return raw
   }
@@ -513,17 +527,127 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// The end of one camera command's transitions, borrowed for the callback.
+///
+/// See `mln_camera_transition_end` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraTransitionEnd: Equatable, Hashable, Sendable {
+  /// One of `mln_camera_transition_outcome`.
+  public var outcome: CameraTransitionOutcome
+  /// Generation of the published snapshot that shows the camera where the
+  /// transitions left it. The map events of the change that ended them carry
+  /// this generation and are queued before the callback runs. Zero for
+  /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+  public var generation: UInt64
+  public static var `default`: Self {
+    Self(raw: mln_camera_transition_end())
+  }
+
+  public init(
+    outcome: CameraTransitionOutcome = CameraTransitionEnd.default.outcome,
+    generation: UInt64 = CameraTransitionEnd.default.generation
+  ) {
+    self.outcome = outcome
+    self.generation = generation
+  }
+
+  init(raw: mln_camera_transition_end) {
+    outcome = CameraTransitionOutcome(rawValue: raw.outcome)
+    generation = raw.generation
+  }
+
+  func nativeValue() -> mln_camera_transition_end {
+    var raw = mln_camera_transition_end()
+    raw.size = UInt32(MemoryLayout<mln_camera_transition_end>.size)
+    raw.outcome = outcome.rawValue
+    raw.generation = generation
+    return raw
+  }
+}
+
+/// Callback state that one camera command copies to report the end of its
+/// transitions.
+///
+/// See `mln_camera_transition_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraTransitionHandler: Sendable {
+  public var callback: (@Sendable (CameraTransitionEnd) throws -> Void)?
+  public init(callback: (@Sendable (CameraTransitionEnd) throws -> Void)? =
+    nil)
+  {
+    self.callback = callback
+  }
+
+  public static var `default`: Self {
+    Self()
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_camera_transition_handler
+  {
+    var raw = mln_camera_transition_handler()
+    raw.callback = callback == nil ? nil : invokeCameraTransitionHandlerCallback
+    if callback != nil {
+      raw.user_data = arena.callback(self)
+      raw.release_user_data = releaseGeneratedCallback
+    }
+    return raw
+  }
+}
+
+private func invokeCameraTransitionHandlerCallback(
+  user_data: UnsafeMutableRawPointer?,
+  end: UnsafePointer<mln_camera_transition_end>?
+) {
+  guard let user_data else { return }
+  let box = Unmanaged<GeneratedCallbackBox<CameraTransitionHandler>>
+    .fromOpaque(user_data).takeUnretainedValue()
+  do {
+    try box.value
+      .callback?(NativeInputArena.copyArray(end, count: 1)
+        .map { CameraTransitionEnd(raw: $0) }[0])
+  } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_camera_transition_end_callback",
+      error: error
+    ))
+  }
+}
+
+/// How the transitions of one camera command ended.
+///
+/// See `mln_camera_transition_outcome` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+public struct CameraTransitionOutcome: RawRepresentable, NativeOpenValue,
+  Equatable, Hashable, Sendable
+{
+  public let rawValue: UInt32
+  public init(rawValue: UInt32) {
+    self.rawValue = rawValue
+  }
+
+  /// Every property of the command reached its target, or a later camera write
+  /// replaced it.
+  public static let completed: CameraTransitionOutcome = .init(rawValue: 0)
+  /// `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
+  /// `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed
+  /// before it started them.
+  public static let cancelled: CameraTransitionOutcome = .init(rawValue: 1)
+  /// The map closed before the transitions ended.
+  public static let closed: CameraTransitionOutcome = .init(rawValue: 2)
+}
+
 /// One atomic absolute camera update.
 ///
 /// See `mln_camera_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-public struct CameraUpdate: Equatable, Hashable, Sendable {
+public struct CameraUpdate: Sendable {
   public var mode: CameraUpdateMode
   public var camera: CameraOptions
   public var animation: AnimationOptions
   public var gesturePhase: GesturePhase
   public static var `default`: Self {
-    Self(raw: mln_camera_update_default())
+    try! Self(raw: mln_camera_update_default())
   }
 
   public init(
@@ -538,18 +662,22 @@ public struct CameraUpdate: Equatable, Hashable, Sendable {
     self.gesturePhase = gesturePhase
   }
 
-  init(raw: mln_camera_update) {
+  init(
+    raw: mln_camera_update,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
     mode = CameraUpdateMode(rawValue: raw.mode)
     camera = CameraOptions(raw: raw.camera)
-    animation = AnimationOptions(raw: raw.animation)
+    animation = try AnimationOptions(raw: raw.animation)
     gesturePhase = GesturePhase(rawValue: raw.gesture_phase)
   }
 
-  func nativeValue() -> mln_camera_update {
+  func nativeValue(arena: NativeInputArena) throws -> mln_camera_update {
     var raw = mln_camera_update_default()
+    raw.size = UInt32(MemoryLayout<mln_camera_update>.size)
     raw.mode = mode.rawValue
     raw.camera = camera.nativeValue()
-    raw.animation = animation.nativeValue()
+    raw.animation = try animation.nativeValue(arena: arena)
     raw.gesture_phase = gesturePhase.rawValue
     return raw
   }

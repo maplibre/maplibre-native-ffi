@@ -34,9 +34,9 @@ import Testing
 /// A presence field tells an absent value from a zero one in both directions,
 /// and a record read from native keeps the fields native left absent.
 @Test func presenceFieldsTellAbsentFromZero() throws {
-  #expect(AnimationOptions(transitionId: 0).nativeValue().fields ==
-    MLN_ANIMATION_OPTION_TRANSITION_ID.rawValue)
-  #expect(AnimationOptions().nativeValue().fields == 0)
+  #expect(CameraFitOptions(bearing: 0).nativeValue().fields ==
+    MLN_CAMERA_FIT_OPTION_BEARING.rawValue)
+  #expect(CameraFitOptions().nativeValue().fields == 0)
 
   var raw = mln_camera_options_default()
   raw.fields = MLN_CAMERA_OPTION_ZOOM.rawValue

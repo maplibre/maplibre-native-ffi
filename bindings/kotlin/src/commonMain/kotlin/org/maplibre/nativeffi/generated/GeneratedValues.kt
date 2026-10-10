@@ -167,6 +167,27 @@ public data class CameraOptionField(public val rawValue: UInt) {
 }
 
 /**
+ * How the transitions of one camera command ended.
+ *
+ * See `mln_camera_transition_outcome` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraTransitionOutcome(public val rawValue: UInt) {
+  public companion object {
+    /** Every property of the command reached its target, or a later camera write replaced it. */
+    public val COMPLETED: CameraTransitionOutcome = CameraTransitionOutcome(0u)
+    /**
+     * `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
+     * `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed before it started
+     * them.
+     */
+    public val CANCELLED: CameraTransitionOutcome = CameraTransitionOutcome(1u)
+    /** The map closed before the transitions ended. */
+    public val CLOSED: CameraTransitionOutcome = CameraTransitionOutcome(2u)
+  }
+}
+
+/**
  * Camera transition behavior for `mln_camera_update`.
  *
  * See `mln_camera_update_mode` in the
@@ -1104,17 +1125,16 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
     public val MAP_RENDER_MAP_FINISHED: RuntimeEventMask = RuntimeEventMask(65536uL)
     public val MAP_STYLE_IMAGE_MISSING: RuntimeEventMask = RuntimeEventMask(131072uL)
     public val MAP_TILE_ACTION: RuntimeEventMask = RuntimeEventMask(262144uL)
-    public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventMask = RuntimeEventMask(4194304uL)
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventMask = RuntimeEventMask(524288uL)
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventMask = RuntimeEventMask(1048576uL)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventMask =
       RuntimeEventMask(2097152uL)
     /** Selects every map-originated event type this version defines. */
-    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(4718590uL)
+    public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(524286uL)
     /** Selects every runtime-originated event type this version defines. */
     public val ALL_RUNTIME_EVENTS: RuntimeEventMask = RuntimeEventMask(3670016uL)
     /** Selects every event type this version defines. */
-    public val ALL: RuntimeEventMask = RuntimeEventMask(8388606uL)
+    public val ALL: RuntimeEventMask = RuntimeEventMask(4194302uL)
   }
 }
 
@@ -1134,7 +1154,6 @@ public data class RuntimeEventPayloadType(public val rawValue: UInt) {
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventPayloadType = RuntimeEventPayloadType(6u)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT: RuntimeEventPayloadType =
       RuntimeEventPayloadType(7u)
-    public val CAMERA_TRANSITION_FINISHED: RuntimeEventPayloadType = RuntimeEventPayloadType(9u)
   }
 }
 
@@ -1180,7 +1199,6 @@ public data class RuntimeEventType(public val rawValue: UInt) {
     public val OFFLINE_REGION_STATUS_CHANGED: RuntimeEventType = RuntimeEventType(19u)
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventType = RuntimeEventType(20u)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventType = RuntimeEventType(21u)
-    public val MAP_CAMERA_TRANSITION_FINISHED: RuntimeEventType = RuntimeEventType(22u)
   }
 }
 
@@ -2044,6 +2062,23 @@ public data class UnitBezier(
 )
 
 /**
+ * The end of one camera command's transitions, borrowed for the callback.
+ *
+ * See `mln_camera_transition_end` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraTransitionEnd(
+  /** One of `mln_camera_transition_outcome`. */
+  public val outcome: CameraTransitionOutcome = CameraTransitionOutcome(0u),
+  /**
+   * Generation of the published snapshot that shows the camera where the transitions left it. The
+   * map events of the change that ended them carry this generation and are queued before the
+   * callback runs. Zero for `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+   */
+  public val generation: ULong = 0uL,
+)
+
+/**
  * Optional animation controls for camera transitions.
  *
  * See `mln_animation_options` in the
@@ -2063,8 +2098,13 @@ public data class AnimationOptions(
   /** Peak zoom for flyTo transitions. */
   public val minZoom: Double? = null,
   public val easing: UnitBezier? = null,
-  /** Caller-chosen identity for the transition this options struct starts. */
+  /**
+   * Caller-chosen identity of the command that these options animate, which
+   * `mln_map_cancel_camera_transition()` matches.
+   */
   public val transitionId: ULong? = null,
+  /** Reports the end of the command's transitions. Disabled by default. */
+  public val endHandler: CameraTransitionHandler = CameraTransitionHandler(),
 )
 
 /**
@@ -3230,19 +3270,6 @@ public data class RuntimeEventOfflineRegionTileCountLimit(
 )
 
 /**
- * Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
- *
- * See `mln_runtime_event_camera_transition_finished` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class RuntimeEventCameraTransitionFinished(
-  /**
-   * The transition_id the caller set on the `mln_animation_options` that started this transition.
-   */
-  public val transitionId: ULong = 0uL
-)
-
-/**
  * Typed event payload carried inline by every event.
  *
  * See `mln_runtime_event_payload` in the
@@ -3264,10 +3291,6 @@ public sealed interface RuntimeEventPayload {
 
   public data class OfflineRegionTileCountLimit(
     public val value: RuntimeEventOfflineRegionTileCountLimit
-  ) : RuntimeEventPayload
-
-  public data class CameraTransitionFinished(
-    public val value: RuntimeEventCameraTransitionFinished
   ) : RuntimeEventPayload
 
   public data object None : RuntimeEventPayload
@@ -3718,6 +3741,22 @@ public data class RenderSessionAttachment(
 )
 
 public data class LogicalExtentPhysicalSizeResult(public val width: UInt, public val height: UInt)
+
+/**
+ * Callback state that one camera command copies to report the end of its transitions.
+ *
+ * See `mln_camera_transition_handler` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class CameraTransitionHandler(public val callback: CameraTransitionEndCallback? = null)
+
+/**
+ * Receives the end of one camera command's transitions.
+ *
+ * See `mln_camera_transition_end_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public typealias CameraTransitionEndCallback = (end: CameraTransitionEnd) -> Unit
 
 /**
  * Options for custom geometry sources.

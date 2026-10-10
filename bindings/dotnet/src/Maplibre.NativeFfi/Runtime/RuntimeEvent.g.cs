@@ -63,9 +63,6 @@ public readonly partial record struct RuntimeEvent(
             RuntimeEventOfflineRegionTileCountLimit Value
         ) : PayloadValue;
 
-        public sealed record CameraTransitionFinished(RuntimeEventCameraTransitionFinished Value)
-            : PayloadValue;
-
         public sealed record None : PayloadValue;
 
         public sealed record Unknown : PayloadValue

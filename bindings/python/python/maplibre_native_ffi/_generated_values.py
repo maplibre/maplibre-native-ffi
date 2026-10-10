@@ -98,16 +98,6 @@ class RuntimeEventOfflineRegionTileCountLimitVariant:
 
 
 @dataclass(frozen=True, slots=True)
-class RuntimeEventCameraTransitionFinishedVariant:
-    value: RuntimeEventCameraTransitionFinished
-    _tag = 9
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(RuntimeEventCameraTransitionFinished._from_native(raw))
-
-
-@dataclass(frozen=True, slots=True)
 class OpenglContextDescriptorWglVariant:
     value: WglContextDescriptor
     _tag = 1
@@ -276,6 +266,18 @@ class CameraOptionField(IntFlag):
     ANCHOR = 64
     ROLL = 128
     FOV = 256
+
+
+class CameraTransitionOutcome(UnknownIntEnum):
+    """How the transitions of one camera command ended.
+
+    See `mln_camera_transition_outcome` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    COMPLETED = 0
+    CANCELLED = 1
+    CLOSED = 2
 
 
 class CameraUpdateMode(UnknownIntEnum):
@@ -869,13 +871,12 @@ class RuntimeEventMask(IntFlag):
     MAP_RENDER_MAP_FINISHED = 65536
     MAP_STYLE_IMAGE_MISSING = 131072
     MAP_TILE_ACTION = 262144
-    MAP_CAMERA_TRANSITION_FINISHED = 4194304
     OFFLINE_REGION_STATUS_CHANGED = 524288
     OFFLINE_REGION_RESPONSE_ERROR = 1048576
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152
-    ALL_MAP_EVENTS = 4718590
+    ALL_MAP_EVENTS = 524286
     ALL_RUNTIME_EVENTS = 3670016
-    ALL = 8388606
+    ALL = 4194302
 
 
 class RuntimeEventPayloadType(UnknownIntEnum):
@@ -892,7 +893,6 @@ class RuntimeEventPayloadType(UnknownIntEnum):
     OFFLINE_REGION_STATUS = 5
     OFFLINE_REGION_RESPONSE_ERROR = 6
     OFFLINE_REGION_TILE_COUNT_LIMIT = 7
-    CAMERA_TRANSITION_FINISHED = 9
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
@@ -934,7 +934,6 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_STATUS_CHANGED = 19
     OFFLINE_REGION_RESPONSE_ERROR = 20
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
-    MAP_CAMERA_TRANSITION_FINISHED = 22
 
 
 class SourceFeatureQueryOptionField(IntFlag):
@@ -1181,6 +1180,9 @@ class AnimationOptions:
     min_zoom: float | None = None
     easing: UnitBezier | None = None
     transition_id: int | None = None
+    end_handler: CameraTransitionHandler = field(
+        default_factory=lambda: CameraTransitionHandler()
+    )
 
     @classmethod
     def _from_native(cls, raw):
@@ -1190,6 +1192,7 @@ class AnimationOptions:
             min_zoom=raw["min_zoom"],
             easing=_maybe(UnitBezier._from_native, raw["easing"]),
             transition_id=raw["transition_id"],
+            end_handler=CameraTransitionHandler(),
         )
 
     @classmethod
@@ -1350,6 +1353,42 @@ class CameraQueryResult:
             generation=raw["generation"],
             camera=CameraOptions._from_native(raw["camera"]),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class CameraTransitionEnd:
+    """The end of one camera command's transitions, borrowed for the callback.
+
+    See `mln_camera_transition_end` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    outcome: CameraTransitionOutcome
+    generation: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            outcome=CameraTransitionOutcome(raw["outcome"]),
+            generation=raw["generation"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CameraTransitionHandler:
+    """Callback state that one camera command copies to report the end of its
+    transitions.
+
+    See `mln_camera_transition_handler` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
+    callback: Callable[[CameraTransitionEnd], None] | None = None
+
+    def _invoke_callback(self, end):
+        callback = self.callback
+        assert callback is not None
+        return callback(CameraTransitionEnd._from_native(end))
 
 
 @dataclass(frozen=True, slots=True)
@@ -2919,7 +2958,6 @@ class RuntimeEvent:
         | RuntimeEventOfflineRegionStatusVariant
         | RuntimeEventOfflineRegionResponseErrorVariant
         | RuntimeEventOfflineRegionTileCountLimitVariant
-        | RuntimeEventCameraTransitionFinishedVariant
         | UnknownVariant
         | None
     )
@@ -2942,27 +2980,11 @@ class RuntimeEvent:
                     "offline_region_status": RuntimeEventOfflineRegionStatusVariant,
                     "offline_region_response_error": RuntimeEventOfflineRegionResponseErrorVariant,
                     "offline_region_tile_count_limit": RuntimeEventOfflineRegionTileCountLimitVariant,
-                    "camera_transition_finished": RuntimeEventCameraTransitionFinishedVariant,
                 },
                 0,
             ),
             message=raw["message"],
         )
-
-
-@dataclass(frozen=True, slots=True)
-class RuntimeEventCameraTransitionFinished:
-    """Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
-
-    See `mln_runtime_event_camera_transition_finished` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-    """
-
-    transition_id: int
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(transition_id=raw["transition_id"])
 
 
 @dataclass(frozen=True, slots=True)

@@ -28,7 +28,7 @@ pub struct AnimationOptionField: u32 {
 ///
 /// See `mln_animation_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct AnimationOptions {
     /// Duration in milliseconds. Must be finite and non-negative. Values that
     /// would overflow MapLibre Native's internal duration are invalid.
@@ -39,8 +39,11 @@ pub struct AnimationOptions {
     /// Peak zoom for flyTo transitions.
     pub min_zoom: Option<f64>,
     pub easing: Option<UnitBezier>,
-    /// Caller-chosen identity for the transition this options struct starts.
+    /// Caller-chosen identity of the command that these options animate, which
+    /// `mln_map_cancel_camera_transition()` matches.
     pub transition_id: Option<u64>,
+    /// Reports the end of the command's transitions. Disabled by default.
+    pub end_handler: CameraTransitionHandler,
 }
 impl Default for AnimationOptions {
     fn default() -> Self {
@@ -71,6 +74,7 @@ impl ToNative<sys::mln_animation_options> for AnimationOptions {
             raw.fields |= sys::MLN_ANIMATION_OPTION_TRANSITION_ID;
             raw.transition_id = *item;
         }
+        raw.end_handler = to_native(&self.end_handler, arena)?;
         Ok(raw)
     }
 }
@@ -88,6 +92,7 @@ impl FromNative<sys::mln_animation_options> for AnimationOptions {
             }?,
             transition_id: (raw.fields & sys::MLN_ANIMATION_OPTION_TRANSITION_ID != 0)
                 .then_some(raw.transition_id),
+            end_handler: Default::default(),
         })
     }
 }
@@ -204,7 +209,7 @@ pub enum CameraChangeMode: u32 {
 ///
 /// See `mln_camera_delta` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct CameraDelta {
     /// Pan in logical map pixels; the content moves by this offset.
     pub offset: Option<ScreenPoint>,
@@ -477,11 +482,118 @@ impl FromNative<sys::mln_camera_query_result> for CameraQueryResult {
     }
 }
 
+/// The end of one camera command's transitions, borrowed for the callback.
+///
+/// See `mln_camera_transition_end` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct CameraTransitionEnd {
+    /// One of `mln_camera_transition_outcome`.
+    pub outcome: CameraTransitionOutcome,
+    /// Generation of the published snapshot that shows the camera where the
+    /// transitions left it. The map events of the change that ended them carry
+    /// this generation and are queued before the callback runs. Zero for
+    /// `MLN_CAMERA_TRANSITION_OUTCOME_CLOSED`.
+    pub generation: u64,
+}
+impl CameraTransitionEnd {
+    pub const fn new(outcome: CameraTransitionOutcome, generation: u64) -> Self {
+        Self {
+            outcome,
+            generation,
+        }
+    }
+}
+impl FromNative<sys::mln_camera_transition_end> for CameraTransitionEnd {
+    unsafe fn from_native(raw: sys::mln_camera_transition_end) -> Result<Self> {
+        Ok(Self {
+            outcome: unsafe { from_native(raw.outcome) }?,
+            generation: raw.generation,
+        })
+    }
+}
+
+/// Callback state that one camera command copies to report the end of its
+/// transitions.
+///
+/// See `mln_camera_transition_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+#[derive(Clone, Default)]
+pub struct CameraTransitionHandler {
+    pub callback: Option<std::sync::Arc<dyn Fn(CameraTransitionEnd) -> () + Send + Sync + 'static>>,
+}
+impl std::fmt::Debug for CameraTransitionHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CameraTransitionHandler")
+            .finish_non_exhaustive()
+    }
+}
+impl CameraTransitionHandler {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(CameraTransitionEnd) -> () + Send + Sync + 'static,
+    {
+        self.callback = Some(std::sync::Arc::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: Fn(CameraTransitionEnd) -> () + Send + Sync + 'static,
+    {
+        Self::default().with_callback(callback)
+    }
+    unsafe extern "C" fn callback_trampoline(
+        user_data: *mut std::ffi::c_void,
+        end: *const sys::mln_camera_transition_end,
+    ) {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
+        let state = unsafe { callback::state::<Self>(user_data) };
+        callback::invoke("mln_camera_transition_end_callback", None, (), || {
+            callback::require(&state.callback)?(unsafe { convert::copy_reference(end) }?);
+            Ok(())
+        })
+    }
+}
+impl ToNative<sys::mln_camera_transition_handler> for CameraTransitionHandler {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_camera_transition_handler> {
+        let mut raw: sys::mln_camera_transition_handler = unsafe { std::mem::zeroed() };
+        raw.callback = self
+            .callback
+            .as_ref()
+            .map(|_| Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            // SAFETY: the release reclaims exactly this state.
+            raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
+            raw.release_user_data = Some(callback::release::<Self>);
+        }
+        Ok(raw)
+    }
+}
+
+native_enum! {
+/// How the transitions of one camera command ended.
+///
+/// See `mln_camera_transition_outcome` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+pub enum CameraTransitionOutcome: u32 {
+    /// Every property of the command reached its target, or a later camera
+    /// write replaced it.
+    Completed = 0,
+    /// `mln_map_cancel_transitions()`, `mln_map_cancel_camera_transition()`, or
+    /// `MLN_GESTURE_PHASE_CANCEL` ended the transitions, or the command failed
+    /// before it started them.
+    Cancelled = 1,
+    /// The map closed before the transitions ended.
+    Closed = 2,
+} Unknown
+}
+
 /// One atomic absolute camera update.
 ///
 /// See `mln_camera_update` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct CameraUpdate {
     pub mode: CameraUpdateMode,
     pub camera: CameraOptions,
@@ -491,21 +603,6 @@ pub struct CameraUpdate {
 impl Default for CameraUpdate {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_camera_update_default() })
-    }
-}
-impl CameraUpdate {
-    pub const fn new(
-        mode: CameraUpdateMode,
-        camera: CameraOptions,
-        animation: AnimationOptions,
-        gesture_phase: GesturePhase,
-    ) -> Self {
-        Self {
-            mode,
-            camera,
-            animation,
-            gesture_phase,
-        }
     }
 }
 impl ToNative<sys::mln_camera_update> for CameraUpdate {
@@ -4696,39 +4793,9 @@ impl FromNative<sys::mln_runtime_event> for RuntimeEvent {
                         from_native(raw.payload.offline_region_tile_count_limit)
                     }?)
                 }
-                sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => {
-                    RuntimeEventPayload::CameraTransitionFinished(unsafe {
-                        from_native(raw.payload.camera_transition_finished)
-                    }?)
-                }
                 sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE => RuntimeEventPayload::Empty,
                 tag => RuntimeEventPayload::Unknown(tag as u32),
             },
-        })
-    }
-}
-
-/// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
-///
-/// See `mln_runtime_event_camera_transition_finished` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct RuntimeEventCameraTransitionFinished {
-    /// The transition_id the caller set on the `mln_animation_options` that
-    /// started this transition.
-    pub transition_id: u64,
-}
-impl RuntimeEventCameraTransitionFinished {
-    pub const fn new(transition_id: u64) -> Self {
-        Self { transition_id }
-    }
-}
-impl FromNative<sys::mln_runtime_event_camera_transition_finished>
-    for RuntimeEventCameraTransitionFinished
-{
-    unsafe fn from_native(raw: sys::mln_runtime_event_camera_transition_finished) -> Result<Self> {
-        Ok(Self {
-            transition_id: raw.transition_id,
         })
     }
 }
@@ -4759,16 +4826,15 @@ pub struct RuntimeEventMask: u64 {
     const MAP_RENDER_MAP_FINISHED = 65536;
     const MAP_STYLE_IMAGE_MISSING = 131072;
     const MAP_TILE_ACTION = 262144;
-    const MAP_CAMERA_TRANSITION_FINISHED = 4194304;
     const OFFLINE_REGION_STATUS_CHANGED = 524288;
     const OFFLINE_REGION_RESPONSE_ERROR = 1048576;
     const OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
     /// Selects every map-originated event type this version defines.
-    const ALL_MAP_EVENTS = 4718590;
+    const ALL_MAP_EVENTS = 524286;
     /// Selects every runtime-originated event type this version defines.
     const ALL_RUNTIME_EVENTS = 3670016;
     /// Selects every event type this version defines.
-    const ALL = 8388606;
+    const ALL = 4194302;
 }
 }
 
@@ -4862,7 +4928,6 @@ pub enum RuntimeEventPayload {
     OfflineRegionStatus(RuntimeEventOfflineRegionStatus),
     OfflineRegionResponseError(RuntimeEventOfflineRegionResponseError),
     OfflineRegionTileCountLimit(RuntimeEventOfflineRegionTileCountLimit),
-    CameraTransitionFinished(RuntimeEventCameraTransitionFinished),
     Empty,
     Unknown(u32),
 }
@@ -4885,7 +4950,6 @@ pub enum RuntimeEventPayloadType: u32 {
     OfflineRegionStatus = 5,
     OfflineRegionResponseError = 6,
     OfflineRegionTileCountLimit = 7,
-    CameraTransitionFinished = 9,
 } Unknown
 }
 
@@ -5013,7 +5077,6 @@ pub enum RuntimeEventType: u32 {
     OfflineRegionStatusChanged = 19,
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
-    MapCameraTransitionFinished = 22,
 } Unknown
 }
 

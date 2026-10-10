@@ -84,12 +84,6 @@ func (event runtimeEventForTest) withTileAction(payload RuntimeEventTileAction) 
 	})
 }
 
-func (event runtimeEventForTest) withCameraTransitionFinished(payload RuntimeEventCameraTransitionFinished) runtimeEventForTest {
-	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED, C.mln_runtime_event_camera_transition_finished{
-		transition_id: C.uint64_t(payload.TransitionId),
-	})
-}
-
 func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOfflineRegionStatus) runtimeEventForTest {
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS, C.mln_runtime_event_offline_region_status{
 		region_id: C.mln_offline_region_id(payload.RegionId),

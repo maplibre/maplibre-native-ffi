@@ -559,7 +559,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             (completion, diagnostic) =>
                 NativeMethods.mln_map_apply_camera_delta(
                     Handle,
-                    scope.Value(NativeCameraDelta(delta)),
+                    scope.Value(NativeCameraDelta(delta, scope)),
                     completion,
                     diagnostic
                 ),
@@ -992,6 +992,32 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
                     diagnostic
                 ),
             CopyCameraOptions,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Cancels the camera transitions of the commands whose animation carried
+    /// transition_id, and leaves every other transition running.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_cancel_camera_transition</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
+    public Task<CommandCompletion> CancelCameraTransitionAsync(
+        ulong transitionId,
+        CancellationToken cancellationToken = default
+    )
+    {
+        using var scope = new NativeCallScope(this, "mln_map_cancel_camera_transition");
+        return scope.Command(
+            (completion, diagnostic) =>
+                NativeMethods.mln_map_cancel_camera_transition(
+                    Handle,
+                    transitionId,
+                    completion,
+                    diagnostic
+                ),
             cancellationToken
         );
     }
@@ -3021,7 +3047,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             (completion, diagnostic) =>
                 NativeMethods.mln_map_update_camera(
                     Handle,
-                    scope.Value(NativeCameraUpdate(update)),
+                    scope.Value(NativeCameraUpdate(update, scope)),
                     completion,
                     diagnostic
                 ),

@@ -17,4 +17,5 @@ internal actual object UpcallStubs {
   actual val wakeCallback: Long = Jni.upcallStub(12)
   actual val queueLockLock: Long = Jni.upcallStub(13)
   actual val queueLockUnlock: Long = Jni.upcallStub(14)
+  actual val cameraTransitionHandlerCallback: Long = Jni.upcallStub(15)
 }

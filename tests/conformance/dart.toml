@@ -33,6 +33,7 @@
 "CB-06" = { na = "The Dart binding exposes no scoped response object: resource and header transforms are native rule tables, and a provider answers through the transferable ResourceRequestHandle of CB-05" }
 "CB-07" = "bindings/dart/test/log_test.dart::replacing the log callback releases the previous registration"
 "CB-08" = "bindings/dart/test/resource_provider_test.dart::a cancel registration on a cancelled request is refused and not rooted"
+"CB-09" = "bindings/dart/test/callback_ports_test.dart::a camera end handler root is released after the handler runs"
 "VAL-01" = "bindings/dart/test/values_test.dart::strings cross as NUL-terminated and explicit-length views"
 "VAL-02" = "bindings/dart/test/values_test.dart::presence fields keep a present zero apart from an absent one"
 "VAL-03" = "bindings/dart/test/internal_support_test.dart::a drained batch is indexed by its stride and copied field by field"

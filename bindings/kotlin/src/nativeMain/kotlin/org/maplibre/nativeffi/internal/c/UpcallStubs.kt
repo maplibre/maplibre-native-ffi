@@ -117,4 +117,9 @@ internal actual object UpcallStubs {
   actual val queueLockUnlock: Long =
     staticCFunction { userData: COpaquePointer? -> Upcalls.queueLockUnlock(userData.toLong()) }
       .toLong()
+  actual val cameraTransitionHandlerCallback: Long =
+    staticCFunction { userData: COpaquePointer?, end: CPointer<mln_camera_transition_end>? ->
+        Upcalls.cameraTransitionHandlerCallback(userData.toLong(), end.toLong())
+      }
+      .toLong()
 }

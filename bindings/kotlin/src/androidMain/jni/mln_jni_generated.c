@@ -723,6 +723,17 @@ static jint mln_map_camera_for_lat_lngs_jni(
   );
 }
 
+static jint mln_map_cancel_camera_transition_jni(
+  JNIEnv* env, jclass type, jlong map, jlong transition_id, jlong completion,
+  jlong out_diagnostic
+) {
+  return (jint)mln_map_cancel_camera_transition(
+    (mln_map)map, (uint64_t)transition_id,
+    MLN_JNI_POINTER(const mln_completion*, completion),
+    MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
+  );
+}
+
 static jint mln_map_cancel_transitions_jni(
   JNIEnv* env, jclass type, jlong map, jlong completion, jlong out_diagnostic
 ) {
@@ -2733,6 +2744,8 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_map_camera_for_lat_lng_bounds_jni},
   {"mln_map_camera_for_lat_lngs", "(JJJJJJ)I",
    (void*)mln_map_camera_for_lat_lngs_jni},
+  {"mln_map_cancel_camera_transition", "(JJJJ)I",
+   (void*)mln_map_cancel_camera_transition_jni},
   {"mln_map_cancel_transitions", "(JJJ)I",
    (void*)mln_map_cancel_transitions_jni},
   {"mln_map_create_projection", "(JJJ)I", (void*)mln_map_create_projection_jni},
@@ -3089,6 +3102,7 @@ mln_jni_upcall mln_jni_upcalls[] = {
   {"wakeCallback", "(J)V", NULL},
   {"queueLockLock", "(J)V", NULL},
   {"queueLockUnlock", "(J)V", NULL},
+  {"cameraTransitionHandlerCallback", "(JJ)V", NULL},
 };
 
 static void mln_jni_completion(
@@ -3226,6 +3240,15 @@ static void mln_jni_queueLockUnlock(void* userData) {
   mln_jni_upcall_void(&mln_jni_upcalls[14], arguments);
 }
 
+static void mln_jni_cameraTransitionHandlerCallback(
+  void* userData, const mln_camera_transition_end* end
+) {
+  jvalue arguments[] = {
+    {.j = MLN_JNI_ADDRESS(userData)}, {.j = MLN_JNI_ADDRESS(end)}
+  };
+  mln_jni_upcall_void(&mln_jni_upcalls[15], arguments);
+}
+
 void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_completion,
   (void*)mln_jni_completionRelease,
@@ -3242,6 +3265,7 @@ void* const mln_jni_upcall_stubs[] = {
   (void*)mln_jni_wakeCallback,
   (void*)mln_jni_queueLockLock,
   (void*)mln_jni_queueLockUnlock,
+  (void*)mln_jni_cameraTransitionHandlerCallback,
 };
 const size_t mln_jni_upcall_count =
   sizeof mln_jni_upcall_stubs / sizeof mln_jni_upcall_stubs[0];

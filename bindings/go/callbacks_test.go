@@ -115,6 +115,53 @@ func TestCallbackRootsFollowTheNativeRegistration(t *testing.T) {
 	}
 }
 
+// A camera command's end handler sits two records deep in its input. The map
+// roots it while the ease runs, and native runs it once and releases it when
+// its identity is cancelled. A command that native rejects roots nothing.
+func TestCameraEndHandlerIsRootedUntilItRuns(t *testing.T) {
+	f := newFixture(t)
+	ends := make(chan CameraTransitionEnd, 2)
+	zoom := 4.0
+	duration := 60000.0
+	identity := uint64(1<<64 - 1)
+	update := DefaultCameraUpdate()
+	update.Mode = CameraUpdateModeEase
+	update.Camera.Zoom = &zoom
+	update.Animation.DurationMs = &duration
+	update.Animation.TransitionId = &identity
+	update.Animation.EndHandler = CameraTransitionHandler{Callback: func(end CameraTransitionEnd) { ends <- end }}
+	awaitCommitted(t, submitted(f.m.UpdateCamera(update)))
+	if roots := rootCount(f.m.bindingOwner); roots != 1 {
+		t.Fatalf("roots while the ease runs = %d, want 1", roots)
+	}
+	awaitCommitted(t, submitted(f.m.CancelCameraTransition(identity)))
+	select {
+	case end := <-ends:
+		if end.Outcome != CameraTransitionOutcomeCancelled || end.Generation == 0 {
+			t.Fatalf("end = %+v, want a cancellation with a generation", end)
+		}
+	case <-time.After(testTimeout()):
+		t.Fatal("the end handler never ran")
+	}
+	if roots := rootCount(f.m.bindingOwner); roots != 0 {
+		t.Fatalf("roots after the end = %d, want 0", roots)
+	}
+
+	scale := -1.0
+	delta := DefaultCameraDelta()
+	delta.Scale = &scale
+	delta.Animation.EndHandler = update.Animation.EndHandler
+	if _, err := f.m.ApplyCameraDelta(delta); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("apply delta = %v, want ErrInvalidArgument", err)
+	}
+	if roots := rootCount(f.m.bindingOwner); roots != 0 {
+		t.Fatalf("roots after a rejected delta = %d, want 0", roots)
+	}
+	if len(ends) != 0 {
+		t.Fatal("the end handler ran more than once")
+	}
+}
+
 // discardProviderCycle registers a provider whose closure captures its
 // runtime, and drops every other reference to both.
 func discardProviderCycle(t *testing.T) weak.Pointer[bindingOwner] {

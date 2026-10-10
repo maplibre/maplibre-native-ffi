@@ -258,6 +258,65 @@ typedef struct mln_unit_bezier {
   double y2;
 } mln_unit_bezier MLN_BINDING("fields=ordered");
 
+/** How the transitions of one camera command ended. */
+typedef enum mln_camera_transition_outcome : uint32_t {
+  /**
+   * Every property of the command reached its target, or a later camera write
+   * replaced it.
+   */
+  MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0,
+  /**
+   * mln_map_cancel_transitions(), mln_map_cancel_camera_transition(), or
+   * MLN_GESTURE_PHASE_CANCEL ended the transitions, or the command failed
+   * before it started them.
+   */
+  MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
+  /** The map closed before the transitions ended. */
+  MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2,
+} mln_camera_transition_outcome;
+
+/**
+ * The end of one camera command's transitions, borrowed for the callback.
+ */
+typedef struct mln_camera_transition_end {
+  uint32_t size;
+  /** One of mln_camera_transition_outcome. */
+  uint32_t outcome MLN_BINDING("enum=mln_camera_transition_outcome");
+  /**
+   * Generation of the published snapshot that shows the camera where the
+   * transitions left it. The map events of the change that ended them carry
+   * this generation and are queued before the callback runs. Zero for
+   * MLN_CAMERA_TRANSITION_OUTCOME_CLOSED.
+   */
+  uint64_t generation;
+} mln_camera_transition_end;
+
+/** Receives the end of one camera command's transitions. */
+typedef void (*mln_camera_transition_end_callback)(
+  void* user_data, const mln_camera_transition_end* end
+);
+
+/**
+ * Callback state that one camera command copies to report the end of its
+ * transitions.
+ *
+ * A null callback disables the handler, and a disabled handler must not carry
+ * release_user_data. See mln_animation_options.end_handler for when the
+ * callback runs.
+ */
+typedef struct mln_camera_transition_handler {
+  mln_camera_transition_end_callback callback MLN_BINDING("nullable=true");
+  void* user_data MLN_BINDING("kind=context");
+  /**
+   * Optional. Releases user_data on the runtime worker after the callback
+   * returns. A rejected command runs neither callback, and the caller keeps
+   * user_data.
+   */
+  mln_user_data_release release_user_data;
+} mln_camera_transition_handler MLN_BINDING(
+  "kind=callback_registration;release=release_user_data"
+);
+
 /** Optional animation controls for camera transitions. */
 typedef struct mln_animation_options {
   uint32_t fields MLN_BINDING("enum=mln_animation_option_field");
@@ -280,33 +339,39 @@ typedef struct mln_animation_options {
   mln_unit_bezier easing
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_EASING");
   /**
-   * Caller-chosen identity for the transition this options struct starts.
+   * Caller-chosen identity of the command that these options animate, which
+   * mln_map_cancel_camera_transition() matches.
    *
-   * When MLN_ANIMATION_OPTION_TRANSITION_ID is set, the transition emits one
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED event carrying this value
-   * in its mln_runtime_event_camera_transition_finished payload. The C API
-   * passes the value through without interpreting it, so callers pick their own
-   * scheme, such as a monotonically increasing counter.
-   *
-   * Each command emits that event once all its properties complete or are
-   * superseded. Replacing one property leaves other properties animating.
-   * Cancelling all transitions ends every active command. The event carries no
-   * completion reason, so a host that needs to distinguish outcomes compares
-   * the resulting camera against the requested one.
-   *
-   * The event is queued on the runtime that owns the map and is drained by
-   * mln_runtime_drain_events(). It is queued immediately after that command's
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event and carries the same
-   * generation, so the published snapshot at that generation already shows
-   * the camera where the transition left it. Other commands can still be
-   * animating when these events arrive. A map reports the terminal outcome
-   * only while its event mask selects
-   * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
-   *
-   * When this field is omitted, the transition emits no such event.
+   * The C API passes the value through without interpreting it, so callers
+   * pick their own scheme, such as a monotonically increasing counter. Several
+   * commands may share one identity. A command without this field matches no
+   * identity.
    */
   uint64_t transition_id
     MLN_BINDING("mask=fields;bit=MLN_ANIMATION_OPTION_TRANSITION_ID");
+  /**
+   * Reports the end of the command's transitions. Disabled by default.
+   *
+   * For each accepted command that carries an enabled handler, the callback
+   * runs exactly once, on the runtime worker, and release_user_data runs after
+   * it. A command ends when every MapLibre transition that it started has
+   * ended, so a camera delta that pans and zooms reports once, after both. A
+   * jump, a zero-duration transition, and a command that changes no camera
+   * field end right after the command applies.
+   *
+   * The callback runs after the map events of the change that ended the
+   * transitions are queued, and never from inside a MapLibre Native call. A
+   * transition that a command ends reports before that command's completion
+   * runs. A transition that ends outside a command, as rendered frames advance
+   * it, reports from a later task on the runtime worker. A runtime barrier does
+   * not wait for the callback. When the map closes first, the callback runs
+   * with MLN_CAMERA_TRANSITION_OUTCOME_CLOSED before the release completes.
+   *
+   * The callback may call any C API that a completion callback may call,
+   * including camera commands, but must return promptly. A rejected command
+   * runs neither callback and leaves user_data with the caller.
+   */
+  mln_camera_transition_handler end_handler;
 } mln_animation_options;
 
 /** Camera transition behavior for mln_camera_update. */
@@ -371,9 +436,9 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
  * bearing change takes the shorter way around.
  *
  * fields may be zero, in which case the delta changes only the gesture phase
- * and reports any transition_id at once. gesture_phase is applied around the
- * camera write, as in mln_camera_update. The command copies this struct before
- * returning.
+ * and its animation's end handler runs at once. gesture_phase is applied around
+ * the camera write, as in mln_camera_update. The command copies this struct
+ * before returning.
  */
 typedef struct mln_camera_delta {
   uint32_t size;
@@ -1378,9 +1443,6 @@ MLN_API mln_status mln_map_get_style_url(
  * - MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FINISHED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_STILL_IMAGE_FAILED report observer completion
  *   in addition to the still-image completion.
- * - MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED carries the
- *   transition identity a caller set on an animation. Camera events report no
- *   completion reason. See mln_animation_options.transition_id.
  * - MLN_RUNTIME_EVENT_MASK_MAP_LOADING_FAILED and
  *   MLN_RUNTIME_EVENT_MASK_MAP_RENDER_ERROR carry native failure text.
  *

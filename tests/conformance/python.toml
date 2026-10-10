@@ -25,6 +25,7 @@
 "CB-06" = "bindings/python/tests/test_callbacks.py::test_a_scoped_response_refuses_use_after_its_callback_and_off_its_thread"
 "CB-07" = "bindings/python/tests/test_callbacks.py::test_replacing_the_log_callback_releases_the_previous_one"
 "CB-08" = "bindings/python/tests/test_callbacks.py::test_a_registration_reported_as_rejected_is_not_rooted"
+"CB-09" = "bindings/python/tests/test_callbacks.py::test_a_camera_end_handler_is_rooted_until_it_runs"
 "VAL-01" = "bindings/python/tests/test_values.py::test_strings_cross_as_c_strings_and_as_sized_views"
 "VAL-02" = "bindings/python/tests/test_values.py::test_absent_fields_stay_distinct_from_present_values"
 "VAL-03" = "bindings/python/tests/test_values.py::test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native"

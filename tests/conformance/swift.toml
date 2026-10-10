@@ -29,6 +29,7 @@
 "CB-06" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aTransformResponseExpiresWithItsCallback"
 "CB-07" = "bindings/swift/Tests/MaplibreNativeFFITests/GlobalStateTests.swift::replacingTheLogCallbackReleasesThePreviousOne"
 "CB-08" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aRegistrationOnACancelledRequestIsNotRooted"
+"CB-09" = "bindings/swift/Tests/MaplibreNativeFFITests/CallbackTests.swift::aCameraEndHandlerIsRootedUntilItRuns"
 "VAL-01" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::stringsCrossAsCountedViewsOrTerminatedCStrings"
 "VAL-02" = "bindings/swift/Tests/MaplibreNativeFFITests/ValueTests.swift::presenceFieldsTellAbsentFromZero"
 "VAL-03" = "bindings/swift/Tests/MaplibreNativeFFITests/EventDecodeTests.swift::unknownEventSourceAndPayloadKindsSurviveAsRawValues"

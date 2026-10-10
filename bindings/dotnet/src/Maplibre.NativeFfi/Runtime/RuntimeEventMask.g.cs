@@ -33,7 +33,6 @@ public enum RuntimeEventMask : ulong
     MapRenderMapFinished = 65536,
     MapStyleImageMissing = 131072,
     MapTileAction = 262144,
-    MapCameraTransitionFinished = 4194304,
     OfflineRegionStatusChanged = 524288,
     OfflineRegionResponseError = 1048576,
     OfflineRegionTileCountLimitExceeded = 2097152,
@@ -41,7 +40,7 @@ public enum RuntimeEventMask : ulong
     /// <summary>
     /// Selects every map-originated event type this version defines.
     /// </summary>
-    AllMapEvents = 4718590,
+    AllMapEvents = 524286,
 
     /// <summary>
     /// Selects every runtime-originated event type this version defines.
@@ -51,5 +50,5 @@ public enum RuntimeEventMask : ulong
     /// <summary>
     /// Selects every event type this version defines.
     /// </summary>
-    All = 8388606,
+    All = 4194302,
 }

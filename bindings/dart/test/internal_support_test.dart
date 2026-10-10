@@ -210,17 +210,17 @@ void main() {
         renderMap.payload_type = 2;
         renderMap.payload.render_map.mode = 1;
 
-        final transition = (events + 2 * eventSize)
+        final limit = (events + 2 * eventSize)
             .cast<raw.mln_runtime_event>()
             .ref;
-        transition.type = 22;
-        transition.source_type = 0;
-        transition.code = 0;
-        transition.payload_type =
-            raw.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
-        transition.payload.camera_transition_finished.transition_id = -1;
-        transition.message_offset = 15;
-        transition.message_size = 11;
+        limit.type = 21;
+        limit.source_type = 0;
+        limit.code = 0;
+        limit.payload_type =
+            raw.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT;
+        limit.payload.offline_region_tile_count_limit.limit = -1;
+        limit.message_offset = 15;
+        limit.message_size = 11;
 
         batch.ref.size = sizeOf<raw.mln_event_batch_view>();
         batch.ref.event_size = eventSize;
@@ -263,18 +263,17 @@ void main() {
           RenderMode.full,
         );
 
-        final transitionEvent = decoded[2];
+        final limitEvent = decoded[2];
         expect(
-          transitionEvent.type,
-          RuntimeEventType.mapCameraTransitionFinished,
+          limitEvent.type,
+          RuntimeEventType.offlineRegionTileCountLimitExceeded,
         );
-        expect(transitionEvent.sourceType, RuntimeEventSourceType.runtime);
-        expect(transitionEvent.message, 'tile-source');
+        expect(limitEvent.sourceType, RuntimeEventSourceType.runtime);
+        expect(limitEvent.message, 'tile-source');
         expect(
-          (transitionEvent.payload
-                  as RuntimeEventPayloadCameraTransitionFinished)
+          (limitEvent.payload as RuntimeEventPayloadOfflineRegionTileCountLimit)
               .value
-              .transitionId,
+              .limit,
           (BigInt.one << 64) - BigInt.one,
         );
       } finally {

@@ -82,6 +82,48 @@ def test_a_registration_is_rooted_until_native_releases_it(
     assert fetch_retired.wait(TIMEOUT)
 
 
+def test_a_camera_end_handler_is_rooted_until_it_runs(
+    map_handle: mln.MapHandle,
+) -> None:
+    # The handler sits two records deep in the command's input. Native holds
+    # it while the ease runs, and runs it once when its identity is cancelled.
+    ended = _Retiring()
+    ended_retired = ended.retired
+    update = replace(
+        mln.CameraUpdate.default(),
+        mode=mln.CameraUpdateMode.EASE,
+        camera=mln.CameraOptions(zoom=4.0),
+        animation=mln.AnimationOptions(
+            duration_ms=60000.0,
+            transition_id=3,
+            end_handler=mln.CameraTransitionHandler(ended),
+        ),
+    )
+    result(map_handle.update_camera(update))
+    del update
+    gc.collect()
+    assert not ended_retired.is_set()
+    result(map_handle.cancel_camera_transition(3))
+    assert ended.called.is_set()
+    del ended
+    assert ended_retired.wait(TIMEOUT)
+
+    # A rejected command releases the handler before the call returns.
+    rejected = _Retiring()
+    rejected_retired = rejected.retired
+    delta = replace(
+        mln.CameraDelta.default(),
+        scale=-1.0,
+        animation=mln.AnimationOptions(
+            end_handler=mln.CameraTransitionHandler(rejected)
+        ),
+    )
+    with pytest.raises(mln.InvalidArgumentError):
+        map_handle.apply_camera_delta(delta)
+    del delta, rejected
+    assert rejected_retired.is_set()
+
+
 def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
     woke = threading.Event()
     receiver: dict[str, object] = {}

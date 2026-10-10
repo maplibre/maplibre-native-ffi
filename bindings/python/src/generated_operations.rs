@@ -260,6 +260,40 @@ fn generated_copy_mln_camera_query_result(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_camera_transition_end(
+    py: Python<'_>,
+    value: &sys::mln_camera_transition_end,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("outcome", generated_value(py, value.outcome)?)?;
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+unsafe extern "C" fn generated_callback_mln_camera_transition_handler_callback(
+    user_data: *mut std::ffi::c_void,
+    end: *const sys::mln_camera_transition_end,
+) {
+    generated_invoke(
+        || (),
+        |py| {
+            let Some(callback) = (unsafe { generated_get_callback(py, user_data, 0) }) else {
+                return Ok(());
+            };
+            let _result = callback.bind(py).call1(({
+                if end.is_null() {
+                    return Err(native_error("null record pointer"));
+                }
+                {
+                    let referenced = unsafe { *end };
+                    generated_copy_mln_camera_transition_end(py, &referenced)?
+                }
+            },))?;
+            Ok(())
+        },
+    )
+}
+
 fn generated_copy_mln_camera_update(
     py: Python<'_>,
     value: &sys::mln_camera_update,
@@ -1831,26 +1865,9 @@ fn generated_copy_mln_runtime_event(
                     &(unsafe { value.payload.offline_region_tile_count_limit }),
                 )?,
             )?,
-            sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => generated_variant(
-                py,
-                "camera_transition_finished",
-                generated_copy_mln_runtime_event_camera_transition_finished(
-                    py,
-                    &(unsafe { value.payload.camera_transition_finished }),
-                )?,
-            )?,
             tag => generated_unknown_variant(py, tag)?,
         },
     )?;
-    Ok(dict.into_any().unbind())
-}
-
-fn generated_copy_mln_runtime_event_camera_transition_finished(
-    py: Python<'_>,
-    value: &sys::mln_runtime_event_camera_transition_finished,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("transition_id", generated_value(py, value.transition_id)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2715,6 +2732,8 @@ fn generated_input_mln_animation_options<'py>(
         raw.transition_id = field.extract::<u64>()?;
         raw.fields |= sys::MLN_ANIMATION_OPTION_TRANSITION_ID;
     }
+    raw.end_handler =
+        generated_input_mln_camera_transition_handler(&value.getattr("end_handler")?, storage)?;
     Ok(raw)
 }
 
@@ -2863,6 +2882,25 @@ fn generated_input_mln_camera_options<'py>(
     if let Some(field) = generated_present(value, "field_of_view")? {
         raw.field_of_view = field.extract::<f64>()?;
         raw.fields |= sys::MLN_CAMERA_OPTION_FOV;
+    }
+    Ok(raw)
+}
+
+fn generated_input_mln_camera_transition_handler<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_camera_transition_handler> {
+    let mut raw: sys::mln_camera_transition_handler = unsafe { std::mem::zeroed() };
+    let callback_enabled = !value.getattr("callback")?.is_none();
+    if callback_enabled {
+        raw.user_data =
+            storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
+        raw.release_user_data = Some(generated_release_callbacks);
+        raw.callback = if callback_enabled {
+            Some(generated_callback_mln_camera_transition_handler_callback)
+        } else {
+            None
+        };
     }
     Ok(raw)
 }
@@ -5300,11 +5338,14 @@ impl MapHandle {
         let delta = delta.unwrap_or_else(|| py.None().into_bound(py));
         let delta_value = generated_input_mln_camera_delta(&delta.clone(), storage)?;
         let handle = self.live()?;
-        unsafe {
+        let future = unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_apply_camera_delta(handle, &delta_value, completion, diagnostic)
             })
-        }
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
     }
     #[pyo3(signature = (descriptor=None, options=None))]
     fn attach_metal_borrowed_texture(
@@ -5968,6 +6009,17 @@ impl MapHandle {
                 },
                 convert,
             )
+        }
+    }
+    #[pyo3(signature = (transition_id))]
+    fn cancel_camera_transition(&self, py: Python<'_>, transition_id: u64) -> PyResult<Py<PyAny>> {
+        let mut call =
+            GeneratedCall::new(py, "mln_map_cancel_camera_transition", self.admission())?;
+        let handle = self.live()?;
+        unsafe {
+            call.command(|completion, diagnostic| {
+                sys::mln_map_cancel_camera_transition(handle, transition_id, completion, diagnostic)
+            })
         }
     }
     #[pyo3(signature = ())]
@@ -7766,11 +7818,14 @@ impl MapHandle {
         let update = update.unwrap_or_else(|| py.None().into_bound(py));
         let update_value = generated_input_mln_camera_update(&update.clone(), storage)?;
         let handle = self.live()?;
-        unsafe {
+        let future = unsafe {
             call.command(|completion, diagnostic| {
                 sys::mln_map_update_camera(handle, &update_value, completion, diagnostic)
             })
-        }
+        }?;
+        let callback_roots = call.accept_callbacks();
+        self.state().retain_callback_roots(callback_roots);
+        Ok(future)
     }
 }
 

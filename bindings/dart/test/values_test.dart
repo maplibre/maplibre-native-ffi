@@ -1,4 +1,5 @@
 // One representative per generated value shape, against the real library.
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -75,26 +76,26 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
 
-    // An identity with the high bit set comes back from native unchanged.
+    // Cancelling the largest identity ends the ease that carries it, so the
+    // identity crossed whole both times.
     final map = await fixture.openStyledMap();
+    final ended = Completer<CameraTransitionEnd>();
     await expectCommitted(
       map.updateCamera(
         CameraUpdate(
           camera: const CameraOptions(zoom: 2),
           mode: CameraUpdateMode.ease,
-          animation: AnimationOptions(durationMs: 0, transitionId: maximum),
+          animation: AnimationOptions(
+            durationMs: 60000,
+            transitionId: maximum,
+            endHandler: CameraTransitionHandler(callback: ended.complete),
+          ),
         ),
       ),
     );
-    final finished = await fixture.awaitEventType(
-      RuntimeEventType.mapCameraTransitionFinished,
-    );
-    expect(
-      (finished.payload as RuntimeEventPayloadCameraTransitionFinished)
-          .value
-          .transitionId,
-      maximum,
-    );
+    await expectCommitted(map.cancelCameraTransition(maximum));
+    final end = await within(ended.future, 'the end handler');
+    expect(end.outcome, CameraTransitionOutcome.cancelled);
   });
 
   test('an array input is copied when the call submits it', () async {

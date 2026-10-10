@@ -943,6 +943,21 @@ impl MapHandle {
         )
     }
 
+    /// Cancels the camera transitions of the commands whose animation carried
+    /// transition_id, and leaves every other transition running.
+    ///
+    /// See `mln_map_cancel_camera_transition` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn cancel_camera_transition(
+        &self,
+        transition_id: u64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_cancel_camera_transition")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_cancel_camera_transition(map, transition_id, completion, out_diagnostic)
+        })
+    }
+
     /// Cancels the camera transitions running when this command commits.
     ///
     /// See `mln_map_cancel_transitions` in the

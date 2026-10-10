@@ -290,9 +290,6 @@ static const payload_row payload_rows[] = {
    .unreachable_reason =
      "MapLibre limits only mapbox:// tile downloads, and no call sets the "
      "limit"},
-  {MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, SCENARIO_CAMERA, MAP,
-   MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
-   sizeof(mln_runtime_event_camera_transition_finished)},
 };
 
 static const size_t payload_row_count =
@@ -389,7 +386,7 @@ static void every_event_type_has_one_payload_row(void) {
 
 static void submit_camera(
   mln_map map, uint32_t mode, double zoom, uint32_t animation_fields,
-  double duration_ms, uint64_t transition_id
+  double duration_ms
 ) {
   mln_camera_update update = mln_camera_update_default();
   update.mode = mode;
@@ -397,14 +394,10 @@ static void submit_camera(
   update.camera.zoom = zoom;
   update.animation.fields = animation_fields;
   update.animation.duration_ms = duration_ms;
-  update.animation.transition_id = transition_id;
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
 }
-
-static const uint32_t with_duration_and_id =
-  MLN_ANIMATION_OPTION_DURATION | MLN_ANIMATION_OPTION_TRANSITION_ID;
 
 // Reports the index of the event of `type` from `source` after `start`, or the
 // log's count when there is none.
@@ -422,11 +415,8 @@ static size_t log_next(
   return log->count;
 }
 
-// A jump reports an immediate change and an ease an animated one. The jump
-// that cancels the running ease ends it, and that transition's finished event
-// comes immediately after the camera change that completed it, with the same
-// generation.
-static void camera_events_carry_their_change_mode_and_transition(void) {
+// A jump reports an immediate change and an ease an animated one.
+static void camera_events_carry_their_change_mode(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   const scenario_context context = {.runtime = runtime, .map = map};
@@ -434,7 +424,7 @@ static void camera_events_carry_their_change_mode_and_transition(void) {
   event_log* log = &scenario_log;
   log_reset(log);
 
-  submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 2.0, 0, 0.0, 0);
+  submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 2.0, 0, 0.0);
   log_drain(runtime, log);
   const recorded_event* jump_will =
     log_find(log, MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, map);
@@ -451,7 +441,8 @@ static void camera_events_carry_their_change_mode_and_transition(void) {
 
   const size_t ease_start = log->count;
   submit_camera(
-    map, MLN_CAMERA_UPDATE_MODE_EASE, 6.0, with_duration_and_id, 60000.0, 41
+    map, MLN_CAMERA_UPDATE_MODE_EASE, 6.0, MLN_ANIMATION_OPTION_DURATION,
+    60000.0
   );
   log_drain(runtime, log);
   const size_t ease_will =
@@ -460,101 +451,8 @@ static void camera_events_carry_their_change_mode_and_transition(void) {
   TEST_ASSERT_EQUAL_INT32(
     MLN_CAMERA_CHANGE_MODE_ANIMATED, log->events[ease_will].event.code
   );
-  TEST_ASSERT_EQUAL_size_t(
-    log->count,
-    log_next(
-      log, ease_start, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, map
-    )
-  );
-
-  const size_t cancel_start = log->count;
-  submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 8.0, 0, 0.0, 0);
-  log_drain(runtime, log);
-  const size_t finished = log_next(
-    log, cancel_start, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, map
-  );
-  TEST_ASSERT_LESS_THAN_size_t(log->count, finished);
-  TEST_ASSERT_EQUAL_UINT64(
-    41,
-    log->events[finished].event.payload.camera_transition_finished.transition_id
-  );
-  TEST_ASSERT_GREATER_THAN_size_t(cancel_start, finished);
-  const mln_runtime_event* ended = &log->events[finished - 1].event;
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, ended->type
-  );
-  TEST_ASSERT_EQUAL_UINT64(
-    ended->generation, log->events[finished].event.generation
-  );
 
   check_scenario_rows(SCENARIO_CAMERA, log, &context);
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
-typedef struct zero_duration_case {
-  const char* label;
-  uint32_t mode;
-  uint32_t animation_fields;
-} zero_duration_case;
-
-static const zero_duration_case zero_duration_cases[] = {
-  {"ease with a zero duration", MLN_CAMERA_UPDATE_MODE_EASE,
-   with_duration_and_id},
-  {"ease with no duration", MLN_CAMERA_UPDATE_MODE_EASE,
-   MLN_ANIMATION_OPTION_TRANSITION_ID},
-  {"fly with a zero duration", MLN_CAMERA_UPDATE_MODE_FLY,
-   with_duration_and_id},
-};
-
-// A transition with nothing to animate finishes within its command: one
-// finished event, immediately after an immediate camera change.
-static void zero_duration_transitions_finish_within_their_command(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map map = mln_test_create_map(runtime);
-  mln_test_drain_all(runtime);
-  event_log* log = &scenario_log;
-
-  const size_t case_count =
-    sizeof(zero_duration_cases) / sizeof(*zero_duration_cases);
-  for (size_t index = 0; index < case_count; index += 1) {
-    const zero_duration_case* row = &zero_duration_cases[index];
-    log_reset(log);
-    const uint64_t transition_id = 100 + index;
-    submit_camera(
-      map, row->mode, 3.0 + (double)index, row->animation_fields, 0.0,
-      transition_id
-    );
-    log_drain(runtime, log);
-
-    size_t finished_count = 0;
-    size_t finished = log->count;
-    for (size_t event = 0; event < log->count; event += 1) {
-      if (
-        log->events[event].event.type ==
-        MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
-      ) {
-        finished_count += 1;
-        finished = event;
-      }
-    }
-    TEST_ASSERT_EQUAL_size_t_MESSAGE(1, finished_count, row->label);
-    TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-      transition_id,
-      log->events[finished]
-        .event.payload.camera_transition_finished.transition_id,
-      row->label
-    );
-    TEST_ASSERT_GREATER_THAN_size_t_MESSAGE(0, finished, row->label);
-    const mln_runtime_event* change = &log->events[finished - 1].event;
-    TEST_ASSERT_EQUAL_UINT32_MESSAGE(
-      MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, change->type, row->label
-    );
-    TEST_ASSERT_EQUAL_INT32_MESSAGE(
-      MLN_CAMERA_CHANGE_MODE_IMMEDIATE, change->code, row->label
-    );
-  }
-
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -618,12 +516,12 @@ static void rendering_a_style_to_idle_reports_its_lifecycle(void) {
 
   submit_camera(
     map, MLN_CAMERA_UPDATE_MODE_EASE, 4.0, MLN_ANIMATION_OPTION_DURATION,
-    60000.0, 0
+    60000.0
   );
   render_until_logged(
     &fixture, runtime, log, MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING, map
   );
-  submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 4.0, 0, 0.0, 0);
+  submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 4.0, 0, 0.0);
   log_drain(runtime, log);
 
   // The map rendered fully before it went idle, and the renderer's frame count
@@ -913,7 +811,7 @@ static void a_map_created_with_an_empty_mask_queues_nothing(void) {
   MLN_TEST_AWAIT_OK(mln_map_set_style_json(
     map, mln_test_background_style_json, &completion.descriptor, NULL
   ));
-  submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 2.0, 0, 0.0, 0);
+  submit_camera(map, MLN_CAMERA_UPDATE_MODE_JUMP, 2.0, 0, 0.0);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   MLN_TEST_OK(render_still_image(&fixture, runtime, map, 0, NULL, 0));
@@ -931,8 +829,7 @@ static void a_map_created_with_an_empty_mask_queues_nothing(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(every_event_type_has_one_payload_row);
-  RUN_TEST(camera_events_carry_their_change_mode_and_transition);
-  RUN_TEST(zero_duration_transitions_finish_within_their_command);
+  RUN_TEST(camera_events_carry_their_change_mode);
   RUN_TEST(rendering_a_style_to_idle_reports_its_lifecycle);
   RUN_TEST(a_still_image_reports_that_it_finished);
   RUN_TEST(failed_loads_report_their_text);

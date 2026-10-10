@@ -66,6 +66,16 @@ void binding_mln_custom_mvt_vector_source_options_cancel_tile(
     (void*)user_data, tile_id
   );
 }
+extern void mlnGo_mln_camera_transition_handler_callback(
+  void* user_data, mln_camera_transition_end* end
+);
+void binding_mln_camera_transition_handler_callback(
+  void* user_data, const mln_camera_transition_end* end
+) {
+  mlnGo_mln_camera_transition_handler_callback(
+    (void*)user_data, (mln_camera_transition_end*)end
+  );
+}
 extern void mlnGo_mln_wake_callback(void* user_data);
 void binding_mln_wake_callback(void* user_data) {
   mlnGo_mln_wake_callback((void*)user_data);

@@ -11,7 +11,6 @@ typedef struct recorded_event {
   uint64_t source;
   uint64_t generation;
   int32_t code;
-  uint64_t transition_id;
   // The published snapshot read when the event was drained, set only when the
   // recorder reads snapshots.
   bool snapshot_read;
@@ -67,10 +66,6 @@ static void record_event(const mln_runtime_event* event) {
     .source = event->source,
     .generation = event->generation,
     .code = event->code,
-    .transition_id = event->payload_type ==
-                         MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
-                       ? event->payload.camera_transition_finished.transition_id
-                       : 0,
   };
   const uint64_t map = atomic_load(&recorder.map);
   if (
@@ -414,48 +409,6 @@ static void a_coalesced_render_update_carries_the_newest_generation(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-static void submit_ease(mln_map map, double zoom, uint64_t transition_id) {
-  mln_camera_update update = mln_camera_update_default();
-  update.mode = MLN_CAMERA_UPDATE_MODE_EASE;
-  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
-  update.camera.zoom = zoom;
-  update.animation.fields = MLN_ANIMATION_OPTION_DURATION;
-  update.animation.duration_ms = 60000.0;
-  if (transition_id != 0) {
-    update.animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID;
-    update.animation.transition_id = transition_id;
-  }
-  MLN_TEST_AWAIT_OK(
-    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
-  );
-}
-
-// A host that selects only finished transitions still receives them, from the
-// command that ended the transition and with its generation.
-static void finished_transitions_arrive_without_camera_changes(void) {
-  mln_runtime runtime = mln_test_create_runtime();
-  mln_map_options options = mln_map_options_default();
-  options.event_mask = MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED;
-  mln_map map = mln_test_create_map_with_options(runtime, &options);
-  mln_test_drain_all(runtime);
-  recorder_reset(runtime, false);
-
-  submit_ease(map, 6.0, 7);
-  const probed_result jump = run_probed(map, jump_to_zoom_three);
-  MLN_TEST_OK(jump.status);
-  assert_recorder_complete();
-  TEST_ASSERT_EQUAL_size_t(1, jump.end - jump.start);
-  const recorded_event* finished = &recorder.events[jump.start];
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, finished->type
-  );
-  TEST_ASSERT_EQUAL_UINT64(7, finished->transition_id);
-  TEST_ASSERT_EQUAL_UINT64(jump.generation, finished->generation);
-
-  mln_test_destroy_map(map);
-  mln_test_destroy_runtime(runtime);
-}
-
 // Drains on every wake, so each event is recorded with the snapshot published
 // when the map queued it.
 static void drain_on_wake(void* user_data) {
@@ -579,6 +532,5 @@ MLN_TEST_GROUP {
   RUN_TEST(a_failed_command_reports_the_generation_of_its_events);
   RUN_TEST(a_command_that_fails_a_still_image_queues_its_event_first);
   RUN_TEST(a_coalesced_render_update_carries_the_newest_generation);
-  RUN_TEST(finished_transitions_arrive_without_camera_changes);
   RUN_TEST(state_events_follow_a_snapshot_that_includes_them);
 }

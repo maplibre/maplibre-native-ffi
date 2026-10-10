@@ -29,6 +29,7 @@ internal unsafe struct mln_animation_options
     public double min_zoom;
     public mln_unit_bezier easing;
     public ulong transition_id;
+    public mln_camera_transition_handler end_handler;
 }
 
 internal unsafe struct mln_bound_options
@@ -90,6 +91,20 @@ internal unsafe struct mln_camera_query_result
 {
     public ulong generation;
     public mln_camera_options camera;
+}
+
+internal unsafe struct mln_camera_transition_end
+{
+    public uint size;
+    public uint outcome;
+    public ulong generation;
+}
+
+internal unsafe struct mln_camera_transition_handler
+{
+    public delegate* unmanaged[Cdecl]<void*, mln_camera_transition_end*, void> callback;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }
 
 internal unsafe struct mln_camera_update
@@ -783,11 +798,6 @@ internal unsafe struct mln_runtime_event
     public mln_runtime_event_payload payload;
 }
 
-internal unsafe struct mln_runtime_event_camera_transition_finished
-{
-    public ulong transition_id;
-}
-
 internal unsafe struct mln_runtime_event_offline_region_response_error
 {
     public long region_id;
@@ -826,9 +836,6 @@ internal unsafe struct mln_runtime_event_payload
 
     [FieldOffset(0)]
     public mln_runtime_event_offline_region_tile_count_limit offline_region_tile_count_limit;
-
-    [FieldOffset(0)]
-    public mln_runtime_event_camera_transition_finished camera_transition_finished;
 }
 
 internal unsafe struct mln_runtime_event_render_frame
@@ -1213,6 +1220,13 @@ internal enum mln_camera_option_field : uint
     MLN_CAMERA_OPTION_ANCHOR = 64,
     MLN_CAMERA_OPTION_ROLL = 128,
     MLN_CAMERA_OPTION_FOV = 256,
+}
+
+internal enum mln_camera_transition_outcome : uint
+{
+    MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0,
+    MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1,
+    MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2,
 }
 
 internal enum mln_camera_update_mode : uint
@@ -1620,13 +1634,12 @@ internal enum mln_runtime_event_mask : ulong
     MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536,
     MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072,
     MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144,
-    MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED = 4194304,
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288,
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576,
     MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152,
-    MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 4718590,
+    MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 524286,
     MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016,
-    MLN_RUNTIME_EVENT_MASK_ALL = 8388606,
+    MLN_RUNTIME_EVENT_MASK_ALL = 4194302,
 }
 
 internal enum mln_runtime_event_payload_type : uint
@@ -1638,7 +1651,6 @@ internal enum mln_runtime_event_payload_type : uint
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
     MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
-    MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
 }
 
 internal enum mln_runtime_event_source_type : uint
@@ -1670,7 +1682,6 @@ internal enum mln_runtime_event_type : uint
     MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
     MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
     MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
-    MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22,
 }
 
 internal enum mln_source_feature_query_option_field : uint

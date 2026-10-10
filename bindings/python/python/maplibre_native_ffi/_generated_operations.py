@@ -753,6 +753,15 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: CameraOptions._from_native(value),
         )
 
+    def cancel_camera_transition(self, transition_id: int) -> Future[CommandCompletion]:
+        """Cancels the camera transitions of the commands whose animation
+        carried transition_id, and leaves every other transition running.
+
+        See `mln_map_cancel_camera_transition` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return self._native.cancel_camera_transition(transition_id)
+
     def cancel_transitions(self) -> Future[CommandCompletion]:
         """Cancels the camera transitions running when this command commits.
 

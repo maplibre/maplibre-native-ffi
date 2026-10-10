@@ -33,6 +33,13 @@ typedef mln_adapter_deferred_call_listenerFunction =
       Pointer<Void> user_data,
       Pointer<mln_adapter_deferred_call_record> record,
     );
+typedef mln_camera_transition_end_callback =
+    Pointer<NativeFunction<mln_camera_transition_end_callbackFunction>>;
+typedef mln_camera_transition_end_callbackFunction =
+    Void Function(
+      Pointer<Void> user_data,
+      Pointer<mln_camera_transition_end> end,
+    );
 typedef mln_completion_callback =
     Pointer<NativeFunction<mln_completion_callbackFunction>>;
 typedef mln_completion_callbackFunction =
@@ -201,6 +208,7 @@ final class mln_animation_options extends Struct {
   external mln_unit_bezier easing;
   @Uint64()
   external int transition_id;
+  external mln_camera_transition_handler end_handler;
 }
 
 final class mln_bound_options extends Struct {
@@ -283,6 +291,21 @@ final class mln_camera_query_result extends Struct {
   @Uint64()
   external int generation;
   external mln_camera_options camera;
+}
+
+final class mln_camera_transition_end extends Struct {
+  @Uint32()
+  external int size;
+  @Uint32()
+  external int outcome;
+  @Uint64()
+  external int generation;
+}
+
+final class mln_camera_transition_handler extends Struct {
+  external mln_camera_transition_end_callback callback;
+  external Pointer<Void> user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_camera_update extends Struct {
@@ -1127,11 +1150,6 @@ final class mln_runtime_event extends Struct {
   external mln_runtime_event_payload payload;
 }
 
-final class mln_runtime_event_camera_transition_finished extends Struct {
-  @Uint64()
-  external int transition_id;
-}
-
 final class mln_runtime_event_offline_region_response_error extends Struct {
   @Int64()
   external int region_id;
@@ -1161,8 +1179,6 @@ final class mln_runtime_event_payload extends Union {
   offline_region_response_error;
   external mln_runtime_event_offline_region_tile_count_limit
   offline_region_tile_count_limit;
-  external mln_runtime_event_camera_transition_finished
-  camera_transition_finished;
 }
 
 final class mln_runtime_event_render_frame extends Struct {
@@ -1585,6 +1601,7 @@ const MLN_ADAPTER_COMPLETION_COPY_STYLE_TRANSITION_OPTIONS = 221419390;
 const MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT = 2875519289;
 
 // mln_adapter_dart_port_callback
+const MLN_ADAPTER_DART_PORT_CAMERA_TRANSITION_HANDLER_CALLBACK = 1068062508;
 const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE =
     3644896267;
 const MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_CANCEL_TILE =
@@ -1657,6 +1674,11 @@ const MLN_CAMERA_OPTION_PADDING = 32;
 const MLN_CAMERA_OPTION_ANCHOR = 64;
 const MLN_CAMERA_OPTION_ROLL = 128;
 const MLN_CAMERA_OPTION_FOV = 256;
+
+// mln_camera_transition_outcome
+const MLN_CAMERA_TRANSITION_OUTCOME_COMPLETED = 0;
+const MLN_CAMERA_TRANSITION_OUTCOME_CANCELLED = 1;
+const MLN_CAMERA_TRANSITION_OUTCOME_CLOSED = 2;
 
 // mln_camera_update_mode
 const MLN_CAMERA_UPDATE_MODE_JUMP = 0;
@@ -1966,13 +1988,12 @@ const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_STARTED = 32768;
 const MLN_RUNTIME_EVENT_MASK_MAP_RENDER_MAP_FINISHED = 65536;
 const MLN_RUNTIME_EVENT_MASK_MAP_STYLE_IMAGE_MISSING = 131072;
 const MLN_RUNTIME_EVENT_MASK_MAP_TILE_ACTION = 262144;
-const MLN_RUNTIME_EVENT_MASK_MAP_CAMERA_TRANSITION_FINISHED = 4194304;
 const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_STATUS_CHANGED = 524288;
 const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_RESPONSE_ERROR = 1048576;
 const MLN_RUNTIME_EVENT_MASK_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 2097152;
-const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 4718590;
+const MLN_RUNTIME_EVENT_MASK_ALL_MAP_EVENTS = 524286;
 const MLN_RUNTIME_EVENT_MASK_ALL_RUNTIME_EVENTS = 3670016;
-const MLN_RUNTIME_EVENT_MASK_ALL = 8388606;
+const MLN_RUNTIME_EVENT_MASK_ALL = 4194302;
 
 // mln_runtime_event_payload_type
 const MLN_RUNTIME_EVENT_PAYLOAD_NONE = 0;
@@ -1982,7 +2003,6 @@ const MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION = 4;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6;
 const MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7;
-const MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9;
 
 // mln_runtime_event_source_type
 const MLN_RUNTIME_EVENT_SOURCE_RUNTIME = 0;
@@ -2010,7 +2030,6 @@ const MLN_RUNTIME_EVENT_MAP_TILE_ACTION = 18;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20;
 const MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21;
-const MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 22;
 
 // mln_source_feature_query_option_field
 const MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS = 1;
@@ -3278,6 +3297,21 @@ external int mln_map_camera_for_lat_lngs(
   Pointer<mln_lat_lng> coordinates,
   int coordinate_count,
   Pointer<mln_camera_fit_options> fit_options,
+  Pointer<mln_completion> completion,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
+  Int32 Function(
+    mln_map,
+    Uint64,
+    Pointer<mln_completion>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_map_cancel_camera_transition(
+  int map,
+  int transition_id,
   Pointer<mln_completion> completion,
   Pointer<mln_diagnostic> out_diagnostic,
 );

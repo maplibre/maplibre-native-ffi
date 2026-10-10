@@ -481,6 +481,14 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_map_cancel_camera_transition(
+    map: Long,
+    transitionId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_cancel_transitions(
     map: Long,
     completion: Long,

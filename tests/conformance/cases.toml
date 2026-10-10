@@ -32,6 +32,7 @@
 "CB-06" = "A scoped response object rejects use after its callback returns and use from another thread"
 "CB-07" = "Replacing a process-global callback releases the previous registration"
 "CB-08" = "A registration whose accepted_unless output reports rejection is not rooted"
+"CB-09" = "A registration nested in a command's input record is rooted until native runs and releases it, and a command that native rejects does not root it"
 
 # Generated value shapes
 "VAL-01" = "Strings cross as NUL-terminated and as explicit-length views, and an embedded NUL is rejected where the C API needs termination"
