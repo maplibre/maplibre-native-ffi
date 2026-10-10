@@ -878,7 +878,6 @@ auto erase_tracked_submission(
     runtime->pending_submissions.erase(sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
   }
-  runtime->terminal_condition.notify_all();
   if (dispose) runtime_disposal_lane().submit(runtime->disposal_task);
 }
 
@@ -892,7 +891,6 @@ auto erase_runtime_barrier(
     runtime->pending_submissions.erase(sequence);
     dispose = mark_runtime_disposal_ready(*runtime);
   }
-  runtime->terminal_condition.notify_all();
   if (dispose) runtime_disposal_lane().submit(runtime->disposal_task);
 }
 

@@ -1333,9 +1333,10 @@ MLN_API mln_status mln_runtime_barrier(
  * The completion runs after every earlier accepted submission, including
  * released maps' teardown, has finished and the runtime's threads and
  * resources are gone. It runs on the native thread that retires runtimes,
- * which other runtimes' teardown shares, so it MUST NOT block. The invoking
- * thread touches no library state after the callback returns. A host that
- * outlives its runtimes may pass a discarding completion.
+ * which other runtimes' teardown shares, so it MUST NOT block. This runtime's
+ * retirement touches no library state after the callback returns; the thread
+ * then goes on to retire other runtimes. A host that outlives its runtimes may
+ * pass a discarding completion.
  *
  * A process may exit at any point, including while runtimes and maps are live
  * and their work is in flight. Render sessions may stay live too, once their
