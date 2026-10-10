@@ -20,7 +20,7 @@
 #define MLN_TEST_FAKE_HANDLE ((void*)(uintptr_t)1)
 
 // How many textures a call's borrowed descriptor can name.
-#define MLN_TEST_RING_TEXTURES 2
+#define MLN_TEST_RING_TEXTURES 4
 
 // One call's arguments around any backend's descriptor.
 typedef struct mln_test_target_call {
@@ -187,8 +187,9 @@ static inline void mln_test_run_attach_table(
 
 // Defines the edits every borrowed descriptor shares, for the union member
 // `member` whose entries live in the call's `textures.entries`: no textures
-// array, a zero count, and one texture named twice. Each starts from a ring of
-// one texture. MLN_TEST_BORROWED_CASES(member) names their rows.
+// array, a zero count, one texture named twice, and a ring deeper than three.
+// Each starts from a ring of one texture. MLN_TEST_BORROWED_CASES(member)
+// names their rows.
 #define MLN_TEST_BORROWED_EDITS(member, entries)                        \
   static void member##_without_textures(void* call) {                   \
     ((mln_test_target_call*)call)->descriptor.member.textures = NULL;   \
@@ -201,6 +202,14 @@ static inline void mln_test_run_attach_table(
     edited->textures.entries[1] = edited->textures.entries[0];          \
     edited->descriptor.member.textures = edited->textures.entries;      \
     edited->descriptor.member.texture_count = 2;                        \
+  }                                                                     \
+  static void member##_four_deep(void* call) {                          \
+    mln_test_target_call* edited = call;                                \
+    for (size_t index = 1; index < 4; index += 1) {                     \
+      edited->textures.entries[index] = edited->textures.entries[0];    \
+    }                                                                   \
+    edited->descriptor.member.textures = edited->textures.entries;      \
+    edited->descriptor.member.texture_count = 4;                        \
   }
 
 #define MLN_TEST_BORROWED_CASES(member)                      \
@@ -209,7 +218,9 @@ static inline void mln_test_run_attach_table(
     {"zero texture count", member##_without_texture_count,   \
      MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},   \
     {"a texture named twice", member##_with_a_texture_twice, \
-     MLN_STATUS_INVALID_ARGUMENT, "distinct textures"}
+     MLN_STATUS_INVALID_ARGUMENT, "distinct textures"},      \
+    {"a ring four textures deep", member##_four_deep,        \
+     MLN_STATUS_INVALID_ARGUMENT, "at most 3"}
 
 // For a target whose physical size follows from its extent: an extent that
 // overflows 32 bits once scaled. MLN_TEST_OVERFLOW_CASE(member) names its row.

@@ -173,8 +173,8 @@ auto validate_borrowed_textures(
     set_thread_error("textures must name at least one texture");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (count > std::numeric_limits<uint32_t>::max()) {
-    set_thread_error("texture_count is too large");
+  if (count > max_texture_ring_depth) {
+    set_thread_error("texture_count must be at most 3");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   for (size_t index = 0; index < count; ++index) {

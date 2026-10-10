@@ -566,12 +566,12 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * When a disposed frame or a failed release quarantined a slot of a
  * session-owned texture ring, the host's GPU may still read that slot's
  * texture. Detach then keeps the ring and its graphics context until the
- * process exits, and destroys the rest. A borrowed ring's textures belong to
- * the host, so its quarantined slots keep nothing. It waits for the map's
- * in-flight tile work in that case, and once detach completes the host may
+ * process exits, and destroys the rest. When it keeps a ring, detach waits for
+ * the map's in-flight tile work, and once detach completes the host may
  * destroy its graphics objects. The one exception is a kept Vulkan ring: it is
  * a child of the host's VkDevice, so the host keeps the device until the
- * process exits.
+ * process exits. A borrowed ring's textures belong to the host, so detach
+ * keeps nothing for its quarantined slots.
  *
  * Returns:
  * - MLN_STATUS_OK when the detach is accepted.

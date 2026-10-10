@@ -395,6 +395,9 @@ struct RenderSurfaceState {
   std::unique_ptr<SurfaceSessionBackend> backend = nullptr;
 };
 
+// The most slots a texture ring holds, owned or borrowed.
+inline constexpr std::size_t max_texture_ring_depth = 3;
+
 struct RenderTextureSlot {
   mln_render_frame_result result{};
   mln_gpu_sync producer_sync{

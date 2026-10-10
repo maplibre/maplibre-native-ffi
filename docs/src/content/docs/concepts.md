@@ -167,7 +167,8 @@ Vulkan host keeps its device, surface, and instance until the process exits. To
 destroy them sooner, detach or abandon the session before disposing of it, and
 follow what that call reports.
 
-Host-acquirable owned texture targets negotiate a ring of one to three slots.
+Host-acquirable owned texture targets negotiate a ring of one to three slots,
+and a borrowed texture target lends one to three textures, one per slot.
 Acquiring a frame leases one slot and returns producer-completion
 synchronization. Releasing the frame supplies consumer-completion
 synchronization when the host submitted GPU reads. The driver reuses the slot

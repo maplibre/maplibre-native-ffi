@@ -61,7 +61,7 @@ typedef struct mln_metal_borrowed_texture_descriptor {
   const mln_metal_borrowed_texture* textures
     MLN_BINDING("length=texture_count");
   /**
-   * Number of textures, which is the ring depth. Must be positive. A
+   * Number of textures, which is the ring depth, from one to three. A
    * replacement keeps the count the session attached with.
    */
   size_t texture_count;
@@ -154,8 +154,8 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
   const mln_vulkan_borrowed_texture* textures
     MLN_BINDING("length=texture_count");
   /**
-   * Number of images, which is the ring depth. Must be positive. A replacement
-   * keeps the count the session attached with.
+   * Number of images, which is the ring depth, from one to three. A
+   * replacement keeps the count the session attached with.
    */
   size_t texture_count;
   /**
@@ -166,8 +166,12 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
   /**
    * Backend-native VkImageLayout value expected at render-pass begin.
    *
-   * Use VK_IMAGE_LAYOUT_UNDEFINED when the previous image contents may be
-   * discarded. Setting it equal to final_layout, or to
+   * The session expects an image in this layout each time it renders into
+   * it: the first time, and again after the host releases a frame of its
+   * slot. A frame's image is in final_layout when the host acquires it, so
+   * the host returns it to this layout before it releases the frame.
+   * VK_IMAGE_LAYOUT_UNDEFINED accepts an image in any layout and discards its
+   * previous contents. Setting it equal to final_layout, or to
    * VK_IMAGE_LAYOUT_UNDEFINED, lets the host release a frame without a layout
    * transition.
    */
@@ -267,7 +271,7 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   const mln_opengl_borrowed_texture* textures
     MLN_BINDING("length=texture_count");
   /**
-   * Number of textures, which is the ring depth. Must be positive. A
+   * Number of textures, which is the ring depth, from one to three. A
    * replacement keeps the count the session attached with.
    */
   size_t texture_count;
@@ -326,7 +330,7 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
   const mln_webgpu_borrowed_texture* textures
     MLN_BINDING("length=texture_count");
   /**
-   * Number of textures, which is the ring depth. Must be positive. A
+   * Number of textures, which is the ring depth, from one to three. A
    * replacement keeps the count the session attached with.
    */
   size_t texture_count;
@@ -538,12 +542,12 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; textures is null, texture_count is zero, or two entries name the
- *   same texture; the textures differ in device or pixel format, or one does
- *   not match the physical size, render-target usage, or sample count; the
- *   stated extent or physical size is not positive; out_session is null or
- *   does not point to the null handle; or the requested driver kind is
- *   unknown, or options carry a malformed wake or queue lock.
+ *   null; textures is null, texture_count is zero or above three, or two
+ *   entries name the same texture; the textures differ in device or pixel
+ *   format, or one does not match the physical size, render-target usage, or
+ *   sample count; the stated extent or physical size is not positive;
+ *   out_session is null or does not point to the null handle; or the requested
+ *   driver kind is unknown, or options carry a malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or
  *   options enable a queue lock.
@@ -624,10 +628,11 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; textures is null, texture_count is zero, or two entries name the
- *   same texture; the stated extent or physical size is not positive;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a malformed wake or queue lock.
+ *   null; textures is null, texture_count is zero or above three, or two
+ *   entries name the same texture; the stated extent or physical size is not
+ *   positive; out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -716,11 +721,11 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; textures is null, texture_count is zero, or two entries name the
- *   same texture; target is not GL_TEXTURE_2D; the stated extent or physical
- *   size is not positive; out_session is null or does not point to the null
- *   handle; or the requested driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; textures is null, texture_count is zero or above three, or two
+ *   entries name the same texture; target is not GL_TEXTURE_2D; the stated
+ *   extent or physical size is not positive; out_session is null or does not
+ *   point to the null handle; or the requested driver kind is unknown, or
+ *   options carry a malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable; the requested driver is not
@@ -801,10 +806,11 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; textures is null, texture_count is zero, or two entries name the
- *   same texture; the stated extent or physical size is not positive;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a malformed wake or queue lock.
+ *   null; textures is null, texture_count is zero or above three, or two
+ *   entries name the same texture; the stated extent or physical size is not
+ *   positive; out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
@@ -842,9 +848,9 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
  *   or completion is null or undersized; a required backend handle is null;
- *   textures is null, texture_count is zero or differs from the session's ring
- *   depth, or two entries name the same texture; or the stated physical size
- *   is not positive.
+ *   textures is null, texture_count is zero, above three, or different from the
+ *   session's ring depth, or two entries name the same texture; or the stated
+ *   physical size is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
@@ -883,9 +889,9 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
  *   or completion is null or undersized; a required backend handle is null;
- *   textures is null, texture_count is zero or differs from the session's ring
- *   depth, or two entries name the same texture; or the stated physical size
- *   is not positive.
+ *   textures is null, texture_count is zero, above three, or different from the
+ *   session's ring depth, or two entries name the same texture; or the stated
+ *   physical size is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
@@ -925,9 +931,9 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
  *   or completion is null or undersized; a required backend handle is null;
- *   textures is null, texture_count is zero or differs from the session's ring
- *   depth, or two entries name the same texture; or the stated physical size
- *   is not positive.
+ *   textures is null, texture_count is zero, above three, or different from the
+ *   session's ring depth, or two entries name the same texture; or the stated
+ *   physical size is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
@@ -965,9 +971,9 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
  *   or completion is null or undersized; a required backend handle is null;
- *   textures is null, texture_count is zero or differs from the session's ring
- *   depth, or two entries name the same texture; or the stated physical size
- *   is not positive.
+ *   textures is null, texture_count is zero, above three, or different from the
+ *   session's ring depth, or two entries name the same texture; or the stated
+ *   physical size is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the

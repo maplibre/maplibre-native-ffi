@@ -65,8 +65,8 @@ consumer synchronization, and presentation are available.
 
 A borrowed texture descriptor also states its physical device-pixel size, which
 must match the host's textures, including on graphics APIs that cannot query
-them. It names one texture per ring slot, and the attach call copies that array.
-Both texture kinds hand frames over the same way: the host acquires a rendered
+them. It names one texture per ring slot, up to three, and the attach call
+copies that array. Both texture kinds hand frames over the same way: the host acquires a rendered
 frame before it samples the frame's texture and releases it afterward, and the
 session never renders into a texture whose frame is acquired. With two textures,
 the host holds the newest frame while the session renders the next one into the

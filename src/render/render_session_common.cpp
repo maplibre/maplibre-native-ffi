@@ -1514,7 +1514,10 @@ auto start_attach_render_session(
   if (kind == RenderSessionKind::Texture) {
     // A borrowed ring's depth is the texture count its descriptor validated.
     const auto depth = session->texture.mode == TextureSessionMode::Owned
-                         ? std::clamp(capabilities.texture_ring_depth, 1u, 3u)
+                         ? std::clamp(
+                             capabilities.texture_ring_depth, 1u,
+                             static_cast<uint32_t>(max_texture_ring_depth)
+                           )
                          : capabilities.texture_ring_depth;
     session->capabilities.texture_ring_depth = depth;
     session->texture.slots.resize(depth);
