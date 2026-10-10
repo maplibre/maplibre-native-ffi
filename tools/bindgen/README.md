@@ -22,9 +22,10 @@ context.
 
 `mise run bindings:check` fails when the committed output is stale or when a
 public declaration has no generated operation. The coverage report lists each
-unsupported declaration with the emitter's reason. Never edit generated files by
-hand; change the header, the compiler rule, or the runtime helper, and
-regenerate.
+unsupported declaration with the emitter's reason. Its `files` list records
+every output, so the next run deletes a listed file that the generator no longer
+writes, and a check reports it. Never edit generated files by hand; change the
+header, the compiler rule, or the runtime helper, and regenerate.
 
 Pick the execution category that describes the native operation. The schema
 checks the signature that each category requires. A function without a
