@@ -472,17 +472,41 @@ public struct ResourceProviderDecision: RawRepresentable, NativeOpenValue,
   public static let handle: ResourceProviderDecision = .init(rawValue: 1)
 }
 
-public struct ResourceRequestRange: Equatable, Hashable, Sendable {
-  public var rangeStart: UInt64
-  public var rangeEnd: UInt64
-  public init(rangeStart: UInt64, rangeEnd: UInt64) {
-    self.rangeStart = rangeStart
-    self.rangeEnd = rangeEnd
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRange: Equatable, Hashable, Sendable {
+  /// First byte offset of the requested range.
+  public var start: UInt64
+  /// Last byte offset of the requested range, inclusive.
+  public var end: UInt64
+  public static var `default`: Self {
+    Self(raw: mln_resource_range())
+  }
+
+  public init(
+    start: UInt64 = ResourceRange.default.start,
+    end: UInt64 = ResourceRange.default.end
+  ) {
+    self.start = start
+    self.end = end
+  }
+
+  init(raw: mln_resource_range) {
+    start = raw.start
+    end = raw.end
+  }
+
+  func nativeValue() -> mln_resource_range {
+    var raw = mln_resource_range()
+    raw.start = start
+    raw.end = end
+    return raw
   }
 }
 
 public struct ResourceRequest: Equatable, Hashable, Sendable {
-  public var range: ResourceRequestRange?
   /// URL entering the network layer, before tile server normalization.
   public var requestedUrl: String?
   /// URL to fetch, after resource-kind normalization against the runtime's tile
@@ -493,6 +517,7 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   public var priority: ResourcePriority
   public var usage: ResourceUsage
   public var storagePolicy: ResourceStoragePolicy
+  public var range: ResourceRange?
   public var priorModifiedUnixMs: Int64?
   public var priorExpiresUnixMs: Int64?
   public var priorEtag: String?
@@ -502,7 +527,6 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   }
 
   public init(
-    range: ResourceRequestRange? = nil,
     requestedUrl: String? = nil,
     resolvedUrl: String? = nil,
     kind: ResourceKind = .init(rawValue: 0),
@@ -510,12 +534,12 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     priority: ResourcePriority = .init(rawValue: 0),
     usage: ResourceUsage = .init(rawValue: 0),
     storagePolicy: ResourceStoragePolicy = .init(rawValue: 0),
+    range: ResourceRange? = nil,
     priorModifiedUnixMs: Int64? = nil,
     priorExpiresUnixMs: Int64? = nil,
     priorEtag: String? = nil,
     priorData: Data = Data()
   ) {
-    self.range = range
     self.requestedUrl = requestedUrl
     self.resolvedUrl = resolvedUrl
     self.kind = kind
@@ -523,6 +547,7 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     self.priority = priority
     self.usage = usage
     self.storagePolicy = storagePolicy
+    self.range = range
     self.priorModifiedUnixMs = priorModifiedUnixMs
     self.priorExpiresUnixMs = priorExpiresUnixMs
     self.priorEtag = priorEtag
@@ -533,11 +558,6 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     raw: mln_resource_request,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    range = raw.fields & MLN_RESOURCE_REQUEST_RANGE
-      .rawValue != 0 ? ResourceRequestRange(
-        rangeStart: raw.range_start,
-        rangeEnd: raw.range_end
-      ) : nil
     requestedUrl = raw.requested_url == nil ? nil : try NativeString
       .copyCString(raw.requested_url)
     resolvedUrl = raw.resolved_url == nil ? nil : try NativeString
@@ -547,6 +567,8 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     priority = ResourcePriority(rawValue: raw.priority)
     usage = ResourceUsage(rawValue: raw.usage)
     storagePolicy = ResourceStoragePolicy(rawValue: raw.storage_policy)
+    range = raw.fields & MLN_RESOURCE_REQUEST_RANGE
+      .rawValue != 0 ? ResourceRange(raw: raw.range) : nil
     priorModifiedUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED
       .rawValue != 0 ? raw.prior_modified_unix_ms : nil
     priorExpiresUnixMs = raw.fields & MLN_RESOURCE_REQUEST_PRIOR_EXPIRES
@@ -562,10 +584,6 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws -> mln_resource_request {
     var raw = mln_resource_request()
     raw.fields = 0
-    if let item = range {
-      raw.fields |= MLN_RESOURCE_REQUEST_RANGE.rawValue; raw.range_start = item
-        .rangeStart; raw.range_end = item.rangeEnd
-    }
     raw.size = UInt32(MemoryLayout<mln_resource_request>.size)
     raw.requested_url = try requestedUrl.map { try arena.cString($0) }
     raw.resolved_url = try resolvedUrl.map { try arena.cString($0) }
@@ -574,6 +592,10 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
     raw.priority = priority.rawValue
     raw.usage = usage.rawValue
     raw.storage_policy = storagePolicy.rawValue
+    if let item = range {
+      raw.fields |= MLN_RESOURCE_REQUEST_RANGE.rawValue; raw.range = item
+        .nativeValue()
+    }
     if let item = priorModifiedUnixMs {
       raw.fields |= MLN_RESOURCE_REQUEST_PRIOR_MODIFIED.rawValue; raw
         .prior_modified_unix_ms = item
@@ -602,7 +624,7 @@ public struct ResourceRequestField: OptionSet, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
-  /// The request asks for the inclusive byte range range_start to range_end.
+  /// The request asks only for the bytes in range.
   public static let range: ResourceRequestField = .init(rawValue: 1)
   /// The cached copy being revalidated carries a modification time.
   public static let priorModified: ResourceRequestField = .init(rawValue: 2)

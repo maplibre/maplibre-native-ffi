@@ -996,7 +996,7 @@ public data class ResourceRequestField(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
-    /** The request asks for the inclusive byte range range_start to range_end. */
+    /** The request asks only for the bytes in range. */
     public val RANGE: ResourceRequestField = ResourceRequestField(1u)
     /** The cached copy being revalidated carries a modification time. */
     public val PRIOR_MODIFIED: ResourceRequestField = ResourceRequestField(2u)
@@ -3481,6 +3481,19 @@ public data class OfflineRegionInfo(
   public val metadata: ByteArray = byteArrayOf(),
 )
 
+/**
+ * Inclusive byte range of a resource request.
+ *
+ * See `mln_resource_range` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceRange(
+  /** First byte offset of the requested range. */
+  public val start: ULong = 0uL,
+  /** Last byte offset of the requested range, inclusive. */
+  public val end: ULong = 0uL,
+)
+
 public data class ResourceRequest(
   /** URL entering the network layer, before tile server normalization. */
   public val requestedUrl: String? = null,
@@ -3494,7 +3507,7 @@ public data class ResourceRequest(
   public val priority: ResourcePriority = ResourcePriority(0u),
   public val usage: ResourceUsage = ResourceUsage(0u),
   public val storagePolicy: ResourceStoragePolicy = ResourceStoragePolicy(0u),
-  public val range: ResourceRequestRange? = null,
+  public val range: ResourceRange? = null,
   public val priorModifiedUnixMs: Long? = null,
   public val priorExpiresUnixMs: Long? = null,
   public val priorEtag: String? = null,
@@ -3602,11 +3615,6 @@ public data class ResourceResponse(
   public val expiresUnixMs: Long? = null,
   public val etag: String? = null,
   public val retryAfterUnixMs: Long? = null,
-)
-
-public data class ResourceRequestRange(
-  public val rangeStart: ULong = 0uL,
-  public val rangeEnd: ULong = 0uL,
 )
 
 public data class RenderSessionAttachment(

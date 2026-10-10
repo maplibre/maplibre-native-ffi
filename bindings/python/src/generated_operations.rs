@@ -1642,6 +1642,16 @@ unsafe extern "C" fn generated_callback_mln_resource_provider_callback(
     )
 }
 
+fn generated_copy_mln_resource_range(
+    py: Python<'_>,
+    value: &sys::mln_resource_range,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("start", generated_value(py, value.start)?)?;
+    dict.set_item("end", generated_value(py, value.end)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_resource_request(
     py: Python<'_>,
     value: &sys::mln_resource_request,
@@ -1663,14 +1673,7 @@ fn generated_copy_mln_resource_request(
         generated_optional(
             py,
             value.fields & sys::MLN_RESOURCE_REQUEST_RANGE != 0,
-            || {
-                Ok({
-                    let inner = PyDict::new(py);
-                    inner.set_item("start", generated_value(py, value.range_start)?)?;
-                    inner.set_item("end", generated_value(py, value.range_end)?)?;
-                    inner.into_any().unbind()
-                })
-            },
+            || generated_copy_mln_resource_range(py, &value.range),
         )?,
     )?;
     dict.set_item(

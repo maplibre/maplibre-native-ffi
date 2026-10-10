@@ -2573,6 +2573,9 @@ Pointer<raw.mln_adapter_resource_route> _writeAdapterResourceRoute(
   return result;
 }
 
+ResourceRange _readResourceRange(raw.mln_resource_range source) =>
+    ResourceRange(uint64FromNative(source.start), uint64FromNative(source.end));
+
 ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
     ResourceRequest(
       requestedUrl: source.requested_url == nullptr
@@ -2587,10 +2590,7 @@ ResourceRequest _readResourceRequest(raw.mln_resource_request source) =>
       usage: ResourceUsage.fromRawValue(source.usage),
       storagePolicy: ResourceStoragePolicy.fromRawValue(source.storage_policy),
       range: (source.fields & raw.MLN_RESOURCE_REQUEST_RANGE) != 0
-          ? (
-              rangeStart: uint64FromNative(source.range_start),
-              rangeEnd: uint64FromNative(source.range_end),
-            )
+          ? _readResourceRange(source.range)
           : null,
       priorModifiedUnixMs:
           (source.fields & raw.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0

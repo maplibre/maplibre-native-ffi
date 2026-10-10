@@ -1841,13 +1841,7 @@ internal fun readResourceRequest(source: Long): ResourceRequest =
     priority = ResourcePriority(readU32(source + w(24, 32))),
     usage = ResourceUsage(readU32(source + w(28, 36))),
     storagePolicy = ResourceStoragePolicy(readU32(source + w(32, 40))),
-    range =
-      if ((readU32(source + 4) and 1u) != 0u)
-        ResourceRequestRange(
-          rangeStart = readU64(source + w(40, 48)),
-          rangeEnd = readU64(source + w(48, 56)),
-        )
-      else null,
+    range = if ((readU32(source + 4) and 1u) != 0u) readResourceRange(source + w(40, 48)) else null,
     priorModifiedUnixMs =
       if ((readU32(source + 4) and 2u) != 0u) readI64(source + w(56, 64)) else null,
     priorExpiresUnixMs =
@@ -2086,6 +2080,9 @@ internal fun NativeArena.putWebglContextDescriptor(target: Long, value: WebglCon
 
 internal fun NativeArena.writeWebglContextDescriptor(value: WebglContextDescriptor): Long =
   allocate(w(20, 32), w(4, 8)).also { putWebglContextDescriptor(it, value) }
+
+internal fun readResourceRange(source: Long): ResourceRange =
+  ResourceRange(start = readU64(source), end = readU64(source + 8))
 
 internal fun readWglContextDescriptor(source: Long): WglContextDescriptor =
   WglContextDescriptor(

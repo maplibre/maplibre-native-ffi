@@ -11,7 +11,7 @@ public sealed record ResourceRequest
     public ResourcePriority Priority { get; set; }
     public ResourceUsage Usage { get; set; }
     public ResourceStoragePolicy StoragePolicy { get; set; }
-    public ResourceRequest.RangeValue? Range { get; set; }
+    public ResourceRange? Range { get; set; }
     public long? PriorModifiedUnixMs { get; set; }
     public long? PriorExpiresUnixMs { get; set; }
     public string? PriorEtag { get; set; }
@@ -21,6 +21,4 @@ public sealed record ResourceRequest
         set => PriorDataStorage = ValueArray.Copy(value);
     }
     internal ValueArray<byte> PriorDataStorage { get; set; }
-
-    public readonly record struct RangeValue(ulong RangeStart, ulong RangeEnd);
 }

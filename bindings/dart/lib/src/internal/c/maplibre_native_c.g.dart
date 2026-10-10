@@ -1062,6 +1062,13 @@ final class mln_resource_provider extends Struct {
   external mln_runtime_callback_release release_user_data;
 }
 
+final class mln_resource_range extends Struct {
+  @Uint64()
+  external int start;
+  @Uint64()
+  external int end;
+}
+
 final class mln_resource_request extends Struct {
   @Uint32()
   external int size;
@@ -1079,10 +1086,7 @@ final class mln_resource_request extends Struct {
   external int usage;
   @Uint32()
   external int storage_policy;
-  @Uint64()
-  external int range_start;
-  @Uint64()
-  external int range_end;
+  external mln_resource_range range;
   @Int64()
   external int prior_modified_unix_ms;
   @Int64()

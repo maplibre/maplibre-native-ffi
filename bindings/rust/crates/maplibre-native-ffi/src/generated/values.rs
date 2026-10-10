@@ -4129,14 +4129,33 @@ pub enum ResourceProviderDecision: u32 {
 } Unknown
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct ResourceRequestRange {
-    pub range_start: u64,
-    pub range_end: u64,
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ResourceRange {
+    /// First byte offset of the requested range.
+    pub start: u64,
+    /// Last byte offset of the requested range, inclusive.
+    pub end: u64,
 }
+impl ResourceRange {
+    pub const fn new(start: u64, end: u64) -> Self {
+        Self { start, end }
+    }
+}
+impl FromNative<sys::mln_resource_range> for ResourceRange {
+    unsafe fn from_native(raw: sys::mln_resource_range) -> Result<Self> {
+        Ok(Self {
+            start: raw.start,
+            end: raw.end,
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ResourceRequest {
-    pub range: Option<ResourceRequestRange>,
     /// URL entering the network layer, before tile server normalization.
     pub requested_url: Option<String>,
     /// URL to fetch, after resource-kind normalization against the runtime's
@@ -4147,6 +4166,7 @@ pub struct ResourceRequest {
     pub priority: ResourcePriority,
     pub usage: ResourceUsage,
     pub storage_policy: ResourceStoragePolicy,
+    pub range: Option<ResourceRange>,
     pub prior_modified_unix_ms: Option<i64>,
     pub prior_expires_unix_ms: Option<i64>,
     pub prior_etag: Option<String>,
@@ -4155,14 +4175,6 @@ pub struct ResourceRequest {
 impl FromNative<sys::mln_resource_request> for ResourceRequest {
     unsafe fn from_native(raw: sys::mln_resource_request) -> Result<Self> {
         Ok(Self {
-            range: if raw.fields & sys::MLN_RESOURCE_REQUEST_RANGE != 0 {
-                Some(ResourceRequestRange {
-                    range_start: raw.range_start,
-                    range_end: raw.range_end,
-                })
-            } else {
-                None
-            },
             requested_url: unsafe { from_native(raw.requested_url) }?,
             resolved_url: unsafe { from_native(raw.resolved_url) }?,
             kind: unsafe { from_native(raw.kind) }?,
@@ -4170,6 +4182,9 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
             priority: unsafe { from_native(raw.priority) }?,
             usage: unsafe { from_native(raw.usage) }?,
             storage_policy: unsafe { from_native(raw.storage_policy) }?,
+            range: unsafe {
+                convert::present(raw.fields, sys::MLN_RESOURCE_REQUEST_RANGE, raw.range)
+            }?,
             prior_modified_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0)
                 .then_some(raw.prior_modified_unix_ms),
             prior_expires_unix_ms: (raw.fields & sys::MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0)
@@ -4186,7 +4201,7 @@ native_flags! {
 /// See `mln_resource_request_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub struct ResourceRequestField: u32 {
-    /// The request asks for the inclusive byte range range_start to range_end.
+    /// The request asks only for the bytes in range.
     const RANGE = 1;
     /// The cached copy being revalidated carries a modification time.
     const PRIOR_MODIFIED = 2;

@@ -3157,9 +3157,30 @@ pub const ResourceProviderDecision = enum(u32) {
     pub const toNative = marshal.EnumMethods(@This()).toNative;
 };
 
-pub const ResourceRequestRange = struct { range_start: u64, range_end: u64 };
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRange = struct {
+    /// First byte offset of the requested range.
+    start: u64 = std.mem.zeroes(u64),
+    /// Last byte offset of the requested range, inclusive.
+    end: u64 = std.mem.zeroes(u64),
+    pub fn toNative(self: ResourceRange) c.mln_resource_range {
+        var raw = std.mem.zeroes(c.mln_resource_range);
+        raw.start = self.start;
+        raw.end = self.end;
+        return raw;
+    }
+    pub fn fromNative(raw: c.mln_resource_range) ResourceRange {
+        return .{
+            .start = raw.start,
+            .end = raw.end,
+        };
+    }
+};
+
 pub const ResourceRequest = struct {
-    range: ?ResourceRequestRange = null,
     requested_url: ?[]const u8 = null,
     resolved_url: ?[]const u8 = null,
     kind: ResourceKind = std.mem.zeroes(ResourceKind),
@@ -3167,6 +3188,7 @@ pub const ResourceRequest = struct {
     priority: ResourcePriority = std.mem.zeroes(ResourcePriority),
     usage: ResourceUsage = std.mem.zeroes(ResourceUsage),
     storage_policy: ResourceStoragePolicy = std.mem.zeroes(ResourceStoragePolicy),
+    range: ?ResourceRange = null,
     prior_modified_unix_ms: ?i64 = null,
     prior_expires_unix_ms: ?i64 = null,
     prior_etag: ?[]const u8 = null,
@@ -3175,11 +3197,6 @@ pub const ResourceRequest = struct {
         _ = roots;
         var raw = std.mem.zeroes(c.mln_resource_request);
         raw.fields = 0;
-        if (self.range) |item| {
-            raw.fields |= c.MLN_RESOURCE_REQUEST_RANGE;
-            raw.range_start = item.range_start;
-            raw.range_end = item.range_end;
-        }
         raw.size = @sizeOf(c.mln_resource_request);
         raw.requested_url = if (self.requested_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
         raw.resolved_url = if (self.resolved_url) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
@@ -3188,6 +3205,7 @@ pub const ResourceRequest = struct {
         raw.priority = self.priority.toNative();
         raw.usage = self.usage.toNative();
         raw.storage_policy = self.storage_policy.toNative();
+        marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_RANGE, &raw.range, self.range);
         marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED, &raw.prior_modified_unix_ms, self.prior_modified_unix_ms);
         marshal.present(&raw.fields, c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES, &raw.prior_expires_unix_ms, self.prior_expires_unix_ms);
         raw.prior_etag = if (self.prior_etag) |array_item_0| try marshal.cString(allocator, array_item_0) else null;
@@ -3198,7 +3216,6 @@ pub const ResourceRequest = struct {
 
     pub fn fromNative(allocator: std.mem.Allocator, raw: c.mln_resource_request) status.Error!ResourceRequest {
         return .{
-            .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) .{ .range_start = raw.range_start, .range_end = raw.range_end } else null,
             .requested_url = if (raw.requested_url == null) null else try allocator.dupe(u8, std.mem.span(raw.requested_url orelse return error.NativeError)),
             .resolved_url = if (raw.resolved_url == null) null else try allocator.dupe(u8, std.mem.span(raw.resolved_url orelse return error.NativeError)),
             .kind = ResourceKind.fromNative(raw.kind),
@@ -3206,6 +3223,7 @@ pub const ResourceRequest = struct {
             .priority = ResourcePriority.fromNative(raw.priority),
             .usage = ResourceUsage.fromNative(raw.usage),
             .storage_policy = ResourceStoragePolicy.fromNative(raw.storage_policy),
+            .range = if (raw.fields & c.MLN_RESOURCE_REQUEST_RANGE != 0) ResourceRange.fromNative(raw.range) else null,
             .prior_modified_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0) raw.prior_modified_unix_ms else null,
             .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
             .prior_etag = if (raw.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(raw.prior_etag orelse return error.NativeError)),
@@ -3219,7 +3237,7 @@ pub const ResourceRequest = struct {
 /// See `mln_resource_request_field` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 pub const ResourceRequestField = struct {
-    /// The request asks for the inclusive byte range range_start to range_end.
+    /// The request asks only for the bytes in range.
     range: bool = false,
     /// The cached copy being revalidated carries a modification time.
     prior_modified: bool = false,

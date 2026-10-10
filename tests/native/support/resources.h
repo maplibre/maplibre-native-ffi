@@ -63,8 +63,7 @@ typedef struct mln_test_provider_request {
   uint32_t kind;
   uint32_t usage;
   uint32_t fields;
-  uint64_t range_start;
-  uint64_t range_end;
+  mln_resource_range range;
   int64_t prior_modified_unix_ms;
   int64_t prior_expires_unix_ms;
   bool has_prior_etag;

@@ -2770,6 +2770,22 @@ class ResourceProvider:
 
 
 @dataclass(frozen=True, slots=True)
+class ResourceRange:
+    """Inclusive byte range of a resource request.
+
+    See `mln_resource_range` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
+    start: int
+    end: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(start=raw["start"], end=raw["end"])
+
+
+@dataclass(frozen=True, slots=True)
 class ResourceRequest:
     kind: ResourceKind
     loading_method: ResourceLoadingMethod
@@ -2779,7 +2795,7 @@ class ResourceRequest:
     prior_data: bytes
     requested_url: str | None = None
     resolved_url: str | None = None
-    range: ResourceRequestRange | None = None
+    range: ResourceRange | None = None
     prior_modified_unix_ms: int | None = None
     prior_expires_unix_ms: int | None = None
     prior_etag: str | None = None
@@ -2794,22 +2810,12 @@ class ResourceRequest:
             priority=ResourcePriority(raw["priority"]),
             usage=ResourceUsage(raw["usage"]),
             storage_policy=ResourceStoragePolicy(raw["storage_policy"]),
-            range=_maybe(ResourceRequestRange._from_native, raw["range"]),
+            range=_maybe(ResourceRange._from_native, raw["range"]),
             prior_modified_unix_ms=raw["prior_modified_unix_ms"],
             prior_expires_unix_ms=raw["prior_expires_unix_ms"],
             prior_etag=raw["prior_etag"],
             prior_data=raw["prior_data"],
         )
-
-
-@dataclass(frozen=True, slots=True)
-class ResourceRequestRange:
-    start: int
-    end: int
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(start=raw["start"], end=raw["end"])
 
 
 @dataclass(frozen=True, slots=True)

@@ -1947,6 +1947,17 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static ResourceRange CopyResourceRange(mln_resource_range value) =>
+        new(value.start, value.end);
+
+    internal static mln_resource_range NativeResourceRange(ResourceRange value)
+    {
+        var native = new mln_resource_range();
+        native.start = value.Start;
+        native.end = value.End;
+        return native;
+    }
+
     internal static ResourceRequest CopyResourceRequest(mln_resource_request value) =>
         new()
         {
@@ -1962,7 +1973,7 @@ internal static unsafe class GeneratedValues
             Usage = (ResourceUsage)value.usage,
             StoragePolicy = (ResourceStoragePolicy)value.storage_policy,
             Range = value.fields.HasFlag(MLN_RESOURCE_REQUEST_RANGE)
-                ? new ResourceRequest.RangeValue(value.range_start, value.range_end)
+                ? CopyResourceRange(value.range)
                 : null,
             PriorModifiedUnixMs = value.fields.HasFlag(MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
                 ? value.prior_modified_unix_ms
@@ -1997,12 +2008,12 @@ internal static unsafe class GeneratedValues
         native.priority = (uint)value.Priority;
         native.usage = (uint)value.Usage;
         native.storage_policy = (uint)value.StoragePolicy;
-        if (value.Range is { } fieldRange)
-        {
-            native.fields |= MLN_RESOURCE_REQUEST_RANGE;
-            native.range_start = fieldRange.RangeStart;
-            native.range_end = fieldRange.RangeEnd;
-        }
+        native.fields |= Put(
+            value.Range,
+            ref native.range,
+            MLN_RESOURCE_REQUEST_RANGE,
+            NativeResourceRange
+        );
         native.fields |= Put(
             value.PriorModifiedUnixMs,
             ref native.prior_modified_unix_ms,

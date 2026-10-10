@@ -125,6 +125,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourcePriority.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProvider.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProviderDecision.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRange.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequest.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestField.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestHandle.Operations.g.cs",

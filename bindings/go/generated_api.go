@@ -814,7 +814,7 @@ const (
 type ResourceRequestField uint32
 
 const (
-	// The request asks for the inclusive byte range range_start to range_end.
+	// The request asks only for the bytes in range.
 	ResourceRequestFieldRange ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_RANGE)
 	// The cached copy being revalidated carries a modification time.
 	ResourceRequestFieldPriorModified ResourceRequestField = ResourceRequestField(C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED)
@@ -3538,6 +3538,25 @@ func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_r
 	return raw
 }
 
+// ResourceRange corresponds to mln_resource_range. Inclusive byte range of a
+// resource request.
+//
+// See mln_resource_range in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRange struct {
+	// First byte offset of the requested range.
+	Start uint64
+	// Last byte offset of the requested range, inclusive.
+	End uint64
+}
+
+func copyResourceRange(raw C.mln_resource_range) ResourceRange {
+	var result ResourceRange
+	result.Start = uint64(raw.start)
+	result.End = uint64(raw.end)
+	return result
+}
+
 type ResourceRequest struct {
 	// URL entering the network layer, before tile server normalization.
 	RequestedUrl *string
@@ -3549,7 +3568,7 @@ type ResourceRequest struct {
 	Priority            ResourcePriority
 	Usage               ResourceUsage
 	StoragePolicy       ResourceStoragePolicy
-	Range               *ResourceRequestRange
+	Range               *ResourceRange
 	PriorModifiedUnixMs *int64
 	PriorExpiresUnixMs  *int64
 	PriorEtag           *string
@@ -3577,14 +3596,7 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	result.Priority = ResourcePriority(raw.priority)
 	result.Usage = ResourceUsage(raw.usage)
 	result.StoragePolicy = ResourceStoragePolicy(raw.storage_policy)
-	result.Range = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_RANGE != 0, func() ResourceRequestRange {
-		return func() ResourceRequestRange {
-			var inner ResourceRequestRange
-			inner.Start = uint64(raw.range_start)
-			inner.End = uint64(raw.range_end)
-			return inner
-		}()
-	})
+	result.Range = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_RANGE != 0, func() ResourceRange { return copyResourceRange(raw._range) })
 	result.PriorModifiedUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_MODIFIED != 0, func() int64 { return int64(raw.prior_modified_unix_ms) })
 	result.PriorExpiresUnixMs = bindingPresent(raw.fields&C.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0, func() int64 { return int64(raw.prior_expires_unix_ms) })
 	result.PriorEtag = func() *string {
@@ -3596,11 +3608,6 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	}()
 	result.PriorData = bindingBytes(unsafe.Pointer(raw.prior_data), uint64(raw.prior_data_size))
 	return result
-}
-
-type ResourceRequestRange struct {
-	Start uint64
-	End   uint64
 }
 
 type ResourceRequestSetCancelCallbackRegistration struct{ Callback func() }

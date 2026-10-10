@@ -403,8 +403,11 @@ auto make_request_view(
       resource.storagePolicy == mln::Resource::StoragePolicy::Volatile
         ? MLN_RESOURCE_STORAGE_POLICY_VOLATILE
         : MLN_RESOURCE_STORAGE_POLICY_PERMANENT,
-    .range_start = resource.dataRange ? resource.dataRange->first : 0,
-    .range_end = resource.dataRange ? resource.dataRange->second : 0,
+    .range =
+      resource.dataRange
+        ? mln_resource_range{.start = resource.dataRange->first,
+                             .end = resource.dataRange->second}
+        : mln_resource_range{},
     .prior_modified_unix_ms =
       resource.priorModified ? to_unix_ms(*resource.priorModified) : 0,
     .prior_expires_unix_ms =

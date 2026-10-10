@@ -703,11 +703,7 @@ auto capture_mln_adapter_resource_provider_callback_arguments(
       copied_1.resolved_url = string(arena, element_1.resolved_url);
       if ((element_1.fields & MLN_RESOURCE_REQUEST_RANGE) != 0) {
       } else {
-        copied_1.range_start = {};
-      }
-      if ((element_1.fields & MLN_RESOURCE_REQUEST_RANGE) != 0) {
-      } else {
-        copied_1.range_end = {};
+        copied_1.range = {};
       }
       if ((element_1.fields & MLN_RESOURCE_REQUEST_PRIOR_MODIFIED) != 0) {
       } else {

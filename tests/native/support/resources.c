@@ -195,8 +195,7 @@ static uint32_t scripted_provider(
     record->kind = request->kind;
     record->usage = request->usage;
     record->fields = request->fields;
-    record->range_start = request->range_start;
-    record->range_end = request->range_end;
+    record->range = request->range;
     record->prior_modified_unix_ms = request->prior_modified_unix_ms;
     record->prior_expires_unix_ms = request->prior_expires_unix_ms;
     record->has_prior_etag = request->prior_etag != NULL;

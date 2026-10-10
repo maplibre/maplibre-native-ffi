@@ -697,6 +697,12 @@ internal unsafe struct mln_resource_provider
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }
 
+internal unsafe struct mln_resource_range
+{
+    public ulong start;
+    public ulong end;
+}
+
 internal unsafe struct mln_resource_request
 {
     public uint size;
@@ -708,8 +714,7 @@ internal unsafe struct mln_resource_request
     public uint priority;
     public uint usage;
     public uint storage_policy;
-    public ulong range_start;
-    public ulong range_end;
+    public mln_resource_range range;
     public long prior_modified_unix_ms;
     public long prior_expires_unix_ms;
     public sbyte* prior_etag;

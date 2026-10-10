@@ -1092,6 +1092,12 @@ pub struct mln_resource_provider {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_resource_range {
+    pub start: u64,
+    pub end: u64,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_request {
     pub size: u32,
     pub fields: u32,
@@ -1102,8 +1108,7 @@ pub struct mln_resource_request {
     pub priority: u32,
     pub usage: u32,
     pub storage_policy: u32,
-    pub range_start: u64,
-    pub range_end: u64,
+    pub range: mln_resource_range,
     pub prior_modified_unix_ms: i64,
     pub prior_expires_unix_ms: i64,
     pub prior_etag: *const std::ffi::c_char,

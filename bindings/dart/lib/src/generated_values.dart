@@ -747,7 +747,7 @@ final class ResourceProviderDecision extends _Enum {
 final class ResourceRequestField extends _Flags<ResourceRequestField> {
   const ResourceRequestField.fromRawValue(super.rawValue);
 
-  /// The request asks for the inclusive byte range range_start to range_end.
+  /// The request asks only for the bytes in range.
   static const range = ResourceRequestField.fromRawValue(1);
 
   /// The cached copy being revalidated carries a modification time.
@@ -4049,6 +4049,23 @@ final class AdapterResourceRoute extends _Value {
   List<Object?> get _members => [kind, flags, url];
 }
 
+/// Inclusive byte range of a resource request.
+///
+/// See `mln_resource_range` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRange extends _Value {
+  const ResourceRange(this.start, this.end);
+
+  /// First byte offset of the requested range.
+  final BigInt start;
+
+  /// Last byte offset of the requested range, inclusive.
+  final BigInt end;
+
+  @override
+  List<Object?> get _members => [start, end];
+}
+
 final class ResourceRequest extends _Value {
   ResourceRequest({
     this.requestedUrl,
@@ -4078,7 +4095,7 @@ final class ResourceRequest extends _Value {
   final ResourcePriority priority;
   final ResourceUsage usage;
   final ResourceStoragePolicy storagePolicy;
-  final ({BigInt rangeStart, BigInt rangeEnd})? range;
+  final ResourceRange? range;
   final int? priorModifiedUnixMs;
   final int? priorExpiresUnixMs;
   final String? priorEtag;

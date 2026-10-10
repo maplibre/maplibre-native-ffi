@@ -770,9 +770,17 @@ typedef struct mln_http_header_transform {
   "kind=callback_registration;release=release_user_data"
 );
 
+/** Inclusive byte range of a resource request. */
+typedef struct mln_resource_range {
+  /** First byte offset of the requested range. */
+  uint64_t start;
+  /** Last byte offset of the requested range, inclusive. */
+  uint64_t end;
+} mln_resource_range MLN_BINDING("fields=ordered");
+
 /** Field mask values for mln_resource_request. */
 typedef enum MLN_BINDING("kind=bitmask") mln_resource_request_field : uint32_t {
-  /** The request asks for the inclusive byte range range_start to range_end. */
+  /** The request asks only for the bytes in range. */
   MLN_RESOURCE_REQUEST_RANGE = 1U << 0U,
   /** The cached copy being revalidated carries a modification time. */
   MLN_RESOURCE_REQUEST_PRIOR_MODIFIED = 1U << 1U,
@@ -810,9 +818,8 @@ typedef struct mln_resource_request {
   uint32_t priority MLN_BINDING("enum=mln_resource_priority");
   uint32_t usage MLN_BINDING("enum=mln_resource_usage");
   uint32_t storage_policy MLN_BINDING("enum=mln_resource_storage_policy");
-  uint64_t range_start
+  mln_resource_range range
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_RANGE");
-  uint64_t range_end MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_RANGE");
   int64_t prior_modified_unix_ms
     MLN_BINDING("mask=fields;bit=MLN_RESOURCE_REQUEST_PRIOR_MODIFIED");
   int64_t prior_expires_unix_ms

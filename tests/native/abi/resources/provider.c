@@ -688,8 +688,8 @@ static void a_pmtiles_request_carries_its_byte_range(void) {
   TEST_ASSERT_NOT_NULL(archive);
   TEST_ASSERT_EQUAL_UINT32(MLN_RESOURCE_KIND_SOURCE, archive->kind);
   TEST_ASSERT_BITS_HIGH(MLN_RESOURCE_REQUEST_RANGE, archive->fields);
-  TEST_ASSERT_EQUAL_UINT64(0, archive->range_start);
-  TEST_ASSERT_GREATER_THAN_UINT64(archive->range_start, archive->range_end);
+  TEST_ASSERT_EQUAL_UINT64(0, archive->range.start);
+  TEST_ASSERT_GREATER_THAN_UINT64(archive->range.start, archive->range.end);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
   mln_test_provider_destroy(provider);

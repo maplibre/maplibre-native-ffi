@@ -12,7 +12,7 @@ namespace Maplibre.NativeFfi;
 public enum ResourceRequestField : uint
 {
     /// <summary>
-    /// The request asks for the inclusive byte range range_start to range_end.
+    /// The request asks only for the bytes in range.
     /// </summary>
     Range = 1,
 
