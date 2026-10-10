@@ -90,7 +90,7 @@ internal class NativeCall(val handle: Long, val completion: Long = 0L) : NativeA
     result: (H, Deferred<Unit>) -> R,
   ): R {
     val out = allocate(8)
-    val ready = CompletionBridge.unitChecked { completion -> check(submit(out, completion)) }
+    val ready = CompletionBridge.unit { completion -> check(submit(out, completion)) }
     val owner =
       if (callbacks == null) adopt(out, dispose, create)
       else adoptRegistered(out, dispose, create, callbacks, drop)
@@ -212,7 +212,11 @@ internal fun nativeUnit(
     CompletionBridge.unit { completion -> run(handle, completion, callbacks, body) }
   }
 
-/** Submits an ordered command, whose failure arrives as data. */
+/**
+ * Submits an ordered command. A rejected submission throws; a terminal failure arrives as data in
+ * its completion. A handler attached to the returned Deferred may run on the native thread that
+ * completes it, so it must return promptly and must not block, as a C completion callback must not.
+ */
 internal fun nativeCommand(
   owner: Any?,
   state: OwnerState?,
@@ -312,9 +316,7 @@ internal fun nativeRetire(
     CallbackAdmission.checkOperation(name)
     state.retireHandle { handle ->
       CallbackAdmission.check(handle, name)
-      CompletionBridge.unitChecked { completion ->
-        NativeCall(handle, completion).use { it.body() }
-      }
+      CompletionBridge.unit { completion -> NativeCall(handle, completion).use { it.body() } }
     }
   } finally {
     bindingKeepAlive(owner)

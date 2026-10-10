@@ -66,7 +66,7 @@ internal object CompletionBridge {
   }
 
   fun <T> submit(convert: (Long) -> T, call: (Long) -> Unit): Deferred<T> =
-    submitInternal(convert, false, false, call)
+    submitInternal(convert, false, call)
 
   /**
    * Submits a completion that produces an owned handle wrapper, handing the wrapper to
@@ -81,22 +81,17 @@ internal object CompletionBridge {
     submitInternal(
       { result -> adoptOwned(result, disposeUnadopted, convert) },
       false,
-      false,
       call,
       closeDropped,
     )
 
   fun unit(call: (Long) -> Unit): Deferred<Unit> = submit({}, call)
 
-  /** Submits and throws instead of deferring a synchronous rejection. */
-  fun unitChecked(call: (Long) -> Unit): Deferred<Unit> = submitInternal({}, true, false, call)
-
   fun command(call: (Long) -> Unit): Deferred<CommandCompletion> =
-    submitInternal(::commandCompletion, false, true, call)
+    submitInternal(::commandCompletion, true, call)
 
   private fun <T> submitInternal(
     convert: (Long) -> T,
-    rejectSynchronously: Boolean,
     acceptErrorStatus: Boolean,
     call: (Long) -> Unit,
     closeDropped: (T) -> Unit = {},
@@ -114,10 +109,10 @@ internal object CompletionBridge {
         call(completion)
       }
     } catch (failure: Throwable) {
-      // A rejected submission never hands its token to native, so nothing else releases it.
+      // A throw from [call] means native rejected the submission, which then never takes the
+      // token, so nothing else releases it. Nothing in [call] may throw once native accepted.
       release(token)
-      if (rejectSynchronously) throw failure
-      state.deferred.completeExceptionally(failure)
+      throw failure
     }
     return state.deferred
   }

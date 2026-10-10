@@ -75,10 +75,13 @@ cover behavior beyond construction, such as source-type validation and per-frame
 property updates.
 
 Map mutations are commands. A command copies its input before returning
-acceptance and later invokes one completion with its terminal disposition.
-Ordered queries and lifecycle transitions use typed completions. Bindings expose
-one-shot work through their normal future, promise, task, suspension, or
-explicit async idiom.
+acceptance and later invokes one completion with its terminal disposition. Every
+binding reports a submission that native rejects from the call itself, and a
+command's terminal failure as data in its completion. A host that submits
+commands without waiting on them attaches a completion handler to observe their
+failures. Ordered queries and lifecycle transitions use typed completions.
+Bindings expose one-shot work through their normal future, promise, task,
+suspension, or explicit async idiom.
 
 Cancelling or timing out a binding's wait ends only that wait. The native work
 continues to its terminal disposition, and its completion still runs. When the

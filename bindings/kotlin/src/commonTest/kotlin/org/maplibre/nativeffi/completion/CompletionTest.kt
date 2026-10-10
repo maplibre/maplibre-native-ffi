@@ -27,12 +27,14 @@ class CompletionTest {
   fun aSubmissionNativeRejectsLeavesNoCompletionBehind(): Unit = runSuspendTest {
     withMap {
       val before = pendingCompletionsForTesting()
-      // Native rejects the unknown state before it takes the completion, so the bridge frees its
-      // state and fails the Deferred with the rejection.
-      val rejected = runtime.offlineRegionSetDownloadState(1, OfflineRegionDownloadState(900u))
-      assertEquals(before, pendingCompletionsForTesting())
-      val failure = assertFailsWith<InvalidArgumentException> { rejected.await() }
+      // Native rejects the unknown state before it takes the completion, so the call itself throws
+      // the rejection and the bridge frees its state without returning a Deferred.
+      val failure =
+        assertFailsWith<InvalidArgumentException> {
+          runtime.offlineRegionSetDownloadState(1, OfflineRegionDownloadState(900u))
+        }
       assertTrue(failure.diagnostic.isNotEmpty(), "the rejection carries its diagnostic")
+      assertEquals(before, pendingCompletionsForTesting())
     }
   }
 

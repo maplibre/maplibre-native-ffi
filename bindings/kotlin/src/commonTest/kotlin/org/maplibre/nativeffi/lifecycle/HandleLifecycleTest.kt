@@ -48,8 +48,9 @@ class HandleLifecycleTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
     val map = runtime.mapCreate(smallMapOptions()).awaitWithin("the map")
 
-    // Native refuses to release a runtime with a live map, and the handle rolls back to live.
-    assertFailsWith<InvalidStateException> { runtime.release().await() }
+    // Native refuses to release a runtime with a live map, so the call throws and the handle rolls
+    // back to live.
+    assertFailsWith<InvalidStateException> { runtime.release() }
     assertFalse(runtime.isClosed)
     runtime.barrier().awaitWithin("a barrier on the refused runtime")
 
