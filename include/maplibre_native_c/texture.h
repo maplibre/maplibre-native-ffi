@@ -41,7 +41,7 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * 256. */
   uint32_t physical_height MLN_BINDING("default=256");
   /**
-   * Borrowed id<MTLTexture> / MTL::Texture*. Required.
+   * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
    *
    * The texture's pixel dimensions must equal physical_width and
    * physical_height, the texture must allow render-target usage, and it must be
@@ -66,9 +66,9 @@ typedef struct mln_metal_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
-  /** Borrowed id<MTLTexture> / MTL::Texture*. Valid until frame release. */
+  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release. */
   void* texture;
-  /** Borrowed id<MTLDevice> / MTL::Device*. Valid until frame release. */
+  /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
   void* device;
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
   uint64_t pixel_format;

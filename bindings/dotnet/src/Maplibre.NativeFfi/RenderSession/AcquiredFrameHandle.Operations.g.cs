@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// A rendered frame that a render session lends until its release.
+/// </summary>
+/// <remarks>
+/// See <c>mln_acquired_frame</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwner<MlnAcquiredFrame>
 {
     private readonly NativeHandleState<MlnAcquiredFrame> state;

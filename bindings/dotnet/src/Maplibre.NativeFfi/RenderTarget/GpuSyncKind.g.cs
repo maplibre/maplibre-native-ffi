@@ -16,7 +16,8 @@ public enum GpuSyncKind : uint
     CpuComplete = 0,
 
     /// <summary>
-    /// id&lt;MTLSharedEvent&gt; plus a monotonically increasing signal value.
+    /// <c>id&lt;MTLSharedEvent&gt;</c> plus a monotonically increasing signal
+    /// value.
     /// </summary>
     MetalSharedEvent = 1,
 

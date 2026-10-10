@@ -9,6 +9,9 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_runtime_event_offline_region_response_error</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Reason">
+/// One of <c>mln_resource_error_reason</c>.
+/// </param>
 public readonly partial record struct RuntimeEventOfflineRegionResponseError(
     long RegionId,
     ResourceErrorReason Reason

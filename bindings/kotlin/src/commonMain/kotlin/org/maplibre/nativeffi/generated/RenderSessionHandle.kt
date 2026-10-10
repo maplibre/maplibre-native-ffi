@@ -3,6 +3,12 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.lifecycle.*
 
+/**
+ * A render session, which renders one map to one render target.
+ *
+ * See `mln_render_session` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public class RenderSessionHandle
 internal constructor(
   handle: Long,

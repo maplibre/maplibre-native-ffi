@@ -3,6 +3,11 @@ use super::*;
 
 native_owner! {
     /// Owns one `mln_acquired_frame` native handle.
+    ///
+    /// A rendered frame that a render session lends until its release.
+    ///
+    /// See `mln_acquired_frame` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     #[must_use = "`AcquiredFrameHandle` must be released with `AcquiredFrameHandle::release`"]
     pub struct AcquiredFrameHandle(mln_acquired_frame) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_acquired_frame_dispose(raw, out_diagnostic) });
 }

@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// A resource request that a resource provider handles.
+/// </summary>
+/// <remarks>
+/// See <c>mln_resource_request_handle</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class ResourceRequestHandle
     : IDisposable,
         INativeOwner<MlnResourceRequest>

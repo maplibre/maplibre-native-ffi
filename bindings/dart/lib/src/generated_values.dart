@@ -283,7 +283,7 @@ final class GpuSyncKind extends _Enum {
   /// The producer or consumer has completed before the API call returns.
   static const cpuComplete = GpuSyncKind.fromRawValue(0);
 
-  /// id\<MTLSharedEvent\> plus a monotonically increasing signal value.
+  /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
   static const metalSharedEvent = GpuSyncKind.fromRawValue(1);
 
   /// VkSemaphore plus a timeline value.
@@ -1146,10 +1146,10 @@ final class MetalOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
-  /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Valid until frame release.
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
   final NativePointer texture;
 
-  /// Borrowed id\<MTLDevice\> / MTL::Device\*. Valid until frame release.
+  /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
   final NativePointer device;
 
   /// Backend-native pixel format value. Metal uses MTLPixelFormat.
@@ -1246,7 +1246,7 @@ final class GpuSync extends _Value {
   final GpuSyncKind kind;
 
   /// Bit pattern of the backend object that kind names: the
-  /// id\<MTLSharedEvent\> pointer, the VkSemaphore handle, the GLsync pointer,
+  /// `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync pointer,
   /// or the WebGPU token.
   final BigInt object;
   final BigInt value;
@@ -3018,7 +3018,7 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   /// 256.
   final int physicalHeight;
 
-  /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Required.
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
   final NativePointer texture;
 
   @override
@@ -3088,7 +3088,7 @@ final class RenderSessionAttachOptions extends _Value {
 final class MetalContextDescriptor extends _Value {
   const MetalContextDescriptor({this.device = NativePointer.nullPointer});
 
-  /// id\<MTLDevice\> / MTL::Device\*. Retained when the target requires it.
+  /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
   final NativePointer device;
 
   @override
@@ -3132,7 +3132,7 @@ final class MetalSurfaceDescriptor extends _Value {
   /// Metal backend context. device is optional for Metal surfaces.
   final MetalContextDescriptor context;
 
-  /// CAMetalLayer\* / CA::MetalLayer\* retained by the session. Required.
+  /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
   final NativePointer layer;
 
   @override

@@ -3,6 +3,11 @@ use super::*;
 
 native_owner! {
     /// Owns one `mln_render_session` native handle.
+    ///
+    /// A render session, which renders one map to one render target.
+    ///
+    /// See `mln_render_session` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct RenderSessionHandle(mln_render_session) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_render_session_dispose(raw, out_diagnostic) });
 }
 

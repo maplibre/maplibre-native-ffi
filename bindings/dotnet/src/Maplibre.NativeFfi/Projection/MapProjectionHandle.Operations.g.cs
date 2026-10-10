@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// A standalone projection of a map's transform state at its creation.
+/// </summary>
+/// <remarks>
+/// See <c>mln_map_projection</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwner<MlnMapProjection>
 {
     private readonly NativeHandleState<MlnMapProjection> state;

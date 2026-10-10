@@ -9,6 +9,12 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_vulkan_owned_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Extent">
+/// Logical texture extent.
+/// </param>
+/// <param name="Context">
+/// Borrowed Vulkan context. All handles are required.
+/// </param>
 public readonly partial record struct VulkanOwnedTextureDescriptor(
     RenderTargetExtent Extent,
     VulkanContextDescriptor Context

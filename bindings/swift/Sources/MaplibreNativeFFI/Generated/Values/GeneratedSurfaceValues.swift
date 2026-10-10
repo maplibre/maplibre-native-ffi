@@ -12,7 +12,7 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   public var extent: RenderTargetExtent
   /// Metal backend context. device is optional for Metal surfaces.
   public var context: MetalContextDescriptor
-  /// CAMetalLayer\* / CA::MetalLayer\* retained by the session. Required.
+  /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
   public var layer: NativePointer
   public static var `default`: Self {
     Self(raw: mln_metal_surface_descriptor_default())

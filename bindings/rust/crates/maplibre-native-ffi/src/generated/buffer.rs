@@ -3,6 +3,11 @@ use super::*;
 
 native_owner! {
     /// Owns one `mln_buffer` native handle.
+    ///
+    /// An owned buffer of bytes.
+    ///
+    /// See `mln_buffer` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct BufferHandle(mln_buffer) dispose |raw| { unsafe { sys::mln_buffer_destroy(raw) }; Ok(()) };
 }
 

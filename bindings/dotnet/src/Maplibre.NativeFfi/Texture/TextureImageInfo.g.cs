@@ -9,6 +9,18 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_texture_image_info</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Width">
+/// Physical image width in device pixels.
+/// </param>
+/// <param name="Height">
+/// Physical image height in device pixels.
+/// </param>
+/// <param name="Stride">
+/// Bytes per image row.
+/// </param>
+/// <param name="ByteLength">
+/// Required output buffer byte length.
+/// </param>
 public readonly partial record struct TextureImageInfo(
     uint Width,
     uint Height,

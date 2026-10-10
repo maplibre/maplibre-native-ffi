@@ -1349,7 +1349,7 @@ pub struct GpuSync {
     /// One `mln_gpu_sync_kind` value.
     pub kind: GpuSyncKind,
     /// Bit pattern of the backend object that kind names: the
-    /// id\<MTLSharedEvent\> pointer, the VkSemaphore handle, the GLsync
+    /// `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync
     /// pointer, or the WebGPU token.
     pub object: u64,
     pub value: u64,
@@ -1396,7 +1396,7 @@ native_enum! {
 pub enum GpuSyncKind: u32 {
     /// The producer or consumer has completed before the API call returns.
     CpuComplete = 0,
-    /// id\<MTLSharedEvent\> plus a monotonically increasing signal value.
+    /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
     MetalSharedEvent = 1,
     /// VkSemaphore plus a timeline value.
     VulkanTimelineSemaphore = 2,
@@ -2148,7 +2148,7 @@ pub struct MetalBorrowedTextureDescriptor {
     /// Physical texture height in device pixels. Must be positive. Defaults to
     /// 256.
     pub physical_height: u32,
-    /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Required.
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
     pub texture: *mut std::ffi::c_void,
 }
 impl Default for MetalBorrowedTextureDescriptor {
@@ -2203,7 +2203,7 @@ impl FromNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTex
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct MetalContextDescriptor {
-    /// id\<MTLDevice\> / MTL::Device\*. Retained when the target requires it.
+    /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
     pub device: *mut std::ffi::c_void,
 }
 impl MetalContextDescriptor {
@@ -2281,9 +2281,9 @@ pub struct MetalOwnedTextureFrame {
     pub scale_factor: f64,
     /// Opaque frame identity used to reject stale releases.
     pub frame_id: u64,
-    /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Valid until frame release.
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
     pub texture: *mut std::ffi::c_void,
-    /// Borrowed id\<MTLDevice\> / MTL::Device\*. Valid until frame release.
+    /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
     pub device: *mut std::ffi::c_void,
     /// Backend-native pixel format value. Metal uses MTLPixelFormat.
     pub pixel_format: u64,
@@ -2336,7 +2336,7 @@ pub struct MetalSurfaceDescriptor {
     pub extent: RenderTargetExtent,
     /// Metal backend context. device is optional for Metal surfaces.
     pub context: MetalContextDescriptor,
-    /// CAMetalLayer\* / CA::MetalLayer\* retained by the session. Required.
+    /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
     pub layer: *mut std::ffi::c_void,
 }
 impl Default for MetalSurfaceDescriptor {
@@ -4012,6 +4012,10 @@ impl FromNative<sys::mln_resource_request> for ResourceRequest {
     }
 }
 
+/// A resource request that a resource provider handles.
+///
+/// See `mln_resource_request_handle` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 #[derive(Debug)]
 pub struct ResourceRequestHandle {
     state: std::sync::Arc<

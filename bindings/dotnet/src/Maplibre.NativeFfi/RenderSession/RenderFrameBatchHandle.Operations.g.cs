@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// An owned batch of frame results from one drain.
+/// </summary>
+/// <remarks>
+/// See <c>mln_render_frame_batch</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class RenderFrameBatchHandle
     : IDisposable,
         INativeOwner<MlnRenderFrameBatch>

@@ -3,6 +3,11 @@ use super::*;
 
 native_owner! {
     /// Owns one `mln_render_frame_batch` native handle.
+    ///
+    /// An owned batch of frame results from one drain.
+    ///
+    /// See `mln_render_frame_batch` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct RenderFrameBatchHandle(mln_render_frame_batch) dispose |raw| { unsafe { sys::mln_render_frame_batch_release(raw) }; Ok(()) };
 }
 

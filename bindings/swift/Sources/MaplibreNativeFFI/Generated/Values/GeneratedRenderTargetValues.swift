@@ -79,7 +79,7 @@ public struct GpuSync: Equatable, Hashable, Sendable {
   /// One `mln_gpu_sync_kind` value.
   public var kind: GpuSyncKind
   /// Bit pattern of the backend object that kind names: the
-  /// id\<MTLSharedEvent\> pointer, the VkSemaphore handle, the GLsync pointer,
+  /// `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync pointer,
   /// or the WebGPU token.
   public var object: UInt64
   public var value: UInt64
@@ -126,7 +126,7 @@ public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
 
   /// The producer or consumer has completed before the API call returns.
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
-  /// id\<MTLSharedEvent\> plus a monotonically increasing signal value.
+  /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
   public static let metalSharedEvent: GpuSyncKind = .init(rawValue: 1)
   /// VkSemaphore plus a timeline value.
   public static let vulkanTimelineSemaphore: GpuSyncKind = .init(rawValue: 2)
@@ -141,7 +141,7 @@ public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_metal_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
-  /// id\<MTLDevice\> / MTL::Device\*. Retained when the target requires it.
+  /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
   public var device: NativePointer
   public static var `default`: Self {
     Self(raw: mln_metal_context_descriptor())

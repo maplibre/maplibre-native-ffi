@@ -12,6 +12,10 @@ struct NativeAcquiredFrameHandle: NativeHandle {
   }
 }
 
+/// A rendered frame that a render session lends until its release.
+///
+/// See `mln_acquired_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class AcquiredFrameHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeAcquiredFrameHandle>
   init(adopting raw: mln_acquired_frame, parent: RenderSessionHandle) throws {
@@ -44,6 +48,10 @@ struct NativeBufferHandle: NativeHandle {
   }
 }
 
+/// An owned buffer of bytes.
+///
+/// See `mln_buffer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class BufferHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeBufferHandle>
   init(adopting raw: mln_buffer) throws {
@@ -75,6 +83,10 @@ struct NativeEventBatchHandle: NativeHandle {
   }
 }
 
+/// An owned batch of runtime events from one drain.
+///
+/// See `mln_event_batch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class EventBatchHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeEventBatchHandle>
   init(adopting raw: mln_event_batch) throws {
@@ -140,6 +152,10 @@ struct NativeMapHandle: NativeHandle {
   }
 }
 
+/// A map, which holds map state independent of any render target.
+///
+/// See `mln_map` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class MapHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeMapHandle>
   init(adopting raw: mln_map, parent: RuntimeHandle) throws {
@@ -172,6 +188,10 @@ struct NativeMapProjectionHandle: NativeHandle {
   }
 }
 
+/// A standalone projection of a map's transform state at its creation.
+///
+/// See `mln_map_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class MapProjectionHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeMapProjectionHandle>
   init(adopting raw: mln_map_projection) throws {
@@ -203,6 +223,10 @@ struct NativeRenderFrameBatchHandle: NativeHandle {
   }
 }
 
+/// An owned batch of frame results from one drain.
+///
+/// See `mln_render_frame_batch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class RenderFrameBatchHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeRenderFrameBatchHandle>
   init(adopting raw: mln_render_frame_batch) throws {
@@ -235,6 +259,10 @@ struct NativeRenderSessionHandle: NativeHandle {
   }
 }
 
+/// A render session, which renders one map to one render target.
+///
+/// See `mln_render_session` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class RenderSessionHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeRenderSessionHandle>
   init(adopting raw: mln_render_session, parent: MapHandle) throws {
@@ -267,6 +295,10 @@ struct NativeResourceRequestHandle: NativeHandle {
   }
 }
 
+/// A resource request that a resource provider handles.
+///
+/// See `mln_resource_request_handle` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class ResourceRequestHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeResourceRequestHandle>
   init(
@@ -303,7 +335,7 @@ struct NativeRuntimeHandle: NativeHandle {
   }
 }
 
-/// Handles are opaque 64-bit generational ids.
+/// A runtime: the native scheduler thread and event store for its maps.
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

@@ -3,6 +3,11 @@ use super::*;
 
 native_owner! {
     /// Owns one `mln_map` native handle.
+    ///
+    /// A map, which holds map state independent of any render target.
+    ///
+    /// See `mln_map` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
     pub struct MapHandle(mln_map) dispose |raw| maplibre_core::check(|out_diagnostic| unsafe { sys::mln_map_dispose(raw, out_diagnostic) });
 }
 

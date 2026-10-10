@@ -6,7 +6,7 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Handles are opaque 64-bit generational ids.
+/// A runtime: the native scheduler thread and event store for its maps.
 /// </summary>
 /// <remarks>
 /// See <c>mln_runtime</c> in the <see

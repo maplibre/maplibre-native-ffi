@@ -9,6 +9,25 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_runtime_event</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Type">
+/// One of <c>mln_runtime_event_type</c>.
+/// </param>
+/// <param name="SourceType">
+/// One of <c>mln_runtime_event_source_type</c>.
+/// </param>
+/// <param name="Source">
+/// Source handle selected by source_type: an <c>mln_runtime</c> or an
+/// <c>mln_map</c>. Every handle type is uint64_t, so this needs no cast.
+/// </param>
+/// <param name="Code">
+/// Secondary event detail whose meaning type selects. Depending on type it
+/// carries an <c>mln_camera_change_mode</c>, an <c>mln_status</c>, a MapLibre
+/// Native error ordinal, or 0. See <c>mln_runtime_event_type</c> for the
+/// per-type meaning.
+/// </param>
+/// <param name="Payload">
+/// Typed payload selected by payload_type.
+/// </param>
 public readonly partial record struct RuntimeEvent(
     RuntimeEventType Type,
     RuntimeEventSourceType SourceType,

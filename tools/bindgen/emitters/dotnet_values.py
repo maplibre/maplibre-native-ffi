@@ -1332,7 +1332,14 @@ class Values:
                 + "\n".join(properties)
                 + "\n}\n"
             )
-        declaration = (
+        # A positional record documents each property as a parameter, in the
+        # comment that the record's own summary begins.
+        params = "".join(
+            docs.xml_param(self.bound.doc(f"{plan.native}.{members[0].name}"), name)
+            for name, members in self.members(plan)
+            if len(members) == 1
+        )
+        declaration = params + (
             f"public readonly partial record struct {public_name(plan.native)}("
             + ", ".join(
                 f"{self.member_type(plan, name, members)} {name}"

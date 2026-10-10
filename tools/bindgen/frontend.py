@@ -37,11 +37,12 @@ CursorKind: Any = cindex.CursorKind
 TypeKind: Any = cindex.TypeKind
 
 ANNOTATION_PREFIX = "mln:"
-# Source that may separate a doc comment from the start of its declaration: an
-# annotation macro, which takes only string literals, or the `typedef` before a
-# tag.
-_DECLARATION_PREFIX = re.compile(
-    r'(?:\b[A-Z][A-Z0-9_]*\(\s*(?:"[^"]*"\s*)*\)|\btypedef)\s*$'
+# Source that may separate a doc comment from the start of its declaration,
+# spelled backward: whitespace, an annotation macro, which takes only string
+# literals, or the `typedef` before a tag. Matching the reversed source at a
+# declaration reads only as far back as its comment.
+_DECLARATION_PREFIX_REVERSED = re.compile(
+    rb'(?:\s|\)\s*(?:"[^"]*"\s*)*\([A-Z0-9_]*[A-Z]\b|fedepyt\b)*'
 )
 
 
@@ -106,7 +107,8 @@ class Extractor:
         self.include_directory = include_directory.resolve()
         self.errors: list[str] = []
         self.records: dict[str, Record] = {}
-        self.sources: dict[str, bytes] = {}
+        # Each header's source, forward and reversed.
+        self.sources: dict[str, tuple[bytes, bytes]] = {}
 
     def location(self, cursor: cindex.Cursor) -> Location:
         source = cursor.location
@@ -134,22 +136,26 @@ class Extractor:
             return ""
         name = start.file.name
         if name not in self.sources:
-            self.sources[name] = Path(name).read_bytes()
-        text = self.sources[name][: start.offset].decode().rstrip()
-        while match := _DECLARATION_PREFIX.search(text):
-            text = text[: match.start()].rstrip()
-        if text.endswith("*/"):
-            comment = text[text.rfind("/*") :]
-            if comment.startswith(("/**", "/*!")) and not comment.startswith("/**<"):
-                return comment
+            source = Path(name).read_bytes()
+            self.sources[name] = (source, source[::-1])
+        source, reversed_source = self.sources[name]
+        prefix = _DECLARATION_PREFIX_REVERSED.match(
+            reversed_source, len(source) - start.offset
+        )
+        end = len(source) - prefix.end()
+        if source.endswith(b"*/", 0, end):
+            comment = source[source.rfind(b"/*", 0, end) : end]
+            if comment.startswith((b"/**", b"/*!")) and not comment.startswith(b"/**<"):
+                return comment.decode()
             return ""
-        lines = []
-        for line in reversed(text.splitlines()):
-            if not line.lstrip().startswith(("///", "//!")) or line.lstrip().startswith(
-                "///<"
-            ):
+        lines: list[str] = []
+        while end > 0:
+            line_start = source.rfind(b"\n", 0, end) + 1
+            line = source[line_start:end].strip()
+            if not line.startswith((b"///", b"//!")) or line.startswith(b"///<"):
                 break
-            lines.append(line.strip())
+            lines.append(line.decode())
+            end = line_start - 1
         return "\n".join(reversed(lines))
 
     def owned(self, cursor: cindex.Cursor) -> bool:

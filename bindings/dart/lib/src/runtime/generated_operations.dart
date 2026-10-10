@@ -3849,6 +3849,11 @@ WebgpuSurfaceDescriptor webgpuSurfaceDescriptorDefault() {
 extension type const NativeAcquiredFrame(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_acquired_frame` handle.
+///
+/// A rendered frame that a render session lends until its release.
+///
+/// See `mln_acquired_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class AcquiredFrameHandle implements Finalizable {
   AcquiredFrameHandle._(this._parent, NativeAcquiredFrame handle)
     : _state = NativeHandleState(handle, 'AcquiredFrameHandle');
@@ -4006,6 +4011,11 @@ final class AcquiredFrameHandle implements Finalizable {
 extension type const NativeBuffer(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_buffer` handle.
+///
+/// An owned buffer of bytes.
+///
+/// See `mln_buffer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class BufferHandle implements Finalizable {
   BufferHandle._(NativeBuffer handle)
     : _state = NativeHandleState(handle, 'BufferHandle');
@@ -4042,6 +4052,11 @@ final class BufferHandle implements Finalizable {
 extension type const NativeEventBatch(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_event_batch` handle.
+///
+/// An owned batch of runtime events from one drain.
+///
+/// See `mln_event_batch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class EventBatchHandle implements Finalizable {
   EventBatchHandle._(NativeEventBatch handle)
     : _state = NativeHandleState(handle, 'EventBatchHandle');
@@ -4105,6 +4120,11 @@ final class GeojsonSourceDataHandle implements Finalizable {
 extension type const NativeMap(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_map` handle.
+///
+/// A map, which holds map state independent of any render target.
+///
+/// See `mln_map` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class MapHandle implements Finalizable, _CallbackPortOwner {
   MapHandle._(this._parent, NativeMap handle)
     : _state = NativeHandleState(handle, 'MapHandle');
@@ -6308,6 +6328,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
 extension type const NativeMapProjection(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_map_projection` handle.
+///
+/// A standalone projection of a map's transform state at its creation.
+///
+/// See `mln_map_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class MapProjectionHandle implements Finalizable {
   MapProjectionHandle._(NativeMapProjection handle)
     : _state = NativeHandleState(handle, 'MapProjectionHandle');
@@ -6475,6 +6500,11 @@ final class MapProjectionHandle implements Finalizable {
 extension type const NativeRenderFrameBatch(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_render_frame_batch` handle.
+///
+/// An owned batch of frame results from one drain.
+///
+/// See `mln_render_frame_batch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RenderFrameBatchHandle implements Finalizable {
   RenderFrameBatchHandle._(NativeRenderFrameBatch handle)
     : _state = NativeHandleState(handle, 'RenderFrameBatchHandle');
@@ -6535,6 +6565,11 @@ final class RenderFrameBatchHandle implements Finalizable {
 extension type const NativeRenderSession(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_render_session` handle.
+///
+/// A render session, which renders one map to one render target.
+///
+/// See `mln_render_session` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RenderSessionHandle implements Finalizable {
   RenderSessionHandle._(this._parent, NativeRenderSession handle)
     : _state = NativeHandleState(handle, 'RenderSessionHandle');
@@ -7015,6 +7050,11 @@ final class RenderSessionHandle implements Finalizable {
 extension type const NativeResourceRequest(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_resource_request_handle` handle.
+///
+/// A resource request that a resource provider handles.
+///
+/// See `mln_resource_request_handle` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   ResourceRequestHandle._(NativeResourceRequest handle)
     : _state = NativeHandleState(handle, 'ResourceRequestHandle');
@@ -7135,7 +7175,7 @@ extension type const NativeRuntime(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_runtime` handle.
 ///
-/// Handles are opaque 64-bit generational ids.
+/// A runtime: the native scheduler thread and event store for its maps.
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

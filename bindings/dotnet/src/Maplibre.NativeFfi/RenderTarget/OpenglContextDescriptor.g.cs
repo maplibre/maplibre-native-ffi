@@ -9,6 +9,11 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_opengl_context_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Ownership">
+/// Whether the session shares its driver thread and graphics objects with the
+/// host. A private EGL owned texture and a transferred WebGL canvas are
+/// dedicated to their core worker.
+/// </param>
 public readonly partial record struct OpenglContextDescriptor(
     OpenglContextOwnership Ownership,
     OpenglContextDescriptor.DataValue Data

@@ -4,7 +4,7 @@ package org.maplibre.nativeffi.generated
 import org.maplibre.nativeffi.internal.lifecycle.*
 
 /**
- * Handles are opaque 64-bit generational ids.
+ * A runtime: the native scheduler thread and event store for its maps.
  *
  * See `mln_runtime` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).

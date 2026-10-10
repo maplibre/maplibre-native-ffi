@@ -146,9 +146,14 @@ def _escape_kdoc(text: str) -> str:
     """Escape prose for KDoc, which reads a backslash literally.
 
     Character references keep brackets from naming links and keep `*/` from
-    closing the comment.
+    closing the comment. Dokka writes a decoded reference into its HTML
+    unescaped, so a word with an angle bracket becomes a code span instead.
     """
-    return re.sub(r"[\[\]<>*&]", lambda match: f"&#{ord(match[0])};", text)
+    return re.sub(
+        r"(?P<code>\S*[<>]\S*)|[\[\]*&]",
+        lambda match: f"`{match[0]}`" if match["code"] else f"&#{ord(match[0])};",
+        text,
+    )
 
 
 # Wrapping never breaks the text of the reference link.
@@ -197,27 +202,43 @@ def block_comment(doc: Doc | None, indent: str = "") -> str:
     return f"{indent}/**\n{body}{indent} */\n"
 
 
+def _xml_escape(text: str) -> str:
+    return html.escape(text, quote=False)
+
+
+def _xml_text(summary: str) -> str:
+    return _render(summary, _xml_escape, lambda c: f"<c>{_xml_escape(c)}</c>")
+
+
 def xml_comment(doc: Doc | None, indent: str = "") -> str:
     """A .NET XML doc comment, with the C names as `<c>` elements."""
     if doc is None:
         return ""
     width = WIDTH - len(indent) - 4
-
-    def escape(text: str) -> str:
-        return html.escape(text, quote=False)
-
-    text = _render(doc.summary, escape, lambda c: f"<c>{escape(c)}</c>")
-    lines = ["<summary>", *_wrap(text, width), "</summary>"]
+    lines = ["<summary>", *_wrap(_xml_text(doc.summary), width), "</summary>"]
     if doc.url:
         lines += [
             "<remarks>",
             *_wrap(
-                f'See <c>{escape(doc.symbol)}</c> in the <see href="{escape(doc.url)}">'
-                "C API reference</see>.",
+                f"See <c>{_xml_escape(doc.symbol)}</c> in the "
+                f'<see href="{_xml_escape(doc.url)}">C API reference</see>.',
                 width,
             ),
             "</remarks>",
         ]
+    return "".join(f"{indent}/// {line}\n" for line in lines)
+
+
+def xml_param(doc: Doc | None, name: str, indent: str = "") -> str:
+    """A .NET XML `<param>` element, which documents a positional record's
+    property."""
+    if doc is None:
+        return ""
+    lines = [
+        f'<param name="{name}">',
+        *_wrap(_xml_text(doc.summary), WIDTH - len(indent) - 4),
+        "</param>",
+    ]
     return "".join(f"{indent}/// {line}\n" for line in lines)
 
 

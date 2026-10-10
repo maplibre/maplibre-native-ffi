@@ -107,7 +107,7 @@ typedef struct mln_render_session_capabilities {
 typedef enum mln_gpu_sync_kind : uint32_t {
   /** The producer or consumer has completed before the API call returns. */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
-  /** id<MTLSharedEvent> plus a monotonically increasing signal value. */
+  /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,
   /** VkSemaphore plus a timeline value. */
   MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE = 2U,
@@ -128,7 +128,7 @@ typedef struct mln_gpu_sync {
   /** One mln_gpu_sync_kind value. */
   uint32_t kind MLN_BINDING("enum=mln_gpu_sync_kind");
   /**
-   * Bit pattern of the backend object that kind names: the id<MTLSharedEvent>
+   * Bit pattern of the backend object that kind names: the `id<MTLSharedEvent>`
    * pointer, the VkSemaphore handle, the GLsync pointer, or the WebGPU token.
    *
    * A fixed-width carrier keeps a Vulkan non-dispatchable handle intact on
@@ -145,7 +145,7 @@ MLN_API mln_gpu_sync mln_gpu_sync_default(void) MLN_NOEXCEPT;
 /** Metal backend context fields shared by Metal render targets. */
 typedef struct mln_metal_context_descriptor {
   uint32_t size;
-  /** id<MTLDevice> / MTL::Device*. Retained when the target requires it. */
+  /** `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it. */
   void* device;
 } mln_metal_context_descriptor;
 

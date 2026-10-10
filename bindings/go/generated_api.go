@@ -5501,6 +5501,11 @@ func (view WebgpuOwnedTextureFrameView) Format() (uint32, error) {
 	})
 }
 
+// AcquiredFrameHandle corresponds to mln_acquired_frame. A rendered frame that
+// a render session lends until its release.
+//
+// See mln_acquired_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type AcquiredFrameHandle struct{ *bindingOwner }
 
 func adoptAcquiredFrameHandle(raw uint64, parent any) *AcquiredFrameHandle {
@@ -5516,6 +5521,10 @@ func (handle *AcquiredFrameHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// BufferHandle corresponds to mln_buffer. An owned buffer of bytes.
+//
+// See mln_buffer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type BufferHandle struct{ *bindingOwner }
 
 func adoptBufferHandle(raw uint64, parent any) *BufferHandle {
@@ -5531,6 +5540,11 @@ func (handle *BufferHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// EventBatchHandle corresponds to mln_event_batch. An owned batch of runtime
+// events from one drain.
+//
+// See mln_event_batch in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type EventBatchHandle struct{ *bindingOwner }
 
 func adoptEventBatchHandle(raw uint64, parent any) *EventBatchHandle {
@@ -5561,6 +5575,11 @@ func (handle *GeojsonSourceDataHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// MapHandle corresponds to mln_map. A map, which holds map state independent of
+// any render target.
+//
+// See mln_map in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type MapHandle struct{ *bindingOwner }
 
 func adoptMapHandle(raw uint64, parent any) *MapHandle {
@@ -5576,6 +5595,11 @@ func (handle *MapHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// MapProjectionHandle corresponds to mln_map_projection. A standalone
+// projection of a map's transform state at its creation.
+//
+// See mln_map_projection in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type MapProjectionHandle struct{ *bindingOwner }
 
 func adoptMapProjectionHandle(raw uint64, parent any) *MapProjectionHandle {
@@ -5591,6 +5615,11 @@ func (handle *MapProjectionHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// RenderFrameBatchHandle corresponds to mln_render_frame_batch. An owned batch
+// of frame results from one drain.
+//
+// See mln_render_frame_batch in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type RenderFrameBatchHandle struct{ *bindingOwner }
 
 func adoptRenderFrameBatchHandle(raw uint64, parent any) *RenderFrameBatchHandle {
@@ -5606,6 +5635,11 @@ func (handle *RenderFrameBatchHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// RenderSessionHandle corresponds to mln_render_session. A render session,
+// which renders one map to one render target.
+//
+// See mln_render_session in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type RenderSessionHandle struct{ *bindingOwner }
 
 func adoptRenderSessionHandle(raw uint64, parent any) *RenderSessionHandle {
@@ -5621,6 +5655,11 @@ func (handle *RenderSessionHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
+// ResourceRequestHandle corresponds to mln_resource_request_handle. A resource
+// request that a resource provider handles.
+//
+// See mln_resource_request_handle in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html
 type ResourceRequestHandle struct{ *bindingOwner }
 
 func adoptResourceRequestHandle(raw uint64, parent any) *ResourceRequestHandle {
@@ -5636,8 +5675,8 @@ func (handle *ResourceRequestHandle) owner() *bindingOwner {
 	return handle.bindingOwner
 }
 
-// RuntimeHandle corresponds to mln_runtime. Handles are opaque 64-bit
-// generational ids.
+// RuntimeHandle corresponds to mln_runtime. A runtime: the native scheduler
+// thread and event store for its maps.
 //
 // See mln_runtime in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html

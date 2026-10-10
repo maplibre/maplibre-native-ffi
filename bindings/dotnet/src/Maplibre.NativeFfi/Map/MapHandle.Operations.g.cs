@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// A map, which holds map state independent of any render target.
+/// </summary>
+/// <remarks>
+/// See <c>mln_map</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, INativeOwner<MlnMap>
 {
     private readonly NativeHandleState<MlnMap> state;

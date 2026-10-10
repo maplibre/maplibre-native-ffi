@@ -3,6 +3,12 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.lifecycle.*
 
+/**
+ * A rendered frame that a render session lends until its release.
+ *
+ * See `mln_acquired_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public class AcquiredFrameHandle
 internal constructor(
   handle: Long,

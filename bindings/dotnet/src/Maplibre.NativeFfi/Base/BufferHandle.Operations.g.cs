@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// An owned buffer of bytes.
+/// </summary>
+/// <remarks>
+/// See <c>mln_buffer</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class BufferHandle : IDisposable, INativeOwner<MlnBuffer>
 {
     private readonly NativeHandleState<MlnBuffer> state;

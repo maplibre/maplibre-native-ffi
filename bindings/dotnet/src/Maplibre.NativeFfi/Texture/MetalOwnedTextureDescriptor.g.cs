@@ -9,6 +9,12 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_metal_owned_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
+/// <param name="Extent">
+/// Logical texture extent.
+/// </param>
+/// <param name="Context">
+/// Metal backend context. device is required.
+/// </param>
 public readonly partial record struct MetalOwnedTextureDescriptor(
     RenderTargetExtent Extent,
     MetalContextDescriptor Context

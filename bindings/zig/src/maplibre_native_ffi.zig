@@ -26,16 +26,28 @@ pub const BindingError = status.BindingError;
 pub const Diagnostic = diagnostics.Diagnostic;
 pub const validateAbiVersion = status.validateAbiVersion;
 
+/// A rendered frame that a render session lends until its release.
+///
+/// See `mln_acquired_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const AcquiredFrame = owner.Handle("mln_acquired_frame", "AcquiredFrame", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_acquired_frame_dispose, .{raw}, null);
     }
 }.dispose);
+/// An owned buffer of bytes.
+///
+/// See `mln_buffer` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const Buffer = owner.Handle("mln_buffer", "Buffer", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_buffer_destroy(raw);
     }
 }.dispose);
+/// An owned batch of runtime events from one drain.
+///
+/// See `mln_event_batch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const EventBatch = owner.Handle("mln_event_batch", "EventBatch", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_event_batch_release(raw);
@@ -46,32 +58,52 @@ pub const GeojsonSourceData = owner.Handle("mln_geojson_source_data", "GeojsonSo
         c.mln_geojson_source_data_destroy(raw);
     }
 }.dispose);
+/// A map, which holds map state independent of any render target.
+///
+/// See `mln_map` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const Map = owner.Handle("mln_map", "Map", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_map_dispose, .{raw}, null);
     }
 }.dispose);
+/// A standalone projection of a map's transform state at its creation.
+///
+/// See `mln_map_projection` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const MapProjection = owner.Handle("mln_map_projection", "MapProjection", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_map_projection_close, .{raw}, null);
     }
 }.dispose);
+/// An owned batch of frame results from one drain.
+///
+/// See `mln_render_frame_batch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const RenderFrameBatch = owner.Handle("mln_render_frame_batch", "RenderFrameBatch", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_render_frame_batch_release(raw);
     }
 }.dispose);
+/// A render session, which renders one map to one render target.
+///
+/// See `mln_render_session` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const RenderSession = owner.Handle("mln_render_session", "RenderSession", struct {
     fn dispose(raw: u64) status.Error!void {
         try status.call(c.mln_render_session_dispose, .{raw}, null);
     }
 }.dispose);
+/// A resource request that a resource provider handles.
+///
+/// See `mln_resource_request_handle` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 pub const ResourceRequestHandle = owner.Handle("mln_resource_request_handle", "ResourceRequestHandle", struct {
     fn dispose(raw: u64) status.Error!void {
         c.mln_resource_request_release(raw);
     }
 }.dispose);
-/// Handles are opaque 64-bit generational ids.
+/// A runtime: the native scheduler thread and event store for its maps.
 ///
 /// See `mln_runtime` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
@@ -1028,7 +1060,7 @@ pub const GpuSync = struct {
     /// One `mln_gpu_sync_kind` value.
     kind: GpuSyncKind = std.mem.zeroes(GpuSyncKind),
     /// Bit pattern of the backend object that kind names: the
-    /// id\<MTLSharedEvent\> pointer, the VkSemaphore handle, the GLsync
+    /// `id<MTLSharedEvent>` pointer, the VkSemaphore handle, the GLsync
     /// pointer, or the WebGPU token.
     object: u64 = std.mem.zeroes(u64),
     value: u64 = std.mem.zeroes(u64),
@@ -1059,7 +1091,7 @@ pub const GpuSyncKind = enum(u32) {
     opengl_fence = 3,
     /// VkSemaphore plus a timeline value.
     vulkan_timeline_semaphore = 2,
-    /// id\<MTLSharedEvent\> plus a monotonically increasing signal value.
+    /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
     metal_shared_event = 1,
     /// The producer or consumer has completed before the API call returns.
     cpu_complete = 0,
@@ -1562,7 +1594,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
     /// Physical texture height in device pixels. Must be positive. Defaults to
     /// 256.
     physical_height: u32 = 256,
-    /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Required.
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
     texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: MetalBorrowedTextureDescriptor) c.mln_metal_borrowed_texture_descriptor {
         var raw = c.mln_metal_borrowed_texture_descriptor_default();
@@ -1587,7 +1619,7 @@ pub const MetalBorrowedTextureDescriptor = struct {
 /// See `mln_metal_context_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub const MetalContextDescriptor = struct {
-    /// id\<MTLDevice\> / MTL::Device\*. Retained when the target requires it.
+    /// `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it.
     device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: MetalContextDescriptor) c.mln_metal_context_descriptor {
         var raw = std.mem.zeroes(c.mln_metal_context_descriptor);
@@ -1640,9 +1672,9 @@ pub const MetalOwnedTextureFrame = struct {
     scale_factor: f64 = std.mem.zeroes(f64),
     /// Opaque frame identity used to reject stale releases.
     frame_id: u64 = std.mem.zeroes(u64),
-    /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Valid until frame release.
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
     texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
-    /// Borrowed id\<MTLDevice\> / MTL::Device\*. Valid until frame release.
+    /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
     device: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     /// Backend-native pixel format value. Metal uses MTLPixelFormat.
     pixel_format: u64 = std.mem.zeroes(u64),
@@ -1682,7 +1714,7 @@ pub const MetalSurfaceDescriptor = struct {
     extent: RenderTargetExtent = .{},
     /// Metal backend context. device is optional for Metal surfaces.
     context: MetalContextDescriptor = .{},
-    /// CAMetalLayer\* / CA::MetalLayer\* retained by the session. Required.
+    /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
     layer: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
         var raw = c.mln_metal_surface_descriptor_default();

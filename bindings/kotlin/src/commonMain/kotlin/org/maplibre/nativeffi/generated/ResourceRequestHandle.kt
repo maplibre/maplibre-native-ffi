@@ -3,6 +3,12 @@ package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.lifecycle.*
 
+/**
+ * A resource request that a resource provider handles.
+ *
+ * See `mln_resource_request_handle` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public class ResourceRequestHandle
 internal constructor(
   handle: Long,

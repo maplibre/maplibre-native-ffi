@@ -5,6 +5,13 @@ using static Maplibre.NativeFfi.Internal.Struct.GeneratedValues;
 
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// An owned batch of runtime events from one drain.
+/// </summary>
+/// <remarks>
+/// See <c>mln_event_batch</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+/// </remarks>
 public sealed unsafe partial class EventBatchHandle : IDisposable, INativeOwner<MlnEventBatch>
 {
     private readonly NativeHandleState<MlnEventBatch> state;

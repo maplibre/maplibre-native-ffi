@@ -17,7 +17,7 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Physical texture height in device pixels. Must be positive. Defaults to
   /// 256.
   public var physicalHeight: UInt32
-  /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Required.
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
   public var texture: NativePointer
   public static var `default`: Self {
     Self(raw: mln_metal_borrowed_texture_descriptor_default())
@@ -107,9 +107,9 @@ public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
   public var scaleFactor: Double
   /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
-  /// Borrowed id\<MTLTexture\> / MTL::Texture\*. Valid until frame release.
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
   public var texture: NativePointer
-  /// Borrowed id\<MTLDevice\> / MTL::Device\*. Valid until frame release.
+  /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
   public var device: NativePointer
   /// Backend-native pixel format value. Metal uses MTLPixelFormat.
   public var pixelFormat: UInt64

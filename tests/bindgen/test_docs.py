@@ -2,6 +2,7 @@
 
 import ast
 import unittest
+from xml.etree import ElementTree
 
 from support import parse
 
@@ -69,11 +70,12 @@ class RenderTests(unittest.TestCase):
             "Accepts \\[0, 1\\] and \\<x\\> where a \\*/ b; keeps `mln_x[i]` and & \\\\.",
         )
 
-    def test_kdoc_uses_character_references_and_never_closes_early(self):
+    def test_kdoc_escapes_prose_without_backslashes_and_never_closes_early(self):
         body = docs.block_comment(self.doc).removeprefix("/**").removesuffix("*/\n")
         self.assertNotIn("*/", body)
         # KDoc reads a backslash literally, so brackets become references.
-        self.assertIn("Accepts &#91;0, 1&#93; and &#60;x&#62;", body)
+        # Dokka would emit a decoded `<` as markup, so it stays in code.
+        self.assertIn("Accepts &#91;0, 1&#93; and `<x>` where a &#42;/ b;", body)
         self.assertIn("`mln_x[i]`", body)
 
     def test_xml_comment_escapes_markup(self):
@@ -81,6 +83,15 @@ class RenderTests(unittest.TestCase):
         self.assertIn("&lt;x&gt;", comment)
         self.assertIn("&amp;", comment)
         self.assertIn("<c>mln_x[i]</c>", comment)
+
+    def test_xml_param_documents_a_positional_property(self):
+        param = docs.xml_param(self.doc, "Range", "    ")
+        element = ElementTree.fromstring(
+            "".join(line.strip().removeprefix("/// ") for line in param.splitlines())
+        )
+        self.assertEqual(element.get("name"), "Range")
+        self.assertEqual(element.find("c").text, "mln_x[i]")
+        self.assertIn("<x>", element.text)
 
     def test_docstring_escapes_quotes_and_backslashes(self):
         doc = Doc("mln_quote", 'Holds """ and \\ and "x"')
@@ -130,13 +141,19 @@ typedef struct mln_pair {
   int right;
 } mln_pair;
 
+/// A count of pairs.
+///
+/// Counts are never negative.
+typedef unsigned mln_count;
+
 /**
  * Reads a pair.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  */
-BIND("execution=query;result=double")
+BIND("execution=query;"
+     "result=double")
 mln_status mln_pair_read(
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
@@ -152,6 +169,7 @@ mln_status mln_pair_read(
         self.assertEqual(index["mln_pair"].summary, "A pair of values.")
         self.assertEqual(index["mln_pair.left"].summary, "The left value.")
         self.assertNotIn("mln_pair.right", index)
+        self.assertEqual(index["mln_count"].summary, "A count of pairs.")
 
 
 if __name__ == "__main__":

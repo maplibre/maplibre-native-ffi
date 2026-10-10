@@ -23,7 +23,7 @@ typedef struct mln_metal_surface_descriptor {
   mln_render_target_extent extent;
   /** Metal backend context. device is optional for Metal surfaces. */
   mln_metal_context_descriptor context;
-  /** CAMetalLayer* / CA::MetalLayer* retained by the session. Required. */
+  /** `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required. */
   void* layer;
 } mln_metal_surface_descriptor;
 

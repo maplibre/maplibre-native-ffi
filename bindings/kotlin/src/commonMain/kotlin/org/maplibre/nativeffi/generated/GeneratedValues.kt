@@ -388,7 +388,7 @@ public data class GpuSyncKind(public val rawValue: UInt) {
   public companion object {
     /** The producer or consumer has completed before the API call returns. */
     public val CPU_COMPLETE: GpuSyncKind = GpuSyncKind(0u)
-    /** id&#60;MTLSharedEvent&#62; plus a monotonically increasing signal value. */
+    /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
     public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(1u)
     /** VkSemaphore plus a timeline value. */
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(2u)
@@ -1425,9 +1425,9 @@ public class MetalOwnedTextureFrame(
   scaleFactor: Double = 0.0,
   /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
-  /** Borrowed id&#60;MTLTexture&#62; / MTL::Texture&#42;. Valid until frame release. */
+  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release. */
   texture: NativePointer,
-  /** Borrowed id&#60;MTLDevice&#62; / MTL::Device&#42;. Valid until frame release. */
+  /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
   device: NativePointer,
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
   pixelFormat: ULong = 0uL,
@@ -1600,7 +1600,7 @@ public class GpuSync(
   /** One `mln_gpu_sync_kind` value. */
   kind: GpuSyncKind = GpuSyncKind(0u),
   /**
-   * Bit pattern of the backend object that kind names: the id&#60;MTLSharedEvent&#62; pointer, the
+   * Bit pattern of the backend object that kind names: the `id<MTLSharedEvent>` pointer, the
    * VkSemaphore handle, the GLsync pointer, or the WebGPU token.
    */
   `object`: ULong = 0uL,
@@ -2229,7 +2229,7 @@ public data class MetalBorrowedTextureDescriptor(
   public val physicalWidth: UInt = 256u,
   /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
-  /** Borrowed id&#60;MTLTexture&#62; / MTL::Texture&#42;. Required. */
+  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
   public val texture: NativePointer,
 )
 
@@ -2240,7 +2240,7 @@ public data class MetalBorrowedTextureDescriptor(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
  */
 public data class MetalContextDescriptor(
-  /** id&#60;MTLDevice&#62; / MTL::Device&#42;. Retained when the target requires it. */
+  /** `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it. */
   public val device: NativePointer
 )
 
@@ -2268,7 +2268,7 @@ public data class MetalSurfaceDescriptor(
   public val extent: RenderTargetExtent = RenderTargetExtent(),
   /** Metal backend context. device is optional for Metal surfaces. */
   public val context: MetalContextDescriptor,
-  /** CAMetalLayer&#42; / CA::MetalLayer&#42; retained by the session. Required. */
+  /** `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required. */
   public val layer: NativePointer,
 )
 
