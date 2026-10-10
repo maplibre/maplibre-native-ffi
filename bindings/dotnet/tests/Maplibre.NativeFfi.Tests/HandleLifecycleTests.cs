@@ -12,7 +12,7 @@ public sealed class HandleLifecycleTests
     public async Task ClosingAHandleTwiceClosesItOnce()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = await runtime.MapCreateAsync(NativeFixture.SmallMap);
+        var map = await runtime.MapCreateAsync(NativeFixture.SmallMap, TestWaits.Token);
 
         await map.CloseAsync();
         await map.CloseAsync();
@@ -31,7 +31,7 @@ public sealed class HandleLifecycleTests
     public async Task ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds()
     {
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        using var map = await runtime.MapCreateAsync(NativeFixture.SmallMap);
+        using var map = await runtime.MapCreateAsync(NativeFixture.SmallMap, TestWaits.Token);
 
         var error = Assert.Throws<InvalidStateException>(() =>
         {
@@ -51,7 +51,7 @@ public sealed class HandleLifecycleTests
     public async Task AClosedHandleRejectsCallsBeforeTheyReachNative()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = await runtime.MapCreateAsync(NativeFixture.SmallMap);
+        var map = await runtime.MapCreateAsync(NativeFixture.SmallMap, TestWaits.Token);
         await map.CloseAsync();
         await runtime.CloseAsync();
 

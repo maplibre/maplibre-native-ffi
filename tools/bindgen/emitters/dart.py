@@ -472,7 +472,7 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         if plan.absence:
             public += "?"
         body = setup + [
-            f"if (!_present({call}, raw.{plan.absence.status})) return null;"
+            f"if (!_present({call}, raw.{plan.absence.status})) {{ return null; }}"
             if plan.absence
             else f"_check({call});"
             if status_return

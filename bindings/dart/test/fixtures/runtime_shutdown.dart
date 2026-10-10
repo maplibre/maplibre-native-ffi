@@ -83,12 +83,11 @@ Future<void> abandonSession() async {
   while (drained == 0) {
     await frames.future;
     frames = Completer<void>();
-    try {
-      final batch = session.drainFrameResults();
+    // A wake that came before the result could be drained finds no batch.
+    final batch = session.drainFrameResults();
+    if (batch != null) {
       drained = batch.count();
       batch.close();
-    } on NotReadyException {
-      // The wake came before the result could be drained.
     }
   }
   waiting.close();

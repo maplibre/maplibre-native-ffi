@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const c = @import("c.zig").raw;
+const callback_scope = @import("callback.zig");
 const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
 const sync = @import("sync.zig");
@@ -15,8 +16,8 @@ const WakeSlot = enum(u8) { idle, armed, settled };
 
 /// Runs a wake the future took, then releases its context.
 fn fireWake(wake: Wake) void {
-    // A wake only schedules work, so an error it returns has nowhere to go.
-    if (wake.callback) |run| run(wake.context) catch {};
+    // Native wakes report their errors the same way.
+    if (wake.callback) |run| run(wake.context) catch |err| callback_scope.reportError("mln_wake_callback", err);
     if (wake.release_context) |release| release(wake.context);
 }
 
@@ -127,7 +128,8 @@ pub fn Future(comptime T: type) type {
         /// releases `wake` on the calling thread before `notify` returns.
         /// Otherwise it runs on the thread that delivers the completion, where
         /// it should only schedule work, such as waking a loop that then calls
-        /// `wait`, which returns at once.
+        /// `wait`, which returns at once. An error that the wake returns goes
+        /// to the callback error reporter, as a native wake's does.
         ///
         /// A future dropped by `deinit` before its completion arrives releases
         /// the context without running the callback. A future accepts one

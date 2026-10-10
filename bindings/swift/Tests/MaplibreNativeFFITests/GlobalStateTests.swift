@@ -102,7 +102,7 @@ struct GlobalStateTests {
     withUnsafePointer(to: UInt64(0x5)) { value in
       var result = mln_completion_result()
       result.size = UInt32(MemoryLayout<mln_completion_result>.size)
-      result.status = MLN_STATUS_OK
+      result.status = MLN_STATUS_OK.rawValue
       result.value = UnsafeRawPointer(value)
       result.value_count = 1
       descriptor.callback?(descriptor.user_data, &result)

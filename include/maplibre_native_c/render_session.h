@@ -393,9 +393,9 @@ MLN_API mln_status mln_acquired_frame_release(
  * - MLN_STATUS_OK when *out_scope receives the scope.
  * - MLN_STATUS_INVALID_ARGUMENT when frame is an invalid handle or out_scope is
  *   null.
- * - MLN_STATUS_INVALID_STATE when frame has been released.
+ * - MLN_STATUS_INVALID_STATE when frame has been released or disposed.
  * - MLN_STATUS_TARGET_LOST when the session lost or abandoned its target, or
- *   disposal of the frame or session has begun.
+ *   disposal of the session has begun.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_acquired_frame_view_begin(
@@ -542,8 +542,7 @@ MLN_API mln_status mln_render_session_dump_debug_logs(
  *   out_serviced is null.
  * - MLN_STATUS_INVALID_STATE when session has been released or is driven by its
  *   own core worker.
- * - MLN_STATUS_TARGET_LOST after abandonment or dispose of the session or of
- *   one of its acquired frames.
+ * - MLN_STATUS_TARGET_LOST after abandonment or dispose of the session.
  * - MLN_STATUS_WRONG_THREAD when another native thread already fixed the
  *   session's graphics-thread identity.
  * - MLN_STATUS_BUSY when a driver call is already in flight.
@@ -650,8 +649,10 @@ MLN_API mln_status mln_render_session_destroy(
  * Queued driver work completes with MLN_STATUS_TARGET_LOST. A core-worker
  * session that is attached and has no acquired frame detaches on its worker
  * after the in-flight call, which frees its graphics resources. Every other
- * session is abandoned on the cleanup worker once in-flight driver work ends,
- * which quarantines its graphics resources. Either way, retirement releases the
+ * session is abandoned on the cleanup worker once its in-flight driver work and
+ * its scopes from mln_acquired_frame_view_begin() end, which quarantines its
+ * graphics resources. A session that waits for those does not delay other
+ * sessions' retirement. Either way, retirement releases the
  * map attachment. The host keeps its graphics objects alive until the session's
  * wake release callbacks run. Acquired frame accessors report target loss after
  * acceptance; their owners still release or dispose those frames.

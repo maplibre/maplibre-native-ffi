@@ -6668,8 +6668,9 @@ final class RenderSessionHandle implements Finalizable {
         nativeDiagnostic,
       ),
       raw.MLN_STATUS_NOT_READY,
-    ))
+    )) {
       return null;
+    }
     return _adoptOwned(
       outFrame.value,
       () => AcquiredFrameHandle._(this, NativeAcquiredFrame(outFrame.value)),
@@ -6749,8 +6750,9 @@ final class RenderSessionHandle implements Finalizable {
         nativeDiagnostic,
       ),
       raw.MLN_STATUS_NOT_READY,
-    ))
+    )) {
       return null;
+    }
     return _adoptOwned(
       outBatch.value,
       () => RenderFrameBatchHandle._(NativeRenderFrameBatch(outBatch.value)),
