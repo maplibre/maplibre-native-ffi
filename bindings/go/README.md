@@ -23,8 +23,10 @@ Callback admission is per OS thread. While a callback runs, its goroutine is
 locked to the native thread and can make only the calls that the callback's
 declaration admits. Any other call returns `ErrInvalidState` before it reaches
 native. A goroutine that the callback starts runs on another thread and has no
-such restriction. The callback must return without waiting on that goroutine's
-work, because native work can depend on the callback's return.
+such restriction. The callback can wait for work that does not need it to
+return, such as a submission's acceptance, but must not wait for work that does,
+such as a submission's completion, because native work can depend on the
+callback's return.
 
 A resource provider that returns `ResourceProviderDecisionHandle` keeps its
 `ResourceRequestHandle`, and any goroutine can complete and close that handle

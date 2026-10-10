@@ -160,7 +160,9 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 }
 
 // Admission is per OS thread. A goroutine that a callback starts runs on
-// another thread, so a call the callback may not make succeeds there.
+// another thread, so a call the callback may not make succeeds there while the
+// callback still runs. The callback waits only for the submission's acceptance,
+// which needs nothing from the callback's thread.
 func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 	f := newFixture(t)
 	failures := newFailureLog()
@@ -171,14 +173,21 @@ func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 	barriers := make(chan barrier, 1)
 	var spawn sync.Once
 	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, _ string, _ *ResourceTransformResponseScope) Status {
-		if _, err := f.runtime.Barrier(); !errors.Is(err, ErrInvalidState) {
-			failures.add("Barrier inside the transform = %v, want ErrInvalidState", err)
-		}
 		spawn.Do(func() {
+			if _, err := f.runtime.Barrier(); !errors.Is(err, ErrInvalidState) {
+				failures.add("Barrier inside the transform = %v, want ErrInvalidState", err)
+			}
+			accepted := make(chan barrier, 1)
 			go func() {
 				future, err := f.runtime.Barrier()
-				barriers <- barrier{future, err}
+				accepted <- barrier{future, err}
 			}()
+			select {
+			case result := <-accepted:
+				barriers <- result
+			case <-time.After(testTimeout()):
+				failures.add("the goroutine's Barrier did not return while the transform ran")
+			}
 		})
 		return StatusOk
 	}})))
@@ -187,12 +196,12 @@ func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the style load", isStyleLoaded)
+	failures.check(t)
 	result := receive(t, barriers, "the goroutine's barrier")
 	if result.err != nil {
 		t.Fatalf("Barrier from the goroutine: %v", result.err)
 	}
 	await(t, result.future)
-	failures.check(t)
 }
 
 // A panic in a callback stays in the binding, which returns the callback's
