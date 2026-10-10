@@ -2,9 +2,11 @@
 // and must retire the graph only once nothing still runs against it.
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <thread>
 
 #include "completion/completion.hpp"
 #include "internal/support/allocation_faults.hpp"
@@ -748,6 +750,109 @@ void a_running_driver_call_parks_its_retirement_without_stalling_others() {
   });
 }
 
+// So does a call that services a caller-driven session's driver work.
+void a_serviced_driver_call_parks_its_retirement_without_stalling_others() {
+  const auto runtime = create_runtime();
+  const auto busy_map = create_map(runtime);
+  const auto other_map = create_map(runtime);
+  auto busy = std::make_shared<mln_render_session_object>();
+  busy->map = busy_map;
+  auto options = mln_render_session_attach_options_default();
+  options.driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD;
+  auto capabilities = mln_render_session_capabilities{};
+  capabilities.size = sizeof(capabilities);
+  auto attach = Result{};
+  const auto attach_completion = descriptor(attach);
+  auto busy_id = mln_render_session{MLN_HANDLE_NULL};
+  MLN_TEST_OK(
+    mln::core::start_attach_render_session(
+      busy, mln::core::RenderSessionKind::Surface, &options, capabilities,
+      &busy_id, &attach_completion
+    )
+  );
+  auto busy_weak = std::weak_ptr{busy};
+  busy.reset();
+  // Driver work belongs to the thread that first services it, so one helper
+  // thread services both the attachment and the blocking operation.
+  auto checks = BackgroundChecks{};
+  auto serve = std::atomic_bool{false};
+  auto graphics = std::thread{[&] {
+    auto serviced = std::size_t{0};
+    checks.check(
+      mln_render_session_service_driver_work(busy_id, 0, &serviced, nullptr) ==
+        MLN_STATUS_OK,
+      "servicing the attachment failed"
+    );
+    checks.check(
+      await([&] { return serve.load(); }, "the operation to service"),
+      "the operation was never enqueued"
+    );
+    checks.check(
+      mln_render_session_service_driver_work(busy_id, 0, &serviced, nullptr) ==
+        MLN_STATUS_OK,
+      "servicing the operation failed"
+    );
+  }};
+  const auto attached = released(attach);
+  auto driver = WorkerGate{};
+  auto blocked = Result{};
+  const auto blocked_completion = descriptor(blocked);
+  const auto enqueued = mln::core::enqueue_driver_operation(
+    busy_id,
+    [&driver](mln_render_session_object&) {
+      driver.entered = true;
+      mln_test_pulse();
+      static_cast<void>(
+        await([&] { return driver.release.load(); }, "release")
+      );
+      return MLN_STATUS_OK;
+    },
+    &blocked_completion
+  );
+  serve = true;
+  mln_test_pulse();
+  const auto entered =
+    await([&] { return driver.entered.load(); }, "the driver call");
+  auto other = attach_fake_texture_session(other_map);
+  auto other_weak = std::weak_ptr{other.session};
+  const auto busy_disposed = mln_render_session_dispose(busy_id, nullptr);
+  const auto frame_disposed = mln_acquired_frame_dispose(other.frame, nullptr);
+  const auto other_disposed =
+    mln_render_session_dispose(other.session->self, nullptr);
+  other.session.reset();
+  const auto other_retired = expired(other_weak);
+  const auto busy_retired_early = busy_weak.expired();
+  // Assertions wait until the helper thread joins, so a failure never leaves
+  // it parked on this frame's state.
+  driver.release = true;
+  mln_test_pulse();
+  graphics.join();
+  TEST_ASSERT_TRUE(attached);
+  MLN_TEST_OK(attach.status.load());
+  MLN_TEST_OK(enqueued);
+  TEST_ASSERT_TRUE(entered);
+  MLN_TEST_OK(busy_disposed);
+  MLN_TEST_OK(frame_disposed);
+  MLN_TEST_OK(other_disposed);
+  TEST_ASSERT_NULL_MESSAGE(checks.failure(), checks.failure());
+  TEST_ASSERT_TRUE(other_retired);
+  TEST_ASSERT_FALSE_MESSAGE(
+    busy_retired_early, "a session retired under its driver call"
+  );
+  TEST_ASSERT_TRUE(expired(busy_weak));
+  TEST_ASSERT_TRUE(released(blocked));
+  MLN_TEST_OK(blocked.status.load());
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(busy_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_map_dispose(other_map, nullptr);
+  });
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_runtime_dispose(runtime, nullptr);
+  });
+}
+
 }  // namespace
 
 MLN_TEST_GROUP {
@@ -755,6 +860,7 @@ MLN_TEST_GROUP {
   RUN_TEST(borrowed_views_hold_the_session_through_sibling_disposal);
   RUN_TEST(a_held_view_parks_its_retirements_without_stalling_others);
   RUN_TEST(a_running_driver_call_parks_its_retirement_without_stalling_others);
+  RUN_TEST(a_serviced_driver_call_parks_its_retirement_without_stalling_others);
   RUN_TEST(failed_finalizer_token_creation_disposes_the_owner);
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
   RUN_TEST(
