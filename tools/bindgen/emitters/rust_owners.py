@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from tools.bindgen.semantic import BoundApi, HandlePlan
 
-from .rust import pascal
+from .rust import doc, pascal
 
 
 def owner_name(native: str) -> str:
@@ -58,7 +58,8 @@ def declaration(bound: BoundApi, handle: HandlePlan) -> str:
     return (
         "native_owner! {\n"
         f"    /// Owns one `{native}` native handle.\n"
-        f"{must_use}"
+        + (f"    ///\n{summary}" if (summary := doc(bound, native, "    ")) else "")
+        + f"{must_use}"
         f"    pub struct {owner}({native}) dispose {finalize};\n"
         "}\n"
     )

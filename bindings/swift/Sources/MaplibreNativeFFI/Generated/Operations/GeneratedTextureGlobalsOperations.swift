@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_metal_borrowed_texture_descriptor_default`.
+  /// Returns Metal borrowed-texture descriptor defaults for this C API version.
+  ///
+  /// See `mln_metal_borrowed_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func metalBorrowedTextureDescriptorDefault() throws
     -> MetalBorrowedTextureDescriptor
   {
@@ -15,7 +18,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_metal_owned_texture_descriptor_default`.
+  /// Returns Metal owned-texture descriptor defaults for this C API version.
+  ///
+  /// See `mln_metal_owned_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func metalOwnedTextureDescriptorDefault() throws
     -> MetalOwnedTextureDescriptor
   {
@@ -26,7 +32,11 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_opengl_borrowed_texture_descriptor_default`.
+  /// Returns OpenGL borrowed-texture descriptor defaults for this C API
+  /// version.
+  ///
+  /// See `mln_opengl_borrowed_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func openglBorrowedTextureDescriptorDefault() throws
     -> OpenglBorrowedTextureDescriptor
   {
@@ -37,7 +47,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_opengl_owned_texture_descriptor_default`.
+  /// Returns OpenGL owned-texture descriptor defaults for this C API version.
+  ///
+  /// See `mln_opengl_owned_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func openglOwnedTextureDescriptorDefault() throws
     -> OpenglOwnedTextureDescriptor
   {
@@ -48,14 +61,21 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_texture_image_info_default`.
+  /// Returns texture image info defaults for this C API version.
+  ///
+  /// See `mln_texture_image_info_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func textureImageInfoDefault() throws -> TextureImageInfo {
     try nativeDirect("mln_texture_image_info_default") { _ in
       TextureImageInfo(raw: mln_texture_image_info_default())
     }
   }
 
-  /// Calls `mln_vulkan_borrowed_texture_descriptor_default`.
+  /// Returns Vulkan borrowed-texture descriptor defaults for this C API
+  /// version.
+  ///
+  /// See `mln_vulkan_borrowed_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func vulkanBorrowedTextureDescriptorDefault() throws
     -> VulkanBorrowedTextureDescriptor
   {
@@ -66,7 +86,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_vulkan_owned_texture_descriptor_default`.
+  /// Returns Vulkan owned-texture descriptor defaults for this C API version.
+  ///
+  /// See `mln_vulkan_owned_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func vulkanOwnedTextureDescriptorDefault() throws
     -> VulkanOwnedTextureDescriptor
   {
@@ -77,7 +100,11 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_webgpu_borrowed_texture_descriptor_default`.
+  /// Returns WebGPU borrowed-texture descriptor defaults for this C API
+  /// version.
+  ///
+  /// See `mln_webgpu_borrowed_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func webgpuBorrowedTextureDescriptorDefault() throws
     -> WebgpuBorrowedTextureDescriptor
   {
@@ -88,7 +115,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_webgpu_owned_texture_descriptor_default`.
+  /// Returns WebGPU owned-texture descriptor defaults for this C API version.
+  ///
+  /// See `mln_webgpu_owned_texture_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   static func webgpuOwnedTextureDescriptorDefault() throws
     -> WebgpuOwnedTextureDescriptor
   {

@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 
+from .. import docs
 from .python_values import public_name, rust_field, scalar_type
 from .rust import native_call
 from .rust_callbacks import decision_table_name
@@ -270,7 +271,7 @@ def direct_operation(plan, values):
     }}
 """
         facade = f"""    def {name}(self, callback: Callable[[], None]) -> bool:
-        return self._native.{name}(callback)
+{docs.docstring(values.api.doc(plan.name), "        ")}        return self._native.{name}(callback)
 """
         return (
             owner,
@@ -326,7 +327,7 @@ fn {name}(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {{
     )
     public_type = f"Callable[[{parameter_types}], {result_type}] | None"
     facade = f"""def {name}(callback: {public_type} = None) -> None:
-    return _native.{name}({public_name(descriptor.native)}(callback))
+{docs.docstring(values.api.doc(plan.name), "    ")}    return _native.{name}({public_name(descriptor.native)}(callback))
 """
     return (
         "",

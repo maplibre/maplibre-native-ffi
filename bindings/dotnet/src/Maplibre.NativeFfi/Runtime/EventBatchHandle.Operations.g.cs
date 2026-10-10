@@ -37,6 +37,13 @@ public sealed unsafe partial class EventBatchHandle : IDisposable, INativeOwner<
         state.Retire();
     }
 
+    /// <summary>
+    /// Borrows the event and message view stored by an owned event batch.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_event_batch_get</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public RuntimeEventBatchView Get()
     {
         using var read = state.Read(this, "mln_event_batch_get");
@@ -48,6 +55,13 @@ public sealed unsafe partial class EventBatchHandle : IDisposable, INativeOwner<
         return CopyRuntimeEventBatchView(outView);
     }
 
+    /// <summary>
+    /// Releases an owned event batch. A null handle is a no-op.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_event_batch_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
     public void Close()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_event_batch_release");

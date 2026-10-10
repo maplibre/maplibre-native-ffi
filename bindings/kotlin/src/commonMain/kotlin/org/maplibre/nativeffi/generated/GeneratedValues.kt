@@ -13,6 +13,12 @@ public data class AmbientCacheOperation(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_animation_options`.
+ *
+ * See `mln_animation_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class AnimationOptionField(public val rawValue: UInt) {
   public infix fun or(other: AnimationOptionField): AnimationOptionField =
     AnimationOptionField(rawValue or other.rawValue)
@@ -32,6 +38,12 @@ public data class AnimationOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_bound_options`.
+ *
+ * See `mln_bound_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class BoundOptionField(public val rawValue: UInt) {
   public infix fun or(other: BoundOptionField): BoundOptionField =
     BoundOptionField(rawValue or other.rawValue)
@@ -43,22 +55,46 @@ public data class BoundOptionField(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
+    /**
+     * Selects `mln_bound_options.bounds` as a geographic constraint that the camera center stays
+     * inside. Mutually exclusive with `MLN_BOUND_OPTION_UNBOUNDED`.
+     */
     public val BOUNDS: BoundOptionField = BoundOptionField(1u)
     public val MIN_ZOOM: BoundOptionField = BoundOptionField(2u)
     public val MAX_ZOOM: BoundOptionField = BoundOptionField(4u)
     public val MIN_PITCH: BoundOptionField = BoundOptionField(8u)
     public val MAX_PITCH: BoundOptionField = BoundOptionField(16u)
+    /**
+     * Selects the unbounded geographic constraint, which leaves every camera center unconstrained
+     * and lets the map pan freely across the antimeridian. This differs from world bounds of
+     * -90/-180 to 90/180, which clamp longitude to that range. Mutually exclusive with
+     * `MLN_BOUND_OPTION_BOUNDS`, and leaves `mln_bound_options.bounds` unread.
+     */
     public val UNBOUNDED: BoundOptionField = BoundOptionField(32u)
   }
 }
 
+/**
+ * Camera change kinds reported by camera will-change and did-change events.
+ *
+ * See `mln_camera_change_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class CameraChangeMode(public val rawValue: UInt) {
   public companion object {
+    /** The camera reached its new value without an animated transition. */
     public val IMMEDIATE: CameraChangeMode = CameraChangeMode(0u)
+    /** The camera moved as part of an animated transition. */
     public val ANIMATED: CameraChangeMode = CameraChangeMode(1u)
   }
 }
 
+/**
+ * Relative camera operation carried by `mln_camera_delta`.
+ *
+ * See `mln_camera_delta_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraDeltaKind(public val rawValue: UInt) {
   public companion object {
     public val MOVE: CameraDeltaKind = CameraDeltaKind(0u)
@@ -68,6 +104,12 @@ public data class CameraDeltaKind(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_camera_fit_options`.
+ *
+ * See `mln_camera_fit_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraFitOptionField(public val rawValue: UInt) {
   public infix fun or(other: CameraFitOptionField): CameraFitOptionField =
     CameraFitOptionField(rawValue or other.rawValue)
@@ -85,6 +127,12 @@ public data class CameraFitOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_camera_options`.
+ *
+ * See `mln_camera_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraOptionField(public val rawValue: UInt) {
   public infix fun or(other: CameraOptionField): CameraOptionField =
     CameraOptionField(rawValue or other.rawValue)
@@ -108,6 +156,12 @@ public data class CameraOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Camera transition behavior for `mln_camera_update`.
+ *
+ * See `mln_camera_update_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraUpdateMode(public val rawValue: UInt) {
   public companion object {
     public val JUMP: CameraUpdateMode = CameraUpdateMode(0u)
@@ -116,6 +170,12 @@ public data class CameraUpdateMode(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Terminal dispositions reported by command completions.
+ *
+ * See `mln_command_disposition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
+ */
 public data class CommandDisposition(public val rawValue: UInt) {
   public companion object {
     public val COMMITTED: CommandDisposition = CommandDisposition(0u)
@@ -125,6 +185,12 @@ public data class CommandDisposition(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Map constraint modes used by `mln_map_viewport_options`.
+ *
+ * See `mln_constrain_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class ConstrainMode(public val rawValue: UInt) {
   public companion object {
     public val NONE: ConstrainMode = ConstrainMode(0u)
@@ -134,6 +200,12 @@ public data class ConstrainMode(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_custom_geometry_source_options`.
+ *
+ * See `mln_custom_geometry_source_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class CustomGeometrySourceOptionField(public val rawValue: UInt) {
   public infix fun or(other: CustomGeometrySourceOptionField): CustomGeometrySourceOptionField =
     CustomGeometrySourceOptionField(rawValue or other.rawValue)
@@ -155,6 +227,12 @@ public data class CustomGeometrySourceOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_custom_mvt_vector_source_options`.
+ *
+ * See `mln_custom_mvt_vector_source_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class CustomMvtVectorSourceOptionField(public val rawValue: UInt) {
   public infix fun or(other: CustomMvtVectorSourceOptionField): CustomMvtVectorSourceOptionField =
     CustomMvtVectorSourceOptionField(rawValue or other.rawValue)
@@ -171,6 +249,12 @@ public data class CustomMvtVectorSourceOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Optional fields for `mln_feature_state_selector`.
+ *
+ * See `mln_feature_state_selector_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class FeatureStateSelectorField(public val rawValue: UInt) {
   public infix fun or(other: FeatureStateSelectorField): FeatureStateSelectorField =
     FeatureStateSelectorField(rawValue or other.rawValue)
@@ -188,6 +272,12 @@ public data class FeatureStateSelectorField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Frame-demand policy bits.
+ *
+ * See `mln_frame_demand_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 public data class FrameDemandFlag(public val rawValue: UInt) {
   public infix fun or(other: FrameDemandFlag): FrameDemandFlag =
     FrameDemandFlag(rawValue or other.rawValue)
@@ -199,11 +289,23 @@ public data class FrameDemandFlag(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
+    /** Render only when a newer map update exists. */
     public val IF_NEEDED: FrameDemandFlag = FrameDemandFlag(1u)
+    /**
+     * Present the rendered frame on a target that supports presentation. A presenting target whose
+     * demand clears this bit still renders and keeps whatever it presented last. Ignored by targets
+     * without presentation.
+     */
     public val PRESENT: FrameDemandFlag = FrameDemandFlag(2u)
   }
 }
 
+/**
+ * Field mask values for `mln_free_camera_options`.
+ *
+ * See `mln_free_camera_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class FreeCameraOptionField(public val rawValue: UInt) {
   public infix fun or(other: FreeCameraOptionField): FreeCameraOptionField =
     FreeCameraOptionField(rawValue or other.rawValue)
@@ -220,6 +322,12 @@ public data class FreeCameraOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_geojson_source_options`.
+ *
+ * See `mln_geojson_source_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class GeojsonSourceOptionField(public val rawValue: UInt) {
   public infix fun or(other: GeojsonSourceOptionField): GeojsonSourceOptionField =
     GeojsonSourceOptionField(rawValue or other.rawValue)
@@ -246,26 +354,57 @@ public data class GeojsonSourceOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Gesture boundary carried atomically with a camera update.
+ *
+ * See `mln_gesture_phase` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class GesturePhase(public val rawValue: UInt) {
   public companion object {
+    /** The update carries no gesture boundary and leaves the flag as it is. */
     public val NONE: GesturePhase = GesturePhase(0u)
+    /**
+     * Marks a gesture as in progress before the camera write. It does not cancel running
+     * transitions; use `mln_map_cancel_transitions()` for that.
+     */
     public val BEGIN: GesturePhase = GesturePhase(1u)
+    /** Keeps the gesture marked as in progress before the camera write. */
     public val UPDATE: GesturePhase = GesturePhase(2u)
+    /** Clears the gesture flag after the camera write. */
     public val END: GesturePhase = GesturePhase(3u)
+    /** Cancels transitions running after the camera write, then clears the gesture flag. */
     public val CANCEL: GesturePhase = GesturePhase(4u)
   }
 }
 
+/**
+ * Synchronization payload kind for acquired texture frames.
+ *
+ * See `mln_gpu_sync_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class GpuSyncKind(public val rawValue: UInt) {
   public companion object {
+    /** The producer or consumer has completed before the API call returns. */
     public val CPU_COMPLETE: GpuSyncKind = GpuSyncKind(0u)
+    /** id&#60;MTLSharedEvent&#62; plus a monotonically increasing signal value. */
     public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(1u)
+    /** VkSemaphore plus a timeline value. */
     public val VULKAN_TIMELINE_SEMAPHORE: GpuSyncKind = GpuSyncKind(2u)
+    /** GLsync, used only by a caller-graphics-thread driver. */
     public val OPENGL_FENCE: GpuSyncKind = GpuSyncKind(3u)
+    /** A backend-defined WebGPU completion token. */
     public val WEBGPU_TOKEN: GpuSyncKind = GpuSyncKind(4u)
   }
 }
 
+/**
+ * Location indicator image-name properties.
+ *
+ * See `mln_location_indicator_image_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class LocationIndicatorImageKind(public val rawValue: UInt) {
   public companion object {
     public val TOP: LocationIndicatorImageKind = LocationIndicatorImageKind(0u)
@@ -274,6 +413,12 @@ public data class LocationIndicatorImageKind(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Log event categories emitted by MapLibre Native.
+ *
+ * See `mln_log_event` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
 public data class LogEvent(public val rawValue: UInt) {
   public companion object {
     public val GENERAL: LogEvent = LogEvent(0u)
@@ -296,6 +441,12 @@ public data class LogEvent(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Log severity values emitted by MapLibre Native.
+ *
+ * See `mln_log_severity` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
 public data class LogSeverity(public val rawValue: UInt) {
   public companion object {
     public val INFO: LogSeverity = LogSeverity(1u)
@@ -304,6 +455,12 @@ public data class LogSeverity(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Bitmask values for log severities dispatched asynchronously.
+ *
+ * See `mln_log_severity_mask` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
 public data class LogSeverityMask(public val rawValue: UInt) {
   public infix fun or(other: LogSeverityMask): LogSeverityMask =
     LogSeverityMask(rawValue or other.rawValue)
@@ -323,6 +480,12 @@ public data class LogSeverityMask(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Debug overlay mask values for `mln_map_set_debug_options()`.
+ *
+ * See `mln_map_debug_option` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapDebugOption(public val rawValue: UInt) {
   public infix fun or(other: MapDebugOption): MapDebugOption =
     MapDebugOption(rawValue or other.rawValue)
@@ -344,14 +507,29 @@ public data class MapDebugOption(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Map rendering modes used when creating a map.
+ *
+ * See `mln_map_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapMode(public val rawValue: UInt) {
   public companion object {
+    /** Continuously updates as data arrives and map state changes. */
     public val CONTINUOUS: MapMode = MapMode(0u)
+    /** Produces one-off still images of an arbitrary viewport. */
     public val STATIC: MapMode = MapMode(1u)
+    /** Produces one-off still images for a single tile. */
     public val TILE: MapMode = MapMode(2u)
   }
 }
 
+/**
+ * Field mask values for `mln_map_tile_options`.
+ *
+ * See `mln_map_tile_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapTileOptionField(public val rawValue: UInt) {
   public infix fun or(other: MapTileOptionField): MapTileOptionField =
     MapTileOptionField(rawValue or other.rawValue)
@@ -372,6 +550,12 @@ public data class MapTileOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_map_viewport_options`.
+ *
+ * See `mln_map_viewport_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapViewportOptionField(public val rawValue: UInt) {
   public infix fun or(other: MapViewportOptionField): MapViewportOptionField =
     MapViewportOptionField(rawValue or other.rawValue)
@@ -397,6 +581,12 @@ public data class NetworkStatus(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Map north orientation values used by `mln_map_viewport_options`.
+ *
+ * See `mln_north_orientation` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class NorthOrientation(public val rawValue: UInt) {
   public companion object {
     public val UP: NorthOrientation = NorthOrientation(0u)
@@ -420,30 +610,61 @@ public data class OfflineRegionDownloadState(public val rawValue: UInt) {
   }
 }
 
+/**
+ * OpenGL client API a dedicated EGL session creates its context for.
+ *
+ * See `mln_opengl_client_api` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class OpenglClientApi(public val rawValue: UInt) {
   public companion object {
+    /** No client API is named. */
     public val UNSPECIFIED: OpenglClientApi = OpenglClientApi(0u)
+    /** Desktop OpenGL, as EGL_OPENGL_API names it. */
     public val GL: OpenglClientApi = OpenglClientApi(1u)
+    /** OpenGL ES, as EGL_OPENGL_ES_API names it. */
     public val GLES: OpenglClientApi = OpenglClientApi(2u)
   }
 }
 
+/**
+ * How a session's OpenGL context relates to its driver thread and host graphics state.
+ *
+ * See `mln_opengl_context_ownership` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class OpenglContextOwnership(public val rawValue: UInt) {
   public companion object {
+    /** The session shares its thread with host graphics work. */
     public val SHARED: OpenglContextOwnership = OpenglContextOwnership(0u)
+    /** The session owns its thread's OpenGL context. */
     public val DEDICATED: OpenglContextOwnership = OpenglContextOwnership(1u)
   }
 }
 
+/**
+ * OpenGL platform context provider used by a context descriptor.
+ *
+ * See `mln_opengl_context_platform` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class OpenglContextPlatform(public val rawValue: UInt) {
   public companion object {
+    /** No OpenGL context provider is selected. */
     public val UNSPECIFIED: OpenglContextPlatform = OpenglContextPlatform(0u)
     public val WGL: OpenglContextPlatform = OpenglContextPlatform(1u)
     public val EGL: OpenglContextPlatform = OpenglContextPlatform(2u)
+    /** Emscripten WebGL context handle. */
     public val WEBGL: OpenglContextPlatform = OpenglContextPlatform(3u)
   }
 }
 
+/**
+ * OpenGL context providers supported by this build.
+ *
+ * See `mln_opengl_context_provider_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class OpenglContextProviderFlag(public val rawValue: UInt) {
   public infix fun or(other: OpenglContextProviderFlag): OpenglContextProviderFlag =
     OpenglContextProviderFlag(rawValue or other.rawValue)
@@ -457,10 +678,17 @@ public data class OpenglContextProviderFlag(public val rawValue: UInt) {
   public companion object {
     public val WGL: OpenglContextProviderFlag = OpenglContextProviderFlag(1u)
     public val EGL: OpenglContextProviderFlag = OpenglContextProviderFlag(2u)
+    /** Browser WebGL context imported into an Emscripten module. */
     public val WEBGL: OpenglContextProviderFlag = OpenglContextProviderFlag(4u)
   }
 }
 
+/**
+ * Field mask values for MapLibre axonometric rendering options.
+ *
+ * See `mln_projection_mode_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class ProjectionModeField(public val rawValue: UInt) {
   public infix fun or(other: ProjectionModeField): ProjectionModeField =
     ProjectionModeField(rawValue or other.rawValue)
@@ -478,6 +706,12 @@ public data class ProjectionModeField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Optional fields for `mln_queried_feature`.
+ *
+ * See `mln_queried_feature_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class QueriedFeatureField(public val rawValue: UInt) {
   public infix fun or(other: QueriedFeatureField): QueriedFeatureField =
     QueriedFeatureField(rawValue or other.rawValue)
@@ -495,13 +729,27 @@ public data class QueriedFeatureField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Result of irreversible CPU-side target abandonment.
+ *
+ * See `mln_render_abandon_disposition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 public data class RenderAbandonDisposition(public val rawValue: UInt) {
   public companion object {
+    /** No graphics resources remained when control was abandoned. */
     public val CLEAN: RenderAbandonDisposition = RenderAbandonDisposition(0u)
+    /** Graphics resources could not be destroyed and were quarantined. */
     public val QUARANTINED: RenderAbandonDisposition = RenderAbandonDisposition(1u)
   }
 }
 
+/**
+ * Render backend support flags reported by this native library build.
+ *
+ * See `mln_render_backend_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public data class RenderBackendFlag(public val rawValue: UInt) {
   public infix fun or(other: RenderBackendFlag): RenderBackendFlag =
     RenderBackendFlag(rawValue or other.rawValue)
@@ -520,13 +768,33 @@ public data class RenderBackendFlag(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Execution placement for one render session.
+ *
+ * See `mln_render_driver_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class RenderDriverKind(public val rawValue: UInt) {
   public companion object {
+    /**
+     * Native code owns a serial worker that initializes, drives, and tears down transferable
+     * graphics state.
+     */
     public val CORE_WORKER: RenderDriverKind = RenderDriverKind(1u)
+    /**
+     * The host explicitly calls the narrow driver API from the thread or realm where its graphics
+     * context is current.
+     */
     public val CALLER_GRAPHICS_THREAD: RenderDriverKind = RenderDriverKind(2u)
   }
 }
 
+/**
+ * Render modes reported by render observer events.
+ *
+ * See `mln_render_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RenderMode(public val rawValue: UInt) {
   public companion object {
     public val PARTIAL: RenderMode = RenderMode(0u)
@@ -534,17 +802,35 @@ public data class RenderMode(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Terminal disposition of one accepted frame demand.
+ *
+ * See `mln_render_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 public data class RenderResult(public val rawValue: UInt) {
   public companion object {
+    /** A frame was rendered for acquisition, presentation, or ordered readback. */
     public val RENDERED: RenderResult = RenderResult(0u)
+    /** No newer map update was available. */
     public val NO_UPDATE: RenderResult = RenderResult(1u)
+    /** An ordered extent change had not reached the driver. */
     public val SIZE_PENDING: RenderResult = RenderResult(2u)
+    /** The target could not produce a frame. */
     public val TARGET_NOT_READY: RenderResult = RenderResult(3u)
+    /** A newer demand in the same coalescing boundary replaced this demand. */
     public val SUPERSEDED: RenderResult = RenderResult(4u)
+    /** The demand's timeout elapsed before driver work began. */
     public val DEADLINE_MISSED: RenderResult = RenderResult(5u)
   }
 }
 
+/**
+ * Optional render-session capabilities.
+ *
+ * See `mln_render_session_capability_flag` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class RenderSessionCapabilityFlag(public val rawValue: UInt) {
   public infix fun or(other: RenderSessionCapabilityFlag): RenderSessionCapabilityFlag =
     RenderSessionCapabilityFlag(rawValue or other.rawValue)
@@ -563,6 +849,12 @@ public data class RenderSessionCapabilityFlag(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Render-session lifecycle visible in snapshots.
+ *
+ * See `mln_render_session_state` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 public data class RenderSessionState(public val rawValue: UInt) {
   public companion object {
     public val ATTACHING: RenderSessionState = RenderSessionState(1u)
@@ -574,6 +866,12 @@ public data class RenderSessionState(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Optional fields for `mln_rendered_feature_query_options`.
+ *
+ * See `mln_rendered_feature_query_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class RenderedFeatureQueryOptionField(public val rawValue: UInt) {
   public infix fun or(other: RenderedFeatureQueryOptionField): RenderedFeatureQueryOptionField =
     RenderedFeatureQueryOptionField(rawValue or other.rawValue)
@@ -589,6 +887,12 @@ public data class RenderedFeatureQueryOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Rendered feature query geometry variants.
+ *
+ * See `mln_rendered_query_geometry_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class RenderedQueryGeometryType(public val rawValue: UInt) {
   public companion object {
     public val POINT: RenderedQueryGeometryType = RenderedQueryGeometryType(1u)
@@ -643,6 +947,12 @@ public data class ResourceProviderDecision(public val rawValue: UInt) {
   }
 }
 
+/**
+ * How a resource provider answered a request.
+ *
+ * See `mln_resource_response_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class ResourceResponseStatus(public val rawValue: UInt) {
   public companion object {
     public val OK: ResourceResponseStatus = ResourceResponseStatus(0u)
@@ -666,6 +976,12 @@ public data class ResourceUsage(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Bit values for the map and runtime event subscription masks.
+ *
+ * See `mln_runtime_event_mask` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventMask(public val rawValue: ULong) {
   public infix fun or(other: RuntimeEventMask): RuntimeEventMask =
     RuntimeEventMask(rawValue or other.rawValue)
@@ -677,6 +993,7 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
+    /** Selects no event type. */
     public val NONE: RuntimeEventMask = RuntimeEventMask(0uL)
     public val MAP_CAMERA_WILL_CHANGE: RuntimeEventMask = RuntimeEventMask(2uL)
     public val MAP_CAMERA_IS_CHANGING: RuntimeEventMask = RuntimeEventMask(4uL)
@@ -701,12 +1018,21 @@ public data class RuntimeEventMask(public val rawValue: ULong) {
     public val OFFLINE_REGION_RESPONSE_ERROR: RuntimeEventMask = RuntimeEventMask(1048576uL)
     public val OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: RuntimeEventMask =
       RuntimeEventMask(2097152uL)
+    /** Selects every map-originated event type this version defines. */
     public val ALL_MAP_EVENTS: RuntimeEventMask = RuntimeEventMask(4718590uL)
+    /** Selects every runtime-originated event type this version defines. */
     public val ALL_RUNTIME_EVENTS: RuntimeEventMask = RuntimeEventMask(3670016uL)
+    /** Selects every event type this version defines. */
     public val ALL: RuntimeEventMask = RuntimeEventMask(8388606uL)
   }
 }
 
+/**
+ * Payload kinds used by `mln_runtime_event.payload_type`.
+ *
+ * See `mln_runtime_event_payload_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventPayloadType(public val rawValue: UInt) {
   public companion object {
     public val NONE: RuntimeEventPayloadType = RuntimeEventPayloadType(0u)
@@ -721,6 +1047,12 @@ public data class RuntimeEventPayloadType(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Source kinds used by `mln_runtime_event.source_type`.
+ *
+ * See `mln_runtime_event_source_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventSourceType(public val rawValue: UInt) {
   public companion object {
     public val RUNTIME: RuntimeEventSourceType = RuntimeEventSourceType(0u)
@@ -728,6 +1060,12 @@ public data class RuntimeEventSourceType(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Runtime event types carried by `mln_runtime_event.type`.
+ *
+ * See `mln_runtime_event_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventType(public val rawValue: UInt) {
   public companion object {
     public val MAP_CAMERA_WILL_CHANGE: RuntimeEventType = RuntimeEventType(1u)
@@ -755,6 +1093,12 @@ public data class RuntimeEventType(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Optional fields for `mln_source_feature_query_options`.
+ *
+ * See `mln_source_feature_query_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class SourceFeatureQueryOptionField(public val rawValue: UInt) {
   public infix fun or(other: SourceFeatureQueryOptionField): SourceFeatureQueryOptionField =
     SourceFeatureQueryOptionField(rawValue or other.rawValue)
@@ -770,22 +1114,44 @@ public data class SourceFeatureQueryOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Status values returned by status-returning functions.
+ *
+ * See `mln_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+ */
 public data class Status(public val rawValue: Int) {
   public companion object {
     public val OK: Status = Status(0)
+    /** A pointer, size field, mask, or handle argument was invalid. */
     public val INVALID_ARGUMENT: Status = Status(-1)
+    /** The object is valid but not currently in a state that permits the call. */
     public val INVALID_STATE: Status = Status(-2)
+    /** The handle is thread-affine and the call was made from the wrong thread. */
     public val WRONG_THREAD: Status = Status(-3)
+    /** The entry point or requested behavior is unavailable in this build. */
     public val UNSUPPORTED: Status = Status(-4)
+    /** A native MapLibre error or C++ exception was converted to status. */
     public val NATIVE_ERROR: Status = Status(-5)
+    /** The operation reached its terminal cancelled disposition. */
     public val CANCELLED: Status = Status(-6)
+    /** A conflicting driver call or lifecycle transition is in flight. */
     public val BUSY: Status = Status(-7)
+    /** The render target or graphics receiver was irreversibly lost. */
     public val TARGET_LOST: Status = Status(-8)
+    /** A nonblocking acquisition or service call has no result yet. */
     public val NOT_READY: Status = Status(-9)
+    /** A command or operation named an ID with no live object behind it. */
     public val NOT_FOUND: Status = Status(-10)
   }
 }
 
+/**
+ * Field mask values for `mln_style_image_options`.
+ *
+ * See `mln_style_image_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleImageOptionField(public val rawValue: UInt) {
   public infix fun or(other: StyleImageOptionField): StyleImageOptionField =
     StyleImageOptionField(rawValue or other.rawValue)
@@ -807,6 +1173,12 @@ public data class StyleImageOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * How a stretchable image fits text along one axis.
+ *
+ * See `mln_style_image_text_fit` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleImageTextFit(public val rawValue: UInt) {
   public companion object {
     public val STRETCH_OR_SHRINK: StyleImageTextFit = StyleImageTextFit(0u)
@@ -815,6 +1187,12 @@ public data class StyleImageTextFit(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Layer visibility values used by the visibility setter and layer info.
+ *
+ * See `mln_style_layer_visibility` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleLayerVisibility(public val rawValue: UInt) {
   public companion object {
     public val VISIBLE: StyleLayerVisibility = StyleLayerVisibility(0u)
@@ -822,6 +1200,12 @@ public data class StyleLayerVisibility(public val rawValue: UInt) {
   }
 }
 
+/**
+ * DEM raster encoding values used by `mln_style_tile_source_options`.
+ *
+ * See `mln_style_raster_dem_encoding` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleRasterDemEncoding(public val rawValue: UInt) {
   public companion object {
     public val MAPBOX: StyleRasterDemEncoding = StyleRasterDemEncoding(0u)
@@ -829,6 +1213,12 @@ public data class StyleRasterDemEncoding(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Fields available in `mln_style_source_info`.
+ *
+ * See `mln_style_source_info_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleSourceInfoField(public val rawValue: UInt) {
   public infix fun or(other: StyleSourceInfoField): StyleSourceInfoField =
     StyleSourceInfoField(rawValue or other.rawValue)
@@ -840,15 +1230,27 @@ public data class StyleSourceInfoField(public val rawValue: UInt) {
     (rawValue and other.rawValue) == other.rawValue
 
   public companion object {
+    /** The source retains a URL. */
     public val URL: StyleSourceInfoField = StyleSourceInfoField(1u)
+    /** The tile source was defined with an inline TileJSON description. */
     public val TILEJSON: StyleSourceInfoField = StyleSourceInfoField(2u)
+    /** The inline TileJSON description contains geographic bounds. */
     public val BOUNDS: StyleSourceInfoField = StyleSourceInfoField(4u)
+    /** The source exposes a tile size. */
     public val TILE_SIZE: StyleSourceInfoField = StyleSourceInfoField(8u)
+    /** The source exposes a vector tile encoding. */
     public val VECTOR_ENCODING: StyleSourceInfoField = StyleSourceInfoField(16u)
+    /** The source exposes a DEM raster encoding. */
     public val RASTER_ENCODING: StyleSourceInfoField = StyleSourceInfoField(32u)
   }
 }
 
+/**
+ * Style source type values returned by source metadata queries.
+ *
+ * See `mln_style_source_type` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleSourceType(public val rawValue: UInt) {
   public companion object {
     public val UNKNOWN: StyleSourceType = StyleSourceType(0u)
@@ -864,6 +1266,12 @@ public data class StyleSourceType(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+ *
+ * See `mln_style_tile_scheme` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleTileScheme(public val rawValue: UInt) {
   public companion object {
     public val XYZ: StyleTileScheme = StyleTileScheme(0u)
@@ -871,6 +1279,12 @@ public data class StyleTileScheme(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_style_tile_source_options`.
+ *
+ * See `mln_style_tile_source_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleTileSourceOptionField(public val rawValue: UInt) {
   public infix fun or(other: StyleTileSourceOptionField): StyleTileSourceOptionField =
     StyleTileSourceOptionField(rawValue or other.rawValue)
@@ -893,6 +1307,12 @@ public data class StyleTileSourceOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Field mask values for `mln_style_transition_options`.
+ *
+ * See `mln_style_transition_option_field` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleTransitionOptionField(public val rawValue: UInt) {
   public infix fun or(other: StyleTransitionOptionField): StyleTransitionOptionField =
     StyleTransitionOptionField(rawValue or other.rawValue)
@@ -911,6 +1331,12 @@ public data class StyleTransitionOptionField(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Vector tile encoding values used by `mln_style_tile_source_options`.
+ *
+ * See `mln_style_vector_tile_encoding` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleVectorTileEncoding(public val rawValue: UInt) {
   public companion object {
     public val MVT: StyleVectorTileEncoding = StyleVectorTileEncoding(0u)
@@ -918,6 +1344,12 @@ public data class StyleVectorTileEncoding(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Tile LOD algorithms used by `mln_map_tile_options`.
+ *
+ * See `mln_tile_lod_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class TileLodMode(public val rawValue: UInt) {
   public companion object {
     public val DEFAULT: TileLodMode = TileLodMode(0u)
@@ -925,6 +1357,12 @@ public data class TileLodMode(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Tile operations reported by tile observer events.
+ *
+ * See `mln_tile_operation` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class TileOperation(public val rawValue: UInt) {
   public companion object {
     public val REQUESTED_FROM_CACHE: TileOperation = TileOperation(0u)
@@ -939,6 +1377,12 @@ public data class TileOperation(public val rawValue: UInt) {
   }
 }
 
+/**
+ * Viewport orientation modes used by `mln_map_viewport_options`.
+ *
+ * See `mln_viewport_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class ViewportMode(public val rawValue: UInt) {
   public companion object {
     public val DEFAULT: ViewportMode = ViewportMode(0u)
@@ -946,21 +1390,46 @@ public data class ViewportMode(public val rawValue: UInt) {
   }
 }
 
+/**
+ * WebGL context placement.
+ *
+ * See `mln_webgl_context_kind` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class WebglContextKind(public val rawValue: UInt) {
   public companion object {
+    /** Use a host-created context on its current browser agent. */
     public val EXISTING: WebglContextKind = WebglContextKind(0u)
+    /**
+     * Create a WebGL 2 context on a native worker whose pthread creation claims canvas_selector
+     * through Emscripten's transferred-canvases attribute.
+     */
     public val TRANSFERRED_CANVAS: WebglContextKind = WebglContextKind(1u)
   }
 }
 
+/**
+ * Metal frame acquired from a session-owned texture target.
+ *
+ * See `mln_metal_owned_texture_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public class MetalOwnedTextureFrame(
+  /** Session generation that produced this frame. */
   generation: ULong = 0uL,
+  /** Physical Metal texture width in device pixels. */
   width: UInt = 0u,
+  /** Physical Metal texture height in device pixels. */
   height: UInt = 0u,
+  /** UI-to-device pixel scale used for this frame. */
   scaleFactor: Double = 0.0,
+  /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /** Borrowed id&#60;MTLTexture&#62; / MTL::Texture&#42;. Valid until frame release. */
   texture: NativePointer,
+  /** Borrowed id&#60;MTLDevice&#62; / MTL::Device&#42;. Valid until frame release. */
   device: NativePointer,
+  /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
   pixelFormat: ULong = 0uL,
 ) {
   internal var bindingScope: ViewScope? = null
@@ -1021,16 +1490,32 @@ public class MetalOwnedTextureFrame(
     }
 }
 
+/**
+ * OpenGL frame acquired from a session-owned texture target.
+ *
+ * See `mln_opengl_owned_texture_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public class OpenglOwnedTextureFrame(
+  /** Session generation that produced this frame. */
   generation: ULong = 0uL,
+  /** Physical OpenGL texture width in device pixels. */
   width: UInt = 0u,
+  /** Physical OpenGL texture height in device pixels. */
   height: UInt = 0u,
+  /** UI-to-device pixel scale used for this frame. */
   scaleFactor: Double = 0.0,
+  /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /** Borrowed OpenGL texture object name. Valid until frame release. */
   texture: UInt = 0u,
+  /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   target: UInt = 0u,
+  /** OpenGL internal format, such as GL_RGBA8. */
   internalFormat: UInt = 0u,
+  /** OpenGL pixel format, such as GL_RGBA. */
   format: UInt = 0u,
+  /** OpenGL pixel type, such as GL_UNSIGNED_BYTE. */
   type: UInt = 0u,
 ) {
   internal var bindingScope: ViewScope? = null
@@ -1105,8 +1590,19 @@ public class OpenglOwnedTextureFrame(
     }
 }
 
+/**
+ * Backend synchronization copied by frame access and release calls.
+ *
+ * See `mln_gpu_sync` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public class GpuSync(
+  /** One `mln_gpu_sync_kind` value. */
   kind: GpuSyncKind = GpuSyncKind(0u),
+  /**
+   * Bit pattern of the backend object that kind names: the id&#60;MTLSharedEvent&#62; pointer, the
+   * VkSemaphore handle, the GLsync pointer, or the WebGPU token.
+   */
   `object`: ULong = 0uL,
   value: ULong = 0uL,
 ) {
@@ -1133,25 +1629,58 @@ public class GpuSync(
     }
 }
 
+/**
+ * Immutable result record copied into an owned frame-result batch.
+ *
+ * See `mln_render_frame_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 public data class RenderFrameResult(
+  /** One `mln_render_result` value. */
   public val disposition: RenderResult = RenderResult(0u),
   public val token: ULong = 0uL,
   public val mapUpdateGeneration: ULong = 0uL,
   public val extentGeneration: ULong = 0uL,
+  /** Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`. */
   public val frameGeneration: ULong = 0uL,
+  /**
+   * Whether the map asked for another frame while it rendered this one, as during an ongoing paint
+   * transition. Set only when disposition is `MLN_RENDER_RESULT_RENDERED`, and false for every
+   * other outcome. This is the same signal that `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`
+   * carries in its needs_repaint field, delivered with the frame result so a host can re-arm its
+   * frame loop without the runtime event round trip. A camera transition does not set it by itself:
+   * the map publishes a new update after each of the transition's frames instead, which a
+   * render-if-needed demand renders.
+   */
   public val needsRepaint: Boolean = false,
 )
 
+/**
+ * Vulkan frame acquired from a session-owned texture target.
+ *
+ * See `mln_vulkan_owned_texture_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public class VulkanOwnedTextureFrame(
+  /** Session generation that produced this frame. */
   generation: ULong = 0uL,
+  /** Physical Vulkan image width in device pixels. */
   width: UInt = 0u,
+  /** Physical Vulkan image height in device pixels. */
   height: UInt = 0u,
+  /** UI-to-device pixel scale used for this frame. */
   scaleFactor: Double = 0.0,
+  /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /** Borrowed VkImage bit pattern. Valid until frame release. */
   image: ULong = 0uL,
+  /** Borrowed VkImageView bit pattern. Valid until frame release. */
   imageView: ULong = 0uL,
+  /** Borrowed VkDevice. Valid until frame release. */
   device: NativePointer,
+  /** Backend-native VkFormat value. */
   format: UInt = 0u,
+  /** Backend-native VkImageLayout value; Vulkan frames are host-sampleable. */
   layout: UInt = 0u,
 ) {
   internal var bindingScope: ViewScope? = null
@@ -1226,15 +1755,30 @@ public class VulkanOwnedTextureFrame(
     }
 }
 
+/**
+ * WebGPU frame acquired from a session-owned texture target.
+ *
+ * See `mln_webgpu_owned_texture_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public class WebgpuOwnedTextureFrame(
+  /** Session generation that produced this frame. */
   generation: ULong = 0uL,
+  /** Physical WebGPU texture width in device pixels. */
   width: UInt = 0u,
+  /** Physical WebGPU texture height in device pixels. */
   height: UInt = 0u,
+  /** UI-to-device pixel scale used for this frame. */
   scaleFactor: Double = 0.0,
+  /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /** Borrowed WGPUTexture. Valid until frame release. */
   texture: NativePointer,
+  /** Borrowed WGPUTextureView. Valid until frame release. */
   textureView: NativePointer,
+  /** Borrowed WGPUDevice. Valid until frame release. */
   device: NativePointer,
+  /** Backend-native WGPUTextureFormat value. */
   format: UInt = 0u,
 ) {
   internal var bindingScope: ViewScope? = null
@@ -1302,6 +1846,12 @@ public class WebgpuOwnedTextureFrame(
     }
 }
 
+/**
+ * Cubic easing curve for animated camera transitions.
+ *
+ * See `mln_unit_bezier` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class UnitBezier(
   public val x1: Double = 0.0,
   public val y1: Double = 0.0,
@@ -1309,32 +1859,90 @@ public data class UnitBezier(
   public val y2: Double = 0.0,
 )
 
+/**
+ * Optional animation controls for camera transitions.
+ *
+ * See `mln_animation_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class AnimationOptions(
+  /**
+   * Duration in milliseconds. Must be finite and non-negative. Values that would overflow MapLibre
+   * Native's internal duration are invalid.
+   */
   public val durationMs: Double? = null,
+  /**
+   * Average fly velocity in screenfuls per second. Must be positive and defaults to 1.2 when
+   * omitted.
+   */
   public val velocity: Double? = null,
+  /** Peak zoom for flyTo transitions. */
   public val minZoom: Double? = null,
   public val easing: UnitBezier? = null,
+  /** Caller-chosen identity for the transition this options struct starts. */
   public val transitionId: ULong? = null,
 )
 
-public data class LatLng(public val latitude: Double = 0.0, public val longitude: Double = 0.0)
+/**
+ * Geographic coordinate in degrees used by map and projection APIs.
+ *
+ * See `mln_lat_lng` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
+public data class LatLng(
+  /** Latitude in degrees. Input latitude must be finite and within &#91;-90, 90&#93;. */
+  public val latitude: Double = 0.0,
+  /** Longitude in degrees. Input longitude must be finite. */
+  public val longitude: Double = 0.0,
+)
 
+/**
+ * Geographic bounds in degrees.
+ *
+ * See `mln_lat_lng_bounds` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class LatLngBounds(
   public val southwest: LatLng = LatLng(),
   public val northeast: LatLng = LatLng(),
 )
 
+/**
+ * Optional map camera constraint fields.
+ *
+ * See `mln_bound_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class BoundOptions(
+  /** Read when fields contains `MLN_BOUND_OPTION_BOUNDS`. */
   public val bounds: LatLngBounds? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val minPitch: Double? = null,
   public val maxPitch: Double? = null,
+  /**
+   * Selects the unbounded geographic constraint, which leaves every camera center unconstrained and
+   * lets the map pan freely across the antimeridian. This differs from world bounds of -90/-180 to
+   * 90/180, which clamp longitude to that range. Mutually exclusive with `MLN_BOUND_OPTION_BOUNDS`,
+   * and leaves `mln_bound_options.bounds` unread.
+   */
   public val unbounded: Boolean = false,
 )
 
+/**
+ * Screen-space point in logical map pixels.
+ *
+ * See `mln_screen_point` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class ScreenPoint(public val x: Double = 0.0, public val y: Double = 0.0)
 
+/**
+ * One relative camera operation.
+ *
+ * See `mln_camera_delta` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraDelta(
   public val kind: CameraDeltaKind = CameraDeltaKind(0u),
   public val offset: ScreenPoint = ScreenPoint(),
@@ -1343,6 +1951,12 @@ public data class CameraDelta(
   public val animation: AnimationOptions = AnimationOptions(),
 )
 
+/**
+ * Screen-space inset in logical map pixels.
+ *
+ * See `mln_edge_insets` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class EdgeInsets(
   public val top: Double = 0.0,
   public val left: Double = 0.0,
@@ -1350,16 +1964,29 @@ public data class EdgeInsets(
   public val right: Double = 0.0,
 )
 
+/**
+ * Optional fitting controls for camera-for-viewport queries.
+ *
+ * See `mln_camera_fit_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraFitOptions(
   public val padding: EdgeInsets? = null,
   public val bearing: Double? = null,
   public val pitch: Double? = null,
 )
 
+/**
+ * Camera fields used by snapshots and camera updates.
+ *
+ * See `mln_camera_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraOptions(
   public val center: LatLng? = null,
   public val centerAltitude: Double? = null,
   public val padding: EdgeInsets? = null,
+  /** Optional screen-space focal point in logical map pixels. */
   public val anchor: ScreenPoint? = null,
   public val zoom: Double? = null,
   public val bearing: Double? = null,
@@ -1368,6 +1995,12 @@ public data class CameraOptions(
   public val fieldOfView: Double? = null,
 )
 
+/**
+ * One atomic absolute camera update.
+ *
+ * See `mln_camera_update` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraUpdate(
   public val mode: CameraUpdateMode = CameraUpdateMode(0u),
   public val camera: CameraOptions = CameraOptions(),
@@ -1375,25 +2008,53 @@ public data class CameraUpdate(
   public val gesturePhase: GesturePhase = GesturePhase(0u),
 )
 
+/**
+ * Canonical tile identity used by custom geometry and custom MVT vector source callbacks.
+ *
+ * See `mln_canonical_tile_id` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class CanonicalTileId(
   public val z: UInt = 0u,
   public val x: UInt = 0u,
   public val y: UInt = 0u,
 )
 
+/**
+ * One nonblocking request for a frame.
+ *
+ * See `mln_frame_demand` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 public data class FrameDemand(
+  /** A bitwise OR of `mln_frame_demand_flag` values. Defaults to `MLN_FRAME_DEMAND_IF_NEEDED`. */
   public val flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED,
+  /** Host identity returned with the terminal frame result. */
   public val token: ULong = 0uL,
+  /** Demands coalesce only when this value and their flags match. */
   public val coalescingBoundary: ULong = 0uL,
+  /** Positive time allowed before driver work begins, in nanoseconds; zero has no limit. */
   public val timeoutNs: ULong = 0uL,
 )
 
+/**
+ * Three-component vector used by free camera options.
+ *
+ * See `mln_vec3` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class Vec3(
   public val x: Double = 0.0,
   public val y: Double = 0.0,
   public val z: Double = 0.0,
 )
 
+/**
+ * Quaternion stored as x, y, z, w components.
+ *
+ * See `mln_quaternion` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class Quaternion(
   public val x: Double = 0.0,
   public val y: Double = 0.0,
@@ -1401,106 +2062,287 @@ public data class Quaternion(
   public val w: Double = 0.0,
 )
 
+/**
+ * Free camera position and orientation in MapLibre Native camera space.
+ *
+ * See `mln_free_camera_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class FreeCameraOptions(
   public val position: Vec3? = null,
   public val orientation: Quaternion? = null,
 )
 
+/**
+ * Options for GeoJSON sources.
+ *
+ * See `mln_geojson_source_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class GeojsonSourceOptions(
+  /** Minimum tiling zoom. Defaults to 0. */
   public val minZoom: Double? = null,
+  /** Maximum tiling zoom. Defaults to 18. */
   public val maxZoom: Double? = null,
+  /** Douglas-Peucker simplification tolerance. Defaults to 0.375. */
   public val tolerance: Double? = null,
+  /** Highest zoom that clusters points. Defaults to 17. */
   public val clusterMaxZoom: Double? = null,
+  /**
+   * Cluster aggregation expressions keyed by property name, as a JSON object whose members follow
+   * the MapLibre Style Spec clusterProperties form. The UTF-8 bytes are borrowed for the call.
+   */
   public val clusterProperties: ByteArray? = null,
+  /** Tile extent in pixels. Defaults to 512. */
   public val tileSize: UInt? = null,
+  /** Tile buffer in pixels. Defaults to 128. */
   public val buffer: UInt? = null,
+  /** Cluster radius in pixels. Defaults to 50. */
   public val clusterRadius: UInt? = null,
+  /** Points required to form a cluster. Defaults to 2. */
   public val clusterMinPoints: UInt? = null,
+  /** Adds line distance metrics to line features. Defaults to false. */
   public val lineMetrics: Boolean? = null,
+  /** Clusters point features. Defaults to false. */
   public val cluster: Boolean? = null,
+  /** Slices requested tiles inline during the update pass. Defaults to false. */
   public val synchronousTiling: Boolean? = null,
 )
 
+/**
+ * Lower-level Spherical Mercator projected-meter coordinate.
+ *
+ * See `mln_projected_meters` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class ProjectedMeters(
+  /** Distance measured northward from the equator, in meters. */
   public val northing: Double = 0.0,
+  /** Distance measured eastward from the prime meridian, in meters. */
   public val easting: Double = 0.0,
 )
 
+/**
+ * Logical map extent in UI pixels and device-pixel scale.
+ *
+ * See `mln_logical_extent` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class LogicalExtent(
+  /** Width in UI pixels. Defaults to 256. */
   public val width: UInt = 256u,
+  /** Height in UI pixels. Defaults to 256. */
   public val height: UInt = 256u,
+  /**
+   * Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map creation, so
+   * `mln_map_resize()` accepts only the value the map was created with.
+   */
   public val scaleFactor: Double = 1.0,
 )
 
+/**
+ * Options used when creating a map.
+ *
+ * See `mln_map_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapOptions(
+  /**
+   * Initial logical extent. Width and height must be positive. The scale factor must be positive
+   * and finite, and fixes the map's scale factor for its lifetime.
+   */
   public val initialExtent: LogicalExtent = LogicalExtent(),
+  /** One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`. */
   public val mapMode: MapMode = MapMode(0u),
+  /**
+   * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR encodings. Defaults to
+   * false.
+   */
   public val fastPforEnabled: Boolean = false,
+  /**
+   * Map-originated event types this map queues, as a bitwise OR of `mln_runtime_event_mask` values.
+   */
   public val eventMask: RuntimeEventMask = RuntimeEventMask.ALL,
 )
 
+/**
+ * Tile prefetch and LOD tuning controls.
+ *
+ * See `mln_map_tile_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapTileOptions(
+  /** Native uint8_t prefetch zoom delta. */
   public val prefetchZoomDelta: UInt? = null,
   public val lodMinRadius: Double? = null,
   public val lodScale: Double? = null,
   public val lodPitchThreshold: Double? = null,
   public val lodZoomShift: Double? = null,
+  /** One of `mln_tile_lod_mode`. */
   public val lodMode: TileLodMode? = null,
 )
 
+/**
+ * Live map viewport and render-transform controls.
+ *
+ * See `mln_map_viewport_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapViewportOptions(
+  /** One of `mln_north_orientation`. */
   public val northOrientation: NorthOrientation? = null,
+  /** One of `mln_constrain_mode`. */
   public val constrainMode: ConstrainMode? = null,
+  /** One of `mln_viewport_mode`. */
   public val viewportMode: ViewportMode? = null,
   public val frustumOffset: EdgeInsets? = null,
 )
 
+/**
+ * Logical render target extent in UI pixels.
+ *
+ * See `mln_render_target_extent` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class RenderTargetExtent(
+  /** Logical map width in UI pixels. Defaults to 256. */
   public val width: UInt = 256u,
+  /** Logical map height in UI pixels. Defaults to 256. */
   public val height: UInt = 256u,
+  /** UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0. */
   public val scaleFactor: Double = 1.0,
 )
 
+/**
+ * Metal attachment options for a borrowed texture target.
+ *
+ * See `mln_metal_borrowed_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class MetalBorrowedTextureDescriptor(
+  /**
+   * Logical texture extent. The map viewport uses width and height and the renderer uses
+   * scale_factor; the physical size is stated separately below.
+   */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Physical texture width in device pixels. Must be positive. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
+  /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
+  /** Borrowed id&#60;MTLTexture&#62; / MTL::Texture&#42;. Required. */
   public val texture: NativePointer,
 )
 
-public data class MetalContextDescriptor(public val device: NativePointer)
+/**
+ * Metal backend context fields shared by Metal render targets.
+ *
+ * See `mln_metal_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class MetalContextDescriptor(
+  /** id&#60;MTLDevice&#62; / MTL::Device&#42;. Retained when the target requires it. */
+  public val device: NativePointer
+)
 
+/**
+ * Metal attachment options for an owned texture target.
+ *
+ * See `mln_metal_owned_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class MetalOwnedTextureDescriptor(
+  /** Logical texture extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Metal backend context. device is required. */
   public val context: MetalContextDescriptor,
 )
 
+/**
+ * Metal attachment options for a native surface.
+ *
+ * See `mln_metal_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
 public data class MetalSurfaceDescriptor(
+  /** Logical surface extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Metal backend context. device is optional for Metal surfaces. */
   public val context: MetalContextDescriptor,
+  /** CAMetalLayer&#42; / CA::MetalLayer&#42; retained by the session. Required. */
   public val layer: NativePointer,
 )
 
+/**
+ * WGL context fields shared by OpenGL render targets on Windows.
+ *
+ * See `mln_wgl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class WglContextDescriptor(
+  /** Borrowed HDC used to create the session context. Required. */
   public val deviceContext: NativePointer,
+  /**
+   * Borrowed HGLRC whose share group the session context joins. Required under shared ownership. A
+   * dedicated session joins no share group, so it must be null there.
+   */
   public val shareContext: NativePointer,
+  /** Optional wglGetProcAddress-compatible function for the host loader. */
   public val getProcAddress: NativePointer,
 )
 
+/**
+ * EGL context fields shared by OpenGL render targets.
+ *
+ * See `mln_egl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class EglContextDescriptor(
+  /** Borrowed EGLDisplay. Required and kept initialized through teardown. */
   public val display: NativePointer,
+  /**
+   * Borrowed EGLConfig used to create the session context. Required. OpenGL texture targets require
+   * EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
+   */
   public val config: NativePointer,
+  /**
+   * Borrowed EGLContext whose share group the session context joins. Required under shared
+   * ownership, where the session also takes its client API from this context. A dedicated session
+   * joins no share group, so it must be null there and names client_api instead.
+   */
   public val shareContext: NativePointer,
+  /**
+   * Client API the session creates its context for. Required under dedicated ownership. A shared
+   * session queries share_context for it, so this is ignored there.
+   */
   public val clientApi: OpenglClientApi = OpenglClientApi(0u),
+  /** Optional eglGetProcAddress-compatible function for the host loader. */
   public val getProcAddress: NativePointer,
 )
 
+/**
+ * WebGL context fields shared by OpenGL render targets in the browser.
+ *
+ * See `mln_webgl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class WebglContextDescriptor(
+  /** One `mln_webgl_context_kind` value. */
   public val kind: WebglContextKind = WebglContextKind(0u),
+  /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive. */
   public val context: Int = 0,
+  /**
+   * Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML canvas must still be
+   * transferable when attachment starts.
+   */
   public val canvasSelector: String = "",
 )
 
+/**
+ * Backend-specific OpenGL context data.
+ *
+ * See `mln_opengl_context_descriptor_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public sealed interface OpenglContextDescriptorData {
   public data class Wgl(public val value: WglContextDescriptor) : OpenglContextDescriptorData
 
@@ -1512,63 +2354,174 @@ public sealed interface OpenglContextDescriptorData {
     OpenglContextDescriptorData
 }
 
+/**
+ * OpenGL backend context fields shared by OpenGL render targets.
+ *
+ * See `mln_opengl_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class OpenglContextDescriptor(
+  /**
+   * Whether the session shares its driver thread and graphics objects with the host. A private EGL
+   * owned texture and a transferred WebGL canvas are dedicated to their core worker.
+   */
   public val ownership: OpenglContextOwnership = OpenglContextOwnership(0u),
   public val data: OpenglContextDescriptorData,
 )
 
+/**
+ * OpenGL attachment options for a borrowed texture target.
+ *
+ * See `mln_opengl_borrowed_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class OpenglBorrowedTextureDescriptor(
+  /**
+   * Logical texture extent. The map viewport uses width and height and the renderer uses
+   * scale_factor; the physical size is stated separately below.
+   */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Physical texture width in device pixels. Must be positive. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
+  /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
+  /**
+   * Borrowed OpenGL context provider data. The texture must belong to this context or a context in
+   * the same share group.
+   */
   public val context: OpenglContextDescriptor,
+  /** Borrowed OpenGL texture object name. Required. */
   public val texture: UInt = 0u,
+  /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   public val target: UInt = 0u,
 )
 
+/**
+ * OpenGL attachment options for an owned texture target.
+ *
+ * See `mln_opengl_owned_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class OpenglOwnedTextureDescriptor(
+  /** Logical texture extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Borrowed OpenGL context provider data. Shared ownership creates a context whose texture frames
+   * the host can acquire. Dedicated EGL or transferred WebGL ownership creates a private
+   * core-worker context for CPU readback.
+   */
   public val context: OpenglContextDescriptor,
 )
 
+/**
+ * OpenGL attachment options for a native surface.
+ *
+ * See `mln_opengl_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
 public data class OpenglSurfaceDescriptor(
+  /** Logical surface extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Borrowed OpenGL context provider data. */
   public val context: OpenglContextDescriptor,
+  /**
+   * Borrowed platform surface handle: an HDC for WGL and an EGLSurface for EGL, both required. Null
+   * for WebGL, whose context carries its canvas binding.
+   */
   public val surface: NativePointer,
 )
 
+/**
+ * Caller-owned premultiplied RGBA8 image pixels.
+ *
+ * See `mln_premultiplied_rgba8_image` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class PremultipliedRgba8Image(
   public val width: UInt = 0u,
   public val height: UInt = 0u,
+  /** Bytes per image row. Must be at least width &#42; 4. */
   public val stride: UInt = 0u,
+  /** Premultiplied RGBA8 pixels. Must not be null for a non-empty image. */
   public val pixels: ByteArray = byteArrayOf(),
 )
 
+/**
+ * MapLibre axonometric rendering options used for snapshots and commands.
+ *
+ * See `mln_projection_mode` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class ProjectionMode(
+  /** Enables a non-perspective axonometric render transform. */
   public val axonometric: Boolean? = null,
+  /** Native x-skew factor used by the axonometric transform. */
   public val xSkew: Double? = null,
+  /** Native y-skew factor used by the axonometric transform. */
   public val ySkew: Double? = null,
 )
 
+/**
+ * Common attachment policy copied before an attach call returns.
+ *
+ * See `mln_render_session_attach_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class RenderSessionAttachOptions(
+  /** One `mln_render_driver_kind` value. Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`. */
   public val driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+  /**
+   * Requested host-acquirable owned-texture slot count. Private targets grant one slot regardless
+   * of this value. Ignored by other targets. Defaults to 1.
+   */
   public val requestedTextureRingDepth: UInt = 1u,
+  /** Wakes the receiver when the frame-result queue becomes nonempty. */
   public val frameWake: Wake = Wake(),
+  /** Wakes the graphics receiver when caller-driver work is available. */
   public val driverWorkWake: Wake = Wake(),
 )
 
+/**
+ * Options for rendered feature queries.
+ *
+ * See `mln_rendered_feature_query_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class RenderedFeatureQueryOptions(
+  /** Optional style layer IDs. When absent, all rendered layers are queried. */
   public val layerIds: List<String>? = null,
+  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
   public val filter: ByteArray? = null,
 )
 
+/**
+ * Screen-space box in logical map pixels.
+ *
+ * See `mln_screen_box` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class ScreenBox(
   public val min: ScreenPoint = ScreenPoint(),
   public val max: ScreenPoint = ScreenPoint(),
 )
 
-public data class ScreenLineString(public val points: List<ScreenPoint> = emptyList())
+/**
+ * Screen-space line string in logical map pixels.
+ *
+ * See `mln_screen_line_string` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class ScreenLineString(
+  /** Points. Null only when point_count is 0. */
+  public val points: List<ScreenPoint> = emptyList()
+)
 
+/**
+ * Screen-space query geometry data.
+ *
+ * See `mln_rendered_query_geometry_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public sealed interface RenderedQueryGeometryData {
   public data class Point(public val value: ScreenPoint) : RenderedQueryGeometryData
 
@@ -1580,21 +2533,58 @@ public sealed interface RenderedQueryGeometryData {
     RenderedQueryGeometryData
 }
 
+/**
+ * Rendered feature query geometry descriptor.
+ *
+ * See `mln_rendered_query_geometry` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class RenderedQueryGeometry(public val data: RenderedQueryGeometryData)
 
+/**
+ * Options used when creating a runtime.
+ *
+ * See `mln_runtime_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeOptions(
+  /** No flags are currently defined. Must be zero. */
   public val flags: UInt = 0u,
+  /**
+   * Directory root for asset:// URLs. Copied during runtime creation. Null or empty selects
+   * `/android_asset` on Android and `.` elsewhere.
+   */
   public val assetPath: String? = null,
+  /** Cache database path. Copied during runtime creation. */
   public val cachePath: String? = null,
+  /**
+   * Runtime-scoped event types this runtime queues, as a bitwise OR of `mln_runtime_event_mask`
+   * values.
+   */
   public val eventMask: RuntimeEventMask = RuntimeEventMask.ALL,
+  /** Wakes the receiver when the runtime event queue becomes nonempty. */
   public val eventWake: Wake = Wake(),
 )
 
+/**
+ * Options for source feature queries.
+ *
+ * See `mln_source_feature_query_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class SourceFeatureQueryOptions(
+  /** Optional source-layer IDs. Required by vector sources; ignored by GeoJSON. */
   public val sourceLayerIds: List<String>? = null,
+  /** Optional UTF-8 MapLibre style-spec filter JSON. Null means no filter. */
   public val filter: ByteArray? = null,
 )
 
+/**
+ * Content-box insets in image pixels, measured from the image's top-left.
+ *
+ * See `mln_image_content` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class ImageContent(
   public val left: Float = 0f,
   public val top: Float = 0f,
@@ -1602,134 +2592,344 @@ public data class ImageContent(
   public val bottom: Float = 0f,
 )
 
+/**
+ * Fixed metadata for one runtime style image.
+ *
+ * See `mln_style_image_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleImageInfo(
   public val width: UInt = 0u,
   public val height: UInt = 0u,
+  /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
   public val stride: UInt = 0u,
   public val byteLength: ULong = 0uL,
+  /** Interval counts for the stretchable axes. */
   public val stretchXCount: ULong = 0uL,
   public val stretchYCount: ULong = 0uL,
+  /** Content box, meaningful only when has_content is true. */
   public val content: ImageContent? = null,
+  /** One of `mln_style_image_text_fit`, meaningful only when its flag is true. */
   public val textFitWidth: StyleImageTextFit? = null,
+  /** One of `mln_style_image_text_fit`, meaningful only when its flag is true. */
   public val textFitHeight: StyleImageTextFit? = null,
+  /** Sprite pixel ratio. Defaults to 1.0. */
   public val pixelRatio: Float = 1.0f,
   public val sdf: Boolean = false,
 )
 
+/**
+ * One stretchable interval along an image axis, in image pixels.
+ *
+ * See `mln_image_stretch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class ImageStretch(public val from: Float = 0f, public val to: Float = 0f)
 
+/**
+ * Options for runtime style images.
+ *
+ * See `mln_style_image_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleImageOptions(
+  /**
+   * Horizontally stretchable intervals. Borrowed for the call and copied before return. May be null
+   * only when stretch_x_count is 0.
+   */
   public val stretchX: List<ImageStretch>? = null,
+  /**
+   * Vertically stretchable intervals. Borrowed for the call and copied before return. May be null
+   * only when stretch_y_count is 0.
+   */
   public val stretchY: List<ImageStretch>? = null,
+  /** Content box used when icon-text-fit applies. */
   public val content: ImageContent? = null,
+  /** One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK. */
   public val textFitWidth: StyleImageTextFit? = null,
+  /** One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK. */
   public val textFitHeight: StyleImageTextFit? = null,
+  /** Sprite pixel ratio. Defaults to 1. */
   public val pixelRatio: Float? = null,
+  /** Whether the image is a signed distance field icon. Defaults to false. */
   public val sdf: Boolean? = null,
 )
 
+/**
+ * Options for vector and raster tile sources.
+ *
+ * See `mln_style_tile_source_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleTileSourceOptions(
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val attribution: String? = null,
+  /** One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`. */
   public val scheme: StyleTileScheme? = null,
   public val bounds: LatLngBounds? = null,
+  /** Raster tile size in pixels. Defaults to 512. */
   public val tileSize: UInt? = null,
+  /** One of `mln_style_vector_tile_encoding`. Defaults to MVT. */
   public val vectorEncoding: StyleVectorTileEncoding? = null,
+  /** One of `mln_style_raster_dem_encoding`. Defaults to Mapbox. */
   public val rasterEncoding: StyleRasterDemEncoding? = null,
 )
 
+/**
+ * Global style transition options.
+ *
+ * See `mln_style_transition_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleTransitionOptions(
+  /**
+   * Transition duration in milliseconds. Must be finite and non-negative. Values that would
+   * overflow MapLibre Native's internal duration are invalid.
+   */
   public val durationMs: Double? = null,
+  /**
+   * Transition delay in milliseconds. Must be finite and non-negative. Values that would overflow
+   * MapLibre Native's internal duration are invalid.
+   */
   public val delayMs: Double? = null,
+  /** Whether symbol placement changes cross-fade. */
   public val enablePlacementTransitions: Boolean? = null,
 )
 
+/**
+ * CPU image readback metadata for a texture target frame.
+ *
+ * See `mln_texture_image_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class TextureImageInfo(
+  /** Physical image width in device pixels. */
   public val width: UInt = 0u,
+  /** Physical image height in device pixels. */
   public val height: UInt = 0u,
+  /** Bytes per image row. */
   public val stride: UInt = 0u,
+  /** Required output buffer byte length. */
   public val byteLength: ULong = 0uL,
 )
 
+/**
+ * Vulkan backend context fields shared by Vulkan render targets.
+ *
+ * See `mln_vulkan_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class VulkanContextDescriptor(
+  /** Borrowed VkInstance. Required. */
   public val instance: NativePointer,
+  /** Borrowed VkPhysicalDevice. Required. */
   public val physicalDevice: NativePointer,
+  /** Borrowed VkDevice. Required. */
   public val device: NativePointer,
+  /** Borrowed graphics VkQueue. Required. */
   public val graphicsQueue: NativePointer,
+  /** Queue family index for graphics_queue. Must support graphics commands. */
   public val graphicsQueueFamilyIndex: UInt = 0u,
+  /** PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles. */
   public val getInstanceProcAddr: NativePointer,
+  /** PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device. */
   public val getDeviceProcAddr: NativePointer,
 )
 
+/**
+ * Vulkan attachment options for a borrowed texture target.
+ *
+ * See `mln_vulkan_borrowed_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class VulkanBorrowedTextureDescriptor(
+  /**
+   * Logical texture extent. The map viewport uses width and height and the renderer uses
+   * scale_factor; the physical size is stated separately below.
+   */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Physical image width in device pixels. Must be positive. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
+  /** Physical image height in device pixels. Must be positive. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
+  /** Borrowed Vulkan context. All handles are required. */
   public val context: VulkanContextDescriptor,
+  /** Borrowed VkImage. Required. */
   public val image: ULong = 0uL,
+  /** Borrowed VkImageView for image. Required. */
   public val imageView: ULong = 0uL,
+  /** Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid. */
   public val format: UInt = 0u,
+  /** Backend-native VkImageLayout value expected at render-pass begin. */
   public val initialLayout: UInt = 0u,
+  /**
+   * Backend-native VkImageLayout value left after rendering succeeds. Defaults to 5,
+   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+   */
   public val finalLayout: UInt = 5u,
 )
 
+/**
+ * Vulkan attachment options for an owned texture target.
+ *
+ * See `mln_vulkan_owned_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class VulkanOwnedTextureDescriptor(
+  /** Logical texture extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Borrowed Vulkan context. All handles are required. */
   public val context: VulkanContextDescriptor,
 )
 
+/**
+ * Vulkan attachment options for a native surface.
+ *
+ * See `mln_vulkan_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
 public data class VulkanSurfaceDescriptor(
+  /** Logical surface extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /**
+   * Borrowed Vulkan context. All handles are required. The device must support VK_KHR_swapchain,
+   * and the queue family must support graphics and presentation to this descriptor's surface.
+   */
   public val context: VulkanContextDescriptor,
+  /** Borrowed VkSurfaceKHR bit pattern. Required. */
   public val surface: ULong = 0uL,
 )
 
+/**
+ * WebGPU backend context fields shared by WebGPU render targets.
+ *
+ * See `mln_webgpu_context_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class WebgpuContextDescriptor(
+  /** Borrowed WGPUInstance. Optional for texture targets. */
   public val instance: NativePointer,
+  /** Borrowed WGPUDevice. Required. */
   public val device: NativePointer,
+  /**
+   * Borrowed WGPUQueue. Optional; null uses the device default queue. A non-null queue must belong
+   * to device.
+   */
   public val queue: NativePointer,
 )
 
+/**
+ * WebGPU attachment options for a borrowed texture target.
+ *
+ * See `mln_webgpu_borrowed_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class WebgpuBorrowedTextureDescriptor(
+  /** Logical texture extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Physical texture width in device pixels. Defaults to 256. */
   public val physicalWidth: UInt = 256u,
+  /** Physical texture height in device pixels. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
+  /** Borrowed WebGPU context. device is required. */
   public val context: WebgpuContextDescriptor,
+  /** Borrowed WGPUTexture. Required. */
   public val texture: NativePointer,
+  /** Borrowed WGPUTextureView for texture. Required. */
   public val textureView: NativePointer,
+  /** Backend-native WGPUTextureFormat value. Undefined is invalid. */
   public val format: UInt = 0u,
 )
 
+/**
+ * WebGPU attachment options for an owned texture target.
+ *
+ * See `mln_webgpu_owned_texture_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class WebgpuOwnedTextureDescriptor(
+  /** Logical texture extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Borrowed WebGPU context. device is required. */
   public val context: WebgpuContextDescriptor,
 )
 
+/**
+ * WebGPU attachment options for a native surface.
+ *
+ * See `mln_webgpu_surface_descriptor` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+ */
 public data class WebgpuSurfaceDescriptor(
+  /** Logical surface extent. */
   public val extent: RenderTargetExtent = RenderTargetExtent(),
+  /** Borrowed WebGPU context. device is required. */
   public val context: WebgpuContextDescriptor,
+  /**
+   * Borrowed WGPUSurface. Required, and must stay alive for the session. The session configures it
+   * for this device and extent, and unconfigures it when the session ends.
+   */
   public val surface: NativePointer,
+  /**
+   * WGPUTextureFormat to configure the surface with. Required. A browser host takes it from
+   * navigator.gpu.getPreferredCanvasFormat().
+   */
   public val format: UInt = 0u,
 )
 
+/**
+ * Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+ *
+ * See `mln_rendering_stats` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RenderingStats(
+  /** Frame CPU encoding time in seconds. */
   public val encodingTime: Double = 0.0,
+  /** Frame CPU rendering time in seconds. */
   public val renderingTime: Double = 0.0,
+  /** Number of frames rendered by the native renderer. */
   public val frameCount: Long = 0L,
+  /** Draw calls executed during the most recent frame. */
   public val drawCallCount: Long = 0L,
+  /** Total draw calls executed by the native renderer. */
   public val totalDrawCallCount: Long = 0L,
 )
 
+/**
+ * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+ *
+ * See `mln_runtime_event_render_frame` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventRenderFrame(
+  /** One of `mln_render_mode`. */
   public val mode: RenderMode = RenderMode(0u),
+  /** Whether MapLibre needs another frame after this one. */
   public val needsRepaint: Boolean = false,
+  /** Whether symbol placement changed during this frame. */
   public val placementChanged: Boolean = false,
   public val stats: RenderingStats = RenderingStats(),
 )
 
-public data class RuntimeEventRenderMap(public val mode: RenderMode = RenderMode(0u))
+/**
+ * Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+ *
+ * See `mln_runtime_event_render_map` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventRenderMap(
+  /** One of `mln_render_mode`. */
+  public val mode: RenderMode = RenderMode(0u)
+)
 
+/**
+ * Overscaled tile identity reported in tile observer events.
+ *
+ * See `mln_tile_id` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class TileId(
   public val overscaledZ: UInt = 0u,
   public val wrap: Int = 0,
@@ -1738,12 +2938,26 @@ public data class TileId(
   public val canonicalY: UInt = 0u,
 )
 
+/**
+ * Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+ *
+ * See `mln_runtime_event_tile_action` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventTileAction(
+  /** One of `mln_tile_operation`. */
   public val operation: TileOperation = TileOperation(0u),
   public val tileId: TileId = TileId(),
 )
 
+/**
+ * Offline region status snapshot.
+ *
+ * See `mln_offline_region_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class OfflineRegionStatus(
+  /** One of `mln_offline_region_download_state`. */
   public val downloadState: OfflineRegionDownloadState = OfflineRegionDownloadState(0u),
   public val completedResourceCount: ULong = 0uL,
   public val completedResourceSize: ULong = 0uL,
@@ -1755,23 +2969,63 @@ public data class OfflineRegionStatus(
   public val complete: Boolean = false,
 )
 
+/**
+ * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+ *
+ * See `mln_runtime_event_offline_region_status` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventOfflineRegionStatus(
   public val regionId: Long = 0L,
+  /**
+   * Region status. This member keeps its own size field because the same struct is also returned by
+   * `mln_runtime_offline_region_get_status()`.
+   */
   public val status: OfflineRegionStatus = OfflineRegionStatus(),
 )
 
+/**
+ * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+ *
+ * See `mln_runtime_event_offline_region_response_error` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventOfflineRegionResponseError(
   public val regionId: Long = 0L,
+  /** One of `mln_resource_error_reason`. */
   public val reason: ResourceErrorReason = ResourceErrorReason(0u),
 )
 
+/**
+ * Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+ *
+ * See `mln_runtime_event_offline_region_tile_count_limit` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEventOfflineRegionTileCountLimit(
   public val regionId: Long = 0L,
   public val limit: ULong = 0uL,
 )
 
-public data class RuntimeEventCameraTransitionFinished(public val transitionId: ULong = 0uL)
+/**
+ * Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
+ *
+ * See `mln_runtime_event_camera_transition_finished` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventCameraTransitionFinished(
+  /**
+   * The transition_id the caller set on the `mln_animation_options` that started this transition.
+   */
+  public val transitionId: ULong = 0uL
+)
 
+/**
+ * Typed event payload carried inline by every event.
+ *
+ * See `mln_runtime_event_payload` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public sealed interface RuntimeEventPayload {
   public data class RenderFrame(public val value: RuntimeEventRenderFrame) : RuntimeEventPayload
 
@@ -1799,34 +3053,89 @@ public sealed interface RuntimeEventPayload {
   public data class Unknown(public val tag: UInt, public val bytes: ByteArray) : RuntimeEventPayload
 }
 
+/**
+ * One drained runtime event.
+ *
+ * See `mln_runtime_event` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public data class RuntimeEvent(
+  /** One of `mln_runtime_event_type`. */
   public val type: RuntimeEventType,
+  /** One of `mln_runtime_event_source_type`. */
   public val sourceType: RuntimeEventSourceType = RuntimeEventSourceType(0u),
+  /**
+   * Source handle selected by source_type: an `mln_runtime` or an `mln_map`. Every handle type is
+   * uint64_t, so this needs no cast.
+   */
   public val source: ULong = 0uL,
+  /**
+   * Secondary event detail whose meaning type selects. Depending on type it carries an
+   * `mln_camera_change_mode`, an `mln_status`, a MapLibre Native error ordinal, or 0. See
+   * `mln_runtime_event_type` for the per-type meaning.
+   */
   public val code: Int = 0,
+  /** Typed payload selected by payload_type. */
   public val payload: RuntimeEventPayload,
   public val message: String = "",
 )
 
-public data class RuntimeEventBatchView(public val events: List<RuntimeEvent> = emptyList())
+/**
+ * A borrowed view of one owned runtime-event batch.
+ *
+ * See `mln_runtime_event_batch_view` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class RuntimeEventBatchView(
+  /** Borrowed array of event_count events in queue order. */
+  public val events: List<RuntimeEvent> = emptyList()
+)
 
+/**
+ * Camera result borrowed for an ordered camera-query completion.
+ *
+ * See `mln_camera_query_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class CameraQueryResult(
   public val generation: ULong = 0uL,
   public val camera: CameraOptions = CameraOptions(),
 )
 
+/**
+ * Borrowed image-stretch arrays available during a completion callback.
+ *
+ * See `mln_style_image_stretches_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleImageStretchesResult(
   public val stretchX: List<ImageStretch> = emptyList(),
   public val stretchY: List<ImageStretch> = emptyList(),
 )
 
+/**
+ * Feature-state source, feature, and key selector.
+ *
+ * See `mln_feature_state_selector` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class FeatureStateSelector(
+  /** Source ID. Required and borrowed for the duration of the call. */
   public val sourceId: String = "",
+  /** Optional source layer ID. Required for vector-source disambiguation. */
   public val sourceLayerId: String? = null,
+  /** Optional feature ID string. Required by set/get and optional for remove. */
   public val featureId: String? = null,
+  /** Optional state key. Used only by remove and requires feature_id. */
   public val stateKey: String? = null,
 )
 
+/**
+ * Complete style image borrowed for a completion callback.
+ *
+ * See `mln_style_image_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleImageResult(
   public val info: StyleImageInfo = StyleImageInfo(),
   public val pixels: ByteArray = byteArrayOf(),
@@ -1834,19 +3143,43 @@ public data class StyleImageResult(
   public val stretchY: List<ImageStretch> = emptyList(),
 )
 
+/**
+ * Fixed layer metadata included in `mln_style_layer_result`.
+ *
+ * See `mln_style_layer_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleLayerInfo(
+  /** View of a static style-spec layer type string. It stays valid for the life of the process. */
   public val type: String = "",
+  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
   public val minZoom: Double = 0.0,
+  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
   public val maxZoom: Double = 0.0,
+  /** One of `mln_style_layer_visibility`. */
   public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
 )
 
+/**
+ * Complete layer metadata borrowed for a completion callback.
+ *
+ * See `mln_style_layer_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleLayerResult(
   public val info: StyleLayerInfo = StyleLayerInfo(),
+  /** Source ID. Empty for a layer type that takes no source. */
   public val sourceId: String? = null,
+  /** Source-layer ID. Empty when the layer sets none. */
   public val sourceLayer: String? = null,
 )
 
+/**
+ * Inline tile metadata selected as one value by the source-info field mask.
+ *
+ * See `mln_style_source_tile_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleSourceTileInfo(
   public val tileCount: ULong = 0uL,
   public val minZoom: Double = 0.0,
@@ -1854,19 +3187,40 @@ public data class StyleSourceTileInfo(
   public val scheme: StyleTileScheme = StyleTileScheme(0u),
 )
 
+/**
+ * Fixed source metadata included in `mln_style_source_result`.
+ *
+ * See `mln_style_source_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleSourceInfo(
+  /** One of `mln_style_source_type`. */
   public val type: StyleSourceType = StyleSourceType(0u),
+  /** Source ID byte length, excluding any null terminator. */
   public val idSize: ULong = 0uL,
+  /** Whether the source is marked volatile. */
   public val isVolatile: Boolean = false,
+  /** Attribution byte length, excluding any null terminator. */
   public val attributionSize: ULong? = null,
+  /** URL byte length, meaningful when fields contains URL. */
   public val urlSize: ULong? = null,
   public val tilejson: StyleSourceTileInfo? = null,
+  /** Geographic bounds, meaningful when fields contains BOUNDS. */
   public val bounds: LatLngBounds? = null,
+  /** Tile size in pixels, meaningful when fields contains TILE_SIZE. */
   public val tileSize: UInt? = null,
+  /** Vector encoding, meaningful when fields contains VECTOR_ENCODING. */
   public val vectorEncoding: StyleVectorTileEncoding? = null,
+  /** DEM encoding, meaningful when fields contains RASTER_ENCODING. */
   public val rasterEncoding: StyleRasterDemEncoding? = null,
 )
 
+/**
+ * Complete source metadata borrowed for a completion callback.
+ *
+ * See `mln_style_source_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleSourceResult(
   public val info: StyleSourceInfo = StyleSourceInfo(),
   public val attribution: String? = null,
@@ -1874,8 +3228,20 @@ public data class StyleSourceResult(
   public val tileUrls: List<String>? = null,
 )
 
+/**
+ * Borrowed inline TileJSON tile URLs available during a completion callback.
+ *
+ * See `mln_style_source_tile_urls_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleSourceTileUrlsResult(public val tileUrls: List<String> = emptyList())
 
+/**
+ * One style layer borrowed for a list completion callback.
+ *
+ * See `mln_style_layer_entry` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class StyleLayerEntry(
   public val id: String = "",
   public val type: String = "",
@@ -1883,16 +3249,25 @@ public data class StyleLayerEntry(
   public val sourceLayer: String? = null,
 )
 
+/**
+ * Immutable map state copied from the latest published generation.
+ *
+ * See `mln_map_snapshot` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class MapSnapshot(
+  /** Debug overlay mask of `mln_map_debug_option` values. */
   public val debugOptions: MapDebugOption,
   public val generation: ULong = 0uL,
   public val camera: CameraOptions = CameraOptions(),
   public val logicalExtent: LogicalExtent = LogicalExtent(),
   public val projectionMode: ProjectionMode = ProjectionMode(),
   public val viewport: MapViewportOptions = MapViewportOptions(),
+  /** True once every requested style and tile resource finished loading. */
   public val fullyLoaded: Boolean = false,
   public val renderingStatsViewEnabled: Boolean = false,
   public val repaintDemand: Boolean = false,
+  /** True while the map is inside a gesture. */
   public val gestureInProgress: Boolean = false,
   public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
   public val latestRenderUpdateGeneration: ULong = 0uL,
@@ -1901,24 +3276,53 @@ public data class MapSnapshot(
   public val freeCamera: FreeCameraOptions = FreeCameraOptions(),
 )
 
+/**
+ * Tile-pyramid offline region definition.
+ *
+ * See `mln_offline_tile_pyramid_region_definition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class OfflineTilePyramidRegionDefinition(
+  /** Style URL. Copied during region creation. */
   public val styleUrl: String = "",
   public val bounds: LatLngBounds = LatLngBounds(),
   public val minZoom: Double = 0.0,
+  /**
+   * Maximum zoom. Positive infinity follows MapLibre Native behavior and lets each tile source use
+   * its own maximum zoom.
+   */
   public val maxZoom: Double = 0.0,
   public val pixelRatio: Float = 0f,
   public val includeIdeographs: Boolean = false,
 )
 
+/**
+ * Geometry offline region definition.
+ *
+ * See `mln_offline_geometry_region_definition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class OfflineGeometryRegionDefinition(
+  /** Style URL. Copied during region creation. */
   public val styleUrl: String = "",
+  /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
   public val geometry: ByteArray = byteArrayOf(),
   public val minZoom: Double = 0.0,
+  /**
+   * Maximum zoom. Positive infinity follows MapLibre Native behavior and lets each tile source use
+   * its own maximum zoom.
+   */
   public val maxZoom: Double = 0.0,
   public val pixelRatio: Float = 0f,
   public val includeIdeographs: Boolean = false,
 )
 
+/**
+ * Offline region definition data.
+ *
+ * See `mln_offline_region_definition_data` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public sealed interface OfflineRegionDefinitionData {
   public data class TilePyramid(public val value: OfflineTilePyramidRegionDefinition) :
     OfflineRegionDefinitionData
@@ -1930,16 +3334,34 @@ public sealed interface OfflineRegionDefinitionData {
     OfflineRegionDefinitionData
 }
 
+/**
+ * Tagged offline region definition.
+ *
+ * See `mln_offline_region_definition` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class OfflineRegionDefinition(public val data: OfflineRegionDefinitionData)
 
+/**
+ * Region data delivered by an offline completion.
+ *
+ * See `mln_offline_region_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+ */
 public data class OfflineRegionInfo(
   public val id: Long = 0L,
   public val definition: OfflineRegionDefinition,
+  /** Metadata bytes. */
   public val metadata: ByteArray = byteArrayOf(),
 )
 
 public data class ResourceRequest(
+  /** URL entering the network layer, before tile server normalization. */
   public val requestedUrl: String? = null,
+  /**
+   * URL to fetch, after resource-kind normalization against the runtime's tile server options and
+   * API key.
+   */
   public val resolvedUrl: String? = null,
   public val kind: ResourceKind = ResourceKind(0u),
   public val loadingMethod: ResourceLoadingMethod = ResourceLoadingMethod(0u),
@@ -1954,19 +3376,39 @@ public data class ResourceRequest(
 )
 
 public data class RenderAbandonResult(
+  /** One `mln_render_abandon_disposition` value. */
   public val disposition: RenderAbandonDisposition = RenderAbandonDisposition(0u),
+  /** Backend resource groups intentionally retained until process exit. */
   public val quarantinedResourceCount: UInt = 0u,
 )
 
+/**
+ * Driver and target capabilities fixed for one attached render session.
+ *
+ * See `mln_render_session_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
 public data class RenderSessionCapabilities(
+  /** One `mln_render_driver_kind` value. */
   public val driver: RenderDriverKind,
+  /** Granted owned-texture slot count, or zero for a target without a ring. */
   public val textureRingDepth: UInt = 0u,
+  /** A bitwise OR of `mln_render_session_capability_flag` values. */
   public val flags: RenderSessionCapabilityFlag,
 )
 
+/**
+ * Any-thread render-session snapshot.
+ *
+ * See `mln_render_session_snapshot` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
 public data class RenderSessionSnapshot(
+  /** One `mln_render_session_state` value. */
   public val state: RenderSessionState,
+  /** One `mln_render_driver_kind` value. */
   public val driver: RenderDriverKind,
+  /** Most recent terminal `mln_render_result` value. */
   public val latestResult: RenderResult = RenderResult(0u),
   public val extent: RenderTargetExtent = RenderTargetExtent(),
   public val generation: ULong = 0uL,
@@ -1981,6 +3423,12 @@ public data class RenderSessionSnapshot(
   public val pendingChanges: Boolean = false,
 )
 
+/**
+ * One query hit borrowed for a completion callback.
+ *
+ * See `mln_queried_feature` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
 public data class QueriedFeature(
   public val feature: ByteArray = byteArrayOf(),
   public val sourceId: String? = null,
@@ -1988,7 +3436,14 @@ public data class QueriedFeature(
   public val state: ByteArray? = null,
 )
 
+/**
+ * Texture readback borrowed for a completion callback.
+ *
+ * See `mln_texture_readback_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
 public data class TextureReadbackResult(
+  /** Borrowed pixel bytes, valid only during the callback. */
   public val data: ByteArray = byteArrayOf(),
   public val info: TextureImageInfo = TextureImageInfo(),
 )
@@ -1996,6 +3451,7 @@ public data class TextureReadbackResult(
 public data class ResourceResponse(
   public val status: ResourceResponseStatus = ResourceResponseStatus(0u),
   public val errorReason: ResourceErrorReason = ResourceErrorReason(0u),
+  /** Response bytes. May be null only when byte_count is 0. */
   public val bytes: ByteArray = byteArrayOf(),
   public val errorMessage: String? = null,
   public val mustRevalidate: Boolean = false,
@@ -2025,8 +3481,16 @@ public data class MapCameraSnapshotGetResult(
   public val generation: ULong,
 )
 
+/**
+ * Options for custom geometry sources.
+ *
+ * See `mln_custom_geometry_source_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class CustomGeometrySourceOptions(
+  /** Required tile fetch callback. */
   public val fetchTile: CustomGeometrySourceTileCallback? = null,
+  /** Optional best-effort tile cancel callback. */
   public val cancelTile: CustomGeometrySourceTileCallback? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
@@ -2037,15 +3501,35 @@ public data class CustomGeometrySourceOptions(
   public val wrap: Boolean? = null,
 )
 
+/**
+ * Callback invoked for custom geometry source tile requests and cancels.
+ *
+ * See `mln_custom_geometry_source_tile_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public typealias CustomGeometrySourceTileCallback = (tileId: CanonicalTileId) -> Unit
 
+/**
+ * Options for custom MVT vector sources.
+ *
+ * See `mln_custom_mvt_vector_source_options` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public data class CustomMvtVectorSourceOptions(
+  /** Required tile fetch callback. */
   public val fetchTile: CustomMvtVectorSourceTileCallback? = null,
+  /** Optional best-effort tile cancel callback. */
   public val cancelTile: CustomMvtVectorSourceTileCallback? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
 )
 
+/**
+ * Callback invoked for custom MVT vector source tile requests and cancels.
+ *
+ * See `mln_custom_mvt_vector_source_tile_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
 public typealias CustomMvtVectorSourceTileCallback = (tileId: CanonicalTileId) -> Unit
 
 public class HttpHeaderTransformResponse
@@ -2054,11 +3538,29 @@ internal constructor(
   internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
 )
 
+/**
+ * Receives a MapLibre Native log record.
+ *
+ * See `mln_log_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
 public typealias LogCallback =
   (severity: LogSeverity, event: LogEvent, code: Long, message: String) -> UInt
 
+/**
+ * Receiver wake callback copied by a successful owning call.
+ *
+ * See `mln_wake` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
+ */
 public data class Wake(public val callback: WakeCallback? = null)
 
+/**
+ * Schedules service by the receiver that owns a queue or driver.
+ *
+ * See `mln_wake_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
+ */
 public typealias WakeCallback = () -> Unit
 
 public class ResourceTransformResponse
@@ -2069,19 +3571,43 @@ internal constructor(
 
 public data class HttpHeaderTransform(public val callback: HttpHeaderTransformCallback)
 
+/**
+ * Adds end-to-end headers to one outgoing HTTP request attempt.
+ *
+ * See `mln_http_header_transform_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public typealias HttpHeaderTransformCallback =
   (kind: ResourceKind, url: String, outResponse: HttpHeaderTransformResponse) -> Unit
 
 public data class ResourceProvider(public val callback: ResourceProviderCallback)
 
+/**
+ * Intercepts a network resource request.
+ *
+ * See `mln_resource_provider_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public typealias ResourceProviderCallback =
   (request: ResourceRequest, handle: ResourceRequestHandle) -> ResourceProviderDecision
 
 public data class ResourceTransform(public val callback: ResourceTransformCallback)
 
+/**
+ * Rewrites a network resource URL.
+ *
+ * See `mln_resource_transform_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public typealias ResourceTransformCallback =
   (kind: ResourceKind, url: String, outResponse: ResourceTransformResponse) -> Unit
 
+/**
+ * Reports that MapLibre cancelled a C API resource provider request.
+ *
+ * See `mln_resource_request_cancel_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
 public typealias ResourceRequestCancelCallback = () -> Unit
 
 internal class GeneratedLogCallbackRegistration(val callback: LogCallback)

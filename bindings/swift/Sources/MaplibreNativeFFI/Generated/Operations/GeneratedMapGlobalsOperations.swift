@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_map_options_default`.
+  /// Returns map options initialized for this C API version.
+  ///
+  /// See `mln_map_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   static func mapOptionsDefault() throws -> MapOptions {
     try nativeDirect("mln_map_options_default") { _ in
       MapOptions(raw: mln_map_options_default())

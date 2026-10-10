@@ -12,6 +12,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api, Function
@@ -120,6 +121,11 @@ PRIMITIVES = {
     "uint8_t": "byte",
     "int8_t": "sbyte",
 }
+
+
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The XML doc comment of a declaration, or empty when it has none."""
+    return docs.xml_comment(bound.doc(native), indent)
 
 
 def owner_name(handle: HandlePlan | str) -> str:
@@ -904,7 +910,7 @@ def emit(api: Api | BoundApi) -> Emission:
         except Unsupported as error:
             unsupported[function.name] = f"{function.location}: {error}"
             continue
-        methods[owner].append(emitted)
+        methods[owner].append(doc(bound, function.name, "    ") + emitted)
         records[owner].update(used_records)
         supported.append(function.name)
         # An owner without a declaration of its own lives with its first operation.
@@ -1082,9 +1088,20 @@ def emit(api: Api | BoundApi) -> Emission:
             ),
         ]
         bases = f" : {', '.join(interfaces)}" if interfaces else ""
+        handle_doc = next(
+            (
+                doc(bound, native)
+                for native in created_handles
+                if owners[native] == owner
+            ),
+            "",
+        )
         files[f"{directory}/{owner}.Operations.g.cs"] = (
-            HEADER + OPERATION_HELPERS + f"namespace {NAMESPACE};\n\n"
-            f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
+            HEADER
+            + OPERATION_HELPERS
+            + f"namespace {NAMESPACE};\n\n"
+            + handle_doc
+            + f"public {'static' if owner == 'Maplibre' else 'sealed'} unsafe partial class {owner}{bases}\n{{\n"
             + "\n".join(body)
             + "}\n"
         )
@@ -1143,7 +1160,7 @@ def emit(api: Api | BoundApi) -> Emission:
             else:
                 declaration = declaration.rstrip()[:-1] + default + "}\n"
         files[f"{directory}/{public_type(name)}.g.cs"] = (
-            HEADER + f"namespace {NAMESPACE};\n\n" + declaration
+            HEADER + f"namespace {NAMESPACE};\n\n" + doc(bound, name) + declaration
         )
     for enum in api.enums:
         if enum.name not in enum_names:
@@ -1165,12 +1182,13 @@ def emit(api: Api | BoundApi) -> Emission:
             }[enum.underlying_type.canonical]
         flags = "[Flags]\n" if enum.metadata.get("kind") == "bitmask" else ""
         fields = [
-            f"    {pascal(value.name.removeprefix(prefix).lower())} = {value.value},"
+            doc(bound, value.name, "    ")
+            + f"    {pascal(value.name.removeprefix(prefix).lower())} = {value.value},"
             for value in enum.values
         ]
         files[f"{directory}/{public_type(enum.name)}.g.cs"] = (
             "// Generated from the C headers by tools/bindgen. Do not edit.\n"
-            f"namespace {NAMESPACE};\n\n{flags}"
+            f"namespace {NAMESPACE};\n\n{doc(bound, enum.name)}{flags}"
             f"public enum {public_type(enum.name)} : {underlying}\n{{\n"
             + "\n".join(fields)
             + "\n}\n"

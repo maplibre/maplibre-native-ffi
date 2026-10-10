@@ -4,14 +4,20 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_metal_surface_descriptor_default`.
+  /// Returns Metal surface descriptor defaults for this C API version.
+  ///
+  /// See `mln_metal_surface_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   static func metalSurfaceDescriptorDefault() throws -> MetalSurfaceDescriptor {
     try nativeDirect("mln_metal_surface_descriptor_default") { _ in
       MetalSurfaceDescriptor(raw: mln_metal_surface_descriptor_default())
     }
   }
 
-  /// Calls `mln_opengl_surface_descriptor_default`.
+  /// Returns OpenGL surface descriptor defaults for this C API version.
+  ///
+  /// See `mln_opengl_surface_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   static func openglSurfaceDescriptorDefault() throws
     -> OpenglSurfaceDescriptor
   {
@@ -20,7 +26,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_vulkan_surface_descriptor_default`.
+  /// Returns Vulkan surface descriptor defaults for this C API version.
+  ///
+  /// See `mln_vulkan_surface_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   static func vulkanSurfaceDescriptorDefault() throws
     -> VulkanSurfaceDescriptor
   {
@@ -29,7 +38,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_webgpu_surface_descriptor_default`.
+  /// Returns WebGPU surface descriptor defaults for this C API version.
+  ///
+  /// See `mln_webgpu_surface_descriptor_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   static func webgpuSurfaceDescriptorDefault() throws
     -> WebgpuSurfaceDescriptor
   {

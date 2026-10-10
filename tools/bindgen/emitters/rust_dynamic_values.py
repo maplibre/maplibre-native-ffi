@@ -8,7 +8,7 @@ as an array's count or a presence mask.
 
 from dataclasses import replace
 
-from .rust import Unsupported, identifier, native_identifier, pascal
+from .rust import Unsupported, doc, identifier, native_identifier, pascal
 
 TRAIT_COPY = "unsafe {{ from_native({}) }}?"
 
@@ -182,7 +182,7 @@ def declaration(values, value):
     for flag in value.mask_flags:
         local = identifier(flag.member)
         mask = native_identifier(flag.mask)
-        fields.append(f"    pub {local}: bool,")
+        fields.append(f"{doc(values.bound, flag.name, '    ')}    pub {local}: bool,")
         writes.append(
             f"convert::set_flag(&mut raw.{mask}, sys::{flag.name}, self.{local});"
         )
@@ -254,7 +254,9 @@ def declaration(values, value):
         if field.value.kind == "union":
             union = field.value
             union_name = values.public(union)
-            fields.append(f"    pub {local}: {union_name},")
+            fields.append(
+                f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {local}: {union_name},"
+            )
             copies.append(f"{local}: {decode(values, union, place)},")
             tag = native_identifier(union.tag)
             cases = " ".join(
@@ -269,7 +271,9 @@ def declaration(values, value):
             continue
         typ = values.public(field.value)
         masked = field.presence and field.presence.mask
-        fields.append(f"    pub {local}: {'Option<' + typ + '>' if masked else typ},")
+        fields.append(
+            f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {local}: {'Option<' + typ + '>' if masked else typ},"
+        )
         copied = decode(values, field.value, place)
         if field.value.registration:
             # Native never returns callbacks, so a copy leaves a registration
@@ -338,7 +342,7 @@ def declaration(values, value):
     )
     return (
         "\n".join(extra)
-        + f"\n#[derive({', '.join(derives)})]\npub struct {name} {{\n"
+        + f"\n{doc(values.bound, value.native)}#[derive({', '.join(derives)})]\npub struct {name} {{\n"
         + "\n".join(fields)
         + "\n}\n"
         + default

@@ -43,12 +43,26 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         state.Retire();
     }
 
+    /// <summary>
+    /// Closes a standalone projection.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_close</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public void Close()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_map_projection_close");
         state.Close();
     }
 
+    /// <summary>
+    /// Copies the projection camera into out_camera.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_get_camera</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public CameraOptions GetCamera()
     {
         using var read = state.Read(this, "mln_map_projection_get_camera");
@@ -57,6 +71,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         return CopyCameraOptions(outCamera);
     }
 
+    /// <summary>
+    /// Converts a screen point to a geographic coordinate.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_lat_lng_for_pixel</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public LatLng LatLngForPixel(ScreenPoint point)
     {
         using var read = state.Read(this, "mln_map_projection_lat_lng_for_pixel");
@@ -72,6 +93,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         return CopyLatLng(outCoordinate);
     }
 
+    /// <summary>
+    /// Converts a screen point to an unwrapped geographic coordinate.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_lat_lng_for_pixel_unwrapped</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public LatLng LatLngForPixelUnwrapped(ScreenPoint point)
     {
         using var read = state.Read(this, "mln_map_projection_lat_lng_for_pixel_unwrapped");
@@ -87,6 +115,14 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         return CopyLatLng(outCoordinate);
     }
 
+    /// <summary>
+    /// Reads the ground distance covered by one logical map pixel at a latitude
+    /// for the helper camera zoom.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_meters_per_pixel_at_latitude</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public double MetersPerPixelAtLatitude(double latitude)
     {
         using var read = state.Read(this, "mln_map_projection_meters_per_pixel_at_latitude");
@@ -102,6 +138,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         return outMetersPerPixel;
     }
 
+    /// <summary>
+    /// Converts a geographic coordinate to a screen point.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_pixel_for_lat_lng</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
         using var read = state.Read(this, "mln_map_projection_pixel_for_lat_lng");
@@ -117,6 +160,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         return CopyScreenPoint(outPoint);
     }
 
+    /// <summary>
+    /// Applies a camera update to a standalone projection.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_set_camera</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public void SetCamera(CameraOptions camera)
     {
         using var call = Enter(this, "mln_map_projection_set_camera");
@@ -124,6 +174,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         Check(NativeMethods.mln_map_projection_set_camera(Handle, &nativeCamera, Diagnostic));
     }
 
+    /// <summary>
+    /// Applies a camera fit for geographic coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_set_visible_coordinates</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public void SetVisibleCoordinates(LatLng[] coordinates, EdgeInsets padding)
     {
         using var scope = new NativeCallScope(this, "mln_map_projection_set_visible_coordinates");
@@ -139,6 +196,13 @@ public sealed unsafe partial class MapProjectionHandle : IDisposable, INativeOwn
         scope.Accept();
     }
 
+    /// <summary>
+    /// Applies a camera fit for GeoJSON Geometry bytes.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_set_visible_geometry</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public void SetVisibleGeometry(byte[] geometry, EdgeInsets padding)
     {
         using var scope = new NativeCallScope(this, "mln_map_projection_set_visible_geometry");

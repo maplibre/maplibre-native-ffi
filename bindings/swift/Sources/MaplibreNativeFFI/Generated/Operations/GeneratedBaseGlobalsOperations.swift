@@ -4,12 +4,19 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_c_version`.
+  /// Reports the C ABI contract version. The value is 0 while the ABI is
+  /// unstable, and will increment on each SemVer major release.
+  ///
+  /// See `mln_c_version` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   static func cVersion() throws -> UInt32 {
     try nativeDirect("mln_c_version") { _ in mln_c_version() }
   }
 
-  /// Calls `mln_supported_render_backend_mask`.
+  /// Reports the render backends available in this native library build.
+  ///
+  /// See `mln_supported_render_backend_mask` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   static func supportedRenderBackendMask() throws -> RenderBackendFlag {
     try nativeDirect("mln_supported_render_backend_mask") { _ in
       RenderBackendFlag(rawValue: mln_supported_render_backend_mask())

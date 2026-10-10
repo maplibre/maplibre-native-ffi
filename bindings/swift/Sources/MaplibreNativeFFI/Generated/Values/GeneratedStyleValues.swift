@@ -3,6 +3,11 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Canonical tile identity used by custom geometry and custom MVT vector source
+/// callbacks.
+///
+/// See `mln_canonical_tile_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CanonicalTileId: Equatable, Hashable, Sendable {
   public var z: UInt32
   public var x: UInt32
@@ -36,6 +41,10 @@ public struct CanonicalTileId: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_custom_geometry_source_options`.
+///
+/// See `mln_custom_geometry_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptionField: OptionSet, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -58,8 +67,14 @@ public struct CustomGeometrySourceOptionField: OptionSet, NativeOpenValue,
   public static let wrap: CustomGeometrySourceOptionField = .init(rawValue: 64)
 }
 
+/// Options for custom geometry sources.
+///
+/// See `mln_custom_geometry_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomGeometrySourceOptions: Sendable {
+  /// Required tile fetch callback.
   public var fetchTile: (@Sendable (CanonicalTileId) throws -> Void)?
+  /// Optional best-effort tile cancel callback.
   public var cancelTile: (@Sendable (CanonicalTileId) throws -> Void)?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -180,6 +195,10 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {}
 }
 
+/// Field mask values for `mln_custom_mvt_vector_source_options`.
+///
+/// See `mln_custom_mvt_vector_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomMvtVectorSourceOptionField: OptionSet, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -194,8 +213,14 @@ public struct CustomMvtVectorSourceOptionField: OptionSet, NativeOpenValue,
     .init(rawValue: 2)
 }
 
+/// Options for custom MVT vector sources.
+///
+/// See `mln_custom_mvt_vector_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct CustomMvtVectorSourceOptions: Sendable {
+  /// Required tile fetch callback.
   public var fetchTile: (@Sendable (CanonicalTileId) throws -> Void)?
+  /// Optional best-effort tile cancel callback.
   public var cancelTile: (@Sendable (CanonicalTileId) throws -> Void)?
   public var minZoom: Double?
   public var maxZoom: Double?
@@ -271,6 +296,10 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {}
 }
 
+/// Field mask values for `mln_geojson_source_options`.
+///
+/// See `mln_geojson_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct GeojsonSourceOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -298,18 +327,36 @@ public struct GeojsonSourceOptionField: OptionSet, NativeOpenValue, Equatable,
     .init(rawValue: 2048)
 }
 
+/// Options for GeoJSON sources.
+///
+/// See `mln_geojson_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
+  /// Minimum tiling zoom. Defaults to 0.
   public var minZoom: Double?
+  /// Maximum tiling zoom. Defaults to 18.
   public var maxZoom: Double?
+  /// Douglas-Peucker simplification tolerance. Defaults to 0.375.
   public var tolerance: Double?
+  /// Highest zoom that clusters points. Defaults to 17.
   public var clusterMaxZoom: Double?
+  /// Cluster aggregation expressions keyed by property name, as a JSON object
+  /// whose members follow the MapLibre Style Spec clusterProperties form. The
+  /// UTF-8 bytes are borrowed for the call.
   public var clusterProperties: Data?
+  /// Tile extent in pixels. Defaults to 512.
   public var tileSize: UInt32?
+  /// Tile buffer in pixels. Defaults to 128.
   public var buffer: UInt32?
+  /// Cluster radius in pixels. Defaults to 50.
   public var clusterRadius: UInt32?
+  /// Points required to form a cluster. Defaults to 2.
   public var clusterMinPoints: UInt32?
+  /// Adds line distance metrics to line features. Defaults to false.
   public var lineMetrics: Bool?
+  /// Clusters point features. Defaults to false.
   public var cluster: Bool?
+  /// Slices requested tiles inline during the update pass. Defaults to false.
   public var synchronousTiling: Bool?
   public static var `default`: Self {
     try! Self(raw: mln_geojson_source_options_default())
@@ -436,6 +483,10 @@ public struct GeojsonSourceOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Content-box insets in image pixels, measured from the image's top-left.
+///
+/// See `mln_image_content` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct ImageContent: Equatable, Hashable, Sendable {
   public var left: Float
   public var top: Float
@@ -474,6 +525,10 @@ public struct ImageContent: Equatable, Hashable, Sendable {
   }
 }
 
+/// One stretchable interval along an image axis, in image pixels.
+///
+/// See `mln_image_stretch` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct ImageStretch: Equatable, Hashable, Sendable {
   public var from: Float
   public var to: Float
@@ -502,6 +557,10 @@ public struct ImageStretch: Equatable, Hashable, Sendable {
   }
 }
 
+/// Location indicator image-name properties.
+///
+/// See `mln_location_indicator_image_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct LocationIndicatorImageKind: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -515,10 +574,16 @@ public struct LocationIndicatorImageKind: RawRepresentable, NativeOpenValue,
   public static let shadow: LocationIndicatorImageKind = .init(rawValue: 2)
 }
 
+/// Caller-owned premultiplied RGBA8 image pixels.
+///
+/// See `mln_premultiplied_rgba8_image` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   public var width: UInt32
   public var height: UInt32
+  /// Bytes per image row. Must be at least width \* 4.
   public var stride: UInt32
+  /// Premultiplied RGBA8 pixels. Must not be null for a non-empty image.
   public var pixels: Data
   public static var `default`: Self {
     try! Self(raw: mln_premultiplied_rgba8_image_default())
@@ -563,16 +628,26 @@ public struct PremultipliedRgba8Image: Equatable, Hashable, Sendable {
   }
 }
 
+/// Fixed metadata for one runtime style image.
+///
+/// See `mln_style_image_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageInfo: Equatable, Hashable, Sendable {
   public var width: UInt32
   public var height: UInt32
+  /// Native copied images are exposed as tightly packed premultiplied RGBA8.
   public var stride: UInt32
   public var byteLength: Int
+  /// Interval counts for the stretchable axes.
   public var stretchXCount: Int
   public var stretchYCount: Int
+  /// Content box, meaningful only when has_content is true.
   public var content: ImageContent?
+  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
   public var textFitWidth: StyleImageTextFit?
+  /// One of `mln_style_image_text_fit`, meaningful only when its flag is true.
   public var textFitHeight: StyleImageTextFit?
+  /// Sprite pixel ratio. Defaults to 1.0.
   public var pixelRatio: Float
   public var sdf: Bool
   public static var `default`: Self {
@@ -649,6 +724,10 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_style_image_options`.
+///
+/// See `mln_style_image_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -666,13 +745,26 @@ public struct StyleImageOptionField: OptionSet, NativeOpenValue, Equatable,
   public static let textFitHeight: StyleImageOptionField = .init(rawValue: 64)
 }
 
+/// Options for runtime style images.
+///
+/// See `mln_style_image_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageOptions: Equatable, Hashable, Sendable {
+  /// Horizontally stretchable intervals. Borrowed for the call and copied
+  /// before return. May be null only when stretch_x_count is 0.
   public var stretchX: [ImageStretch]?
+  /// Vertically stretchable intervals. Borrowed for the call and copied before
+  /// return. May be null only when stretch_y_count is 0.
   public var stretchY: [ImageStretch]?
+  /// Content box used when icon-text-fit applies.
   public var content: ImageContent?
+  /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
   public var textFitWidth: StyleImageTextFit?
+  /// One of `mln_style_image_text_fit`. Defaults to STRETCH_OR_SHRINK.
   public var textFitHeight: StyleImageTextFit?
+  /// Sprite pixel ratio. Defaults to 1.
   public var pixelRatio: Float?
+  /// Whether the image is a signed distance field icon. Defaults to false.
   public var sdf: Bool?
   public static var `default`: Self {
     try! Self(raw: mln_style_image_options_default())
@@ -758,6 +850,10 @@ public struct StyleImageOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Complete style image borrowed for a completion callback.
+///
+/// See `mln_style_image_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageResult: Equatable, Hashable, Sendable {
   public var info: StyleImageInfo
   public var pixels: Data
@@ -811,6 +907,10 @@ public struct StyleImageResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// Borrowed image-stretch arrays available during a completion callback.
+///
+/// See `mln_style_image_stretches_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageStretchesResult: Equatable, Hashable, Sendable {
   public var stretchX: [ImageStretch]
   public var stretchY: [ImageStretch]
@@ -850,6 +950,10 @@ public struct StyleImageStretchesResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// How a stretchable image fits text along one axis.
+///
+/// See `mln_style_image_text_fit` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -863,6 +967,10 @@ public struct StyleImageTextFit: RawRepresentable, NativeOpenValue, Equatable,
   public static let proportional: StyleImageTextFit = .init(rawValue: 2)
 }
 
+/// One style layer borrowed for a list completion callback.
+///
+/// See `mln_style_layer_entry` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerEntry: Equatable, Hashable, Sendable {
   public var id: String
   public var type: String
@@ -911,10 +1019,19 @@ public struct StyleLayerEntry: Equatable, Hashable, Sendable {
   }
 }
 
+/// Fixed layer metadata included in `mln_style_layer_result`.
+///
+/// See `mln_style_layer_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerInfo: Equatable, Hashable, Sendable {
+  /// View of a static style-spec layer type string. It stays valid for the life
+  /// of the process.
   public var type: String
+  /// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
   public var minZoom: Double
+  /// Highest zoom at which the layer draws; INFINITY with no upper bound.
   public var maxZoom: Double
+  /// One of `mln_style_layer_visibility`.
   public var visibility: StyleLayerVisibility
   public static var `default`: Self {
     Self()
@@ -953,9 +1070,15 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
   }
 }
 
+/// Complete layer metadata borrowed for a completion callback.
+///
+/// See `mln_style_layer_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerResult: Equatable, Hashable, Sendable {
   public var info: StyleLayerInfo
+  /// Source ID. Empty for a layer type that takes no source.
   public var sourceId: String?
+  /// Source-layer ID. Empty when the layer sets none.
   public var sourceLayer: String?
   public static var `default`: Self {
     Self()
@@ -996,6 +1119,10 @@ public struct StyleLayerResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// Layer visibility values used by the visibility setter and layer info.
+///
+/// See `mln_style_layer_visibility` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleLayerVisibility: RawRepresentable, NativeOpenValue,
   Equatable,
   Hashable, Sendable
@@ -1009,6 +1136,10 @@ public struct StyleLayerVisibility: RawRepresentable, NativeOpenValue,
   public static let none: StyleLayerVisibility = .init(rawValue: 1)
 }
 
+/// DEM raster encoding values used by `mln_style_tile_source_options`.
+///
+/// See `mln_style_raster_dem_encoding` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -1021,16 +1152,29 @@ public struct StyleRasterDemEncoding: RawRepresentable, NativeOpenValue,
   public static let terrarium: StyleRasterDemEncoding = .init(rawValue: 1)
 }
 
+/// Fixed source metadata included in `mln_style_source_result`.
+///
+/// See `mln_style_source_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   public var tilejson: StyleSourceTileInfo?
+  /// One of `mln_style_source_type`.
   public var type: StyleSourceType
+  /// Source ID byte length, excluding any null terminator.
   public var idSize: Int
+  /// Whether the source is marked volatile.
   public var isVolatile: Bool
+  /// Attribution byte length, excluding any null terminator.
   public var attributionSize: Int?
+  /// URL byte length, meaningful when fields contains URL.
   public var urlSize: Int?
+  /// Geographic bounds, meaningful when fields contains BOUNDS.
   public var bounds: LatLngBounds?
+  /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
   public var tileSize: UInt32?
+  /// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
   public var vectorEncoding: StyleVectorTileEncoding?
+  /// DEM encoding, meaningful when fields contains RASTER_ENCODING.
   public var rasterEncoding: StyleRasterDemEncoding?
   public static var `default`: Self {
     Self(raw: mln_style_source_info())
@@ -1127,6 +1271,10 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   }
 }
 
+/// Fields available in `mln_style_source_info`.
+///
+/// See `mln_style_source_info_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1135,14 +1283,24 @@ public struct StyleSourceInfoField: OptionSet, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// The source retains a URL.
   public static let url: StyleSourceInfoField = .init(rawValue: 1)
+  /// The tile source was defined with an inline TileJSON description.
   public static let tilejson: StyleSourceInfoField = .init(rawValue: 2)
+  /// The inline TileJSON description contains geographic bounds.
   public static let bounds: StyleSourceInfoField = .init(rawValue: 4)
+  /// The source exposes a tile size.
   public static let tileSize: StyleSourceInfoField = .init(rawValue: 8)
+  /// The source exposes a vector tile encoding.
   public static let vectorEncoding: StyleSourceInfoField = .init(rawValue: 16)
+  /// The source exposes a DEM raster encoding.
   public static let rasterEncoding: StyleSourceInfoField = .init(rawValue: 32)
 }
 
+/// Complete source metadata borrowed for a completion callback.
+///
+/// See `mln_style_source_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceResult: Equatable, Hashable, Sendable {
   public var info: StyleSourceInfo
   public var attribution: String?
@@ -1205,6 +1363,10 @@ public struct StyleSourceResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// Inline tile metadata selected as one value by the source-info field mask.
+///
+/// See `mln_style_source_tile_info` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
   public var tileCount: Int
   public var minZoom: Double
@@ -1243,6 +1405,10 @@ public struct StyleSourceTileInfo: Equatable, Hashable, Sendable {
   }
 }
 
+/// Borrowed inline TileJSON tile URLs available during a completion callback.
+///
+/// See `mln_style_source_tile_urls_result` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceTileUrlsResult: Equatable, Hashable, Sendable {
   public var tileUrls: [String]
   public static var `default`: Self {
@@ -1274,6 +1440,10 @@ public struct StyleSourceTileUrlsResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// Style source type values returned by source metadata queries.
+///
+/// See `mln_style_source_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleSourceType: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1294,6 +1464,10 @@ public struct StyleSourceType: RawRepresentable, NativeOpenValue, Equatable,
   public static let customMvtVector: StyleSourceType = .init(rawValue: 9)
 }
 
+/// Tile URL coordinate scheme values used by `mln_style_tile_source_options`.
+///
+/// See `mln_style_tile_scheme` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTileScheme: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1306,6 +1480,10 @@ public struct StyleTileScheme: RawRepresentable, NativeOpenValue, Equatable,
   public static let tms: StyleTileScheme = .init(rawValue: 1)
 }
 
+/// Field mask values for `mln_style_tile_source_options`.
+///
+/// See `mln_style_tile_source_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTileSourceOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1326,14 +1504,22 @@ public struct StyleTileSourceOptionField: OptionSet, NativeOpenValue, Equatable,
     .init(rawValue: 128)
 }
 
+/// Options for vector and raster tile sources.
+///
+/// See `mln_style_tile_source_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTileSourceOptions: Equatable, Hashable, Sendable {
   public var minZoom: Double?
   public var maxZoom: Double?
   public var attribution: String?
+  /// One of `mln_style_tile_scheme`. Defaults to `MLN_STYLE_TILE_SCHEME_XYZ`.
   public var scheme: StyleTileScheme?
   public var bounds: LatLngBounds?
+  /// Raster tile size in pixels. Defaults to 512.
   public var tileSize: UInt32?
+  /// One of `mln_style_vector_tile_encoding`. Defaults to MVT.
   public var vectorEncoding: StyleVectorTileEncoding?
+  /// One of `mln_style_raster_dem_encoding`. Defaults to Mapbox.
   public var rasterEncoding: StyleRasterDemEncoding?
   public static var `default`: Self {
     try! Self(raw: mln_style_tile_source_options_default())
@@ -1430,6 +1616,10 @@ public struct StyleTileSourceOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Field mask values for `mln_style_transition_options`.
+///
+/// See `mln_style_transition_option_field` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTransitionOptionField: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1444,9 +1634,19 @@ public struct StyleTransitionOptionField: OptionSet, NativeOpenValue, Equatable,
     .init(rawValue: 4)
 }
 
+/// Global style transition options.
+///
+/// See `mln_style_transition_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
+  /// Transition duration in milliseconds. Must be finite and non-negative.
+  /// Values that would overflow MapLibre Native's internal duration are
+  /// invalid.
   public var durationMs: Double?
+  /// Transition delay in milliseconds. Must be finite and non-negative. Values
+  /// that would overflow MapLibre Native's internal duration are invalid.
   public var delayMs: Double?
+  /// Whether symbol placement changes cross-fade.
   public var enablePlacementTransitions: Bool?
   public static var `default`: Self {
     Self(raw: mln_style_transition_options_default())
@@ -1492,6 +1692,10 @@ public struct StyleTransitionOptions: Equatable, Hashable, Sendable {
   }
 }
 
+/// Vector tile encoding values used by `mln_style_tile_source_options`.
+///
+/// See `mln_style_vector_tile_encoding` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 public struct StyleVectorTileEncoding: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {

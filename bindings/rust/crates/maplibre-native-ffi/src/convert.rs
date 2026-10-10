@@ -635,12 +635,14 @@ pub(crate) unsafe fn arena_string<P>(
 macro_rules! native_enum {
     (
         $(#[$meta:meta])*
-        pub enum $name:ident: $raw:ty { $($variant:ident = $value:expr),* $(,)? } $unknown:ident
+        pub enum $name:ident: $raw:ty {
+            $($(#[$variant_meta:meta])* $variant:ident = $value:expr),* $(,)?
+        } $unknown:ident
     ) => {
         $(#[$meta])*
         #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
         pub enum $name {
-            $($variant,)*
+            $($(#[$variant_meta])* $variant,)*
             $unknown($raw),
         }
         impl Default for $name {
@@ -686,13 +688,17 @@ macro_rules! native_enum {
 macro_rules! native_flags {
     (
         $(#[$meta:meta])*
-        pub struct $name:ident: $raw:ty { $(const $flag:ident = $value:expr;)* }
+        pub struct $name:ident: $raw:ty {
+            $($(#[$($flag_meta:tt)*])* const $flag:ident = $value:expr;)*
+        }
     ) => {
         bitflags::bitflags! {
             $(#[$meta])*
             #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
             pub struct $name: $raw {
-                $(const $flag = $value;)*
+                // bitflags matches each flag attribute's tokens, so they pass
+                // through unparsed.
+                $($(#[$($flag_meta)*])* const $flag = $value;)*
                 const _ = !0;
             }
         }

@@ -37,12 +37,26 @@ public sealed unsafe partial class BufferHandle : IDisposable, INativeOwner<MlnB
         state.Retire();
     }
 
+    /// <summary>
+    /// Destroys an owned buffer. A null handle is a no-op.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_buffer_destroy</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+    /// </remarks>
     public void Close()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_buffer_destroy");
         state.Close();
     }
 
+    /// <summary>
+    /// Borrows the data stored by an owned buffer.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_buffer_get</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html">C API reference</see>.
+    /// </remarks>
     public byte[] Get()
     {
         using var read = state.Read(this, "mln_buffer_get");

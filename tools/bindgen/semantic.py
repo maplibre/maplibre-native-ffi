@@ -6,10 +6,12 @@ these plans and keep allocation, callback roots, and scheduling in their runtime
 
 from __future__ import annotations
 
+import functools
 import os
 from dataclasses import dataclass, field, replace
 from typing import TypedDict
 
+from . import docs
 from .model import Api, CType, Function, ModelError
 from .names import type_name
 from .protocol import BUFFER_VIEW, STATUS, is_completion, is_status
@@ -361,6 +363,15 @@ class BoundApi:
     # operation's output or result, a callback's argument, or a record default
     # reaches. A copy leaves a callback registration field unset.
     returned: frozenset[str] = frozenset()
+
+    @functools.cached_property
+    def docs(self) -> dict[str, docs.Doc]:
+        """The documentation of each documented public declaration, by C name."""
+        return docs.index(self.source)
+
+    def doc(self, native: str) -> docs.Doc | None:
+        """The documentation of a declaration, or `record.field` member."""
+        return self.docs.get(native)
 
     @property
     def public_values(self) -> dict[str, ValuePlan]:

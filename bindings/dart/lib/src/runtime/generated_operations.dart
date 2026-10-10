@@ -3167,6 +3167,10 @@ final _resultdouble = _CompletionValue(
   (element) => element.cast<Double>().value,
 );
 
+/// Initializes Android platform services.
+///
+/// See `mln_android_init` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/android_8h.html).
 void androidInit(
   NativePointer jniEnv,
   NativePointer jniClass,
@@ -3183,72 +3187,121 @@ void androidInit(
   );
 }
 
+/// Returns empty animation options initialized for this C API version.
+///
+/// See `mln_animation_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 AnimationOptions animationOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_animation_options_default();
   return _readAnimationOptions(nativeResult);
 }
 
+/// Returns empty map bound options initialized for this C API version.
+///
+/// See `mln_bound_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 BoundOptions boundOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_bound_options_default();
   return _readBoundOptions(nativeResult);
 }
 
+/// Reports the C ABI contract version. The value is 0 while the ABI is
+/// unstable, and will increment on each SemVer major release.
+///
+/// See `mln_c_version` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 int cVersion() {
   ensureAbiVersion();
   final nativeResult = raw.mln_c_version();
   return nativeResult;
 }
 
+/// Returns an empty relative camera update initialized for this API version.
+///
+/// See `mln_camera_delta_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 CameraDelta cameraDeltaDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_camera_delta_default();
   return _readCameraDelta(nativeResult);
 }
 
+/// Returns empty camera fitting options initialized for this C API version.
+///
+/// See `mln_camera_fit_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 CameraFitOptions cameraFitOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_camera_fit_options_default();
   return _readCameraFitOptions(nativeResult);
 }
 
+/// Returns empty camera options initialized for this C API version.
+///
+/// See `mln_camera_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 CameraOptions cameraOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_camera_options_default();
   return _readCameraOptions(nativeResult);
 }
 
+/// Returns an empty atomic camera update initialized for this API version.
+///
+/// See `mln_camera_update_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 CameraUpdate cameraUpdateDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_camera_update_default();
   return _readCameraUpdate(nativeResult);
 }
 
+/// Returns default custom geometry source options.
+///
+/// See `mln_custom_geometry_source_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 CustomGeometrySourceOptions customGeometrySourceOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_custom_geometry_source_options_default();
   return _readCustomGeometrySourceOptions(nativeResult);
 }
 
+/// Returns default custom MVT vector source options.
+///
+/// See `mln_custom_mvt_vector_source_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 CustomMvtVectorSourceOptions customMvtVectorSourceOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_custom_mvt_vector_source_options_default();
   return _readCustomMvtVectorSourceOptions(nativeResult);
 }
 
+/// Returns a zero-token, render-if-needed, nonpresenting frame demand.
+///
+/// See `mln_frame_demand_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 FrameDemand frameDemandDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_frame_demand_default();
   return _readFrameDemand(nativeResult);
 }
 
+/// Returns empty free camera options initialized for this C API version.
+///
+/// See `mln_free_camera_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 FreeCameraOptions freeCameraOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_free_camera_options_default();
   return _readFreeCameraOptions(nativeResult);
 }
 
+/// Prepares GeoJSON source data for installation on a map.
+///
+/// See `mln_geojson_source_data_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 GeojsonSourceDataHandle geojsonSourceDataCreate(
   Uint8List data, {
   GeojsonSourceOptions? options,
@@ -3272,18 +3325,30 @@ GeojsonSourceDataHandle geojsonSourceDataCreate(
   );
 });
 
+/// Returns default GeoJSON source options.
+///
+/// See `mln_geojson_source_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 GeojsonSourceOptions geojsonSourceOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_geojson_source_options_default();
   return _readGeojsonSourceOptions(nativeResult);
 }
 
+/// Returns CPU-complete synchronization for this C API version.
+///
+/// See `mln_gpu_sync_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 GpuSync gpuSyncDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_gpu_sync_default();
   return _readGpuSync(nativeResult);
 }
 
+/// Converts spherical Mercator projected meters to a geographic coordinate.
+///
+/// See `mln_lat_lng_for_projected_meters` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
     withNativeArena((arena) {
       ensureAbiVersion();
@@ -3298,11 +3363,19 @@ LatLng latLngForProjectedMeters(ProjectedMeters meters) =>
       return _readLatLng(outCoordinate.ref);
     });
 
+/// Clears the process-global log callback.
+///
+/// See `mln_log_clear_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 void logClearCallback() {
   ensureAbiVersion();
   return _check(raw.mln_log_clear_callback(nativeDiagnostic));
 }
 
+/// Controls which log severities MapLibre Native may dispatch asynchronously.
+///
+/// See `mln_log_set_async_severity_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 void logSetAsyncSeverityMask(LogSeverityMask mask) {
   ensureAbiVersion();
   return _check(
@@ -3310,6 +3383,10 @@ void logSetAsyncSeverityMask(LogSeverityMask mask) {
   );
 }
 
+/// Installs a process-global MapLibre Native log callback.
+///
+/// See `mln_log_set_callback` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 void logSetCallback(LogCallback callback) {
   ensureAbiVersion();
   final port = _globalCallbackPorts.registerDeferred(
@@ -3340,42 +3417,70 @@ void logSetCallback(LogCallback callback) {
   }
 }
 
+/// Returns map options initialized for this C API version.
+///
+/// See `mln_map_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 MapOptions mapOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_map_options_default();
   return _readMapOptions(nativeResult);
 }
 
+/// Returns empty tile tuning options initialized for this C API version.
+///
+/// See `mln_map_tile_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 MapTileOptions mapTileOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_map_tile_options_default();
   return _readMapTileOptions(nativeResult);
 }
 
+/// Returns empty viewport options initialized for this C API version.
+///
+/// See `mln_map_viewport_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 MapViewportOptions mapViewportOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_map_viewport_options_default();
   return _readMapViewportOptions(nativeResult);
 }
 
+/// Returns Metal borrowed-texture descriptor defaults for this C API version.
+///
+/// See `mln_metal_borrowed_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 MetalBorrowedTextureDescriptor metalBorrowedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_metal_borrowed_texture_descriptor_default();
   return _readMetalBorrowedTextureDescriptor(nativeResult);
 }
 
+/// Returns Metal owned-texture descriptor defaults for this C API version.
+///
+/// See `mln_metal_owned_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 MetalOwnedTextureDescriptor metalOwnedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_metal_owned_texture_descriptor_default();
   return _readMetalOwnedTextureDescriptor(nativeResult);
 }
 
+/// Returns Metal surface descriptor defaults for this C API version.
+///
+/// See `mln_metal_surface_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 MetalSurfaceDescriptor metalSurfaceDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_metal_surface_descriptor_default();
   return _readMetalSurfaceDescriptor(nativeResult);
 }
 
+/// Reads MapLibre Native's process-global network status.
+///
+/// See `mln_network_status_get` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 NetworkStatus networkStatusGet() => withNativeArena((arena) {
   ensureAbiVersion();
   final outStatus = arena<Uint32>();
@@ -3383,47 +3488,80 @@ NetworkStatus networkStatusGet() => withNativeArena((arena) {
   return NetworkStatus.fromRawValue(outStatus.value);
 });
 
+/// Sets MapLibre Native's process-global network status.
+///
+/// See `mln_network_status_set` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 void networkStatusSet(NetworkStatus status) {
   ensureAbiVersion();
   return _check(raw.mln_network_status_set(status.rawValue, nativeDiagnostic));
 }
 
+/// Returns OpenGL borrowed-texture descriptor defaults for this C API
+/// version.
+///
+/// See `mln_opengl_borrowed_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 OpenglBorrowedTextureDescriptor openglBorrowedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_opengl_borrowed_texture_descriptor_default();
   return _readOpenglBorrowedTextureDescriptor(nativeResult);
 }
 
+/// Returns OpenGL owned-texture descriptor defaults for this C API version.
+///
+/// See `mln_opengl_owned_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 OpenglOwnedTextureDescriptor openglOwnedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_opengl_owned_texture_descriptor_default();
   return _readOpenglOwnedTextureDescriptor(nativeResult);
 }
 
+/// Returns OpenGL context providers supported by this build.
+///
+/// See `mln_opengl_supported_context_provider_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 OpenglContextProviderFlag openglSupportedContextProviderMask() {
   ensureAbiVersion();
   final nativeResult = raw.mln_opengl_supported_context_provider_mask();
   return OpenglContextProviderFlag.fromRawValue(nativeResult);
 }
 
+/// Returns OpenGL surface descriptor defaults for this C API version.
+///
+/// See `mln_opengl_surface_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 OpenglSurfaceDescriptor openglSurfaceDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_opengl_surface_descriptor_default();
   return _readOpenglSurfaceDescriptor(nativeResult);
 }
 
+/// Returns the process-wide `mln_plugin_register_v1` entry point; never null.
+///
+/// See `mln_plugin_get_register_function_v1` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/plugin_8h.html).
 NativePointer pluginGetRegisterFunctionV1() {
   ensureAbiVersion();
   final nativeResult = raw.mln_plugin_get_register_function_v1();
   return NativePointer(nativeResult.address);
 }
 
+/// Returns a default premultiplied RGBA8 image descriptor.
+///
+/// See `mln_premultiplied_rgba8_image_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 PremultipliedRgba8Image premultipliedRgba8ImageDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_premultiplied_rgba8_image_default();
   return _readPremultipliedRgba8Image(nativeResult);
 }
 
+/// Converts a geographic coordinate to spherical Mercator projected meters.
+///
+/// See `mln_projected_meters_for_lat_lng` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
 ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
     withNativeArena((arena) {
       ensureAbiVersion();
@@ -3438,18 +3576,32 @@ ProjectedMeters projectedMetersForLatLng(LatLng coordinate) =>
       return _readProjectedMeters(outMeters.ref);
     });
 
+/// Returns empty axonometric rendering options initialized for this C API
+/// version.
+///
+/// See `mln_projection_mode_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
 ProjectionMode projectionModeDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_projection_mode_default();
   return _readProjectionMode(nativeResult);
 }
 
+/// Returns default caller-graphics-thread attachment policy with no wakes and
+/// a one-slot texture ring.
+///
+/// See `mln_render_session_attach_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 RenderSessionAttachOptions renderSessionAttachOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_render_session_attach_options_default();
   return _readRenderSessionAttachOptions(nativeResult);
 }
 
+/// Computes the physical device-pixel size of a logical render target extent.
+///
+/// See `mln_render_target_extent_physical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 (int, int) renderTargetExtentPhysicalSize(RenderTargetExtent extent) =>
     withNativeArena((arena) {
       ensureAbiVersion();
@@ -3466,12 +3618,20 @@ RenderSessionAttachOptions renderSessionAttachOptionsDefault() {
       return (outWidth.value, outHeight.value);
     });
 
+/// Returns default rendered feature query options.
+///
+/// See `mln_rendered_feature_query_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 RenderedFeatureQueryOptions renderedFeatureQueryOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_rendered_feature_query_options_default();
   return _readRenderedFeatureQueryOptions(nativeResult);
 }
 
+/// Returns a rendered box query geometry descriptor.
+///
+/// See `mln_rendered_query_geometry_box` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 RenderedQueryGeometry renderedQueryGeometryBox(ScreenBox box) =>
     withNativeArena((arena) {
       ensureAbiVersion();
@@ -3481,6 +3641,10 @@ RenderedQueryGeometry renderedQueryGeometryBox(ScreenBox box) =>
       return _readRenderedQueryGeometry(nativeResult);
     });
 
+/// Returns a rendered line-string query geometry descriptor.
+///
+/// See `mln_rendered_query_geometry_line_string` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 RenderedQueryGeometry renderedQueryGeometryLineString(
   List<ScreenPoint> points,
 ) => withNativeArena((arena) {
@@ -3498,6 +3662,10 @@ RenderedQueryGeometry renderedQueryGeometryLineString(
   return _readRenderedQueryGeometry(nativeResult);
 });
 
+/// Returns a rendered point query geometry descriptor.
+///
+/// See `mln_rendered_query_geometry_point` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
     withNativeArena((arena) {
       ensureAbiVersion();
@@ -3507,6 +3675,10 @@ RenderedQueryGeometry renderedQueryGeometryPoint(ScreenPoint point) =>
       return _readRenderedQueryGeometry(nativeResult);
     });
 
+/// Creates a runtime with a new core-owned worker.
+///
+/// See `mln_runtime_create` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
   ensureAbiVersion();
   final outRuntime = arena<Uint64>();
@@ -3531,84 +3703,142 @@ RuntimeHandle runtimeCreate(RuntimeOptions options) => withNativeArena((arena) {
   );
 });
 
+/// Returns runtime options initialized for this C API version.
+///
+/// See `mln_runtime_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 RuntimeOptions runtimeOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_runtime_options_default();
   return _readRuntimeOptions(nativeResult);
 }
 
+/// Returns default source feature query options.
+///
+/// See `mln_source_feature_query_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
 SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_source_feature_query_options_default();
   return _readSourceFeatureQueryOptions(nativeResult);
 }
 
+/// Returns default runtime style image metadata.
+///
+/// See `mln_style_image_info_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 StyleImageInfo styleImageInfoDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_style_image_info_default();
   return _readStyleImageInfo(nativeResult);
 }
 
+/// Returns default runtime style image options.
+///
+/// See `mln_style_image_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 StyleImageOptions styleImageOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_style_image_options_default();
   return _readStyleImageOptions(nativeResult);
 }
 
+/// Returns default tile source options.
+///
+/// See `mln_style_tile_source_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 StyleTileSourceOptions styleTileSourceOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_style_tile_source_options_default();
   return _readStyleTileSourceOptions(nativeResult);
 }
 
+/// Returns default global style transition options.
+///
+/// See `mln_style_transition_options_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 StyleTransitionOptions styleTransitionOptionsDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_style_transition_options_default();
   return _readStyleTransitionOptions(nativeResult);
 }
 
+/// Reports the render backends available in this native library build.
+///
+/// See `mln_supported_render_backend_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 RenderBackendFlag supportedRenderBackendMask() {
   ensureAbiVersion();
   final nativeResult = raw.mln_supported_render_backend_mask();
   return RenderBackendFlag.fromRawValue(nativeResult);
 }
 
+/// Returns texture image info defaults for this C API version.
+///
+/// See `mln_texture_image_info_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 TextureImageInfo textureImageInfoDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_texture_image_info_default();
   return _readTextureImageInfo(nativeResult);
 }
 
+/// Returns Vulkan borrowed-texture descriptor defaults for this C API
+/// version.
+///
+/// See `mln_vulkan_borrowed_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 VulkanBorrowedTextureDescriptor vulkanBorrowedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_vulkan_borrowed_texture_descriptor_default();
   return _readVulkanBorrowedTextureDescriptor(nativeResult);
 }
 
+/// Returns Vulkan owned-texture descriptor defaults for this C API version.
+///
+/// See `mln_vulkan_owned_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 VulkanOwnedTextureDescriptor vulkanOwnedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_vulkan_owned_texture_descriptor_default();
   return _readVulkanOwnedTextureDescriptor(nativeResult);
 }
 
+/// Returns Vulkan surface descriptor defaults for this C API version.
+///
+/// See `mln_vulkan_surface_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 VulkanSurfaceDescriptor vulkanSurfaceDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_vulkan_surface_descriptor_default();
   return _readVulkanSurfaceDescriptor(nativeResult);
 }
 
+/// Returns WebGPU borrowed-texture descriptor defaults for this C API
+/// version.
+///
+/// See `mln_webgpu_borrowed_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 WebgpuBorrowedTextureDescriptor webgpuBorrowedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_webgpu_borrowed_texture_descriptor_default();
   return _readWebgpuBorrowedTextureDescriptor(nativeResult);
 }
 
+/// Returns WebGPU owned-texture descriptor defaults for this C API version.
+///
+/// See `mln_webgpu_owned_texture_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 WebgpuOwnedTextureDescriptor webgpuOwnedTextureDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_webgpu_owned_texture_descriptor_default();
   return _readWebgpuOwnedTextureDescriptor(nativeResult);
 }
 
+/// Returns WebGPU surface descriptor defaults for this C API version.
+///
+/// See `mln_webgpu_surface_descriptor_default` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 WebgpuSurfaceDescriptor webgpuSurfaceDescriptorDefault() {
   ensureAbiVersion();
   final nativeResult = raw.mln_webgpu_surface_descriptor_default();
@@ -3634,9 +3864,18 @@ final class AcquiredFrameHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Consumes an acquired frame and schedules abandonment of its session.
+  ///
+  /// See `mln_acquired_frame_dispose` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void dispose() => _state.close(
     (handle) => raw.mln_acquired_frame_dispose(handle.raw, nativeDiagnostic),
   );
+
+  /// Copies Metal-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_metal_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   ScopedMetalOwnedTextureFrame getMetalTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_metal_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_metal_owned_texture_frame>();
@@ -3652,6 +3891,11 @@ final class AcquiredFrameHandle implements Finalizable {
       _readMetalOwnedTextureFrame(outFrame.ref),
     );
   });
+
+  /// Copies OpenGL-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_opengl_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   ScopedOpenglOwnedTextureFrame getOpenglTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_opengl_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_opengl_owned_texture_frame>();
@@ -3667,6 +3911,11 @@ final class AcquiredFrameHandle implements Finalizable {
       _readOpenglOwnedTextureFrame(outFrame.ref),
     );
   });
+
+  /// Copies the producer synchronization for an acquired texture frame.
+  ///
+  /// See `mln_acquired_frame_get_producer_sync` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   ScopedGpuSync getProducerSync() => withNativeArena((arena) {
     final outSync = arena<raw.mln_gpu_sync>();
     outSync.ref = raw.mln_gpu_sync_default();
@@ -3679,6 +3928,11 @@ final class AcquiredFrameHandle implements Finalizable {
     );
     return ScopedGpuSync._(this, _readGpuSync(outSync.ref));
   });
+
+  /// Copies common metadata for an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_result` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   RenderFrameResult getResult() => withNativeArena((arena) {
     final outResult = arena<raw.mln_render_frame_result>();
     outResult.ref.size = sizeOf<raw.mln_render_frame_result>();
@@ -3691,6 +3945,11 @@ final class AcquiredFrameHandle implements Finalizable {
     );
     return _readRenderFrameResult(outResult.ref);
   });
+
+  /// Copies Vulkan-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_vulkan_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   ScopedVulkanOwnedTextureFrame getVulkanTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_vulkan_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_vulkan_owned_texture_frame>();
@@ -3706,6 +3965,11 @@ final class AcquiredFrameHandle implements Finalizable {
       _readVulkanOwnedTextureFrame(outFrame.ref),
     );
   });
+
+  /// Copies WebGPU-native metadata from an acquired frame.
+  ///
+  /// See `mln_acquired_frame_get_webgpu_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   ScopedWebgpuOwnedTextureFrame getWebgpuTexture() => withNativeArena((arena) {
     final outFrame = arena<raw.mln_webgpu_owned_texture_frame>();
     outFrame.ref.size = sizeOf<raw.mln_webgpu_owned_texture_frame>();
@@ -3721,6 +3985,11 @@ final class AcquiredFrameHandle implements Finalizable {
       _readWebgpuOwnedTextureFrame(outFrame.ref),
     );
   });
+
+  /// Releases an acquired frame after optional consumer GPU work.
+  ///
+  /// See `mln_acquired_frame_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void release(GpuSync consumerCompletion) => _state.close(
     (handle) => withNativeArena((arena) {
       final receiverPointer = arena<Uint64>()..value = handle.raw;
@@ -3749,10 +4018,19 @@ final class BufferHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Destroys an owned buffer. A null handle is a no-op.
+  ///
+  /// See `mln_buffer_destroy` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   void close() => _state.close((handle) {
     raw.mln_buffer_destroy(handle.raw);
     return nativeStatusOk;
   });
+
+  /// Borrows the data stored by an owned buffer.
+  ///
+  /// See `mln_buffer_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
   Uint8List getValue() => withNativeArena((arena) {
     final outView = arena<raw.mln_buffer_view>();
     _check(raw.mln_buffer_get(_handle.raw, outView, nativeDiagnostic));
@@ -3776,12 +4054,21 @@ final class EventBatchHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Borrows the event and message view stored by an owned event batch.
+  ///
+  /// See `mln_event_batch_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   RuntimeEventBatchView getValue() => withNativeArena((arena) {
     final outView = arena<raw.mln_runtime_event_batch_view>();
     outView.ref.size = sizeOf<raw.mln_runtime_event_batch_view>();
     _check(raw.mln_event_batch_get(_handle.raw, outView, nativeDiagnostic));
     return _readRuntimeEventBatchView(outView.ref);
   });
+
+  /// Releases an owned event batch. A null handle is a no-op.
+  ///
+  /// See `mln_event_batch_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   void close() => _state.close((handle) {
     raw.mln_event_batch_release(handle.raw);
     return nativeStatusOk;
@@ -3804,6 +4091,10 @@ final class GeojsonSourceDataHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Releases prepared GeoJSON source data.
+  ///
+  /// See `mln_geojson_source_data_destroy` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   void close() => _state.close((handle) {
     raw.mln_geojson_source_data_destroy(handle.raw);
     return nativeStatusOk;
@@ -3832,6 +4123,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Adds a color-relief layer for a raster DEM source.
+  ///
+  /// See `mln_map_add_color_relief_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addColorReliefLayer(
     String layerId,
     String sourceId, {
@@ -3846,6 +4141,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds a custom geometry source.
+  ///
+  /// See `mln_map_add_custom_geometry_source` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addCustomGeometrySource(
     String sourceId,
     CustomGeometrySourceOptions options,
@@ -3863,6 +4163,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       ),
     );
   });
+
+  /// Adds a custom MVT vector source.
+  ///
+  /// See `mln_map_add_custom_mvt_vector_source` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addCustomMvtVectorSource(
     String sourceId,
     CustomMvtVectorSourceOptions options,
@@ -3880,6 +4185,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       ),
     );
   });
+
+  /// Adds a GeoJSON source with prepared inline data.
+  ///
+  /// See `mln_map_add_geojson_source_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addGeojsonSourceData(
     String sourceId,
     GeojsonSourceDataHandle data,
@@ -3892,6 +4202,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds a GeoJSON source with URL data.
+  ///
+  /// See `mln_map_add_geojson_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addGeojsonSourceUrl(
     String sourceId,
     String url, {
@@ -3906,6 +4221,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds a hillshade layer for a raster DEM source.
+  ///
+  /// See `mln_map_add_hillshade_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addHillshadeLayer(
     String layerId,
     String sourceId, {
@@ -3920,6 +4240,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds an image source with inline image pixels.
+  ///
+  /// See `mln_map_add_image_source_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addImageSourceImage(
     String sourceId,
     List<LatLng> coordinates,
@@ -3941,6 +4266,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Adds an image source that loads its image from a URL.
+  ///
+  /// See `mln_map_add_image_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addImageSourceUrl(
     String sourceId,
     List<LatLng> coordinates,
@@ -3962,6 +4292,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Adds a source-free location indicator layer.
+  ///
+  /// See `mln_map_add_location_indicator_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addLocationIndicatorLayer(
     String layerId, {
     String? beforeLayerId,
@@ -3974,6 +4309,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds a raster DEM source with inline tile URLs.
+  ///
+  /// See `mln_map_add_raster_dem_source_tiles` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addRasterDemSourceTiles(
     String sourceId,
     List<String> tiles, {
@@ -3995,6 +4335,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Adds a raster DEM source with a TileJSON URL.
+  ///
+  /// See `mln_map_add_raster_dem_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addRasterDemSourceUrl(
     String sourceId,
     String url, {
@@ -4009,6 +4354,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds a raster source with inline tile URLs.
+  ///
+  /// See `mln_map_add_raster_source_tiles` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addRasterSourceTiles(
     String sourceId,
     List<String> tiles, {
@@ -4030,6 +4380,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Adds a raster source with a TileJSON URL.
+  ///
+  /// See `mln_map_add_raster_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addRasterSourceUrl(
     String sourceId,
     String url, {
@@ -4044,6 +4399,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds one style layer from a full style-spec layer JSON object.
+  ///
+  /// See `mln_map_add_style_layer_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addStyleLayerJson(
     Uint8List layerJson, {
     String? beforeLayerId,
@@ -4056,6 +4416,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds one style source from a style-spec source JSON object.
+  ///
+  /// See `mln_map_add_style_source_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addStyleSourceJson(
     String sourceId,
     Uint8List sourceJson,
@@ -4068,6 +4433,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Adds a vector source with inline tile URLs.
+  ///
+  /// See `mln_map_add_vector_source_tiles` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addVectorSourceTiles(
     String sourceId,
     List<String> tiles, {
@@ -4089,6 +4459,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Adds a vector source with a TileJSON URL.
+  ///
+  /// See `mln_map_add_vector_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> addVectorSourceUrl(
     String sourceId,
     String url, {
@@ -4103,6 +4478,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits one copied relative camera update.
+  ///
+  /// See `mln_map_apply_camera_delta` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> applyCameraDelta(CameraDelta delta) => _command(
     (arena, completion) => raw.mln_map_apply_camera_delta(
       _handle.raw,
@@ -4111,6 +4491,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered query for a camera that fits a GeoJSON geometry.
+  ///
+  /// See `mln_map_camera_for_geometry` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CameraOptions> cameraForGeometry(
     Uint8List geometry, {
     CameraFitOptions? fitOptions,
@@ -4124,6 +4509,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered query for a camera that fits geographic bounds.
+  ///
+  /// See `mln_map_camera_for_lat_lng_bounds` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CameraOptions> cameraForLatLngBounds(
     LatLngBounds bounds, {
     CameraFitOptions? fitOptions,
@@ -4137,6 +4527,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered query for a camera that fits geographic coordinates.
+  ///
+  /// See `mln_map_camera_for_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CameraOptions> cameraForLatLngs(
     List<LatLng> coordinates, {
     CameraFitOptions? fitOptions,
@@ -4156,11 +4551,21 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Starts an ordered camera read.
+  ///
+  /// See `mln_map_camera_query` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CameraQueryResult> cameraQuery() => _query(
     _resultCameraQueryResult,
     (arena, completion) =>
         raw.mln_map_camera_query(_handle.raw, completion, nativeDiagnostic),
   );
+
+  /// Copies the camera from the latest immutable map snapshot.
+  ///
+  /// See `mln_map_camera_snapshot_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   (CameraOptions, BigInt) cameraSnapshotGet() => withNativeArena((arena) {
     final outCamera = arena<raw.mln_camera_options>();
     outCamera.ref = raw.mln_camera_options_default();
@@ -4178,6 +4583,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       uint64FromNative(outGeneration.value),
     );
   });
+
+  /// Cancels the camera transitions running when this command commits.
+  ///
+  /// See `mln_map_cancel_transitions` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> cancelTransitions() => _command(
     (arena, completion) => raw.mln_map_cancel_transitions(
       _handle.raw,
@@ -4185,6 +4595,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Copies one layer's source ID.
+  ///
+  /// See `mln_map_copy_layer_source_id` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<String?> copyLayerSourceId(String layerId) => _query(
     _resultStringOrNull,
     (arena, completion) => raw.mln_map_copy_layer_source_id(
@@ -4194,6 +4609,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Copies one layer's source-layer ID.
+  ///
+  /// See `mln_map_copy_layer_source_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<String?> copyLayerSourceLayer(String layerId) => _query(
     _resultStringOrNull,
     (arena, completion) => raw.mln_map_copy_layer_source_layer(
@@ -4203,6 +4623,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Copies one runtime style image as tightly packed premultiplied RGBA8
+  /// pixels.
+  ///
+  /// See `mln_map_copy_style_image_premultiplied_rgba8` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<Uint8List?> copyStyleImagePremultipliedRgba8(String imageId) =>
       _queryOptional(
         _resultUint8ListOrNull,
@@ -4213,6 +4639,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Copies one runtime style image's stretchable intervals.
+  ///
+  /// See `mln_map_copy_style_image_stretches` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<StyleImageStretchesResult?> copyStyleImageStretches(String imageId) =>
       _queryOptional(
         _resultStyleImageStretchesResult,
@@ -4223,6 +4654,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Copies one style source attribution string.
+  ///
+  /// See `mln_map_copy_style_source_attribution` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<String?> copyStyleSourceAttribution(String sourceId) => _queryOptional(
     _resultStringOrNull,
     (arena, completion) => raw.mln_map_copy_style_source_attribution(
@@ -4232,6 +4668,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Copies one style source URL.
+  ///
+  /// See `mln_map_copy_style_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<String?> copyStyleSourceUrl(String sourceId) => _queryOptional(
     _resultStringOrNull,
     (arena, completion) => raw.mln_map_copy_style_source_url(
@@ -4241,13 +4682,28 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Consumes a map handle without observing its asynchronous retirement.
+  ///
+  /// See `mln_map_dispose` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   void dispose() => _state.close(
     (handle) => raw.mln_map_dispose(handle.raw, nativeDiagnostic),
   );
+
+  /// Submits an ordered debug-log command.
+  ///
+  /// See `mln_map_dump_debug_logs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> dumpDebugLogs() => _command(
     (arena, completion) =>
         raw.mln_map_dump_debug_logs(_handle.raw, completion, nativeDiagnostic),
   );
+
+  /// Starts an ordered read of per-feature state from this map.
+  ///
+  /// See `mln_map_get_feature_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<Uint8List> getFeatureState(FeatureStateSelector selector) => _query(
     _resultUint8List,
     (arena, completion) => raw.mln_map_get_feature_state(
@@ -4257,11 +4713,22 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Queries the global-state JSON object, including style defaults. Completion
+  /// borrows one `mln_buffer_view` for the duration of the callback.
+  ///
+  /// See `mln_map_get_global_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<Uint8List> getGlobalState() => _query(
     _resultUint8List,
     (arena, completion) =>
         raw.mln_map_get_global_state(_handle.raw, completion, nativeDiagnostic),
   );
+
+  /// Copies image source coordinates.
+  ///
+  /// See `mln_map_get_image_source_coordinates` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<List<LatLng>?> getImageSourceCoordinates(String sourceId) =>
       _queryOptionalList(
         _resultLatLng,
@@ -4272,6 +4739,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Serializes one layer filter as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<Uint8List?> getLayerFilter(String layerId) => _queryOptional(
     _resultUint8ListOrNull,
     (arena, completion) => raw.mln_map_get_layer_filter(
@@ -4281,6 +4753,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Serializes one layer property as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<Uint8List?> getLayerProperty(String layerId, String propertyName) =>
       _queryOptional(
         _resultUint8ListOrNull,
@@ -4292,6 +4769,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Copies one complete runtime style image.
+  ///
+  /// See `mln_map_get_style_image_info` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<StyleImageResult?> getStyleImageInfo(String imageId) => _queryOptional(
     _resultStyleImageResult,
     (arena, completion) => raw.mln_map_get_style_image_info(
@@ -4301,6 +4783,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Copies complete metadata for one style layer.
+  ///
+  /// See `mln_map_get_style_layer_info` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<StyleLayerResult?> getStyleLayerInfo(String layerId) => _queryOptional(
     _resultStyleLayerResult,
     (arena, completion) => raw.mln_map_get_style_layer_info(
@@ -4310,6 +4797,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Serializes one style layer as a full style-spec layer JSON object.
+  ///
+  /// See `mln_map_get_style_layer_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<Uint8List?> getStyleLayerJson(String layerId) => _queryOptional(
     _resultUint8ListOrNull,
     (arena, completion) => raw.mln_map_get_style_layer_json(
@@ -4319,6 +4811,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Serializes one style light property as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_style_light_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<Uint8List?> getStyleLightProperty(String propertyName) =>
       _queryOptional(
         _resultUint8ListOrNull,
@@ -4329,6 +4826,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Copies complete metadata for one style source.
+  ///
+  /// See `mln_map_get_style_source_info` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<StyleSourceResult?> getStyleSourceInfo(String sourceId) =>
       _queryOptional(
         _resultStyleSourceResult,
@@ -4339,6 +4841,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Copies one style source's inline TileJSON tile URLs.
+  ///
+  /// See `mln_map_get_style_source_tile_urls` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<StyleSourceTileUrlsResult?> getStyleSourceTileUrls(String sourceId) =>
       _queryOptional(
         _resultStyleSourceTileUrlsResult,
@@ -4349,6 +4856,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Reads the style's global transition options.
+  ///
+  /// See `mln_map_get_style_transition_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<StyleTransitionOptions> getStyleTransitionOptions() => _query(
     _resultStyleTransitionOptions,
     (arena, completion) => raw.mln_map_get_style_transition_options(
@@ -4357,6 +4869,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Invalidates custom geometry source data inside one geographic region.
+  ///
+  /// See `mln_map_invalidate_custom_geometry_source_region` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> invalidateCustomGeometrySourceRegion(
     String sourceId,
     LatLngBounds bounds,
@@ -4369,6 +4886,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Invalidates custom geometry source data for one canonical tile.
+  ///
+  /// See `mln_map_invalidate_custom_geometry_source_tile` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> invalidateCustomGeometrySourceTile(
     String sourceId,
     CanonicalTileId tileId,
@@ -4381,6 +4903,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Invalidates custom MVT vector source data for one canonical tile.
+  ///
+  /// See `mln_map_invalidate_custom_mvt_vector_source_tile` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> invalidateCustomMvtVectorSourceTile(
     String sourceId,
     CanonicalTileId tileId,
@@ -4393,6 +4920,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered wrapped-bounds query for a copied camera.
+  ///
+  /// See `mln_map_lat_lng_bounds_for_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<LatLngBounds> latLngBoundsForCamera(CameraOptions camera) => _query(
     _resultLatLngBounds,
     (arena, completion) => raw.mln_map_lat_lng_bounds_for_camera(
@@ -4402,6 +4934,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered unwrapped-bounds query for a copied camera.
+  ///
+  /// See `mln_map_lat_lng_bounds_for_camera_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<LatLngBounds> latLngBoundsForCameraUnwrapped(CameraOptions camera) =>
       _query(
         _resultLatLngBounds,
@@ -4412,6 +4949,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Starts an ordered conversion from a screen point to a geographic
+  /// coordinate.
+  ///
+  /// See `mln_map_lat_lng_for_pixel` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<LatLng> latLngForPixel(ScreenPoint point) => _query(
     _resultLatLng,
     (arena, completion) => raw.mln_map_lat_lng_for_pixel(
@@ -4421,6 +4964,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered conversion from a screen point to an unwrapped
+  /// geographic coordinate.
+  ///
+  /// See `mln_map_lat_lng_for_pixel_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<LatLng> latLngForPixelUnwrapped(ScreenPoint point) => _query(
     _resultLatLng,
     (arena, completion) => raw.mln_map_lat_lng_for_pixel_unwrapped(
@@ -4430,6 +4979,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered conversion of copied screen points to coordinates.
+  ///
+  /// See `mln_map_lat_lngs_for_pixels` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<List<LatLng>> latLngsForPixels(List<ScreenPoint> points) =>
       _queryList(_resultLatLng, (arena, completion) {
         final nativepoints = arena<raw.mln_screen_point>(
@@ -4446,6 +5000,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         );
       });
+
+  /// Starts an ordered conversion of copied screen points to unwrapped
+  /// coordinates.
+  ///
+  /// See `mln_map_lat_lngs_for_pixels_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<List<LatLng>> latLngsForPixelsUnwrapped(List<ScreenPoint> points) =>
       _queryList(_resultLatLng, (arena, completion) {
         final nativepoints = arena<raw.mln_screen_point>(
@@ -4462,6 +5022,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         );
       });
+
+  /// Copies style layer IDs in style order.
+  ///
+  /// See `mln_map_list_style_layer_ids` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<List<String>> listStyleLayerIds() => _queryList(
     _resultString,
     (arena, completion) => raw.mln_map_list_style_layer_ids(
@@ -4470,6 +5035,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered query of every style layer in style order.
+  ///
+  /// See `mln_map_list_style_layers` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<List<StyleLayerEntry>> listStyleLayers() => _queryList(
     _resultStyleLayerEntry,
     (arena, completion) => raw.mln_map_list_style_layers(
@@ -4478,6 +5048,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Copies style source IDs in style order.
+  ///
+  /// See `mln_map_list_style_source_ids` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<List<String>> listStyleSourceIds() => _queryList(
     _resultString,
     (arena, completion) => raw.mln_map_list_style_source_ids(
@@ -4486,6 +5061,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered copy of the last successfully parsed style document.
+  ///
+  /// See `mln_map_loaded_style_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<Uint8List> loadedStyleJson() => _query(
     _resultUint8List,
     (arena, completion) => raw.mln_map_loaded_style_json(
@@ -4494,6 +5074,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered query of meters per logical pixel at a latitude and the
+  /// current map zoom. The completion borrows one double.
+  ///
+  /// See `mln_map_meters_per_pixel_at_latitude` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<double> metersPerPixelAtLatitude(double latitude) => _query(
     _resultdouble,
     (arena, completion) => raw.mln_map_meters_per_pixel_at_latitude(
@@ -4503,6 +5089,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Moves one style layer before another layer or to the top.
+  ///
+  /// See `mln_map_move_style_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> moveStyleLayer(
     String layerId, {
     String? beforeLayerId,
@@ -4515,6 +5106,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered conversion from a geographic coordinate to a screen
+  /// point.
+  ///
+  /// See `mln_map_pixel_for_lat_lng` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<ScreenPoint> pixelForLatLng(LatLng coordinate) => _query(
     _resultScreenPoint,
     (arena, completion) => raw.mln_map_pixel_for_lat_lng(
@@ -4524,6 +5121,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered conversion of copied coordinates to screen points.
+  ///
+  /// See `mln_map_pixels_for_lat_lngs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<List<ScreenPoint>> pixelsForLatLngs(List<LatLng> coordinates) =>
       _queryList(_resultScreenPoint, (arena, completion) {
         final nativecoordinates = arena<raw.mln_lat_lng>(
@@ -4543,6 +5145,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         );
       });
+
+  /// Starts creation of a standalone projection from the map's ordered
+  /// transform state.
+  ///
+  /// See `mln_map_projection_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   Future<MapProjectionHandle> projectionCreate() => _queryOwned(
     raw.MLN_ADAPTER_COMPLETION_COPY_MAP_PROJECTION,
     (arena, completion) => raw.mln_map_projection_create(
@@ -4558,12 +5166,22 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       },
     ),
   );
+
+  /// Releases a map after synchronous state preflight.
+  ///
+  /// See `mln_map_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<void> close() => _state.closeAsync(
     (handle) => _run(
       (arena, completion) =>
           raw.mln_map_release(handle.raw, completion, nativeDiagnostic),
     ),
   );
+
+  /// Removes per-feature state from this map.
+  ///
+  /// See `mln_map_remove_feature_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> removeFeatureState(FeatureStateSelector selector) =>
       _command(
         (arena, completion) => raw.mln_map_remove_feature_state(
@@ -4573,6 +5191,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Removes one runtime style image by ID.
+  ///
+  /// See `mln_map_remove_style_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> removeStyleImage(String imageId) => _command(
     (arena, completion) => raw.mln_map_remove_style_image(
       _handle.raw,
@@ -4581,6 +5204,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Removes one style layer by ID.
+  ///
+  /// See `mln_map_remove_style_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> removeStyleLayer(String layerId) => _command(
     (arena, completion) => raw.mln_map_remove_style_layer(
       _handle.raw,
@@ -4589,6 +5217,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Removes one style source by ID.
+  ///
+  /// See `mln_map_remove_style_source` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> removeStyleSource(String sourceId) => _command(
     (arena, completion) => raw.mln_map_remove_style_source(
       _handle.raw,
@@ -4597,10 +5230,20 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Requests a repaint for a continuous map.
+  ///
+  /// See `mln_map_request_repaint` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> requestRepaint() => _command(
     (arena, completion) =>
         raw.mln_map_request_repaint(_handle.raw, completion, nativeDiagnostic),
   );
+
+  /// Requests one still image for a static or tile map.
+  ///
+  /// See `mln_map_request_still_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<void> requestStillImage() => _run(
     (arena, completion) => raw.mln_map_request_still_image(
       _handle.raw,
@@ -4608,6 +5251,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits the sole post-creation logical extent update.
+  ///
+  /// See `mln_map_resize` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> resize(LogicalExtent extent) => _command(
     (arena, completion) => raw.mln_map_resize(
       _handle.raw,
@@ -4616,6 +5264,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits a copied camera-constraint command.
+  ///
+  /// See `mln_map_set_bounds` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> setBounds(BoundOptions options) => _command(
     (arena, completion) => raw.mln_map_set_bounds(
       _handle.raw,
@@ -4624,6 +5277,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets custom geometry source data for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_geometry_source_tile_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setCustomGeometrySourceTileData(
     String sourceId,
     CanonicalTileId tileId,
@@ -4638,6 +5296,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets custom MVT vector source data for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_mvt_vector_source_tile_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setCustomMvtVectorSourceTileData(
     String sourceId,
     CanonicalTileId tileId,
@@ -4652,6 +5315,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Reports a custom MVT vector source error for one canonical tile.
+  ///
+  /// See `mln_map_set_custom_mvt_vector_source_tile_error` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setCustomMvtVectorSourceTileError(
     String sourceId,
     CanonicalTileId tileId,
@@ -4666,6 +5334,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits a debug-overlay command.
+  ///
+  /// See `mln_map_set_debug_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> setDebugOptions(MapDebugOption options) => _command(
     (arena, completion) => raw.mln_map_set_debug_options(
       _handle.raw,
@@ -4674,6 +5347,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Selects which map-originated event types this map queues.
+  ///
+  /// See `mln_map_set_event_mask` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> setEventMask(RuntimeEventMask mask) => _command(
     (arena, completion) => raw.mln_map_set_event_mask(
       _handle.raw,
@@ -4682,6 +5360,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits a copied per-feature-state command.
+  ///
+  /// See `mln_map_set_feature_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> setFeatureState(
     FeatureStateSelector selector,
     Uint8List state,
@@ -4694,6 +5377,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits a copied free-camera command.
+  ///
+  /// See `mln_map_set_free_camera_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> setFreeCameraOptions(FreeCameraOptions options) =>
       _command(
         (arena, completion) => raw.mln_map_set_free_camera_options(
@@ -4703,6 +5391,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Updates one GeoJSON source with prepared inline data.
+  ///
+  /// See `mln_map_set_geojson_source_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setGeojsonSourceData(
     String sourceId,
     GeojsonSourceDataHandle data,
@@ -4715,6 +5408,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Overrides one GeoJSON source's synchronous tiling at runtime.
+  ///
+  /// See `mln_map_set_geojson_source_synchronous_tiling` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setGeojsonSourceSynchronousTiling(
     String sourceId,
     bool enabled,
@@ -4727,6 +5425,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Updates one GeoJSON source to load data from a URL.
+  ///
+  /// See `mln_map_set_geojson_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setGeojsonSourceUrl(String sourceId, String url) =>
       _command(
         (arena, completion) => raw.mln_map_set_geojson_source_url(
@@ -4737,6 +5440,13 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Submits a global-state JSON value. JSON null restores the style default.
+  /// Input is copied before return. Completion reports invalid state if the
+  /// style is not loaded, or invalid argument if the JSON cannot be parsed.
+  ///
+  /// See `mln_map_set_global_state_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setGlobalStateProperty(
     String propertyName,
     Uint8List value,
@@ -4749,6 +5459,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Updates image source coordinates.
+  ///
+  /// See `mln_map_set_image_source_coordinates` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setImageSourceCoordinates(
     String sourceId,
     List<LatLng> coordinates,
@@ -4768,6 +5483,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Updates an image source with inline image pixels.
+  ///
+  /// See `mln_map_set_image_source_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setImageSourceImage(
     String sourceId,
     PremultipliedRgba8Image image,
@@ -4780,6 +5500,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Updates an image source to load its image from a URL.
+  ///
+  /// See `mln_map_set_image_source_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setImageSourceUrl(String sourceId, String url) =>
       _command(
         (arena, completion) => raw.mln_map_set_image_source_url(
@@ -4790,6 +5515,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Sets or clears one layer filter.
+  ///
+  /// See `mln_map_set_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLayerFilter(
     String layerId, {
     Uint8List? filter,
@@ -4808,6 +5538,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets the highest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_layer_max_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLayerMaxZoom(String layerId, double maxZoom) =>
       _command(
         (arena, completion) => raw.mln_map_set_layer_max_zoom(
@@ -4818,6 +5553,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Sets the lowest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_layer_min_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLayerMinZoom(String layerId, double minZoom) =>
       _command(
         (arena, completion) => raw.mln_map_set_layer_min_zoom(
@@ -4828,6 +5568,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Sets one layer property using its MapLibre style-spec property name.
+  ///
+  /// See `mln_map_set_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLayerProperty(
     String layerId,
     String propertyName,
@@ -4842,6 +5587,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets one layer's source ID.
+  ///
+  /// See `mln_map_set_layer_source_id` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLayerSourceId(String layerId, String sourceId) =>
       _command(
         (arena, completion) => raw.mln_map_set_layer_source_id(
@@ -4852,6 +5602,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Sets one layer's source-layer ID.
+  ///
+  /// See `mln_map_set_layer_source_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLayerSourceLayer(
     String layerId, {
     String? sourceLayer,
@@ -4864,6 +5619,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets whether one layer draws.
+  ///
+  /// See `mln_map_set_layer_visibility` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLayerVisibility(
     String layerId,
     StyleLayerVisibility visibility,
@@ -4876,6 +5636,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets a location indicator layer accuracy radius in meters.
+  ///
+  /// See `mln_map_set_location_indicator_accuracy_radius` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLocationIndicatorAccuracyRadius(
     String layerId,
     double radius,
@@ -4888,6 +5653,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets a location indicator layer bearing in degrees.
+  ///
+  /// See `mln_map_set_location_indicator_bearing` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLocationIndicatorBearing(
     String layerId,
     double bearing,
@@ -4900,6 +5670,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets one location indicator image-name property.
+  ///
+  /// See `mln_map_set_location_indicator_image_name` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLocationIndicatorImageName(
     String layerId,
     LocationIndicatorImageKind imageKind,
@@ -4914,6 +5689,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets a location indicator layer location.
+  ///
+  /// See `mln_map_set_location_indicator_location` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setLocationIndicatorLocation(
     String layerId,
     LatLng coordinate,
@@ -4928,6 +5708,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits copied axonometric rendering option fields.
+  ///
+  /// See `mln_map_set_projection_mode` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> setProjectionMode(ProjectionMode mode) => _command(
     (arena, completion) => raw.mln_map_set_projection_mode(
       _handle.raw,
@@ -4936,6 +5721,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits a rendering-stats visibility command.
+  ///
+  /// See `mln_map_set_rendering_stats_view_enabled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> setRenderingStatsViewEnabled(bool enabled) =>
       _command(
         (arena, completion) => raw.mln_map_set_rendering_stats_view_enabled(
@@ -4945,6 +5735,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Sets one runtime style image.
+  ///
+  /// See `mln_map_set_style_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setStyleImage(
     String imageId,
     PremultipliedRgba8Image image, {
@@ -4959,6 +5754,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Queues an inline style JSON command.
+  ///
+  /// See `mln_map_set_style_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> setStyleJson(Uint8List json) => _command(
     (arena, completion) => raw.mln_map_set_style_json(
       _handle.raw,
@@ -4967,6 +5767,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets the style light from a style-spec light JSON object.
+  ///
+  /// See `mln_map_set_style_light_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setStyleLightJson(Uint8List lightJson) => _command(
     (arena, completion) => raw.mln_map_set_style_light_json(
       _handle.raw,
@@ -4975,6 +5780,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets one style light property using its MapLibre style-spec property name.
+  ///
+  /// See `mln_map_set_style_light_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setStyleLightProperty(
     String propertyName,
     Uint8List value,
@@ -4987,6 +5797,12 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets whether one style source stores fetched tiles in the persistent
+  /// cache.
+  ///
+  /// See `mln_map_set_style_source_volatile` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setStyleSourceVolatile(
     String sourceId,
     bool isVolatile,
@@ -4999,6 +5815,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets the style's global transition options.
+  ///
+  /// See `mln_map_set_style_transition_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   Future<CommandCompletion> setStyleTransitionOptions(
     StyleTransitionOptions options,
   ) => _command(
@@ -5009,6 +5830,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Queues a style URL command.
+  ///
+  /// See `mln_map_set_style_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<CommandCompletion> setStyleUrl(String url) => _command(
     (arena, completion) => raw.mln_map_set_style_url(
       _handle.raw,
@@ -5017,6 +5843,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits a copied tile-options command.
+  ///
+  /// See `mln_map_set_tile_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> setTileOptions(MapTileOptions options) => _command(
     (arena, completion) => raw.mln_map_set_tile_options(
       _handle.raw,
@@ -5025,6 +5856,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Submits a copied viewport-options command.
+  ///
+  /// See `mln_map_set_viewport_options` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> setViewportOptions(MapViewportOptions options) =>
       _command(
         (arena, completion) => raw.mln_map_set_viewport_options(
@@ -5034,6 +5870,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Copies the latest immutable state published by the map worker.
+  ///
+  /// See `mln_map_snapshot_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   MapSnapshot snapshotGet() => withNativeArena((arena) {
     final outSnapshot = arena<raw.mln_map_snapshot>();
     outSnapshot.ref.size = sizeOf<raw.mln_map_snapshot>();
@@ -5042,11 +5883,21 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
     return _readMapSnapshot(outSnapshot.ref);
   });
+
+  /// Starts an ordered copy of the last requested style URL.
+  ///
+  /// See `mln_map_style_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<String> styleUrl() => _query(
     _resultString,
     (arena, completion) =>
         raw.mln_map_style_url(_handle.raw, completion, nativeDiagnostic),
   );
+
+  /// Submits one atomic camera update.
+  ///
+  /// See `mln_map_update_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
   Future<CommandCompletion> updateCamera(CameraUpdate update) => _command(
     (arena, completion) => raw.mln_map_update_camera(
       _handle.raw,
@@ -5055,6 +5906,11 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts attachment of a caller-owned Metal texture target.
+  ///
+  /// See `mln_metal_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment metalBorrowedTextureAttach(
     MetalBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5084,6 +5940,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a session-owned Metal texture ring.
+  ///
+  /// See `mln_metal_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment metalOwnedTextureAttach(
     MetalOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5113,6 +5973,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a Metal surface target.
+  ///
+  /// See `mln_metal_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   RenderSessionAttachment metalSurfaceAttach(
     MetalSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5142,6 +6006,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a caller-owned OpenGL texture target.
+  ///
+  /// See `mln_opengl_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment openglBorrowedTextureAttach(
     OpenglBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5171,6 +6039,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a session-owned OpenGL texture ring.
+  ///
+  /// See `mln_opengl_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment openglOwnedTextureAttach(
     OpenglOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5200,6 +6072,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of an OpenGL surface target.
+  ///
+  /// See `mln_opengl_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   RenderSessionAttachment openglSurfaceAttach(
     OpenglSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5229,6 +6105,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a caller-owned Vulkan texture target.
+  ///
+  /// See `mln_vulkan_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment vulkanBorrowedTextureAttach(
     VulkanBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5258,6 +6138,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a session-owned Vulkan texture ring.
+  ///
+  /// See `mln_vulkan_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment vulkanOwnedTextureAttach(
     VulkanOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5287,6 +6171,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a Vulkan surface target.
+  ///
+  /// See `mln_vulkan_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   RenderSessionAttachment vulkanSurfaceAttach(
     VulkanSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5316,6 +6204,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a caller-owned WebGPU texture target.
+  ///
+  /// See `mln_webgpu_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment webgpuBorrowedTextureAttach(
     WebgpuBorrowedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5345,6 +6237,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a session-owned WebGPU texture ring.
+  ///
+  /// See `mln_webgpu_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   RenderSessionAttachment webgpuOwnedTextureAttach(
     WebgpuOwnedTextureDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5374,6 +6270,10 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
+  /// Starts attachment of a WebGPU surface target.
+  ///
+  /// See `mln_webgpu_surface_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   RenderSessionAttachment webgpuSurfaceAttach(
     WebgpuSurfaceDescriptor descriptor,
     RenderSessionAttachOptions options,
@@ -5420,9 +6320,18 @@ final class MapProjectionHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Closes a standalone projection.
+  ///
+  /// See `mln_map_projection_close` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   void close() => _state.close(
     (handle) => raw.mln_map_projection_close(handle.raw, nativeDiagnostic),
   );
+
+  /// Copies the projection camera into out_camera.
+  ///
+  /// See `mln_map_projection_get_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   CameraOptions getCamera() => withNativeArena((arena) {
     final outCamera = arena<raw.mln_camera_options>();
     outCamera.ref = raw.mln_camera_options_default();
@@ -5435,6 +6344,11 @@ final class MapProjectionHandle implements Finalizable {
     );
     return _readCameraOptions(outCamera.ref);
   });
+
+  /// Converts a screen point to a geographic coordinate.
+  ///
+  /// See `mln_map_projection_lat_lng_for_pixel` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   LatLng latLngForPixel(ScreenPoint point) => withNativeArena((arena) {
     final outCoordinate = arena<raw.mln_lat_lng>();
     _check(
@@ -5447,6 +6361,11 @@ final class MapProjectionHandle implements Finalizable {
     );
     return _readLatLng(outCoordinate.ref);
   });
+
+  /// Converts a screen point to an unwrapped geographic coordinate.
+  ///
+  /// See `mln_map_projection_lat_lng_for_pixel_unwrapped` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   LatLng latLngForPixelUnwrapped(ScreenPoint point) => withNativeArena((arena) {
     final outCoordinate = arena<raw.mln_lat_lng>();
     _check(
@@ -5459,6 +6378,12 @@ final class MapProjectionHandle implements Finalizable {
     );
     return _readLatLng(outCoordinate.ref);
   });
+
+  /// Reads the ground distance covered by one logical map pixel at a latitude
+  /// for the helper camera zoom.
+  ///
+  /// See `mln_map_projection_meters_per_pixel_at_latitude` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   double metersPerPixelAtLatitude(double latitude) => withNativeArena((arena) {
     final outMetersPerPixel = arena<Double>();
     _check(
@@ -5471,6 +6396,11 @@ final class MapProjectionHandle implements Finalizable {
     );
     return outMetersPerPixel.value;
   });
+
+  /// Converts a geographic coordinate to a screen point.
+  ///
+  /// See `mln_map_projection_pixel_for_lat_lng` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   ScreenPoint pixelForLatLng(LatLng coordinate) => withNativeArena((arena) {
     final outPoint = arena<raw.mln_screen_point>();
     _check(
@@ -5483,6 +6413,11 @@ final class MapProjectionHandle implements Finalizable {
     );
     return _readScreenPoint(outPoint.ref);
   });
+
+  /// Applies a camera update to a standalone projection.
+  ///
+  /// See `mln_map_projection_set_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   void setCamera(CameraOptions camera) => withNativeArena((arena) {
     _check(
       raw.mln_map_projection_set_camera(
@@ -5492,6 +6427,11 @@ final class MapProjectionHandle implements Finalizable {
       ),
     );
   });
+
+  /// Applies a camera fit for geographic coordinates.
+  ///
+  /// See `mln_map_projection_set_visible_coordinates` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   void setVisibleCoordinates(List<LatLng> coordinates, EdgeInsets padding) =>
       withNativeArena((arena) {
         final nativecoordinates = arena<raw.mln_lat_lng>(
@@ -5513,6 +6453,11 @@ final class MapProjectionHandle implements Finalizable {
           ),
         );
       });
+
+  /// Applies a camera fit for GeoJSON Geometry bytes.
+  ///
+  /// See `mln_map_projection_set_visible_geometry` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
   void setVisibleGeometry(Uint8List geometry, EdgeInsets padding) =>
       withNativeArena((arena) {
         _check(
@@ -5542,6 +6487,10 @@ final class RenderFrameBatchHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Returns the number of records in an owned frame-result batch.
+  ///
+  /// See `mln_render_frame_batch_count` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   int count() => withNativeArena((arena) {
     final outCount = arena<Size>();
     _check(
@@ -5549,6 +6498,11 @@ final class RenderFrameBatchHandle implements Finalizable {
     );
     return outCount.value;
   });
+
+  /// Copies one frame-result record.
+  ///
+  /// See `mln_render_frame_batch_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   RenderFrameResult getValue(int indexValue) => withNativeArena((arena) {
     final outResult = arena<raw.mln_render_frame_result>();
     outResult.ref.size = sizeOf<raw.mln_render_frame_result>();
@@ -5566,6 +6520,11 @@ final class RenderFrameBatchHandle implements Finalizable {
     );
     return _readRenderFrameResult(outResult.ref);
   });
+
+  /// Releases a frame-result batch.
+  ///
+  /// See `mln_render_frame_batch_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void close() => _state.close((handle) {
     raw.mln_render_frame_batch_release(handle.raw);
     return nativeStatusOk;
@@ -5591,6 +6550,10 @@ final class RenderSessionHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Starts an ordered caller-owned Metal texture replacement.
+  ///
+  /// See `mln_metal_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   Future<void> metalBorrowedTextureSetTarget(
     MetalBorrowedTextureDescriptor descriptor,
   ) => _run(
@@ -5601,6 +6564,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered Metal surface replacement.
+  ///
+  /// See `mln_metal_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   Future<void> metalSurfaceSetTarget(MetalSurfaceDescriptor descriptor) => _run(
     (arena, completion) => raw.mln_metal_surface_set_target(
       _handle.raw,
@@ -5609,6 +6577,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered caller-owned OpenGL texture replacement.
+  ///
+  /// See `mln_opengl_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   Future<void> openglBorrowedTextureSetTarget(
     OpenglBorrowedTextureDescriptor descriptor,
   ) => _run(
@@ -5619,6 +6592,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered OpenGL surface replacement.
+  ///
+  /// See `mln_opengl_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   Future<void> openglSurfaceSetTarget(OpenglSurfaceDescriptor descriptor) =>
       _run(
         (arena, completion) => raw.mln_opengl_surface_set_target(
@@ -5628,6 +6606,11 @@ final class RenderSessionHandle implements Finalizable {
           nativeDiagnostic,
         ),
       );
+
+  /// Irreversibly closes control and mailboxes without graphics calls.
+  ///
+  /// See `mln_render_session_abandon` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   RenderAbandonResult abandon() => withNativeArena((arena) {
     final outResult = arena<raw.mln_render_abandon_result>();
     outResult.ref.size = sizeOf<raw.mln_render_abandon_result>();
@@ -5636,6 +6619,12 @@ final class RenderSessionHandle implements Finalizable {
     );
     return _readRenderAbandonResult(outResult.ref);
   });
+
+  /// Acquires the oldest rendered frame that is not already acquired. The frame
+  /// owns its slot until release. The call is nonblocking.
+  ///
+  /// See `mln_render_session_acquire_frame` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   AcquiredFrameHandle? acquireFrame() => withNativeArena((arena) {
     final outFrame = arena<Uint64>();
     if (!_present(
@@ -5655,6 +6644,12 @@ final class RenderSessionHandle implements Finalizable {
       },
     );
   });
+
+  /// Starts a barrier that completes after all render work accepted before it
+  /// has a terminal result. A barrier does not request a frame.
+  ///
+  /// See `mln_render_session_barrier` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   Future<void> barrier() => _run(
     (arena, completion) => raw.mln_render_session_barrier(
       _handle.raw,
@@ -5662,6 +6657,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts asynchronous renderer-data clearing.
+  ///
+  /// See `mln_render_session_clear_data` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   Future<void> clearData() => _run(
     (arena, completion) => raw.mln_render_session_clear_data(
       _handle.raw,
@@ -5669,9 +6669,22 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Retires a detached or abandoned session handle. The call is CPU-only and
+  /// may run on any native thread, including from one of the session's own
+  /// completions. If frame disposal already started abandonment, this waits for
+  /// that abandonment to finish before consuming the session owner.
+  ///
+  /// See `mln_render_session_destroy` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void close() => _state.close(
     (handle) => raw.mln_render_session_destroy(handle.raw, nativeDiagnostic),
   );
+
+  /// Starts normal graphics-owner teardown and map detachment.
+  ///
+  /// See `mln_render_session_detach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   Future<void> detach() => _run(
     (arena, completion) => raw.mln_render_session_detach(
       _handle.raw,
@@ -5679,9 +6692,20 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Consumes a session and schedules CPU-side abandonment and destruction.
+  ///
+  /// See `mln_render_session_dispose` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void dispose() => _state.close(
     (handle) => raw.mln_render_session_dispose(handle.raw, nativeDiagnostic),
   );
+
+  /// Drains every currently queued terminal frame result into an independently
+  /// owned batch. The records remain stable until the batch is released.
+  ///
+  /// See `mln_render_session_drain_frame_results` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   RenderFrameBatchHandle? drainFrameResults() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
     if (!_present(
@@ -5701,6 +6725,11 @@ final class RenderSessionHandle implements Finalizable {
       },
     );
   });
+
+  /// Starts asynchronous renderer diagnostic-log emission.
+  ///
+  /// See `mln_render_session_dump_debug_logs` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   Future<void> dumpDebugLogs() => _run(
     (arena, completion) => raw.mln_render_session_dump_debug_logs(
       _handle.raw,
@@ -5708,6 +6737,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Returns the immutable capabilities fixed during attachment.
+  ///
+  /// See `mln_render_session_get_capabilities` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   RenderSessionCapabilities getCapabilities() => withNativeArena((arena) {
     final outCapabilities = arena<raw.mln_render_session_capabilities>();
     outCapabilities.ref.size = sizeOf<raw.mln_render_session_capabilities>();
@@ -5720,6 +6754,11 @@ final class RenderSessionHandle implements Finalizable {
     );
     return _readRenderSessionCapabilities(outCapabilities.ref);
   });
+
+  /// Copies the latest render-session snapshot from any native thread.
+  ///
+  /// See `mln_render_session_get_snapshot` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   RenderSessionSnapshot getSnapshot() => withNativeArena((arena) {
     final outSnapshot = arena<raw.mln_render_session_snapshot>();
     outSnapshot.ref.size = sizeOf<raw.mln_render_session_snapshot>();
@@ -5732,6 +6771,15 @@ final class RenderSessionHandle implements Finalizable {
     );
     return _readRenderSessionSnapshot(outSnapshot.ref);
   });
+
+  /// Copies the last completed rendered transform into an independent
+  /// projection. Callable from any thread. Returns invalid state before a
+  /// completed render, after an extent or target change, or after detachment.
+  /// The caller owns the returned projection, which remains usable after the
+  /// session is released. out_projection must point to a null handle.
+  ///
+  /// See `mln_render_session_projection_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   MapProjectionHandle projectionCreate() => withNativeArena((arena) {
     final outProjection = arena<Uint64>();
     _check(
@@ -5749,6 +6797,13 @@ final class RenderSessionHandle implements Finalizable {
       },
     );
   });
+
+  /// Starts a feature-extension query against the latest driver state. The
+  /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
+  /// 1), valid only for the callback.
+  ///
+  /// See `mln_render_session_query_feature_extensions` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   Future<Uint8List> queryFeatureExtensions(
     String sourceId,
     Uint8List feature,
@@ -5774,6 +6829,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts a rendered-feature query against the session's latest driver state.
+  ///
+  /// See `mln_render_session_query_rendered_features` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   Future<List<QueriedFeature>> queryRenderedFeatures(
     RenderedQueryGeometry geometry, {
     RenderedFeatureQueryOptions? options,
@@ -5789,6 +6849,13 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts a source-feature query against the session's latest driver state.
+  /// The completion borrows an array of `mln_queried_feature` values
+  /// (value_count entries), valid only for the callback.
+  ///
+  /// See `mln_render_session_query_source_features` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   Future<List<QueriedFeature>> querySourceFeatures(
     String sourceId, {
     SourceFeatureQueryOptions? options,
@@ -5804,6 +6871,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts best-effort release of renderer caches.
+  ///
+  /// See `mln_render_session_reduce_memory_use` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   Future<void> reduceMemoryUse() => _run(
     (arena, completion) => raw.mln_render_session_reduce_memory_use(
       _handle.raw,
@@ -5811,6 +6883,13 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Requests a frame without waiting. Every accepted demand produces one
+  /// terminal result record. A core worker wakes itself; a caller driver
+  /// publishes its driver-work endpoint.
+  ///
+  /// See `mln_render_session_request_frame` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   void requestFrame(FrameDemand demand) => withNativeArena((arena) {
     _check(
       raw.mln_render_session_request_frame(
@@ -5820,6 +6899,12 @@ final class RenderSessionHandle implements Finalizable {
       ),
     );
   });
+
+  /// Starts an ordered logical resize. The completion runs after the selected
+  /// driver applies the extent and updates the map viewport.
+  ///
+  /// See `mln_render_session_resize` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   Future<CommandCompletion> resize(RenderTargetExtent extent) => _command(
     (arena, completion) => raw.mln_render_session_resize(
       _handle.raw,
@@ -5828,6 +6913,15 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Services up to max_work items for a caller-graphics-thread driver; zero
+  /// services every item currently queued. The first successful service call
+  /// fixes the session's graphics-thread identity; later calls from another
+  /// native thread return `MLN_STATUS_WRONG_THREAD`. The target context must be
+  /// current. Core-worker sessions return `MLN_STATUS_INVALID_STATE`.
+  ///
+  /// See `mln_render_session_service_driver_work` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   int serviceDriverWork(int maxWork) => withNativeArena((arena) {
     final outServiced = arena<Size>();
     _check(
@@ -5844,6 +6938,11 @@ final class RenderSessionHandle implements Finalizable {
     );
     return outServiced.value;
   });
+
+  /// Starts readback of the latest rendered texture frame.
+  ///
+  /// See `mln_texture_read_premultiplied_rgba8` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   Future<TextureReadbackResult> textureReadPremultipliedRgba8() => _query(
     _resultTextureReadbackResult,
     (arena, completion) => raw.mln_texture_read_premultiplied_rgba8(
@@ -5852,6 +6951,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered caller-owned Vulkan texture replacement.
+  ///
+  /// See `mln_vulkan_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   Future<void> vulkanBorrowedTextureSetTarget(
     VulkanBorrowedTextureDescriptor descriptor,
   ) => _run(
@@ -5862,6 +6966,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered Vulkan surface replacement.
+  ///
+  /// See `mln_vulkan_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   Future<void> vulkanSurfaceSetTarget(VulkanSurfaceDescriptor descriptor) =>
       _run(
         (arena, completion) => raw.mln_vulkan_surface_set_target(
@@ -5871,6 +6980,11 @@ final class RenderSessionHandle implements Finalizable {
           nativeDiagnostic,
         ),
       );
+
+  /// Starts an ordered caller-owned WebGPU texture replacement.
+  ///
+  /// See `mln_webgpu_borrowed_texture_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   Future<void> webgpuBorrowedTextureSetTarget(
     WebgpuBorrowedTextureDescriptor descriptor,
   ) => _run(
@@ -5881,6 +6995,11 @@ final class RenderSessionHandle implements Finalizable {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts an ordered WebGPU surface replacement.
+  ///
+  /// See `mln_webgpu_surface_set_target` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
   Future<void> webgpuSurfaceSetTarget(WebgpuSurfaceDescriptor descriptor) =>
       _run(
         (arena, completion) => raw.mln_webgpu_surface_set_target(
@@ -5911,6 +7030,10 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Reports whether MapLibre has cancelled a C API resource provider request.
+  ///
+  /// See `mln_resource_request_cancelled` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   bool cancelled() => withNativeArena((arena) {
     final outCancelled = arena<Bool>();
     _check(
@@ -5922,6 +7045,11 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
     );
     return outCancelled.value;
   });
+
+  /// Completes a C API resource provider request.
+  ///
+  /// See `mln_resource_request_complete` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   void complete(ResourceResponse response) => withNativeArena((arena) {
     _check(
       raw.mln_resource_request_complete(
@@ -5931,10 +7059,21 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
       ),
     );
   });
+
+  /// Releases the provider's reference to a resource request handle.
+  ///
+  /// See `mln_resource_request_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   void close() => _state.close((handle) {
     raw.mln_resource_request_release(handle.raw);
     return nativeStatusOk;
   });
+
+  /// Registers a callback that runs when MapLibre cancels a C API resource
+  /// provider request.
+  ///
+  /// See `mln_resource_request_set_cancel_callback` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   bool setCancelCallback(
     ResourceRequestCancelCallback callback,
   ) => withNativeArena((arena) {
@@ -5976,6 +7115,13 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
       }
     }
   });
+
+  /// Blocks until a resource request is released and its cancel callback
+  /// registration has retired: the callback, if it ran, and release_user_data
+  /// have both returned. Completing a request does not release its owner.
+  ///
+  /// See `mln_resource_request_wait_until_retired` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   void waitUntilRetired() => _check(
     raw.mln_resource_request_wait_until_retired(
       _state.handleId,
@@ -5988,6 +7134,11 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
 extension type const NativeRuntime(int raw) implements NativeHandle {}
 
 /// Owner of one native `mln_runtime` handle.
+///
+/// Handles are opaque 64-bit generational ids.
+///
+/// See `mln_runtime` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   RuntimeHandle._(NativeRuntime handle)
     : _state = NativeHandleState(handle, 'RuntimeHandle');
@@ -6003,6 +7154,10 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
+  /// Creates a map on the runtime worker.
+  ///
+  /// See `mln_map_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<MapHandle> mapCreate(MapOptions options) => _queryOwned(
     raw.MLN_ADAPTER_COMPLETION_COPY_MAP,
     (arena, completion) => raw.mln_map_create(
@@ -6019,10 +7174,20 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       },
     ),
   );
+
+  /// Starts an ordered runtime barrier.
+  ///
+  /// See `mln_runtime_barrier` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> barrier() => _run(
     (arena, completion) =>
         raw.mln_runtime_barrier(_handle.raw, completion, nativeDiagnostic),
   );
+
+  /// Clears the runtime-scoped outgoing HTTP header transform.
+  ///
+  /// See `mln_runtime_clear_http_header_transform` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> clearHttpHeaderTransform() => _run(
     (arena, completion) => raw.mln_runtime_clear_http_header_transform(
       _handle.raw,
@@ -6030,6 +7195,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Clears the runtime-scoped network resource provider.
+  ///
+  /// See `mln_runtime_clear_resource_provider` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> clearResourceProvider() => _run(
     (arena, completion) => raw.mln_runtime_clear_resource_provider(
       _handle.raw,
@@ -6037,6 +7207,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Clears the runtime-scoped URL transform for network resources.
+  ///
+  /// See `mln_runtime_clear_resource_transform` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> clearResourceTransform() => _run(
     (arena, completion) => raw.mln_runtime_clear_resource_transform(
       _handle.raw,
@@ -6044,9 +7219,19 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Consumes a runtime handle without observing its asynchronous retirement.
+  ///
+  /// See `mln_runtime_dispose` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   void dispose() => _state.close(
     (handle) => raw.mln_runtime_dispose(handle.raw, nativeDiagnostic),
   );
+
+  /// Drains this runtime's queued events into a new owned batch.
+  ///
+  /// See `mln_runtime_drain_events` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   EventBatchHandle drainEvents() => withNativeArena((arena) {
     final outBatch = arena<Uint64>();
     _check(
@@ -6060,6 +7245,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       },
     );
   });
+
+  /// Reports which runtime-scoped event types this runtime queues.
+  ///
+  /// See `mln_runtime_get_event_mask` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   RuntimeEventMask getEventMask() => withNativeArena((arena) {
     final outMask = arena<Uint64>();
     _check(
@@ -6067,6 +7257,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
     );
     return RuntimeEventMask.fromRawValue(outMask.value);
   });
+
+  /// Starts creating an offline region.
+  ///
+  /// See `mln_runtime_offline_region_create` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<OfflineRegionInfo> offlineRegionCreate(
     OfflineRegionDefinition definition,
     Uint8List metadata,
@@ -6081,6 +7276,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Deletes an offline region.
+  ///
+  /// See `mln_runtime_offline_region_delete` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<void> offlineRegionDelete(int regionId) => _run(
     (arena, completion) => raw.mln_runtime_offline_region_delete(
       _handle.raw,
@@ -6089,6 +7289,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts getting one offline region by ID.
+  ///
+  /// See `mln_runtime_offline_region_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<OfflineRegionInfo?> offlineRegionGet(int regionId) => _queryOptional(
     _resultOfflineRegionInfo,
     (arena, completion) => raw.mln_runtime_offline_region_get(
@@ -6098,6 +7303,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts getting the current download status for an offline region.
+  ///
+  /// See `mln_runtime_offline_region_get_status` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<OfflineRegionStatus> offlineRegionGetStatus(int regionId) => _query(
     _resultOfflineRegionStatus,
     (arena, completion) => raw.mln_runtime_offline_region_get_status(
@@ -6107,6 +7317,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Invalidates cached resources for an offline region.
+  ///
+  /// See `mln_runtime_offline_region_invalidate` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<void> offlineRegionInvalidate(int regionId) => _run(
     (arena, completion) => raw.mln_runtime_offline_region_invalidate(
       _handle.raw,
@@ -6115,6 +7330,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Sets an offline region's native download state.
+  ///
+  /// See `mln_runtime_offline_region_set_download_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<void> offlineRegionSetDownloadState(
     int regionId,
     OfflineRegionDownloadState state,
@@ -6127,6 +7347,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Enables or disables runtime events for an offline region.
+  ///
+  /// See `mln_runtime_offline_region_set_observed` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<void> offlineRegionSetObserved(int regionId, bool observed) => _run(
     (arena, completion) => raw.mln_runtime_offline_region_set_observed(
       _handle.raw,
@@ -6136,6 +7361,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts updating opaque binary metadata for an offline region.
+  ///
+  /// See `mln_runtime_offline_region_update_metadata` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<OfflineRegionInfo> offlineRegionUpdateMetadata(
     int regionId,
     Uint8List metadata,
@@ -6150,6 +7380,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     );
   });
+
+  /// Starts listing the offline regions in the runtime database.
+  ///
+  /// See `mln_runtime_offline_regions_list` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<List<OfflineRegionInfo>> offlineRegionsList() => _queryList(
     _resultOfflineRegionInfo,
     (arena, completion) => raw.mln_runtime_offline_regions_list(
@@ -6158,6 +7393,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Starts merging offline regions from another MapLibre offline database.
+  ///
+  /// See `mln_runtime_offline_regions_merge_database` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   Future<List<OfflineRegionInfo>> offlineRegionsMergeDatabase(
     String sideDatabasePath,
   ) => _queryList(
@@ -6169,12 +7409,22 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Releases a runtime after synchronous child preflight.
+  ///
+  /// See `mln_runtime_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> close() => _state.closeAsync(
     (handle) => _run(
       (arena, completion) =>
           raw.mln_runtime_release(handle.raw, completion, nativeDiagnostic),
     ),
   );
+
+  /// Starts a MapLibre ambient cache maintenance operation for this runtime.
+  ///
+  /// See `mln_runtime_run_ambient_cache_operation` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> runAmbientCacheOperation(AmbientCacheOperation operation) =>
       _run(
         (arena, completion) => raw.mln_runtime_run_ambient_cache_operation(
@@ -6184,6 +7434,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
           nativeDiagnostic,
         ),
       );
+
+  /// Selects which runtime-scoped event types this runtime queues.
+  ///
+  /// See `mln_runtime_set_event_mask` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   void setEventMask(RuntimeEventMask mask) => _check(
     raw.mln_runtime_set_event_mask(
       _handle.raw,
@@ -6191,6 +7446,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Registers or replaces the runtime-scoped outgoing HTTP header transform.
+  ///
+  /// See `mln_runtime_set_http_header_transform` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> setHttpHeaderTransform(HttpHeaderTransform transform) =>
       _run((arena, completion) {
         final registrations = _NativeRegistrations(_callbackPorts);
@@ -6205,6 +7465,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
           ),
         );
       });
+
+  /// Starts a change to this runtime's maximum ambient cache size.
+  ///
+  /// See `mln_runtime_set_maximum_ambient_cache_size` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> setMaximumAmbientCacheSize(BigInt size) => _run(
     (arena, completion) => raw.mln_runtime_set_maximum_ambient_cache_size(
       _handle.raw,
@@ -6213,6 +7478,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
       nativeDiagnostic,
     ),
   );
+
+  /// Registers or replaces a runtime-scoped network resource provider.
+  ///
+  /// See `mln_runtime_set_resource_provider` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> setResourceProvider(ResourceProvider provider) =>
       _run((arena, completion) {
         final registrations = _NativeRegistrations(_callbackPorts);
@@ -6231,6 +7501,11 @@ final class RuntimeHandle implements Finalizable, _CallbackPortOwner {
           ),
         );
       });
+
+  /// Registers or updates a runtime-scoped URL transform for network resources.
+  ///
+  /// See `mln_runtime_set_resource_transform` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   Future<void> setResourceTransform(ResourceTransform transform) =>
       _run((arena, completion) {
         final registrations = _NativeRegistrations(_callbackPorts);

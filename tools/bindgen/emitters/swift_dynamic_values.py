@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from .swift import camel, identifier, name
+from .swift import camel, doc, identifier, name
 
 
 def dynamic(value):
@@ -344,7 +344,9 @@ def declaration(values, value):
         if f.value.kind == "union":
             union = f.value
             union_type = values.public(union)
-            fields.append(f"  public var {local}: {union_type}")
+            fields.append(
+                f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {union_type}"
+            )
             args.append(
                 f"{local}: {union_type} = {typ}.default.{local}"
                 if value.default
@@ -375,7 +377,9 @@ def declaration(values, value):
         optional = f.presence and f.presence.mask
         field_type = values.public(f.value) + ("?" if optional else "")
         default = zero(f.value, field_type)
-        fields.append(f"  public var {local}: {field_type}")
+        fields.append(
+            f"{doc(values.bound, f'{value.native}.{f.name}', '  ')}  public var {local}: {field_type}"
+        )
         args.append(
             f"{local}: {field_type} = {typ}.default.{local}"
             if value.default
@@ -412,7 +416,7 @@ def declaration(values, value):
         ]
     return (
         "\n".join(group_declarations)
-        + f"""public struct {typ}: {conformances} {{
+        + f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
   public static var `default`: Self {{ {f"try! Self(raw: {initial})" if value.default else "Self()"} }}
 {chr(10).join(constructors)}

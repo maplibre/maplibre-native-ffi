@@ -35,6 +35,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         state.Retire();
     }
 
+    /// <summary>
+    /// Adds a color-relief layer for a raster DEM source.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_color_relief_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddColorReliefLayerAsync(
         string layerId,
         string sourceId,
@@ -57,6 +64,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a custom geometry source.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_custom_geometry_source</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddCustomGeometrySourceAsync(
         string sourceId,
         CustomGeometrySourceOptions options,
@@ -77,6 +91,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a custom MVT vector source.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_custom_mvt_vector_source</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddCustomMvtVectorSourceAsync(
         string sourceId,
         CustomMvtVectorSourceOptions options,
@@ -97,6 +118,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a GeoJSON source with prepared inline data.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_geojson_source_data</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddGeojsonSourceDataAsync(
         string sourceId,
         GeojsonSourceDataHandle data,
@@ -117,6 +145,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a GeoJSON source with URL data.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_geojson_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddGeojsonSourceUrlAsync(
         string sourceId,
         string url,
@@ -141,6 +176,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a hillshade layer for a raster DEM source.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_hillshade_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddHillshadeLayerAsync(
         string layerId,
         string sourceId,
@@ -163,6 +205,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds an image source with inline image pixels.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_image_source_image</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddImageSourceImageAsync(
         string sourceId,
         LatLng[] coordinates,
@@ -186,6 +235,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds an image source that loads its image from a URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_image_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddImageSourceUrlAsync(
         string sourceId,
         LatLng[] coordinates,
@@ -209,6 +265,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a source-free location indicator layer.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_location_indicator_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddLocationIndicatorLayerAsync(
         string layerId,
         string beforeLayerId,
@@ -229,6 +292,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a raster DEM source with inline tile URLs.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_raster_dem_source_tiles</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddRasterDemSourceTilesAsync(
         string sourceId,
         string[] tiles,
@@ -254,6 +324,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a raster DEM source with a TileJSON URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_raster_dem_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddRasterDemSourceUrlAsync(
         string sourceId,
         string url,
@@ -278,6 +355,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a raster source with inline tile URLs.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_raster_source_tiles</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddRasterSourceTilesAsync(
         string sourceId,
         string[] tiles,
@@ -303,6 +387,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a raster source with a TileJSON URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_raster_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddRasterSourceUrlAsync(
         string sourceId,
         string url,
@@ -327,6 +418,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds one style layer from a full style-spec layer JSON object.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_style_layer_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddStyleLayerJsonAsync(
         byte[] layerJson,
         string beforeLayerId,
@@ -347,6 +445,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds one style source from a style-spec source JSON object.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_style_source_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddStyleSourceJsonAsync(
         string sourceId,
         byte[] sourceJson,
@@ -367,6 +472,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a vector source with inline tile URLs.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_vector_source_tiles</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddVectorSourceTilesAsync(
         string sourceId,
         string[] tiles,
@@ -392,6 +504,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Adds a vector source with a TileJSON URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_add_vector_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> AddVectorSourceUrlAsync(
         string sourceId,
         string url,
@@ -416,6 +535,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits one copied relative camera update.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_apply_camera_delta</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> ApplyCameraDeltaAsync(
         CameraDelta delta,
         CancellationToken cancellationToken = default
@@ -434,6 +560,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered query for a camera that fits a GeoJSON geometry.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_camera_for_geometry</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CameraOptions> CameraForGeometryAsync(
         byte[] geometry,
         CameraFitOptions? fitOptions,
@@ -455,6 +588,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered query for a camera that fits geographic bounds.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_camera_for_lat_lng_bounds</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CameraOptions> CameraForLatLngBoundsAsync(
         LatLngBounds bounds,
         CameraFitOptions? fitOptions,
@@ -476,6 +616,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered query for a camera that fits geographic coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_camera_for_lat_lngs</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CameraOptions> CameraForLatLngsAsync(
         LatLng[] coordinates,
         CameraFitOptions? fitOptions,
@@ -498,6 +645,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered camera read.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_camera_query</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CameraQueryResult> CameraQueryAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_camera_query");
@@ -509,6 +663,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies the camera from the latest immutable map snapshot.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_camera_snapshot_get</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public (CameraOptions Camera, ulong Generation) CameraSnapshotGet()
     {
         using var read = state.Read(this, "mln_map_camera_snapshot_get");
@@ -525,6 +686,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         return (CopyCameraOptions(outCamera), outGeneration);
     }
 
+    /// <summary>
+    /// Cancels the camera transitions running when this command commits.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_cancel_transitions</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> CancelTransitionsAsync(
         CancellationToken cancellationToken = default
     )
@@ -537,6 +705,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one layer's source ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_copy_layer_source_id</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<string?> CopyLayerSourceIdAsync(
         string layerId,
         CancellationToken cancellationToken = default
@@ -556,6 +731,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one layer's source-layer ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_copy_layer_source_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<string?> CopyLayerSourceLayerAsync(
         string layerId,
         CancellationToken cancellationToken = default
@@ -575,6 +757,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one runtime style image as tightly packed premultiplied RGBA8
+    /// pixels.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_copy_style_image_premultiplied_rgba8</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]?> CopyStyleImagePremultipliedRgba8Async(
         string imageId,
         CancellationToken cancellationToken = default
@@ -594,6 +784,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one runtime style image's stretchable intervals.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_copy_style_image_stretches</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<StyleImageStretchesResult?> CopyStyleImageStretchesAsync(
         string imageId,
         CancellationToken cancellationToken = default
@@ -616,6 +813,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one style source attribution string.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_copy_style_source_attribution</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<string?> CopyStyleSourceAttributionAsync(
         string sourceId,
         CancellationToken cancellationToken = default
@@ -635,6 +839,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one style source URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_copy_style_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<string?> CopyStyleSourceUrlAsync(
         string sourceId,
         CancellationToken cancellationToken = default
@@ -654,6 +865,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits an ordered debug-log command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_dump_debug_logs</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> DumpDebugLogsAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_dump_debug_logs");
@@ -664,6 +882,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered read of per-feature state from this map.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_feature_state</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]> GetFeatureStateAsync(
         FeatureStateSelector selector,
         CancellationToken cancellationToken = default
@@ -683,6 +908,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Queries the global-state JSON object, including style defaults.
+    /// Completion borrows one <c>mln_buffer_view</c> for the duration of the
+    /// callback.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_global_state</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]> GetGlobalStateAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_get_global_state");
@@ -694,6 +928,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies image source coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_image_source_coordinates</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<LatLng[]?> GetImageSourceCoordinatesAsync(
         string sourceId,
         CancellationToken cancellationToken = default
@@ -713,6 +954,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Serializes one layer filter as a style-spec JSON value.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_layer_filter</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]?> GetLayerFilterAsync(
         string layerId,
         CancellationToken cancellationToken = default
@@ -732,6 +980,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Serializes one layer property as a style-spec JSON value.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_layer_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]?> GetLayerPropertyAsync(
         string layerId,
         string propertyName,
@@ -753,6 +1008,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one complete runtime style image.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_image_info</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<StyleImageResult?> GetStyleImageInfoAsync(
         string imageId,
         CancellationToken cancellationToken = default
@@ -772,6 +1034,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies complete metadata for one style layer.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_layer_info</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<StyleLayerResult?> GetStyleLayerInfoAsync(
         string layerId,
         CancellationToken cancellationToken = default
@@ -791,6 +1060,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Serializes one style layer as a full style-spec layer JSON object.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_layer_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]?> GetStyleLayerJsonAsync(
         string layerId,
         CancellationToken cancellationToken = default
@@ -810,6 +1086,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Serializes one style light property as a style-spec JSON value.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_light_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]?> GetStyleLightPropertyAsync(
         string propertyName,
         CancellationToken cancellationToken = default
@@ -829,6 +1112,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies complete metadata for one style source.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_source_info</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<StyleSourceResult?> GetStyleSourceInfoAsync(
         string sourceId,
         CancellationToken cancellationToken = default
@@ -848,6 +1138,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies one style source's inline TileJSON tile URLs.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_source_tile_urls</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<StyleSourceTileUrlsResult?> GetStyleSourceTileUrlsAsync(
         string sourceId,
         CancellationToken cancellationToken = default
@@ -870,6 +1167,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Reads the style's global transition options.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_get_style_transition_options</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<StyleTransitionOptions> GetStyleTransitionOptionsAsync(
         CancellationToken cancellationToken = default
     )
@@ -883,6 +1187,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Invalidates custom geometry source data inside one geographic region.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_invalidate_custom_geometry_source_region</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> InvalidateCustomGeometrySourceRegionAsync(
         string sourceId,
         LatLngBounds bounds,
@@ -906,6 +1217,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Invalidates custom geometry source data for one canonical tile.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_invalidate_custom_geometry_source_tile</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> InvalidateCustomGeometrySourceTileAsync(
         string sourceId,
         CanonicalTileId tileId,
@@ -929,6 +1247,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Invalidates custom MVT vector source data for one canonical tile.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_invalidate_custom_mvt_vector_source_tile</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> InvalidateCustomMvtVectorSourceTileAsync(
         string sourceId,
         CanonicalTileId tileId,
@@ -952,6 +1277,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered wrapped-bounds query for a copied camera.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_lat_lng_bounds_for_camera</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<LatLngBounds> LatLngBoundsForCameraAsync(
         CameraOptions camera,
         CancellationToken cancellationToken = default
@@ -971,6 +1303,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered unwrapped-bounds query for a copied camera.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_lat_lng_bounds_for_camera_unwrapped</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<LatLngBounds> LatLngBoundsForCameraUnwrappedAsync(
         CameraOptions camera,
         CancellationToken cancellationToken = default
@@ -990,6 +1329,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered conversion from a screen point to a geographic
+    /// coordinate.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_lat_lng_for_pixel</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<LatLng> LatLngForPixelAsync(
         ScreenPoint point,
         CancellationToken cancellationToken = default
@@ -1009,6 +1356,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered conversion from a screen point to an unwrapped
+    /// geographic coordinate.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_lat_lng_for_pixel_unwrapped</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<LatLng> LatLngForPixelUnwrappedAsync(
         ScreenPoint point,
         CancellationToken cancellationToken = default
@@ -1028,6 +1383,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered conversion of copied screen points to coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_lat_lngs_for_pixels</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<LatLng[]> LatLngsForPixelsAsync(
         ScreenPoint[] points,
         CancellationToken cancellationToken = default
@@ -1051,6 +1413,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered conversion of copied screen points to unwrapped
+    /// coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_lat_lngs_for_pixels_unwrapped</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<LatLng[]> LatLngsForPixelsUnwrappedAsync(
         ScreenPoint[] points,
         CancellationToken cancellationToken = default
@@ -1074,6 +1444,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies style layer IDs in style order.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_list_style_layer_ids</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<string[]> ListStyleLayerIdsAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_list_style_layer_ids");
@@ -1085,6 +1462,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered query of every style layer in style order.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_list_style_layers</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<StyleLayerEntry[]> ListStyleLayersAsync(
         CancellationToken cancellationToken = default
     )
@@ -1098,6 +1482,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies style source IDs in style order.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_list_style_source_ids</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<string[]> ListStyleSourceIdsAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_list_style_source_ids");
@@ -1109,6 +1500,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered copy of the last successfully parsed style document.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_loaded_style_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<byte[]> LoadedStyleJsonAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_loaded_style_json");
@@ -1120,6 +1518,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered query of meters per logical pixel at a latitude and
+    /// the current map zoom. The completion borrows one double.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_meters_per_pixel_at_latitude</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<double> MetersPerPixelAtLatitudeAsync(
         double latitude,
         CancellationToken cancellationToken = default
@@ -1139,6 +1545,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Moves one style layer before another layer or to the top.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_move_style_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> MoveStyleLayerAsync(
         string layerId,
         string beforeLayerId,
@@ -1159,6 +1572,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered conversion from a geographic coordinate to a screen
+    /// point.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_pixel_for_lat_lng</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<ScreenPoint> PixelForLatLngAsync(
         LatLng coordinate,
         CancellationToken cancellationToken = default
@@ -1178,6 +1599,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts an ordered conversion of copied coordinates to screen points.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_pixels_for_lat_lngs</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<ScreenPoint[]> PixelsForLatLngsAsync(
         LatLng[] coordinates,
         CancellationToken cancellationToken = default
@@ -1198,6 +1626,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts creation of a standalone projection from the map's ordered
+    /// transform state.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_projection_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<MapProjectionHandle> ProjectionCreateAsync()
     {
         using var scope = new NativeCallScope(this, "mln_map_projection_create");
@@ -1208,6 +1644,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Releases a map after synchronous state preflight.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_release</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public void Close() => CloseAsync().GetAwaiter().GetResult();
 
     public Task CloseAsync()
@@ -1228,6 +1671,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         return mln_status.MLN_STATUS_OK;
     }
 
+    /// <summary>
+    /// Removes per-feature state from this map.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_remove_feature_state</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> RemoveFeatureStateAsync(
         FeatureStateSelector selector,
         CancellationToken cancellationToken = default
@@ -1246,6 +1696,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Removes one runtime style image by ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_remove_style_image</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> RemoveStyleImageAsync(
         string imageId,
         CancellationToken cancellationToken = default
@@ -1264,6 +1721,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Removes one style layer by ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_remove_style_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> RemoveStyleLayerAsync(
         string layerId,
         CancellationToken cancellationToken = default
@@ -1282,6 +1746,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Removes one style source by ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_remove_style_source</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> RemoveStyleSourceAsync(
         string sourceId,
         CancellationToken cancellationToken = default
@@ -1300,6 +1771,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Requests a repaint for a continuous map.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_request_repaint</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> RequestRepaintAsync(
         CancellationToken cancellationToken = default
     )
@@ -1312,6 +1790,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Requests one still image for a static or tile map.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_request_still_image</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task RequestStillImageAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_request_still_image");
@@ -1322,6 +1807,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits the sole post-creation logical extent update.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_resize</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> ResizeAsync(
         LogicalExtent extent,
         CancellationToken cancellationToken = default
@@ -1340,6 +1832,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a copied camera-constraint command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_bounds</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetBoundsAsync(
         BoundOptions options,
         CancellationToken cancellationToken = default
@@ -1358,6 +1857,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets custom geometry source data for one canonical tile.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_custom_geometry_source_tile_data</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetCustomGeometrySourceTileDataAsync(
         string sourceId,
         CanonicalTileId tileId,
@@ -1380,6 +1886,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets custom MVT vector source data for one canonical tile.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_custom_mvt_vector_source_tile_data</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetCustomMvtVectorSourceTileDataAsync(
         string sourceId,
         CanonicalTileId tileId,
@@ -1405,6 +1918,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Reports a custom MVT vector source error for one canonical tile.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_custom_mvt_vector_source_tile_error</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetCustomMvtVectorSourceTileErrorAsync(
         string sourceId,
         CanonicalTileId tileId,
@@ -1430,6 +1950,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a debug-overlay command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_debug_options</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetDebugOptionsAsync(
         MapDebugOption options,
         CancellationToken cancellationToken = default
@@ -1448,6 +1975,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Selects which map-originated event types this map queues.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_event_mask</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetEventMaskAsync(
         RuntimeEventMask mask,
         CancellationToken cancellationToken = default
@@ -1461,6 +1995,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a copied per-feature-state command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_feature_state</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetFeatureStateAsync(
         FeatureStateSelector selector,
         byte[] state,
@@ -1481,6 +2022,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a copied free-camera command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_free_camera_options</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetFreeCameraOptionsAsync(
         FreeCameraOptions options,
         CancellationToken cancellationToken = default
@@ -1499,6 +2047,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Updates one GeoJSON source with prepared inline data.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_geojson_source_data</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetGeojsonSourceDataAsync(
         string sourceId,
         GeojsonSourceDataHandle data,
@@ -1519,6 +2074,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Overrides one GeoJSON source's synchronous tiling at runtime.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_geojson_source_synchronous_tiling</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetGeojsonSourceSynchronousTilingAsync(
         string sourceId,
         bool enabled,
@@ -1542,6 +2104,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Updates one GeoJSON source to load data from a URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_geojson_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetGeojsonSourceUrlAsync(
         string sourceId,
         string url,
@@ -1562,6 +2131,15 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a global-state JSON value. JSON null restores the style default.
+    /// Input is copied before return. Completion reports invalid state if the
+    /// style is not loaded, or invalid argument if the JSON cannot be parsed.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_global_state_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetGlobalStatePropertyAsync(
         string propertyName,
         byte[] value,
@@ -1582,6 +2160,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Updates image source coordinates.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_image_source_coordinates</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetImageSourceCoordinatesAsync(
         string sourceId,
         LatLng[] coordinates,
@@ -1603,6 +2188,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Updates an image source with inline image pixels.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_image_source_image</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetImageSourceImageAsync(
         string sourceId,
         PremultipliedRgba8Image image,
@@ -1623,6 +2215,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Updates an image source to load its image from a URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_image_source_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetImageSourceUrlAsync(
         string sourceId,
         string url,
@@ -1643,6 +2242,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets or clears one layer filter.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_layer_filter</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLayerFilterAsync(
         string layerId,
         byte[]? filter,
@@ -1663,6 +2269,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets the highest zoom at which one layer draws.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_layer_max_zoom</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLayerMaxZoomAsync(
         string layerId,
         double maxZoom,
@@ -1683,6 +2296,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets the lowest zoom at which one layer draws.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_layer_min_zoom</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLayerMinZoomAsync(
         string layerId,
         double minZoom,
@@ -1703,6 +2323,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets one layer property using its MapLibre style-spec property name.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_layer_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLayerPropertyAsync(
         string layerId,
         string propertyName,
@@ -1725,6 +2352,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets one layer's source ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_layer_source_id</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLayerSourceIdAsync(
         string layerId,
         string sourceId,
@@ -1745,6 +2379,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets one layer's source-layer ID.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_layer_source_layer</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLayerSourceLayerAsync(
         string layerId,
         string sourceLayer,
@@ -1765,6 +2406,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets whether one layer draws.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_layer_visibility</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLayerVisibilityAsync(
         string layerId,
         StyleLayerVisibility visibility,
@@ -1785,6 +2433,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets a location indicator layer accuracy radius in meters.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_location_indicator_accuracy_radius</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLocationIndicatorAccuracyRadiusAsync(
         string layerId,
         double radius,
@@ -1808,6 +2463,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets a location indicator layer bearing in degrees.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_location_indicator_bearing</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLocationIndicatorBearingAsync(
         string layerId,
         double bearing,
@@ -1828,6 +2490,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets one location indicator image-name property.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_location_indicator_image_name</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLocationIndicatorImageNameAsync(
         string layerId,
         LocationIndicatorImageKind imageKind,
@@ -1850,6 +2519,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets a location indicator layer location.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_location_indicator_location</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetLocationIndicatorLocationAsync(
         string layerId,
         LatLng coordinate,
@@ -1872,6 +2548,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits copied axonometric rendering option fields.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_projection_mode</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetProjectionModeAsync(
         ProjectionMode mode,
         CancellationToken cancellationToken = default
@@ -1890,6 +2573,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a rendering-stats visibility command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_rendering_stats_view_enabled</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetRenderingStatsViewEnabledAsync(
         bool enabled,
         CancellationToken cancellationToken = default
@@ -1908,6 +2598,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets one runtime style image.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_image</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetStyleImageAsync(
         string imageId,
         PremultipliedRgba8Image image,
@@ -1930,6 +2627,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Queues an inline style JSON command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetStyleJsonAsync(
         byte[] json,
         CancellationToken cancellationToken = default
@@ -1948,6 +2652,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets the style light from a style-spec light JSON object.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_light_json</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetStyleLightJsonAsync(
         byte[] lightJson,
         CancellationToken cancellationToken = default
@@ -1966,6 +2677,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets one style light property using its MapLibre style-spec property
+    /// name.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_light_property</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetStyleLightPropertyAsync(
         string propertyName,
         byte[] value,
@@ -1986,6 +2705,14 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets whether one style source stores fetched tiles in the persistent
+    /// cache.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_source_volatile</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetStyleSourceVolatileAsync(
         string sourceId,
         bool isVolatile,
@@ -2006,6 +2733,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Sets the style's global transition options.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_transition_options</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetStyleTransitionOptionsAsync(
         StyleTransitionOptions options,
         CancellationToken cancellationToken = default
@@ -2024,6 +2758,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Queues a style URL command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_style_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetStyleUrlAsync(
         string url,
         CancellationToken cancellationToken = default
@@ -2042,6 +2783,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a copied tile-options command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_tile_options</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetTileOptionsAsync(
         MapTileOptions options,
         CancellationToken cancellationToken = default
@@ -2060,6 +2808,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits a copied viewport-options command.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_set_viewport_options</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> SetViewportOptionsAsync(
         MapViewportOptions options,
         CancellationToken cancellationToken = default
@@ -2078,6 +2833,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Copies the latest immutable state published by the map worker.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_snapshot_get</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public MapSnapshot SnapshotGet()
     {
         using var read = state.Read(this, "mln_map_snapshot_get");
@@ -2086,6 +2848,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         return CopyMapSnapshot(outSnapshot);
     }
 
+    /// <summary>
+    /// Starts an ordered copy of the last requested style URL.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_style_url</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<string> StyleUrlAsync(CancellationToken cancellationToken = default)
     {
         using var scope = new NativeCallScope(this, "mln_map_style_url");
@@ -2097,6 +2866,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Submits one atomic camera update.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_map_update_camera</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
+    /// </remarks>
     public Task<CommandCompletion> UpdateCameraAsync(
         CameraUpdate update,
         CancellationToken cancellationToken = default
@@ -2115,6 +2891,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a caller-owned Metal texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_metal_borrowed_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle MetalBorrowedTextureAttach(
         MetalBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2135,6 +2918,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a session-owned Metal texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_metal_owned_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle MetalOwnedTextureAttach(
         MetalOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2155,6 +2945,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a Metal surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_metal_surface_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle MetalSurfaceAttach(
         MetalSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2175,6 +2972,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a caller-owned OpenGL texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_opengl_borrowed_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle OpenglBorrowedTextureAttach(
         OpenglBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2195,6 +2999,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a session-owned OpenGL texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_opengl_owned_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle OpenglOwnedTextureAttach(
         OpenglOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2215,6 +3026,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of an OpenGL surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_opengl_surface_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle OpenglSurfaceAttach(
         OpenglSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2235,6 +3053,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a caller-owned Vulkan texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_vulkan_borrowed_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle VulkanBorrowedTextureAttach(
         VulkanBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2255,6 +3080,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a session-owned Vulkan texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_vulkan_owned_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle VulkanOwnedTextureAttach(
         VulkanOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2275,6 +3107,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a Vulkan surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_vulkan_surface_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle VulkanSurfaceAttach(
         VulkanSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2295,6 +3134,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a caller-owned WebGPU texture target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_webgpu_borrowed_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle WebgpuBorrowedTextureAttach(
         WebgpuBorrowedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2315,6 +3161,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a session-owned WebGPU texture ring.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_webgpu_owned_texture_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle WebgpuOwnedTextureAttach(
         WebgpuOwnedTextureDescriptor descriptor,
         RenderSessionAttachOptions options
@@ -2335,6 +3188,13 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
         );
     }
 
+    /// <summary>
+    /// Starts attachment of a WebGPU surface target.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_webgpu_surface_attach</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+    /// </remarks>
     public RenderSessionHandle WebgpuSurfaceAttach(
         WebgpuSurfaceDescriptor descriptor,
         RenderSessionAttachOptions options

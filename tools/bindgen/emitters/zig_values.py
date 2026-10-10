@@ -4,7 +4,7 @@ from os.path import commonprefix
 
 from ..model import ModelError
 from ..semantic import ValuePlan
-from .zig import SCALARS, identifier, pascal
+from .zig import SCALARS, doc, documented, identifier, pascal
 
 
 def field_default(values, field) -> str:
@@ -147,7 +147,15 @@ class Values:
         )
 
     def render(self):
-        return "\n".join(self.record(value) for _, value in sorted(self.used.items()))
+        return "\n".join(
+            documented(
+                self.bound,
+                value.native,
+                self.record(value),
+                f"pub const {self.public(value)} = ",
+            )
+            for _, value in sorted(self.used.items())
+        )
 
     def record(self, value: ValuePlan):
         from .zig_dynamic_values import declaration, dynamic
@@ -156,7 +164,8 @@ class Values:
             return f"pub const {self.public(value)} = struct {{ native: *c.{value.native} }};\n"
         if value.kind == "union":
             fields = "\n".join(
-                f"    {identifier(field.name)}: {self.public(field.value)},"
+                doc(self.bound, f"{value.native}.{field.name}", "    ")
+                + f"    {identifier(field.name)}: {self.public(field.value)},"
                 for field in value.fields
             )
             empty = "    empty,\n" if value.empty_variant else ""
@@ -174,7 +183,9 @@ class Values:
                 )
         for flag in value.mask_flags:
             local = identifier(flag.member)
-            fields.append(f"    {local}: bool = false,")
+            fields.append(
+                f"{doc(self.bound, flag.name, '    ')}    {local}: bool = false,"
+            )
             copies.append(
                 f"            .{local} = raw.{flag.mask} & c.{flag.name} != 0,"
             )
@@ -220,7 +231,8 @@ class Values:
             optional = field.presence and field.presence.mask
             initial = "null" if optional else field_default(self, field)
             fields.append(
-                f"    {local}: {'?' if optional else ''}{self.public(field.value)} = {initial},"
+                doc(self.bound, f"{value.native}.{field.name}", "    ")
+                + f"    {local}: {'?' if optional else ''}{self.public(field.value)} = {initial},"
             )
             copy = self.capture(field.value, f"raw.{local}")
             if optional:
@@ -281,17 +293,20 @@ class Values:
         )
         if value.enum_kind == "bitmask":
             single = [
-                (identifier(key.removeprefix(prefix).lower()), number)
+                (identifier(key.removeprefix(prefix).lower()), number, key)
                 for key, number in value.enum_values
                 if number > 0 and number & (number - 1) == 0
             ]
-            fields = "\n".join(f"    {local}: bool = false," for local, _ in single)
+            fields = "\n".join(
+                f"{doc(self.bound, key, '    ')}    {local}: bool = false,"
+                for local, _, key in single
+            )
             constants = "".join(
                 f"    pub const {identifier(key.removeprefix(prefix).lower())} = fromNative({number});\n"
                 for key, number in value.enum_values
                 if number == 0 or number & (number - 1) != 0
             )
-            bits = ", ".join(str(number) for _, number in single)
+            bits = ", ".join(str(number) for _, number, _ in single)
             methods = "".join(
                 f"    pub const {method} = methods.{method};\n"
                 for method in (
@@ -304,7 +319,7 @@ class Values:
             )
             return f"pub const {public} = struct {{\n{fields}\n    unknown_bits: {raw} = 0,\n    pub const native_bits = [_]{raw}{{ {bits} }};\n    const methods = marshal.FlagMethods(@This());\n{methods}{constants}}};\n"
         members = "\n".join(
-            f"    {identifier(key.removeprefix(prefix).lower())} = {number},"
+            f"{doc(self.bound, key, '    ')}    {identifier(key.removeprefix(prefix).lower())} = {number},"
             for number, key in {
                 number: key for key, number in reversed(value.enum_values)
             }.items()

@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Borrowed image-stretch arrays available during a completion callback.
+/// </summary>
+/// <remarks>
+/// See <c>mln_style_image_stretches_result</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+/// </remarks>
 public readonly record struct StyleImageStretchesResult
 {
     public StyleImageStretchesResult(ImageStretch[] StretchX, ImageStretch[] StretchY)

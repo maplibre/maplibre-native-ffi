@@ -1,7 +1,7 @@
 """Render Swift callback descriptors from registration metadata."""
 
 from ..model import ModelError
-from .swift import SCALARS, camel, checked, identifier, name, native_call
+from .swift import SCALARS, camel, checked, doc, identifier, name, native_call
 
 
 def contains_callback(value):
@@ -87,7 +87,9 @@ def descriptor(values, plan):
         if field.name in callbacks:
             callback = values.bound.callbacks[field.value.native]
             typ = closure_type(values, callback)
-            fields.append(f"  public var {local}: ({typ})?")
+            fields.append(
+                f"{doc(values.bound, f'{plan.native}.{field.name}', '  ')}  public var {local}: ({typ})?"
+            )
             arguments.append(f"{local}: ({typ})? = nil")
             assignments.append(f"    self.{local} = {local}")
             defaults.append(f"    self.{local} = nil")
@@ -97,7 +99,9 @@ def descriptor(values, plan):
         else:
             optional = field.presence and field.presence.mask
             typ = values.public(field.value) + ("?" if optional else "")
-            fields.append(f"  public var {local}: {typ}")
+            fields.append(
+                f"{doc(values.bound, f'{plan.native}.{field.name}', '  ')}  public var {local}: {typ}"
+            )
             arguments.append(
                 f"{local}: {typ} = "
                 + (
@@ -144,7 +148,7 @@ def descriptor(values, plan):
         if plan.native in values.bound.returned
         else "  public static var `default`: Self { Self() }\n"
     )
-    declarations = f"""public struct {public}: Sendable {{
+    declarations = f"""{doc(values.bound, plan.native)}public struct {public}: Sendable {{
 {chr(10).join(fields)}
   public init({", ".join(arguments)}) {{
 {chr(10).join(assignments)}
@@ -336,7 +340,7 @@ def direct_operation(plan, values):
         lines.append(checked(f"arena.submit {{ {call} }}"))
         result_type = ""
     parameter_type = f"({typ})?" if optional else f"@escaping {typ}"
-    body = f"""  {"static " if optional else ""}func {method}(_ callback: {parameter_type}) throws{result_type} {{
+    body = f"""{doc(values.bound, function, "  ")}  {"static " if optional else ""}func {method}(_ callback: {parameter_type}) throws{result_type} {{
     {"try NativeAbi.ensureCompatible()" + chr(10) + "    " if optional else ""}try NativeCallbackGuard.check(owner: {"nil" if optional else "self"}, operation: "{function}")
     {"return " if result_type else ""}try mapNativeFailure {{
       {(chr(10) + "      ").join(lines)}

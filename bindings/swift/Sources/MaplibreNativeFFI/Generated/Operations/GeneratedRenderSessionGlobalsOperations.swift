@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_frame_demand_default`.
+  /// Returns a zero-token, render-if-needed, nonpresenting frame demand.
+  ///
+  /// See `mln_frame_demand_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
   static func frameDemandDefault() throws -> FrameDemand {
     try nativeDirect("mln_frame_demand_default") { _ in
       FrameDemand(raw: mln_frame_demand_default())

@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// WebGPU attachment options for a borrowed texture target.
+/// </summary>
+/// <remarks>
+/// See <c>mln_webgpu_borrowed_texture_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// </remarks>
 public readonly partial record struct WebgpuBorrowedTextureDescriptor(
     RenderTargetExtent Extent,
     uint PhysicalWidth,

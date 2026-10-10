@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// OpenGL backend context fields shared by OpenGL render targets.
+/// </summary>
+/// <remarks>
+/// See <c>mln_opengl_context_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html">C API reference</see>.
+/// </remarks>
 public readonly partial record struct OpenglContextDescriptor(
     OpenglContextOwnership Ownership,
     OpenglContextDescriptor.DataValue Data

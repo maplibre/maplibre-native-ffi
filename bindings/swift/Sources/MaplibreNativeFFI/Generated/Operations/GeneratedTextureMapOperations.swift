@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Calls `mln_metal_borrowed_texture_attach`.
+  /// Starts attachment of a caller-owned Metal texture target.
+  ///
+  /// See `mln_metal_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func metalBorrowedTextureAttach(
     descriptor bindingArg0: MetalBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -25,7 +28,10 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_metal_owned_texture_attach`.
+  /// Starts attachment of a session-owned Metal texture ring.
+  ///
+  /// See `mln_metal_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func metalOwnedTextureAttach(
     descriptor bindingArg0: MetalOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -46,7 +52,10 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_opengl_borrowed_texture_attach`.
+  /// Starts attachment of a caller-owned OpenGL texture target.
+  ///
+  /// See `mln_opengl_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func openglBorrowedTextureAttach(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -67,7 +76,10 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_opengl_owned_texture_attach`.
+  /// Starts attachment of a session-owned OpenGL texture ring.
+  ///
+  /// See `mln_opengl_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func openglOwnedTextureAttach(
     descriptor bindingArg0: OpenglOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -88,7 +100,10 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_vulkan_borrowed_texture_attach`.
+  /// Starts attachment of a caller-owned Vulkan texture target.
+  ///
+  /// See `mln_vulkan_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func vulkanBorrowedTextureAttach(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -109,7 +124,10 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_vulkan_owned_texture_attach`.
+  /// Starts attachment of a session-owned Vulkan texture ring.
+  ///
+  /// See `mln_vulkan_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func vulkanOwnedTextureAttach(
     descriptor bindingArg0: VulkanOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -130,7 +148,10 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_webgpu_borrowed_texture_attach`.
+  /// Starts attachment of a caller-owned WebGPU texture target.
+  ///
+  /// See `mln_webgpu_borrowed_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func webgpuBorrowedTextureAttach(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions
@@ -151,7 +172,10 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Calls `mln_webgpu_owned_texture_attach`.
+  /// Starts attachment of a session-owned WebGPU texture ring.
+  ///
+  /// See `mln_webgpu_owned_texture_attach` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
   func webgpuOwnedTextureAttach(
     descriptor bindingArg0: WebgpuOwnedTextureDescriptor,
     options bindingArg1: RenderSessionAttachOptions

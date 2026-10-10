@@ -1,5 +1,8 @@
 """Generate Go APIs from the shared C ownership and value model."""
 
+import re
+
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import ModelError
 
@@ -38,6 +41,20 @@ def native_identifier(value: str) -> str:
 
 def name(value: str) -> str:
     return "".join(word[:1].upper() + word[1:] for word in value.split("_"))
+
+
+def doc(bound, native: str, declared: str | None, *, operation: bool = False) -> str:
+    """The Go doc comment of a declaration, or empty when it has none."""
+    return docs.go_comment(bound.doc(native), declared, operation=operation)
+
+
+def documented_operation(bound, native: str, source: str) -> str:
+    """An operation's source with its comment before its function."""
+    match = re.search(r"^func (?:\([^)]*\) )?(\w+)", source, re.MULTILINE)
+    if not match:
+        return source
+    comment = doc(bound, native, match[1], operation=True)
+    return source[: match.start()] + comment + source[match.start() :]
 
 
 def native_call(function, *arguments, diagnostic="diagnostic"):
@@ -80,7 +97,8 @@ def lower(api):
             diagnostic="nil",
         )
         owners.append(
-            f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",func(raw uint64){{ {dispose} }})}}; return owner }}\n'
+            doc(bound, native, owner)
+            + f'type {owner} struct {{ *bindingOwner }}\nfunc adopt{owner}(raw uint64, parent any) *{owner} {{ owner := &{owner}{{bindingAdopt(raw,parent,"{owner}",func(raw uint64){{ {dispose} }})}}; return owner }}\n'
             f"// owner returns the handle's owner state, or nil for a nil handle.\nfunc (handle *{owner}) owner() *bindingOwner {{ if handle == nil {{ return nil }}; return handle.bindingOwner }}"
         )
         used_support.add(disposer)

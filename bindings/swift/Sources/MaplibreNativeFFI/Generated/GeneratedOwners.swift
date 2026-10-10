@@ -303,6 +303,10 @@ struct NativeRuntimeHandle: NativeHandle {
   }
 }
 
+/// Handles are opaque 64-bit generational ids.
+///
+/// See `mln_runtime` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public final class RuntimeHandle: @unchecked Sendable, NativeReceiver {
   let handle: NativeHandleBox<NativeRuntimeHandle>
   init(adopting raw: mln_runtime) throws {

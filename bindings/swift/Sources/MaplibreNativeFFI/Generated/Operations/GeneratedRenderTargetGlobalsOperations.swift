@@ -4,14 +4,20 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_gpu_sync_default`.
+  /// Returns CPU-complete synchronization for this C API version.
+  ///
+  /// See `mln_gpu_sync_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
   static func gpuSyncDefault() throws -> GpuSync {
     try nativeDirect("mln_gpu_sync_default") { _ in
       GpuSync(raw: mln_gpu_sync_default())
     }
   }
 
-  /// Calls `mln_opengl_supported_context_provider_mask`.
+  /// Returns OpenGL context providers supported by this build.
+  ///
+  /// See `mln_opengl_supported_context_provider_mask` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
   static func openglSupportedContextProviderMask() throws
     -> OpenglContextProviderFlag
   {
@@ -22,7 +28,12 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_render_session_attach_options_default`.
+  /// Returns default caller-graphics-thread attachment policy with no wakes and
+  /// a
+  /// one-slot texture ring.
+  ///
+  /// See `mln_render_session_attach_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
   static func renderSessionAttachOptionsDefault() throws
     -> RenderSessionAttachOptions
   {
@@ -33,7 +44,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_render_target_extent_physical_size`.
+  /// Computes the physical device-pixel size of a logical render target extent.
+  ///
+  /// See `mln_render_target_extent_physical_size` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
   static func renderTargetExtentPhysicalSize(
     extent bindingArg0: RenderTargetExtent
   ) throws

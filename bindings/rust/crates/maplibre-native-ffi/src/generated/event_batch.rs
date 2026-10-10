@@ -7,7 +7,10 @@ native_owner! {
 }
 
 impl EventBatchHandle {
-    /// Calls `mln_event_batch_get`.
+    /// Borrows the event and message view stored by an owned event batch.
+    ///
+    /// See `mln_event_batch_get` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn get(&self) -> Result<RuntimeEventBatchView> {
         let mut call = self.inner.read("mln_event_batch_get")?;
         let mut out_view: sys::mln_runtime_event_batch_view = unsafe { std::mem::zeroed() };
@@ -18,7 +21,10 @@ impl EventBatchHandle {
         Ok(unsafe { from_native(out_view) }?)
     }
 
-    /// Calls `mln_event_batch_release`.
+    /// Releases an owned event batch. A null handle is a no-op.
+    ///
+    /// See `mln_event_batch_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     pub fn release(&self) -> Result<()> {
         self.inner.close(|batch| {
             let mut call = Call::new(batch, None);

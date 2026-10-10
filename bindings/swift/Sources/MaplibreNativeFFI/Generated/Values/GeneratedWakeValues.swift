@@ -3,6 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Receiver wake callback copied by a successful owning call.
+///
+/// See `mln_wake` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
 public struct Wake: Sendable {
   public var callback: (@Sendable () throws -> Void)?
   public init(callback: (@Sendable () throws -> Void)? = nil) {

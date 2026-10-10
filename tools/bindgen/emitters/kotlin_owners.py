@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from .kotlin_operations import method_name, receiver_value
-from .kotlin_values import generated_owners, name, owner_name
+from .kotlin_values import doc, generated_owners, name, owner_name
 
 ASYNC_RELEASABLE = "org.maplibre.nativeffi.runtime.AsyncReleasable"
 
@@ -131,7 +131,8 @@ def owner(bound, native, plans):
         "// Generated from handle ownership plans by tools/bindgen. Do not edit.\n"
         "package org.maplibre.nativeffi.generated\n\n"
         "import org.maplibre.nativeffi.internal.lifecycle.*\n\n"
-        f"public class {owner_class} internal constructor(\n  "
+        + doc(bound, native)
+        + f"public class {owner_class} internal constructor(\n  "
         + ",\n  ".join(parameters)
         + f",\n) : {', '.join(supertypes)} {{\n"
         + "\n".join(body)

@@ -1,9 +1,19 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Bit values for the map and runtime event subscription masks.
+/// </summary>
+/// <remarks>
+/// See <c>mln_runtime_event_mask</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+/// </remarks>
 [Flags]
 public enum RuntimeEventMask : ulong
 {
+    /// <summary>
+    /// Selects no event type.
+    /// </summary>
     None = 0,
     MapCameraWillChange = 2,
     MapCameraIsChanging = 4,
@@ -27,7 +37,19 @@ public enum RuntimeEventMask : ulong
     OfflineRegionStatusChanged = 524288,
     OfflineRegionResponseError = 1048576,
     OfflineRegionTileCountLimitExceeded = 2097152,
+
+    /// <summary>
+    /// Selects every map-originated event type this version defines.
+    /// </summary>
     AllMapEvents = 4718590,
+
+    /// <summary>
+    /// Selects every runtime-originated event type this version defines.
+    /// </summary>
     AllRuntimeEvents = 3670016,
+
+    /// <summary>
+    /// Selects every event type this version defines.
+    /// </summary>
     All = 8388606,
 }

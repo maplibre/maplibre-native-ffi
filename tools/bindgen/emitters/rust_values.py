@@ -3,7 +3,7 @@
 from os.path import commonprefix
 
 from ..semantic import BoundApi, ValuePlan
-from .rust import SCALARS, Unsupported, pascal
+from .rust import SCALARS, Unsupported, doc, pascal
 
 
 class Values:
@@ -169,12 +169,13 @@ class Values:
             return registration(self, value)
         if value.kind == "union":
             members = ", ".join(
-                f"{pascal(field.name)}({self.public(field.value)})"
+                doc(self.bound, f"{value.native}.{field.name}")
+                + f"{pascal(field.name)}({self.public(field.value)})"
                 for field in value.fields
             )
             if value.empty_variant:
                 members += ", Empty"
-            return f"#[derive(Debug, Clone, PartialEq)]\npub enum {self.name(value)} {{ {members}, Unknown(u32) }}\nimpl Default for {self.name(value)} {{ fn default() -> Self {{ Self::Unknown(0) }} }}\n"
+            return f"{doc(self.bound, value.native)}#[derive(Debug, Clone, PartialEq)]\npub enum {self.name(value)} {{ {members}, Unknown(u32) }}\nimpl Default for {self.name(value)} {{ fn default() -> Self {{ Self::Unknown(0) }} }}\n"
         if value.kind == "enum":
             return self.enum(value)
         return declaration(self, value)
@@ -187,28 +188,29 @@ class Values:
         )
         if value.enum_kind == "bitmask":
             members = "\n".join(
-                f"    const {key.removeprefix(prefix)} = {number};"
+                f"{doc(self.bound, key, '    ')}    const {key.removeprefix(prefix)} = {number};"
                 for key, number in value.enum_values
             )
-            return (
-                f"native_flags! {{\npub struct {public}: {raw} {{\n{members}\n}}\n}}\n"
-            )
+            return f"native_flags! {{\n{doc(self.bound, value.native)}pub struct {public}: {raw} {{\n{members}\n}}\n}}\n"
         variants = [
-            (pascal(key.removeprefix(prefix).lower()), number)
+            (pascal(key.removeprefix(prefix).lower()), number, key)
             for key, number in value.enum_values
         ]
         # Aliased C enum constants share one Rust variant.
         unique = {}
-        for name, number in variants:
-            unique.setdefault(number, (name, number))
+        for variant in variants:
+            unique.setdefault(variant[1], variant)
         variants = list(unique.values())
         unknown = (
             "Unrecognized"
-            if any(name == "Unknown" for name, _ in variants)
+            if any(name == "Unknown" for name, _, _ in variants)
             else "Unknown"
         )
-        members = "\n".join(f"    {name} = {number}," for name, number in variants)
-        return f"native_enum! {{\npub enum {public}: {raw} {{\n{members}\n}} {unknown}\n}}\n"
+        members = "\n".join(
+            f"{doc(self.bound, key, '    ')}    {name} = {number},"
+            for name, number, key in variants
+        )
+        return f"native_enum! {{\n{doc(self.bound, value.native)}pub enum {public}: {raw} {{\n{members}\n}} {unknown}\n}}\n"
 
     def render(self) -> str:
         return "\n".join(

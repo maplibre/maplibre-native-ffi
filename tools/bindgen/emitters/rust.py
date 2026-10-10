@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import replace
 
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.semantic import BoundApi, OperationPlan
 
@@ -32,6 +33,11 @@ SCALARS = {
 
 class Unsupported(ValueError):
     pass
+
+
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The rustdoc comment of a declaration, or empty when it has none."""
+    return docs.line_comment(bound.doc(native), indent)
 
 
 def ctype(value: CType) -> str:
@@ -681,7 +687,7 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str]:
         else ""
     )
     code = (
-        f"    /// Calls `{function.name}`.\n"
+        doc(value_types.bound, function.name, "    ")
         + safety_doc
         + f"    pub {'unsafe ' if unsafe_input else ''}fn {method}{generic}({', '.join(signature)}) -> Result<{public}> {{\n"
         + "\n".join("        " + line for line in body)

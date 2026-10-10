@@ -1,6 +1,6 @@
 """Retained callback descriptors, scoped responses, and decision handles."""
 
-from .rust import Unsupported, identifier, native_call, native_identifier
+from .rust import Unsupported, doc, identifier, native_call, native_identifier
 from .rust_dynamic_values import decode, encode
 
 
@@ -189,7 +189,9 @@ def declaration(values, value):
             code = decision_trampoline(values, callback, f"{public}_trampoline", public)
         trampolines.append(code)
         function = f"Fn({signature}) -> {output} + Send + Sync + 'static"
-        fields.append(f"    pub {public}: Option<std::sync::Arc<dyn {function}>>,")
+        fields.append(
+            f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {public}: Option<std::sync::Arc<dyn {function}>>,"
+        )
         writes.append(
             f"raw.{native_identifier(field.name)} = self.{public}.as_ref().map(|_| Self::{public}_trampoline as _);"
         )
@@ -213,7 +215,9 @@ def declaration(values, value):
         public = identifier(field.name)
         masked = field.presence and field.presence.mask
         typ = values.public(field.value)
-        fields.append(f"    pub {public}: {'Option<' + typ + '>' if masked else typ},")
+        fields.append(
+            f"{doc(values.bound, f'{value.native}.{field.name}', '    ')}    pub {public}: {'Option<' + typ + '>' if masked else typ},"
+        )
         copied = decode(values, field.value, place)
         if masked:
             from .rust_dynamic_values import masked_field
@@ -241,7 +245,8 @@ def declaration(values, value):
     user_data = native_identifier(value.registration.user_data)
     release = native_identifier(value.registration.release)
     return (
-        f"#[derive(Clone{', Default' if not value.default else ''})]\n"
+        doc(values.bound, value.native)
+        + f"#[derive(Clone{', Default' if not value.default else ''})]\n"
         f"pub struct {name} {{\n"
         + "\n".join(fields)
         + "\n}\n"
@@ -375,10 +380,12 @@ def response_declaration(values, value):
             raise Unsupported(f"{plan.function.name}: status return has no diagnostic")
         call = native_call(plan.function, args, diagnostic="out_diagnostic")
         methods.append(
-            f'    pub fn {method}({", ".join(signature)}) -> Result<()> {{ maplibre_core::callback::check("{method_name}", self.raw.as_ptr() as usize as u64)?; {" ".join(setup)} maplibre_core::check(|out_diagnostic| unsafe {{ {call} }}) }}'
+            doc(values.bound, method_name, "    ")
+            + f'    pub fn {method}({", ".join(signature)}) -> Result<()> {{ maplibre_core::callback::check("{method_name}", self.raw.as_ptr() as usize as u64)?; {" ".join(setup)} maplibre_core::check(|out_diagnostic| unsafe {{ {call} }}) }}'
         )
+    summary = doc(values.bound, value.native)
     return f"""/// A native response borrowed only for one host callback.
-#[derive(Debug)]
+{"///" + chr(10) + summary if summary else ""}#[derive(Debug)]
 pub struct {name}<'a> {{
     raw: std::ptr::NonNull<{raw}>,
     lifetime: std::marker::PhantomData<&'a mut {raw}>,
@@ -444,13 +451,17 @@ def decision_declaration(values, value):
     def method(operation):
         return identifier(values.bound.operations_by_name[operation].member)
 
+    def documented(operation):
+        return doc(values.bound, operation, "    ").rstrip("\n")
+
     cancel_registration(values, decision)
-    return f'''#[derive(Debug)]
+    return f'''{doc(values.bound, value.native)}#[derive(Debug)]
 pub struct {name} {{
     state: std::sync::Arc<maplibre_core::decision::DecisionHandleState<sys::{decision.handle.native}>>,
     not_sync: std::marker::PhantomData<std::cell::Cell<()>>,
 }}
 impl {name} {{
+{documented(decision.complete)}
     pub fn {method(decision.complete)}(&self, response: &{values.public(response_value)}) -> Result<()> {{
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("{decision.complete}", native.0)?;
@@ -458,6 +469,7 @@ impl {name} {{
         let response = response.to_native(&mut arena)?;
         self.state.complete_with(|handle| {checked(decision.complete, "handle", "&response")})
     }}
+{documented(decision.cancelled)}
     pub fn {method(decision.cancelled)}(&self) -> Result<bool> {{
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("{decision.cancelled}", native.0)?;
@@ -465,11 +477,13 @@ impl {name} {{
         {checked(decision.cancelled, "native", "&mut cancelled")}?;
         Ok(cancelled)
     }}
+{documented(decision.cancel_registration)}
     pub fn {method(decision.cancel_registration)}(&self, callback: impl FnOnce() + Send + 'static) -> Result<bool> {{
         let native = self.state.native_for_call()?;
         maplibre_core::callback::check("{decision.cancel_registration}", native.0)?;
         self.state.register_cancel(Box::new(callback))
     }}
+{documented(decision.wait_retired)}
     pub fn {method(decision.wait_retired)}(&self) -> Result<()> {{
         let native = self.state.issued_handle();
         maplibre_core::callback::check("{decision.wait_retired}", native.0)?;

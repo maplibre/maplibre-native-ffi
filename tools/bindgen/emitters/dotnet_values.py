@@ -6,6 +6,7 @@ import os
 import re
 from dataclasses import replace
 
+from .. import docs
 from ..compiler import compile_api
 from ..managed_contracts import KEYWORDS
 from ..model import Api, ModelError
@@ -1275,6 +1276,14 @@ class Values:
             f"        : this({', '.join(arguments)}) {{ }}\n"
         )
 
+    def member_doc(self, plan: ValuePlan, fields) -> str:
+        """The XML doc comment of a member that one field backs."""
+        if len(fields) != 1:
+            return ""
+        return docs.xml_comment(
+            self.bound.doc(f"{plan.native}.{fields[0].name}"), "    "
+        )
+
     def value_declaration(self, plan: ValuePlan) -> str:
         fields = self.fields(plan)
         if any(
@@ -1308,12 +1317,14 @@ class Values:
                     else ""
                 )
                 properties.append(
-                    self.initialized(
+                    self.member_doc(plan, members)
+                    + self.initialized(
                         f"    public {required}{type_} {name} {{ get; set; }}", members
                     )
                 )
             properties.extend(
-                f"    public bool {self.flag_name(flag)} {{ get; set; }}"
+                docs.xml_comment(self.bound.doc(flag.name), "    ")
+                + f"    public bool {self.flag_name(flag)} {{ get; set; }}"
                 for flag in plan.mask_flags
             )
             return (

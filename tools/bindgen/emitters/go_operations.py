@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from ..model import ModelError
 from ..semantic import output_member
-from .go import GO_KEYWORDS, name, native_call
+from .go import GO_KEYWORDS, documented_operation, name, native_call
 from .go_values import Values, absent, public
 
 
@@ -391,7 +391,9 @@ def lower(bound):
     )
     for plan in bound.operations:
         try:
-            chunks.append(operation(plan, values))
+            chunks.append(
+                documented_operation(bound, plan.name, operation(plan, values))
+            )
             generated.append(plan.name)
         except ModelError as error:
             errors[plan.name] = str(error)

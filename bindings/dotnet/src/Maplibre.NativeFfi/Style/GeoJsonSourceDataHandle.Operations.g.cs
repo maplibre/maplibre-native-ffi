@@ -43,6 +43,13 @@ public sealed unsafe partial class GeojsonSourceDataHandle
         state.Retire();
     }
 
+    /// <summary>
+    /// Prepares GeoJSON source data for installation on a map.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_geojson_source_data_create</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public static GeojsonSourceDataHandle Create(byte[] data, GeojsonSourceOptions? options)
     {
         using var scope = new NativeCallScope(null, "mln_geojson_source_data_create");
@@ -62,6 +69,13 @@ public sealed unsafe partial class GeojsonSourceDataHandle
         return GeojsonSourceDataHandle.Adopt(outData);
     }
 
+    /// <summary>
+    /// Releases prepared GeoJSON source data.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_geojson_source_data_destroy</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+    /// </remarks>
     public void Close()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_geojson_source_data_destroy");

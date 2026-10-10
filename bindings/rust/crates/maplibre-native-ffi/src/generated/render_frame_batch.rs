@@ -7,7 +7,10 @@ native_owner! {
 }
 
 impl RenderFrameBatchHandle {
-    /// Calls `mln_render_frame_batch_count`.
+    /// Returns the number of records in an owned frame-result batch.
+    ///
+    /// See `mln_render_frame_batch_count` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn count(&self) -> Result<usize> {
         let mut call = self.inner.call("mln_render_frame_batch_count")?;
         let mut out_count: usize = Default::default();
@@ -17,7 +20,10 @@ impl RenderFrameBatchHandle {
         Ok(out_count)
     }
 
-    /// Calls `mln_render_frame_batch_get`.
+    /// Copies one frame-result record.
+    ///
+    /// See `mln_render_frame_batch_get` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn get(&self, index: usize) -> Result<RenderFrameResult> {
         let mut call = self.inner.call("mln_render_frame_batch_get")?;
         let mut out_result: sys::mln_render_frame_result = unsafe { std::mem::zeroed() };
@@ -28,7 +34,10 @@ impl RenderFrameBatchHandle {
         Ok(unsafe { from_native(out_result) }?)
     }
 
-    /// Calls `mln_render_frame_batch_release`.
+    /// Releases a frame-result batch.
+    ///
+    /// See `mln_render_frame_batch_release` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
     pub fn release(&self) -> Result<()> {
         self.inner.close(|batch| {
             let mut call = Call::new(batch, None);

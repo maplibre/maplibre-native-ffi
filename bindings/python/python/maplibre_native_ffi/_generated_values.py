@@ -195,6 +195,12 @@ class AmbientCacheOperation(UnknownIntEnum):
 
 
 class AnimationOptionField(IntFlag):
+    """Field mask values for `mln_animation_options`.
+
+    See `mln_animation_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     DURATION = 1
     VELOCITY = 2
     MIN_ZOOM = 4
@@ -203,6 +209,12 @@ class AnimationOptionField(IntFlag):
 
 
 class BoundOptionField(IntFlag):
+    """Field mask values for `mln_bound_options`.
+
+    See `mln_bound_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     BOUNDS = 1
     MIN_ZOOM = 2
     MAX_ZOOM = 4
@@ -212,11 +224,23 @@ class BoundOptionField(IntFlag):
 
 
 class CameraChangeMode(UnknownIntEnum):
+    """Camera change kinds reported by camera will-change and did-change events.
+
+    See `mln_camera_change_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     IMMEDIATE = 0
     ANIMATED = 1
 
 
 class CameraDeltaKind(UnknownIntEnum):
+    """Relative camera operation carried by `mln_camera_delta`.
+
+    See `mln_camera_delta_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     MOVE = 0
     SCALE = 1
     BEARING = 2
@@ -224,12 +248,24 @@ class CameraDeltaKind(UnknownIntEnum):
 
 
 class CameraFitOptionField(IntFlag):
+    """Field mask values for `mln_camera_fit_options`.
+
+    See `mln_camera_fit_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     PADDING = 1
     BEARING = 2
     PITCH = 4
 
 
 class CameraOptionField(IntFlag):
+    """Field mask values for `mln_camera_options`.
+
+    See `mln_camera_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     CENTER = 1
     ZOOM = 2
     BEARING = 4
@@ -242,12 +278,24 @@ class CameraOptionField(IntFlag):
 
 
 class CameraUpdateMode(UnknownIntEnum):
+    """Camera transition behavior for `mln_camera_update`.
+
+    See `mln_camera_update_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     JUMP = 0
     EASE = 1
     FLY = 2
 
 
 class CommandDisposition(UnknownIntEnum):
+    """Terminal dispositions reported by command completions.
+
+    See `mln_command_disposition` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
+    """
+
     COMMITTED = 0
     SUPERSEDED = 1
     FAILED = 2
@@ -255,6 +303,12 @@ class CommandDisposition(UnknownIntEnum):
 
 
 class ConstrainMode(UnknownIntEnum):
+    """Map constraint modes used by `mln_map_viewport_options`.
+
+    See `mln_constrain_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     NONE = 0
     HEIGHT_ONLY = 1
     WIDTH_AND_HEIGHT = 2
@@ -262,6 +316,12 @@ class ConstrainMode(UnknownIntEnum):
 
 
 class CustomGeometrySourceOptionField(IntFlag):
+    """Field mask values for `mln_custom_geometry_source_options`.
+
+    See `mln_custom_geometry_source_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     MIN_ZOOM = 1
     MAX_ZOOM = 2
     TOLERANCE = 4
@@ -272,27 +332,57 @@ class CustomGeometrySourceOptionField(IntFlag):
 
 
 class CustomMvtVectorSourceOptionField(IntFlag):
+    """Field mask values for `mln_custom_mvt_vector_source_options`.
+
+    See `mln_custom_mvt_vector_source_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     MIN_ZOOM = 1
     MAX_ZOOM = 2
 
 
 class FeatureStateSelectorField(IntFlag):
+    """Optional fields for `mln_feature_state_selector`.
+
+    See `mln_feature_state_selector_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     SOURCE_LAYER_ID = 1
     FEATURE_ID = 2
     STATE_KEY = 4
 
 
 class FrameDemandFlag(IntFlag):
+    """Frame-demand policy bits.
+
+    See `mln_frame_demand_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
     IF_NEEDED = 1
     PRESENT = 2
 
 
 class FreeCameraOptionField(IntFlag):
+    """Field mask values for `mln_free_camera_options`.
+
+    See `mln_free_camera_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     POSITION = 1
     ORIENTATION = 2
 
 
 class GeojsonSourceOptionField(IntFlag):
+    """Field mask values for `mln_geojson_source_options`.
+
+    See `mln_geojson_source_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     MIN_ZOOM = 1
     MAX_ZOOM = 2
     TOLERANCE = 4
@@ -308,6 +398,12 @@ class GeojsonSourceOptionField(IntFlag):
 
 
 class GesturePhase(UnknownIntEnum):
+    """Gesture boundary carried atomically with a camera update.
+
+    See `mln_gesture_phase` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     NONE = 0
     BEGIN = 1
     UPDATE = 2
@@ -316,6 +412,12 @@ class GesturePhase(UnknownIntEnum):
 
 
 class GpuSyncKind(UnknownIntEnum):
+    """Synchronization payload kind for acquired texture frames.
+
+    See `mln_gpu_sync_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     CPU_COMPLETE = 0
     METAL_SHARED_EVENT = 1
     VULKAN_TIMELINE_SEMAPHORE = 2
@@ -324,12 +426,24 @@ class GpuSyncKind(UnknownIntEnum):
 
 
 class LocationIndicatorImageKind(UnknownIntEnum):
+    """Location indicator image-name properties.
+
+    See `mln_location_indicator_image_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     TOP = 0
     BEARING = 1
     SHADOW = 2
 
 
 class LogEvent(UnknownIntEnum):
+    """Log event categories emitted by MapLibre Native.
+
+    See `mln_log_event` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+    """
+
     GENERAL = 0
     SETUP = 1
     SHADER = 2
@@ -350,12 +464,24 @@ class LogEvent(UnknownIntEnum):
 
 
 class LogSeverity(UnknownIntEnum):
+    """Log severity values emitted by MapLibre Native.
+
+    See `mln_log_severity` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+    """
+
     INFO = 1
     WARNING = 2
     ERROR = 3
 
 
 class LogSeverityMask(IntFlag):
+    """Bitmask values for log severities dispatched asynchronously.
+
+    See `mln_log_severity_mask` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+    """
+
     INFO = 2
     WARNING = 4
     ERROR = 8
@@ -364,6 +490,12 @@ class LogSeverityMask(IntFlag):
 
 
 class MapDebugOption(IntFlag):
+    """Debug overlay mask values for `mln_map_set_debug_options()`.
+
+    See `mln_map_debug_option` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     TILE_BORDERS = 2
     PARSE_STATUS = 4
     TIMESTAMPS = 8
@@ -374,12 +506,24 @@ class MapDebugOption(IntFlag):
 
 
 class MapMode(UnknownIntEnum):
+    """Map rendering modes used when creating a map.
+
+    See `mln_map_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     CONTINUOUS = 0
     STATIC = 1
     TILE = 2
 
 
 class MapTileOptionField(IntFlag):
+    """Field mask values for `mln_map_tile_options`.
+
+    See `mln_map_tile_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     PREFETCH_ZOOM_DELTA = 1
     LOD_MIN_RADIUS = 2
     LOD_SCALE = 4
@@ -389,6 +533,12 @@ class MapTileOptionField(IntFlag):
 
 
 class MapViewportOptionField(IntFlag):
+    """Field mask values for `mln_map_viewport_options`.
+
+    See `mln_map_viewport_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     NORTH_ORIENTATION = 1
     CONSTRAIN_MODE = 2
     VIEWPORT_MODE = 4
@@ -401,6 +551,12 @@ class NetworkStatus(UnknownIntEnum):
 
 
 class NorthOrientation(UnknownIntEnum):
+    """Map north orientation values used by `mln_map_viewport_options`.
+
+    See `mln_north_orientation` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     UP = 0
     RIGHT = 1
     DOWN = 2
@@ -418,17 +574,36 @@ class OfflineRegionDownloadState(UnknownIntEnum):
 
 
 class OpenglClientApi(UnknownIntEnum):
+    """OpenGL client API a dedicated EGL session creates its context for.
+
+    See `mln_opengl_client_api` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     UNSPECIFIED = 0
     GL = 1
     GLES = 2
 
 
 class OpenglContextOwnership(UnknownIntEnum):
+    """How a session's OpenGL context relates to its driver thread and host
+    graphics state.
+
+    See `mln_opengl_context_ownership` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     SHARED = 0
     DEDICATED = 1
 
 
 class OpenglContextPlatform(UnknownIntEnum):
+    """OpenGL platform context provider used by a context descriptor.
+
+    See `mln_opengl_context_platform` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     UNSPECIFIED = 0
     WGL = 1
     EGL = 2
@@ -436,29 +611,59 @@ class OpenglContextPlatform(UnknownIntEnum):
 
 
 class OpenglContextProviderFlag(IntFlag):
+    """OpenGL context providers supported by this build.
+
+    See `mln_opengl_context_provider_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     WGL = 1
     EGL = 2
     WEBGL = 4
 
 
 class ProjectionModeField(IntFlag):
+    """Field mask values for MapLibre axonometric rendering options.
+
+    See `mln_projection_mode_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     AXONOMETRIC = 1
     X_SKEW = 2
     Y_SKEW = 4
 
 
 class QueriedFeatureField(IntFlag):
+    """Optional fields for `mln_queried_feature`.
+
+    See `mln_queried_feature_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     SOURCE_ID = 1
     SOURCE_LAYER_ID = 2
     STATE = 4
 
 
 class RenderAbandonDisposition(UnknownIntEnum):
+    """Result of irreversible CPU-side target abandonment.
+
+    See `mln_render_abandon_disposition` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
     CLEAN = 0
     QUARANTINED = 1
 
 
 class RenderBackendFlag(IntFlag):
+    """Render backend support flags reported by this native library build.
+
+    See `mln_render_backend_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     METAL = 1
     VULKAN = 2
     OPENGL = 4
@@ -466,16 +671,34 @@ class RenderBackendFlag(IntFlag):
 
 
 class RenderDriverKind(UnknownIntEnum):
+    """Execution placement for one render session.
+
+    See `mln_render_driver_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     CORE_WORKER = 1
     CALLER_GRAPHICS_THREAD = 2
 
 
 class RenderMode(UnknownIntEnum):
+    """Render modes reported by render observer events.
+
+    See `mln_render_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     PARTIAL = 0
     FULL = 1
 
 
 class RenderResult(UnknownIntEnum):
+    """Terminal disposition of one accepted frame demand.
+
+    See `mln_render_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
     RENDERED = 0
     NO_UPDATE = 1
     SIZE_PENDING = 2
@@ -485,6 +708,12 @@ class RenderResult(UnknownIntEnum):
 
 
 class RenderSessionCapabilityFlag(IntFlag):
+    """Optional render-session capabilities.
+
+    See `mln_render_session_capability_flag` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     FRAME_ACQUISITION = 1
     READBACK = 2
     CONSUMER_SYNC = 4
@@ -492,6 +721,12 @@ class RenderSessionCapabilityFlag(IntFlag):
 
 
 class RenderSessionState(UnknownIntEnum):
+    """Render-session lifecycle visible in snapshots.
+
+    See `mln_render_session_state` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
     ATTACHING = 1
     ATTACHED = 2
     DETACHING = 3
@@ -501,10 +736,22 @@ class RenderSessionState(UnknownIntEnum):
 
 
 class RenderedFeatureQueryOptionField(IntFlag):
+    """Optional fields for `mln_rendered_feature_query_options`.
+
+    See `mln_rendered_feature_query_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     IDS = 1
 
 
 class RenderedQueryGeometryType(UnknownIntEnum):
+    """Rendered feature query geometry variants.
+
+    See `mln_rendered_query_geometry_type` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     POINT = 1
     BOX = 2
     LINE_STRING = 3
@@ -547,6 +794,12 @@ class ResourceProviderDecision(UnknownIntEnum):
 
 
 class ResourceResponseStatus(UnknownIntEnum):
+    """How a resource provider answered a request.
+
+    See `mln_resource_response_status` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     OK = 0
     ERROR = 1
     NO_CONTENT = 2
@@ -564,6 +817,12 @@ class ResourceUsage(UnknownIntEnum):
 
 
 class RuntimeEventMask(IntFlag):
+    """Bit values for the map and runtime event subscription masks.
+
+    See `mln_runtime_event_mask` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     NONE = 0
     MAP_CAMERA_WILL_CHANGE = 2
     MAP_CAMERA_IS_CHANGING = 4
@@ -593,6 +852,12 @@ class RuntimeEventMask(IntFlag):
 
 
 class RuntimeEventPayloadType(UnknownIntEnum):
+    """Payload kinds used by `mln_runtime_event.payload_type`.
+
+    See `mln_runtime_event_payload_type` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     NONE = 0
     RENDER_FRAME = 1
     RENDER_MAP = 2
@@ -604,11 +869,23 @@ class RuntimeEventPayloadType(UnknownIntEnum):
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
+    """Source kinds used by `mln_runtime_event.source_type`.
+
+    See `mln_runtime_event_source_type` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     RUNTIME = 0
     MAP = 1
 
 
 class RuntimeEventType(UnknownIntEnum):
+    """Runtime event types carried by `mln_runtime_event.type`.
+
+    See `mln_runtime_event_type` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     MAP_CAMERA_WILL_CHANGE = 1
     MAP_CAMERA_IS_CHANGING = 2
     MAP_CAMERA_DID_CHANGE = 3
@@ -634,10 +911,22 @@ class RuntimeEventType(UnknownIntEnum):
 
 
 class SourceFeatureQueryOptionField(IntFlag):
+    """Optional fields for `mln_source_feature_query_options`.
+
+    See `mln_source_feature_query_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     IDS = 1
 
 
 class Status(UnknownIntEnum):
+    """Status values returned by status-returning functions.
+
+    See `mln_status` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     OK = 0
     INVALID_ARGUMENT = -1
     INVALID_STATE = -2
@@ -652,6 +941,12 @@ class Status(UnknownIntEnum):
 
 
 class StyleImageOptionField(IntFlag):
+    """Field mask values for `mln_style_image_options`.
+
+    See `mln_style_image_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     PIXEL_RATIO = 1
     SDF = 2
     STRETCH_X = 4
@@ -662,22 +957,46 @@ class StyleImageOptionField(IntFlag):
 
 
 class StyleImageTextFit(UnknownIntEnum):
+    """How a stretchable image fits text along one axis.
+
+    See `mln_style_image_text_fit` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     STRETCH_OR_SHRINK = 0
     STRETCH_ONLY = 1
     PROPORTIONAL = 2
 
 
 class StyleLayerVisibility(UnknownIntEnum):
+    """Layer visibility values used by the visibility setter and layer info.
+
+    See `mln_style_layer_visibility` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     VISIBLE = 0
     NONE = 1
 
 
 class StyleRasterDemEncoding(UnknownIntEnum):
+    """DEM raster encoding values used by `mln_style_tile_source_options`.
+
+    See `mln_style_raster_dem_encoding` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     MAPBOX = 0
     TERRARIUM = 1
 
 
 class StyleSourceInfoField(IntFlag):
+    """Fields available in `mln_style_source_info`.
+
+    See `mln_style_source_info_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     URL = 1
     TILEJSON = 2
     BOUNDS = 4
@@ -687,6 +1006,12 @@ class StyleSourceInfoField(IntFlag):
 
 
 class StyleSourceType(UnknownIntEnum):
+    """Style source type values returned by source metadata queries.
+
+    See `mln_style_source_type` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     UNKNOWN = 0
     VECTOR = 1
     RASTER = 2
@@ -700,11 +1025,24 @@ class StyleSourceType(UnknownIntEnum):
 
 
 class StyleTileScheme(UnknownIntEnum):
+    """Tile URL coordinate scheme values used by
+    `mln_style_tile_source_options`.
+
+    See `mln_style_tile_scheme` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     XYZ = 0
     TMS = 1
 
 
 class StyleTileSourceOptionField(IntFlag):
+    """Field mask values for `mln_style_tile_source_options`.
+
+    See `mln_style_tile_source_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     MIN_ZOOM = 1
     MAX_ZOOM = 2
     ATTRIBUTION = 4
@@ -716,22 +1054,46 @@ class StyleTileSourceOptionField(IntFlag):
 
 
 class StyleTransitionOptionField(IntFlag):
+    """Field mask values for `mln_style_transition_options`.
+
+    See `mln_style_transition_option_field` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     DURATION = 1
     DELAY = 2
     ENABLE_PLACEMENT_TRANSITIONS = 4
 
 
 class StyleVectorTileEncoding(UnknownIntEnum):
+    """Vector tile encoding values used by `mln_style_tile_source_options`.
+
+    See `mln_style_vector_tile_encoding` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     MVT = 0
     MLT = 1
 
 
 class TileLodMode(UnknownIntEnum):
+    """Tile LOD algorithms used by `mln_map_tile_options`.
+
+    See `mln_tile_lod_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     DEFAULT = 0
     DISTANCE = 1
 
 
 class TileOperation(UnknownIntEnum):
+    """Tile operations reported by tile observer events.
+
+    See `mln_tile_operation` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     REQUESTED_FROM_CACHE = 0
     REQUESTED_FROM_NETWORK = 1
     LOAD_FROM_NETWORK = 2
@@ -744,17 +1106,35 @@ class TileOperation(UnknownIntEnum):
 
 
 class ViewportMode(UnknownIntEnum):
+    """Viewport orientation modes used by `mln_map_viewport_options`.
+
+    See `mln_viewport_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     DEFAULT = 0
     FLIPPED_Y = 1
 
 
 class WebglContextKind(UnknownIntEnum):
+    """WebGL context placement.
+
+    See `mln_webgl_context_kind` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     EXISTING = 0
     TRANSFERRED_CANVAS = 1
 
 
 @dataclass(frozen=True, slots=True)
 class AnimationOptions:
+    """Optional animation controls for camera transitions.
+
+    See `mln_animation_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     duration_ms: float | None = None
     velocity: float | None = None
     min_zoom: float | None = None
@@ -780,6 +1160,12 @@ class AnimationOptions:
 
 @dataclass(frozen=True, slots=True)
 class BoundOptions:
+    """Optional map camera constraint fields.
+
+    See `mln_bound_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     bounds: LatLngBounds | None = None
     min_zoom: float | None = None
     max_zoom: float | None = None
@@ -807,6 +1193,12 @@ class BoundOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraDelta:
+    """One relative camera operation.
+
+    See `mln_camera_delta` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     kind: CameraDeltaKind
     offset: ScreenPoint
     amount: float
@@ -832,6 +1224,12 @@ class CameraDelta:
 
 @dataclass(frozen=True, slots=True)
 class CameraFitOptions:
+    """Optional fitting controls for camera-for-viewport queries.
+
+    See `mln_camera_fit_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     padding: EdgeInsets | None = None
     bearing: float | None = None
     pitch: float | None = None
@@ -853,6 +1251,12 @@ class CameraFitOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraOptions:
+    """Camera fields used by snapshots and camera updates.
+
+    See `mln_camera_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     center: LatLng | None = None
     center_altitude: float | None = None
     padding: EdgeInsets | None = None
@@ -886,6 +1290,12 @@ class CameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class CameraQueryResult:
+    """Camera result borrowed for an ordered camera-query completion.
+
+    See `mln_camera_query_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     generation: int
     camera: CameraOptions
 
@@ -899,6 +1309,12 @@ class CameraQueryResult:
 
 @dataclass(frozen=True, slots=True)
 class CameraUpdate:
+    """One atomic absolute camera update.
+
+    See `mln_camera_update` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     mode: CameraUpdateMode
     camera: CameraOptions
     animation: AnimationOptions
@@ -922,6 +1338,13 @@ class CameraUpdate:
 
 @dataclass(frozen=True, slots=True)
 class CanonicalTileId:
+    """Canonical tile identity used by custom geometry and custom MVT vector
+    source callbacks.
+
+    See `mln_canonical_tile_id` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     z: int
     x: int
     y: int
@@ -933,6 +1356,12 @@ class CanonicalTileId:
 
 @dataclass(frozen=True, slots=True)
 class CustomGeometrySourceOptions:
+    """Options for custom geometry sources.
+
+    See `mln_custom_geometry_source_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     fetch_tile: Callable[[CanonicalTileId], None] | None = None
     cancel_tile: Callable[[CanonicalTileId], None] | None = None
     min_zoom: float | None = None
@@ -974,6 +1403,12 @@ class CustomGeometrySourceOptions:
 
 @dataclass(frozen=True, slots=True)
 class CustomMvtVectorSourceOptions:
+    """Options for custom MVT vector sources.
+
+    See `mln_custom_mvt_vector_source_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     fetch_tile: Callable[[CanonicalTileId], None] | None = None
     cancel_tile: Callable[[CanonicalTileId], None] | None = None
     min_zoom: float | None = None
@@ -1002,6 +1437,12 @@ class CustomMvtVectorSourceOptions:
 
 @dataclass(frozen=True, slots=True)
 class EdgeInsets:
+    """Screen-space inset in logical map pixels.
+
+    See `mln_edge_insets` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     top: float
     left: float
     bottom: float
@@ -1016,6 +1457,12 @@ class EdgeInsets:
 
 @dataclass(frozen=True, slots=True)
 class EglContextDescriptor:
+    """EGL context fields shared by OpenGL render targets.
+
+    See `mln_egl_context_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     display: int
     config: int
     share_context: int
@@ -1035,6 +1482,12 @@ class EglContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class FeatureStateSelector:
+    """Feature-state source, feature, and key selector.
+
+    See `mln_feature_state_selector` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     source_id: str
     source_layer_id: str | None = None
     feature_id: str | None = None
@@ -1052,6 +1505,12 @@ class FeatureStateSelector:
 
 @dataclass(frozen=True, slots=True)
 class FrameDemand:
+    """One nonblocking request for a frame.
+
+    See `mln_frame_demand` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
     flags: FrameDemandFlag
     token: int
     coalescing_boundary: int
@@ -1075,6 +1534,12 @@ class FrameDemand:
 
 @dataclass(frozen=True, slots=True)
 class FreeCameraOptions:
+    """Free camera position and orientation in MapLibre Native camera space.
+
+    See `mln_free_camera_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     position: Vec3 | None = None
     orientation: Quaternion | None = None
 
@@ -1094,6 +1559,12 @@ class FreeCameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class GeojsonSourceOptions:
+    """Options for GeoJSON sources.
+
+    See `mln_geojson_source_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     min_zoom: float | None = None
     max_zoom: float | None = None
     tolerance: float | None = None
@@ -1133,6 +1604,12 @@ class GeojsonSourceOptions:
 
 @dataclass(frozen=True, slots=True)
 class GpuSync:
+    """Backend synchronization copied by frame access and release calls.
+
+    See `mln_gpu_sync` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     kind: GpuSyncKind
     object: int
     value: int
@@ -1168,6 +1645,12 @@ class HttpHeaderTransform:
 
 @dataclass(frozen=True, slots=True)
 class ImageContent:
+    """Content-box insets in image pixels, measured from the image's top-left.
+
+    See `mln_image_content` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     left: float
     top: float
     right: float
@@ -1182,6 +1665,12 @@ class ImageContent:
 
 @dataclass(frozen=True, slots=True)
 class ImageStretch:
+    """One stretchable interval along an image axis, in image pixels.
+
+    See `mln_image_stretch` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     from_: float
     to: float
 
@@ -1192,6 +1681,12 @@ class ImageStretch:
 
 @dataclass(frozen=True, slots=True)
 class LatLng:
+    """Geographic coordinate in degrees used by map and projection APIs.
+
+    See `mln_lat_lng` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     latitude: float
     longitude: float
 
@@ -1202,6 +1697,12 @@ class LatLng:
 
 @dataclass(frozen=True, slots=True)
 class LatLngBounds:
+    """Geographic bounds in degrees.
+
+    See `mln_lat_lng_bounds` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     southwest: LatLng
     northeast: LatLng
 
@@ -1225,6 +1726,12 @@ class LogSetCallbackRegistration:
 
 @dataclass(frozen=True, slots=True)
 class LogicalExtent:
+    """Logical map extent in UI pixels and device-pixel scale.
+
+    See `mln_logical_extent` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     width: int
     height: int
     scale_factor: float
@@ -1238,6 +1745,12 @@ class LogicalExtent:
 
 @dataclass(frozen=True, slots=True)
 class MapOptions:
+    """Options used when creating a map.
+
+    See `mln_map_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     initial_extent: LogicalExtent
     map_mode: MapMode
     fast_pfor_enabled: bool
@@ -1261,6 +1774,12 @@ class MapOptions:
 
 @dataclass(frozen=True, slots=True)
 class MapSnapshot:
+    """Immutable map state copied from the latest published generation.
+
+    See `mln_map_snapshot` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     debug_options: MapDebugOption
     generation: int
     camera: CameraOptions
@@ -1300,6 +1819,12 @@ class MapSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class MapTileOptions:
+    """Tile prefetch and LOD tuning controls.
+
+    See `mln_map_tile_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     prefetch_zoom_delta: int | None = None
     lod_min_radius: float | None = None
     lod_scale: float | None = None
@@ -1327,6 +1852,12 @@ class MapTileOptions:
 
 @dataclass(frozen=True, slots=True)
 class MapViewportOptions:
+    """Live map viewport and render-transform controls.
+
+    See `mln_map_viewport_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     north_orientation: NorthOrientation | None = None
     constrain_mode: ConstrainMode | None = None
     viewport_mode: ViewportMode | None = None
@@ -1350,6 +1881,12 @@ class MapViewportOptions:
 
 @dataclass(frozen=True, slots=True)
 class MetalBorrowedTextureDescriptor:
+    """Metal attachment options for a borrowed texture target.
+
+    See `mln_metal_borrowed_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     physical_width: int
     physical_height: int
@@ -1373,6 +1910,12 @@ class MetalBorrowedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class MetalContextDescriptor:
+    """Metal backend context fields shared by Metal render targets.
+
+    See `mln_metal_context_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     device: int
 
     @classmethod
@@ -1382,6 +1925,12 @@ class MetalContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class MetalOwnedTextureDescriptor:
+    """Metal attachment options for an owned texture target.
+
+    See `mln_metal_owned_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: MetalContextDescriptor
 
@@ -1401,6 +1950,12 @@ class MetalOwnedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class MetalOwnedTextureFrame:
+    """Metal frame acquired from a session-owned texture target.
+
+    See `mln_metal_owned_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     generation: int
     width: int
     height: int
@@ -1426,6 +1981,12 @@ class MetalOwnedTextureFrame:
 
 @dataclass(frozen=True, slots=True)
 class MetalSurfaceDescriptor:
+    """Metal attachment options for a native surface.
+
+    See `mln_metal_surface_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: MetalContextDescriptor
     layer: int
@@ -1447,6 +2008,12 @@ class MetalSurfaceDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class OfflineGeometryRegionDefinition:
+    """Geometry offline region definition.
+
+    See `mln_offline_geometry_region_definition` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     style_url: str
     geometry: bytes
     min_zoom: float
@@ -1468,6 +2035,12 @@ class OfflineGeometryRegionDefinition:
 
 @dataclass(frozen=True, slots=True)
 class OfflineRegionDefinition:
+    """Tagged offline region definition.
+
+    See `mln_offline_region_definition` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     data: (
         OfflineRegionDefinitionTilePyramidVariant
         | OfflineRegionDefinitionGeometryVariant
@@ -1490,6 +2063,12 @@ class OfflineRegionDefinition:
 
 @dataclass(frozen=True, slots=True)
 class OfflineRegionInfo:
+    """Region data delivered by an offline completion.
+
+    See `mln_offline_region_info` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     id: int
     definition: OfflineRegionDefinition
     metadata: bytes
@@ -1505,6 +2084,12 @@ class OfflineRegionInfo:
 
 @dataclass(frozen=True, slots=True)
 class OfflineRegionStatus:
+    """Offline region status snapshot.
+
+    See `mln_offline_region_status` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     download_state: OfflineRegionDownloadState
     completed_resource_count: int
     completed_resource_size: int
@@ -1534,6 +2119,12 @@ class OfflineRegionStatus:
 
 @dataclass(frozen=True, slots=True)
 class OfflineTilePyramidRegionDefinition:
+    """Tile-pyramid offline region definition.
+
+    See `mln_offline_tile_pyramid_region_definition` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     style_url: str
     bounds: LatLngBounds
     min_zoom: float
@@ -1555,6 +2146,12 @@ class OfflineTilePyramidRegionDefinition:
 
 @dataclass(frozen=True, slots=True)
 class OpenglBorrowedTextureDescriptor:
+    """OpenGL attachment options for a borrowed texture target.
+
+    See `mln_opengl_borrowed_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     physical_width: int
     physical_height: int
@@ -1582,6 +2179,12 @@ class OpenglBorrowedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class OpenglContextDescriptor:
+    """OpenGL backend context fields shared by OpenGL render targets.
+
+    See `mln_opengl_context_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     ownership: OpenglContextOwnership
     data: (
         OpenglContextDescriptorWglVariant
@@ -1608,6 +2211,12 @@ class OpenglContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class OpenglOwnedTextureDescriptor:
+    """OpenGL attachment options for an owned texture target.
+
+    See `mln_opengl_owned_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: OpenglContextDescriptor
 
@@ -1627,6 +2236,12 @@ class OpenglOwnedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class OpenglOwnedTextureFrame:
+    """OpenGL frame acquired from a session-owned texture target.
+
+    See `mln_opengl_owned_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     generation: int
     width: int
     height: int
@@ -1656,6 +2271,12 @@ class OpenglOwnedTextureFrame:
 
 @dataclass(frozen=True, slots=True)
 class OpenglSurfaceDescriptor:
+    """OpenGL attachment options for a native surface.
+
+    See `mln_opengl_surface_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: OpenglContextDescriptor
     surface: int
@@ -1677,6 +2298,12 @@ class OpenglSurfaceDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class PremultipliedRgba8Image:
+    """Caller-owned premultiplied RGBA8 image pixels.
+
+    See `mln_premultiplied_rgba8_image` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     width: int
     height: int
     stride: int
@@ -1700,6 +2327,12 @@ class PremultipliedRgba8Image:
 
 @dataclass(frozen=True, slots=True)
 class ProjectedMeters:
+    """Lower-level Spherical Mercator projected-meter coordinate.
+
+    See `mln_projected_meters` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     northing: float
     easting: float
 
@@ -1710,6 +2343,12 @@ class ProjectedMeters:
 
 @dataclass(frozen=True, slots=True)
 class ProjectionMode:
+    """MapLibre axonometric rendering options used for snapshots and commands.
+
+    See `mln_projection_mode` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     axonometric: bool | None = None
     x_skew: float | None = None
     y_skew: float | None = None
@@ -1729,6 +2368,12 @@ class ProjectionMode:
 
 @dataclass(frozen=True, slots=True)
 class Quaternion:
+    """Quaternion stored as x, y, z, w components.
+
+    See `mln_quaternion` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     x: float
     y: float
     z: float
@@ -1741,6 +2386,12 @@ class Quaternion:
 
 @dataclass(frozen=True, slots=True)
 class QueriedFeature:
+    """One query hit borrowed for a completion callback.
+
+    See `mln_queried_feature` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     feature: bytes
     source_id: str | None = None
     source_layer_id: str | None = None
@@ -1771,6 +2422,12 @@ class RenderAbandonResult:
 
 @dataclass(frozen=True, slots=True)
 class RenderFrameResult:
+    """Immutable result record copied into an owned frame-result batch.
+
+    See `mln_render_frame_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
     disposition: RenderResult
     token: int
     map_update_generation: int
@@ -1792,6 +2449,12 @@ class RenderFrameResult:
 
 @dataclass(frozen=True, slots=True)
 class RenderSessionAttachOptions:
+    """Common attachment policy copied before an attach call returns.
+
+    See `mln_render_session_attach_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     driver: RenderDriverKind
     requested_texture_ring_depth: int
     frame_wake: Wake
@@ -1815,6 +2478,12 @@ class RenderSessionAttachOptions:
 
 @dataclass(frozen=True, slots=True)
 class RenderSessionCapabilities:
+    """Driver and target capabilities fixed for one attached render session.
+
+    See `mln_render_session_capabilities` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     driver: RenderDriverKind
     texture_ring_depth: int
     flags: RenderSessionCapabilityFlag
@@ -1830,6 +2499,12 @@ class RenderSessionCapabilities:
 
 @dataclass(frozen=True, slots=True)
 class RenderSessionSnapshot:
+    """Any-thread render-session snapshot.
+
+    See `mln_render_session_snapshot` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    """
+
     state: RenderSessionState
     driver: RenderDriverKind
     latest_result: RenderResult
@@ -1867,6 +2542,12 @@ class RenderSessionSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class RenderTargetExtent:
+    """Logical render target extent in UI pixels.
+
+    See `mln_render_target_extent` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     width: int
     height: int
     scale_factor: float
@@ -1880,6 +2561,12 @@ class RenderTargetExtent:
 
 @dataclass(frozen=True, slots=True)
 class RenderedFeatureQueryOptions:
+    """Options for rendered feature queries.
+
+    See `mln_rendered_feature_query_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     layer_ids: tuple[str, ...] | None = None
     filter: bytes | None = None
 
@@ -1901,6 +2588,12 @@ class RenderedFeatureQueryOptions:
 
 @dataclass(frozen=True, slots=True)
 class RenderedQueryGeometry:
+    """Rendered feature query geometry descriptor.
+
+    See `mln_rendered_query_geometry` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     data: (
         RenderedQueryGeometryPointVariant
         | RenderedQueryGeometryBoxVariant
@@ -1925,6 +2618,13 @@ class RenderedQueryGeometry:
 
 @dataclass(frozen=True, slots=True)
 class RenderingStats:
+    """Rendering statistics reported in
+    `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+
+    See `mln_rendering_stats` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     encoding_time: float
     rendering_time: float
     frame_count: int
@@ -2046,6 +2746,12 @@ class ResourceTransform:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEvent:
+    """One drained runtime event.
+
+    See `mln_runtime_event` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     type: RuntimeEventType
     source_type: RuntimeEventSourceType
     source: int
@@ -2089,6 +2795,12 @@ class RuntimeEvent:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventBatchView:
+    """A borrowed view of one owned runtime-event batch.
+
+    See `mln_runtime_event_batch_view` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     events: tuple[RuntimeEvent, ...]
 
     @classmethod
@@ -2100,6 +2812,12 @@ class RuntimeEventBatchView:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventCameraTransitionFinished:
+    """Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
+
+    See `mln_runtime_event_camera_transition_finished` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     transition_id: int
 
     @classmethod
@@ -2109,6 +2827,12 @@ class RuntimeEventCameraTransitionFinished:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionResponseError:
+    """Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+
+    See `mln_runtime_event_offline_region_response_error` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     region_id: int
     reason: ResourceErrorReason
 
@@ -2121,6 +2845,12 @@ class RuntimeEventOfflineRegionResponseError:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionStatus:
+    """Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+
+    See `mln_runtime_event_offline_region_status` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     region_id: int
     status: OfflineRegionStatus
 
@@ -2134,6 +2864,12 @@ class RuntimeEventOfflineRegionStatus:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventOfflineRegionTileCountLimit:
+    """Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+
+    See `mln_runtime_event_offline_region_tile_count_limit` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     region_id: int
     limit: int
 
@@ -2144,6 +2880,12 @@ class RuntimeEventOfflineRegionTileCountLimit:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventRenderFrame:
+    """Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+
+    See `mln_runtime_event_render_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     mode: RenderMode
     needs_repaint: bool
     placement_changed: bool
@@ -2161,6 +2903,12 @@ class RuntimeEventRenderFrame:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventRenderMap:
+    """Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+
+    See `mln_runtime_event_render_map` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     mode: RenderMode
 
     @classmethod
@@ -2170,6 +2918,12 @@ class RuntimeEventRenderMap:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEventTileAction:
+    """Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+
+    See `mln_runtime_event_tile_action` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     operation: TileOperation
     tile_id: TileId
 
@@ -2183,6 +2937,12 @@ class RuntimeEventTileAction:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeOptions:
+    """Options used when creating a runtime.
+
+    See `mln_runtime_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     flags: int
     event_mask: RuntimeEventMask
     event_wake: Wake
@@ -2208,6 +2968,12 @@ class RuntimeOptions:
 
 @dataclass(frozen=True, slots=True)
 class ScreenBox:
+    """Screen-space box in logical map pixels.
+
+    See `mln_screen_box` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     min: ScreenPoint
     max: ScreenPoint
 
@@ -2221,6 +2987,12 @@ class ScreenBox:
 
 @dataclass(frozen=True, slots=True)
 class ScreenLineString:
+    """Screen-space line string in logical map pixels.
+
+    See `mln_screen_line_string` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     points: tuple[ScreenPoint, ...]
 
     @classmethod
@@ -2232,6 +3004,12 @@ class ScreenLineString:
 
 @dataclass(frozen=True, slots=True)
 class ScreenPoint:
+    """Screen-space point in logical map pixels.
+
+    See `mln_screen_point` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     x: float
     y: float
 
@@ -2242,6 +3020,12 @@ class ScreenPoint:
 
 @dataclass(frozen=True, slots=True)
 class SourceFeatureQueryOptions:
+    """Options for source feature queries.
+
+    See `mln_source_feature_query_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+    """
+
     source_layer_ids: tuple[str, ...] | None = None
     filter: bytes | None = None
 
@@ -2263,6 +3047,12 @@ class SourceFeatureQueryOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageInfo:
+    """Fixed metadata for one runtime style image.
+
+    See `mln_style_image_info` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     width: int
     height: int
     stride: int
@@ -2300,6 +3090,12 @@ class StyleImageInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageOptions:
+    """Options for runtime style images.
+
+    See `mln_style_image_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     stretch_x: tuple[ImageStretch, ...] | None = None
     stretch_y: tuple[ImageStretch, ...] | None = None
     content: ImageContent | None = None
@@ -2333,6 +3129,12 @@ class StyleImageOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageResult:
+    """Complete style image borrowed for a completion callback.
+
+    See `mln_style_image_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     info: StyleImageInfo
     pixels: bytes
     stretch_x: tuple[ImageStretch, ...]
@@ -2354,6 +3156,12 @@ class StyleImageResult:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageStretchesResult:
+    """Borrowed image-stretch arrays available during a completion callback.
+
+    See `mln_style_image_stretches_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     stretch_x: tuple[ImageStretch, ...]
     stretch_y: tuple[ImageStretch, ...]
 
@@ -2371,6 +3179,12 @@ class StyleImageStretchesResult:
 
 @dataclass(frozen=True, slots=True)
 class StyleLayerEntry:
+    """One style layer borrowed for a list completion callback.
+
+    See `mln_style_layer_entry` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     id: str
     type: str
     source_id: str | None = None
@@ -2388,6 +3202,12 @@ class StyleLayerEntry:
 
 @dataclass(frozen=True, slots=True)
 class StyleLayerInfo:
+    """Fixed layer metadata included in `mln_style_layer_result`.
+
+    See `mln_style_layer_info` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     type: str
     min_zoom: float
     max_zoom: float
@@ -2405,6 +3225,12 @@ class StyleLayerInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleLayerResult:
+    """Complete layer metadata borrowed for a completion callback.
+
+    See `mln_style_layer_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     info: StyleLayerInfo
     source_id: str | None = None
     source_layer: str | None = None
@@ -2420,6 +3246,12 @@ class StyleLayerResult:
 
 @dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
+    """Fixed source metadata included in `mln_style_source_result`.
+
+    See `mln_style_source_info` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     type: StyleSourceType
     id_size: int
     is_volatile: bool
@@ -2449,6 +3281,12 @@ class StyleSourceInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleSourceResult:
+    """Complete source metadata borrowed for a completion callback.
+
+    See `mln_style_source_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     info: StyleSourceInfo
     attribution: str | None = None
     url: str | None = None
@@ -2468,6 +3306,12 @@ class StyleSourceResult:
 
 @dataclass(frozen=True, slots=True)
 class StyleSourceTileInfo:
+    """Inline tile metadata selected as one value by the source-info field mask.
+
+    See `mln_style_source_tile_info` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     tile_count: int
     min_zoom: float
     max_zoom: float
@@ -2485,6 +3329,13 @@ class StyleSourceTileInfo:
 
 @dataclass(frozen=True, slots=True)
 class StyleSourceTileUrlsResult:
+    """Borrowed inline TileJSON tile URLs available during a completion
+    callback.
+
+    See `mln_style_source_tile_urls_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     tile_urls: tuple[str, ...]
 
     @classmethod
@@ -2494,6 +3345,12 @@ class StyleSourceTileUrlsResult:
 
 @dataclass(frozen=True, slots=True)
 class StyleTileSourceOptions:
+    """Options for vector and raster tile sources.
+
+    See `mln_style_tile_source_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     min_zoom: float | None = None
     max_zoom: float | None = None
     attribution: str | None = None
@@ -2525,6 +3382,12 @@ class StyleTileSourceOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleTransitionOptions:
+    """Global style transition options.
+
+    See `mln_style_transition_options` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    """
+
     duration_ms: float | None = None
     delay_ms: float | None = None
     enable_placement_transitions: bool | None = None
@@ -2546,6 +3409,12 @@ class StyleTransitionOptions:
 
 @dataclass(frozen=True, slots=True)
 class TextureImageInfo:
+    """CPU image readback metadata for a texture target frame.
+
+    See `mln_texture_image_info` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     width: int
     height: int
     stride: int
@@ -2569,6 +3438,12 @@ class TextureImageInfo:
 
 @dataclass(frozen=True, slots=True)
 class TextureReadbackResult:
+    """Texture readback borrowed for a completion callback.
+
+    See `mln_texture_readback_result` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     data: bytes
     info: TextureImageInfo
 
@@ -2579,6 +3454,12 @@ class TextureReadbackResult:
 
 @dataclass(frozen=True, slots=True)
 class TileId:
+    """Overscaled tile identity reported in tile observer events.
+
+    See `mln_tile_id` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+    """
+
     overscaled_z: int
     wrap: int
     canonical_z: int
@@ -2598,6 +3479,12 @@ class TileId:
 
 @dataclass(frozen=True, slots=True)
 class UnitBezier:
+    """Cubic easing curve for animated camera transitions.
+
+    See `mln_unit_bezier` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     x1: float
     y1: float
     x2: float
@@ -2610,6 +3497,12 @@ class UnitBezier:
 
 @dataclass(frozen=True, slots=True)
 class Vec3:
+    """Three-component vector used by free camera options.
+
+    See `mln_vec3` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    """
+
     x: float
     y: float
     z: float
@@ -2621,6 +3514,12 @@ class Vec3:
 
 @dataclass(frozen=True, slots=True)
 class VulkanBorrowedTextureDescriptor:
+    """Vulkan attachment options for a borrowed texture target.
+
+    See `mln_vulkan_borrowed_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     physical_width: int
     physical_height: int
@@ -2654,6 +3553,12 @@ class VulkanBorrowedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class VulkanContextDescriptor:
+    """Vulkan backend context fields shared by Vulkan render targets.
+
+    See `mln_vulkan_context_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     instance: int
     physical_device: int
     device: int
@@ -2677,6 +3582,12 @@ class VulkanContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class VulkanOwnedTextureDescriptor:
+    """Vulkan attachment options for an owned texture target.
+
+    See `mln_vulkan_owned_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: VulkanContextDescriptor
 
@@ -2696,6 +3607,12 @@ class VulkanOwnedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class VulkanOwnedTextureFrame:
+    """Vulkan frame acquired from a session-owned texture target.
+
+    See `mln_vulkan_owned_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     generation: int
     width: int
     height: int
@@ -2725,6 +3642,12 @@ class VulkanOwnedTextureFrame:
 
 @dataclass(frozen=True, slots=True)
 class VulkanSurfaceDescriptor:
+    """Vulkan attachment options for a native surface.
+
+    See `mln_vulkan_surface_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: VulkanContextDescriptor
     surface: int
@@ -2746,6 +3669,12 @@ class VulkanSurfaceDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class Wake:
+    """Receiver wake callback copied by a successful owning call.
+
+    See `mln_wake` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/wake_8h.html).
+    """
+
     callback: Callable[[], None] | None = None
 
     def _invoke_callback(self):
@@ -2756,6 +3685,12 @@ class Wake:
 
 @dataclass(frozen=True, slots=True)
 class WebglContextDescriptor:
+    """WebGL context fields shared by OpenGL render targets in the browser.
+
+    See `mln_webgl_context_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     kind: WebglContextKind
     context: int
     canvas_selector: str
@@ -2771,6 +3706,12 @@ class WebglContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class WebgpuBorrowedTextureDescriptor:
+    """WebGPU attachment options for a borrowed texture target.
+
+    See `mln_webgpu_borrowed_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     physical_width: int
     physical_height: int
@@ -2800,6 +3741,12 @@ class WebgpuBorrowedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class WebgpuContextDescriptor:
+    """WebGPU backend context fields shared by WebGPU render targets.
+
+    See `mln_webgpu_context_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     instance: int
     device: int
     queue: int
@@ -2811,6 +3758,12 @@ class WebgpuContextDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class WebgpuOwnedTextureDescriptor:
+    """WebGPU attachment options for an owned texture target.
+
+    See `mln_webgpu_owned_texture_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: WebgpuContextDescriptor
 
@@ -2830,6 +3783,12 @@ class WebgpuOwnedTextureDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class WebgpuOwnedTextureFrame:
+    """WebGPU frame acquired from a session-owned texture target.
+
+    See `mln_webgpu_owned_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
     generation: int
     width: int
     height: int
@@ -2857,6 +3816,12 @@ class WebgpuOwnedTextureFrame:
 
 @dataclass(frozen=True, slots=True)
 class WebgpuSurfaceDescriptor:
+    """WebGPU attachment options for a native surface.
+
+    See `mln_webgpu_surface_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    """
+
     extent: RenderTargetExtent
     context: WebgpuContextDescriptor
     surface: int
@@ -2880,6 +3845,12 @@ class WebgpuSurfaceDescriptor:
 
 @dataclass(frozen=True, slots=True)
 class WglContextDescriptor:
+    """WGL context fields shared by OpenGL render targets on Windows.
+
+    See `mln_wgl_context_descriptor` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+    """
+
     device_context: int
     share_context: int
     get_proc_address: int

@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension Maplibre {
-  /// Calls `mln_rendered_feature_query_options_default`.
+  /// Returns default rendered feature query options.
+  ///
+  /// See `mln_rendered_feature_query_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   static func renderedFeatureQueryOptionsDefault() throws
     -> RenderedFeatureQueryOptions
   {
@@ -15,7 +18,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_rendered_query_geometry_box`.
+  /// Returns a rendered box query geometry descriptor.
+  ///
+  /// See `mln_rendered_query_geometry_box` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   static func renderedQueryGeometryBox(box bindingArg0: ScreenBox) throws
     -> RenderedQueryGeometry
   {
@@ -25,7 +31,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_rendered_query_geometry_line_string`.
+  /// Returns a rendered line-string query geometry descriptor.
+  ///
+  /// See `mln_rendered_query_geometry_line_string` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   static func renderedQueryGeometryLineString(
     points bindingArg0: [ScreenPoint]
   ) throws
@@ -41,7 +50,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_rendered_query_geometry_point`.
+  /// Returns a rendered point query geometry descriptor.
+  ///
+  /// See `mln_rendered_query_geometry_point` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   static func renderedQueryGeometryPoint(point bindingArg0: ScreenPoint) throws
     -> RenderedQueryGeometry
   {
@@ -53,7 +65,10 @@ public extension Maplibre {
     }
   }
 
-  /// Calls `mln_source_feature_query_options_default`.
+  /// Returns default source feature query options.
+  ///
+  /// See `mln_source_feature_query_options_default` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
   static func sourceFeatureQueryOptionsDefault() throws
     -> SourceFeatureQueryOptions
   {

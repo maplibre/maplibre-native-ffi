@@ -119,11 +119,32 @@ An annotation that names another declaration, such as `reentry_calls`,
 `complete`, `cancel_registration`, or `wait_retired`, must name one that exists;
 the schema reports the name that does not resolve.
 
+## Document a declaration
+
+Each generated declaration carries the first paragraph of its header comment and
+a link to its header's page in the C API reference. The paragraph ends at a
+blank line, a list item, or a heading such as `Returns:`, so write a first
+paragraph that stands alone as a summary. The C header remains the full
+contract: status lists, output parameters, and ownership rules name C concepts
+that each binding expresses differently, so the bindings repeat only the
+summary.
+
+A comment documents the declaration directly after it. Only whitespace,
+`MLN_BINDING` annotations, and the `typedef` before a tag may separate the two.
+A declaration without a comment has no generated comment, because the reference
+lists only documented declarations.
+
+The summary keeps C identifiers as written and marks each `mln_` and `MLN_` name
+as code. `docs.py` renders it in each language's comment syntax and escapes its
+prose for that language's documentation tool. A record field and an enum
+constant carry their summary without the link, which their type carries.
+
 ## Where each rule lives
 
 | Change                                              | Module              |
 | --------------------------------------------------- | ------------------- |
 | Header extraction and attribute parsing             | `frontend.py`       |
+| Summaries, reference links, and comment escaping    | `docs.py`           |
 | Conventions, accepted attributes, and signatures    | `schema.py`         |
 | Value shapes, presence, and ownership relationships | `semantic.py`       |
 | Native copies for deferred callbacks and results    | `native_capture.py` |

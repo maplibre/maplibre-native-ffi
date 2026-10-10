@@ -3,11 +3,26 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// EGL context fields shared by OpenGL render targets.
+///
+/// See `mln_egl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct EglContextDescriptor: Equatable, Hashable, Sendable {
+  /// Borrowed EGLDisplay. Required and kept initialized through teardown.
   public var display: NativePointer
+  /// Borrowed EGLConfig used to create the session context. Required. OpenGL
+  /// texture targets require EGL_SURFACE_TYPE to include EGL_PBUFFER_BIT.
   public var config: NativePointer
+  /// Borrowed EGLContext whose share group the session context joins. Required
+  /// under shared ownership, where the session also takes its client API from
+  /// this context. A dedicated session joins no share group, so it must be null
+  /// there and names client_api instead.
   public var shareContext: NativePointer
+  /// Client API the session creates its context for. Required under dedicated
+  /// ownership. A shared session queries share_context for it, so this is
+  /// ignored there.
   public var clientApi: OpenglClientApi
+  /// Optional eglGetProcAddress-compatible function for the host loader.
   public var getProcAddress: NativePointer
   public static var `default`: Self {
     Self(raw: mln_egl_context_descriptor())
@@ -56,8 +71,16 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// Backend synchronization copied by frame access and release calls.
+///
+/// See `mln_gpu_sync` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct GpuSync: Equatable, Hashable, Sendable {
+  /// One `mln_gpu_sync_kind` value.
   public var kind: GpuSyncKind
+  /// Bit pattern of the backend object that kind names: the
+  /// id\<MTLSharedEvent\> pointer, the VkSemaphore handle, the GLsync pointer,
+  /// or the WebGPU token.
   public var object: UInt64
   public var value: UInt64
   public static var `default`: Self {
@@ -89,6 +112,10 @@ public struct GpuSync: Equatable, Hashable, Sendable {
   }
 }
 
+/// Synchronization payload kind for acquired texture frames.
+///
+/// See `mln_gpu_sync_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -97,14 +124,24 @@ public struct GpuSyncKind: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// The producer or consumer has completed before the API call returns.
   public static let cpuComplete: GpuSyncKind = .init(rawValue: 0)
+  /// id\<MTLSharedEvent\> plus a monotonically increasing signal value.
   public static let metalSharedEvent: GpuSyncKind = .init(rawValue: 1)
+  /// VkSemaphore plus a timeline value.
   public static let vulkanTimelineSemaphore: GpuSyncKind = .init(rawValue: 2)
+  /// GLsync, used only by a caller-graphics-thread driver.
   public static let openglFence: GpuSyncKind = .init(rawValue: 3)
+  /// A backend-defined WebGPU completion token.
   public static let webgpuToken: GpuSyncKind = .init(rawValue: 4)
 }
 
+/// Metal backend context fields shared by Metal render targets.
+///
+/// See `mln_metal_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
+  /// id\<MTLDevice\> / MTL::Device\*. Retained when the target requires it.
   public var device: NativePointer
   public static var `default`: Self {
     Self(raw: mln_metal_context_descriptor())
@@ -126,6 +163,10 @@ public struct MetalContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// OpenGL client API a dedicated EGL session creates its context for.
+///
+/// See `mln_opengl_client_api` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct OpenglClientApi: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -134,12 +175,22 @@ public struct OpenglClientApi: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// No client API is named.
   public static let unspecified: OpenglClientApi = .init(rawValue: 0)
+  /// Desktop OpenGL, as EGL_OPENGL_API names it.
   public static let gl: OpenglClientApi = .init(rawValue: 1)
+  /// OpenGL ES, as EGL_OPENGL_ES_API names it.
   public static let gles: OpenglClientApi = .init(rawValue: 2)
 }
 
+/// OpenGL backend context fields shared by OpenGL render targets.
+///
+/// See `mln_opengl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
+  /// Whether the session shares its driver thread and graphics objects with the
+  /// host. A private EGL owned texture and a transferred WebGL canvas are
+  /// dedicated to their core worker.
   public var ownership: OpenglContextOwnership
   public var data: OpenglContextDescriptorData
   public static var `default`: Self {
@@ -204,6 +255,10 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// Backend-specific OpenGL context data.
+///
+/// See `mln_opengl_context_descriptor_data` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public enum OpenglContextDescriptorData: Equatable, Hashable, Sendable {
   case wgl(WglContextDescriptor)
   case egl(EglContextDescriptor)
@@ -215,6 +270,11 @@ public enum OpenglContextDescriptorData: Equatable, Hashable, Sendable {
   }
 }
 
+/// How a session's OpenGL context relates to its driver thread and host
+/// graphics state.
+///
+/// See `mln_opengl_context_ownership` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct OpenglContextOwnership: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -223,10 +283,16 @@ public struct OpenglContextOwnership: RawRepresentable, NativeOpenValue,
     self.rawValue = rawValue
   }
 
+  /// The session shares its thread with host graphics work.
   public static let shared: OpenglContextOwnership = .init(rawValue: 0)
+  /// The session owns its thread's OpenGL context.
   public static let dedicated: OpenglContextOwnership = .init(rawValue: 1)
 }
 
+/// OpenGL platform context provider used by a context descriptor.
+///
+/// See `mln_opengl_context_platform` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct OpenglContextPlatform: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -235,12 +301,18 @@ public struct OpenglContextPlatform: RawRepresentable, NativeOpenValue,
     self.rawValue = rawValue
   }
 
+  /// No OpenGL context provider is selected.
   public static let unspecified: OpenglContextPlatform = .init(rawValue: 0)
   public static let wgl: OpenglContextPlatform = .init(rawValue: 1)
   public static let egl: OpenglContextPlatform = .init(rawValue: 2)
+  /// Emscripten WebGL context handle.
   public static let webgl: OpenglContextPlatform = .init(rawValue: 3)
 }
 
+/// OpenGL context providers supported by this build.
+///
+/// See `mln_opengl_context_provider_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct OpenglContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -251,9 +323,14 @@ public struct OpenglContextProviderFlag: OptionSet, NativeOpenValue, Equatable,
 
   public static let wgl: OpenglContextProviderFlag = .init(rawValue: 1)
   public static let egl: OpenglContextProviderFlag = .init(rawValue: 2)
+  /// Browser WebGL context imported into an Emscripten module.
   public static let webgl: OpenglContextProviderFlag = .init(rawValue: 4)
 }
 
+/// Execution placement for one render session.
+///
+/// See `mln_render_driver_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderDriverKind: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -262,14 +339,29 @@ public struct RenderDriverKind: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// Native code owns a serial worker that initializes, drives, and tears down
+  /// transferable graphics state.
   public static let coreWorker: RenderDriverKind = .init(rawValue: 1)
+  /// The host explicitly calls the narrow driver API from the thread or realm
+  /// where its graphics context is current.
   public static let callerGraphicsThread: RenderDriverKind = .init(rawValue: 2)
 }
 
+/// Common attachment policy copied before an attach call returns.
+///
+/// See `mln_render_session_attach_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionAttachOptions: Sendable {
+  /// One `mln_render_driver_kind` value. Defaults to
+  /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
   public var driver: RenderDriverKind
+  /// Requested host-acquirable owned-texture slot count. Private targets grant
+  /// one slot regardless of this value. Ignored by other targets. Defaults to
+  /// 1.
   public var requestedTextureRingDepth: UInt32
+  /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake
+  /// Wakes the graphics receiver when caller-driver work is available.
   public var driverWorkWake: Wake
   public static var `default`: Self {
     try! Self(raw: mln_render_session_attach_options_default())
@@ -311,9 +403,16 @@ public struct RenderSessionAttachOptions: Sendable {
   }
 }
 
+/// Driver and target capabilities fixed for one attached render session.
+///
+/// See `mln_render_session_capabilities` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
+  /// One `mln_render_driver_kind` value.
   public var driver: RenderDriverKind
+  /// Granted owned-texture slot count, or zero for a target without a ring.
   public var textureRingDepth: UInt32
+  /// A bitwise OR of `mln_render_session_capability_flag` values.
   public var flags: RenderSessionCapabilityFlag
   public static var `default`: Self {
     Self(raw: mln_render_session_capabilities())
@@ -346,6 +445,10 @@ public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   }
 }
 
+/// Optional render-session capabilities.
+///
+/// See `mln_render_session_capability_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
   Equatable,
   Hashable, Sendable
@@ -364,9 +467,16 @@ public struct RenderSessionCapabilityFlag: OptionSet, NativeOpenValue,
     .init(rawValue: 8)
 }
 
+/// Logical render target extent in UI pixels.
+///
+/// See `mln_render_target_extent` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct RenderTargetExtent: Equatable, Hashable, Sendable {
+  /// Logical map width in UI pixels. Defaults to 256.
   public var width: UInt32
+  /// Logical map height in UI pixels. Defaults to 256.
   public var height: UInt32
+  /// UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0.
   public var scaleFactor: Double
   public static var `default`: Self {
     Self(raw: mln_render_target_extent())
@@ -398,13 +508,24 @@ public struct RenderTargetExtent: Equatable, Hashable, Sendable {
   }
 }
 
+/// Vulkan backend context fields shared by Vulkan render targets.
+///
+/// See `mln_vulkan_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
+  /// Borrowed VkInstance. Required.
   public var instance: NativePointer
+  /// Borrowed VkPhysicalDevice. Required.
   public var physicalDevice: NativePointer
+  /// Borrowed VkDevice. Required.
   public var device: NativePointer
+  /// Borrowed graphics VkQueue. Required.
   public var graphicsQueue: NativePointer
+  /// Queue family index for graphics_queue. Must support graphics commands.
   public var graphicsQueueFamilyIndex: UInt32
+  /// PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles.
   public var getInstanceProcAddr: NativePointer
+  /// PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device.
   public var getDeviceProcAddr: NativePointer
   public static var `default`: Self {
     Self(raw: mln_vulkan_context_descriptor())
@@ -472,9 +593,17 @@ public struct VulkanContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// WebGL context fields shared by OpenGL render targets in the browser.
+///
+/// See `mln_webgl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
+  /// One `mln_webgl_context_kind` value.
   public var kind: WebglContextKind
+  /// Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
   public var context: Int32
+  /// Copied UTF-8 Emscripten target selector for TRANSFERRED_CANVAS. The HTML
+  /// canvas must still be transferable when attachment starts.
   public var canvasSelector: String
   public static var `default`: Self {
     Self()
@@ -514,6 +643,10 @@ public struct WebglContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// WebGL context placement.
+///
+/// See `mln_webgl_context_kind` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WebglContextKind: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -522,13 +655,24 @@ public struct WebglContextKind: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// Use a host-created context on its current browser agent.
   public static let existing: WebglContextKind = .init(rawValue: 0)
+  /// Create a WebGL 2 context on a native worker whose pthread creation claims
+  /// canvas_selector through Emscripten's transferred-canvases attribute.
   public static let transferredCanvas: WebglContextKind = .init(rawValue: 1)
 }
 
+/// WebGPU backend context fields shared by WebGPU render targets.
+///
+/// See `mln_webgpu_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WebgpuContextDescriptor: Equatable, Hashable, Sendable {
+  /// Borrowed WGPUInstance. Optional for texture targets.
   public var instance: NativePointer
+  /// Borrowed WGPUDevice. Required.
   public var device: NativePointer
+  /// Borrowed WGPUQueue. Optional; null uses the device default queue. A
+  /// non-null queue must belong to device.
   public var queue: NativePointer
   public static var `default`: Self {
     Self(raw: mln_webgpu_context_descriptor())
@@ -563,9 +707,18 @@ public struct WebgpuContextDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
+/// WGL context fields shared by OpenGL render targets on Windows.
+///
+/// See `mln_wgl_context_descriptor` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 public struct WglContextDescriptor: Equatable, Hashable, Sendable {
+  /// Borrowed HDC used to create the session context. Required.
   public var deviceContext: NativePointer
+  /// Borrowed HGLRC whose share group the session context joins. Required under
+  /// shared ownership. A dedicated session joins no share group, so it must be
+  /// null there.
   public var shareContext: NativePointer
+  /// Optional wglGetProcAddress-compatible function for the host loader.
   public var getProcAddress: NativePointer
   public static var `default`: Self {
     Self(raw: mln_wgl_context_descriptor())

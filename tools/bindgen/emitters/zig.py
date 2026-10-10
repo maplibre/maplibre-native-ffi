@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 
+from tools.bindgen import docs
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.model import Api, CType, Function, ModelError, Record
 from tools.bindgen.names import camel, pascal
@@ -60,6 +61,17 @@ def status_call(
     return f"try status.call(c.{function.name}, {tuple_}, {diagnostic});"
 
 
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The Zig doc comment of a declaration, or empty when it has none."""
+    return docs.line_comment(bound.doc(native), indent)
+
+
+def documented(bound: BoundApi, native: str, code: str, marker: str) -> str:
+    """Code with a declaration's comment before the line that starts it."""
+    start = code.index(marker)
+    return code[:start] + doc(bound, native) + code[start:]
+
+
 def expose_parameter_names(plan, code):
     """Keep generated temporaries private while naming parameters from the header."""
     marker = f"pub fn {camel(plan.name.removeprefix('mln_'))}("
@@ -106,7 +118,14 @@ def lower(api: Api | BoundApi) -> tuple[list[str], list[str], dict[str, str]]:
         previous = dict(value_types.used)
         try:
             code = lower_operation(plan, value_types)
-            chunks.append(expose_parameter_names(plan, code))
+            chunks.append(
+                documented(
+                    bound,
+                    function.name,
+                    expose_parameter_names(plan, code),
+                    f"pub fn {camel(plan.name.removeprefix('mln_'))}(",
+                )
+            )
             generated.append(function.name)
         except ModelError as error:
             value_types.used = previous
@@ -145,7 +164,8 @@ pub const OwnedValue = marshal.OwnedValue;
             )
         public = pascal(handle.native.removeprefix("mln_"))
         owners.append(
-            f'pub const {public} = owner.Handle("{handle.native}", "{public}", struct {{ fn dispose(raw: u64) status.Error!void {{ {" ".join(calls)} }} }}.dispose);'
+            doc(bound, handle.native)
+            + f'pub const {public} = owner.Handle("{handle.native}", "{public}", struct {{ fn dispose(raw: u64) status.Error!void {{ {" ".join(calls)} }} }}.dispose);'
         )
     # The generated surface is the package root, next to the runtime types it
     # exposes, so the package needs no file of re-exports.

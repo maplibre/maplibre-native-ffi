@@ -13,7 +13,7 @@ from dataclasses import dataclass, replace
 from ..model import CType
 from ..protocol import COMPLETION
 from ..semantic import public_stem
-from .kotlin_values import Unsupported, identifier, name, owner_class
+from .kotlin_values import Unsupported, doc, identifier, name, owner_class
 
 
 @dataclass(frozen=True)
@@ -78,24 +78,31 @@ def common(values):
                 else values.public(callback.result)
             )
             result.append(
-                f"public typealias {public_name} = ({parameters}) -> {returns}"
+                f"{doc(values.bound, value.native)}public typealias {public_name} = ({parameters}) -> {returns}"
             )
         elif value.response:
             result.append(
-                f"public class {public_name} internal constructor(internal val bindingAddress: Long, internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
+                f"{doc(values.bound, value.native)}public class {public_name} internal constructor(internal val bindingAddress: Long, internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope)"
             )
         elif value.registration:
             parameters = []
-            for member, typ, children, _group in values.members(value):
+            for member, typ, children, group in values.members(value):
                 default = (
                     "null" if typ.endswith("?") else values.field_default(children[0])
                 )
                 parameters.append(
-                    f"  public val {member}: {typ}"
+                    (
+                        doc(values.bound, f"{value.native}.{children[0].name}", "  ")
+                        if not group
+                        else ""
+                    )
+                    + f"  public val {member}: {typ}"
                     + (f" = {default}" if default else "")
                 )
             result.append(
-                f"public data class {public_name}(\n" + ",\n".join(parameters) + "\n)"
+                f"{doc(values.bound, value.native)}public data class {public_name}(\n"
+                + ",\n".join(parameters)
+                + "\n)"
             )
     for callback in values.direct_callbacks.values():
         result.append(

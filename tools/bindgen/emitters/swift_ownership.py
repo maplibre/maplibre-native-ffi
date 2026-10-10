@@ -25,8 +25,9 @@ def consumed(plan, owner, values):
                 f"Swift: {function.name}: release inputs require scoped ownership conversion"
             ]
         )
-    from .swift import checked, native_call
+    from .swift import checked, doc, native_call
 
+    documented = doc(values.bound, function.name)
     if len(plan.inputs) != 1:
         from .swift import camel, identifier
         from .swift_dynamic_values import encode
@@ -42,7 +43,7 @@ def consumed(plan, owner, values):
             args.append(encode(values, parameter.value, local))
         return (
             f"""public extension {owner} {{
-  func release({", ".join(declarations)}) throws {{
+{doc(values.bound, function.name, "  ")}  func release({", ".join(declarations)}) throws {{
     try NativeCallbackGuard.check(owner: self, operation: "{function.name}")
     try mapNativeFailure {{
       let arena = NativeInputArena()
@@ -61,7 +62,7 @@ def consumed(plan, owner, values):
     method = "close" if is_release else "dispose"
     if plan.completion:
         return (
-            f"""func close() async throws {{
+            f"""{documented}func close() async throws {{
   guard let future = try startClose() else {{ return }}
   try await mapNativeFailure {{ try await future.value() }}
 }}
@@ -76,7 +77,7 @@ internal func startClose() throws -> NativeFuture<Void>? {{
     call = native_call(function, "raw")
     parameters = "raw" if function.return_type.kind == "void" else "raw, diagnostic"
     return (
-        f"""func {method}() throws {{
+        f"""{documented}func {method}() throws {{
   try nativeClose("{function.name}") {{ {parameters} in {call} }}
 }}
 """,
@@ -138,7 +139,9 @@ def owner_declarations(bound):
         if decision:
             parent += ", pendingDecision: Bool = false"
             passed += ", pendingDecision: pendingDecision"
-        chunks.append(f'''public final class {owner}: @unchecked Sendable, NativeReceiver {{
+        from .swift import doc
+
+        chunks.append(f'''{doc(bound, handle.native)}public final class {owner}: @unchecked Sendable, NativeReceiver {{
   let handle: NativeHandleBox<{raw}>
   init(adopting raw: {handle.native}{parent}) throws {{
     handle = try NativeHandleBox(typeName: "{owner}", handle: {raw}(raw: raw){passed})

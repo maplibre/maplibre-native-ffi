@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from ..model import ModelError
 from ..semantic import ValuePlan
-from .go import name, native_identifier
+from .go import doc, name, native_identifier
 
 
 def public(native):
@@ -386,11 +386,13 @@ class Values:
                 + "_"
             )
             constants = "\n".join(
-                f"{typename}{name(key.removeprefix(prefix).lower())} {typename} = {typename}(C.{key})"
+                doc(self.api, key, None)
+                + f"{typename}{name(key.removeprefix(prefix).lower())} {typename} = {typename}(C.{key})"
                 for key, number in value.enum_values
             )
             chunks.append(
-                f"type {typename} {scalar(value.enum_underlying or value.ctype, value.scalar_carrier)}\nconst (\n{constants}\n)\n"
+                doc(self.api, native, typename)
+                + f"type {typename} {scalar(value.enum_underlying or value.ctype, value.scalar_carrier)}\nconst (\n{constants}\n)\n"
             )
             if value.enum_kind == "bitmask":
                 chunks.append(
@@ -398,7 +400,10 @@ class Values:
                 )
         for native, value in sorted(self.unions.items()):
             typename = self.union_name(value)
-            chunks.append(f"type {typename} interface {{ bindingTag() uint32 }}")
+            chunks.append(
+                doc(self.api, native, typename)
+                + f"type {typename} interface {{ bindingTag() uint32 }}"
+            )
             for f in value.fields:
                 wrapper = typename + name(f.name) + "Variant"
                 chunks.append(
@@ -417,18 +422,35 @@ class Values:
             visible = plain(value) if value.registration else value
             members = list(self.members(visible))
             fields = [
-                f"{member} {self.type(v) if v else 'bool'}"
-                for member, v, _, _ in members
+                (
+                    doc(self.api, source.name, None)
+                    if v is None
+                    else doc(self.api, f"{native}.{source.name}", None)
+                    if group is None
+                    else ""
+                )
+                + f"{member} {self.type(v) if v else 'bool'}"
+                for member, v, source, group in members
             ]
             if value.registration:
                 for member in value.registration.callbacks:
                     callback = self.api.callbacks[
                         next(f.value.native for f in value.fields if f.name == member)
                     ]
-                    fields.append(f"{name(member)} {signature(self, callback)}")
+                    fields.append(
+                        doc(self.api, f"{native}.{member}", None)
+                        + f"{name(member)} {signature(self, callback)}"
+                    )
             if arena := self.arenas.get(native):
                 fields.append(f"{name(arena.field)} string")
-            chunks.append(f"type {typename} struct {{ {'; '.join(fields)} }}")
+            body = (
+                "\n" + "\n".join(fields) + "\n"
+                if any("//" in field for field in fields)
+                else f" {'; '.join(fields)} "
+            )
+            chunks.append(
+                doc(self.api, native, typename) + f"type {typename} struct {{{body}}}"
+            )
             if native not in self.api.values:
                 continue
             if native in self.api.returned:

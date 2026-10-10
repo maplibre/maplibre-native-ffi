@@ -17,6 +17,10 @@ public struct AmbientCacheOperation: RawRepresentable, NativeOpenValue,
   public static let clear: AmbientCacheOperation = .init(rawValue: 4)
 }
 
+/// Camera change kinds reported by camera will-change and did-change events.
+///
+/// See `mln_camera_change_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -25,7 +29,9 @@ public struct CameraChangeMode: RawRepresentable, NativeOpenValue, Equatable,
     self.rawValue = rawValue
   }
 
+  /// The camera reached its new value without an animated transition.
   public static let immediate: CameraChangeMode = .init(rawValue: 0)
+  /// The camera moved as part of an animated transition.
   public static let animated: CameraChangeMode = .init(rawValue: 1)
 }
 
@@ -140,7 +146,12 @@ public struct OfflineRegionDownloadState: RawRepresentable, NativeOpenValue,
   public static let active: OfflineRegionDownloadState = .init(rawValue: 1)
 }
 
+/// Offline region status snapshot.
+///
+/// See `mln_offline_region_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
+  /// One of `mln_offline_region_download_state`.
   public var downloadState: OfflineRegionDownloadState
   public var completedResourceCount: UInt64
   public var completedResourceSize: UInt64
@@ -209,6 +220,10 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
   }
 }
 
+/// Render modes reported by render observer events.
+///
+/// See `mln_render_mode` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RenderMode: RawRepresentable, NativeOpenValue, Equatable,
   Hashable,
   Sendable
@@ -222,11 +237,20 @@ public struct RenderMode: RawRepresentable, NativeOpenValue, Equatable,
   public static let full: RenderMode = .init(rawValue: 1)
 }
 
+/// Rendering statistics reported in `MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME`.
+///
+/// See `mln_rendering_stats` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RenderingStats: Equatable, Hashable, Sendable {
+  /// Frame CPU encoding time in seconds.
   public var encodingTime: Double
+  /// Frame CPU rendering time in seconds.
   public var renderingTime: Double
+  /// Number of frames rendered by the native renderer.
   public var frameCount: Int64
+  /// Draw calls executed during the most recent frame.
   public var drawCallCount: Int64
+  /// Total draw calls executed by the native renderer.
   public var totalDrawCallCount: Int64
   public static var `default`: Self {
     Self(raw: mln_rendering_stats())
@@ -413,7 +437,10 @@ public struct ResourceRequestRange: Equatable, Hashable, Sendable {
 
 public struct ResourceRequest: Equatable, Hashable, Sendable {
   public var range: ResourceRequestRange?
+  /// URL entering the network layer, before tile server normalization.
   public var requestedUrl: String?
+  /// URL to fetch, after resource-kind normalization against the runtime's tile
+  /// server options and API key.
   public var resolvedUrl: String?
   public var kind: ResourceKind
   public var loadingMethod: ResourceLoadingMethod
@@ -518,6 +545,7 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
 public struct ResourceResponse: Equatable, Hashable, Sendable {
   public var status: ResourceResponseStatus
   public var errorReason: ResourceErrorReason
+  /// Response bytes. May be null only when byte_count is 0.
   public var bytes: Data
   public var errorMessage: String?
   public var mustRevalidate: Bool
@@ -596,6 +624,10 @@ public struct ResourceResponse: Equatable, Hashable, Sendable {
   }
 }
 
+/// How a resource provider answered a request.
+///
+/// See `mln_resource_response_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct ResourceResponseStatus: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -706,12 +738,25 @@ public struct ResourceUsage: RawRepresentable, NativeOpenValue, Equatable,
   public static let offline: ResourceUsage = .init(rawValue: 1)
 }
 
+/// One drained runtime event.
+///
+/// See `mln_runtime_event` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEvent: Equatable, Hashable, Sendable {
   public var message: String
+  /// One of `mln_runtime_event_type`.
   public var type: RuntimeEventType
+  /// One of `mln_runtime_event_source_type`.
   public var sourceType: RuntimeEventSourceType
+  /// Source handle selected by source_type: an `mln_runtime` or an `mln_map`.
+  /// Every handle type is uint64_t, so this needs no cast.
   public var source: UInt64
+  /// Secondary event detail whose meaning type selects. Depending on type it
+  /// carries an `mln_camera_change_mode`, an `mln_status`, a MapLibre Native
+  /// error ordinal, or 0. See `mln_runtime_event_type` for the per-type
+  /// meaning.
   public var code: Int32
+  /// Typed payload selected by payload_type.
   public var payload: RuntimeEventPayload
   public static var `default`: Self {
     Self()
@@ -794,7 +839,12 @@ public struct RuntimeEvent: Equatable, Hashable, Sendable {
   }
 }
 
+/// A borrowed view of one owned runtime-event batch.
+///
+/// See `mln_runtime_event_batch_view` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventBatchView: Equatable, Hashable, Sendable {
+  /// Borrowed array of event_count events in queue order.
   public var events: [RuntimeEvent]
   public static var `default`: Self {
     Self()
@@ -831,9 +881,15 @@ public struct RuntimeEventBatchView: Equatable, Hashable, Sendable {
   }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED`.
+///
+/// See `mln_runtime_event_camera_transition_finished` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventCameraTransitionFinished: Equatable, Hashable,
   Sendable
 {
+  /// The transition_id the caller set on the `mln_animation_options` that
+  /// started this transition.
   public var transitionId: UInt64
   public static var `default`: Self {
     Self(raw: mln_runtime_event_camera_transition_finished())
@@ -856,6 +912,10 @@ public struct RuntimeEventCameraTransitionFinished: Equatable, Hashable,
   }
 }
 
+/// Bit values for the map and runtime event subscription masks.
+///
+/// See `mln_runtime_event_mask` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
@@ -864,6 +924,7 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
     self.rawValue = rawValue
   }
 
+  /// Selects no event type.
   public static let none: RuntimeEventMask = []
   public static let mapCameraWillChange: RuntimeEventMask = .init(rawValue: 2)
   public static let mapCameraIsChanging: RuntimeEventMask = .init(rawValue: 4)
@@ -899,16 +960,24 @@ public struct RuntimeEventMask: OptionSet, NativeOpenValue, Equatable, Hashable,
     .init(rawValue: 1_048_576)
   public static let offlineRegionTileCountLimitExceeded: RuntimeEventMask =
     .init(rawValue: 2_097_152)
+  /// Selects every map-originated event type this version defines.
   public static let allMapEvents: RuntimeEventMask = .init(rawValue: 4_718_590)
+  /// Selects every runtime-originated event type this version defines.
   public static let allRuntimeEvents: RuntimeEventMask =
     .init(rawValue: 3_670_016)
+  /// Selects every event type this version defines.
   public static let all: RuntimeEventMask = .init(rawValue: 8_388_606)
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR`.
+///
+/// See `mln_runtime_event_offline_region_response_error` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
   Sendable
 {
   public var regionId: Int64
+  /// One of `mln_resource_error_reason`.
   public var reason: ResourceErrorReason
   public static var `default`: Self {
     Self(raw: mln_runtime_event_offline_region_response_error())
@@ -936,8 +1005,14 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
   }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED`.
+///
+/// See `mln_runtime_event_offline_region_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   public var regionId: Int64
+  /// Region status. This member keeps its own size field because the same
+  /// struct is also returned by `mln_runtime_offline_region_get_status()`.
   public var status: OfflineRegionStatus
   public static var `default`: Self {
     Self(raw: mln_runtime_event_offline_region_status())
@@ -964,6 +1039,10 @@ public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED`.
+///
+/// See `mln_runtime_event_offline_region_tile_count_limit` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
   Sendable
 {
@@ -994,6 +1073,10 @@ public struct RuntimeEventOfflineRegionTileCountLimit: Equatable, Hashable,
   }
 }
 
+/// Typed event payload carried inline by every event.
+///
+/// See `mln_runtime_event_payload` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   case renderFrame(RuntimeEventRenderFrame)
   case renderMap(RuntimeEventRenderMap)
@@ -1009,6 +1092,10 @@ public enum RuntimeEventPayload: Equatable, Hashable, Sendable {
   }
 }
 
+/// Payload kinds used by `mln_runtime_event.payload_type`.
+///
+/// See `mln_runtime_event_payload_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventPayloadType: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -1031,9 +1118,16 @@ public struct RuntimeEventPayloadType: RawRepresentable, NativeOpenValue,
     .init(rawValue: 9)
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED`.
+///
+/// See `mln_runtime_event_render_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
+  /// One of `mln_render_mode`.
   public var mode: RenderMode
+  /// Whether MapLibre needs another frame after this one.
   public var needsRepaint: Bool
+  /// Whether symbol placement changed during this frame.
   public var placementChanged: Bool
   public var stats: RenderingStats
   public static var `default`: Self {
@@ -1069,7 +1163,12 @@ public struct RuntimeEventRenderFrame: Equatable, Hashable, Sendable {
   }
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED`.
+///
+/// See `mln_runtime_event_render_map` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
+  /// One of `mln_render_mode`.
   public var mode: RenderMode
   public static var `default`: Self {
     Self(raw: mln_runtime_event_render_map())
@@ -1090,6 +1189,10 @@ public struct RuntimeEventRenderMap: Equatable, Hashable, Sendable {
   }
 }
 
+/// Source kinds used by `mln_runtime_event.source_type`.
+///
+/// See `mln_runtime_event_source_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventSourceType: RawRepresentable, NativeOpenValue,
   Equatable, Hashable, Sendable
 {
@@ -1102,7 +1205,12 @@ public struct RuntimeEventSourceType: RawRepresentable, NativeOpenValue,
   public static let map: RuntimeEventSourceType = .init(rawValue: 1)
 }
 
+/// Payload for `MLN_RUNTIME_EVENT_MAP_TILE_ACTION`.
+///
+/// See `mln_runtime_event_tile_action` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
+  /// One of `mln_tile_operation`.
   public var operation: TileOperation
   public var tileId: TileId
   public static var `default`: Self {
@@ -1130,6 +1238,10 @@ public struct RuntimeEventTileAction: Equatable, Hashable, Sendable {
   }
 }
 
+/// Runtime event types carried by `mln_runtime_event.type`.
+///
+/// See `mln_runtime_event_type` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {
@@ -1170,11 +1282,22 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
     .init(rawValue: 22)
 }
 
+/// Options used when creating a runtime.
+///
+/// See `mln_runtime_options` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeOptions: Sendable {
+  /// No flags are currently defined. Must be zero.
   public var flags: UInt32
+  /// Directory root for asset:// URLs. Copied during runtime creation. Null or
+  /// empty selects `/android_asset` on Android and `.` elsewhere.
   public var assetPath: String?
+  /// Cache database path. Copied during runtime creation.
   public var cachePath: String?
+  /// Runtime-scoped event types this runtime queues, as a bitwise OR of
+  /// `mln_runtime_event_mask` values.
   public var eventMask: RuntimeEventMask
+  /// Wakes the receiver when the runtime event queue becomes nonempty.
   public var eventWake: Wake
   public static var `default`: Self {
     try! Self(raw: mln_runtime_options_default())
@@ -1219,6 +1342,10 @@ public struct RuntimeOptions: Sendable {
   }
 }
 
+/// Overscaled tile identity reported in tile observer events.
+///
+/// See `mln_tile_id` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct TileId: Equatable, Hashable, Sendable {
   public var overscaledZ: UInt32
   public var wrap: Int32
@@ -1262,6 +1389,10 @@ public struct TileId: Equatable, Hashable, Sendable {
   }
 }
 
+/// Tile operations reported by tile observer events.
+///
+/// See `mln_tile_operation` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct TileOperation: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {

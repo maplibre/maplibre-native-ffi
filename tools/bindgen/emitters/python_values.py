@@ -8,6 +8,7 @@ import re
 from dataclasses import replace
 from typing import NoReturn
 
+from .. import docs
 from ..model import ModelError
 from ..semantic import BoundApi, ValuePlan
 
@@ -580,7 +581,9 @@ class Values:
                 for key, value in plan.enum_values
             )
             python.append(
-                f"class {public_name(name)}({'IntFlag' if plan.enum_kind == 'bitmask' else 'UnknownIntEnum'}):\n{body or '    pass'}\n"
+                f"class {public_name(name)}({'IntFlag' if plan.enum_kind == 'bitmask' else 'UnknownIntEnum'}):\n"
+                + docs.docstring(self.api.doc(name), "    ")
+                + f"{body or '    pass'}\n"
             )
         for name, plan in sorted(self.records.items()):
             if plan.response:
@@ -661,6 +664,7 @@ class Values:
             public_copies.append(f"{arena.field}=raw[{arena.field!r}]")
         python.append(
             f"@dataclass(frozen=True, slots=True)\nclass {public_name(name)}:\n"
+            + docs.docstring(self.api.doc(name), "    ")
             + "\n".join(sorted(fields, key=lambda line: " = " in line) or ["    pass"])
             + "\n"
         )

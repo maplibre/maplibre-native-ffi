@@ -175,6 +175,12 @@ class ResourceRequestHandle(_ResourceRequestHandleOperations, NativeHandleMixin)
 
 
 class RuntimeHandle(_RuntimeHandleOperations, NativeHandleMixin):
+    """Handles are opaque 64-bit generational ids.
+
+    See `mln_runtime` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
+    """
+
     _handle_name = "RuntimeHandle"
     _parent: NativeHandleMixin | None
 

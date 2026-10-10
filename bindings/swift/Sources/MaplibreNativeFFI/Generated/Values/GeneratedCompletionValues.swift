@@ -3,6 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Terminal dispositions reported by command completions.
+///
+/// See `mln_command_disposition` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/completion_8h.html).
 public struct CommandDisposition: RawRepresentable, NativeOpenValue, Equatable,
   Hashable, Sendable
 {

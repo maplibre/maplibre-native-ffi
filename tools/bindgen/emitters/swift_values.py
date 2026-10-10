@@ -3,7 +3,7 @@
 from os.path import commonprefix
 
 from ..model import ModelError
-from .swift import SCALARS, camel, identifier, name
+from .swift import SCALARS, camel, doc, identifier, name
 
 
 class Values:
@@ -146,10 +146,10 @@ class Values:
             return descriptor(self, value)
         if value.kind == "union":
             variants = "\n".join(
-                f"  case {identifier(camel(field.name))}({self.public(field.value)})"
+                f"{doc(self.bound, f'{value.native}.{field.name}', '  ')}  case {identifier(camel(field.name))}({self.public(field.value)})"
                 for field in value.fields
             )
-            return f"public enum {self.public(value)}: Equatable, Hashable, Sendable {{\n{variants}\n{'  case none' if value.empty_variant else ''}\n  case unknown(UInt32, Data)\n  public static var `default`: Self {{ {'.none' if value.empty_variant else '.unknown(0, Data())'} }}\n}}\n"
+            return f"{doc(self.bound, value.native)}public enum {self.public(value)}: Equatable, Hashable, Sendable {{\n{variants}\n{'  case none' if value.empty_variant else ''}\n  case unknown(UInt32, Data)\n  public static var `default`: Self {{ {'.none' if value.empty_variant else '.unknown(0, Data())'} }}\n}}\n"
         if dynamic(value):
             return declaration(self, value)
         public = self.public(value)
@@ -163,7 +163,9 @@ class Values:
                 )
         for flag in value.mask_flags:
             local = identifier(camel(flag.member))
-            fields.append(f"  public var {local}: Bool")
+            fields.append(
+                f"{doc(self.bound, flag.name, '  ')}  public var {local}: Bool"
+            )
             init.append(f"{local}: Bool = {public}.default.{local}")
             assignments.append(f"    self.{local} = {local}")
             captures.append(
@@ -215,7 +217,7 @@ class Values:
             optional = field.presence and field.presence.mask
             field_type = self.public(field.value)
             fields.append(
-                f"  public var {local}: {field_type}{'?' if optional else ''}"
+                f"{doc(self.bound, f'{value.native}.{field.name}', '  ')}  public var {local}: {field_type}{'?' if optional else ''}"
             )
             init.append(
                 f"{local}: {field_type}{'?' if optional else ''} = {public}.default.{local}"
@@ -238,7 +240,7 @@ class Values:
                     f"    {raw} = {self.native(field.value, 'self.' + local)}"
                 )
         initial = f"{value.default}()" if value.default else f"{value.native}()"
-        return f"""public struct {public}: Equatable, Hashable, Sendable {{
+        return f"""{doc(self.bound, value.native)}public struct {public}: Equatable, Hashable, Sendable {{
 {chr(10).join(fields)}
   public static var `default`: Self {{ Self(raw: {initial}) }}
   public init({", ".join(init)}) {{
@@ -277,7 +279,7 @@ class Values:
             commonprefix([key for key, _ in value.enum_values]).rsplit("_", 1)[0] + "_"
         )
         members = "\n".join(
-            f"  public static let {identifier(camel(key.removeprefix(prefix).lower()))}: {public} = "
+            f"{doc(self.bound, key, '  ')}  public static let {identifier(camel(key.removeprefix(prefix).lower()))}: {public} = "
             + (
                 "[]"
                 if number == 0 and value.enum_kind == "bitmask"
@@ -288,4 +290,4 @@ class Values:
         conformance = (
             "OptionSet" if value.enum_kind == "bitmask" else "RawRepresentable"
         )
-        return f"public struct {public}: {conformance}, NativeOpenValue, Equatable, Hashable, Sendable {{\n  public let rawValue: {raw}\n  public init(rawValue: {raw}) {{ self.rawValue = rawValue }}\n{members}\n}}\n"
+        return f"{doc(self.bound, value.native)}public struct {public}: {conformance}, NativeOpenValue, Equatable, Hashable, Sendable {{\n  public let rawValue: {raw}\n  public init(rawValue: {raw}) {{ self.rawValue = rawValue }}\n{members}\n}}\n"

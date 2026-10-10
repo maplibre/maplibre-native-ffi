@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from os.path import commonprefix
 
-from .. import native_ports
+from .. import docs, native_ports
 from ..managed_contracts import DART_RESERVED
 from ..names import camel, pascal
 from ..native_capture import arguments_record, deferred_constant
@@ -51,6 +51,11 @@ def owner_names(handle) -> tuple[str, str]:
     """The public owner class and native handle type for a handle plan."""
     name = pascal(handle.stem)
     return name + "Handle", "Native" + name
+
+
+def doc(bound: BoundApi, native: str, indent: str = "") -> str:
+    """The dartdoc comment of a declaration, or empty when it has none."""
+    return docs.line_comment(bound.doc(native), indent)
 
 
 class Unsupported(ValueError):
@@ -982,7 +987,10 @@ class Values:
 
     def render(self):
         declarations, conversions = [], []
+        # The first declaration that each value renders carries its comment.
+        documented = []
         for value in list(self.used.values()):
+            documented.append((len(declarations), value.native))
             if value.kind == "enum":
                 public = public_name(value.native)
                 prefix = (
@@ -992,7 +1000,7 @@ class Values:
                     + "_"
                 )
                 members = "\n".join(
-                    f"  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
+                    f"{doc(self.bound, name, '  ')}  static const {identifier(name.removeprefix(prefix).lower())} = {public}.fromRawValue({number});"
                     for name, number in value.enum_values
                 )
                 bitmask = value.enum_kind == "bitmask"
@@ -1042,8 +1050,19 @@ class Values:
             flags = []
             for flag in value.mask_flags:
                 flags.append((identifier(flag.member), flag))
-            fields = "\n".join(f"  final {typ} {name};" for name, typ, _, _ in members)
-            fields += "\n" + "\n".join(f"  final bool {name};" for name, _ in flags)
+            fields = "\n".join(
+                (
+                    doc(self.bound, f"{value.native}.{children[0].name}", "  ")
+                    if not group
+                    else ""
+                )
+                + f"  final {typ} {name};"
+                for name, typ, children, group in members
+            )
+            fields += "\n" + "\n".join(
+                f"{doc(self.bound, flag.name, '  ')}  final bool {name};"
+                for name, flag in flags
+            )
             # A record whose field order is its meaning constructs positionally.
             positional = value.ordered
             args, initializers = [], []
@@ -1197,4 +1216,8 @@ class Values:
                 + "\n".join(read)
                 + "\n);\n"
             )
+        ends = [start for start, _ in documented[1:]] + [len(declarations)]
+        for (start, native), end in zip(documented, ends):
+            if start < end:
+                declarations[start] = doc(self.bound, native) + declarations[start]
         return "\n".join(declarations), "\n".join(conversions)

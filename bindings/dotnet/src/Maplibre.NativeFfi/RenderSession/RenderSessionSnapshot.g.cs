@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Any-thread render-session snapshot.
+/// </summary>
+/// <remarks>
+/// See <c>mln_render_session_snapshot</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
+/// </remarks>
 public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
     RenderDriverKind Driver,

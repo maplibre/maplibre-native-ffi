@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -36,6 +37,12 @@ CursorKind: Any = cindex.CursorKind
 TypeKind: Any = cindex.TypeKind
 
 ANNOTATION_PREFIX = "mln:"
+# Source that may separate a doc comment from the start of its declaration: an
+# annotation macro, which takes only string literals, or the `typedef` before a
+# tag.
+_DECLARATION_PREFIX = re.compile(
+    r'(?:\b[A-Z][A-Z0-9_]*\(\s*(?:"[^"]*"\s*)*\)|\btypedef)\s*$'
+)
 
 
 def is_diagnostic_type(native: cindex.Type) -> bool:
@@ -99,6 +106,7 @@ class Extractor:
         self.include_directory = include_directory.resolve()
         self.errors: list[str] = []
         self.records: dict[str, Record] = {}
+        self.sources: dict[str, bytes] = {}
 
     def location(self, cursor: cindex.Cursor) -> Location:
         source = cursor.location
@@ -110,6 +118,39 @@ class Extractor:
         else:
             filename = path.name
         return Location(filename, source.line, source.column)
+
+    def comment(self, cursor: cindex.Cursor) -> str:
+        """The doc comment that immediately precedes a declaration.
+
+        Clang's own attachment misses a comment when an `MLN_BINDING` contract
+        with a semicolon separates it from the declaration, and it gives an
+        undocumented enum constant the comment of the constant before it. This
+        reads the source instead: only whitespace, annotations, and the
+        `typedef` that encloses a tag may separate the comment from the start
+        of the declaration.
+        """
+        start = cursor.extent.start
+        if not start.file:
+            return ""
+        name = start.file.name
+        if name not in self.sources:
+            self.sources[name] = Path(name).read_bytes()
+        text = self.sources[name][: start.offset].decode().rstrip()
+        while match := _DECLARATION_PREFIX.search(text):
+            text = text[: match.start()].rstrip()
+        if text.endswith("*/"):
+            comment = text[text.rfind("/*") :]
+            if comment.startswith(("/**", "/*!")) and not comment.startswith("/**<"):
+                return comment
+            return ""
+        lines = []
+        for line in reversed(text.splitlines()):
+            if not line.lstrip().startswith(("///", "//!")) or line.lstrip().startswith(
+                "///<"
+            ):
+                break
+            lines.append(line.strip())
+        return "\n".join(reversed(lines))
 
     def owned(self, cursor: cindex.Cursor) -> bool:
         return bool(
@@ -256,7 +297,7 @@ class Extractor:
                         type=self.type(child.type),
                         metadata=self.metadata(child),
                         location=self.location(child),
-                        documentation=child.raw_comment or "",
+                        documentation=self.comment(child),
                         bit_width=child.get_bitfield_width()
                         if child.is_bitfield()
                         else None,
@@ -268,7 +309,7 @@ class Extractor:
             fields=tuple(fields),
             metadata=self.metadata(cursor),
             location=self.location(cursor),
-            documentation=cursor.raw_comment or "",
+            documentation=self.comment(cursor),
             complete=cursor.is_definition(),
         )
         previous = self.records.get(name)
@@ -306,7 +347,7 @@ class Extractor:
                     ),
                     metadata=self.metadata(cursor),
                     location=self.location(cursor),
-                    documentation=cursor.raw_comment or "",
+                    documentation=self.comment(cursor),
                     variadic=cursor.type.is_function_variadic(),
                     diagnostic=diagnostic,
                 )
@@ -325,14 +366,14 @@ class Extractor:
                         EnumValue(
                             child.spelling,
                             enum_value(child, cursor.enum_type),
-                            child.raw_comment or "",
+                            self.comment(child),
                         )
                         for child in cursor.get_children()
                         if child.kind == CursorKind.ENUM_CONSTANT_DECL
                     ),
                     metadata=self.metadata(cursor),
                     location=self.location(cursor),
-                    documentation=cursor.raw_comment or "",
+                    documentation=self.comment(cursor),
                 )
             elif kind == CursorKind.TYPEDEF_DECL:
                 typedefs[name] = Typedef(
@@ -340,7 +381,7 @@ class Extractor:
                     type=self.type(cursor.underlying_typedef_type),
                     metadata=self.metadata(cursor),
                     location=self.location(cursor),
-                    documentation=cursor.raw_comment or "",
+                    documentation=self.comment(cursor),
                     parameters=tuple(
                         Parameter(
                             child.spelling, self.type(child.type), self.metadata(child)

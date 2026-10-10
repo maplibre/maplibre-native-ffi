@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// OpenGL attachment options for a native surface.
+/// </summary>
+/// <remarks>
+/// See <c>mln_opengl_surface_descriptor</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html">C API reference</see>.
+/// </remarks>
 public readonly partial record struct OpenglSurfaceDescriptor(
     RenderTargetExtent Extent,
     OpenglContextDescriptor Context,

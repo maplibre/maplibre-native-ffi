@@ -4,6 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension GeojsonSourceDataHandle {
+  /// Releases prepared GeoJSON source data.
+  ///
+  /// See `mln_geojson_source_data_destroy` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func close() throws {
     try nativeClose("mln_geojson_source_data_destroy") { raw in
       mln_geojson_source_data_destroy(raw)

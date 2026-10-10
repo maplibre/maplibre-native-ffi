@@ -4,6 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
+  /// Consumes a map handle without observing its asynchronous retirement.
+  ///
+  /// See `mln_map_dispose` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func dispose() throws {
     try nativeClose("mln_map_dispose") { raw, diagnostic in mln_map_dispose(
       raw,
@@ -11,7 +15,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_get_feature_state`.
+  /// Starts an ordered read of per-feature state from this map.
+  ///
+  /// See `mln_map_get_feature_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func getFeatureState(selector bindingArg0: FeatureStateSelector) async throws
     -> Data
   {
@@ -26,7 +33,10 @@ public extension MapHandle {
     ) }
   }
 
-  /// Calls `mln_map_loaded_style_json`.
+  /// Starts an ordered copy of the last successfully parsed style document.
+  ///
+  /// See `mln_map_loaded_style_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func loadedStyleJson() async throws -> Data {
     try await nativeStart(
       "mln_map_loaded_style_json",
@@ -38,6 +48,10 @@ public extension MapHandle {
     ) }
   }
 
+  /// Releases a map after synchronous state preflight.
+  ///
+  /// See `mln_map_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func close() async throws {
     guard let future = try startClose() else { return }
     try await mapNativeFailure { try await future.value() }
@@ -53,7 +67,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_remove_feature_state`.
+  /// Removes per-feature state from this map.
+  ///
+  /// See `mln_map_remove_feature_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func removeFeatureState(
     selector bindingArg0: FeatureStateSelector
@@ -70,7 +87,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_request_repaint`.
+  /// Requests a repaint for a continuous map.
+  ///
+  /// See `mln_map_request_repaint` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func requestRepaint() async throws -> CommandCompletion {
     try await nativeCommand("mln_map_request_repaint") { raw, _, completion, diagnostic in
@@ -82,7 +102,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_request_still_image`.
+  /// Requests one still image for a static or tile map.
+  ///
+  /// See `mln_map_request_still_image` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func requestStillImage() async throws {
     try await nativeUnit("mln_map_request_still_image") { raw, _, completion, diagnostic in
       mln_map_request_still_image(
@@ -93,7 +116,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_resize`.
+  /// Submits the sole post-creation logical extent update.
+  ///
+  /// See `mln_map_resize` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func resize(extent bindingArg0: LogicalExtent) async throws
     -> CommandCompletion
@@ -108,7 +134,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_event_mask`.
+  /// Selects which map-originated event types this map queues.
+  ///
+  /// See `mln_map_set_event_mask` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func setEventMask(mask bindingArg0: RuntimeEventMask) async throws
     -> CommandCompletion
@@ -123,7 +152,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_feature_state`.
+  /// Submits a copied per-feature-state command.
+  ///
+  /// See `mln_map_set_feature_state` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func setFeatureState(
     selector bindingArg0: FeatureStateSelector,
@@ -140,7 +172,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_style_json`.
+  /// Queues an inline style JSON command.
+  ///
+  /// See `mln_map_set_style_json` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func setStyleJson(json bindingArg0: Data) async throws -> CommandCompletion {
     try await nativeCommand("mln_map_set_style_json") { raw, arena, completion, diagnostic in
@@ -153,7 +188,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_set_style_url`.
+  /// Queues a style URL command.
+  ///
+  /// See `mln_map_set_style_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   @discardableResult
   func setStyleUrl(url bindingArg0: String) async throws -> CommandCompletion {
     try await nativeCommand("mln_map_set_style_url") { raw, arena, completion, diagnostic in
@@ -166,7 +204,10 @@ public extension MapHandle {
     }
   }
 
-  /// Calls `mln_map_snapshot_get`.
+  /// Copies the latest immutable state published by the map worker.
+  ///
+  /// See `mln_map_snapshot_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func snapshotGet() throws -> MapSnapshot {
     var value0 = mln_map_snapshot()
     value0.size = UInt32(MemoryLayout<mln_map_snapshot>.size)
@@ -179,7 +220,10 @@ public extension MapHandle {
     } result: { MapSnapshot(raw: value0) }
   }
 
-  /// Calls `mln_map_style_url`.
+  /// Starts an ordered copy of the last requested style URL.
+  ///
+  /// See `mln_map_style_url` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
   func styleUrl() async throws -> String {
     try await nativeStart(
       "mln_map_style_url",

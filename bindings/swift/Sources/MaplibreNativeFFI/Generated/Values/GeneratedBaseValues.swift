@@ -3,6 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// Render backend support flags reported by this native library build.
+///
+/// See `mln_render_backend_flag` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public struct RenderBackendFlag: OptionSet, NativeOpenValue, Equatable,
   Hashable,
   Sendable
@@ -18,6 +22,10 @@ public struct RenderBackendFlag: OptionSet, NativeOpenValue, Equatable,
   public static let webgpu: RenderBackendFlag = .init(rawValue: 8)
 }
 
+/// Status values returned by status-returning functions.
+///
+/// See `mln_status` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/base_8h.html).
 public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   Sendable
 {
@@ -27,14 +35,24 @@ public struct Status: RawRepresentable, NativeOpenValue, Equatable, Hashable,
   }
 
   public static let ok: Status = .init(rawValue: 0)
+  /// A pointer, size field, mask, or handle argument was invalid.
   public static let invalidArgument: Status = .init(rawValue: -1)
+  /// The object is valid but not currently in a state that permits the call.
   public static let invalidState: Status = .init(rawValue: -2)
+  /// The handle is thread-affine and the call was made from the wrong thread.
   public static let wrongThread: Status = .init(rawValue: -3)
+  /// The entry point or requested behavior is unavailable in this build.
   public static let unsupported: Status = .init(rawValue: -4)
+  /// A native MapLibre error or C++ exception was converted to status.
   public static let nativeError: Status = .init(rawValue: -5)
+  /// The operation reached its terminal cancelled disposition.
   public static let cancelled: Status = .init(rawValue: -6)
+  /// A conflicting driver call or lifecycle transition is in flight.
   public static let busy: Status = .init(rawValue: -7)
+  /// The render target or graphics receiver was irreversibly lost.
   public static let targetLost: Status = .init(rawValue: -8)
+  /// A nonblocking acquisition or service call has no result yet.
   public static let notReady: Status = .init(rawValue: -9)
+  /// A command or operation named an ID with no live object behind it.
   public static let notFound: Status = .init(rawValue: -10)
 }

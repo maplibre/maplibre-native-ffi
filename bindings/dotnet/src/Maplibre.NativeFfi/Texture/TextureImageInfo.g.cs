@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// CPU image readback metadata for a texture target frame.
+/// </summary>
+/// <remarks>
+/// See <c>mln_texture_image_info</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
+/// </remarks>
 public readonly partial record struct TextureImageInfo(
     uint Width,
     uint Height,

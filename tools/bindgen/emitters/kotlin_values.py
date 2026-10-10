@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import replace
 from os.path import commonprefix
 
+from .. import docs
 from ..names import camel, pascal
 from .kotlin_abi import Abi, LayoutError, width_expression
 
@@ -93,6 +94,11 @@ KEYWORDS = {
     "when",
     "while",
 }
+
+
+def doc(bound, native: str, indent: str = "") -> str:
+    """The KDoc comment of a declaration, or empty when it has none."""
+    return docs.block_comment(bound.doc(native), indent)
 
 
 def name(native):
@@ -396,12 +402,12 @@ class Values:
                     + "_"
                 )
                 constants = [
-                    f"    public val {native.removeprefix(prefix)}: {public} = {public}({literal(number, scalar)})"
+                    f"{doc(self.bound, native, '    ')}    public val {native.removeprefix(prefix)}: {public} = {public}({literal(number, scalar)})"
                     for native, number in value.enum_values
                 ]
                 result.extend(
                     [
-                        f"public data class {public}(public val rawValue: {scalar}) {{",
+                        f"{doc(self.bound, value.native)}public data class {public}(public val rawValue: {scalar}) {{",
                         *(
                             [
                                 f"  public infix fun or(other: {public}): {public} = {public}(rawValue or other.rawValue)",
@@ -423,7 +429,7 @@ class Values:
                     continue
                 union_name = public + pascal(field.name)
                 variants = [
-                    f"  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {union_name}"
+                    f"{doc(self.bound, f'{field.value.native}.{v.name}', '  ')}  public data class {pascal(v.name)}(public val value: {self.public(v.value)}): {union_name}"
                     for v in field.value.fields
                 ]
                 if field.value.empty_variant:
@@ -432,17 +438,22 @@ class Values:
                     f"  public data class Unknown(public val tag: UInt, public val bytes: ByteArray): {union_name}"
                 )
                 result.append(
-                    f"public sealed interface {union_name} {{\n"
+                    f"{doc(self.bound, field.value.native)}public sealed interface {union_name} {{\n"
                     + "\n".join(variants)
                     + "\n}"
                 )
             args = []
-            for member, typ, children, _group in self.members(value):
+            for member, typ, children, group in self.members(value):
                 default = (
                     "null" if typ.endswith("?") else self.field_default(children[0])
                 )
                 args.append(
-                    f"  public val {member}: {typ}"
+                    (
+                        doc(self.bound, f"{value.native}.{children[0].name}", "  ")
+                        if not group
+                        else ""
+                    )
+                    + f"  public val {member}: {typ}"
                     + (" = " + default if default is not None else "")
                 )
             if value.native in self.item_buffers:
@@ -456,7 +467,7 @@ class Values:
                     )
                 )
             args.extend(
-                f"  public val {self.flag_name(value, flag)}: Boolean = false"
+                f"{doc(self.bound, flag.name, '  ')}  public val {self.flag_name(value, flag)}: Boolean = false"
                 for flag in value.mask_flags
             )
             if value.native in self.views:
@@ -466,7 +477,7 @@ class Values:
                     for member, typ, _, _ in self.members(value)
                 ]
                 result.append(
-                    f"public class {public}(\n"
+                    f"{doc(self.bound, value.native)}public class {public}(\n"
                     + ",\n".join(args)
                     + "\n) {\n  internal var bindingScope: ViewScope? = null\n"
                     + "\n".join(getters)
@@ -474,7 +485,9 @@ class Values:
                 )
             else:
                 result.append(
-                    f"public data class {public}(\n" + ",\n".join(args) + "\n)"
+                    f"{doc(self.bound, value.native)}public data class {public}(\n"
+                    + ",\n".join(args)
+                    + "\n)"
                 )
         for public, fields in self.groups.items():
             args = []

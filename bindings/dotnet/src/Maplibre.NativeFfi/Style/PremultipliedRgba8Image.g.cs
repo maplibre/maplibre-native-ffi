@@ -2,6 +2,13 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
+/// <summary>
+/// Caller-owned premultiplied RGBA8 image pixels.
+/// </summary>
+/// <remarks>
+/// See <c>mln_premultiplied_rgba8_image</c> in the <see
+/// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
+/// </remarks>
 public readonly record struct PremultipliedRgba8Image
 {
     public PremultipliedRgba8Image(uint Width, uint Height, uint Stride, byte[] Pixels)

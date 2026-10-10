@@ -4,7 +4,10 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension EventBatchHandle {
-  /// Calls `mln_event_batch_get`.
+  /// Borrows the event and message view stored by an owned event batch.
+  ///
+  /// See `mln_event_batch_get` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func get() throws -> RuntimeEventBatchView {
     var value0 = mln_runtime_event_batch_view()
     value0.size = UInt32(MemoryLayout<mln_runtime_event_batch_view>.size)
@@ -17,6 +20,10 @@ public extension EventBatchHandle {
     } result: { try RuntimeEventBatchView(raw: value0) }
   }
 
+  /// Releases an owned event batch. A null handle is a no-op.
+  ///
+  /// See `mln_event_batch_release` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
   func close() throws {
     try nativeClose("mln_event_batch_release") { raw in
       mln_event_batch_release(raw)
