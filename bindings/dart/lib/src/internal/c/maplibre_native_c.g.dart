@@ -2326,19 +2326,6 @@ external void mln_adapter_completion_record_destroy(
 external void mln_adapter_completion_reject(Pointer<mln_completion> completion);
 
 @Native<
-  Void Function(
-    mln_custom_source_tile_callback,
-    mln_custom_source_tile_callback,
-    Pointer<Void>,
-  )
->()
-external void mln_adapter_custom_source_callbacks_retire(
-  mln_custom_source_tile_callback fetch_tile,
-  mln_custom_source_tile_callback cancel_tile,
-  Pointer<Void> user_data,
-);
-
-@Native<
   Int32 Function(
     Uint32,
     Pointer<Void>,

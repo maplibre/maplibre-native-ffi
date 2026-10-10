@@ -32,7 +32,6 @@
 #include "maplibre_native_c/base.h"     // IWYU pragma: export
 #include "maplibre_native_c/logging.h"  // IWYU pragma: export
 #include "maplibre_native_c/runtime.h"  // IWYU pragma: export
-#include "maplibre_native_c/style.h"    // IWYU pragma: export
 #include "maplibre_native_c/wake.h"     // IWYU pragma: export
 
 #ifdef __cplusplus
@@ -630,18 +629,6 @@ MLN_BINDING(
 MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
   void* user_data MLN_BINDING("kind=context"),
   const mln_resource_request* request, mln_resource_request_handle handle
-) MLN_NOEXCEPT;
-
-/**
- * Invokes custom source tile callbacks once with a retirement tile id.
- *
- * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
- * listener recognizes it and releases the state behind the callbacks.
- */
-MLN_API void mln_adapter_custom_source_callbacks_retire(
-  mln_custom_source_tile_callback fetch_tile,
-  mln_custom_source_tile_callback cancel_tile,
-  void* user_data MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)

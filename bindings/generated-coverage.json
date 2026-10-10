@@ -323,7 +323,7 @@
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc"
   ],
-  "function_count": 291,
+  "function_count": 290,
   "languages": {
     "dart": {
       "callback_adapters": {
@@ -2525,7 +2525,6 @@
     "mln_adapter_completion_record_adopt",
     "mln_adapter_completion_record_destroy",
     "mln_adapter_completion_reject",
-    "mln_adapter_custom_source_callbacks_retire",
     "mln_adapter_dart_completion_create",
     "mln_adapter_dart_deferred_callback_create",
     "mln_adapter_dart_port_create",
