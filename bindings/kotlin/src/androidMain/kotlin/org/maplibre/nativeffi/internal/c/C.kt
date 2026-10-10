@@ -138,13 +138,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_log_set_async_severity_mask(mask: Int, outDiagnostic: Long): Int
 
-  @JvmStatic
-  actual external fun mln_log_set_callback(
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
-    outDiagnostic: Long,
-  ): Int
+  @JvmStatic actual external fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
 
   @JvmStatic
   actual external fun mln_map_add_color_relief_layer(
@@ -1449,9 +1443,7 @@ internal actual object C {
   @JvmStatic
   actual external fun mln_resource_request_set_cancel_callback(
     handle: Long,
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
+    handler: Long,
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int

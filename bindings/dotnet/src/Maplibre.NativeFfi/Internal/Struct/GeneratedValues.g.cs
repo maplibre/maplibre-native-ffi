@@ -288,7 +288,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_geometry_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
         }
     }
 
@@ -306,7 +306,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_geometry_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
         }
     }
 
@@ -398,7 +398,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_mvt_vector_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
         }
     }
 
@@ -416,7 +416,7 @@ internal static unsafe class GeneratedValues
         }
         catch (Exception error)
         {
-            NativeCallbackFailure.Report("mln_custom_mvt_vector_source_tile_callback", error);
+            NativeCallbackFailure.Report("mln_custom_source_tile_callback", error);
         }
     }
 
@@ -820,6 +820,48 @@ internal static unsafe class GeneratedValues
         var native = new mln_lat_lng_bounds();
         native.southwest = NativeLatLng(value.Southwest);
         native.northeast = NativeLatLng(value.Northeast);
+        return native;
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static uint InvokeLogHandlerCallback(
+        void* user_data,
+        uint severity,
+        uint @event,
+        long code,
+        sbyte* message
+    )
+    {
+        try
+        {
+            using var restriction = NativeCallbackGuard.ForbidReentry();
+            var answer = ((LogHandler)NativeCallbackRoot.Value(user_data)).Callback;
+            return answer is null
+                ? 0
+                : (uint)answer(
+                    (LogSeverity)severity,
+                    (LogEvent)@event,
+                    code,
+                    NativeCallScope.CopyCString(message)
+                );
+        }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_log_callback", error);
+            return 0;
+        }
+    }
+
+    internal static mln_log_handler NativeLogHandler(LogHandler value, NativeCallScope scope)
+    {
+        var native = new mln_log_handler();
+        native.size = (uint)sizeof(mln_log_handler);
+        if (value.Callback is not null)
+        {
+            native.user_data = scope.Register(value with { });
+            native.release_user_data = &NativeCallbackRoot.Release;
+            native.callback = value.Callback is null ? null : &InvokeLogHandlerCallback;
+        }
         return native;
     }
 
@@ -2028,6 +2070,52 @@ internal static unsafe class GeneratedValues
         var bufferPriorData = scope.Buffer(value.PriorDataStorage.Items);
         native.prior_data = (byte*)bufferPriorData.data;
         native.prior_data_size = checked((nuint)bufferPriorData.size);
+        return native;
+    }
+
+    private static readonly string[] AllowedResourceRequestCancelHandlerCallback =
+    [
+        "mln_resource_request_complete",
+        "mln_resource_request_cancelled",
+        "mln_resource_request_set_cancel_callback",
+        "mln_resource_request_release",
+    ];
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void InvokeResourceRequestCancelHandlerCallback(void* user_data)
+    {
+        try
+        {
+            var receiver = (NativeOwnedCallback)NativeCallbackRoot.Value(user_data);
+            using var restriction = NativeCallbackGuard.Restrict(
+                receiver.Owner,
+                AllowedResourceRequestCancelHandlerCallback
+            );
+            ((ResourceRequestCancelHandler)receiver.Callback).Callback?.Invoke();
+        }
+        catch (Exception error)
+        {
+            NativeCallbackFailure.Report("mln_resource_request_cancel_callback", error);
+        }
+    }
+
+    internal static mln_resource_request_cancel_handler NativeResourceRequestCancelHandler(
+        ResourceRequestCancelHandler value,
+        NativeCallScope scope
+    )
+    {
+        var native = new mln_resource_request_cancel_handler();
+        native.size = (uint)sizeof(mln_resource_request_cancel_handler);
+        if (value.Callback is not null)
+        {
+            native.user_data = scope.Register(
+                new NativeOwnedCallback(value with { }, scope.Receiver!)
+            );
+            native.release_user_data = &NativeCallbackRoot.Release;
+            native.callback = value.Callback is null
+                ? null
+                : &InvokeResourceRequestCancelHandlerCallback;
+        }
         return native;
     }
 
@@ -3434,54 +3522,5 @@ internal static unsafe class GeneratedValues
         native.share_context = (void*)value.ShareContext.Address;
         native.get_proc_address = (void*)value.GetProcAddress.Address;
         return native;
-    }
-
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    internal static uint InvokeLogCallback(
-        void* user_data,
-        uint severity,
-        uint @event,
-        long code,
-        sbyte* message
-    )
-    {
-        try
-        {
-            using var restriction = NativeCallbackGuard.ForbidReentry();
-            return (
-                (Func<LogSeverity, LogEvent, long, string, uint>)NativeCallbackRoot.Value(user_data)
-            )((LogSeverity)severity, (LogEvent)@event, code, NativeCallScope.CopyCString(message));
-        }
-        catch (Exception error)
-        {
-            NativeCallbackFailure.Report("mln_log_callback", error);
-            return 0;
-        }
-    }
-
-    private static readonly string[] AllowedResourceRequestCancelCallback =
-    [
-        "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
-        "mln_resource_request_set_cancel_callback",
-        "mln_resource_request_release",
-    ];
-
-    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    internal static void InvokeResourceRequestCancelCallback(void* user_data)
-    {
-        try
-        {
-            var owned = (NativeOwnedCallback)NativeCallbackRoot.Value(user_data);
-            using var restriction = NativeCallbackGuard.Restrict(
-                owned.Owner,
-                AllowedResourceRequestCancelCallback
-            );
-            ((Action)owned.Callback)();
-        }
-        catch (Exception error)
-        {
-            NativeCallbackFailure.Report("mln_resource_request_cancel_callback", error);
-        }
     }
 }

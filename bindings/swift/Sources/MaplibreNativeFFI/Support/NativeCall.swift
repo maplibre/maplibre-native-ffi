@@ -60,7 +60,7 @@ extension NativeReceiver {
   ) throws -> T {
     try NativeCallbackGuard.check(owner: self, operation: operation)
     defer { withExtendedLifetime(self) {} }
-    let arena = NativeInputArena()
+    let arena = NativeInputArena(receiver: self)
     defer { withExtendedLifetime(arena) {} }
     if access == .issued {
       return try body(handle.issued.raw, arena)

@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.c.C
-import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -286,12 +285,9 @@ public object GeneratedApi {
    * See `mln_log_set_callback` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
    */
-  public fun logSetCallback(callback: LogCallback): Unit =
+  public fun logSetCallback(handler: LogHandler): Unit =
     nativeCall(null, null, "mln_log_set_callback") {
-      val token = registrations.register(GeneratedLogCallbackRegistration(callback))
-      check(
-        C.mln_log_set_callback(UpcallStubs.logCallback, token, UpcallStubs.releaseRoot, diagnostic)
-      )
+      check(C.mln_log_set_callback(writeLogHandler(handler), diagnostic))
       accept(CallbackOwner.global)
     }
 

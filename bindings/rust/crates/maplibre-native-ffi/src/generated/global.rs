@@ -212,13 +212,10 @@ pub fn log_set_async_severity_mask(mask: LogSeverityMask) -> Result<()> {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn log_set_callback(callback_: Option<LogCallback>) -> Result<()> {
+pub fn log_set_callback(handler: LogHandler) -> Result<()> {
     let mut call = Call::global("mln_log_set_callback")?;
-    let (callback_, user_data, release_user_data) =
-        log_callback_registration(callback_, call.arena());
-    call.status(|_, out_diagnostic| unsafe {
-        sys::mln_log_set_callback(callback_, user_data, release_user_data, out_diagnostic)
-    })?;
+    let handler = call.reference(&handler)?;
+    call.status(|_, out_diagnostic| unsafe { sys::mln_log_set_callback(handler, out_diagnostic) })?;
     Ok(())
 }
 

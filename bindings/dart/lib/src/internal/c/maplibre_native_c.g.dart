@@ -40,28 +40,9 @@ typedef mln_completion_callbackFunction =
       Pointer<Void> user_data,
       Pointer<mln_completion_result> result,
     );
-typedef mln_completion_release =
-    Pointer<NativeFunction<mln_completion_releaseFunction>>;
-typedef mln_completion_releaseFunction = Void Function(Pointer<Void> user_data);
-typedef mln_custom_geometry_source_release_callback =
-    Pointer<
-      NativeFunction<mln_custom_geometry_source_release_callbackFunction>
-    >;
-typedef mln_custom_geometry_source_release_callbackFunction =
-    Void Function(Pointer<Void> user_data);
-typedef mln_custom_geometry_source_tile_callback =
-    Pointer<NativeFunction<mln_custom_geometry_source_tile_callbackFunction>>;
-typedef mln_custom_geometry_source_tile_callbackFunction =
-    Void Function(Pointer<Void> user_data, mln_canonical_tile_id tile_id);
-typedef mln_custom_mvt_vector_source_release_callback =
-    Pointer<
-      NativeFunction<mln_custom_mvt_vector_source_release_callbackFunction>
-    >;
-typedef mln_custom_mvt_vector_source_release_callbackFunction =
-    Void Function(Pointer<Void> user_data);
-typedef mln_custom_mvt_vector_source_tile_callback =
-    Pointer<NativeFunction<mln_custom_mvt_vector_source_tile_callbackFunction>>;
-typedef mln_custom_mvt_vector_source_tile_callbackFunction =
+typedef mln_custom_source_tile_callback =
+    Pointer<NativeFunction<mln_custom_source_tile_callbackFunction>>;
+typedef mln_custom_source_tile_callbackFunction =
     Void Function(Pointer<Void> user_data, mln_canonical_tile_id tile_id);
 typedef mln_http_header_transform_callback =
     Pointer<NativeFunction<mln_http_header_transform_callbackFunction>>;
@@ -81,17 +62,10 @@ typedef mln_log_callbackFunction =
       Int64 code,
       Pointer<Char> message,
     );
-typedef mln_log_callback_release =
-    Pointer<NativeFunction<mln_log_callback_releaseFunction>>;
-typedef mln_log_callback_releaseFunction =
-    Void Function(Pointer<Void> user_data);
 typedef mln_queue_lock_callback =
     Pointer<NativeFunction<mln_queue_lock_callbackFunction>>;
 typedef mln_queue_lock_callbackFunction =
     Void Function(Pointer<Void> user_data);
-typedef mln_queue_lock_release =
-    Pointer<NativeFunction<mln_queue_lock_releaseFunction>>;
-typedef mln_queue_lock_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_resource_provider_callback =
     Pointer<NativeFunction<mln_resource_provider_callbackFunction>>;
 typedef mln_resource_provider_callbackFunction =
@@ -113,14 +87,11 @@ typedef mln_resource_transform_callbackFunction =
       Pointer<Char> url,
       Pointer<mln_resource_transform_response> out_response,
     );
-typedef mln_runtime_callback_release =
-    Pointer<NativeFunction<mln_runtime_callback_releaseFunction>>;
-typedef mln_runtime_callback_releaseFunction =
-    Void Function(Pointer<Void> user_data);
+typedef mln_user_data_release =
+    Pointer<NativeFunction<mln_user_data_releaseFunction>>;
+typedef mln_user_data_releaseFunction = Void Function(Pointer<Void> user_data);
 typedef mln_wake_callback = Pointer<NativeFunction<mln_wake_callbackFunction>>;
 typedef mln_wake_callbackFunction = Void Function(Pointer<Void> user_data);
-typedef mln_wake_release = Pointer<NativeFunction<mln_wake_releaseFunction>>;
-typedef mln_wake_releaseFunction = Void Function(Pointer<Void> user_data);
 
 final class mln_adapter_completion_record extends Struct {
   external Pointer<Void> owner;
@@ -341,7 +312,7 @@ final class mln_completion extends Struct {
   external int size;
   external mln_completion_callback callback;
   external Pointer<Void> user_data;
-  external mln_completion_release release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_completion_result extends Struct {
@@ -366,8 +337,8 @@ final class mln_custom_geometry_source_options extends Struct {
   external int size;
   @Uint32()
   external int fields;
-  external mln_custom_geometry_source_tile_callback fetch_tile;
-  external mln_custom_geometry_source_tile_callback cancel_tile;
+  external mln_custom_source_tile_callback fetch_tile;
+  external mln_custom_source_tile_callback cancel_tile;
   external Pointer<Void> user_data;
   @Double()
   external double min_zoom;
@@ -383,7 +354,7 @@ final class mln_custom_geometry_source_options extends Struct {
   external bool clip;
   @Bool()
   external bool wrap;
-  external mln_custom_geometry_source_release_callback release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_custom_mvt_vector_source_options extends Struct {
@@ -391,14 +362,14 @@ final class mln_custom_mvt_vector_source_options extends Struct {
   external int size;
   @Uint32()
   external int fields;
-  external mln_custom_mvt_vector_source_tile_callback fetch_tile;
-  external mln_custom_mvt_vector_source_tile_callback cancel_tile;
+  external mln_custom_source_tile_callback fetch_tile;
+  external mln_custom_source_tile_callback cancel_tile;
   external Pointer<Void> user_data;
   @Double()
   external double min_zoom;
   @Double()
   external double max_zoom;
-  external mln_custom_mvt_vector_source_release_callback release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_diagnostic extends Struct {
@@ -522,7 +493,7 @@ final class mln_http_header_transform extends Struct {
   external int size;
   external mln_http_header_transform_callback callback;
   external Pointer<Void> user_data;
-  external mln_runtime_callback_release release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_http_header_transform_response extends Struct {
@@ -559,6 +530,14 @@ final class mln_lat_lng extends Struct {
 final class mln_lat_lng_bounds extends Struct {
   external mln_lat_lng southwest;
   external mln_lat_lng northeast;
+}
+
+final class mln_log_handler extends Struct {
+  @Uint32()
+  external int size;
+  external mln_log_callback callback;
+  external Pointer<Void> user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_logical_extent extends Struct {
@@ -904,7 +883,7 @@ final class mln_queue_lock extends Struct {
   external mln_queue_lock_callback lock;
   external mln_queue_lock_callback unlock;
   external Pointer<Void> user_data;
-  external mln_queue_lock_release release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_render_abandon_result extends Struct {
@@ -1056,7 +1035,7 @@ final class mln_resource_provider extends Struct {
   external int size;
   external mln_resource_provider_callback callback;
   external Pointer<Void> user_data;
-  external mln_runtime_callback_release release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_resource_range extends Struct {
@@ -1094,6 +1073,14 @@ final class mln_resource_request extends Struct {
   external int prior_data_size;
 }
 
+final class mln_resource_request_cancel_handler extends Struct {
+  @Uint32()
+  external int size;
+  external mln_resource_request_cancel_callback callback;
+  external Pointer<Void> user_data;
+  external mln_user_data_release release_user_data;
+}
+
 final class mln_resource_response extends Struct {
   @Uint32()
   external int size;
@@ -1123,7 +1110,7 @@ final class mln_resource_transform extends Struct {
   external int size;
   external mln_resource_transform_callback callback;
   external Pointer<Void> user_data;
-  external mln_runtime_callback_release release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_resource_transform_response extends Struct {
@@ -1589,7 +1576,7 @@ final class mln_wake extends Struct {
   external int size;
   external mln_wake_callback callback;
   external Pointer<Void> user_data;
-  external mln_wake_release release_user_data;
+  external mln_user_data_release release_user_data;
 }
 
 final class mln_webgl_context_descriptor extends Struct {
@@ -1701,9 +1688,9 @@ const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_FETCH_TILE =
     658252347;
 const MLN_ADAPTER_DART_PORT_CUSTOM_MVT_VECTOR_SOURCE_OPTIONS_CANCEL_TILE =
     1073125309;
+const MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK =
+    2876456937;
 const MLN_ADAPTER_DART_PORT_WAKE_CALLBACK = 2393247646;
-const MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK =
-    1605404209;
 
 // mln_adapter_deferred_callback
 const MLN_ADAPTER_DEFERRED_LOG_CALLBACK = 2203584336;
@@ -2355,14 +2342,14 @@ external int mln_adapter_arena_adopt_handle(
 @Native<
   Int32 Function(
     Pointer<Void>,
-    mln_runtime_callback_release,
+    mln_user_data_release,
     Pointer<Void>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_adapter_arena_adopt_release(
   Pointer<Void> arena,
-  mln_runtime_callback_release release,
+  mln_user_data_release release,
   Pointer<Void> context,
   Pointer<mln_diagnostic> out_diagnostic,
 );
@@ -2414,27 +2401,14 @@ external void mln_adapter_completion_reject(Pointer<mln_completion> completion);
 
 @Native<
   Void Function(
-    mln_custom_geometry_source_tile_callback,
-    mln_custom_geometry_source_tile_callback,
+    mln_custom_source_tile_callback,
+    mln_custom_source_tile_callback,
     Pointer<Void>,
   )
 >()
-external void mln_adapter_custom_geometry_callbacks_retire(
-  mln_custom_geometry_source_tile_callback fetch_tile,
-  mln_custom_geometry_source_tile_callback cancel_tile,
-  Pointer<Void> user_data,
-);
-
-@Native<
-  Void Function(
-    mln_custom_mvt_vector_source_tile_callback,
-    mln_custom_mvt_vector_source_tile_callback,
-    Pointer<Void>,
-  )
->()
-external void mln_adapter_custom_mvt_vector_callbacks_retire(
-  mln_custom_mvt_vector_source_tile_callback fetch_tile,
-  mln_custom_mvt_vector_source_tile_callback cancel_tile,
+external void mln_adapter_custom_source_callbacks_retire(
+  mln_custom_source_tile_callback fetch_tile,
+  mln_custom_source_tile_callback cancel_tile,
   Pointer<Void> user_data,
 );
 
@@ -2761,18 +2735,9 @@ external int mln_log_set_async_severity_mask(
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
-@Native<
-  Int32 Function(
-    mln_log_callback,
-    Pointer<Void>,
-    mln_log_callback_release,
-    Pointer<mln_diagnostic>,
-  )
->()
+@Native<Int32 Function(Pointer<mln_log_handler>, Pointer<mln_diagnostic>)>()
 external int mln_log_set_callback(
-  mln_log_callback callback,
-  Pointer<Void> user_data,
-  mln_log_callback_release release_user_data,
+  Pointer<mln_log_handler> handler,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -5203,18 +5168,14 @@ external void mln_resource_request_release(int handle);
 @Native<
   Int32 Function(
     mln_resource_request_handle,
-    mln_resource_request_cancel_callback,
-    Pointer<Void>,
-    mln_runtime_callback_release,
+    Pointer<mln_resource_request_cancel_handler>,
     Pointer<Bool>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_resource_request_set_cancel_callback(
   int handle,
-  mln_resource_request_cancel_callback callback,
-  Pointer<Void> user_data,
-  mln_runtime_callback_release release_user_data,
+  Pointer<mln_resource_request_cancel_handler> handler,
   Pointer<Bool> out_cancelled,
   Pointer<mln_diagnostic> out_diagnostic,
 );

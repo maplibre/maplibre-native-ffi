@@ -722,7 +722,7 @@ fn generated_copy_mln_lat_lng_bounds(
     Ok(dict.into_any().unbind())
 }
 
-unsafe extern "C" fn generated_callback_mln_log_set_callback_registration_callback(
+unsafe extern "C" fn generated_callback_mln_log_handler_callback(
     user_data: *mut std::ffi::c_void,
     severity: sys::mln_log_severity,
     event: sys::mln_log_event,
@@ -3275,6 +3275,26 @@ fn generated_input_mln_lat_lng_bounds<'py>(
     let mut raw: sys::mln_lat_lng_bounds = unsafe { std::mem::zeroed() };
     raw.southwest = generated_input_mln_lat_lng(&value.getattr("southwest")?, storage)?;
     raw.northeast = generated_input_mln_lat_lng(&value.getattr("northeast")?, storage)?;
+    Ok(raw)
+}
+
+fn generated_input_mln_log_handler<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_log_handler> {
+    let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
+    raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
+    let callback_enabled = !value.getattr("callback")?.is_none();
+    if callback_enabled {
+        raw.user_data =
+            storage.register_callbacks(vec![value.getattr("_invoke_callback")?.unbind()]);
+        raw.release_user_data = Some(generated_release_callbacks_no_reentry);
+        raw.callback = if callback_enabled {
+            Some(generated_callback_mln_log_handler_callback)
+        } else {
+            None
+        };
+    }
     Ok(raw)
 }
 
@@ -9637,6 +9657,30 @@ impl ResourceRequestHandle {
         }
     }
 }
+unsafe fn register_resource_request_cancel(
+    handle: sys::mln_resource_request_handle,
+    callback: maplibre_core::decision::ContextCallback,
+    user_data: *mut std::ffi::c_void,
+    release: maplibre_core::decision::ContextCallback,
+    out_cancelled: *mut bool,
+    out_diagnostic: *mut sys::mln_diagnostic,
+) -> sys::mln_status {
+    let mut handler: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
+    handler.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
+    handler.callback = callback;
+    handler.user_data = user_data;
+    handler.release_user_data = release;
+    // SAFETY: the caller passes the decision handle and the outputs that
+    // the C function requires; the handler is borrowed for the call.
+    unsafe {
+        sys::mln_resource_request_set_cancel_callback(
+            handle,
+            &handler,
+            out_cancelled,
+            out_diagnostic,
+        )
+    }
+}
 pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
     sys::mln_resource_request_handle,
 > = unsafe {
@@ -9645,7 +9689,7 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
         sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
         sys::mln_resource_request_release,
-        sys::mln_resource_request_set_cancel_callback,
+        register_resource_request_cancel,
         &[
             "mln_resource_request_complete",
             "mln_resource_request_cancelled",
@@ -9759,33 +9803,14 @@ fn log_set_async_severity_mask(
 }
 
 #[pyfunction]
-fn log_set_callback(py: Python<'_>, callback: &Bound<'_, PyAny>) -> PyResult<()> {
-    generated_check_reentry()?;
-    let storage = &mut GeneratedInputStorage::default();
-    let enabled = !callback.getattr("callback")?.is_none();
-    let context = if enabled {
-        storage.register_callbacks(vec![callback.getattr("_invoke_callback")?.unbind()])
-    } else {
-        std::ptr::null_mut()
-    };
-    let native_callback: sys::mln_log_callback = if enabled {
-        Some(generated_callback_mln_log_set_callback_registration_callback)
-    } else {
-        None
-    };
-    let release = if enabled {
-        Some(generated_release_callbacks_no_reentry as unsafe extern "C" fn(*mut c_void))
-    } else {
-        None
-    };
-    maplibre_core::check(|diagnostic| unsafe {
-        generated_native_call(py, || {
-            sys::mln_log_set_callback(native_callback, context, release, diagnostic)
-        })
-    })
-    .map_err(map_error)?;
-    storage.accept_callbacks();
-    Ok(())
+#[pyo3(signature = (handler))]
+fn log_set_callback(py: Python<'_>, handler: &Bound<'_, PyAny>) -> PyResult<Py<PyAny>> {
+    let mut call = GeneratedCall::new(py, "mln_log_set_callback", 0)?;
+    let storage = &mut call.storage;
+    let handler_value = generated_input_mln_log_handler(&handler.clone(), storage)?;
+    unsafe { call.status(|diagnostic| sys::mln_log_set_callback(&handler_value, diagnostic)) }?;
+    call.accept_callbacks();
+    Ok(py.None())
 }
 
 #[pyfunction]

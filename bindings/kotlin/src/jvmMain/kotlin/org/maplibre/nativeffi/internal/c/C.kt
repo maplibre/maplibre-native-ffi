@@ -91,7 +91,7 @@ internal actual object C {
   private val mln_log_set_async_severity_mask =
     Ffm.downcall("mln_log_set_async_severity_mask", JAVA_INT, JAVA_INT, JAVA_LONG)
   private val mln_log_set_callback =
-    Ffm.downcall("mln_log_set_callback", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+    Ffm.downcall("mln_log_set_callback", JAVA_INT, JAVA_LONG, JAVA_LONG)
   private val mln_map_add_color_relief_layer =
     Ffm.downcall(
       "mln_map_add_color_relief_layer",
@@ -1306,8 +1306,6 @@ internal actual object C {
       JAVA_LONG,
       JAVA_LONG,
       JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
     )
   private val mln_resource_request_wait_until_retired =
     Ffm.downcall("mln_resource_request_wait_until_retired", JAVA_INT, JAVA_LONG, JAVA_LONG)
@@ -1791,13 +1789,8 @@ internal actual object C {
   actual fun mln_log_set_async_severity_mask(mask: Int, outDiagnostic: Long): Int =
     mln_log_set_async_severity_mask.invokeExact(mask, outDiagnostic) as Int
 
-  actual fun mln_log_set_callback(
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_log_set_callback.invokeExact(callback, userData, releaseUserData, outDiagnostic) as Int
+  actual fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int =
+    mln_log_set_callback.invokeExact(handler, outDiagnostic) as Int
 
   actual fun mln_map_add_color_relief_layer(
     map: Long,
@@ -3659,17 +3652,13 @@ internal actual object C {
 
   actual fun mln_resource_request_set_cancel_callback(
     handle: Long,
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
+    handler: Long,
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int =
     mln_resource_request_set_cancel_callback.invokeExact(
       handle,
-      callback,
-      userData,
-      releaseUserData,
+      handler,
       outCancelled,
       outDiagnostic,
     ) as Int

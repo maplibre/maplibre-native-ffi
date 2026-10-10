@@ -2,12 +2,13 @@ import MaplibreNativeFFI
 
 func installCAPILogging() {
   do {
-    try Maplibre.logSetCallback { severity, event, code, message in
+    try Maplibre.logSetCallback(handler: LogHandler {
+      severity, event, code, message in
       print(
         "[MapLibre] severity=\(severity) event=\(event) code=\(code): \(message)"
       )
       return 1
-    }
+    })
   } catch {
     print("log callback install failed: \(error)")
   }

@@ -50,6 +50,7 @@ ANNOTATION_VALUES = {
     "lifetime": frozenset({"call", "owner", "process"}),
     "consumes": frozenset({"success"}),
     "reentry": frozenset({"forbid", "protocol"}),
+    "release_reentry": frozenset({"forbid"}),
     "handle_access": frozenset({"issued"}),
     "synchronous": frozenset({"true"}),
 }
@@ -65,9 +66,6 @@ FUNCTION_KEYS = COMMON_KEYS | frozenset(
         "consumes",
         "kind",
         "length",
-        "registration",
-        "user_data",
-        "release_callback",
         "accepted_unless",
         "absent_on",
         "view_owner",
@@ -101,12 +99,22 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
     }
 )
 RECORD_KEYS = COMMON_KEYS | frozenset(
-    {"kind", "default", "mask", "tag", "release", "user_data", "fields"}
+    {
+        "kind",
+        "default",
+        "mask",
+        "tag",
+        "release",
+        "release_reentry",
+        "user_data",
+        "fields",
+    }
 )
 TYPEDEF_KEYS = COMMON_KEYS | frozenset(
     {
         "kind",
         "release",
+        "release_reentry",
         "parent",
         "dispose",
         "view_begin",
@@ -329,18 +337,9 @@ class Conventions:
         """A function without a completion runs immediately, and a drain
         reports nothing queued as an absent output; a completion without a
         result delivers none, and a result is one borrowed value unless it is a
-        handle, which the completion transfers. A callback registration passes
-        its context parameter as the user data."""
+        handle, which the completion transfers."""
         explicit = function.metadata
         defaults = {}
-        if "registration" in explicit:
-            contexts = [
-                parameter.name
-                for parameter in function.parameters
-                if parameter.metadata.get("kind") == "context"
-            ]
-            if len(contexts) == 1:
-                defaults["user_data"] = contexts[0]
         if not has_completion(function):
             defaults["execution"] = "immediate"
             if explicit.get("execution") == "event_batch":
@@ -741,63 +740,8 @@ def validate(api: Api) -> None:
                 f"{context}: variadic public functions cannot be generated safely"
             )
         parameters = {parameter.name: parameter for parameter in function.parameters}
-        if (
-            metadata.keys() & {"user_data", "release_callback", "accepted_unless"}
-            and "registration" not in metadata
-        ):
-            errors.append(
-                f"{context}: registration lifetime metadata requires a callback registration"
-            )
-        if "registration" in metadata:
-            callback = parameters.get(metadata["registration"])
-            callback_type = (
-                api.typedefs_by_name.get(callback.type.declaration or "")
-                if callback
-                else None
-            )
-            signature = callback_type.type.pointee if callback_type else None
-            if signature is None or signature.kind != "function":
-                errors.append(f"{context}: registration requires a callback parameter")
-            user_data = parameters.get(metadata.get("user_data", ""))
-            if (
-                user_data is None
-                or user_data.type.spelling != "void *"
-                or user_data.metadata.get("kind") != "context"
-            ):
-                errors.append(
-                    f"{context}: registration user_data requires a void context parameter"
-                )
-            if "release_callback" not in metadata:
-                errors.append(f"{context}: registration requires a release callback")
-            if "release_callback" in metadata:
-                release = parameters.get(metadata["release_callback"])
-                release_type = (
-                    api.typedefs_by_name.get(release.type.declaration or "")
-                    if release
-                    else None
-                )
-                signature = release_type.type.pointee if release_type else None
-                if (
-                    signature is None
-                    or signature.result is None
-                    or signature.result.kind != "void"
-                    or len(signature.parameters) != 1
-                    or signature.parameters[0].spelling != "void *"
-                ):
-                    errors.append(
-                        f"{context}: release_callback requires a void callback taking its context"
-                    )
-            if "accepted_unless" in metadata:
-                condition = parameters.get(metadata["accepted_unless"])
-                if (
-                    condition is None
-                    or condition.metadata.get("direction") != "out"
-                    or condition.type.pointee is None
-                    or condition.type.pointee.kind != "bool"
-                ):
-                    errors.append(
-                        f"{context}: accepted_unless requires a boolean output"
-                    )
+        if "accepted_unless" in metadata:
+            errors.extend(acceptance_errors(api, function, context))
         for parameter in function.parameters:
             pcontext = f"{context} parameter {parameter.name}"
             errors.extend(
@@ -1089,6 +1033,10 @@ def validate(api: Api) -> None:
                 errors.append(
                     f"{context}: registration user_data requires a void context pointer"
                 )
+        elif "release_reentry" in typedef.metadata:
+            errors.append(
+                f"{context}: release_reentry requires a callback registration"
+            )
         default = typedef.metadata.get("default")
         if default:
             constructor = api.functions_by_name.get(default)
@@ -1150,37 +1098,13 @@ def validate(api: Api) -> None:
                 if key in {"dispose", "abandon"} and has_completion(operation):
                     errors.append(f"{context}: {key} must have synchronous acceptance")
         if typedef.metadata.get("reentry") == "protocol":
-            owner_name = typedef.metadata.get("reentry_owner")
-            owner = next(
-                (
-                    p.type.pointee or p.type
-                    for p in typedef.parameters
-                    if p.name == owner_name
-                ),
-                None,
-            )
-            if owner_name == "registration":
-                owners = [
-                    f.parameters[0].type
-                    for f in api.functions
-                    if f.metadata.get("registration")
-                    and any(
-                        p.name == f.metadata["registration"]
-                        and p.type.declaration == typedef.name
-                        for p in f.parameters
-                    )
-                ]
-                owner = (
-                    owners[0]
-                    if owners and len({o.declaration for o in owners}) == 1
-                    else None
-                )
+            owner = reentry_owner(api, typedef)
             names = tuple(
                 filter(None, typedef.metadata.get("reentry_calls", "").split(","))
             )
             if owner is None or not names:
                 errors.append(
-                    f"{context}: protocol reentry requires a callback or registration owner and operations"
+                    f"{context}: protocol reentry requires an owner parameter or handle and operations"
                 )
             for name in names:
                 operation = api.functions_by_name.get(name)
@@ -1459,13 +1383,7 @@ FUNCTION_REFERENCES = {
     ),
 }
 PARAMETER_REFERENCES = {
-    "function": (
-        "view_owner",
-        "registration",
-        "user_data",
-        "release_callback",
-        "accepted_unless",
-    ),
+    "function": ("view_owner", "accepted_unless"),
     "typedef": ("decision_handle", "reentry_owner"),
 }
 
@@ -1490,8 +1408,8 @@ def reference_errors(api: Api) -> list[str]:
         parameters = {parameter.name for parameter in declaration.parameters}
         for key in PARAMETER_REFERENCES[site]:
             name = metadata.get(key)
-            if key == "reentry_owner" and name == "registration":
-                continue  # The callback's registration function owns its reentry.
+            if key == "reentry_owner" and is_handle(api, name):
+                continue  # A callback without an owner parameter names its handle.
             if name is not None and name not in parameters:
                 errors.append(f"{context}: {key} names an absent parameter {name!r}")
 
@@ -1499,6 +1417,67 @@ def reference_errors(api: Api) -> list[str]:
         check("function", function, f"{function.location}: {function.name}")
     for typedef in api.typedefs:
         check("typedef", typedef, f"{typedef.location}: {typedef.name}")
+    return errors
+
+
+def is_handle(api: Api, name: str | None) -> bool:
+    typedef = api.typedefs_by_name.get(name or "")
+    return typedef is not None and typedef.metadata.get("kind") == "handle"
+
+
+def reentry_owner(api: Api, typedef):
+    """The type whose operations a protocol callback may call: the type of its
+    `reentry_owner` parameter, or the handle that the key names when the
+    callback has no parameter that identifies its owner."""
+    name = typedef.metadata.get("reentry_owner")
+    owner = next(
+        (p.type.pointee or p.type for p in typedef.parameters if p.name == name),
+        None,
+    )
+    if owner is None and is_handle(api, name):
+        owner = api.typedefs_by_name[name].type
+        owner = CType("typedef", name, owner.canonical, name)
+    return owner
+
+
+def registration_parameters(api: Api, function: Function) -> list:
+    """The parameters that pass a callback registration record by pointer."""
+    result = []
+    for parameter in function.parameters:
+        pointee = parameter.type.pointee
+        typedef = api.typedefs_by_name.get(
+            (pointee.declaration if pointee else None) or ""
+        )
+        if typedef and typedef.metadata.get("kind") == "callback_registration":
+            result.append(parameter)
+    return result
+
+
+def acceptance_errors(api: Api, function: Function, context: str) -> list[str]:
+    """Check `accepted_unless`: a boolean output that, when set on success,
+    reports that native kept nothing from the call's one registration."""
+    errors = []
+    condition = next(
+        (
+            p
+            for p in function.parameters
+            if p.name == function.metadata["accepted_unless"]
+        ),
+        None,
+    )
+    if (
+        condition is None
+        or condition.metadata.get("direction") != "out"
+        or condition.type.pointee is None
+        or condition.type.pointee.kind != "bool"
+    ):
+        errors.append(f"{context}: accepted_unless requires a boolean output")
+    if len(registration_parameters(api, function)) != 1:
+        errors.append(f"{context}: accepted_unless requires one registration parameter")
+    if has_completion(function) or not is_status(function.return_type):
+        errors.append(
+            f"{context}: accepted_unless requires a status return without a completion"
+        )
     return errors
 
 

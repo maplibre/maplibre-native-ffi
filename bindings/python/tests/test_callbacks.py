@@ -283,8 +283,8 @@ def test_replacing_the_log_callback_releases_the_previous_one(
     logged = second.called
 
     try:
-        mln.log_set_callback(first)
-        mln.log_set_callback(second)
+        mln.log_set_callback(mln.LogHandler(first))
+        mln.log_set_callback(mln.LogHandler(second))
         del first
         assert first_retired.wait(TIMEOUT)
 

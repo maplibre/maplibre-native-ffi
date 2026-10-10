@@ -360,7 +360,7 @@ static void dart_notification_ports_post_copied_arguments_until_released(void) {
     MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE
   );
   TEST_ASSERT_NOT_NULL(address);
-  mln_custom_geometry_source_tile_callback fetch_tile = NULL;
+  mln_custom_source_tile_callback fetch_tile = NULL;
   memcpy(&fetch_tile, &address, sizeof(fetch_tile));
 
   fetch_tile(context, (mln_canonical_tile_id){.z = 5, .x = 7, .y = 9});

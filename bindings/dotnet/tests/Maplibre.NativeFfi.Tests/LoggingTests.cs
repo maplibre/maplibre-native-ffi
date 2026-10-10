@@ -23,12 +23,8 @@ public sealed class LoggingTests
             Assert.False(Gc.IsAlive(first));
             Assert.True(Gc.IsAlive(second));
 
-            Maplibre.LogSetCallback(null);
-            Assert.False(Gc.IsAlive(second));
-
-            var third = InstallCapturingCallback();
             Maplibre.LogClearCallback();
-            Assert.False(Gc.IsAlive(third));
+            Assert.False(Gc.IsAlive(second));
         }
         finally
         {
@@ -41,11 +37,13 @@ public sealed class LoggingTests
     {
         var captured = new object();
         Maplibre.LogSetCallback(
-            (_, _, _, _) =>
-            {
-                GC.KeepAlive(captured);
-                return 0;
-            }
+            new LogHandler(
+                (_, _, _, _) =>
+                {
+                    GC.KeepAlive(captured);
+                    return 0;
+                }
+            )
         );
         return new WeakReference(captured);
     }
@@ -74,11 +72,9 @@ public sealed class LoggingTests
             throw new FormatException("Host callback failed.");
         };
         using var scope = new NativeCallScope();
-        var root = scope.Register(callback);
-        delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> invoke =
-            &GeneratedValues.InvokeLogCallback;
+        var handler = GeneratedValues.NativeLogHandler(new LogHandler(callback), scope);
 
-        Assert.Equal(0u, invoke(root, 999, 998, 42, scope.CString("é")));
+        Assert.Equal(0u, handler.callback(handler.user_data, 999, 998, 42, scope.CString("é")));
         Assert.Equal((999u, 998u, 42L, "é"), copied);
         Assert.True(rejectedReentry);
         // The guard ends with the callback, so the thread may call native again.

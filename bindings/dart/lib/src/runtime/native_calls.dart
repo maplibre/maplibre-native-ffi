@@ -165,11 +165,12 @@ final class _NativeRegistrations {
   }
 
   /// Runs the call that carries this transaction's descriptors, accepts them
-  /// when it succeeds, and returns its status.
-  int run(int Function() call) {
+  /// when it succeeds, and returns its status. A successful call for which
+  /// [declined] reports that native kept nothing accepts none of them.
+  int run(int Function() call, {bool Function()? declined}) {
     try {
       final status = call();
-      if (status == nativeStatusOk) {
+      if (status == nativeStatusOk && !(declined?.call() ?? false)) {
         _accepted = true;
       }
       return status;

@@ -153,12 +153,11 @@ void dart_notification_ports_copy_records_before_retirement() {
   auto* context =
     mln_adapter_dart_port_create(reinterpret_cast<void*>(post), 19);
   TEST_ASSERT_NOT_NULL(context);
-  const auto callback =
-    reinterpret_cast<mln_custom_geometry_source_tile_callback>(
-      mln_adapter_dart_port_function(
-        MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE
-      )
-    );
+  const auto callback = reinterpret_cast<mln_custom_source_tile_callback>(
+    mln_adapter_dart_port_function(
+      MLN_ADAPTER_DART_PORT_CUSTOM_GEOMETRY_SOURCE_OPTIONS_FETCH_TILE
+    )
+  );
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     callback(context, {5, 7, 9});
     mln_adapter_dart_port_release(context);

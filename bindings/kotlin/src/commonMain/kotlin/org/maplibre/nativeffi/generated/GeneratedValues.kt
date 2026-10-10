@@ -3645,9 +3645,9 @@ public data class MapCameraSnapshotGetResult(
  */
 public data class CustomGeometrySourceOptions(
   /** Required tile fetch callback. */
-  public val fetchTile: CustomGeometrySourceTileCallback? = null,
+  public val fetchTile: CustomSourceTileCallback? = null,
   /** Optional best-effort tile cancel callback. */
-  public val cancelTile: CustomGeometrySourceTileCallback? = null,
+  public val cancelTile: CustomSourceTileCallback? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
   public val tolerance: Double? = null,
@@ -3658,12 +3658,12 @@ public data class CustomGeometrySourceOptions(
 )
 
 /**
- * Callback invoked for custom geometry source tile requests and cancels.
+ * Callback invoked for custom geometry and custom MVT vector source tile requests and cancels.
  *
- * See `mln_custom_geometry_source_tile_callback` in the
+ * See `mln_custom_source_tile_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
-public typealias CustomGeometrySourceTileCallback = (tileId: CanonicalTileId) -> Unit
+public typealias CustomSourceTileCallback = (tileId: CanonicalTileId) -> Unit
 
 /**
  * Options for custom MVT vector sources.
@@ -3673,26 +3673,26 @@ public typealias CustomGeometrySourceTileCallback = (tileId: CanonicalTileId) ->
  */
 public data class CustomMvtVectorSourceOptions(
   /** Required tile fetch callback. */
-  public val fetchTile: CustomMvtVectorSourceTileCallback? = null,
+  public val fetchTile: CustomSourceTileCallback? = null,
   /** Optional best-effort tile cancel callback. */
-  public val cancelTile: CustomMvtVectorSourceTileCallback? = null,
+  public val cancelTile: CustomSourceTileCallback? = null,
   public val minZoom: Double? = null,
   public val maxZoom: Double? = null,
 )
-
-/**
- * Callback invoked for custom MVT vector source tile requests and cancels.
- *
- * See `mln_custom_mvt_vector_source_tile_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public typealias CustomMvtVectorSourceTileCallback = (tileId: CanonicalTileId) -> Unit
 
 public class HttpHeaderTransformResponse
 internal constructor(
   internal val bindingAddress: Long,
   internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
 )
+
+/**
+ * Process-global log callback state.
+ *
+ * See `mln_log_handler` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+ */
+public data class LogHandler(public val callback: LogCallback)
 
 /**
  * Receives a MapLibre Native log record.
@@ -3780,15 +3780,17 @@ public typealias ResourceTransformCallback =
   (kind: ResourceKind, url: String, outResponse: ResourceTransformResponse) -> Unit
 
 /**
+ * Cancel callback state for one handled resource request.
+ *
+ * See `mln_resource_request_cancel_handler` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceRequestCancelHandler(public val callback: ResourceRequestCancelCallback)
+
+/**
  * Reports that MapLibre cancelled a C API resource provider request.
  *
  * See `mln_resource_request_cancel_callback` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public typealias ResourceRequestCancelCallback = () -> Unit
-
-internal class GeneratedLogCallbackRegistration(val callback: LogCallback)
-
-internal class GeneratedResourceRequestCancelCallbackRegistration(
-  val callback: ResourceRequestCancelCallback
-)

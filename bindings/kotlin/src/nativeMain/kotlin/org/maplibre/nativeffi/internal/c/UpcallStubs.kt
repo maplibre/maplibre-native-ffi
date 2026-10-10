@@ -17,14 +17,14 @@ internal actual object UpcallStubs {
       .toLong()
   actual val releaseRoot: Long =
     staticCFunction { userData: COpaquePointer? -> Upcalls.releaseRoot(userData.toLong()) }.toLong()
-  actual val logCallback: Long =
+  actual val logHandlerCallback: Long =
     staticCFunction {
         userData: COpaquePointer?,
         severity: UInt,
         event: UInt,
         code: Long,
         message: CPointer<ByteVar>? ->
-        Upcalls.logCallback(
+        Upcalls.logHandlerCallback(
             userData.toLong(),
             severity.toInt(),
             event.toInt(),
@@ -32,11 +32,6 @@ internal actual object UpcallStubs {
             message.toLong(),
           )
           .toUInt()
-      }
-      .toLong()
-  actual val resourceRequestCancelCallback: Long =
-    staticCFunction { userData: COpaquePointer? ->
-        Upcalls.resourceRequestCancelCallback(userData.toLong())
       }
       .toLong()
   actual val customGeometrySourceOptionsFetchTile: Long =
@@ -106,6 +101,11 @@ internal actual object UpcallStubs {
           url.toLong(),
           outResponse.toLong(),
         )
+      }
+      .toLong()
+  actual val resourceRequestCancelHandlerCallback: Long =
+    staticCFunction { userData: COpaquePointer? ->
+        Upcalls.resourceRequestCancelHandlerCallback(userData.toLong())
       }
       .toLong()
   actual val wakeCallback: Long =

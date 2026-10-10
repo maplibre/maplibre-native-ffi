@@ -250,16 +250,9 @@ internal actual object C {
       outDiagnostic.toCPointer(),
     )
 
-  actual fun mln_log_set_callback(
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
-    outDiagnostic: Long,
-  ): Int =
+  actual fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_log_set_callback(
-      callback.toCPointer(),
-      userData.toCPointer<CPointed>(),
-      releaseUserData.toCPointer(),
+      handler.toCPointer(),
       outDiagnostic.toCPointer(),
     )
 
@@ -2412,17 +2405,13 @@ internal actual object C {
 
   actual fun mln_resource_request_set_cancel_callback(
     handle: Long,
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
+    handler: Long,
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_resource_request_set_cancel_callback(
       handle.toULong(),
-      callback.toCPointer(),
-      userData.toCPointer<CPointed>(),
-      releaseUserData.toCPointer(),
+      handler.toCPointer(),
       outCancelled.toCPointer(),
       outDiagnostic.toCPointer(),
     )

@@ -493,10 +493,9 @@ _prepareCustomGeometrySourceOptions(
     }
     result.ref.user_data = port.context;
     result.ref.release_user_data =
-        Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_port_release)
-            .cast();
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
     port?.reject();
@@ -578,10 +577,9 @@ _prepareCustomMvtVectorSourceOptions(
     }
     result.ref.user_data = port.context;
     result.ref.release_user_data =
-        Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_port_release)
-            .cast();
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
     port?.reject();
@@ -986,6 +984,37 @@ void _deliverLogCallback(LogCallback callback, List<dynamic> message) {
     );
   } finally {
     raw.mln_adapter_deferred_call_record_destroy(record);
+  }
+}
+
+_NativeRegistration<raw.mln_log_handler> _prepareLogHandler(
+  LogHandler value,
+  _NativeCallbackPorts roots,
+) {
+  final arena = Arena();
+  _NativeCallbackPort? port;
+  try {
+    final result = arena<raw.mln_log_handler>();
+    result.ref.size = sizeOf<raw.mln_log_handler>();
+    port = roots.registerDeferred(
+      (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
+      (message) => _deliverLogCallback(value.callback, message),
+    );
+    result.ref.callback = raw
+        .mln_adapter_deferred_callback_function(
+          (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
+        )
+        .cast();
+    result.ref.user_data = port.context;
+    result.ref.release_user_data =
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_deferred_callback_release,
+        ).cast();
+    return _NativeRegistration(result, port.reject, arena.releaseAll);
+  } catch (_) {
+    port?.reject();
+    arena.releaseAll();
+    rethrow;
   }
 }
 
@@ -1721,10 +1750,9 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
               .cast();
     result.ref.user_data = port.context;
     result.ref.release_user_data =
-        Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_port_release)
-            .cast();
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
     return _NativeRegistration(result, port.reject, arena.releaseAll);
   } catch (_) {
     port?.reject();
@@ -2287,6 +2315,45 @@ Pointer<raw.mln_resource_response> _writeResourceResponse(
   return result;
 }
 
+_NativeRegistration<raw.mln_resource_request_cancel_handler>
+_prepareResourceRequestCancelHandler(
+  ResourceRequestCancelHandler value,
+  _NativeCallbackPorts roots,
+  bool Function() receiverClosed,
+) {
+  final arena = Arena();
+  _NativeCallbackPort? port;
+  try {
+    final result = arena<raw.mln_resource_request_cancel_handler>();
+    result.ref.size = sizeOf<raw.mln_resource_request_cancel_handler>();
+
+    port = roots.register({
+      (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
+          0xffffffff): (message) {
+        if (!receiverClosed()) {
+          value.callback();
+        }
+      },
+    });
+    result.ref.callback = raw
+        .mln_adapter_dart_port_function(
+          (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_CANCEL_HANDLER_CALLBACK &
+              0xffffffff),
+        )
+        .cast();
+    result.ref.user_data = port.context;
+    result.ref.release_user_data =
+        Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+          raw.mln_adapter_dart_port_release,
+        ).cast();
+    return _NativeRegistration(result, port.reject, arena.releaseAll);
+  } catch (_) {
+    port?.reject();
+    arena.releaseAll();
+    rethrow;
+  }
+}
+
 Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
   RuntimeOptions value,
   Arena arena,
@@ -2511,9 +2578,9 @@ _NativeRegistration<raw.mln_http_header_transform> _prepareHttpHeaderTransform(
             >(raw.mln_adapter_http_header_transform_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -2658,7 +2725,7 @@ _writeAdapterRoutedResourceProvider(
     (message) => _deliverResourceProviderCallback(value.callback, message),
   );
   arena.adoptRelease(
-    Native.addressOf<NativeFunction<raw.mln_runtime_callback_releaseFunction>>(
+    Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
       raw.mln_adapter_deferred_callback_release,
     ),
     portCallback.context,
@@ -2699,9 +2766,9 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
             >(raw.mln_adapter_resource_provider_rules_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -2722,9 +2789,9 @@ _NativeRegistration<raw.mln_resource_provider> _prepareResourceProvider(
             >(raw.mln_adapter_routed_resource_provider_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -2801,9 +2868,9 @@ _NativeRegistration<raw.mln_resource_transform> _prepareResourceTransform(
             >(raw.mln_adapter_resource_transform_rewrite_callback);
         descriptor.ref.user_data = context.cast();
         descriptor.ref.release_user_data =
-            Native.addressOf<
-              NativeFunction<raw.mln_runtime_callback_releaseFunction>
-            >(raw.mln_adapter_dart_release);
+            Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(
+              raw.mln_adapter_dart_release,
+            );
         transferred = true;
         roots.register(context.cast(), arena.releaseAll, arena: arena);
         return _NativeRegistration(
@@ -3418,34 +3485,17 @@ void logSetAsyncSeverityMask(LogSeverityMask mask) {
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-void logSetCallback(LogCallback callback) {
+void logSetCallback(LogHandler handler) {
   ensureAbiVersion();
-  final port = _globalCallbackPorts.registerDeferred(
-    (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
-    (message) => _deliverLogCallback(callback, message),
-  );
-  var accepted = false;
-  try {
-    _check(
-      raw.mln_log_set_callback(
-        raw
-            .mln_adapter_deferred_callback_function(
-              (raw.MLN_ADAPTER_DEFERRED_LOG_CALLBACK & 0xffffffff),
-            )
-            .cast(),
-        port.context,
-        Native.addressOf<NativeFunction<raw.mln_log_callback_releaseFunction>>(
-          raw.mln_adapter_deferred_callback_release,
-        ).cast(),
+  final registrations = _NativeRegistrations(_globalCallbackPorts);
+  _check(
+    registrations.run(
+      () => raw.mln_log_set_callback(
+        registrations.add(_prepareLogHandler(handler, registrations.ports)),
         nativeDiagnostic,
       ),
-    );
-    accepted = true;
-  } finally {
-    if (!accepted) {
-      port.reject();
-    }
-  }
+    ),
+  );
 }
 
 /// Returns map options initialized for this C API version.
@@ -7084,47 +7134,29 @@ final class ResourceRequestHandle implements Finalizable, _CallbackPortOwner {
   ///
   /// See `mln_resource_request_set_cancel_callback` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  bool setCancelCallback(
-    ResourceRequestCancelCallback callback,
-  ) => withNativeArena((arena) {
-    final handle = _handle;
-    final declined = arena<Bool>();
-    final port = _callbackPorts.register({
-      (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
-          0xffffffff): (message) {
-        if (!isClosed) {
-          callback();
-        }
-      },
-    });
-    var accepted = false;
-    try {
-      _check(
-        raw.mln_resource_request_set_cancel_callback(
-          handle.raw,
-          raw
-              .mln_adapter_dart_port_function(
-                (raw.MLN_ADAPTER_DART_PORT_RESOURCE_REQUEST_SET_CANCEL_CALLBACK_CALLBACK &
-                    0xffffffff),
-              )
-              .cast(),
-          port.context,
-          Native.addressOf<
-                NativeFunction<raw.mln_runtime_callback_releaseFunction>
-              >(raw.mln_adapter_dart_port_release)
-              .cast(),
-          declined,
-          nativeDiagnostic,
-        ),
-      );
-      accepted = !declined.value;
-      return declined.value;
-    } finally {
-      if (!accepted) {
-        port.reject();
-      }
-    }
-  });
+  bool setCancelCallback(ResourceRequestCancelHandler handler) =>
+      withNativeArena((arena) {
+        final outCancelled = arena<Bool>();
+        final registrations = _NativeRegistrations(_callbackPorts);
+        _check(
+          registrations.run(
+            () => raw.mln_resource_request_set_cancel_callback(
+              _handle.raw,
+              registrations.add(
+                _prepareResourceRequestCancelHandler(
+                  handler,
+                  registrations.ports,
+                  () => isClosed,
+                ),
+              ),
+              outCancelled,
+              nativeDiagnostic,
+            ),
+            declined: () => outCancelled.value,
+          ),
+        );
+        return outCancelled.value;
+      });
 
   /// Blocks until a resource request is released and its cancel callback
   /// registration has retired: the callback, if it ran, and release_user_data

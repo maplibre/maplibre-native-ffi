@@ -5,7 +5,7 @@
 #include "maplibre_native_c.h"
 void binding_release(void*);
 void binding_release_forbid(void*);
-uint32_t binding_mln_log_set_callback_registration_callback(
+uint32_t binding_mln_log_handler_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 );
@@ -24,9 +24,7 @@ void binding_mln_custom_mvt_vector_source_options_cancel_tile(
 void binding_mln_wake_callback(void* user_data);
 void binding_mln_queue_lock_lock(void* user_data);
 void binding_mln_queue_lock_unlock(void* user_data);
-void binding_mln_resource_request_set_cancel_callback_registration_callback(
-  void* user_data
-);
+void binding_mln_resource_request_cancel_handler_callback(void* user_data);
 mln_status binding_mln_http_header_transform_callback(
   void* user_data, uint32_t kind, const char* url,
   mln_http_header_transform_response* out_response

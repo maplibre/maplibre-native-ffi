@@ -221,18 +221,18 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
 fn replacing_the_log_callback_releases_the_one_it_replaced() {
     let _global = global_state();
     let (first, first_released) = release_probe();
-    log_set_callback(Some(Arc::new(move |_, _, _, _| {
+    log_set_callback(LogHandler::new(move |_, _, _, _| {
         let _ = &first;
         1
-    })))
+    }))
     .unwrap();
     assert!(first_released.try_recv().is_err());
 
     let (second, second_released) = release_probe();
-    log_set_callback(Some(Arc::new(move |_, _, _, _| {
+    log_set_callback(LogHandler::new(move |_, _, _, _| {
         let _ = &second;
         1
-    })))
+    }))
     .unwrap();
     await_release(&first_released);
     assert!(second_released.try_recv().is_err());

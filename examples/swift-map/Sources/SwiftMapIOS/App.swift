@@ -78,12 +78,13 @@ private func installCAPILogging() {
     category: "MapLibre"
   )
   do {
-    try Maplibre.logSetCallback { severity, event, code, message in
+    try Maplibre.logSetCallback(handler: LogHandler {
+      severity, event, code, message in
       log.info(
         "severity=\(String(describing: severity), privacy: .public) event=\(String(describing: event), privacy: .public) code=\(code): \(message, privacy: .public)"
       )
       return 1
-    }
+    })
   } catch {
     log
       .error(

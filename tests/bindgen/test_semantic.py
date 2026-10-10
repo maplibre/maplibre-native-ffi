@@ -816,11 +816,12 @@ typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
 typedef unsigned long request BIND("kind=handle;release=release_request");
 typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
+typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
 typedef unsigned (*provider)(request ticket) BIND("enum=decision;failure=DELEGATE;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
 mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("registration=callback;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
-  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
+BIND("accepted_unless=cancelled") mln_status on_cancel(
+  request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 void release_request(request value);
 mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
@@ -833,9 +834,9 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
         )
         self.assertEqual(decision.wait_retired, "await_retirement")
         self.assertEqual(decision.handle.release_consumes, "always")
-        registration = model.operations_by_name["on_cancel"].direct_registrations[0]
+        (registration,) = model.operations_by_name["on_cancel"].registrations
         self.assertEqual(
-            (registration.release_callback, registration.accepted_unless),
+            (registration.release, registration.accepted_unless),
             ("release", "cancelled"),
         )
         for before, after, error in (
@@ -854,9 +855,9 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             ),
             ("accepted_unless=cancelled", "accepted_unless=value", "boolean output"),
             (
-                "release_callback=release",
-                "release_callback=value",
-                "void callback taking its context",
+                "const cancel_handler *handler",
+                "cancel callback",
+                "one registration parameter",
             ),
         ):
             with self.subTest(after=after), self.assertRaisesRegex(ModelError, error):
@@ -910,20 +911,14 @@ typedef void (*notify)(void *state);
 typedef void (*release)(void *state);
 typedef struct signals { notify signal; void *state BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
 """
-        for annotation, parameters in (
-            ("absent_on=MLN_STATUS_NOT_READY", "const signals *events, " + one),
-            (
-                "registration=signal;release_callback=retire;absent_on=MLN_STATUS_NOT_READY",
-                'notify signal, void *state BIND("kind=context"), release retire, '
-                + one,
-            ),
-        ):
-            source = callbacks + f'BIND("{annotation}") mln_status read({parameters});'
-            with (
-                self.subTest(source=source),
-                self.assertRaisesRegex(ModelError, "without registrations"),
-            ):
-                bind(self.parse(source), require_complete=True)
+        source = (
+            callbacks
+            + 'BIND("absent_on=MLN_STATUS_NOT_READY") mln_status read(const signals *events, '
+            + one
+            + ");"
+        )
+        with self.assertRaisesRegex(ModelError, "without registrations"):
+            bind(self.parse(source), require_complete=True)
 
     def test_deferred_callbacks_answer_early_and_copy_their_inputs(self):
         source = """
@@ -931,12 +926,13 @@ typedef enum decision : unsigned { DELEGATE = 0, CLAIM = 1 } decision;
 typedef unsigned long request BIND("kind=handle;release=release_request");
 typedef void (*cancel)(void *context);
 typedef void (*release_cancel)(void *context);
+typedef struct cancel_handler { unsigned size; cancel callback; void *context BIND("kind=context"); release_cancel release; } cancel_handler BIND("kind=callback_registration;release=release");
 typedef unsigned (*provider)(void *context, const char *url, request ticket) BIND("enum=decision;failure=DELEGATE;deferred=CLAIM;decision_handle=ticket;decision_accept=CLAIM;decision_pass=DELEGATE;complete=answer;cancelled=is_cancelled;cancel_registration=on_cancel;wait_retired=await_retirement");
 typedef unsigned (*logger)(void *context, int code) BIND("failure=0;deferred=1");
 mln_status answer(request value, unsigned response, mln_diagnostic *out_diagnostic);
 mln_status is_cancelled(request value, bool *result BIND("direction=out"), mln_diagnostic *out_diagnostic);
-BIND("registration=callback;release_callback=release;accepted_unless=cancelled") mln_status on_cancel(
-  request value, cancel callback, void *context BIND("kind=context"), release_cancel release, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
+BIND("accepted_unless=cancelled") mln_status on_cancel(
+  request value, const cancel_handler *handler, bool *cancelled BIND("direction=out"), mln_diagnostic *out_diagnostic);
 void release_request(request value);
 mln_status await_retirement(request value BIND("handle_access=issued"), mln_diagnostic *out_diagnostic);
 """
@@ -1031,13 +1027,22 @@ mln_status query(const mln_completion *completion, mln_diagnostic *out_diagnosti
         )
 
     def test_receiver_registration_transfers_its_root_unless_declined(self):
-        model = bind(parse(groups=("direct_registration",)), require_complete=True)
+        model = bind(parse(groups=("declinable_registration",)), require_complete=True)
         operation = model.operations_by_name["mln_ticket_on_cancel"]
         self.assertEqual(operation.receiver, "ticket")
-        (registration,) = operation.direct_registrations
+        (registration,) = operation.registrations
         self.assertEqual(
-            (registration.release_callback, registration.accepted_unless),
+            (registration.release, registration.accepted_unless),
             ("release", "cancelled"),
+        )
+        # The cancel callback names its owner by handle type, so it calls back
+        # only into the ticket that registers it.
+        policy = model.callbacks["mln_ticket_cancel"].reentry_policy
+        self.assertEqual(
+            (policy.owner_parameter, policy.owner_type), (None, "mln_ticket")
+        )
+        self.assertTrue(
+            model.values["mln_ticket_cancel_handler"].registration.receiver_owned
         )
 
     def test_disposal_support_requires_a_handle_consumer(self):

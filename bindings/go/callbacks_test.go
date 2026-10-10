@@ -398,7 +398,7 @@ func TestReplacingAGlobalCallbackReleasesThePreviousOne(t *testing.T) {
 	t.Cleanup(func() { _ = LogClearCallback() })
 	baseline := globalRoots()
 	for range 2 {
-		if err := LogSetCallback(func(LogSeverity, LogEvent, int64, string) uint32 { return 0 }); err != nil {
+		if err := LogSetCallback(LogHandler{Callback: func(LogSeverity, LogEvent, int64, string) uint32 { return 0 }}); err != nil {
 			t.Fatal(err)
 		}
 		if live := globalRoots() - baseline; live != 1 {
@@ -430,10 +430,10 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	}
 	held := receive(t, requests, "the held request")
 	ran := make(chan struct{})
-	if cancelled, err := held.SetCancelCallback(func() { close(ran) }); cancelled || err != nil {
+	if cancelled, err := held.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() { close(ran) }}); cancelled || err != nil {
 		t.Fatalf("SetCancelCallback on a live request = (%v, %v), want (false, nil)", cancelled, err)
 	}
-	if _, err := held.SetCancelCallback(func() {}); !errors.Is(err, ErrInvalidState) {
+	if _, err := held.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("a second SetCancelCallback = %v, want ErrInvalidState", err)
 	}
 	if roots := rootCount(held.bindingOwner); roots != 1 {
@@ -455,7 +455,7 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 		cancelled, err := discarded.Cancelled()
 		return err != nil || cancelled
 	})
-	cancelled, err := discarded.SetCancelCallback(func() { t.Error("a callback ran for an already cancelled request") })
+	cancelled, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() { t.Error("a callback ran for an already cancelled request") }})
 	if !cancelled || err != nil {
 		t.Fatalf("SetCancelCallback on a cancelled request = (%v, %v), want (true, nil)", cancelled, err)
 	}
@@ -465,7 +465,7 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	if err := discarded.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := discarded.SetCancelCallback(func() {}); !errors.Is(err, ErrInvalidState) {
+	if _, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() {}}); !errors.Is(err, ErrInvalidState) {
 		t.Fatalf("SetCancelCallback after Close = %v, want ErrInvalidState", err)
 	}
 	if err := held.Close(); err != nil {

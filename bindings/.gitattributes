@@ -12,6 +12,7 @@
 /dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Internal/Struct/GeneratedValues.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogEvent.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Logging/LogHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverity.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Logging/LogSeverityMask.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Map/AnimationOptionField.g.cs linguist-generated=true
@@ -126,6 +127,7 @@
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProviderDecision.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRange.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequest.g.cs linguist-generated=true
+/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestCancelHandler.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestField.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestHandle.Operations.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponse.g.cs linguist-generated=true

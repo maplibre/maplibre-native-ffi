@@ -172,6 +172,15 @@ typedef struct mln_buffer_view {
 } mln_buffer_view;
 
 /**
+ * Releases the user_data of a callback registration.
+ *
+ * Each registration struct's release_user_data member states when native code
+ * calls it and on which thread. A null release_user_data leaves user_data with
+ * the caller.
+ */
+typedef void (*mln_user_data_release)(void* user_data);
+
+/**
  * Reports the C ABI contract version. The value is 0 while the ABI is unstable,
  * and will increment on each SemVer major release.
  */

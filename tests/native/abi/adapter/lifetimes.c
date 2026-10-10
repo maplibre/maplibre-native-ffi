@@ -133,20 +133,6 @@ static void record_cancel(void* user_data, mln_canonical_tile_id tile) {
   record_tile(false, user_data, tile);
 }
 
-typedef void (*retire_function)(
-  mln_custom_geometry_source_tile_callback fetch_tile,
-  mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
-);
-
-static void retire_mvt_vector(
-  mln_custom_geometry_source_tile_callback fetch_tile,
-  mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
-) {
-  mln_adapter_custom_mvt_vector_callbacks_retire(
-    fetch_tile, cancel_tile, user_data
-  );
-}
-
 // Checks one retirement call: the callbacks that were not null each ran once,
 // fetch before cancel, with the context and the retirement tile id.
 static void assert_retired(
@@ -169,28 +155,20 @@ static void assert_retired(
 }
 
 static void retiring_custom_source_callbacks_calls_each_once(void) {
-  static const struct {
-    const char* label;
-    retire_function retire;
-  } sources[] = {
-    {"custom geometry", mln_adapter_custom_geometry_callbacks_retire},
-    {"custom MVT vector", retire_mvt_vector},
-  };
   int context = 0;
-  for (size_t index = 0; index < sizeof(sources) / sizeof(sources[0]);
-       ++index) {
-    retired = (retire_probe){0};
-    sources[index].retire(record_fetch, record_cancel, &context);
-    assert_retired(sources[index].label, 2, true, &context);
+  retired = (retire_probe){0};
+  mln_adapter_custom_source_callbacks_retire(
+    record_fetch, record_cancel, &context
+  );
+  assert_retired("both callbacks", 2, true, &context);
 
-    retired = (retire_probe){0};
-    sources[index].retire(NULL, record_cancel, &context);
-    assert_retired(sources[index].label, 1, false, &context);
+  retired = (retire_probe){0};
+  mln_adapter_custom_source_callbacks_retire(NULL, record_cancel, &context);
+  assert_retired("cancel only", 1, false, &context);
 
-    retired = (retire_probe){0};
-    sources[index].retire(NULL, NULL, &context);
-    assert_retired(sources[index].label, 0, false, &context);
-  }
+  retired = (retire_probe){0};
+  mln_adapter_custom_source_callbacks_retire(NULL, NULL, &context);
+  assert_retired("no callbacks", 0, false, &context);
 }
 
 MLN_TEST_GROUP {

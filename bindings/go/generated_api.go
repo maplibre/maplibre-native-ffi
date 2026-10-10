@@ -1726,12 +1726,12 @@ func nativeCustomGeometrySourceOptions(input CustomGeometrySourceOptions, arena 
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP, &raw.wrap, input.Wrap, arena, bindingBool[bool, C.bool])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_custom_geometry_source_release_callback(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
-			raw.fetch_tile = C.mln_custom_geometry_source_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
+			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_geometry_source_options_fetch_tile)
 		}
 		if input.CancelTile != nil {
-			raw.cancel_tile = C.mln_custom_geometry_source_tile_callback(C.binding_mln_custom_geometry_source_options_cancel_tile)
+			raw.cancel_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_geometry_source_options_cancel_tile)
 		}
 	}
 	return raw
@@ -1770,12 +1770,12 @@ func nativeCustomMvtVectorSourceOptions(input CustomMvtVectorSourceOptions, aren
 	bindingMasked(&raw.fields, C.MLN_CUSTOM_MVT_VECTOR_SOURCE_OPTION_MAX_ZOOM, &raw.max_zoom, input.MaxZoom, arena, bindingNumber[float64, C.double])
 	if input.FetchTile != nil || input.CancelTile != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_custom_mvt_vector_source_release_callback(C.binding_release_forbid)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
 		if input.FetchTile != nil {
-			raw.fetch_tile = C.mln_custom_mvt_vector_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
+			raw.fetch_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_fetch_tile)
 		}
 		if input.CancelTile != nil {
-			raw.cancel_tile = C.mln_custom_mvt_vector_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_cancel_tile)
+			raw.cancel_tile = C.mln_custom_source_tile_callback(C.binding_mln_custom_mvt_vector_source_options_cancel_tile)
 		}
 	}
 	return raw
@@ -2109,7 +2109,7 @@ func nativeHttpHeaderTransform(input HttpHeaderTransform, arena *bindingArena) C
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_runtime_callback_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_http_header_transform_callback(C.binding_mln_http_header_transform_callback)
 		}
@@ -2232,8 +2232,25 @@ func nativeLatLngBounds(input LatLngBounds, arena *bindingArena) C.mln_lat_lng_b
 	return raw
 }
 
-type LogSetCallbackRegistration struct {
+// LogHandler corresponds to mln_log_handler. Process-global log callback state.
+//
+// See mln_log_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
+type LogHandler struct {
 	Callback func(LogSeverity, LogEvent, int64, string) uint32
+}
+
+func nativeLogHandler(input LogHandler, arena *bindingArena) C.mln_log_handler {
+	raw := C.mln_log_handler{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.Callback != nil {
+		raw.user_data = arena.register(input, 0)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release_forbid)
+		if input.Callback != nil {
+			raw.callback = C.mln_log_callback(C.binding_mln_log_handler_callback)
+		}
+	}
+	return raw
 }
 
 // LogicalExtent corresponds to mln_logical_extent. Logical map extent in UI
@@ -3158,7 +3175,7 @@ func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Lock != nil || input.Unlock != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_queue_lock_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Lock != nil {
 			raw.lock = C.mln_queue_lock_callback(C.binding_mln_queue_lock_lock)
 		}
@@ -3519,7 +3536,7 @@ func nativeResourceProvider(input ResourceProvider, arena *bindingArena) C.mln_r
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_runtime_callback_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_provider_callback(C.binding_mln_resource_provider_callback)
 		}
@@ -3599,7 +3616,26 @@ func copyResourceRequest(raw C.mln_resource_request) ResourceRequest {
 	return result
 }
 
-type ResourceRequestSetCancelCallbackRegistration struct{ Callback func() }
+// ResourceRequestCancelHandler corresponds to
+// mln_resource_request_cancel_handler. Cancel callback state for one handled
+// resource request.
+//
+// See mln_resource_request_cancel_handler in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+type ResourceRequestCancelHandler struct{ Callback func() }
+
+func nativeResourceRequestCancelHandler(input ResourceRequestCancelHandler, arena *bindingArena) C.mln_resource_request_cancel_handler {
+	raw := C.mln_resource_request_cancel_handler{}
+	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
+	if input.Callback != nil {
+		raw.user_data = arena.register(input, arena.identity)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
+		if input.Callback != nil {
+			raw.callback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_cancel_handler_callback)
+		}
+	}
+	return raw
+}
 
 // ResourceResponse corresponds to mln_resource_response. A resource provider's
 // answer to one request.
@@ -3649,7 +3685,7 @@ func nativeResourceTransform(input ResourceTransform, arena *bindingArena) C.mln
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_runtime_callback_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_resource_transform_callback(C.binding_mln_resource_transform_callback)
 		}
@@ -4960,7 +4996,7 @@ func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
-		raw.release_user_data = C.mln_wake_release(C.binding_release)
+		raw.release_user_data = C.mln_user_data_release(C.binding_release)
 		if input.Callback != nil {
 			raw.callback = C.mln_wake_callback(C.binding_mln_wake_callback)
 		}
@@ -6019,28 +6055,10 @@ func LogSetAsyncSeverityMask(mask LogSeverityMask) error {
 //
 // See mln_log_set_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html
-func LogSetCallback(callback func(LogSeverity, LogEvent, int64, string) uint32) error {
-	_, err := bindingCall(func() struct{} {
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_log_set_callback, 0)
-		var context unsafe.Pointer
-		if callback != nil {
-			context = arena.register(LogSetCallbackRegistration{Callback: callback}, 0)
-		}
-		var nativeCallback C.mln_log_callback
-		var nativeRelease C.mln_log_callback_release
-		if callback != nil {
-			nativeCallback = C.mln_log_callback(C.binding_mln_log_set_callback_registration_callback)
-			nativeRelease = C.mln_log_callback_release(C.binding_release_forbid)
-		}
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_log_set_callback(nativeCallback, context, nativeRelease, diagnostic))
-		})
-		arena.accept(nil)
-		return struct{}{}
+func LogSetCallback(handler LogHandler) error {
+	return bindingDo(bindingGlobal(C.binding_operation_mln_log_set_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_log_set_callback(bindingStore(nativeLogHandler(handler, arena), arena), diagnostic))
 	})
-	return err
 }
 
 // AddColorReliefLayer adds a color-relief layer for a raster DEM source.
@@ -7872,34 +7890,15 @@ func (receiver *ResourceRequestHandle) Close() error {
 //
 // See mln_resource_request_set_cancel_callback in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *ResourceRequestHandle) SetCancelCallback(callback func()) (bool, error) {
-	return bindingCall(func() bool {
-		if receiver == nil || receiver.bindingOwner == nil {
-			panic(bindingFailure{newBindingError(ErrInvalidState, "nil handle")})
+func (receiver *ResourceRequestHandle) SetCancelCallback(handler ResourceRequestCancelHandler) (bool, error) {
+	var outCancelled C.bool
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_set_cancel_callback), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), bindingStore(nativeResourceRequestCancelHandler(handler, arena), arena), &outCancelled, diagnostic))
+	}, func(arena *bindingArena) bool {
+		if bool(outCancelled) {
+			arena.decline()
 		}
-		arena := &bindingArena{}
-		defer arena.close()
-		bindingAdmission(C.binding_operation_mln_resource_request_set_cancel_callback, receiver.state.issued)
-		var context unsafe.Pointer
-		if callback != nil {
-			context = arena.register(ResourceRequestSetCancelCallbackRegistration{Callback: callback}, receiver.state.issued)
-		}
-		var nativeCallback C.mln_resource_request_cancel_callback
-		var nativeRelease C.mln_runtime_callback_release
-		if callback != nil {
-			nativeCallback = C.mln_resource_request_cancel_callback(C.binding_mln_resource_request_set_cancel_callback_registration_callback)
-			nativeRelease = C.mln_runtime_callback_release(C.binding_release)
-		}
-		raw, done := receiver.bindingAcquire(false)
-		defer done()
-		var rejected C.bool
-		bindingCheck(func(diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_resource_request_set_cancel_callback(C.mln_resource_request_handle(raw), nativeCallback, context, nativeRelease, &rejected, diagnostic))
-		})
-		if !bool(rejected) {
-			arena.accept(receiver.bindingOwner)
-		}
-		return bool(rejected)
+		return bool(outCancelled)
 	})
 }
 
@@ -8379,8 +8378,8 @@ func (receiver *RenderSessionHandle) WebgpuSurfaceSetTarget(descriptor WebgpuSur
 	}, completionUnit)
 }
 
-//export mlnGo_mln_log_set_callback_registration_callback
-func mlnGo_mln_log_set_callback_registration_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.uint32_t) {
+//export mlnGo_mln_log_handler_callback
+func mlnGo_mln_log_handler_callback(native_user_data unsafe.Pointer, native_severity C.uint32_t, native_event C.uint32_t, native_code C.int64_t, native_message *C.char) (result C.uint32_t) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	result = 0
@@ -8390,7 +8389,7 @@ func mlnGo_mln_log_set_callback_registration_callback(native_user_data unsafe.Po
 			result = 0
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[LogSetCallbackRegistration](native_user_data)
+	callbacks, ok := bindingCallbackValue[LogHandler](native_user_data)
 	if !ok || callbacks.Callback == nil {
 		return
 	}
@@ -8404,7 +8403,7 @@ func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_geometry_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8421,7 +8420,7 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_geometry_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8438,7 +8437,7 @@ func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsa
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_mvt_vector_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
@@ -8455,7 +8454,7 @@ func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data uns
 	defer runtime.UnlockOSThread()
 	defer func() {
 		if failure := recover(); failure != nil {
-			bindingReportCallbackPanic("mln_custom_mvt_vector_source_tile_callback", failure)
+			bindingReportCallbackPanic("mln_custom_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
@@ -8517,8 +8516,8 @@ func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
 	return
 }
 
-//export mlnGo_mln_resource_request_set_cancel_callback_registration_callback
-func mlnGo_mln_resource_request_set_cancel_callback_registration_callback(native_user_data unsafe.Pointer) {
+//export mlnGo_mln_resource_request_cancel_handler_callback
+func mlnGo_mln_resource_request_cancel_handler_callback(native_user_data unsafe.Pointer) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
@@ -8526,7 +8525,7 @@ func mlnGo_mln_resource_request_set_cancel_callback_registration_callback(native
 			bindingReportCallbackPanic("mln_resource_request_cancel_callback", failure)
 		}
 	}()
-	callbacks, ok := bindingCallbackValue[ResourceRequestSetCancelCallbackRegistration](native_user_data)
+	callbacks, ok := bindingCallbackValue[ResourceRequestCancelHandler](native_user_data)
 	if !ok || callbacks.Callback == nil {
 		return
 	}

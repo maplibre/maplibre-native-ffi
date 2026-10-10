@@ -149,8 +149,6 @@ class Values:
         self.readers = {}
         # The C functions that codecs call, which the native shims declare.
         self.functions = {}
-        # Callback values that direct registrations wrap, by native name.
-        self.direct_callbacks = {}
         # Upcall sites by name, which kotlin_callbacks.sites fills on first use.
         self.sites = None
 

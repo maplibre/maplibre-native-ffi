@@ -130,7 +130,7 @@ struct AdapterArena {
     return result;
   }
   std::vector<std::uint64_t> handles;
-  std::vector<std::pair<mln_runtime_callback_release, void*>> releases;
+  std::vector<std::pair<mln_user_data_release, void*>> releases;
 
   ~AdapterArena() {
     for (const auto& [release, context] : releases) {
@@ -703,7 +703,7 @@ extern "C" MLN_API auto mln_adapter_arena_adopt_handle(
 }
 
 extern "C" MLN_API auto mln_adapter_arena_adopt_release(
-  void* arena, mln_runtime_callback_release release, void* context,
+  void* arena, mln_user_data_release release, void* context,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   const auto status =
@@ -961,26 +961,9 @@ extern "C" MLN_API auto mln_adapter_routed_resource_provider_callback(
   return provider.callback(provider.user_data, request, handle);
 }
 
-extern "C" MLN_API void mln_adapter_custom_geometry_callbacks_retire(
-  mln_custom_geometry_source_tile_callback fetch_tile,
-  mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
-) noexcept {
-  constexpr auto RetirementTile = mln_canonical_tile_id{
-    .z = std::numeric_limits<std::uint8_t>::max(),
-    .x = 0,
-    .y = 0,
-  };
-  if (fetch_tile != nullptr) {
-    fetch_tile(user_data, RetirementTile);
-  }
-  if (cancel_tile != nullptr) {
-    cancel_tile(user_data, RetirementTile);
-  }
-}
-
-extern "C" MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
-  mln_custom_mvt_vector_source_tile_callback fetch_tile,
-  mln_custom_mvt_vector_source_tile_callback cancel_tile, void* user_data
+extern "C" MLN_API void mln_adapter_custom_source_callbacks_retire(
+  mln_custom_source_tile_callback fetch_tile,
+  mln_custom_source_tile_callback cancel_tile, void* user_data
 ) noexcept {
   constexpr auto RetirementTile = mln_canonical_tile_id{
     .z = std::numeric_limits<std::uint8_t>::max(),

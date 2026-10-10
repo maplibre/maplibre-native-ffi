@@ -361,7 +361,7 @@ mod tests {
     struct AcceptedSubmission {
         callback: sys::mln_completion_callback,
         user_data: *mut c_void,
-        release_user_data: sys::mln_completion_release,
+        release_user_data: sys::mln_user_data_release,
     }
 
     impl AcceptedSubmission {

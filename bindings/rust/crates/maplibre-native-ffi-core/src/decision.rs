@@ -19,7 +19,10 @@ pub type ContextCallback = Option<unsafe extern "C" fn(*mut c_void)>;
 
 /// Registers a one-shot cancellation notification on a decision handle and
 /// reports whether the handle was already cancelled.
-pub type CancelRegistrationFn<H> = unsafe extern "C" fn(
+///
+/// The generated binding implements it by passing the callback, its context,
+/// and the release in the protocol's registration record.
+pub type CancelRegistrationFn<H> = unsafe fn(
     H,
     ContextCallback,
     *mut c_void,
@@ -461,7 +464,7 @@ mod tests {
         })
     }
 
-    unsafe extern "C" fn fake_cancel_registration(
+    unsafe fn fake_cancel_registration(
         _handle: sys::mln_resource_request_handle,
         _callback: ContextCallback,
         _user_data: *mut c_void,

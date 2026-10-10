@@ -115,10 +115,14 @@ void main() {
     final fixture = await runZonedGuarded(
       () => openRuntime(
         provider: routedProvider([styleRoute(styleUrl)], (_, handle) {
-          final alreadyCancelled = handle.setCancelCallback(() {
-            cancelled.complete(handle.cancelled());
-            throw StateError('cancel callback failed');
-          });
+          final alreadyCancelled = handle.setCancelCallback(
+            ResourceRequestCancelHandler(
+              callback: () {
+                cancelled.complete(handle.cancelled());
+                throw StateError('cancel callback failed');
+              },
+            ),
+          );
           expect(alreadyCancelled, isFalse);
           handed.complete(handle);
         }),
@@ -132,7 +136,9 @@ void main() {
 
     // A request takes one cancel registration.
     expect(
-      () => handle.setCancelCallback(() {}),
+      () => handle.setCancelCallback(
+        ResourceRequestCancelHandler(callback: () {}),
+      ),
       throwsA(isA<InvalidStateException>()),
     );
     expect(probe.closed, isFalse);
@@ -162,7 +168,12 @@ void main() {
     var cancels = 0;
     final fixture = await openRuntime(
       provider: routedProvider([styleRoute(styleUrl)], (_, handle) {
-        expect(handle.setCancelCallback(() => cancels += 1), isFalse);
+        expect(
+          handle.setCancelCallback(
+            ResourceRequestCancelHandler(callback: () => cancels += 1),
+          ),
+          isFalse,
+        );
         registered.complete(singleCallbackPortProbeForTesting(handle));
         handle.complete(emptyStyleResponse);
         handle.close();
@@ -197,7 +208,10 @@ void main() {
 
       // Native reports the cancellation through the registration's output
       // instead of storing the callback, so the binding keeps no root for it.
-      expect(handle.setCancelCallback(() {}), isTrue);
+      expect(
+        handle.setCancelCallback(ResourceRequestCancelHandler(callback: () {})),
+        isTrue,
+      );
       expect(singleCallbackPortProbeForTesting(handle), isNull);
     },
   );

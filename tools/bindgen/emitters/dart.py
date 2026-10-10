@@ -6,7 +6,6 @@ import re
 from collections import defaultdict
 from dataclasses import replace
 
-from tools.bindgen import native_ports
 from tools.bindgen.compiler import compile_api
 from tools.bindgen.managed_contracts import KEYWORDS, LOCALS, conflicting_functions
 from tools.bindgen.model import Api
@@ -17,10 +16,8 @@ from tools.bindgen.semantic import BoundApi, OperationPlan, output_member, view_
 from .dart_values import (
     Unsupported,
     Values,
-    deferred_key,
     doc,
     owner_names,
-    public_name,
 )
 
 
@@ -58,171 +55,13 @@ def adopt_owner(owned, expression, receiver, function, values):
     return public, result
 
 
-def release_callback(registration, inputs, values) -> str:
-    """The C type of a registration's release callback.
-
-    A port adapter's release takes only the context and returns nothing, so
-    the registration's release callback must have that shape.
-    """
-    release = values.bound.callbacks.get(inputs[registration.release_callback].native)
-    if (
-        release is None
-        or release.result.ctype.kind != "void"
-        or len(release.parameters) != 1
-        or release.parameters[0].name != release.context
-        or release.decision
-        or release.deferred
-        or release.reentry_policy
-    ):
-        raise Unsupported("port registration requires a void context release callback")
-    return release.native
-
-
-def lower_port_registration(plan, registration, callback, values):
-    """Lower a receiver's direct registration that a native port delivers.
-
-    The port stays rooted by the receiver until native release retires it. A
-    registration that native code does not accept releases the port at once.
-    """
-    function = plan.function
-    receiver = type_name(function.parameters[0].type) if plan.receiver else None
-    if receiver not in values.bound.public_handles:
-        raise Unsupported("port registration requires an owned receiver")
-    if plan.execution != "immediate" or plan.completion or not plan.status:
-        raise Unsupported("port registration requires immediate admission status")
-    inputs = {p.name: p.value for p in plan.inputs}
-    release = release_callback(registration, inputs, values)
-    controls = {
-        function.parameters[0].name,
-        registration.callback,
-        registration.user_data,
-        registration.release_callback,
-        registration.accepted_unless,
-    }
-    if any(p.name not in controls for p in function.parameters):
-        raise Unsupported("port registration requires no other parameters")
-    outputs = {p.name: p.value for p in plan.outputs}
-    declined = outputs.get(registration.accepted_unless)
-    if registration.accepted_unless and (
-        not declined or not declined.element or declined.element.native != "bool"
-    ):
-        raise Unsupported("port registration refusal requires a boolean output")
-    value = inputs[registration.callback]
-    values.check(value)
-    key = (
-        f"(raw.{native_ports.constant(plan.name, registration.callback)} & 0xffffffff)"
-    )
-    decoded, offset = [], 1
-    for parameter in callback.parameters:
-        if parameter.name != callback.context:
-            expression, offset = values.port_copy(parameter.value, offset)
-            decoded.append(expression)
-    name = camel(plan.member)
-    arguments = {
-        function.parameters[0].name: "handle.raw",
-        registration.callback: f"raw.mln_adapter_dart_port_function({key}).cast()",
-        registration.user_data: "port.context",
-        registration.release_callback: f"Native.addressOf<NativeFunction<raw.{release}Function>>(raw.mln_adapter_dart_port_release).cast()",
-        registration.accepted_unless: "declined",
-    }
-    call = native_call(function, [arguments[p.name] for p in function.parameters])
-    if declined:
-        storage = "      final declined = arena<Bool>();\n"
-        accept, result, public = (
-            "accepted = !declined.value;",
-            "\n        return declined.value;",
-            "bool",
-        )
-    else:
-        storage, accept, result, public = "", "accepted = true;", "", "void"
-    # Delivery queued before the receiver closes is dropped.
-    body = (
-        "      final handle = _handle;\n"
-        + storage
-        + f"      final port = _callbackPorts.register({{\n        {key}: (message) {{ if (!isClosed) {{ callback({', '.join(decoded)}); }} }},\n      }});\n"
-        + f"      var accepted = false;\n      try {{\n        _check({call});\n        {accept}{result}\n      }} finally {{ if (!accepted) {{ port.reject(); }} }}"
-    )
-    return (
-        receiver,
-        f"  {public} {name}({values.public(value)} callback) => withNativeArena((arena) {{\n{body}\n  }});\n",
-    )
-
-
-def lower_deferred_registration(plan, registration, callback, values):
-    """Lower a direct registration of a deferred callback through a native port.
-
-    The generated deferred adapter answers each call at once and posts a copy
-    to the port, which delivers it on this isolate. The receiver, or the
-    isolate for a global registration, roots the port until native release
-    retires it. A registration that native code does not accept releases the
-    port at once.
-    """
-    function = plan.function
-    receiver = type_name(function.parameters[0].type) if plan.receiver else None
-    if receiver and receiver not in values.bound.public_handles:
-        raise Unsupported("deferred registration requires an owned receiver")
-    if plan.execution != "immediate" or plan.completion or not plan.status:
-        raise Unsupported("deferred registration requires immediate admission status")
-    if not registration.release_callback or registration.accepted_unless:
-        raise Unsupported("deferred registration requires an unconditional release")
-    controls = {
-        registration.callback,
-        registration.user_data,
-        registration.release_callback,
-    } | ({function.parameters[0].name} if receiver else set())
-    if any(p.name not in controls for p in function.parameters):
-        raise Unsupported("deferred registration requires no other parameters")
-    inputs = {p.name: p.value for p in plan.inputs}
-    value = inputs[registration.callback]
-    values.check(value)
-    key = deferred_key(callback)
-    release = release_callback(registration, inputs, values)
-    arguments = {
-        registration.callback: f"raw.mln_adapter_deferred_callback_function({key}).cast()",
-        registration.user_data: "port.context",
-        registration.release_callback: f"Native.addressOf<NativeFunction<raw.{release}Function>>(raw.mln_adapter_deferred_callback_release).cast()",
-    }
-    if receiver:
-        arguments[function.parameters[0].name] = "_handle.raw"
-        roots = "_callbackPorts"
-    else:
-        roots = "_globalCallbackPorts"
-    name = camel(plan.member)
-    call = native_call(function, [arguments[p.name] for p in function.parameters])
-    body = (
-        f"    final port = {roots}.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}(callback, message));\n"
-        f"    var accepted = false;\n    try {{\n      _check({call});\n      accepted = true;\n    }} finally {{ if (!accepted) {{ port.reject(); }} }}"
-    )
-    return (
-        receiver or "Globals",
-        f"  void {name}({values.public(value)} callback) {{\n{body}\n  }}\n",
-    )
-
-
-def lower_direct_registration(plan, values):
-    """Lower a direct registration through a native port."""
-    if len(plan.direct_registrations) != 1:
-        raise Unsupported("one direct registration required")
-    registration = plan.direct_registrations[0]
-    for port_plan, _, callback, _ in native_ports.direct_callbacks(values.bound):
-        if port_plan.name == plan.name:
-            return lower_port_registration(plan, registration, callback, values)
-    value = next(p.value for p in plan.inputs if p.name == registration.callback)
-    callback = values.bound.callbacks.get(value.native)
-    if callback and callback.deferred:
-        return lower_deferred_registration(plan, registration, callback, values)
-    raise Unsupported("direct callback requires a native port or deferred adapter")
-
-
 def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
     function = plan.function
     if plan.consumes == "always" and (
         plan.completion or function.return_type.kind != "void"
     ):
         raise Unsupported("unconditional consumption requires a void immediate release")
-    if plan.direct_registrations:
-        return lower_direct_registration(plan, values)
-    if plan.scoped_receiver or plan.direct_registrations:
+    if plan.scoped_receiver:
         raise Unsupported(
             "operation requires its ownership or registration transaction"
         )
@@ -418,10 +257,14 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
     if optional:
         signature.append("{" + ", ".join(optional) + "}")
     call = native_call(function, args)
+    # The receiver roots the ports of the callbacks it registers, an adopted
+    # owner roots those of its call, and the isolate roots a global call's.
     roots = (
-        "_callbackPorts"
-        if plan.receiver and not plan.owned_outputs
-        else "_NativeCallbackPorts()"
+        "_NativeCallbackPorts()"
+        if plan.owned_outputs
+        else "_callbackPorts"
+        if receiver
+        else "_globalCallbackPorts"
     )
     transaction = []
     if plan.registrations:
@@ -429,9 +272,15 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
             raise Unsupported("registration requires an admission status")
         if plan.completion and plan.completion.result_owner:
             raise Unsupported("an adopted result cannot retain its registrations")
-        # A transaction accepts its registrations once native code admits the call.
+        # A transaction accepts its registrations once native code admits the
+        # call, unless native reports that it kept nothing from them.
         transaction = [f"final registrations = _NativeRegistrations({roots});"]
-        call = f"registrations.run(() => {call})"
+        declined = next(
+            (r.accepted_unless for r in plan.registrations if r.accepted_unless),
+            None,
+        )
+        declined = f", declined: () => {camel(declined)}.value" if declined else ""
+        call = f"registrations.run(() => {call}{declined})"
         if not (plan.completion and returns):
             setup += transaction
             transaction = []
@@ -630,10 +479,7 @@ def lower(api: Api | BoundApi):
             values.results.update(local_values.results)
             methods[owner].append(body)
             generated.append(plan.name)
-            if owner != "Globals" and (
-                plan.direct_registrations
-                or (plan.registrations and not plan.owned_outputs)
-            ):
+            if owner != "Globals" and plan.registrations and not plan.owned_outputs:
                 # The receiver roots the ports of the callbacks it registers.
                 port_owners.add(owner)
         except Unsupported as error:
@@ -811,7 +657,7 @@ def coverage(api: Api | BoundApi):
     _, generated, unsupported, values = lower(api)
     adapters = {}
     bound = values.bound
-    for value in values.used.values():
+    for value in list(values.used.values()):
         if value.registration:
             for adapter in values.registration_adapters(value):
                 for plan in bound.adapter_operations(adapter):

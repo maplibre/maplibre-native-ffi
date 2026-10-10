@@ -148,10 +148,6 @@ def operation(plan, values):
     )
     if plan.view:
         return view_operation(plan, values)
-    if plan.direct_registrations:
-        from .zig_direct import operation as direct
-
-        return direct(plan, values)
     inputs = {p.name: p.value for p in plan.inputs}
     outputs = {p.name: p.value for p in plan.outputs}
     owned_outputs = {p.parameter: p for p in plan.owned_outputs}
@@ -294,6 +290,11 @@ def operation(plan, values):
                     for index, (label, _) in enumerate(results)
                 )
                 + " };",
+            ]
+        elif any(r.accepted_unless for r in plan.registrations):
+            return_type = "bool"
+            body = [
+                f"return call.invokeDeclinable({head}, {allocator}, {diagnostic}, {args});"
             ]
         elif plan.absence:
             absent = f"c.{plan.absence.status}"

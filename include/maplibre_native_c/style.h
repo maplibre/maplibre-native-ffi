@@ -498,25 +498,22 @@ typedef struct mln_canonical_tile_id {
   uint32_t y;
 } mln_canonical_tile_id;
 
-/** Callback invoked for custom geometry source tile requests and cancels. */
-typedef void (*mln_custom_geometry_source_tile_callback)(
+/**
+ * Callback invoked for custom geometry and custom MVT vector source tile
+ * requests and cancels.
+ */
+typedef void (*mln_custom_source_tile_callback)(
   void* user_data, mln_canonical_tile_id tile_id
 );
-
-/** Releases a custom geometry source's callback context. */
-MLN_BINDING("reentry=forbid")
-typedef void (*mln_custom_geometry_source_release_callback)(void* user_data);
 
 /** Options for custom geometry sources. */
 typedef struct mln_custom_geometry_source_options {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_custom_geometry_source_option_field");
   /** Required tile fetch callback. */
-  mln_custom_geometry_source_tile_callback fetch_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback fetch_tile MLN_BINDING("nullable=true");
   /** Optional best-effort tile cancel callback. */
-  mln_custom_geometry_source_tile_callback cancel_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback cancel_tile MLN_BINDING("nullable=true");
   /** Caller-owned callback context retained by pointer. */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
@@ -549,30 +546,19 @@ typedef struct mln_custom_geometry_source_options {
    * inside MapLibre's dispatch. Free callback state and return. Schedule native
    * owner cleanup after this callback returns.
    */
-  mln_custom_geometry_source_release_callback release_user_data;
+  mln_user_data_release release_user_data;
 } mln_custom_geometry_source_options MLN_BINDING(
-  "kind=callback_registration;release=release_user_data"
+  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
 );
-
-/** Callback invoked for custom MVT vector source tile requests and cancels. */
-typedef void (*mln_custom_mvt_vector_source_tile_callback)(
-  void* user_data, mln_canonical_tile_id tile_id
-);
-
-/** Releases a custom MVT vector source's callback context. */
-MLN_BINDING("reentry=forbid")
-typedef void (*mln_custom_mvt_vector_source_release_callback)(void* user_data);
 
 /** Options for custom MVT vector sources. */
 typedef struct mln_custom_mvt_vector_source_options {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_custom_mvt_vector_source_option_field");
   /** Required tile fetch callback. */
-  mln_custom_mvt_vector_source_tile_callback fetch_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback fetch_tile MLN_BINDING("nullable=true");
   /** Optional best-effort tile cancel callback. */
-  mln_custom_mvt_vector_source_tile_callback cancel_tile
-    MLN_BINDING("nullable=true");
+  mln_custom_source_tile_callback cancel_tile MLN_BINDING("nullable=true");
   /** Caller-owned callback context retained by pointer. */
   void* user_data MLN_BINDING("kind=context");
   double min_zoom
@@ -595,9 +581,9 @@ typedef struct mln_custom_mvt_vector_source_options {
    * inside MapLibre's dispatch. Free callback state and return. Schedule native
    * owner cleanup after this callback returns.
    */
-  mln_custom_mvt_vector_source_release_callback release_user_data;
+  mln_user_data_release release_user_data;
 } mln_custom_mvt_vector_source_options MLN_BINDING(
-  "kind=callback_registration;release=release_user_data"
+  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
 );
 
 /** Caller-owned premultiplied RGBA8 image pixels. */

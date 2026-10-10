@@ -93,10 +93,6 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
         if receiver
         else "Maplibre"
     )
-    if plan.direct_registrations:
-        from .swift_callbacks import direct_operation
-
-        return direct_operation(plan, value_types)
     if plan.view:
         from .swift_views import operation as view_operation
 
@@ -434,6 +430,20 @@ def operation(plan: OperationPlan, value_types) -> tuple[str, str | None]:
                         )
             capture.append(value_types.copy(value, f"value{index}"))
         absent = f", absentOn: {plan.absence.status}" if plan.absence else ""
+        declined = next(
+            (
+                f"value{index}"
+                for registration in plan.registrations
+                if registration.accepted_unless
+                for index, output in enumerate(outputs)
+                if output.name == registration.accepted_unless
+            ),
+            None,
+        )
+        if declined:
+            # Native kept nothing from a declined registration, so its
+            # callbacks release with the arena.
+            call = f"let status = {call}; arena.decline(if: status == MLN_STATUS_OK && {declined}); return status"
         invoke = (
             f"nativeInvoke({target}{absent}) {{ raw, arena, diagnostic in {call} }}"
         )

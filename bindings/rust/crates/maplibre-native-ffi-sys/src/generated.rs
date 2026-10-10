@@ -539,7 +539,7 @@ pub struct mln_completion {
     pub size: u32,
     pub callback: mln_completion_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_completion_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -558,8 +558,8 @@ pub struct mln_completion_result {
 pub struct mln_custom_geometry_source_options {
     pub size: u32,
     pub fields: u32,
-    pub fetch_tile: mln_custom_geometry_source_tile_callback,
-    pub cancel_tile: mln_custom_geometry_source_tile_callback,
+    pub fetch_tile: mln_custom_source_tile_callback,
+    pub cancel_tile: mln_custom_source_tile_callback,
     pub user_data: *mut std::ffi::c_void,
     pub min_zoom: f64,
     pub max_zoom: f64,
@@ -568,19 +568,19 @@ pub struct mln_custom_geometry_source_options {
     pub buffer: u32,
     pub clip: bool,
     pub wrap: bool,
-    pub release_user_data: mln_custom_geometry_source_release_callback,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_custom_mvt_vector_source_options {
     pub size: u32,
     pub fields: u32,
-    pub fetch_tile: mln_custom_mvt_vector_source_tile_callback,
-    pub cancel_tile: mln_custom_mvt_vector_source_tile_callback,
+    pub fetch_tile: mln_custom_source_tile_callback,
+    pub cancel_tile: mln_custom_source_tile_callback,
     pub user_data: *mut std::ffi::c_void,
     pub min_zoom: f64,
     pub max_zoom: f64,
-    pub release_user_data: mln_custom_mvt_vector_source_release_callback,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -675,7 +675,7 @@ pub struct mln_http_header_transform {
     pub size: u32,
     pub callback: mln_http_header_transform_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_runtime_callback_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -708,6 +708,14 @@ pub struct mln_lat_lng {
 pub struct mln_lat_lng_bounds {
     pub southwest: mln_lat_lng,
     pub northeast: mln_lat_lng,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_log_handler {
+    pub size: u32,
+    pub callback: mln_log_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -974,7 +982,7 @@ pub struct mln_queue_lock {
     pub lock: mln_queue_lock_callback,
     pub unlock: mln_queue_lock_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_queue_lock_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1087,7 +1095,7 @@ pub struct mln_resource_provider {
     pub size: u32,
     pub callback: mln_resource_provider_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_runtime_callback_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1116,6 +1124,14 @@ pub struct mln_resource_request {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_resource_request_cancel_handler {
+    pub size: u32,
+    pub callback: mln_resource_request_cancel_callback,
+    pub user_data: *mut std::ffi::c_void,
+    pub release_user_data: mln_user_data_release,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_resource_response {
     pub size: u32,
     pub fields: u32,
@@ -1136,7 +1152,7 @@ pub struct mln_resource_transform {
     pub size: u32,
     pub callback: mln_resource_transform_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_runtime_callback_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1498,7 +1514,7 @@ pub struct mln_wake {
     pub size: u32,
     pub callback: mln_wake_callback,
     pub user_data: *mut std::ffi::c_void,
-    pub release_user_data: mln_wake_release,
+    pub release_user_data: mln_user_data_release,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1572,14 +1588,7 @@ pub struct mln_acquired_frame(pub u64);
 pub type mln_completion_callback = Option<
     unsafe extern "C" fn(user_data: *mut std::ffi::c_void, result: *const mln_completion_result),
 >;
-pub type mln_completion_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_custom_geometry_source_release_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_custom_geometry_source_tile_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
-pub type mln_custom_mvt_vector_source_release_callback =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_custom_mvt_vector_source_tile_callback =
+pub type mln_custom_source_tile_callback =
     Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void, tile_id: mln_canonical_tile_id)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1604,7 +1613,6 @@ pub type mln_log_callback = Option<
         message: *const std::ffi::c_char,
     ) -> u32,
 >;
-pub type mln_log_callback_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_map(pub u64);
@@ -1613,7 +1621,6 @@ pub struct mln_map(pub u64);
 pub struct mln_map_projection(pub u64);
 pub type mln_offline_region_id = i64;
 pub type mln_queue_lock_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_queue_lock_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_render_frame_batch(pub u64);
@@ -1643,11 +1650,9 @@ pub type mln_resource_transform_callback = Option<
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct mln_runtime(pub u64);
-pub type mln_runtime_callback_release =
-    Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
+pub type mln_user_data_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 pub type mln_vulkan_non_dispatchable_handle = u64;
 pub type mln_wake_callback = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
-pub type mln_wake_release = Option<unsafe extern "C" fn(user_data: *mut std::ffi::c_void)>;
 native_handles!(
     mln_acquired_frame,
     mln_event_batch,
@@ -1757,9 +1762,7 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_log_set_callback(
-        callback: mln_log_callback,
-        user_data: *mut std::ffi::c_void,
-        release_user_data: mln_log_callback_release,
+        handler: *const mln_log_handler,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_add_color_relief_layer(
@@ -2771,9 +2774,7 @@ unsafe extern "C" {
     pub fn mln_resource_request_release(handle: mln_resource_request_handle);
     pub fn mln_resource_request_set_cancel_callback(
         handle: mln_resource_request_handle,
-        callback: mln_resource_request_cancel_callback,
-        user_data: *mut std::ffi::c_void,
-        release_user_data: mln_runtime_callback_release,
+        handler: *const mln_resource_request_cancel_handler,
         out_cancelled: *mut bool,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;

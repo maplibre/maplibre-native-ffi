@@ -715,7 +715,7 @@ auto to_c_canonical_tile_id(const mln::CanonicalTileID& tile_id)
 }
 
 auto to_native_tile_function(
-  mln_custom_geometry_source_tile_callback callback, void* user_data
+  mln_custom_source_tile_callback callback, void* user_data
 ) -> mln::style::TileFunction {
   if (callback == nullptr) {
     return nullptr;

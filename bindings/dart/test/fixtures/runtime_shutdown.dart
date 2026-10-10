@@ -102,7 +102,7 @@ Future<void> abandonSession() async {
 /// keeps the isolate alive itself until the resource provider runs, with a
 /// port that the provider closes.
 Future<void> exitWithLiveCallbacks() async {
-  logSetCallback((_, _, _, _) {});
+  logSetCallback(LogHandler(callback: (_, _, _, _) {}));
   final runtime = runtimeCreate(
     RuntimeOptions(eventWake: Wake(callback: () {})),
   );

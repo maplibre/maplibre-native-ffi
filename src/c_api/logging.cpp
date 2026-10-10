@@ -8,11 +8,10 @@
 #include "maplibre_native_c.h"
 
 auto mln_log_set_callback(
-  mln_log_callback callback, void* user_data,
-  mln_log_callback_release release_user_data, mln_diagnostic* out_diagnostic
+  const mln_log_handler* handler, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::set_log_callback(callback, user_data, release_user_data);
+    return mln::core::set_log_callback(handler);
   });
 }
 

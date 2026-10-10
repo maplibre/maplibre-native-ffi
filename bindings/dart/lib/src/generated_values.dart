@@ -1773,11 +1773,12 @@ final class CanonicalTileId extends _Value {
   List<Object?> get _members => [z, x, y];
 }
 
-/// Callback invoked for custom geometry source tile requests and cancels.
+/// Callback invoked for custom geometry and custom MVT vector source tile
+/// requests and cancels.
 ///
-/// See `mln_custom_geometry_source_tile_callback` in the
+/// See `mln_custom_source_tile_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomGeometrySourceTileCallback = void Function(CanonicalTileId);
+typedef CustomSourceTileCallback = void Function(CanonicalTileId);
 
 /// Options for custom geometry sources.
 ///
@@ -1795,8 +1796,8 @@ final class CustomGeometrySourceOptions {
     this.clip,
     this.wrap,
   });
-  final CustomGeometrySourceTileCallback? fetchTile;
-  final CustomGeometrySourceTileCallback? cancelTile;
+  final CustomSourceTileCallback? fetchTile;
+  final CustomSourceTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
   final double? tolerance;
@@ -1805,12 +1806,6 @@ final class CustomGeometrySourceOptions {
   final bool? clip;
   final bool? wrap;
 }
-
-/// Callback invoked for custom MVT vector source tile requests and cancels.
-///
-/// See `mln_custom_mvt_vector_source_tile_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-typedef CustomMvtVectorSourceTileCallback = void Function(CanonicalTileId);
 
 /// Options for custom MVT vector sources.
 ///
@@ -1823,8 +1818,8 @@ final class CustomMvtVectorSourceOptions {
     this.minZoom,
     this.maxZoom,
   });
-  final CustomMvtVectorSourceTileCallback? fetchTile;
-  final CustomMvtVectorSourceTileCallback? cancelTile;
+  final CustomSourceTileCallback? fetchTile;
+  final CustomSourceTileCallback? cancelTile;
   final double? minZoom;
   final double? maxZoom;
 }
@@ -2328,6 +2323,15 @@ final class ProjectedMeters extends _Value {
 /// See `mln_log_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
+
+/// Process-global log callback state.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+final class LogHandler {
+  const LogHandler({required this.callback});
+  final LogCallback callback;
+}
 
 /// Caller-owned premultiplied RGBA8 image pixels.
 ///
@@ -3773,6 +3777,15 @@ final class ResourceResponse extends _Value {
 /// See `mln_resource_request_cancel_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 typedef ResourceRequestCancelCallback = void Function();
+
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+final class ResourceRequestCancelHandler {
+  const ResourceRequestCancelHandler({required this.callback});
+  final ResourceRequestCancelCallback callback;
+}
 
 /// Options used when creating a runtime.
 ///

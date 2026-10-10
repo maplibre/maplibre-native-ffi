@@ -46,11 +46,6 @@ impl<'a, H: NativeHandle> Call<'a, H> {
         }
     }
 
-    /// The storage that lives through the native call.
-    pub(crate) fn arena(&mut self) -> &mut InputArena {
-        &mut self.arena
-    }
-
     /// Converts one argument; the result borrows `value` and this call.
     pub(crate) fn input<N, T: ToNative<N> + ?Sized>(&mut self, value: &T) -> Result<N> {
         value.to_native(&mut self.arena)

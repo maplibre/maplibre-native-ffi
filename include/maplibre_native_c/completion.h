@@ -58,9 +58,6 @@ typedef void (*mln_completion_callback)(
   void* user_data, const mln_completion_result* result
 );
 
-/** Releases user_data after its completion can no longer run. */
-typedef void (*mln_completion_release)(void* user_data);
-
 /**
  * Callback state for one asynchronous submission.
  *
@@ -79,7 +76,11 @@ typedef struct mln_completion {
   uint32_t size;
   mln_completion_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  mln_completion_release release_user_data;
+  /**
+   * Optional. Releases user_data on the completing thread after the completion
+   * returns.
+   */
+  mln_user_data_release release_user_data;
 } mln_completion MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );

@@ -684,8 +684,15 @@ class Values:
             )
             lines.append(f"        if ({condition})")
             lines.append("        {")
+            # A callback that calls back only into the receiver that
+            # registered it carries that receiver.
+            rooted = (
+                "new NativeOwnedCallback(value with { }, scope.Receiver!)"
+                if plan.registration.receiver_owned
+                else "value with { }"
+            )
             lines.append(
-                f"            native.{member(plan.registration.user_data)} = scope.Register(value with {{ }});"
+                f"            native.{member(plan.registration.user_data)} = scope.Register({rooted});"
             )
             lines.append(
                 f"            native.{member(plan.registration.release)} = &NativeCallbackRoot.Release;"
@@ -834,6 +841,8 @@ class Values:
                 owner_expression = (
                     "owned"
                     if callback.decision
+                    else "receiver.Owner"
+                    if policy.owner_parameter is None
                     else "response" + pascal(policy.owner_parameter)
                 )
                 restriction = f"            using var restriction = NativeCallbackGuard.Restrict({owner_expression}, {table});\n"
@@ -893,24 +902,38 @@ class Values:
             cleanup = " ".join(
                 f"response{pascal(parameter.name)}.Expire();" for parameter in responses
             )
-            invoke = f"(({public_name(plan.native)})NativeCallbackRoot.Value({member(callback.context)})).{pascal(name)}?.Invoke({converted});"
+            root = f"NativeCallbackRoot.Value({member(callback.context)})"
+            if plan.registration.receiver_owned:
+                setup += f"            var receiver = (NativeOwnedCallback){root};\n"
+                root = "receiver.Callback"
+            invoke = f"(({public_name(plan.native)}){root}).{pascal(name)}?.Invoke({converted});"
             if responses:
                 invoke = f"try {{ {invoke} }} finally {{ {cleanup} }}"
             result_type = (
                 "void"
                 if callback.result.ctype.kind == "void"
                 else callback.result.native
+                if callback.status
+                else self.raw_type(callback.result)
             )
             success = (
-                ""
-                if result_type == "void"
-                else "            return mln_status.MLN_STATUS_OK;\n"
+                "            return mln_status.MLN_STATUS_OK;\n"
+                if callback.status
+                else ""
             )
-            failure = (
-                ""
-                if result_type == "void"
-                else f"return {self.constant(callback.failure)};"
+            failure_value = (
+                self.constant(callback.failure)
+                if callback.failure and callback.failure.startswith("MLN_")
+                else callback.failure
             )
+            failure = "" if result_type == "void" else f"return {failure_value};"
+            if result_type != "void" and not callback.status:
+                # A callback that answers with a value returns its failure value
+                # when the record leaves it unset.
+                invoke = (
+                    f"var answer = (({public_name(plan.native)}){root}).{pascal(name)}; "
+                    f"return answer is null ? {failure_value} : ({result_type})answer({converted});"
+                )
             methods.append(
                 "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
                 f"    private static {result_type} Invoke{public_name(plan.native)}{pascal(name)}({args})\n    {{\n"
@@ -918,64 +941,6 @@ class Values:
                 f'        catch (Exception error)\n        {{\n            NativeCallbackFailure.Report("{callback.native}", error);\n            {failure}\n        }}\n    }}\n'
             )
         return "\n".join(methods)
-
-    def owned_direct_callback(self, plan: ValuePlan) -> bool:
-        policy = self.bound.callbacks[plan.native].reentry_policy
-        if policy and not policy.registration_owner:
-            raise Unsupported(
-                f"{plan.native}: direct callback requires a registration owner"
-            )
-        return policy is not None
-
-    def direct_callback_method(self, plan: ValuePlan) -> str:
-        callback = self.bound.callbacks[plan.native]
-        self.supported(plan)
-        parameters = ", ".join(
-            f"{self.raw_type(parameter.value)} {member(parameter.name)}"
-            for parameter in callback.parameters
-        )
-        arguments = ", ".join(
-            self.copy(parameter.value, member(parameter.name))
-            for parameter in callback.parameters
-            if parameter.name != callback.context
-        )
-        result = (
-            self.raw_type(callback.result)
-            if callback.result.native != "void"
-            else "void"
-        )
-        delegate = self.public_type(plan).removesuffix("?")
-        call = f"(({delegate})NativeCallbackRoot.Value({member(callback.context)}))({arguments})"
-        failure = (
-            ""
-            if result == "void"
-            else f"return {self.constant(callback.failure) if callback.failure and callback.failure.startswith('MLN_') else callback.failure};"
-        )
-        guard = (
-            "using var restriction = NativeCallbackGuard.ForbidReentry(); "
-            if callback.reentry == "forbid"
-            else ""
-        )
-        table_declaration = ""
-        if self.owned_direct_callback(plan):
-            policy = callback.reentry_policy
-            table = "Allowed" + public_name(plan.native)
-            operations = ", ".join(f'"{item}"' for item in policy.operations)
-            table_declaration = (
-                f"    private static readonly string[] {table} = [{operations}];\n"
-            )
-            guard = (
-                f"var owned = (NativeOwnedCallback)NativeCallbackRoot.Value({member(callback.context)}); "
-                f"using var restriction = NativeCallbackGuard.Restrict(owned.Owner, {table}); "
-            )
-            call = f"(({delegate})owned.Callback)({arguments})"
-        statement = call + ";" if result == "void" else f"return {call};"
-        return (
-            table_declaration
-            + "    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]\n"
-            f"    internal static {result} Invoke{public_name(plan.native)}({parameters})\n    {{\n"
-            f'        try {{ {guard}{statement} }}\n        catch (Exception error) {{ NativeCallbackFailure.Report("{callback.native}", error); {failure} }}\n    }}\n'
-        )
 
     def array_member(
         self, plan: ValuePlan, name: str, field: FieldPlan

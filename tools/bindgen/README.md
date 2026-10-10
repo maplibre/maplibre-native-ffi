@@ -125,7 +125,7 @@ the rest: `lifetime=completion` for an array completion result, and
 | `kind=reserved` member              | `default=0`                                                                                |
 | Callback typedef                    | `reentry=allow`; a void callback has `failure=contain`                                     |
 | Handle typedef                      | `parent=none`; its operations begin with its own name (`prefix=<handle>`)                  |
-| Callback registration               | `user_data` names its one `kind=context` member or parameter                               |
+| Callback registration               | `user_data` names its one `kind=context` member                                            |
 | Record typedef                      | `default` names the one function that takes no arguments and returns the record            |
 
 `STRUCT_SIZE_FIELD` in `schema.py` names the size member, because other structs
@@ -136,7 +136,7 @@ diagnostic, the completion and its result, and the buffer view. It also names
 `MLN_STATUS_NOT_READY`, which reports a drain with nothing queued. No other rule
 reads a declaration's name.
 
-Five keys state what a C shape cannot:
+Eight keys state what a C shape cannot:
 
 - `prefix=` on a handle names the prefix of its operations when that differs
   from the handle's type name, as `mln_resource_request` does for
@@ -173,6 +173,24 @@ Five keys state what a C shape cannot:
   required fields. The cases skip optional fields, unions, union tags, buffer
   views, and arrays, so those fields take no `default=`, and neither does a
   record that only those fields reach.
+
+- `accepted_unless=` on a function names a boolean output that, when set on
+  success, reports that native kept nothing from the function's one callback
+  registration, as `out_cancelled` does for
+  `mln_resource_request_set_cancel_callback`. The caller still owns that
+  registration, so a binding releases its roots before returning.
+- `release_reentry=forbid` on a callback registration says that its release runs
+  where host code must not call the C API, as with the log handler and the
+  custom source options. Every registration shares the release typedef
+  `mln_user_data_release`, so the registration carries this rule.
+- `reentry_owner=` on a protocol callback names the parameter whose operations
+  the callback may call. A callback without such a parameter names the handle
+  type instead, as `mln_resource_request_cancel_callback` does, and may call
+  back only into the receiver of the call that registers it. A binding records
+  that receiver with the registration.
+
+Every callback registration is a struct with `kind=callback_registration`, which
+a function takes by pointer.
 
 No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment

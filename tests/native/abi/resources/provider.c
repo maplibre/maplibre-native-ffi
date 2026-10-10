@@ -30,6 +30,18 @@ static void count_runtime_callback_release(void* user_data) {
 
 static void ignore_cancel(void* user_data) { (void)user_data; }
 
+static mln_resource_request_cancel_handler cancel_handler(
+  mln_resource_request_cancel_callback callback, void* user_data,
+  mln_user_data_release release_user_data
+) {
+  return (mln_resource_request_cancel_handler){
+    .size = sizeof(mln_resource_request_cancel_handler),
+    .callback = callback,
+    .user_data = user_data,
+    .release_user_data = release_user_data,
+  };
+}
+
 static mln_status submit_provider(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
 ) {
@@ -115,8 +127,10 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   MLN_TEST_INVALID(
     mln_resource_request_complete(MLN_HANDLE_NULL, &response, NULL)
   );
+  const mln_resource_request_cancel_handler handler =
+    cancel_handler(ignore_cancel, NULL, NULL);
   MLN_TEST_INVALID(mln_resource_request_set_cancel_callback(
-    MLN_HANDLE_NULL, ignore_cancel, NULL, NULL, &cancelled, NULL
+    MLN_HANDLE_NULL, &handler, &cancelled, NULL
   ));
   MLN_TEST_INVALID(
     mln_resource_request_wait_until_retired(MLN_HANDLE_NULL, NULL)
@@ -444,6 +458,7 @@ typedef struct cancel_probe {
   atomic_bool skip_register;
   atomic_int register_status;
   atomic_bool register_reported_cancelled;
+  atomic_bool rejected_invalid_handlers;
   _Atomic mln_resource_request_handle handle;
 } cancel_probe;
 
@@ -465,6 +480,33 @@ static void count_cancel_release(void* user_data) {
   mln_test_pulse();
 }
 
+// Each invalid handler fails without taking the request's one registration
+// or releasing its user data.
+static bool rejects_invalid_cancel_handlers(
+  mln_resource_request_handle handle, cancel_probe* probe
+) {
+  mln_resource_request_cancel_handler undersized =
+    cancel_handler(count_cancel, probe, count_cancel_release);
+  undersized.size -= 1;
+  const mln_resource_request_cancel_handler without_callback =
+    cancel_handler(NULL, probe, count_cancel_release);
+  const mln_resource_request_cancel_handler* const handlers[] = {
+    NULL, &undersized, &without_callback
+  };
+  for (size_t index = 0; index < sizeof(handlers) / sizeof(*handlers);
+       ++index) {
+    bool cancelled = false;
+    if (
+      mln_resource_request_set_cancel_callback(
+        handle, handlers[index], &cancelled, NULL
+      ) != MLN_STATUS_INVALID_ARGUMENT
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static uint32_t cancel_probe_resource_provider(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle handle
@@ -473,12 +515,17 @@ static uint32_t cancel_probe_resource_provider(
   cancel_probe* probe = user_data;
   atomic_store(&probe->handle, handle);
   if (!atomic_load(&probe->skip_register)) {
-    bool cancelled = true;
     atomic_store(
-      &probe->register_status,
-      mln_resource_request_set_cancel_callback(
-        handle, count_cancel, probe, count_cancel_release, &cancelled, NULL
-      )
+      &probe->rejected_invalid_handlers,
+      rejects_invalid_cancel_handlers(handle, probe)
+    );
+    bool cancelled = true;
+    const mln_resource_request_cancel_handler handler =
+      cancel_handler(count_cancel, probe, count_cancel_release);
+    atomic_store(
+      &probe->register_status, mln_resource_request_set_cancel_callback(
+                                 handle, &handler, &cancelled, NULL
+                               )
     );
     atomic_store(&probe->register_reported_cancelled, cancelled);
   }
@@ -499,6 +546,7 @@ static mln_map start_cancel_probe_request(
   MLN_TEST_OK(mln_test_map_set_style_url(map, "custom://cancel-style.json"));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&probe->provider_entered));
   if (!atomic_load(&probe->skip_register)) {
+    TEST_ASSERT_TRUE(atomic_load(&probe->rejected_invalid_handlers));
     MLN_TEST_OK(atomic_load(&probe->register_status));
     TEST_ASSERT_FALSE(atomic_load(&probe->register_reported_cancelled));
   }
@@ -532,18 +580,19 @@ static void cancel_callback_runs_when_map_discards_request(void) {
   );
 
   cancelled = false;
+  const mln_resource_request_cancel_handler unreleased =
+    cancel_handler(count_cancel, &probe, NULL);
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE,
-    mln_resource_request_set_cancel_callback(
-      handle, count_cancel, &probe, NULL, &cancelled, NULL
-    )
+    MLN_STATUS_INVALID_STATE, mln_resource_request_set_cancel_callback(
+                                handle, &unreleased, &cancelled, NULL
+                              )
   );
   TEST_ASSERT_FALSE(cancelled);
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
 
   mln_resource_request_release(handle);
   MLN_TEST_INVALID_STATE(mln_resource_request_set_cancel_callback(
-    handle, count_cancel, &probe, NULL, &cancelled, NULL
+    handle, &unreleased, &cancelled, NULL
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.release_count));
@@ -584,9 +633,11 @@ static void late_cancel_callback_registration_reports_cancelled(void) {
   TEST_ASSERT_TRUE(poll.cancelled);
 
   bool cancelled = false;
-  MLN_TEST_OK(mln_resource_request_set_cancel_callback(
-    handle, count_cancel, &probe, count_cancel_release, &cancelled, NULL
-  ));
+  const mln_resource_request_cancel_handler handler =
+    cancel_handler(count_cancel, &probe, count_cancel_release);
+  MLN_TEST_OK(
+    mln_resource_request_set_cancel_callback(handle, &handler, &cancelled, NULL)
+  );
   TEST_ASSERT_TRUE(cancelled);
   TEST_ASSERT_EQUAL_INT(0, atomic_load(&probe.cancel_count));
 
@@ -610,8 +661,10 @@ static void cancel_callback_may_release_the_request(void) {
   const mln_resource_request_handle handle = atomic_load(&probe.handle);
   MLN_TEST_OK(mln_resource_request_wait_until_retired(handle, NULL));
   bool cancelled = false;
+  const mln_resource_request_cancel_handler unreleased =
+    cancel_handler(count_cancel, &probe, NULL);
   MLN_TEST_INVALID_STATE(mln_resource_request_set_cancel_callback(
-    handle, count_cancel, &probe, NULL, &cancelled, NULL
+    handle, &unreleased, &cancelled, NULL
   ));
   TEST_ASSERT_EQUAL_INT(1, atomic_load(&probe.cancel_count));
   mln_test_destroy_runtime(runtime);

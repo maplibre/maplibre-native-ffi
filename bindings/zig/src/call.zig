@@ -171,6 +171,15 @@ fn Receiver(comptime access: Access, comptime T: type) type {
             }
         }
 
+        /// The owner that a registration the call retains calls back into.
+        fn ownerId(receiver: T) u64 {
+            return switch (access) {
+                .none => 0,
+                .scoped => @intFromPtr(receiver.native),
+                else => receiver.raw,
+            };
+        }
+
         /// Takes hold of the receiver, or returns null for a closed one.
         fn acquire(receiver: T, diagnostic: ?*Diagnostic) Error!?Self {
             return .{ .state = switch (access) {
@@ -266,6 +275,7 @@ fn Operation(comptime name: []const u8, comptime access: Access, comptime Receiv
             const hold = try Hold.acquire(receiver, diagnostic) orelse return null;
             return .{
                 .receiver = hold,
+                .roots = .{ .owner = Hold.ownerId(receiver) },
                 .diagnostic = diagnostic,
                 .arena = if (Allocator == std.mem.Allocator) std.heap.ArenaAllocator.init(allocator) else {},
             };
@@ -457,6 +467,34 @@ pub fn invokeUnless(
     op.settled = true;
     if (!present) return null;
     return try op.outputs(allocator);
+}
+
+/// Calls a status-returning native function like `invoke` whose one output
+/// reports, when true, that native kept nothing from the call's registration.
+/// The roots of a declined registration release with the call, and the call
+/// returns whether native declined it.
+pub fn invokeDeclinable(
+    comptime name: []const u8,
+    comptime access: Access,
+    receiver: anytype,
+    allocator: anytype,
+    diagnostic: ?*Diagnostic,
+    args: anytype,
+) Error!bool {
+    status.begin(diagnostic);
+    errdefer |err| status.fail(diagnostic, err);
+    const Op = Operation(name, access, @TypeOf(receiver), @TypeOf(allocator), @TypeOf(args));
+    if (Outputs(@TypeOf(args)) != bool) @compileError(name ++ ": a declinable call has one boolean output");
+    // Only a closing call finds its receiver closed, and a close declines nothing.
+    var op = (try Op.begin(receiver, allocator, diagnostic)).?;
+    defer op.end();
+    const native = try op.arguments(args);
+    try status.call(@field(c, name), native, diagnostic);
+    const declined = try op.outputs(allocator);
+    var kept: callback.Roots = .{};
+    op.receiver.succeed(if (declined) &kept else &op.roots);
+    op.settled = true;
+    return declined;
 }
 
 /// Calls a native function that returns its result rather than a status, and

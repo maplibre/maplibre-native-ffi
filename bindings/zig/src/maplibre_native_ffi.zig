@@ -603,37 +603,37 @@ pub const CustomGeometrySourceOptions = struct {
         }
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_geometry_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_geometry_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_geometry_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_geometry_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomGeometrySourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_geometry_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_geometry_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
@@ -699,37 +699,37 @@ pub const CustomMvtVectorSourceOptions = struct {
         }
         return raw;
     }
-    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+    fn fetch_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.fetch_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
-    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+    fn cancel_tileTrampoline(native_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) callconv(.c) marshal.CallbackResult(c.mln_custom_source_tile_callback) {
         return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_mvt_vector_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_mvt_vector_source_tile_callback) {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_custom_source_tile_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_custom_source_tile_callback, 1)) status.Error!marshal.CallbackResult(c.mln_custom_source_tile_callback) {
                 const state = callback.Registration(CustomMvtVectorSourceOptions).get(callback_arg_0);
                 const host = state.value.cancel_tile orelse {
                     return;
                 };
                 host(state.value.context, CanonicalTileId.fromNative(callback_arg_1)) catch |err| {
-                    callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+                    callback.reportError("mln_custom_source_tile_callback", err);
                     return;
                 };
             }
         }.invoke(native_arg_0, native_arg_1) catch |err| {
-            callback.reportError("mln_custom_mvt_vector_source_tile_callback", err);
+            callback.reportError("mln_custom_source_tile_callback", err);
             return;
         };
     }
@@ -1334,6 +1334,52 @@ pub const LogEvent = enum(u32) {
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
     pub const toNative = marshal.EnumMethods(@This()).toNative;
+};
+
+/// Process-global log callback state.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+pub const LogHandler = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    callback: ?*const fn (?*anyopaque, LogSeverity, LogEvent, i64, []const u8) status.Error!u32 = null,
+    pub fn toNative(self: LogHandler, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_log_handler {
+        _ = allocator;
+        var raw = std.mem.zeroes(c.mln_log_handler);
+        raw.size = @sizeOf(c.mln_log_handler);
+        raw.callback = if (self.callback != null) callbackTrampoline else null;
+        if (!(self.callback == null)) {
+            const retained = try roots.retain(LogHandler, self);
+            raw.user_data = retained;
+            raw.release_user_data = callback.Registration(LogHandler).releaseNative;
+        }
+        return raw;
+    }
+    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), native_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) callconv(.c) marshal.CallbackResult(c.mln_log_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), callback_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) status.Error!marshal.CallbackResult(c.mln_log_callback) {
+                const state = callback.Registration(LogHandler).get(callback_arg_0);
+                const host = state.value.callback orelse {
+                    return 0;
+                };
+                var scope: callback.Scope = .{};
+                scope.enter(&.{}, 0);
+                defer scope.leave();
+                var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
+                defer arena.deinit();
+                const allocator = arena.allocator();
+                const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try allocator.dupe(u8, std.mem.span(callback_arg_4 orelse return error.NativeError))) catch |err| {
+                    callback.reportError("mln_log_callback", err);
+                    return 0;
+                };
+                return result;
+            }
+        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3, native_arg_4) catch |err| {
+            callback.reportError("mln_log_callback", err);
+            return 0;
+        };
+    }
 };
 
 /// Log severity values emitted by MapLibre Native.
@@ -3224,6 +3270,48 @@ pub const ResourceRequest = struct {
             .prior_expires_unix_ms = if (raw.fields & c.MLN_RESOURCE_REQUEST_PRIOR_EXPIRES != 0) raw.prior_expires_unix_ms else null,
             .prior_etag = if (raw.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(raw.prior_etag orelse return error.NativeError)),
             .prior_data = try marshal.copyView(allocator, .{ .data = raw.prior_data, .size = raw.prior_data_size }),
+        };
+    }
+};
+
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+pub const ResourceRequestCancelHandler = struct {
+    context: ?*anyopaque = null,
+    release_context: ?*const fn (?*anyopaque) void = null,
+    callback: ?*const fn (?*anyopaque) status.Error!void = null,
+    pub fn toNative(self: ResourceRequestCancelHandler, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_resource_request_cancel_handler {
+        _ = allocator;
+        var raw = std.mem.zeroes(c.mln_resource_request_cancel_handler);
+        raw.size = @sizeOf(c.mln_resource_request_cancel_handler);
+        raw.callback = if (self.callback != null) callbackTrampoline else null;
+        if (!(self.callback == null)) {
+            const retained = try roots.retain(ResourceRequestCancelHandler, self);
+            raw.user_data = retained;
+            raw.release_user_data = callback.Registration(ResourceRequestCancelHandler).releaseNative;
+        }
+        return raw;
+    }
+    fn callbackTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
+        return struct {
+            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) status.Error!marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
+                const state = callback.Registration(ResourceRequestCancelHandler).get(callback_arg_0);
+                const host = state.value.callback orelse {
+                    return;
+                };
+                var scope: callback.Scope = .{};
+                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.owner);
+                defer scope.leave();
+                host(state.value.context) catch |err| {
+                    callback.reportError("mln_resource_request_cancel_callback", err);
+                    return;
+                };
+            }
+        }.invoke(native_arg_0) catch |err| {
+            callback.reportError("mln_resource_request_cancel_callback", err);
+            return;
         };
     }
 };
@@ -5657,52 +5745,12 @@ pub fn logSetAsyncSeverityMask(mask: LogSeverityMask, diagnostic: ?*diagnostics.
     return call.invoke("mln_log_set_async_severity_mask", .none, {}, null, diagnostic, .{mask});
 }
 
-pub const LogCallback = struct {
-    context: ?*anyopaque = null,
-    release_context: ?*const fn (?*anyopaque) void = null,
-    call: ?*const fn (?*anyopaque, LogSeverity, LogEvent, i64, []const u8) status.Error!u32 = null,
-    fn callTrampoline(native_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), native_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), native_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), native_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), native_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) callconv(.c) marshal.CallbackResult(c.mln_log_callback) {
-        return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_log_callback, 0), callback_arg_1: marshal.CallbackArg(c.mln_log_callback, 1), callback_arg_2: marshal.CallbackArg(c.mln_log_callback, 2), callback_arg_3: marshal.CallbackArg(c.mln_log_callback, 3), callback_arg_4: marshal.CallbackArg(c.mln_log_callback, 4)) status.Error!marshal.CallbackResult(c.mln_log_callback) {
-                const state = callback.Registration(LogCallback).get(callback_arg_0);
-                const host = state.value.call orelse {
-                    return 0;
-                };
-                var scope: callback.Scope = .{};
-                scope.enter(&.{}, 0);
-                defer scope.leave();
-                var arena = std.heap.ArenaAllocator.init(std.heap.smp_allocator);
-                defer arena.deinit();
-                const allocator = arena.allocator();
-                const result = host(state.value.context, LogSeverity.fromNative(callback_arg_1), LogEvent.fromNative(callback_arg_2), callback_arg_3, try allocator.dupe(u8, std.mem.span(callback_arg_4 orelse return error.NativeError))) catch |err| {
-                    callback.reportError("mln_log_callback", err);
-                    return 0;
-                };
-                return result;
-            }
-        }.invoke(native_arg_0, native_arg_1, native_arg_2, native_arg_3, native_arg_4) catch |err| {
-            callback.reportError("mln_log_callback", err);
-            return 0;
-        };
-    }
-};
 /// Installs a process-global MapLibre Native log callback.
 ///
 /// See `mln_log_set_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub fn logSetCallback(callback_input: ?LogCallback, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
-    const binding_arg_0 = callback_input;
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_log_set_callback", 0);
-    var roots: callback.Roots = .{};
-    defer roots.deinit();
-    var context: ?*anyopaque = null;
-    if (binding_arg_0) |value| {
-        if (value.call != null) context = try roots.retain(LogCallback, value);
-    }
-    try status.call(c.mln_log_set_callback, .{ if (context != null) &LogCallback.callTrampoline else null, context, if (context != null) &callback.Registration(LogCallback).releaseNative else null }, diagnostic);
-    roots.accept();
+pub fn logSetCallback(allocator: std.mem.Allocator, handler: LogHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!void {
+    return call.invoke("mln_log_set_callback", .none, {}, allocator, diagnostic, .{handler});
 }
 
 /// Adds a color-relief layer for a raster DEM source.
@@ -7151,58 +7199,13 @@ pub fn resourceRequestRelease(handle: ResourceRequestHandle) status.Error!void {
     return call.direct("mln_resource_request_release", .close, handle, void, null, .{});
 }
 
-pub const ResourceRequestCancelCallback = struct {
-    context: ?*anyopaque = null,
-    release_context: ?*const fn (?*anyopaque) void = null,
-    call: ?*const fn (?*anyopaque) status.Error!void = null,
-    owner: u64 = 0,
-    fn callTrampoline(native_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) callconv(.c) marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
-        return struct {
-            fn invoke(callback_arg_0: marshal.CallbackArg(c.mln_resource_request_cancel_callback, 0)) status.Error!marshal.CallbackResult(c.mln_resource_request_cancel_callback) {
-                const state = callback.Registration(ResourceRequestCancelCallback).get(callback_arg_0);
-                const host = state.value.call orelse {
-                    return;
-                };
-                var scope: callback.Scope = .{};
-                scope.enter(&.{ "mln_resource_request_complete", "mln_resource_request_cancelled", "mln_resource_request_set_cancel_callback", "mln_resource_request_release" }, state.value.owner);
-                defer scope.leave();
-                host(state.value.context) catch |err| {
-                    callback.reportError("mln_resource_request_cancel_callback", err);
-                    return;
-                };
-            }
-        }.invoke(native_arg_0) catch |err| {
-            callback.reportError("mln_resource_request_cancel_callback", err);
-            return;
-        };
-    }
-};
 /// Registers a callback that runs when MapLibre cancels a C API resource
 /// provider request.
 ///
 /// See `mln_resource_request_set_cancel_callback` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-pub fn resourceRequestSetCancelCallback(handle: ResourceRequestHandle, callback_input: ?ResourceRequestCancelCallback, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
-    const binding_arg_0 = handle;
-    const binding_arg_1 = callback_input;
-    status.begin(diagnostic);
-    errdefer |err| status.fail(diagnostic, err);
-    try callback.check("mln_resource_request_set_cancel_callback", binding_arg_0.raw);
-    const lease = try binding_arg_0.lease(diagnostic);
-    defer lease.release();
-    var roots: callback.Roots = .{};
-    defer roots.deinit();
-    var context: ?*anyopaque = null;
-    if (binding_arg_1) |value| {
-        var retained = value;
-        retained.owner = binding_arg_0.raw;
-        if (retained.call != null) context = try roots.retain(ResourceRequestCancelCallback, retained);
-    }
-    var rejected: bool = false;
-    try status.call(c.mln_resource_request_set_cancel_callback, .{ lease.native, if (context != null) &ResourceRequestCancelCallback.callTrampoline else null, context, if (context != null) &callback.Registration(ResourceRequestCancelCallback).releaseNative else null, &rejected }, diagnostic);
-    if (rejected) return true;
-    roots.accept();
-    return false;
+pub fn resourceRequestSetCancelCallback(allocator: std.mem.Allocator, handle: ResourceRequestHandle, handler: ResourceRequestCancelHandler, diagnostic: ?*diagnostics.Diagnostic) status.Error!bool {
+    return call.invokeDeclinable("mln_resource_request_set_cancel_callback", .lease, handle, allocator, diagnostic, .{ handler, call.out(bool) });
 }
 
 /// Blocks until a resource request is released and its cancel callback

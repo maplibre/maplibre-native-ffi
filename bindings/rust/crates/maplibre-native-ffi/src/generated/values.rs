@@ -660,7 +660,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_geometry_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
             callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -672,7 +672,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke("mln_custom_geometry_source_tile_callback", None, (), || {
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
             callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -815,15 +815,10 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(
-            "mln_custom_mvt_vector_source_tile_callback",
-            None,
-            (),
-            || {
-                callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
-                Ok(())
-            },
-        )
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+            callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
+            Ok(())
+        })
     }
     unsafe extern "C" fn cancel_tile_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -832,15 +827,10 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(
-            "mln_custom_mvt_vector_source_tile_callback",
-            None,
-            (),
-            || {
-                callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
-                Ok(())
-            },
-        )
+        callback::invoke("mln_custom_source_tile_callback", None, (), || {
+            callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
+            Ok(())
+        })
     }
 }
 impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSourceOptions {
@@ -1754,6 +1744,73 @@ pub enum LogEvent: u32 {
     Glyph = 15,
     Timing = 16,
 } Unknown
+}
+
+/// Process-global log callback state.
+///
+/// See `mln_log_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+#[derive(Clone, Default)]
+pub struct LogHandler {
+    pub callback: Option<
+        std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static>,
+    >,
+}
+impl std::fmt::Debug for LogHandler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LogHandler").finish_non_exhaustive()
+    }
+}
+impl LogHandler {
+    pub fn with_callback<F>(mut self, callback: F) -> Self
+    where
+        F: Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static,
+    {
+        self.callback = Some(std::sync::Arc::new(callback));
+        self
+    }
+    pub fn new<F>(callback: F) -> Self
+    where
+        F: Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static,
+    {
+        Self::default().with_callback(callback)
+    }
+    unsafe extern "C" fn callback_trampoline(
+        user_data: *mut std::ffi::c_void,
+        severity: u32,
+        event: u32,
+        code: i64,
+        message: *const std::ffi::c_char,
+    ) -> u32 {
+        // SAFETY: native passes the registration that this trampoline's
+        // descriptor transferred.
+        let state = unsafe { callback::state::<Self>(user_data) };
+        callback::invoke("mln_log_callback", Some((&[], 0)), 0, || {
+            let value = callback::require(&state.callback)?(
+                unsafe { from_native(severity) }?,
+                unsafe { from_native(event) }?,
+                code,
+                unsafe { from_native(message) }?,
+            );
+            Ok(value)
+        })
+    }
+}
+impl ToNative<sys::mln_log_handler> for LogHandler {
+    fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_log_handler> {
+        let mut raw: sys::mln_log_handler = unsafe { std::mem::zeroed() };
+        raw.size = std::mem::size_of::<sys::mln_log_handler>() as _;
+        raw.callback = self
+            .callback
+            .as_ref()
+            .map(|_| Self::callback_trampoline as _);
+        if !(raw.callback.is_none()) {
+            // SAFETY: the release reclaims exactly this state.
+            raw.user_data = unsafe { arena.registration(self.clone(), callback::release::<Self>) };
+            raw.release_user_data = Some(callback::release::<Self>);
+        }
+        Ok(raw)
+    }
 }
 
 native_enum! {
@@ -6861,6 +6918,30 @@ impl FromNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
     }
 }
 
+unsafe fn register_resource_request_cancel(
+    handle: sys::mln_resource_request_handle,
+    callback: maplibre_core::decision::ContextCallback,
+    user_data: *mut std::ffi::c_void,
+    release: maplibre_core::decision::ContextCallback,
+    out_cancelled: *mut bool,
+    out_diagnostic: *mut sys::mln_diagnostic,
+) -> sys::mln_status {
+    let mut handler: sys::mln_resource_request_cancel_handler = unsafe { std::mem::zeroed() };
+    handler.size = std::mem::size_of::<sys::mln_resource_request_cancel_handler>() as _;
+    handler.callback = callback;
+    handler.user_data = user_data;
+    handler.release_user_data = release;
+    // SAFETY: the caller passes the decision handle and the outputs that
+    // the C function requires; the handler is borrowed for the call.
+    unsafe {
+        sys::mln_resource_request_set_cancel_callback(
+            handle,
+            &handler,
+            out_cancelled,
+            out_diagnostic,
+        )
+    }
+}
 pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHandleFns<
     sys::mln_resource_request_handle,
 > = unsafe {
@@ -6869,7 +6950,7 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE,
         sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH,
         sys::mln_resource_request_release,
-        sys::mln_resource_request_set_cancel_callback,
+        register_resource_request_cancel,
         &[
             "mln_resource_request_complete",
             "mln_resource_request_cancelled",
@@ -6878,48 +6959,3 @@ pub(crate) const RESOURCE_REQUEST_DECISION: maplibre_core::decision::DecisionHan
         ],
     )
 };
-
-/// Receives a MapLibre Native log record.
-///
-/// See `mln_log_callback` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
-pub type LogCallback =
-    std::sync::Arc<dyn Fn(LogSeverity, LogEvent, i64, String) -> u32 + Send + Sync + 'static>;
-pub(crate) fn log_callback_registration(
-    callback: Option<LogCallback>,
-    arena: &mut InputArena,
-) -> (
-    sys::mln_log_callback,
-    *mut std::ffi::c_void,
-    sys::mln_log_callback_release,
-) {
-    unsafe extern "C" fn invoke(
-        user_data: *mut std::ffi::c_void,
-        severity: u32,
-        event: u32,
-        code: i64,
-        message: *const std::ffi::c_char,
-    ) -> u32 {
-        // SAFETY: native passes the registration that this trampoline's
-        // descriptor transferred.
-        let state = unsafe { callback::state::<LogCallback>(user_data) };
-        callback::invoke("mln_log_callback", Some((&[], 0)), 0, || {
-            let value = state(
-                unsafe { from_native(severity) }?,
-                unsafe { from_native(event) }?,
-                code,
-                unsafe { from_native(message) }?,
-            );
-            Ok(value)
-        })
-    }
-    match callback {
-        // SAFETY: the release reclaims exactly this state.
-        Some(callback) => (
-            Some(invoke),
-            unsafe { arena.registration(callback, callback::release::<LogCallback>) },
-            Some(callback::release::<LogCallback>),
-        ),
-        None => (None, std::ptr::null_mut(), None),
-    }
-}

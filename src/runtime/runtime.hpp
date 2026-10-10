@@ -99,7 +99,7 @@ static_assert(
 class RuntimeCallbackContext {
  public:
   RuntimeCallbackContext(
-    void* user_data, mln_runtime_callback_release release
+    void* user_data, mln_user_data_release release
   ) noexcept
       : user_data_(user_data), release_(release) {}
 
@@ -131,7 +131,7 @@ class RuntimeCallbackContext {
 
  private:
   void* user_data_ = nullptr;
-  mln_runtime_callback_release release_ = nullptr;
+  mln_user_data_release release_ = nullptr;
   std::atomic_bool owned_{false};
 };
 

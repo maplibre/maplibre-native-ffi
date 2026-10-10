@@ -67,8 +67,8 @@ const LogProbe = struct {
         self.releases.add();
     }
 
-    fn callback(self: *LogProbe) maplibre.LogCallback {
-        return .{ .call = record, .context = self, .release_context = released };
+    fn handler(self: *LogProbe) maplibre.LogHandler {
+        return .{ .callback = record, .context = self, .release_context = released };
     }
 };
 
@@ -77,9 +77,9 @@ const LogProbe = struct {
 test "replacing the process-global log callback releases the previous one" {
     var first = LogProbe{};
     var replacement = LogProbe{};
-    try maplibre.logSetCallback(first.callback(), null);
+    try maplibre.logSetCallback(testing.allocator, first.handler(), null);
     defer maplibre.logClearCallback(null) catch |err| std.log.err("log callback clear failed: {s}", .{@errorName(err)});
-    try maplibre.logSetCallback(replacement.callback(), null);
+    try maplibre.logSetCallback(testing.allocator, replacement.handler(), null);
     try first.releases.waitFor(1);
 
     const fixture = try support.Fixture.create(.{});
@@ -268,8 +268,8 @@ test "a registration that reports cancellation is never rooted" {
     }.ready);
 
     var probe = CancelProbe{};
-    try testing.expect(try maplibre.resourceRequestSetCancelCallback(handle, .{
-        .call = CancelProbe.cancelled,
+    try testing.expect(try maplibre.resourceRequestSetCancelCallback(testing.allocator, handle, .{
+        .callback = CancelProbe.cancelled,
         .context = &probe,
         .release_context = CancelProbe.released,
     }, null));

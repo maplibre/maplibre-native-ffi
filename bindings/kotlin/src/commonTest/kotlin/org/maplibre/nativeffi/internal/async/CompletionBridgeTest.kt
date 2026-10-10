@@ -50,7 +50,7 @@ internal class HandDeliveredCompletion<T>(
 /** Calls the `mln_completion_callback` at [callback] on this thread. */
 internal expect fun callCompletion(callback: Long, userData: Long, result: Long)
 
-/** Calls the `mln_completion_release` at [release] on this thread. */
+/** Calls the completion's `mln_user_data_release` at [release] on this thread. */
 internal expect fun callCompletionRelease(release: Long, userData: Long)
 
 /** Submits through [submit] and keeps the descriptor's fields for hand delivery. */

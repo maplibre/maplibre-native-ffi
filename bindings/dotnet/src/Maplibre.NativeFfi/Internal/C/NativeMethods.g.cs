@@ -166,9 +166,7 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_log_set_callback(
-        delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback,
-        void* user_data,
-        delegate* unmanaged[Cdecl]<void*, void> release_user_data,
+        mln_log_handler* handler,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1539,9 +1537,7 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_resource_request_set_cancel_callback(
         MlnResourceRequest handle,
-        delegate* unmanaged[Cdecl]<void*, void> callback,
-        void* user_data,
-        delegate* unmanaged[Cdecl]<void*, void> release_user_data,
+        mln_resource_request_cancel_handler* handler,
         bool* out_cancelled,
         mln_diagnostic* out_diagnostic
     );

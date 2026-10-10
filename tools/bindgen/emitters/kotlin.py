@@ -65,7 +65,7 @@ def lower(api: Api | BoundApi):
 def callback_owner(bound, receiver):
     """Whether a family roots callback registrations, which common tests observe too."""
     return any(
-        (operation.registrations or operation.direct_registrations)
+        operation.registrations
         and (
             (operation.receiver and receiver_value(operation).native == receiver)
             or any(

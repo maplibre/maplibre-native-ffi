@@ -40,12 +40,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .into(),
         );
     }
-    maplibre_native_ffi::log_set_callback(Some(std::sync::Arc::new(
+    maplibre_native_ffi::log_set_callback(maplibre_native_ffi::LogHandler::new(
         |severity, event, code, message| {
             eprintln!("MapLibre {:?} {:?} {}: {}", severity, event, code, message);
             1
         },
-    )))?;
+    ))?;
     struct ClearLogCallback;
     impl Drop for ClearLogCallback {
         fn drop(&mut self) {

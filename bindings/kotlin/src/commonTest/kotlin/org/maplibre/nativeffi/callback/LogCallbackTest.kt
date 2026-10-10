@@ -6,6 +6,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.LogEvent
+import org.maplibre.nativeffi.generated.LogHandler
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -18,14 +19,16 @@ class LogCallbackTest {
     val base = roots.rootCountForTesting()
     val parsed = CompletableDeferred<LogEvent>()
     try {
-      GeneratedApi.logSetCallback { _, _, _, _ -> 0u }
+      GeneratedApi.logSetCallback(LogHandler { _, _, _, _ -> 0u })
       assertEquals(base + 1, roots.rootCountForTesting())
 
       // Native releases the replaced registration before the replacement returns.
-      GeneratedApi.logSetCallback { _, event, _, _ ->
-        if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
-        0u
-      }
+      GeneratedApi.logSetCallback(
+        LogHandler { _, event, _, _ ->
+          if (event == LogEvent.PARSE_STYLE) parsed.complete(event)
+          0u
+        }
+      )
       assertEquals(base + 1, roots.rootCountForTesting())
 
       withMap {

@@ -296,6 +296,14 @@ internal unsafe struct mln_lat_lng_bounds
     public mln_lat_lng northeast;
 }
 
+internal unsafe struct mln_log_handler
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
+}
+
 internal unsafe struct mln_logical_extent
 {
     public uint width;
@@ -719,6 +727,14 @@ internal unsafe struct mln_resource_request
     public sbyte* prior_etag;
     public byte* prior_data;
     public nuint prior_data_size;
+}
+
+internal unsafe struct mln_resource_request_cancel_handler
+{
+    public uint size;
+    public delegate* unmanaged[Cdecl]<void*, void> callback;
+    public void* user_data;
+    public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
 }
 
 internal unsafe struct mln_resource_response

@@ -71,22 +71,36 @@ typedef uint32_t (*mln_log_callback)(
   const char* message
 );
 
-/** Releases user_data from a log callback registration. */
-MLN_BINDING("reentry=forbid")
-typedef void (*mln_log_callback_release)(void* user_data);
+/**
+ * Process-global log callback state.
+ *
+ * The struct itself is borrowed for mln_log_set_callback().
+ */
+typedef struct mln_log_handler {
+  uint32_t size;
+  mln_log_callback callback;
+  void* user_data MLN_BINDING("kind=context");
+  /**
+   * Optional. Releases user_data after the final callback returns, when the
+   * handler is replaced or cleared.
+   *
+   * It runs on the thread that replaces or clears the handler, and must not
+   * call this C API or MapLibre Native APIs.
+   */
+  mln_user_data_release release_user_data;
+} mln_log_handler MLN_BINDING(
+  "kind=callback_registration;release=release_user_data;release_reentry=forbid"
+);
 
 /**
  * Installs a process-global MapLibre Native log callback.
  *
- * Passing a null callback clears the current registration. When that call also
- * passes a non-null release_user_data, the C API invokes it on the passed
- * user_data before returning.
- *
- * With a non-null release_user_data, MLN_STATUS_OK transfers responsibility for
- * releasing user_data to the C API. The C API invokes release_user_data after
- * the final callback returns, when the registration is replaced or cleared.
- * With a null release_user_data, the caller keeps that responsibility and must
- * keep user_data valid until the registration is replaced or cleared.
+ * MLN_STATUS_OK replaces the current handler and transfers the handler's
+ * callback, user_data, and release_user_data to the C API. The handler struct
+ * itself is borrowed for the call. With a null release_user_data, the caller
+ * keeps responsibility for user_data and must keep it valid until the handler
+ * is replaced or cleared. A rejected call leaves the current handler in place
+ * and invokes no release. mln_log_clear_callback() clears the handler.
  *
  * The callback is a low-level native callback:
  *
@@ -95,21 +109,22 @@ typedef void (*mln_log_callback_release)(void* user_data);
  * - MapLibre may invoke it while holding internal logging locks.
  * - The callback must be thread-safe, return quickly, and must not call this C
  *   API or MapLibre Native APIs.
- * - release_user_data may run on the caller that replaces or clears the
- *   registration. It must not call this C API or MapLibre Native APIs.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when handler is null, handler->size is too
+ *   small, or handler->callback is null.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("registration=callback;release_callback=release_user_data")
 MLN_API mln_status mln_log_set_callback(
-  mln_log_callback callback, void* user_data MLN_BINDING("kind=context"),
-  mln_log_callback_release release_user_data, mln_diagnostic* out_diagnostic
+  const mln_log_handler* handler, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**
  * Clears the process-global log callback.
+ *
+ * The C API invokes the cleared handler's release_user_data, if any, before
+ * returning.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

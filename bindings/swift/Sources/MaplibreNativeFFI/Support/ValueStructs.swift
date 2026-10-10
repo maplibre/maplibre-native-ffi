@@ -7,6 +7,14 @@ final class NativeInputArena {
   private var buffers: [UnsafeMutableRawBufferPointer] = []
   private var callbacks: [UnsafeMutableRawPointer] = []
   private var reads: [AnyObject] = []
+  private var declined = false
+  /// The owner whose operation this arena serves, which a callback that calls
+  /// back only into that owner records. It is nil for a global call.
+  private(set) weak var receiver: AnyObject?
+
+  init(receiver: AnyObject? = nil) {
+    self.receiver = receiver
+  }
 
   deinit {
     for callback in callbacks {
@@ -31,8 +39,14 @@ final class NativeInputArena {
 
   func submit(_ body: () throws -> mln_status) rethrows -> mln_status {
     let status = try body()
-    if status == MLN_STATUS_OK { accept() }
+    if status == MLN_STATUS_OK, !declined { accept() }
     return status
+  }
+
+  /// Keeps the registered callbacks with the arena, which releases them, when
+  /// the call reports that native kept nothing from its registration.
+  func decline(if declined: Bool) {
+    self.declined = self.declined || declined
   }
 
   /// Transfers every callback this arena registered to native ownership.

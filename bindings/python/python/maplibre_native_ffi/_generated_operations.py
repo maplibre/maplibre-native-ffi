@@ -35,10 +35,8 @@ from ._generated_values import (
     LatLng,
     LatLngBounds,
     LocationIndicatorImageKind,
-    LogEvent,
+    LogHandler,
     LogicalExtent,
-    LogSetCallbackRegistration,
-    LogSeverity,
     LogSeverityMask,
     MapDebugOption,
     MapOptions,
@@ -2399,15 +2397,13 @@ def log_set_async_severity_mask(mask: LogSeverityMask) -> None:
     return _native.log_set_async_severity_mask(mask)
 
 
-def log_set_callback(
-    callback: Callable[[LogSeverity, LogEvent, int, str], int] | None = None,
-) -> None:
+def log_set_callback(handler: LogHandler) -> None:
     """Installs a process-global MapLibre Native log callback.
 
     See `mln_log_set_callback` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
     """
-    return _native.log_set_callback(LogSetCallbackRegistration(callback))
+    return _native.log_set_callback(handler)
 
 
 def network_status_get() -> NetworkStatus:

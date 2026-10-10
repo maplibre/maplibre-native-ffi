@@ -63,10 +63,10 @@ int main() {
             )
             self.assertEqual(dart.coverage(bound)["unsupported"], {})
 
-    def test_direct_registration_generates_a_native_port_and_dart_method(self):
+    def test_declinable_registration_generates_a_native_port_and_dart_method(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            header = protocol_header(groups=("direct_registration",))
+            header = protocol_header(groups=("declinable_registration",))
             (root / "sample.h").write_text(header)
             bound = compile_api(parse_sources({"sample.h": header}))
             run_port(
@@ -78,13 +78,13 @@ static unsigned deliveries = 0;
 template <std::size_t Count>
 void dart_port_notify(void *context, const std::int64_t (&values)[Count]) {
   assert(context == reinterpret_cast<void*>(17));
-  assert(Count == 1 && values[0] == MLN_ADAPTER_DART_PORT_TICKET_ON_CANCEL_CALLBACK);
+  assert(Count == 1 && values[0] == MLN_ADAPTER_DART_PORT_TICKET_CANCEL_HANDLER_CALLBACK);
   ++deliveries;
 }
 """,
                 """
 int main() {
-  const auto callback = reinterpret_cast<mln_ticket_cancel>(dart_port_function(MLN_ADAPTER_DART_PORT_TICKET_ON_CANCEL_CALLBACK));
+  const auto callback = reinterpret_cast<mln_ticket_cancel>(dart_port_function(MLN_ADAPTER_DART_PORT_TICKET_CANCEL_HANDLER_CALLBACK));
   assert(callback);
   callback(reinterpret_cast<void*>(17));
   assert(deliveries == 1);

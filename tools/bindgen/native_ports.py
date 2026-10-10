@@ -1,8 +1,7 @@
 """Generate native Dart port callbacks for copyable notifications.
 
-A port callback serves a void callback with a context: a descriptor field
-whose record carries a release, or a direct registration that takes a release
-callback.
+A port callback serves a void callback with a context: a field of a callback
+registration record, which carries the release that retires the port.
 """
 
 from __future__ import annotations
@@ -78,34 +77,11 @@ def callbacks(bound):
     return result
 
 
-def direct_callbacks(bound):
-    """Direct registrations whose callback a port delivers until native release."""
-    result = []
-    for plan in sorted(bound.operations, key=lambda p: p.name):
-        if len(plan.direct_registrations) != 1:
-            continue
-        registration = plan.direct_registrations[0]
-        if not registration.release_callback:
-            continue
-        value = next(p.value for p in plan.inputs if p.name == registration.callback)
-        callback = bound.callbacks[value.native]
-        values = payload(callback)
-        if values is not None:
-            result.append((plan, registration, callback, values))
-    return result
-
-
 def entries(bound):
     """Name every port callback by its owner and field."""
     return [
-        *(
-            (record.native, field.name, callback, values)
-            for record, field, callback, values in callbacks(bound)
-        ),
-        *(
-            (plan.name, registration.callback, callback, values)
-            for plan, registration, callback, values in direct_callbacks(bound)
-        ),
+        (record.native, field.name, callback, values)
+        for record, field, callback, values in callbacks(bound)
     ]
 
 

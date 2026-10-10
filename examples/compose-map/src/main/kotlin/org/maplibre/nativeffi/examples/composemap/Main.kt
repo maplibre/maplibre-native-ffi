@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.examples.composemap.app.ComposeMapApp
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreNativeSurfaceAdapter
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogHandler
 
 internal object Main {
   @JvmStatic
@@ -28,10 +29,12 @@ internal object Main {
       if (smoke) MapLibreSurfaceRenderer(SMOKE_STYLE) { rendered.complete(Unit) }
       else MapLibreSurfaceRenderer()
     GeneratedApi.logSetAsyncSeverityMask(org.maplibre.nativeffi.generated.LogSeverityMask(0u))
-    GeneratedApi.logSetCallback { severity, event, code, message ->
-      System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
-      1u
-    }
+    GeneratedApi.logSetCallback(
+      LogHandler { severity, event, code, message ->
+        System.err.printf("MapLibre %s %s %d: %s%n", severity, event, code, message)
+        1u
+      }
+    )
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {
       println("MapLibre native library: $it")
     }

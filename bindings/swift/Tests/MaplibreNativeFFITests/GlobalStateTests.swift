@@ -20,7 +20,7 @@ struct GlobalStateTests {
     let releases = LockedBox(0)
     defer { try? Maplibre.logClearCallback() }
 
-    try Maplibre.logSetCallback(recordingCallback(
+    try Maplibre.logSetCallback(handler: recordingHandler(
       into: records,
       releasing: releases
     ))
@@ -34,7 +34,7 @@ struct GlobalStateTests {
     }
     #expect(releases.value == 0)
 
-    try Maplibre.logSetCallback(recordingCallback(
+    try Maplibre.logSetCallback(handler: recordingHandler(
       into: LockedBox([]),
       releasing: releases
     ))
@@ -182,12 +182,12 @@ private struct ProviderFailure: Error {}
 
 private struct WakeFailure: Error {}
 
-private func recordingCallback(
+private func recordingHandler(
   into records: LockedBox<[LogSeverity]>,
   releasing releases: LockedBox<Int>
-) -> @Sendable (LogSeverity, LogEvent, Int64, String) throws -> UInt32 {
+) -> LogHandler {
   let sentinel = ReleaseProbe(releases)
-  return { severity, _, _, _ in
+  return LogHandler { severity, _, _, _ in
     withExtendedLifetime(sentinel) {}
     records.update { $0.append(severity) }
     return 1

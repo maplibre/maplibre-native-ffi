@@ -153,10 +153,6 @@ def operation(
     plan: OperationPlan, values: Values
 ) -> tuple[str, str, str, str, str | None]:
     function = plan.function
-    if plan.direct_registrations:
-        from .python_callbacks import direct_operation
-
-        return direct_operation(plan, values)
     if plan.role == "support":
         raise unsupported(
             function, "support operation is consumed by the value/runtime compiler"
@@ -165,6 +161,20 @@ def operation(
         raise unsupported(function, "consuming parameter requires an owner transaction")
     receiver_name = plan.receiver or plan.scoped_receiver
     receiver = next((p for p in plan.inputs if p.name == receiver_name), None)
+    decision = owned_decision(values.api, receiver.value.native) if receiver else None
+    if decision and decision.cancel_registration == plan.name:
+        from .python_callbacks import cancel_operation
+
+        return cancel_operation(plan, values, receiver)
+    if any(
+        values.api.values[r.descriptor].registration.receiver_owned
+        for r in plan.registrations
+    ):
+        raise unsupported(
+            function,
+            "a callback that calls back only into its registering receiver "
+            "needs a decision handle, whose state records the receiver",
+        )
     scoped = plan.scoped_receiver is not None
     receiver_pointer = receiver is not None and receiver.value.kind == "reference"
     if receiver_pointer and receiver.value.element:
@@ -651,12 +661,14 @@ def operation(
             )
         else:
             accepted = next(i for i, line in enumerate(body) if "result?;" in line) + 1
-        body.insert(accepted, "        let callback_roots = call.accept_callbacks();")
-        if not outputs:
-            if not receiver:
-                raise unsupported(
-                    function, "global registration requires a process root"
-                )
+        if not outputs and not receiver:
+            # Native holds a global registration's root until it releases it.
+            body.insert(accepted, "        call.accept_callbacks();")
+        else:
+            body.insert(
+                accepted, "        let callback_roots = call.accept_callbacks();"
+            )
+        if not outputs and receiver:
             owner_state = "self.state()"
             body.insert(
                 accepted + 1,

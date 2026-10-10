@@ -34,18 +34,20 @@ void mln_measurement_destroy(mln_measurement_handle owner);
         api = self.parse(
             """
 typedef void (*mln_release)(void *context);
-typedef void (*mln_watch)(void *context) BIND("reentry=protocol;reentry_owner=registration;reentry_calls=mln_map_close");
-BIND("registration=callback;release_callback=release;accepted_unless=done")
-mln_status mln_map_watch(mln_map map, mln_watch callback, void *context BIND("kind=context"), mln_release release, _Bool *done BIND("direction=out"), mln_diagnostic *out_diagnostic);
+typedef void (*mln_watch)(void *context) BIND("reentry=protocol;reentry_owner=mln_map;reentry_calls=mln_map_close");
+typedef struct mln_watcher { unsigned size; mln_watch callback; void *context BIND("kind=context"); mln_release release; } mln_watcher BIND("kind=callback_registration;release=release");
+BIND("accepted_unless=done")
+mln_status mln_map_watch(mln_map map, const mln_watcher *watcher, _Bool *done BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """,
             map_handle=True,
         )
         self.assertEqual(kotlin.coverage(api)["unsupported"], {})
         bound = compile_api(api)
-        (registration,) = bound.operations_by_name["mln_map_watch"].direct_registrations
+        (registration,) = bound.operations_by_name["mln_map_watch"].registrations
         # Native keeps nothing it reports through the condition.
         self.assertEqual(registration.accepted_unless, "done")
-        self.assertTrue(bound.callbacks["mln_watch"].reentry_policy.registration_owner)
+        # The callback calls back only into the map that registers it.
+        self.assertTrue(bound.values["mln_watcher"].registration.receiver_owned)
 
     def parse(self, source="", header="metrics.h", map_handle=False, groups=()):
         api = parse(
@@ -124,8 +126,8 @@ mln_status mln_measurement_change(mln_measurement measurement, const mln_complet
         source = """
 typedef void (*mln_notice_release)(void *context);
 typedef unsigned (*mln_notice_callback)(void *context, int code, const char *text) BIND("failure=0;deferred=1");
-BIND("registration=callback;release_callback=release")
-mln_status mln_notice_set_callback(mln_notice_callback callback, void *context BIND("kind=context"), mln_notice_release release, mln_diagnostic *out_diagnostic);
+typedef struct mln_notice_handler { unsigned size; mln_notice_callback callback; void *context BIND("kind=context"); mln_notice_release release; } mln_notice_handler BIND("kind=callback_registration;release=release");
+mln_status mln_notice_set_callback(const mln_notice_handler *handler, mln_diagnostic *out_diagnostic);
 """
         api = self.parse(source)
         self.assertIn("mln_notice_set_callback", dart.coverage(api)["generated"])

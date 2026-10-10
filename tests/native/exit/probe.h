@@ -210,9 +210,12 @@ static inline uint32_t probe_provide(
 // delivering every severity on MapLibre's logging thread.
 static inline void probe_start(void) {
   probe_write_points();
+  const mln_log_handler handler = {
+    .size = sizeof(mln_log_handler),
+    .callback = probe_consume_log,
+  };
   probe_require(
-    mln_log_set_callback(probe_consume_log, NULL, NULL, NULL),
-    "installing the log callback"
+    mln_log_set_callback(&handler, NULL), "installing the log callback"
   );
   probe_require(
     mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_ALL, NULL),

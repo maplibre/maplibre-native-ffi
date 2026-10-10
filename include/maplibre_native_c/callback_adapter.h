@@ -204,9 +204,9 @@ MLN_API void* mln_adapter_deferred_callback_function(
 /**
  * Releases a deferred callback context exactly once.
  *
- * This function has the signature of mln_runtime_callback_release and
- * mln_log_callback_release, so a registration passes it as its release
- * callback. Call it directly when the registering call rejects the context.
+ * This function has the signature of mln_user_data_release, so a registration
+ * passes it as its release callback. Call it directly when the registering call
+ * rejects the context.
  */
 MLN_API void mln_adapter_deferred_callback_release(
   void* context MLN_BINDING("kind=context")
@@ -483,7 +483,7 @@ MLN_API mln_status mln_adapter_arena_adopt_handle(
  * frees its allocations.
  */
 MLN_API mln_status mln_adapter_arena_adopt_release(
-  void* arena MLN_BINDING("kind=context"), mln_runtime_callback_release release,
+  void* arena MLN_BINDING("kind=context"), mln_user_data_release release,
   void* context MLN_BINDING("kind=context"), mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -631,26 +631,14 @@ MLN_API uint32_t mln_adapter_routed_resource_provider_callback(
 ) MLN_NOEXCEPT;
 
 /**
- * Invokes custom geometry tile callbacks once with a retirement tile id.
+ * Invokes custom source tile callbacks once with a retirement tile id.
  *
  * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
  * listener recognizes it and releases the state behind the callbacks.
  */
-MLN_API void mln_adapter_custom_geometry_callbacks_retire(
-  mln_custom_geometry_source_tile_callback fetch_tile,
-  mln_custom_geometry_source_tile_callback cancel_tile,
-  void* user_data MLN_BINDING("kind=context")
-) MLN_NOEXCEPT;
-
-/**
- * Invokes custom MVT vector tile callbacks once with a retirement tile id.
- *
- * The retirement tile id uses z = UINT8_MAX, which no real tile uses, so a host
- * listener recognizes it and releases the state behind the callbacks.
- */
-MLN_API void mln_adapter_custom_mvt_vector_callbacks_retire(
-  mln_custom_mvt_vector_source_tile_callback fetch_tile,
-  mln_custom_mvt_vector_source_tile_callback cancel_tile,
+MLN_API void mln_adapter_custom_source_callbacks_retire(
+  mln_custom_source_tile_callback fetch_tile,
+  mln_custom_source_tile_callback cancel_tile,
   void* user_data MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 

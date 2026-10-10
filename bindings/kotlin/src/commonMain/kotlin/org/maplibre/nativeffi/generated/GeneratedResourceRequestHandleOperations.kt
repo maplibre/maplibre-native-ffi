@@ -2,7 +2,6 @@
 package org.maplibre.nativeffi.generated
 
 import org.maplibre.nativeffi.internal.c.C
-import org.maplibre.nativeffi.internal.c.UpcallStubs
 import org.maplibre.nativeffi.internal.call.*
 import org.maplibre.nativeffi.internal.callback.CallbackOwner
 import org.maplibre.nativeffi.internal.lifecycle.*
@@ -53,17 +52,13 @@ public abstract class GeneratedResourceRequestHandleOperations internal construc
    * See `mln_resource_request_set_cancel_callback` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun setCancelCallback(callback: ResourceRequestCancelCallback): Boolean =
+  public fun setCancelCallback(handler: ResourceRequestCancelHandler): Boolean =
     nativeCall(this, binding, "mln_resource_request_set_cancel_callback", Access.READ) {
-      val token =
-        registrations.register(GeneratedResourceRequestCancelCallbackRegistration(callback), handle)
       val out = allocate(1)
       check(
         C.mln_resource_request_set_cancel_callback(
           handle,
-          UpcallStubs.resourceRequestCancelCallback,
-          token,
-          UpcallStubs.releaseRoot,
+          writeResourceRequestCancelHandler(handler),
           out,
           diagnostic,
         )

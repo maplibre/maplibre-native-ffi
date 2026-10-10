@@ -47,7 +47,7 @@ final class NativeOwnedArena extends Arena {
 
   /// Runs [release] with [context] when native code destroys this arena.
   void adoptRelease(
-    Pointer<NativeFunction<raw.mln_runtime_callback_releaseFunction>> release,
+    Pointer<NativeFunction<raw.mln_user_data_releaseFunction>> release,
     Pointer<Void> context,
   ) => checkNativeCall(
     raw.mln_adapter_arena_adopt_release(

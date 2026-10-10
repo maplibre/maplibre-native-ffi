@@ -1781,7 +1781,13 @@ class LatLngBounds:
 
 
 @dataclass(frozen=True, slots=True)
-class LogSetCallbackRegistration:
+class LogHandler:
+    """Process-global log callback state.
+
+    See `mln_log_handler` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
+    """
+
     callback: Callable[[LogSeverity, LogEvent, int, str], int] | None = None
 
     def _invoke_callback(self, severity, event, code, message):

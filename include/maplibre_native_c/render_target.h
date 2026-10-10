@@ -69,9 +69,6 @@ typedef enum MLN_BINDING(
 MLN_BINDING("reentry=forbid;synchronous=true")
 typedef void (*mln_queue_lock_callback)(void* user_data);
 
-/** Releases queue-lock state after native code can no longer invoke it. */
-typedef void (*mln_queue_lock_release)(void* user_data);
-
 /**
  * Host lock on the graphics queue that a session shares with its host, copied
  * by a successful attach.
@@ -104,7 +101,12 @@ typedef struct mln_queue_lock {
   mln_queue_lock_callback lock MLN_BINDING("nullable=true");
   mln_queue_lock_callback unlock MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
-  mln_queue_lock_release release_user_data;
+  /**
+   * Optional. Releases user_data once, after all callback invocations have
+   * returned and the session can no longer invoke the callbacks. A disabled
+   * lock leaves it null.
+   */
+  mln_user_data_release release_user_data;
 } mln_queue_lock MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );

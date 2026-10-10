@@ -674,27 +674,22 @@ typedef mln_status (*mln_resource_transform_callback)(
   mln_resource_transform_response* out_response MLN_BINDING("direction=out")
 );
 
-/**
- * Releases callback user data after its final possible invocation.
- *
- * For each accepted registration with a non-null release callback, the C API
- * invokes the callback exactly once after replacement, clear, or runtime
- * teardown has retired the registration and every in-flight callback has
- * returned. It
- * may run on a runtime, worker, network, or closing thread. The C API never
- * invokes it for a rejected registration. Another thread may retire an
- * accepted registration before its registration function returns, so the
- * caller transfers user_data ownership before entering that function and
- * reclaims it only when registration is rejected.
- */
-typedef void (*mln_runtime_callback_release)(void* user_data);
-
 typedef struct mln_resource_transform {
   uint32_t size;
   mln_resource_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /** Optional. Invoked exactly once for each accepted registration. */
-  mln_runtime_callback_release release_user_data;
+  /**
+   * Optional. Releases user_data exactly once for each accepted registration,
+   * after replacement, clear, or runtime teardown has retired the registration
+   * and every in-flight callback has returned.
+   *
+   * It may run on a runtime, worker, network, or closing thread, and never runs
+   * for a rejected registration. Another thread may retire an accepted
+   * registration before its registration function returns, so the caller
+   * transfers user_data before entering that function and reclaims it only
+   * when the registration is rejected.
+   */
+  mln_user_data_release release_user_data;
 } mln_resource_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -764,8 +759,18 @@ typedef struct mln_http_header_transform {
   uint32_t size;
   mln_http_header_transform_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /** Optional. Invoked exactly once for each accepted registration. */
-  mln_runtime_callback_release release_user_data;
+  /**
+   * Optional. Releases user_data exactly once for each accepted registration,
+   * after replacement, clear, or runtime teardown has retired the registration
+   * and every in-flight callback has returned.
+   *
+   * It may run on a runtime, worker, network, or closing thread, and never runs
+   * for a rejected registration. Another thread may retire an accepted
+   * registration before its registration function returns, so the caller
+   * transfers user_data before entering that function and reclaims it only
+   * when the registration is rejected.
+   */
+  mln_user_data_release release_user_data;
 } mln_http_header_transform MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -938,7 +943,7 @@ typedef uint32_t (*mln_resource_provider_callback)(
  */
 MLN_BINDING(
   "reentry=protocol;"
-  "reentry_owner=registration;"
+  "reentry_owner=mln_resource_request_handle;"
   "reentry_calls="
   "mln_resource_request_complete,"
   "mln_resource_request_cancelled,"
@@ -947,12 +952,43 @@ MLN_BINDING(
 )
 typedef void (*mln_resource_request_cancel_callback)(void* user_data);
 
+/**
+ * Cancel callback state for one handled resource request.
+ *
+ * The struct itself is borrowed for the registering call.
+ */
+typedef struct mln_resource_request_cancel_handler {
+  uint32_t size;
+  mln_resource_request_cancel_callback callback;
+  void* user_data MLN_BINDING("kind=context");
+  /**
+   * Optional. Releases user_data exactly once for an accepted registration,
+   * after the callback can no longer run: when the callback returns, on the
+   * thread that ran it, or when the request is released without the callback
+   * having run, on the releasing thread. It never runs for a rejected
+   * registration or for a request that was already cancelled.
+   */
+  mln_user_data_release release_user_data;
+} mln_resource_request_cancel_handler MLN_BINDING(
+  "kind=callback_registration;release=release_user_data"
+);
+
 typedef struct mln_resource_provider {
   uint32_t size;
   mln_resource_provider_callback callback;
   void* user_data MLN_BINDING("kind=context");
-  /** Optional. Invoked exactly once for each accepted registration. */
-  mln_runtime_callback_release release_user_data;
+  /**
+   * Optional. Releases user_data exactly once for each accepted registration,
+   * after replacement, clear, or runtime teardown has retired the registration
+   * and every in-flight callback has returned.
+   *
+   * It may run on a runtime, worker, network, or closing thread, and never runs
+   * for a rejected registration. Another thread may retire an accepted
+   * registration before its registration function returns, so the caller
+   * transfers user_data before entering that function and reclaims it only
+   * when the registration is rejected.
+   */
+  mln_user_data_release release_user_data;
 } mln_resource_provider MLN_BINDING(
   "kind=callback_registration;release=release_user_data"
 );
@@ -1102,11 +1138,9 @@ MLN_API mln_status mln_resource_request_cancelled(
  * handle. A request accepts one registration: a later call fails and leaves the
  * first registration in place.
  *
- * MLN_STATUS_OK with out_cancelled false transfers callback, user_data, and
- * release_user_data to the C API. The callback runs at most once. The C API
- * invokes release_user_data exactly once, after the callback can no longer run:
- * when the callback returns, or when the request is released without the
- * callback having run. release_user_data may be null.
+ * MLN_STATUS_OK with out_cancelled false transfers the handler's callback,
+ * user_data, and release_user_data to the C API. The callback runs at most
+ * once. The handler struct itself is borrowed for the call.
  *
  * A request that is already cancelled and not completed stores nothing and
  * reports true through out_cancelled. The caller keeps user_data and handles
@@ -1119,20 +1153,16 @@ MLN_API mln_status mln_resource_request_cancelled(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, or when
- *   callback or out_cancelled is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is an invalid handle, when handler
+ *   or out_cancelled is null, when handler->size is too small, or when
+ *   handler->callback is null.
  * - MLN_STATUS_INVALID_STATE when handle has been released, or the request
  *   already has a cancel callback.
  */
-MLN_BINDING(
-  "registration=callback;release_callback=release_user_data;"
-  "accepted_unless=out_cancelled"
-)
+MLN_BINDING("accepted_unless=out_cancelled")
 MLN_API mln_status mln_resource_request_set_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback,
-  void* user_data MLN_BINDING("kind=context"),
-  mln_runtime_callback_release release_user_data,
+  const mln_resource_request_cancel_handler* handler,
   bool* out_cancelled MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

@@ -23,9 +23,9 @@
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
-#define MLN_PROTOCOL_DIRECT_REGISTRATION
+#define MLN_PROTOCOL_DECLINABLE_REGISTRATION
 #endif
-#if defined(MLN_PROTOCOL_DIRECT_REGISTRATION) || \
+#if defined(MLN_PROTOCOL_DECLINABLE_REGISTRATION) || \
   defined(MLN_PROTOCOL_DEFERRED_CALLBACK)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
@@ -89,12 +89,12 @@ typedef struct mln_completion_result {
 typedef void (*mln_completion_callback)(
   void* user_data, const mln_completion_result* result
 );
-typedef void (*mln_completion_release)(void* user_data);
+typedef void (*mln_user_data_release)(void* user_data);
 typedef struct mln_completion {
   uint32_t size;
   mln_completion_callback callback;
   void* user_data BIND("kind=context");
-  mln_completion_release release_user_data;
+  mln_user_data_release release_user_data;
 } mln_completion BIND("kind=callback_registration;release=release_user_data");
 #else
 typedef struct mln_completion {
@@ -451,12 +451,13 @@ mln_status mln_map_observe_sample(
 );
 #endif
 
-#ifdef MLN_PROTOCOL_DIRECT_REGISTRATION
-// A direct callback registration that native may decline through an output.
+#ifdef MLN_PROTOCOL_DECLINABLE_REGISTRATION
+// A callback registration that native may decline through an output. The
+// cancel callback names no owner parameter, so it may call back only into the
+// ticket that registers it.
 typedef unsigned long long mln_ticket
   BIND("kind=handle;release=mln_ticket_release");
-typedef void (*mln_runtime_callback_release)(void* context);
-// The cancel callback may call back into the ticket's own protocol.
+typedef void (*mln_ticket_release_context)(void* context);
 #ifdef MLN_PROTOCOL_DECISION
 #define MLN_PROTOCOL_TICKET_CALLS                                \
   "mln_ticket_answer,mln_ticket_cancelled,mln_ticket_on_cancel," \
@@ -465,17 +466,19 @@ typedef void (*mln_runtime_callback_release)(void* context);
 #define MLN_PROTOCOL_TICKET_CALLS "mln_ticket_on_cancel,mln_ticket_release"
 #endif
 typedef void (*mln_ticket_cancel)(void* context) BIND(
-  "reentry=protocol;reentry_owner=registration;"
+  "reentry=protocol;reentry_owner=mln_ticket;"
   "reentry_calls=" MLN_PROTOCOL_TICKET_CALLS
 );
+typedef struct mln_ticket_cancel_handler {
+  unsigned int size;
+  mln_ticket_cancel callback;
+  void* context BIND("kind=context");
+  mln_ticket_release_context release;
+} mln_ticket_cancel_handler BIND("kind=callback_registration;release=release");
 void mln_ticket_release(mln_ticket ticket);
-BIND(
-  "registration=callback;release_callback=release;"
-  "accepted_unless=cancelled"
-)
+BIND("accepted_unless=cancelled")
 mln_status mln_ticket_on_cancel(
-  mln_ticket ticket, mln_ticket_cancel callback,
-  void* context BIND("kind=context"), mln_runtime_callback_release release,
+  mln_ticket ticket, const mln_ticket_cancel_handler* handler,
   bool* cancelled BIND("direction=out"), mln_diagnostic* out_diagnostic
 );
 #endif
@@ -504,7 +507,7 @@ typedef unsigned (*mln_ticket_provider_callback)(void* context, mln_ticket ticke
 typedef struct mln_ticket_provider {
   mln_ticket_provider_callback callback;
   void* user_data BIND("kind=context");
-  mln_runtime_callback_release release;
+  mln_ticket_release_context release;
 } mln_ticket_provider BIND("kind=callback_registration;release=release");
 mln_status mln_host_destroy(mln_host host, mln_diagnostic* out_diagnostic);
 BIND("execution=command")
@@ -532,10 +535,17 @@ typedef void (*mln_notice_release)(void* context);
 typedef unsigned (*mln_notice_callback)(
   void* context, int code, const char* text
 ) BIND("failure=0;deferred=1");
-BIND("registration=callback;release_callback=release")
+// Its release must not call back into the API.
+typedef struct mln_notice_handler {
+  unsigned int size;
+  mln_notice_callback callback;
+  void* context BIND("kind=context");
+  mln_notice_release release;
+} mln_notice_handler BIND(
+  "kind=callback_registration;release=release;release_reentry=forbid"
+);
 mln_status mln_notice_set_callback(
-  mln_notice_callback callback, void* context BIND("kind=context"),
-  mln_notice_release release, mln_diagnostic* out_diagnostic
+  const mln_notice_handler* handler, mln_diagnostic* out_diagnostic
 );
 #endif
 

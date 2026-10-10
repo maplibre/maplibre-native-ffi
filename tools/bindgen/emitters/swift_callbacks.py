@@ -1,7 +1,6 @@
 """Render Swift callback descriptors from registration metadata."""
 
-from ..model import ModelError
-from .swift import SCALARS, camel, checked, doc, identifier, name, native_call
+from .swift import SCALARS, camel, doc, identifier, name
 
 
 def contains_callback(value):
@@ -148,6 +147,14 @@ def descriptor(values, plan):
         if plan.native in values.bound.returned
         else "  public static var `default`: Self { Self() }\n"
     )
+    # A callback that calls back only into the receiver that registered it
+    # carries that receiver weakly, so the native root does not keep it alive.
+    rooted = (
+        "NativeOwnedCallback(owner: arena.receiver, value: self)"
+        if registration.receiver_owned
+        else "self"
+    )
+    stored = f"NativeOwnedCallback<{public}>" if registration.receiver_owned else public
     declarations = f"""{doc(values.bound, plan.native)}public struct {public}: Sendable {{
 {chr(10).join(fields)}
   public init({", ".join(arguments)}) {{
@@ -157,7 +164,7 @@ def descriptor(values, plan):
     var raw = {initial}{sized}
 {chr(10).join(materialize)}
     if {root_needed} {{
-      raw.{registration.user_data} = arena.callback(self)
+      raw.{registration.user_data} = arena.callback({rooted})
       raw.{registration.release} = releaseGeneratedCallback
     }}
     return raw
@@ -189,7 +196,10 @@ def descriptor(values, plan):
             if parameter.name != callback.context
         )
         typed_enum = callback.result.ctype.canonical.startswith("enum ")
-        suffix = "" if typed_enum else ".rawValue"
+        # A failure that names a constant of a C enum converts to the raw
+        # integer result; a numeric failure is that result already.
+        numeric = bool(callback.failure) and callback.failure.lstrip("-").isdigit()
+        suffix = "" if typed_enum or numeric else ".rawValue"
         fail = "" if result == "Void" else f"return {callback.failure}{suffix}"
         setup = "".join(
             f"  guard let {identifier(parameter.name)} else {{ {fail or 'return'} }}\n  let response{name(parameter.name)} = {values.public(parameter.value.element)}(pointer: {identifier(parameter.name)})\n  defer {{ response{name(parameter.name)}.expire() }}\n"
@@ -208,12 +218,17 @@ def descriptor(values, plan):
             policy_owner = (
                 "decisionOwner"
                 if callback.decision
+                else "receiver"
+                if policy.owner_parameter is None
                 else "response" + name(policy.owner_parameter)
             )
             guard = f"  let admission = NativeCallbackGuard.enter(owner: {policy_owner}, operations: allowed{public}{name(field.name)})\n  defer {{ admission.end() }}\n"
         elif callback.reentry == "forbid":
             guard = "  let admission = NativeCallbackGuard.enter(owner: nil, operations: [])\n  defer { admission.end() }\n"
-        call = f"box.value.{identifier(camel(field.name))}?({args})"
+        value = "box.value.value" if registration.receiver_owned else "box.value"
+        if registration.receiver_owned:
+            setup += f"  guard let receiver = box.value.owner else {{ {fail or 'return'} }}\n"
+        call = f"{value}.{identifier(camel(field.name))}?({args})"
         invoke = (
             f"try {call}"
             if result == "Void" or responses
@@ -227,135 +242,8 @@ def descriptor(values, plan):
             invoke += f"; return MLN_STATUS_OK{suffix}"
         declarations += f"""private func invoke{public}{name(field.name)}({parameters}) -> {result} {{
   guard let {identifier(callback.context)} else {{ {"return " + callback.failure + suffix if result != "Void" else "return"} }}
-  let box = Unmanaged<GeneratedCallbackBox<{public}>>.fromOpaque({identifier(callback.context)}).takeUnretainedValue()
+  let box = Unmanaged<GeneratedCallbackBox<{stored}>>.fromOpaque({identifier(callback.context)}).takeUnretainedValue()
 {setup}{guard}  do {{ {invoke} }} catch {{ NativeDiagnostics.report(.callbackError(callback: "{callback.native}", error: error)); {fail} }}
 }}
 """
     return declarations
-
-
-def direct_operation(plan, values):
-    from .swift_dynamic_values import decode
-    from .swift_ownership import owner_name
-
-    (registration,) = plan.direct_registrations
-    parameter = next(
-        parameter
-        for parameter in plan.inputs
-        if parameter.name == registration.callback
-    )
-    callback = values.bound.callbacks[parameter.value.native]
-    values.add(parameter.value)
-    typ = closure_type(values, callback)
-    function = plan.function.name
-    receiver = next(
-        (
-            parameter.value
-            for parameter in plan.inputs
-            if parameter.name == plan.receiver
-        ),
-        None,
-    )
-    owner = owner_name(receiver.handle) if receiver else "Maplibre"
-    method = identifier(camel(plan.member))
-    thunk = "invoke" + name(function)
-    params = ", ".join(
-        f"{identifier(parameter.name)}: {raw_type(parameter.value.ctype)}"
-        for parameter in callback.parameters
-    )
-    args = ", ".join(
-        decode(values, parameter.value, identifier(parameter.name))
-        for parameter in callback.parameters
-        if parameter.name != callback.context
-    )
-    result = (
-        "Void" if callback.result.native == "void" else raw_type(callback.result.ctype)
-    )
-    fail = "return" if result == "Void" else "return " + callback.failure
-    invoke = (
-        f"try box.value({args})"
-        if result == "Void"
-        else f"return try box.value({args})"
-    )
-    if not registration.release_callback:
-        raise ModelError([f"{function}: direct callback requires a native release"])
-    policy = callback.reentry_policy
-    if policy and not (receiver and policy.registration_owner):
-        raise ModelError([f"{function}: direct callback requires a registration owner"])
-    # A callback restricted to its registration owner carries that owner weakly,
-    # so the native root does not keep the handle alive.
-    stored = f"NativeOwnedCallback<{typ}>" if policy else typ
-    lookup = f"guard let {identifier(callback.context)} else {{ {fail} }}\n  let box = Unmanaged<GeneratedCallbackBox<{stored}>>.fromOpaque({identifier(callback.context)}).takeUnretainedValue()"
-    if policy:
-        operations = ", ".join(f'"{operation}"' for operation in policy.operations)
-        lookup += f"\n  guard let owner = box.value.owner else {{ {fail} }}"
-        guard = f"let admission = NativeCallbackGuard.enter(owner: owner, operations: [{operations}])"
-        invoke = invoke.replace("box.value(", "box.value.value(")
-    else:
-        guard = "let admission = NativeCallbackGuard.enter(owner: nil, operations: [])"
-    optional = receiver is None
-    arguments = []
-    for parameter in plan.function.parameters:
-        if parameter.name == plan.receiver:
-            arguments.append("access.handle.raw")
-        elif parameter.name == registration.callback:
-            arguments.append(f"callback == nil ? nil : {thunk}" if optional else thunk)
-        elif parameter.name == registration.user_data:
-            arguments.append("token")
-        elif parameter.name == registration.release_callback:
-            arguments.append("releaseGeneratedCallback")
-        elif parameter.name == registration.accepted_unless:
-            arguments.append("&rejected")
-        else:
-            raise ModelError([f"{function}: unsupported direct callback parameter"])
-    value = (
-        "NativeOwnedCallback(owner: self, value: callback)" if policy else "callback"
-    )
-    token = (
-        "let token = callback.map { arena.callback($0) }"
-        if optional
-        else f"let token = arena.callback({value})"
-    )
-    call = native_call(plan.function, *arguments)
-    lines = [
-        "let arena = NativeInputArena()",
-        "defer { withExtendedLifetime(arena) {} }",
-    ]
-    if receiver:
-        lines += [
-            "let access = try handle.borrow()",
-            "defer { access.end(); withExtendedLifetime(self) {} }",
-        ]
-    lines.append(token)
-    if registration.accepted_unless:
-        # A rejected registration stores nothing, so the arena releases it.
-        lines += [
-            "var rejected = false",
-            checked(call),
-            "if !rejected { arena.accept() }",
-            "return rejected",
-        ]
-        result_type = " -> Bool"
-    else:
-        lines.append(checked(f"arena.submit {{ {call} }}"))
-        result_type = ""
-    parameter_type = f"({typ})?" if optional else f"@escaping {typ}"
-    body = f"""{doc(values.bound, function, "  ")}  {"static " if optional else ""}func {method}(_ callback: {parameter_type}) throws{result_type} {{
-    {"try NativeAbi.ensureCompatible()" + chr(10) + "    " if optional else ""}try NativeCallbackGuard.check(owner: {"nil" if optional else "self"}, operation: "{function}")
-    {"return " if result_type else ""}try mapNativeFailure {{
-      {(chr(10) + "      ").join(lines)}
-    }}
-  }}"""
-    return (
-        f"""public extension {owner} {{
-{body}
-}}
-private func {thunk}({params}) -> {result} {{
-  {lookup}
-  {guard}
-  defer {{ admission.end() }}
-  do {{ {invoke} }} catch {{ NativeDiagnostics.report(.callbackError(callback: "{callback.native}", error: error)); {fail} }}
-}}
-""",
-        None,
-    )

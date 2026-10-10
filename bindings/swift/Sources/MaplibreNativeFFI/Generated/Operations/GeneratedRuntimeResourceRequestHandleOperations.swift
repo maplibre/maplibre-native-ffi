@@ -43,6 +43,27 @@ public extension ResourceRequestHandle {
     }
   }
 
+  /// Registers a callback that runs when MapLibre cancels a C API resource
+  /// provider request.
+  ///
+  /// See `mln_resource_request_set_cancel_callback` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+  func setCancelCallback(
+    handler bindingArg0: ResourceRequestCancelHandler
+  ) throws
+    -> Bool
+  {
+    var value0 = false
+    return try nativeInvoke("mln_resource_request_set_cancel_callback") { raw, arena, diagnostic in
+      let status = try mln_resource_request_set_cancel_callback(
+        raw,
+        arena.store(bindingArg0.nativeValue(arena: arena)),
+        &value0,
+        diagnostic
+      ); arena.decline(if: status == MLN_STATUS_OK && value0); return status
+    } result: { value0 }
+  }
+
   /// Blocks until a resource request is released and its cancel callback
   /// registration has retired: the callback, if it ran, and release_user_data
   /// have both returned. Completing a request does not release its owner.
@@ -57,65 +78,4 @@ public extension ResourceRequestHandle {
       diagnostic
     ) }
   }
-}
-
-public extension ResourceRequestHandle {
-  /// Registers a callback that runs when MapLibre cancels a C API resource
-  /// provider request.
-  ///
-  /// See `mln_resource_request_set_cancel_callback` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func setCancelCallback(_ callback: @escaping @Sendable () throws
-    -> Void) throws -> Bool
-  {
-    try NativeCallbackGuard.check(
-      owner: self,
-      operation: "mln_resource_request_set_cancel_callback"
-    )
-    return try mapNativeFailure {
-      let arena = NativeInputArena()
-      defer { withExtendedLifetime(arena) {} }
-      let access = try handle.borrow()
-      defer { access.end(); withExtendedLifetime(self) {} }
-      let token = arena.callback(NativeOwnedCallback(
-        owner: self,
-        value: callback
-      ))
-      var rejected = false
-      try checkStatus { diagnostic in mln_resource_request_set_cancel_callback(
-        access.handle.raw,
-        invokeMlnResourceRequestSetCancelCallback,
-        token,
-        releaseGeneratedCallback,
-        &rejected,
-        diagnostic
-      ) }
-      if !rejected { arena.accept() }
-      return rejected
-    }
-  }
-}
-
-private func invokeMlnResourceRequestSetCancelCallback(
-  user_data: UnsafeMutableRawPointer?
-) {
-  guard let user_data else { return }
-  let box =
-    Unmanaged<GeneratedCallbackBox<NativeOwnedCallback<@Sendable () throws
-        -> Void>>>.fromOpaque(user_data).takeUnretainedValue()
-  guard let owner = box.value.owner else { return }
-  let admission = NativeCallbackGuard.enter(
-    owner: owner,
-    operations: [
-      "mln_resource_request_complete",
-      "mln_resource_request_cancelled",
-      "mln_resource_request_set_cancel_callback",
-      "mln_resource_request_release",
-    ]
-  )
-  defer { admission.end() }
-  do { try box.value.value() } catch { NativeDiagnostics.report(.callbackError(
-    callback: "mln_resource_request_cancel_callback",
-    error: error
-  )); return }
 }

@@ -44,7 +44,7 @@ struct ResourceRequestObject {
   bool claimed = false;
   bool released_while_deciding = false;
   mln_resource_request_cancel_callback cancel_callback = nullptr;
-  mln_runtime_callback_release cancel_release = nullptr;
+  mln_user_data_release cancel_release = nullptr;
   void* cancel_user_data = nullptr;
   bool cancel_callback_registered = false;
   bool cancel_callback_running = false;
@@ -260,7 +260,7 @@ void fail_unanswered_locked(ResourceRequestObject& object) noexcept {
 // completed. Callers hold no lock; the callback may call back into this handle.
 void run_cancel_callback(ResourceRequestObject& object) noexcept {
   mln_resource_request_cancel_callback callback = nullptr;
-  mln_runtime_callback_release release = nullptr;
+  mln_user_data_release release = nullptr;
   void* user_data = nullptr;
   {
     const std::scoped_lock lock(object.mutex);
@@ -315,7 +315,7 @@ void retire_request(mln_resource_request_handle handle) noexcept {
     return;
   }
   // A registration whose callback never ran retires with the request.
-  mln_runtime_callback_release release = nullptr;
+  mln_user_data_release release = nullptr;
   void* user_data = nullptr;
   {
     auto lock = std::unique_lock{object->mutex};
@@ -634,11 +634,18 @@ auto resource_request_cancelled(
 
 auto set_resource_request_cancel_callback(
   mln_resource_request_handle handle,
-  mln_resource_request_cancel_callback callback, void* user_data,
-  mln_runtime_callback_release release_user_data, bool* out_cancelled
+  const mln_resource_request_cancel_handler* handler, bool* out_cancelled
 ) -> mln_status {
-  if (callback == nullptr) {
-    set_thread_error("callback must not be null");
+  if (handler == nullptr) {
+    set_thread_error("cancel handler must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (handler->size < sizeof(mln_resource_request_cancel_handler)) {
+    set_thread_error("mln_resource_request_cancel_handler.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (handler->callback == nullptr) {
+    set_thread_error("cancel handler callback must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_cancelled == nullptr) {
@@ -660,9 +667,9 @@ auto set_resource_request_cancel_callback(
   live->cancel_callback_registered = true;
   *out_cancelled = live->cancelled && !live->completed;
   if (!*out_cancelled) {
-    live->cancel_callback = callback;
-    live->cancel_release = release_user_data;
-    live->cancel_user_data = user_data;
+    live->cancel_callback = handler->callback;
+    live->cancel_release = handler->release_user_data;
+    live->cancel_user_data = handler->user_data;
   }
   return MLN_STATUS_OK;
 }

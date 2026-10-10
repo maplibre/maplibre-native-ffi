@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.WindowManager
 import org.maplibre.nativeffi.MaplibreAndroid
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogHandler
 
 class MainActivity : Activity() {
   private lateinit var mapView: AndroidMapView
@@ -40,10 +41,12 @@ class MainActivity : Activity() {
   }
 
   private fun installMaplibreLogging() {
-    GeneratedApi.logSetCallback { severity, event, code, message ->
-      Log.i("MapLibre", "severity=${severity} event=${event} code=${code}: ${message}")
-      1u
-    }
+    GeneratedApi.logSetCallback(
+      LogHandler { severity, event, code, message ->
+        Log.i("MapLibre", "severity=${severity} event=${event} code=${code}: ${message}")
+        1u
+      }
+    )
   }
 
   private var smokeReported = false

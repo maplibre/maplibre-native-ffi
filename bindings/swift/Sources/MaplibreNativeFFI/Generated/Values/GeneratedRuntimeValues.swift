@@ -612,6 +612,68 @@ public struct ResourceRequest: Equatable, Hashable, Sendable {
   }
 }
 
+/// Cancel callback state for one handled resource request.
+///
+/// See `mln_resource_request_cancel_handler` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+public struct ResourceRequestCancelHandler: Sendable {
+  public var callback: (@Sendable () throws -> Void)?
+  public init(callback: (@Sendable () throws -> Void)? = nil) {
+    self.callback = callback
+  }
+
+  public static var `default`: Self {
+    Self()
+  }
+
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_resource_request_cancel_handler
+  {
+    var raw = mln_resource_request_cancel_handler()
+    raw.size = UInt32(MemoryLayout<mln_resource_request_cancel_handler>.size)
+    raw
+      .callback = callback == nil ? nil :
+      invokeResourceRequestCancelHandlerCallback
+    if callback != nil {
+      raw.user_data = arena.callback(NativeOwnedCallback(
+        owner: arena.receiver,
+        value: self
+      ))
+      raw.release_user_data = releaseGeneratedCallback
+    }
+    return raw
+  }
+}
+
+private let allowedResourceRequestCancelHandlerCallback: Set<String> = [
+  "mln_resource_request_complete",
+  "mln_resource_request_cancelled",
+  "mln_resource_request_set_cancel_callback",
+  "mln_resource_request_release",
+]
+private func invokeResourceRequestCancelHandlerCallback(
+  user_data: UnsafeMutableRawPointer?
+) {
+  guard let user_data else { return }
+  let box =
+    Unmanaged<
+      GeneratedCallbackBox<NativeOwnedCallback<ResourceRequestCancelHandler>>
+    >
+    .fromOpaque(user_data).takeUnretainedValue()
+  guard let receiver = box.value.owner else { return }
+  let admission = NativeCallbackGuard.enter(
+    owner: receiver,
+    operations: allowedResourceRequestCancelHandlerCallback
+  )
+  defer { admission.end() }
+  do { try box.value.value.callback?() } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_resource_request_cancel_callback",
+      error: error
+    ))
+  }
+}
+
 /// Field mask values for `mln_resource_request`.
 ///
 /// See `mln_resource_request_field` in the

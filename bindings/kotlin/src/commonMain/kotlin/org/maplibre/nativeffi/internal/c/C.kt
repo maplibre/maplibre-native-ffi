@@ -83,12 +83,7 @@ internal expect object C {
 
   fun mln_log_set_async_severity_mask(mask: Int, outDiagnostic: Long): Int
 
-  fun mln_log_set_callback(
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_log_set_callback(handler: Long, outDiagnostic: Long): Int
 
   fun mln_map_add_color_relief_layer(
     map: Long,
@@ -1077,9 +1072,7 @@ internal expect object C {
 
   fun mln_resource_request_set_cancel_callback(
     handle: Long,
-    callback: Long,
-    userData: Long,
-    releaseUserData: Long,
+    handler: Long,
     outCancelled: Long,
     outDiagnostic: Long,
   ): Int

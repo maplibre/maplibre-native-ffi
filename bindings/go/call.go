@@ -133,6 +133,7 @@ func bindingRun[T any](target bindingTarget, call func(arena *bindingArena, raw 
 	}
 	bindingAdmission(target.operation, owner.state.issued)
 	defer runtime.KeepAlive(owner)
+	arena.identity = owner.state.issued
 	var value T
 	switch target.access {
 	case bindingIssuedAccess:

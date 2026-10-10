@@ -82,6 +82,16 @@ internal fun NativeArena.putProjectedMeters(target: Long, value: ProjectedMeters
 internal fun NativeArena.writeProjectedMeters(value: ProjectedMeters): Long =
   allocate(16, 8).also { putProjectedMeters(it, value) }
 
+internal fun NativeCall.putLogHandler(target: Long, value: LogHandler) {
+  writeU32(target, w(16, 32).toUInt())
+  writeAddress(target + w(8, 16), registrations.register(value))
+  writeAddress(target + w(4, 8), UpcallStubs.logHandlerCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeLogHandler(value: LogHandler): Long =
+  allocate(w(16, 32), w(4, 8)).also { putLogHandler(it, value) }
+
 internal fun NativeArena.putLatLng(target: Long, value: LatLng) {
   writeF64(target, value.latitude)
   writeF64(target + 8, value.longitude)
@@ -935,6 +945,20 @@ internal fun NativeArena.putResourceResponse(target: Long, value: ResourceRespon
 
 internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long =
   allocate(w(64, 80), 8).also { putResourceResponse(it, value) }
+
+internal fun NativeCall.putResourceRequestCancelHandler(
+  target: Long,
+  value: ResourceRequestCancelHandler,
+) {
+  writeU32(target, w(16, 32).toUInt())
+  writeAddress(target + w(8, 16), registrations.register(value, handle))
+  writeAddress(target + w(4, 8), UpcallStubs.resourceRequestCancelHandlerCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeResourceRequestCancelHandler(
+  value: ResourceRequestCancelHandler
+): Long = allocate(w(16, 32), w(4, 8)).also { putResourceRequestCancelHandler(it, value) }
 
 internal fun readMetalOwnedTextureFrame(
   source: Long,

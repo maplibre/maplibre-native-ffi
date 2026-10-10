@@ -184,7 +184,7 @@ private func invokeCustomGeometrySourceOptionsFetchTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_geometry_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }
@@ -199,7 +199,7 @@ private func invokeCustomGeometrySourceOptionsCancelTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_geometry_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }
@@ -295,7 +295,7 @@ private func invokeCustomMvtVectorSourceOptionsFetchTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.fetchTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_mvt_vector_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }
@@ -310,7 +310,7 @@ private func invokeCustomMvtVectorSourceOptionsCancelTile(
     .fromOpaque(user_data).takeUnretainedValue()
   do { try box.value.cancelTile?(CanonicalTileId(raw: tile_id)) } catch {
     NativeDiagnostics.report(.callbackError(
-      callback: "mln_custom_mvt_vector_source_tile_callback",
+      callback: "mln_custom_source_tile_callback",
       error: error
     ))
   }

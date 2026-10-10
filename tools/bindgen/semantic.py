@@ -95,6 +95,12 @@ class RegistrationDescriptorPlan:
     callbacks: tuple[str, ...]
     user_data: str
     release: str
+    # Whether the release runs where host code must not call back into the
+    # C API: "forbid", or "allow".
+    release_reentry: str = "allow"
+    # Whether a callback has no owner parameter and calls back only into the
+    # receiver of the call that registers it, which the binding records.
+    receiver_owned: bool = False
 
 
 @dataclass(frozen=True)
@@ -214,10 +220,11 @@ class ParameterPlan:
 
 @dataclass(frozen=True)
 class CallbackReentryPlan:
+    # The callback parameter that identifies the owner, or None when the
+    # callback has none and its registration's receiver is the owner.
     owner_parameter: str | None
     owner_type: str
     operations: tuple[str, ...]
-    registration_owner: bool = False
 
 
 @dataclass(frozen=True)
@@ -249,14 +256,10 @@ class RegistrationPlan:
     user_data: str
     release: str
     path: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class DirectRegistrationPlan:
-    callback: str
-    user_data: str
-    release_callback: str | None
-    accepted_unless: str | None
+    # The boolean output that, set on success, reports that native kept
+    # nothing, so the caller still owns the registration; or None when
+    # success always transfers it.
+    accepted_unless: str | None = None
 
 
 @dataclass(frozen=True)
@@ -325,7 +328,6 @@ class OperationPlan:
     support: DefaultSupport | DisposeSupport | ViewSupport | None = None
     completion: CompletionPlan | None = None
     owned_outputs: tuple[OwnedOutputPlan, ...] = ()
-    direct_registrations: tuple[DirectRegistrationPlan, ...] = ()
     view: BorrowedViewPlan | None = None
     scoped_receiver: str | None = None
     receiver_access: str = "live"
@@ -871,6 +873,13 @@ class Binder:
                         ),
                         record_metadata["user_data"],
                         record_metadata["release"],
+                        record_metadata.get("release_reentry", "allow"),
+                        any(
+                            self.receiver_owned(member.value.native)
+                            for member in fields
+                            if member.value.kind == "callback"
+                            and member.name != record_metadata["release"]
+                        ),
                     )
                     if record_metadata.get("kind") == "callback_registration"
                     else None,
@@ -1006,6 +1015,33 @@ class Binder:
                 validate_input_lifetime(value)
             (outputs if direction == "out" else inputs).append(plan)
 
+            def validate_owned_reentry(descriptor):
+                """A callback without an owner parameter may call back only
+                into the receiver that registered it."""
+                for member in descriptor.fields:
+                    callback = self.callbacks.get(member.value.native)
+                    policy = callback.reentry_policy if callback else None
+                    if policy is None or policy.owner_parameter is not None:
+                        continue
+                    owner = next(
+                        (
+                            type_name(p.type.pointee or p.type)
+                            for p in function.parameters
+                            if p.name == receiver
+                        ),
+                        None,
+                    )
+                    if owner != policy.owner_type:
+                        raise ModelError(
+                            [
+                                (
+                                    f"{context}: {member.value.native} calls back "
+                                    f"into {policy.owner_type}, which must be the "
+                                    "receiver"
+                                )
+                            ]
+                        )
+
             def collect_registrations(
                 descriptor, path=(), parameter_name=parameter.name
             ):
@@ -1022,8 +1058,10 @@ class Binder:
                                 registration.user_data,
                                 registration.release,
                                 path,
+                                function.metadata.get("accepted_unless"),
                             )
                         )
+                        validate_owned_reentry(descriptor)
                     else:
                         for member in descriptor.fields:
                             collect_registrations(member.value, (*path, member.name))
@@ -1219,7 +1257,7 @@ class Binder:
                 raise ModelError(
                     [f"{context}: absent_on requires an output that the caller owns"]
                 )
-            if registrations or "registration" in metadata:
+            if registrations:
                 raise ModelError(
                     [f"{context}: absent_on requires a call without registrations"]
                 )
@@ -1260,16 +1298,6 @@ class Binder:
             support,
             completion,
             tuple(owners),
-            (
-                DirectRegistrationPlan(
-                    metadata["registration"],
-                    metadata["user_data"],
-                    metadata.get("release_callback"),
-                    metadata.get("accepted_unless"),
-                ),
-            )
-            if "registration" in metadata
-            else (),
             view,
             scoped_receiver,
             next(
@@ -1440,31 +1468,25 @@ class Binder:
             typedef.metadata.get("synchronous") == "true",
         )
 
+    def receiver_owned(self, name: str) -> bool:
+        """Whether a protocol callback names its owner by handle type rather
+        than by one of its parameters."""
+        typedef = self.typedefs.get(name)
+        if typedef is None or typedef.metadata.get("reentry") != "protocol":
+            return False
+        owner = typedef.metadata["reentry_owner"]
+        return all(p.name != owner for p in typedef.parameters)
+
     def callback_reentry(self, typedef) -> CallbackReentryPlan | None:
         metadata = typedef.metadata
         if metadata.get("reentry") != "protocol":
             return None
         owner = metadata["reentry_owner"]
-        if owner == "registration":
-            function = next(
-                f
-                for f in self.api.functions
-                if f.metadata.get("registration")
-                and any(
-                    p.name == f.metadata["registration"]
-                    and p.type.declaration == typedef.name
-                    for p in f.parameters
-                )
-            )
-            type_ = function.parameters[0].type
-        else:
-            type_ = next(p.type for p in typedef.parameters if p.name == owner)
-        type_ = type_.pointee or type_
+        parameter = next((p for p in typedef.parameters if p.name == owner), None)
         return CallbackReentryPlan(
-            None if owner == "registration" else owner,
-            type_name(type_),
+            parameter.name if parameter else None,
+            type_name(parameter.type.pointee or parameter.type) if parameter else owner,
             tuple(metadata["reentry_calls"].split(",")),
-            owner == "registration",
         )
 
     def decision(self, typedef) -> DecisionPlan | None:

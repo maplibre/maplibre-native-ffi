@@ -17,9 +17,6 @@ extern "C" {
 /** Schedules service by the receiver that owns a queue or driver. */
 typedef void (*mln_wake_callback)(void* user_data);
 
-/** Releases wake callback state after native code can no longer invoke it. */
-typedef void (*mln_wake_release)(void* user_data);
-
 /**
  * Receiver wake callback copied by a successful owning call.
  *
@@ -40,7 +37,11 @@ typedef struct mln_wake {
   uint32_t size;
   mln_wake_callback callback MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
-  mln_wake_release release_user_data;
+  /**
+   * Optional. Releases user_data after all callback invocations have returned.
+   * A disabled wake leaves it null.
+   */
+  mln_user_data_release release_user_data;
 } mln_wake MLN_BINDING("kind=callback_registration;release=release_user_data");
 
 #ifdef __cplusplus

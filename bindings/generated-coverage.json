@@ -13,6 +13,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Internal/C/NativeTypes.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Internal/Struct/GeneratedValues.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Logging/LogEvent.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Logging/LogHandler.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Logging/LogSeverity.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Logging/LogSeverityMask.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Map/AnimationOptionField.g.cs",
@@ -127,6 +128,7 @@
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceProviderDecision.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRange.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequest.g.cs",
+    "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestCancelHandler.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestField.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceRequestHandle.Operations.g.cs",
     "bindings/dotnet/src/Maplibre.NativeFfi/Runtime/ResourceResponse.g.cs",
@@ -321,7 +323,7 @@
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc"
   ],
-  "function_count": 294,
+  "function_count": 293,
   "languages": {
     "dart": {
       "callback_adapters": {
@@ -2541,8 +2543,7 @@
     "mln_adapter_completion_record_adopt",
     "mln_adapter_completion_record_destroy",
     "mln_adapter_completion_reject",
-    "mln_adapter_custom_geometry_callbacks_retire",
-    "mln_adapter_custom_mvt_vector_callbacks_retire",
+    "mln_adapter_custom_source_callbacks_retire",
     "mln_adapter_dart_completion_create",
     "mln_adapter_dart_deferred_callback_create",
     "mln_adapter_dart_port_create",
@@ -2567,7 +2568,7 @@
   ],
   "schema_version": 1,
   "semantic": {
-    "resolved_callbacks": 19,
+    "resolved_callbacks": 12,
     "resolved_operations": 260,
     "support_relations": {
       "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },

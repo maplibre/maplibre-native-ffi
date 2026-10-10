@@ -113,13 +113,9 @@ def access(plan):
 def signature(plan, values):
     """The method name, public parameters, inputs, result plan, and result type."""
     if (
-        (
-            plan.registrations
-            and any(not registration.path for registration in plan.registrations)
-        )
-        or plan.direct_registrations
-        or plan.scoped_receiver
-    ):
+        plan.registrations
+        and any(not registration.path for registration in plan.registrations)
+    ) or plan.scoped_receiver:
         raise Unsupported("operation requires an owner or callback transaction")
     if plan.view:
         values.views.add(plan.outputs[0].value.element.native)
