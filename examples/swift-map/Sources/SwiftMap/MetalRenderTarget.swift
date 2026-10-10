@@ -110,7 +110,7 @@ final class MetalRenderTarget {
     switch mode {
     case .ownedTexture:
       let session = try await finishAttachment(
-        map.metalOwnedTextureAttach(
+        map.attachMetalOwnedTexture(
           descriptor: MetalOwnedTextureDescriptor(
             extent: viewport.extent,
             context: graphics.contextDescriptor
@@ -127,7 +127,7 @@ final class MetalRenderTarget {
         viewport: viewport
       )
       let session = try await finishAttachment(
-        map.metalBorrowedTextureAttach(
+        map.attachMetalBorrowedTexture(
           descriptor: texture.descriptor(viewport),
           options: options
         )
@@ -141,7 +141,7 @@ final class MetalRenderTarget {
       }
     case .nativeSurface:
       let session = try await finishAttachment(
-        map.metalSurfaceAttach(
+        map.attachMetalSurface(
           descriptor: MetalSurfaceDescriptor(
             extent: viewport.extent,
             context: graphics.contextDescriptor,
@@ -253,7 +253,7 @@ final class MetalRenderTarget {
       graphics: graphics,
       viewport: viewport
     )
-    try await session.metalBorrowedTextureSetTarget(
+    try await session.setMetalBorrowedTextureTarget(
       descriptor: texture.descriptor(viewport)
     )
     // Nothing has rendered into the replacement yet, so the compositor keeps

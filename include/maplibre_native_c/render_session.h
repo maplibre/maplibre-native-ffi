@@ -33,7 +33,7 @@ extern "C" {
  *   no rendered projection.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_render_session_projection_create(
+MLN_API mln_status mln_render_session_create_projection(
   mln_render_session session,
   mln_map_projection* out_projection MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic

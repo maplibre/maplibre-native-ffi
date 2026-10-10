@@ -12,22 +12,6 @@ native_owner! {
 }
 
 impl RuntimeHandle {
-    /// Creates a map on the runtime worker.
-    ///
-    /// See `mln_map_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn map_create(&self, options: &MapOptions) -> Result<NativeFuture<MapHandle>> {
-        let mut call = self.inner.call("mln_map_create")?;
-        let parent = self.inner.parent();
-        let options = call.reference(&options)?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_map_create(runtime, options, completion, out_diagnostic)
-            },
-            move |result| MapHandle::adopt(completion::copy_value::<sys::mln_map>(result)?, parent),
-        )
-    }
-
     /// Starts an ordered runtime barrier.
     ///
     /// See `mln_runtime_barrier` in the
@@ -84,6 +68,69 @@ impl RuntimeHandle {
         )
     }
 
+    /// Creates a map on the runtime worker.
+    ///
+    /// See `mln_runtime_create_map` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn create_map(&self, options: &MapOptions) -> Result<NativeFuture<MapHandle>> {
+        let mut call = self.inner.call("mln_runtime_create_map")?;
+        let parent = self.inner.parent();
+        let options = call.reference(&options)?;
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_create_map(runtime, options, completion, out_diagnostic)
+            },
+            move |result| MapHandle::adopt(completion::copy_value::<sys::mln_map>(result)?, parent),
+        )
+    }
+
+    /// Starts creating an offline region.
+    ///
+    /// See `mln_runtime_create_offline_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn create_offline_region(
+        &self,
+        definition: &OfflineRegionDefinition,
+        metadata: &[u8],
+    ) -> Result<NativeFuture<OfflineRegionInfo>> {
+        let mut call = self.inner.call("mln_runtime_create_offline_region")?;
+        let metadata_size = convert::count(metadata.len())?;
+        let definition = call.reference(&definition)?;
+        let metadata = metadata.as_ptr().cast();
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_create_offline_region(
+                    runtime,
+                    definition,
+                    metadata,
+                    metadata_size,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::value::<sys::mln_offline_region_info, _>,
+        )
+    }
+
+    /// Deletes an offline region.
+    ///
+    /// See `mln_runtime_delete_offline_region` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn delete_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
+        let call = self.inner.call("mln_runtime_delete_offline_region")?;
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_delete_offline_region(
+                    runtime,
+                    region_id,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
     /// Consumes a runtime handle without observing its asynchronous retirement.
     ///
     /// See `mln_runtime_dispose` in the
@@ -128,65 +175,18 @@ impl RuntimeHandle {
         Ok(unsafe { from_native(out_mask) }?)
     }
 
-    /// Starts creating an offline region.
-    ///
-    /// See `mln_runtime_offline_region_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_create(
-        &self,
-        definition: &OfflineRegionDefinition,
-        metadata: &[u8],
-    ) -> Result<NativeFuture<OfflineRegionInfo>> {
-        let mut call = self.inner.call("mln_runtime_offline_region_create")?;
-        let metadata_size = convert::count(metadata.len())?;
-        let definition = call.reference(&definition)?;
-        let metadata = metadata.as_ptr().cast();
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_create(
-                    runtime,
-                    definition,
-                    metadata,
-                    metadata_size,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::value::<sys::mln_offline_region_info, _>,
-        )
-    }
-
-    /// Deletes an offline region.
-    ///
-    /// See `mln_runtime_offline_region_delete` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_delete(&self, region_id: i64) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_offline_region_delete")?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_delete(
-                    runtime,
-                    region_id,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
-    }
-
     /// Starts getting one offline region by ID.
     ///
-    /// See `mln_runtime_offline_region_get` in the
+    /// See `mln_runtime_get_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_get(
+    pub fn get_offline_region(
         &self,
         region_id: i64,
     ) -> Result<NativeFuture<Option<OfflineRegionInfo>>> {
-        let call = self.inner.call("mln_runtime_offline_region_get")?;
+        let call = self.inner.call("mln_runtime_get_offline_region")?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_get(runtime, region_id, completion, out_diagnostic)
+                sys::mln_runtime_get_offline_region(runtime, region_id, completion, out_diagnostic)
             },
             completion::optional::<sys::mln_offline_region_info, _>,
         )
@@ -194,16 +194,16 @@ impl RuntimeHandle {
 
     /// Starts getting the current download status for an offline region.
     ///
-    /// See `mln_runtime_offline_region_get_status` in the
+    /// See `mln_runtime_get_offline_region_status` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_get_status(
+    pub fn get_offline_region_status(
         &self,
         region_id: i64,
     ) -> Result<NativeFuture<OfflineRegionStatus>> {
-        let call = self.inner.call("mln_runtime_offline_region_get_status")?;
+        let call = self.inner.call("mln_runtime_get_offline_region_status")?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_get_status(
+                sys::mln_runtime_get_offline_region_status(
                     runtime,
                     region_id,
                     completion,
@@ -216,13 +216,13 @@ impl RuntimeHandle {
 
     /// Invalidates cached resources for an offline region.
     ///
-    /// See `mln_runtime_offline_region_invalidate` in the
+    /// See `mln_runtime_invalidate_offline_region` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_invalidate(&self, region_id: i64) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_offline_region_invalidate")?;
+    pub fn invalidate_offline_region(&self, region_id: i64) -> Result<NativeFuture<()>> {
+        let call = self.inner.call("mln_runtime_invalidate_offline_region")?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_invalidate(
+                sys::mln_runtime_invalidate_offline_region(
                     runtime,
                     region_id,
                     completion,
@@ -230,97 +230,18 @@ impl RuntimeHandle {
                 )
             },
             completion::unit,
-        )
-    }
-
-    /// Sets an offline region's native download state.
-    ///
-    /// See `mln_runtime_offline_region_set_download_state` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_set_download_state(
-        &self,
-        region_id: i64,
-        state: OfflineRegionDownloadState,
-    ) -> Result<NativeFuture<()>> {
-        let call = self
-            .inner
-            .call("mln_runtime_offline_region_set_download_state")?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_set_download_state(
-                    runtime,
-                    region_id,
-                    state.to_native(),
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
-    }
-
-    /// Enables or disables runtime events for an offline region.
-    ///
-    /// See `mln_runtime_offline_region_set_observed` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_set_observed(
-        &self,
-        region_id: i64,
-        observed: bool,
-    ) -> Result<NativeFuture<()>> {
-        let call = self.inner.call("mln_runtime_offline_region_set_observed")?;
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_set_observed(
-                    runtime,
-                    region_id,
-                    observed,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
-    }
-
-    /// Starts updating opaque binary metadata for an offline region.
-    ///
-    /// See `mln_runtime_offline_region_update_metadata` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_region_update_metadata(
-        &self,
-        region_id: i64,
-        metadata: &[u8],
-    ) -> Result<NativeFuture<OfflineRegionInfo>> {
-        let call = self
-            .inner
-            .call("mln_runtime_offline_region_update_metadata")?;
-        let metadata_size = convert::count(metadata.len())?;
-        let metadata = metadata.as_ptr().cast();
-        call.complete(
-            |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_region_update_metadata(
-                    runtime,
-                    region_id,
-                    metadata,
-                    metadata_size,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::value::<sys::mln_offline_region_info, _>,
         )
     }
 
     /// Starts listing the offline regions in the runtime database.
     ///
-    /// See `mln_runtime_offline_regions_list` in the
+    /// See `mln_runtime_list_offline_regions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_regions_list(&self) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
-        let call = self.inner.call("mln_runtime_offline_regions_list")?;
+    pub fn list_offline_regions(&self) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
+        let call = self.inner.call("mln_runtime_list_offline_regions")?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_regions_list(runtime, completion, out_diagnostic)
+                sys::mln_runtime_list_offline_regions(runtime, completion, out_diagnostic)
             },
             completion::list::<sys::mln_offline_region_info, _>,
         )
@@ -328,19 +249,17 @@ impl RuntimeHandle {
 
     /// Starts merging offline regions from another MapLibre offline database.
     ///
-    /// See `mln_runtime_offline_regions_merge_database` in the
+    /// See `mln_runtime_merge_offline_regions` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn offline_regions_merge_database(
+    pub fn merge_offline_regions(
         &self,
         side_database_path: &str,
     ) -> Result<NativeFuture<Vec<OfflineRegionInfo>>> {
-        let mut call = self
-            .inner
-            .call("mln_runtime_offline_regions_merge_database")?;
+        let mut call = self.inner.call("mln_runtime_merge_offline_regions")?;
         let side_database_path = call.input(side_database_path)?;
         call.complete(
             |runtime, completion, out_diagnostic| unsafe {
-                sys::mln_runtime_offline_regions_merge_database(
+                sys::mln_runtime_merge_offline_regions(
                     runtime,
                     side_database_path,
                     completion,
@@ -445,6 +364,56 @@ impl RuntimeHandle {
         )
     }
 
+    /// Sets an offline region's native download state.
+    ///
+    /// See `mln_runtime_set_offline_region_download_state` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn set_offline_region_download_state(
+        &self,
+        region_id: i64,
+        state: OfflineRegionDownloadState,
+    ) -> Result<NativeFuture<()>> {
+        let call = self
+            .inner
+            .call("mln_runtime_set_offline_region_download_state")?;
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_offline_region_download_state(
+                    runtime,
+                    region_id,
+                    state.to_native(),
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
+    /// Enables or disables runtime events for an offline region.
+    ///
+    /// See `mln_runtime_set_offline_region_observed` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn set_offline_region_observed(
+        &self,
+        region_id: i64,
+        observed: bool,
+    ) -> Result<NativeFuture<()>> {
+        let call = self.inner.call("mln_runtime_set_offline_region_observed")?;
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_set_offline_region_observed(
+                    runtime,
+                    region_id,
+                    observed,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
     /// Registers or replaces a runtime-scoped network resource provider.
     ///
     /// See `mln_runtime_set_resource_provider` in the
@@ -483,6 +452,35 @@ impl RuntimeHandle {
                 )
             },
             completion::unit,
+        )
+    }
+
+    /// Starts updating opaque binary metadata for an offline region.
+    ///
+    /// See `mln_runtime_update_offline_region_metadata` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn update_offline_region_metadata(
+        &self,
+        region_id: i64,
+        metadata: &[u8],
+    ) -> Result<NativeFuture<OfflineRegionInfo>> {
+        let call = self
+            .inner
+            .call("mln_runtime_update_offline_region_metadata")?;
+        let metadata_size = convert::count(metadata.len())?;
+        let metadata = metadata.as_ptr().cast();
+        call.complete(
+            |runtime, completion, out_diagnostic| unsafe {
+                sys::mln_runtime_update_offline_region_metadata(
+                    runtime,
+                    region_id,
+                    metadata,
+                    metadata_size,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::value::<sys::mln_offline_region_info, _>,
         )
     }
 }

@@ -219,10 +219,10 @@ public object GeneratedApi {
   /**
    * Sets one outgoing HTTP request header for the current transform invocation.
    *
-   * See `mln_http_header_transform_response_set` in the
+   * See `mln_http_header_transform_response_set_header` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun httpHeaderTransformResponseSet(
+  public fun httpHeaderTransformResponseSetHeader(
     response: HttpHeaderTransformResponse,
     name: String,
     valueValue: String,
@@ -230,12 +230,12 @@ public object GeneratedApi {
     nativeRespond(
       response.bindingScope,
       response.bindingAddress,
-      "mln_http_header_transform_response_set",
+      "mln_http_header_transform_response_set_header",
     ) {
       val nameUtf8 = name.encodeToByteArray()
       val valueValueUtf8 = valueValue.encodeToByteArray()
       check(
-        C.mln_http_header_transform_response_set(
+        C.mln_http_header_transform_response_set_header(
           handle,
           bytes(nameUtf8),
           nameUtf8.size.toLong(),
@@ -372,25 +372,25 @@ public object GeneratedApi {
   /**
    * Reads MapLibre Native's process-global network status.
    *
-   * See `mln_network_status_get` in the
+   * See `mln_network_get_status` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun networkStatusGet(): NetworkStatus =
-    nativeCall(null, null, "mln_network_status_get") {
+  public fun networkGetStatus(): NetworkStatus =
+    nativeCall(null, null, "mln_network_get_status") {
       val out = allocate(4, 4)
-      check(C.mln_network_status_get(out, diagnostic))
+      check(C.mln_network_get_status(out, diagnostic))
       NetworkStatus(readU32(out))
     }
 
   /**
    * Sets MapLibre Native's process-global network status.
    *
-   * See `mln_network_status_set` in the
+   * See `mln_network_set_status` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
    */
-  public fun networkStatusSet(status: NetworkStatus): Unit =
-    nativeCall(null, null, "mln_network_status_set") {
-      check(C.mln_network_status_set(status.rawValue.toInt(), diagnostic))
+  public fun networkSetStatus(status: NetworkStatus): Unit =
+    nativeCall(null, null, "mln_network_set_status") {
+      check(C.mln_network_set_status(status.rawValue.toInt(), diagnostic))
     }
 
   /**

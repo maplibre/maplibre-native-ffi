@@ -6,13 +6,13 @@ import Foundation
 public extension RenderSessionHandle {
   /// Starts an ordered Metal surface replacement.
   ///
-  /// See `mln_metal_surface_set_target` in the
+  /// See `mln_render_session_set_metal_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func metalSurfaceSetTarget(
+  func setMetalSurfaceTarget(
     descriptor bindingArg0: MetalSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_metal_surface_set_target") { raw, arena, completion, diagnostic in
-      mln_metal_surface_set_target(
+    try await nativeUnit("mln_render_session_set_metal_surface_target") { raw, arena, completion, diagnostic in
+      mln_render_session_set_metal_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
         completion,
@@ -23,13 +23,13 @@ public extension RenderSessionHandle {
 
   /// Starts an ordered OpenGL surface replacement.
   ///
-  /// See `mln_opengl_surface_set_target` in the
+  /// See `mln_render_session_set_opengl_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func openglSurfaceSetTarget(
+  func setOpenglSurfaceTarget(
     descriptor bindingArg0: OpenglSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_opengl_surface_set_target") { raw, arena, completion, diagnostic in
-      try mln_opengl_surface_set_target(
+    try await nativeUnit("mln_render_session_set_opengl_surface_target") { raw, arena, completion, diagnostic in
+      try mln_render_session_set_opengl_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
@@ -40,13 +40,13 @@ public extension RenderSessionHandle {
 
   /// Starts an ordered Vulkan surface replacement.
   ///
-  /// See `mln_vulkan_surface_set_target` in the
+  /// See `mln_render_session_set_vulkan_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func vulkanSurfaceSetTarget(
+  func setVulkanSurfaceTarget(
     descriptor bindingArg0: VulkanSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_vulkan_surface_set_target") { raw, arena, completion, diagnostic in
-      mln_vulkan_surface_set_target(
+    try await nativeUnit("mln_render_session_set_vulkan_surface_target") { raw, arena, completion, diagnostic in
+      mln_render_session_set_vulkan_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
         completion,
@@ -57,13 +57,13 @@ public extension RenderSessionHandle {
 
   /// Starts an ordered WebGPU surface replacement.
   ///
-  /// See `mln_webgpu_surface_set_target` in the
+  /// See `mln_render_session_set_webgpu_surface_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-  func webgpuSurfaceSetTarget(
+  func setWebgpuSurfaceTarget(
     descriptor bindingArg0: WebgpuSurfaceDescriptor
   ) async throws {
-    try await nativeUnit("mln_webgpu_surface_set_target") { raw, arena, completion, diagnostic in
-      mln_webgpu_surface_set_target(
+    try await nativeUnit("mln_render_session_set_webgpu_surface_target") { raw, arena, completion, diagnostic in
+      mln_render_session_set_webgpu_surface_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
         completion,

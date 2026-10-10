@@ -570,7 +570,7 @@ auto texture_read_premultiplied_rgba8_start(
             .data = {.data = bytes.data(), .size = bytes.size()},
             .info = info,
           };
-          CompletionValue<&mln_texture_read_premultiplied_rgba8>::deliver(
+          CompletionValue<&mln_render_session_read_texture>::deliver(
             descriptor, value
           );
         });

@@ -3,7 +3,7 @@
 
 // Helpers for the style suites: stepped frames, feature queries whose borrowed
 // results are copied out, local resources served through a resource provider,
-// and style reads whose results are arrays of borrowed views.
+// and copied layer listings.
 
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -146,10 +146,9 @@ void mln_test_style_serve(
   mln_runtime runtime, mln_test_style_route* routes, size_t route_count
 );
 
-// Copies of the views a list query returned: layer or source IDs, or a layer
-// entry's fields, each string null-terminated. A list longer than
-// MLN_TEST_STYLE_LIST_CAPACITY, or a string longer than its buffer, fails the
-// test.
+// Copies of the layers a list query returned, each string null-terminated. A
+// list longer than MLN_TEST_STYLE_LIST_CAPACITY, or a string longer than its
+// buffer, fails the test.
 #define MLN_TEST_STYLE_LIST_CAPACITY 8
 
 typedef struct mln_test_style_entry {
@@ -157,6 +156,9 @@ typedef struct mln_test_style_entry {
   char type[32];
   char source_id[64];
   char source_layer[64];
+  double min_zoom;
+  double max_zoom;
+  uint32_t visibility;
 } mln_test_style_entry;
 
 typedef struct mln_test_style_list {
@@ -167,9 +169,7 @@ typedef struct mln_test_style_list {
   mln_test_style_entry entries[MLN_TEST_STYLE_LIST_CAPACITY];
 } mln_test_style_list;
 
-mln_test_style_list mln_test_style_list_layer_ids(mln_map map);
 mln_test_style_list mln_test_style_list_layers(mln_map map);
-mln_test_style_list mln_test_style_list_source_ids(mln_map map);
 
 // Finishes a completion from mln_test_completion_buffer_view(), copies the
 // view it delivered into `out` null-terminated, destroys the completion, and

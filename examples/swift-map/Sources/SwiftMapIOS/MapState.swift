@@ -51,7 +51,7 @@ final class MapState {
     )
     let map: MapHandle
     do {
-      map = try await runtime.mapCreate(options: MapOptions(
+      map = try await runtime.createMap(options: MapOptions(
         initialExtent: LogicalExtent(
           width: viewport.logicalWidth,
           height: viewport.logicalHeight,
@@ -141,7 +141,7 @@ final class MapState {
   /// from the zoom of the latest published camera snapshot.
   func zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions) {
     submit { [map] in
-      let zoom = try map.cameraSnapshotGet().camera.zoom ?? 0
+      let zoom = try map.getCameraSnapshot().camera.zoom ?? 0
       _ = try await map.applyCameraDelta(delta: CameraDelta(
         kind: .scale,
         amount: pow(2.0, (zoom.rounded() + 1) - zoom),

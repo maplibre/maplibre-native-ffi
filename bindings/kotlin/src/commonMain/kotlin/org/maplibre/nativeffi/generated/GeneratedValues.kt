@@ -1226,7 +1226,7 @@ public data class Status(public val rawValue: Int) {
     public val TARGET_LOST: Status = Status(-8)
     /** A nonblocking acquisition or service call has no result yet. */
     public val NOT_READY: Status = Status(-9)
-    /** A command or operation named an ID with no live object behind it. */
+    /** A call named an ID with no live object behind it. */
     public val NOT_FOUND: Status = Status(-10)
   }
 }
@@ -1353,7 +1353,7 @@ public data class StyleSourceInfoField(public val rawValue: UInt) {
     public val VECTOR_ENCODING: StyleSourceInfoField = StyleSourceInfoField(16u)
     /** The source exposes a DEM raster encoding. */
     public val RASTER_ENCODING: StyleSourceInfoField = StyleSourceInfoField(32u)
-    /** The source declares an attribution string. */
+    /** The source carries an attribution string, which may be empty. */
     public val ATTRIBUTION: StyleSourceInfoField = StyleSourceInfoField(64u)
   }
 }
@@ -3177,17 +3177,6 @@ public data class CameraQueryResult(
 )
 
 /**
- * Borrowed image-stretch arrays available during a completion callback.
- *
- * See `mln_style_image_stretches_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageStretchesResult(
-  public val stretchX: List<ImageStretch> = emptyList(),
-  public val stretchY: List<ImageStretch> = emptyList(),
-)
-
-/**
  * Feature-state source, feature, and key selector.
  *
  * See `mln_feature_state_selector` in the
@@ -3202,159 +3191,6 @@ public data class FeatureStateSelector(
   public val featureId: String? = null,
   /** Optional state key. Used only by remove and requires feature_id. */
   public val stateKey: String? = null,
-)
-
-/**
- * Fixed metadata for one runtime style image.
- *
- * See `mln_style_image_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageInfo(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
-  /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
-  public val stride: UInt = 0u,
-  public val byteLength: ULong = 0uL,
-  /** Interval counts for the stretchable axes. */
-  public val stretchXCount: ULong = 0uL,
-  public val stretchYCount: ULong = 0uL,
-  /** Content box, meaningful when fields contains CONTENT. */
-  public val content: ImageContent? = null,
-  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_WIDTH. */
-  public val textFitWidth: StyleImageTextFit? = null,
-  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_HEIGHT. */
-  public val textFitHeight: StyleImageTextFit? = null,
-  /** Sprite pixel ratio. */
-  public val pixelRatio: Float = 0f,
-  public val sdf: Boolean = false,
-)
-
-/**
- * Complete style image borrowed for a completion callback.
- *
- * See `mln_style_image_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageResult(
-  public val info: StyleImageInfo = StyleImageInfo(),
-  public val pixels: ByteArray = byteArrayOf(),
-  public val stretchX: List<ImageStretch> = emptyList(),
-  public val stretchY: List<ImageStretch> = emptyList(),
-)
-
-/**
- * Fixed layer metadata included in `mln_style_layer_result`.
- *
- * See `mln_style_layer_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleLayerInfo(
-  /** View of a static style-spec layer type string. It stays valid for the life of the process. */
-  public val type: String = "",
-  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
-  public val minZoom: Double = 0.0,
-  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
-  public val maxZoom: Double = 0.0,
-  /** One of `mln_style_layer_visibility`. */
-  public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
-)
-
-/**
- * Complete layer metadata borrowed for a completion callback.
- *
- * See `mln_style_layer_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleLayerResult(
-  public val info: StyleLayerInfo = StyleLayerInfo(),
-  /** Source ID. Empty for a layer type that takes no source. */
-  public val sourceId: String? = null,
-  /** Source-layer ID. Empty when the layer sets none. */
-  public val sourceLayer: String? = null,
-)
-
-/**
- * Inline tile metadata selected as one value by the source-info field mask.
- *
- * See `mln_style_source_tile_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleSourceTileInfo(
-  /** Inline tile URL count. */
-  public val tileCount: ULong = 0uL,
-  /** Minimum zoom. */
-  public val minZoom: Double = 0.0,
-  /** Maximum zoom. */
-  public val maxZoom: Double = 0.0,
-  /** One of `mln_style_tile_scheme`. */
-  public val scheme: StyleTileScheme = StyleTileScheme(0u),
-)
-
-/**
- * Fixed source metadata included in `mln_style_source_result`.
- *
- * See `mln_style_source_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleSourceInfo(
-  /** One of `mln_style_source_type`. */
-  public val type: StyleSourceType = StyleSourceType(0u),
-  /** Source ID byte length, excluding any null terminator. */
-  public val idSize: ULong = 0uL,
-  /** Whether the source is marked volatile. */
-  public val isVolatile: Boolean = false,
-  /**
-   * Attribution byte length, excluding any null terminator, meaningful when fields contains
-   * ATTRIBUTION.
-   */
-  public val attributionSize: ULong? = null,
-  /** URL byte length, meaningful when fields contains URL. */
-  public val urlSize: ULong? = null,
-  /** Inline tile metadata, meaningful when fields contains TILEJSON. */
-  public val tilejson: StyleSourceTileInfo? = null,
-  /** Geographic bounds, meaningful when fields contains BOUNDS. */
-  public val bounds: LatLngBounds? = null,
-  /** Tile size in pixels, meaningful when fields contains TILE_SIZE. */
-  public val tileSize: UInt? = null,
-  /** Vector encoding, meaningful when fields contains VECTOR_ENCODING. */
-  public val vectorEncoding: StyleVectorTileEncoding? = null,
-  /** DEM encoding, meaningful when fields contains RASTER_ENCODING. */
-  public val rasterEncoding: StyleRasterDemEncoding? = null,
-)
-
-/**
- * Complete source metadata borrowed for a completion callback.
- *
- * See `mln_style_source_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleSourceResult(
-  public val info: StyleSourceInfo = StyleSourceInfo(),
-  public val attribution: String? = null,
-  public val url: String? = null,
-  public val tileUrls: List<String>? = null,
-)
-
-/**
- * Borrowed inline TileJSON tile URLs available during a completion callback.
- *
- * See `mln_style_source_tile_urls_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleSourceTileUrlsResult(public val tileUrls: List<String> = emptyList())
-
-/**
- * One style layer borrowed for a list completion callback.
- *
- * See `mln_style_layer_entry` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleLayerEntry(
-  public val id: String = "",
-  public val type: String = "",
-  public val sourceId: String? = null,
-  public val sourceLayer: String? = null,
 )
 
 /**
@@ -3382,6 +3218,224 @@ public data class MapSnapshot(
   public val tile: MapTileOptions = MapTileOptions(),
   public val bounds: BoundOptions = BoundOptions(),
   public val freeCamera: FreeCameraOptions = FreeCameraOptions(),
+)
+
+/**
+ * One complete runtime style image, borrowed for a completion callback.
+ *
+ * See `mln_style_image_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class StyleImageInfo(
+  /** Image width in pixels. */
+  public val width: UInt = 0u,
+  /** Image height in pixels. */
+  public val height: UInt = 0u,
+  /** Premultiplied RGBA8 pixels in tightly packed rows of width &#42; 4 bytes, top row first. */
+  public val pixels: ByteArray = byteArrayOf(),
+  /** Horizontally stretchable intervals. */
+  public val stretchX: List<ImageStretch> = emptyList(),
+  /** Vertically stretchable intervals. */
+  public val stretchY: List<ImageStretch> = emptyList(),
+  /** Content box, when the image sets one. */
+  public val content: ImageContent? = null,
+  /** How the image fits text horizontally, when it sets this. */
+  public val textFitWidth: StyleImageTextFit? = null,
+  /** How the image fits text vertically, when it sets this. */
+  public val textFitHeight: StyleImageTextFit? = null,
+  /** Sprite pixel ratio. */
+  public val pixelRatio: Float = 0f,
+  /** Whether the image is a signed distance field icon. */
+  public val sdf: Boolean = false,
+)
+
+/**
+ * One style layer, borrowed for a completion callback.
+ *
+ * See `mln_style_layer_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class StyleLayerInfo(
+  /** Layer ID. */
+  public val id: String = "",
+  /** The style-spec layer type string. */
+  public val type: String = "",
+  /** Source ID. Empty for a layer type that takes no source. */
+  public val sourceId: String? = null,
+  /** Source-layer ID. Empty when the layer sets none. */
+  public val sourceLayer: String? = null,
+  /** Lowest zoom at which the layer draws; -INFINITY with no lower bound. */
+  public val minZoom: Double = 0.0,
+  /** Highest zoom at which the layer draws; INFINITY with no upper bound. */
+  public val maxZoom: Double = 0.0,
+  /** One of `mln_style_layer_visibility`. */
+  public val visibility: StyleLayerVisibility = StyleLayerVisibility(0u),
+)
+
+/**
+ * Inline TileJSON metadata of a tile source.
+ *
+ * See `mln_style_source_tile_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class StyleSourceTileInfo(
+  /** Tile URL templates in TileJSON order. */
+  public val tileUrls: List<String> = emptyList(),
+  /** Lowest zoom level the TileJSON provides tiles for. */
+  public val minZoom: Double = 0.0,
+  /** Highest zoom level the TileJSON provides tiles for. */
+  public val maxZoom: Double = 0.0,
+  /** One of `mln_style_tile_scheme`. */
+  public val scheme: StyleTileScheme = StyleTileScheme(0u),
+)
+
+/**
+ * Complete metadata of one style source, borrowed for a completion callback.
+ *
+ * See `mln_style_source_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class StyleSourceInfo(
+  /** Source ID. */
+  public val id: String = "",
+  /** One of `mln_style_source_type`. */
+  public val type: StyleSourceType = StyleSourceType(0u),
+  /** Whether the source is marked volatile. */
+  public val isVolatile: Boolean = false,
+  /** Attribution string, when the source sets one. It may be empty. */
+  public val attribution: String? = null,
+  /** URL that the source loads from, when it has one. */
+  public val url: String? = null,
+  /** Inline TileJSON metadata, when the source was defined with it. */
+  public val tilejson: StyleSourceTileInfo? = null,
+  /** Geographic bounds, when inline TileJSON sets them. */
+  public val bounds: LatLngBounds? = null,
+  /** Tile size in pixels, for a tile source. */
+  public val tileSize: UInt? = null,
+  /** Vector tile encoding, for a vector source. */
+  public val vectorEncoding: StyleVectorTileEncoding? = null,
+  /** DEM raster encoding, when inline TileJSON sets one. */
+  public val rasterEncoding: StyleRasterDemEncoding? = null,
+)
+
+/**
+ * A borrowed view of one owned frame-result batch.
+ *
+ * See `mln_render_frame_batch_view` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class RenderFrameBatchView(
+  /** Borrowed array of result_count terminal frame results in completion order. */
+  public val results: List<RenderFrameResult> = emptyList()
+)
+
+public data class RenderAbandonResult(
+  /** One `mln_render_abandon_disposition` value. */
+  public val disposition: RenderAbandonDisposition = RenderAbandonDisposition(0u),
+  /** Backend resource groups intentionally retained until process exit. */
+  public val quarantinedResourceCount: UInt = 0u,
+)
+
+/**
+ * Driver and target capabilities fixed for one attached render session.
+ *
+ * See `mln_render_session_capabilities` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+ */
+public data class RenderSessionCapabilities(
+  /** One `mln_render_driver_kind` value. */
+  public val driver: RenderDriverKind,
+  /** Granted owned-texture slot count, or zero for a target without a ring. */
+  public val textureRingDepth: UInt = 0u,
+  /** A bitwise OR of `mln_render_session_capability_flag` values. */
+  public val flags: RenderSessionCapabilityFlag,
+)
+
+/**
+ * Any-thread render-session snapshot.
+ *
+ * See `mln_render_session_snapshot` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+ */
+public data class RenderSessionSnapshot(
+  /** One `mln_render_session_state` value. */
+  public val state: RenderSessionState,
+  /** One `mln_render_driver_kind` value. */
+  public val driver: RenderDriverKind,
+  /** Most recent terminal `mln_render_result` value. */
+  public val latestResult: RenderResult = RenderResult(0u),
+  public val extent: RenderTargetExtent = RenderTargetExtent(),
+  public val generation: ULong = 0uL,
+  public val mapUpdateGeneration: ULong = 0uL,
+  public val renderedUpdateGeneration: ULong = 0uL,
+  public val extentGeneration: ULong = 0uL,
+  public val frameGeneration: ULong = 0uL,
+  public val latestDemandToken: ULong = 0uL,
+  public val pendingDemandCount: UInt = 0u,
+  public val acquiredFrameCount: UInt = 0u,
+  public val targetReady: Boolean = false,
+  public val pendingChanges: Boolean = false,
+)
+
+/**
+ * One query hit borrowed for a completion callback.
+ *
+ * See `mln_queried_feature` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
+ */
+public data class QueriedFeature(
+  public val feature: ByteArray = byteArrayOf(),
+  public val sourceId: String? = null,
+  public val sourceLayerId: String? = null,
+  public val state: ByteArray? = null,
+)
+
+/**
+ * CPU image readback metadata for a texture target frame.
+ *
+ * See `mln_texture_image_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class TextureImageInfo(
+  /** Physical image width in device pixels. */
+  public val width: UInt = 0u,
+  /** Physical image height in device pixels. */
+  public val height: UInt = 0u,
+  /** Bytes per image row. */
+  public val stride: UInt = 0u,
+  /** Required output buffer byte length. */
+  public val byteLength: ULong = 0uL,
+)
+
+/**
+ * Texture readback borrowed for a completion callback.
+ *
+ * See `mln_texture_readback_result` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class TextureReadbackResult(
+  /** Borrowed pixel bytes, valid only during the callback. */
+  public val data: ByteArray = byteArrayOf(),
+  public val info: TextureImageInfo = TextureImageInfo(),
+)
+
+/**
+ * A resource provider's answer to one request.
+ *
+ * See `mln_resource_response` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceResponse(
+  public val status: ResourceResponseStatus = ResourceResponseStatus(0u),
+  public val errorReason: ResourceErrorReason = ResourceErrorReason(0u),
+  /** Response bytes. May be null only when byte_count is 0. */
+  public val bytes: ByteArray = byteArrayOf(),
+  public val errorMessage: String? = null,
+  public val mustRevalidate: Boolean = false,
+  public val modifiedUnixMs: Long? = null,
+  public val expiresUnixMs: Long? = null,
+  public val etag: String? = null,
+  public val retryAfterUnixMs: Long? = null,
 )
 
 /**
@@ -3496,126 +3550,6 @@ public data class ResourceRequest(
   public val priorData: ByteArray = byteArrayOf(),
 )
 
-public data class RenderAbandonResult(
-  /** One `mln_render_abandon_disposition` value. */
-  public val disposition: RenderAbandonDisposition = RenderAbandonDisposition(0u),
-  /** Backend resource groups intentionally retained until process exit. */
-  public val quarantinedResourceCount: UInt = 0u,
-)
-
-/**
- * Driver and target capabilities fixed for one attached render session.
- *
- * See `mln_render_session_capabilities` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
- */
-public data class RenderSessionCapabilities(
-  /** One `mln_render_driver_kind` value. */
-  public val driver: RenderDriverKind,
-  /** Granted owned-texture slot count, or zero for a target without a ring. */
-  public val textureRingDepth: UInt = 0u,
-  /** A bitwise OR of `mln_render_session_capability_flag` values. */
-  public val flags: RenderSessionCapabilityFlag,
-)
-
-/**
- * Any-thread render-session snapshot.
- *
- * See `mln_render_session_snapshot` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-public data class RenderSessionSnapshot(
-  /** One `mln_render_session_state` value. */
-  public val state: RenderSessionState,
-  /** One `mln_render_driver_kind` value. */
-  public val driver: RenderDriverKind,
-  /** Most recent terminal `mln_render_result` value. */
-  public val latestResult: RenderResult = RenderResult(0u),
-  public val extent: RenderTargetExtent = RenderTargetExtent(),
-  public val generation: ULong = 0uL,
-  public val mapUpdateGeneration: ULong = 0uL,
-  public val renderedUpdateGeneration: ULong = 0uL,
-  public val extentGeneration: ULong = 0uL,
-  public val frameGeneration: ULong = 0uL,
-  public val latestDemandToken: ULong = 0uL,
-  public val pendingDemandCount: UInt = 0u,
-  public val acquiredFrameCount: UInt = 0u,
-  public val targetReady: Boolean = false,
-  public val pendingChanges: Boolean = false,
-)
-
-/**
- * One query hit borrowed for a completion callback.
- *
- * See `mln_queried_feature` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).
- */
-public data class QueriedFeature(
-  public val feature: ByteArray = byteArrayOf(),
-  public val sourceId: String? = null,
-  public val sourceLayerId: String? = null,
-  public val state: ByteArray? = null,
-)
-
-/**
- * CPU image readback metadata for a texture target frame.
- *
- * See `mln_texture_image_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class TextureImageInfo(
-  /** Physical image width in device pixels. */
-  public val width: UInt = 0u,
-  /** Physical image height in device pixels. */
-  public val height: UInt = 0u,
-  /** Bytes per image row. */
-  public val stride: UInt = 0u,
-  /** Required output buffer byte length. */
-  public val byteLength: ULong = 0uL,
-)
-
-/**
- * Texture readback borrowed for a completion callback.
- *
- * See `mln_texture_readback_result` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class TextureReadbackResult(
-  /** Borrowed pixel bytes, valid only during the callback. */
-  public val data: ByteArray = byteArrayOf(),
-  public val info: TextureImageInfo = TextureImageInfo(),
-)
-
-/**
- * A borrowed view of one owned frame-result batch.
- *
- * See `mln_render_frame_batch_view` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
- */
-public data class RenderFrameBatchView(
-  /** Borrowed array of result_count terminal frame results in completion order. */
-  public val results: List<RenderFrameResult> = emptyList()
-)
-
-/**
- * A resource provider's answer to one request.
- *
- * See `mln_resource_response` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceResponse(
-  public val status: ResourceResponseStatus = ResourceResponseStatus(0u),
-  public val errorReason: ResourceErrorReason = ResourceErrorReason(0u),
-  /** Response bytes. May be null only when byte_count is 0. */
-  public val bytes: ByteArray = byteArrayOf(),
-  public val errorMessage: String? = null,
-  public val mustRevalidate: Boolean = false,
-  public val modifiedUnixMs: Long? = null,
-  public val expiresUnixMs: Long? = null,
-  public val etag: String? = null,
-  public val retryAfterUnixMs: Long? = null,
-)
-
 public data class RenderSessionAttachment(
   public val session: RenderSessionHandle,
   public val ready: kotlinx.coroutines.Deferred<Unit>,
@@ -3626,7 +3560,7 @@ public data class RenderTargetExtentPhysicalSizeResult(
   public val height: UInt,
 )
 
-public data class MapCameraSnapshotGetResult(
+public data class MapGetCameraSnapshotResult(
   public val camera: CameraOptions,
   public val generation: ULong,
 )
@@ -3740,6 +3674,22 @@ internal constructor(
   internal val bindingScope: org.maplibre.nativeffi.internal.callback.CallbackScope,
 )
 
+/**
+ * Cancel callback state for one handled resource request.
+ *
+ * See `mln_resource_request_cancel_handler` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public data class ResourceRequestCancelHandler(public val callback: ResourceRequestCancelCallback)
+
+/**
+ * Reports that MapLibre cancelled a C API resource provider request.
+ *
+ * See `mln_resource_request_cancel_callback` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+ */
+public typealias ResourceRequestCancelCallback = () -> Unit
+
 public data class HttpHeaderTransform(public val callback: HttpHeaderTransformCallback)
 
 /**
@@ -3772,19 +3722,3 @@ public data class ResourceTransform(public val callback: ResourceTransformCallba
  */
 public typealias ResourceTransformCallback =
   (kind: ResourceKind, url: String, outResponse: ResourceTransformResponse) -> Unit
-
-/**
- * Cancel callback state for one handled resource request.
- *
- * See `mln_resource_request_cancel_handler` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public data class ResourceRequestCancelHandler(public val callback: ResourceRequestCancelCallback)
-
-/**
- * Reports that MapLibre cancelled a C API resource provider request.
- *
- * See `mln_resource_request_cancel_callback` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
- */
-public typealias ResourceRequestCancelCallback = () -> Unit

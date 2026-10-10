@@ -794,9 +794,7 @@ def validate(api: Api) -> None:
             errors.extend(ordered_errors(record, record.metadata["fields"], context))
         # A presence bit guards one member, so a value that several fields
         # describe together is a record embedded under that bit. An array's
-        # count takes the array's presence and names no bit of its own. A
-        # member of another record may reuse the bit through a longer mask
-        # path.
+        # count takes the array's presence and names no bit of its own.
         counts = {
             field.metadata["length"]
             for field in record.fields
@@ -897,6 +895,8 @@ def validate(api: Api) -> None:
                 enum.name for enum in api.enums
             }:
                 errors.append(f"{fcontext}: enum names an absent enum")
+            if "." in field.metadata.get("mask", ""):
+                errors.append(f"{fcontext}: mask must name a sibling field")
             if ("mask" in field.metadata) != ("bit" in field.metadata):
                 errors.append(f"{fcontext}: presence requires both mask and bit")
             if "bit" in field.metadata:

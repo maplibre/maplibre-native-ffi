@@ -351,7 +351,7 @@ typedef enum mln_resource_provider_decision : uint32_t {
  * - MLN_STATUS_INVALID_ARGUMENT when out_status is null.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_network_status_get(
+MLN_API mln_status mln_network_get_status(
   uint32_t* out_status MLN_BINDING("direction=out;enum=mln_network_status"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -369,7 +369,7 @@ MLN_API mln_status mln_network_status_get(
  * - MLN_STATUS_INVALID_ARGUMENT when status is not a mln_network_status value.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_network_status_set(
+MLN_API mln_status mln_network_set_status(
   uint32_t status MLN_BINDING("enum=mln_network_status"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -714,7 +714,7 @@ typedef struct mln_http_header_transform_response {
  *   transform callback.
  * - MLN_STATUS_NATIVE_ERROR when native allocation fails.
  */
-MLN_API mln_status mln_http_header_transform_response_set(
+MLN_API mln_status mln_http_header_transform_response_set_header(
   mln_http_header_transform_response* response,
   const char* name MLN_BINDING("length=name_size"), size_t name_size,
   const char* value MLN_BINDING("length=value_size"), size_t value_size,
@@ -732,15 +732,15 @@ MLN_API mln_status mln_http_header_transform_response_set(
  * The callback and user_data must be thread-safe. The C API invokes
  * release_user_data after the final callback returns. url and out_response are
  * borrowed for the callback duration. Callback implementations call only
- * mln_http_header_transform_response_set() and return promptly. A non-OK result
- * discards every header collected during the invocation and lets the request
- * proceed unchanged.
+ * mln_http_header_transform_response_set_header() and return promptly. A non-OK
+ * result discards every header collected during the invocation and lets the
+ * request proceed unchanged.
  */
 MLN_BINDING(
   "failure=MLN_STATUS_NATIVE_ERROR;"
   "reentry=protocol;"
   "reentry_owner=out_response;"
-  "reentry_calls=mln_http_header_transform_response_set"
+  "reentry_calls=mln_http_header_transform_response_set_header"
 )
 typedef mln_status (*mln_http_header_transform_callback)(
   void* user_data, uint32_t kind MLN_BINDING("enum=mln_resource_kind"),
@@ -906,14 +906,14 @@ MLN_BINDING(
   "decision_accept=MLN_RESOURCE_PROVIDER_DECISION_HANDLE;"
   "decision_pass=MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;"
   "complete=mln_resource_request_complete;"
-  "cancelled=mln_resource_request_cancelled;"
+  "cancelled=mln_resource_request_is_cancelled;"
   "cancel_registration=mln_resource_request_set_cancel_callback;"
   "wait_retired=mln_resource_request_wait_until_retired;"
   "reentry=protocol;"
   "reentry_owner=handle;"
   "reentry_calls="
   "mln_resource_request_complete,"
-  "mln_resource_request_cancelled,"
+  "mln_resource_request_is_cancelled,"
   "mln_resource_request_set_cancel_callback,"
   "mln_resource_request_release"
 )
@@ -939,7 +939,7 @@ MLN_BINDING(
   "reentry_owner=mln_resource_request_handle;"
   "reentry_calls="
   "mln_resource_request_complete,"
-  "mln_resource_request_cancelled,"
+  "mln_resource_request_is_cancelled,"
   "mln_resource_request_set_cancel_callback,"
   "mln_resource_request_release"
 )
@@ -1116,7 +1116,7 @@ MLN_API mln_status mln_resource_request_complete(
  *   out_cancelled is null.
  * - MLN_STATUS_INVALID_STATE when handle has been released.
  */
-MLN_API mln_status mln_resource_request_cancelled(
+MLN_API mln_status mln_resource_request_is_cancelled(
   mln_resource_request_handle handle,
   bool* out_cancelled MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -1532,7 +1532,7 @@ MLN_API void mln_event_batch_release(mln_event_batch batch) MLN_NOEXCEPT;
  *
  * A runtime queues an offline event when this mask selects its type. Region
  * status, response error, and tile count limit events also require the region
- * to be observed with mln_runtime_offline_region_set_observed(), so this
+ * to be observed with mln_runtime_set_offline_region_observed(), so this
  * mask narrows that subscription rather than replacing it.
  *
  * A runtime that has not been narrowed selects every runtime-scoped event type

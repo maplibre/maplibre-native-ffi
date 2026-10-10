@@ -48,7 +48,7 @@ auto mln_map_tile_options_default(void) noexcept -> mln_map_tile_options {
   return mln::core::map_tile_options_default();
 }
 
-auto mln_map_camera_snapshot_get(
+auto mln_map_get_camera_snapshot(
   mln_map map, mln_camera_options* out_camera, uint64_t* out_generation,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
@@ -83,7 +83,7 @@ auto mln_map_cancel_transitions(
   });
 }
 
-auto mln_map_camera_query(
+auto mln_map_get_camera(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

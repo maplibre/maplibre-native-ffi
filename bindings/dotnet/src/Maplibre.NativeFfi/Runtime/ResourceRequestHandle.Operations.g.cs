@@ -56,22 +56,6 @@ public sealed unsafe partial class ResourceRequestHandle
     internal bool FinishDecision(bool accepted) => state.FinishDecision(accepted);
 
     /// <summary>
-    /// Reports whether MapLibre has cancelled a C API resource provider
-    /// request.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_resource_request_cancelled</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
-    /// </remarks>
-    public bool Cancelled()
-    {
-        using var read = state.Read(this, "mln_resource_request_cancelled");
-        bool outCancelled = default;
-        Check(NativeMethods.mln_resource_request_cancelled(read.Handle, &outCancelled, Diagnostic));
-        return outCancelled;
-    }
-
-    /// <summary>
     /// Completes a C API resource provider request.
     /// </summary>
     /// <remarks>
@@ -86,6 +70,24 @@ public sealed unsafe partial class ResourceRequestHandle
         Check(NativeMethods.mln_resource_request_complete(Handle, &nativeResponse, Diagnostic));
         scope.Accept();
         claim.Accept();
+    }
+
+    /// <summary>
+    /// Reports whether MapLibre has cancelled a C API resource provider
+    /// request.
+    /// </summary>
+    /// <remarks>
+    /// See <c>mln_resource_request_is_cancelled</c> in the <see
+    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
+    /// </remarks>
+    public bool IsCancelled()
+    {
+        using var read = state.Read(this, "mln_resource_request_is_cancelled");
+        bool outCancelled = default;
+        Check(
+            NativeMethods.mln_resource_request_is_cancelled(read.Handle, &outCancelled, Diagnostic)
+        );
+        return outCancelled;
     }
 
     /// <summary>

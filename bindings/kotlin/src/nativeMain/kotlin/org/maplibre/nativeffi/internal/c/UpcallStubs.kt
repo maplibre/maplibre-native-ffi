@@ -66,6 +66,11 @@ internal actual object UpcallStubs {
         }
       }
       .toLong()
+  actual val resourceRequestCancelHandlerCallback: Long =
+    staticCFunction { userData: COpaquePointer? ->
+        Upcalls.resourceRequestCancelHandlerCallback(userData.toLong())
+      }
+      .toLong()
   actual val httpHeaderTransformCallback: Long =
     staticCFunction {
         userData: COpaquePointer?,
@@ -101,11 +106,6 @@ internal actual object UpcallStubs {
           url.toLong(),
           outResponse.toLong(),
         )
-      }
-      .toLong()
-  actual val resourceRequestCancelHandlerCallback: Long =
-    staticCFunction { userData: COpaquePointer? ->
-        Upcalls.resourceRequestCancelHandlerCallback(userData.toLong())
       }
       .toLong()
   actual val wakeCallback: Long =

@@ -12,7 +12,7 @@ const (
 func attachOwnedTexture(
 	m *MapHandle, context testsupport.Context, extent RenderTargetExtent, options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
-	attachment, err := m.MetalOwnedTextureAttach(MetalOwnedTextureDescriptor{
+	attachment, err := m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{
 		Extent:  extent,
 		Context: MetalContextDescriptor{Device: context.MetalDevice},
 	}, options)

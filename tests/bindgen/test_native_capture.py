@@ -79,7 +79,7 @@ class NativeCaptureTests(unittest.TestCase):
             self.api,
             functions=tuple(
                 replace(function, metadata={**function.metadata, "shape": "array"})
-                if function.name == "mln_map_create"
+                if function.name == "mln_runtime_create_map"
                 else function
                 for function in self.api.functions
             ),
@@ -211,41 +211,57 @@ extern "C" mln_status mln_map_projection_close(mln_map_projection, mln_diagnosti
 int main() {
   char url[] = "retained URL";
   mln_buffer_view views[] = {{url, sizeof(url) - 1}, {url, 3}};
-  mln_style_source_result source{};
-  source.info.fields =
-    MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
-  source.tile_urls = views;
-  source.tile_url_count = 2;
+  mln_style_source_info source{};
+  source.id = {url, 8};
+  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON | MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+  source.tilejson.tile_urls = views;
+  source.tilejson.tile_url_count = 2;
   source.attribution = {url, 5};
   mln_completion_result result{};
   result.status = MLN_STATUS_OK;
   result.value = &source;
   result.value_count = 1;
   const auto before = allocations;
-  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_RESULT);
+  auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
   assert(allocations - before == 1);
-  const auto* copied = static_cast<const mln_style_source_result*>(record->view.result.value);
-  assert(reinterpret_cast<std::uintptr_t>(copied) % alignof(mln_style_source_result) == 0);
-  assert(copied->tile_urls != views && copied->tile_urls[0].data != url);
+  const auto* copied = static_cast<const mln_style_source_info*>(record->view.result.value);
+  assert(reinterpret_cast<std::uintptr_t>(copied) % alignof(mln_style_source_info) == 0);
+  assert(copied->tilejson.tile_urls != views && copied->tilejson.tile_urls[0].data != url);
   std::memset(url, 'X', sizeof(url));
-  assert(std::memcmp(copied->tile_urls[0].data, "retained URL", 12) == 0);
+  assert(std::memcmp(copied->tilejson.tile_urls[0].data, "retained URL", 12) == 0);
   assert(std::memcmp(copied->attribution.data, "retai", 5) == 0);
+  assert(std::memcmp(copied->id.data, "retained", 8) == 0);
   mln::capture::destroy(record);
 
-  result.value = views;
+  // A clear bit leaves the embedded record unread, so the copy never follows
+  // its pointer or trusts its count.
+  mln_style_source_info absent{};
+  absent.fields = MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
+  absent.attribution = {url, 5};
+  absent.tilejson.tile_urls = reinterpret_cast<const mln_buffer_view*>(1);
+  absent.tilejson.tile_url_count = std::numeric_limits<std::size_t>::max();
+  absent.tilejson.min_zoom = 3.0;
+  result.value = &absent;
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
+  copied = static_cast<const mln_style_source_info*>(record->view.result.value);
+  const mln_style_source_tile_info zero{};
+  assert(std::memcmp(&copied->tilejson, &zero, sizeof(zero)) == 0);
+  mln::capture::destroy(record);
+
+  result.value = &source;
   result.value_count = 0;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
   assert(record->view.result.value != nullptr);
   mln::capture::destroy(record);
   result.value = nullptr;
-  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW);
+  record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO);
   assert(record->view.result.value == nullptr);
   mln::capture::destroy(record);
 
   result.value = &source;
   result.value_count = std::numeric_limits<std::size_t>::max();
   bool overflow = false;
-  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_BUFFER_VIEW); }
+  try { record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_STYLE_SOURCE_INFO); }
   catch (const std::bad_alloc&) { overflow = true; }
   assert(overflow);
 
@@ -292,7 +308,7 @@ FIXTURE_HEADER = r"""
 #include "maplibre_native_c.h"
 typedef enum mln_capture_fixture_fields : uint32_t { MLN_CAPTURE_FIXTURE_NAME = 1 } mln_capture_fixture_fields;
 typedef struct mln_capture_fixture {
-  mln_style_source_result nested;
+  mln_style_source_info nested;
   const mln_buffer_view* extra MLN_BINDING("length=count;nullable=true");
   size_t count;
   uint32_t fields;
@@ -312,9 +328,9 @@ int main() {
   char bytes[] = "nested";
   mln_buffer_view view{bytes, 6};
   mln_capture_fixture input{};
-  input.nested.info.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
-  input.nested.tile_urls = &view;
-  input.nested.tile_url_count = 1;
+  input.nested.fields = MLN_STYLE_SOURCE_INFO_TILEJSON;
+  input.nested.tilejson.tile_urls = &view;
+  input.nested.tilejson.tile_url_count = 1;
   input.extra = &view;
   input.count = 1;
   input.fields = 0;
@@ -326,7 +342,7 @@ int main() {
   auto* record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
   auto* copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
   std::memset(bytes, 0, sizeof(bytes));
-  assert(std::memcmp(copied->nested.tile_urls[0].data, "nested", 6) == 0);
+  assert(std::memcmp(copied->nested.tilejson.tile_urls[0].data, "nested", 6) == 0);
   assert(std::memcmp(copied->extra[0].data, "nested", 6) == 0);
   assert(copied->name == nullptr);
   mln::capture::destroy(record);
@@ -338,8 +354,8 @@ int main() {
   copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
   assert(copied->extra != nullptr);
   assert(reinterpret_cast<std::uintptr_t>(copied->extra) % alignof(mln_buffer_view) == 0);
-  assert(copied->nested.tile_urls[0].data != nullptr);
-  assert(copied->nested.tile_urls[0].size == 0);
+  assert(copied->nested.tilejson.tile_urls[0].data != nullptr);
+  assert(copied->nested.tilejson.tile_urls[0].size == 0);
   mln::capture::destroy(record);
 
   input.extra = nullptr;
@@ -347,7 +363,7 @@ int main() {
   record = mln::capture::copy(result, MLN_ADAPTER_COMPLETION_COPY_CAPTURE_FIXTURE);
   copied = static_cast<const mln_capture_fixture*>(record->view.result.value);
   assert(copied->extra == nullptr);
-  assert(copied->nested.tile_urls[0].data == nullptr);
+  assert(copied->nested.tilejson.tile_urls[0].data == nullptr);
   mln::capture::destroy(record);
 }
 """

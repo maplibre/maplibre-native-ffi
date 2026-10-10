@@ -46,7 +46,7 @@ class HandleLifecycleTest {
   @Test
   fun aRefusedReleaseLeavesTheRuntimeUsableAndALaterReleaseSucceeds(): Unit = runSuspendTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-    val map = runtime.mapCreate(smallMapOptions()).awaitWithin("the map")
+    val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
 
     // Native refuses to release a runtime with a live map, and the handle rolls back to live.
     assertFailsWith<InvalidStateException> { runtime.release().await() }
@@ -76,12 +76,12 @@ class HandleLifecycleTest {
   @Test
   fun droppingAMapCreationRetiresTheMapItCreates(): Unit = runSuspendTest {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-    val map = runtime.mapCreate(smallMapOptions()).awaitWithin("the first map")
+    val map = runtime.createMap(smallMapOptions()).awaitWithin("the first map")
     // Parking the runtime's worker holds the creation behind it, so the creation is still pending
     // when the test drops it.
     val resume = CompletableDeferred<Unit>()
     parkWorker(map, resume)
-    val creation = runtime.mapCreate(smallMapOptions())
+    val creation = runtime.createMap(smallMapOptions())
     try {
       creation.cancel()
     } finally {
@@ -124,7 +124,7 @@ class HandleLifecycleTest {
   /** Creates a map whose runtime nothing but the map references, and a weak reference to it. */
   private suspend fun mapWithUnreferencedRuntime(): Pair<MapHandle, TestWeakReference> {
     val runtime = GeneratedApi.runtimeCreate(GeneratedApi.runtimeOptionsDefault())
-    val map = runtime.mapCreate(smallMapOptions()).awaitWithin("the map")
+    val map = runtime.createMap(smallMapOptions()).awaitWithin("the map")
     return map to TestWeakReference(runtime)
   }
 

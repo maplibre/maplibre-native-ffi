@@ -90,7 +90,7 @@ func newFixture(t *testing.T) *fixture {
 func newFixtureWith(t *testing.T, options MapOptions) *fixture {
 	t.Helper()
 	f := newRuntimeFixture(t)
-	f.m = await(t, submitted(f.runtime.MapCreate(options)))
+	f.m = await(t, submitted(f.runtime.CreateMap(options)))
 	// A test that closed the map already gets a completed future here.
 	t.Cleanup(func() { await(t, submitted(f.m.Close())) })
 	return f

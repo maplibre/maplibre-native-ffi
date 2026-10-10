@@ -80,14 +80,11 @@ from ._generated_values import (
     ScreenBox,
     ScreenPoint,
     SourceFeatureQueryOptions,
+    StyleImageInfo,
     StyleImageOptions,
-    StyleImageResult,
-    StyleImageStretchesResult,
-    StyleLayerEntry,
-    StyleLayerResult,
+    StyleLayerInfo,
     StyleLayerVisibility,
-    StyleSourceResult,
-    StyleSourceTileUrlsResult,
+    StyleSourceInfo,
     StyleTileSourceOptions,
     StyleTransitionOptions,
     TextureReadbackResult,
@@ -114,74 +111,74 @@ if TYPE_CHECKING:
     )
 
 
-class MapCameraSnapshotGetResult(NamedTuple):
+class MapAttachMetalBorrowedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachMetalOwnedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachMetalSurfaceResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachOpenglBorrowedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachOpenglOwnedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachOpenglSurfaceResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachVulkanBorrowedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachVulkanOwnedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachVulkanSurfaceResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachWebgpuBorrowedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachWebgpuOwnedTextureResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapAttachWebgpuSurfaceResult(NamedTuple):
+    session: RenderSessionHandle
+    completion: Future[None]
+
+
+class MapGetCameraSnapshotResult(NamedTuple):
     camera: CameraOptions
     generation: int
-
-
-class MetalBorrowedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class MetalOwnedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class MetalSurfaceAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class OpenglBorrowedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class OpenglOwnedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class OpenglSurfaceAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
 
 
 class RenderTargetExtentPhysicalSizeResult(NamedTuple):
     width: int
     height: int
-
-
-class VulkanBorrowedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class VulkanOwnedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class VulkanSurfaceAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class WebgpuBorrowedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class WebgpuOwnedTextureAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
-
-
-class WebgpuSurfaceAttachResult(NamedTuple):
-    session: RenderSessionHandle
-    completion: Future[None]
 
 
 class _AcquiredFrameHandleOperations(GeneratedOperations):
@@ -320,14 +317,14 @@ class _GeojsonSourceDataHandleOperations(GeneratedOperations):
 class _HttpHeaderTransformResponseScopeOperations(GeneratedOperations):
     _native: _native._HttpHeaderTransformResponseScope
 
-    def set(self, name: str, value: str) -> None:
+    def set_header(self, name: str, value: str) -> None:
         """Sets one outgoing HTTP request header for the current transform
         invocation.
 
-        See `mln_http_header_transform_response_set` in the
+        See `mln_http_header_transform_response_set_header` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
-        return self._native.set(name, value)
+        return self._native.set_header(name, value)
 
 
 class _MapHandleOperations(GeneratedOperations):
@@ -525,6 +522,207 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.apply_camera_delta(delta)
 
+    def attach_metal_borrowed_texture(
+        self,
+        descriptor: MetalBorrowedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachMetalBorrowedTextureResult:
+        """Starts attachment of a caller-owned Metal texture target.
+
+        See `mln_map_attach_metal_borrowed_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_metal_borrowed_texture(descriptor, options)
+        return MapAttachMetalBorrowedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_metal_owned_texture(
+        self,
+        descriptor: MetalOwnedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachMetalOwnedTextureResult:
+        """Starts attachment of a session-owned Metal texture ring.
+
+        See `mln_map_attach_metal_owned_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_metal_owned_texture(descriptor, options)
+        return MapAttachMetalOwnedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_metal_surface(
+        self,
+        descriptor: MetalSurfaceDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachMetalSurfaceResult:
+        """Starts attachment of a Metal surface target.
+
+        See `mln_map_attach_metal_surface` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+        """
+        raw = self._native.attach_metal_surface(descriptor, options)
+        return MapAttachMetalSurfaceResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_opengl_borrowed_texture(
+        self,
+        descriptor: OpenglBorrowedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachOpenglBorrowedTextureResult:
+        """Starts attachment of a caller-owned OpenGL texture target.
+
+        See `mln_map_attach_opengl_borrowed_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_opengl_borrowed_texture(descriptor, options)
+        return MapAttachOpenglBorrowedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_opengl_owned_texture(
+        self,
+        descriptor: OpenglOwnedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachOpenglOwnedTextureResult:
+        """Starts attachment of a session-owned OpenGL texture ring.
+
+        See `mln_map_attach_opengl_owned_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_opengl_owned_texture(descriptor, options)
+        return MapAttachOpenglOwnedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_opengl_surface(
+        self,
+        descriptor: OpenglSurfaceDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachOpenglSurfaceResult:
+        """Starts attachment of an OpenGL surface target.
+
+        See `mln_map_attach_opengl_surface` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+        """
+        raw = self._native.attach_opengl_surface(descriptor, options)
+        return MapAttachOpenglSurfaceResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_vulkan_borrowed_texture(
+        self,
+        descriptor: VulkanBorrowedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachVulkanBorrowedTextureResult:
+        """Starts attachment of a caller-owned Vulkan texture target.
+
+        See `mln_map_attach_vulkan_borrowed_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_vulkan_borrowed_texture(descriptor, options)
+        return MapAttachVulkanBorrowedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_vulkan_owned_texture(
+        self,
+        descriptor: VulkanOwnedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachVulkanOwnedTextureResult:
+        """Starts attachment of a session-owned Vulkan texture ring.
+
+        See `mln_map_attach_vulkan_owned_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_vulkan_owned_texture(descriptor, options)
+        return MapAttachVulkanOwnedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_vulkan_surface(
+        self,
+        descriptor: VulkanSurfaceDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachVulkanSurfaceResult:
+        """Starts attachment of a Vulkan surface target.
+
+        See `mln_map_attach_vulkan_surface` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+        """
+        raw = self._native.attach_vulkan_surface(descriptor, options)
+        return MapAttachVulkanSurfaceResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_webgpu_borrowed_texture(
+        self,
+        descriptor: WebgpuBorrowedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachWebgpuBorrowedTextureResult:
+        """Starts attachment of a caller-owned WebGPU texture target.
+
+        See `mln_map_attach_webgpu_borrowed_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_webgpu_borrowed_texture(descriptor, options)
+        return MapAttachWebgpuBorrowedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_webgpu_owned_texture(
+        self,
+        descriptor: WebgpuOwnedTextureDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachWebgpuOwnedTextureResult:
+        """Starts attachment of a session-owned WebGPU texture ring.
+
+        See `mln_map_attach_webgpu_owned_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        raw = self._native.attach_webgpu_owned_texture(descriptor, options)
+        return MapAttachWebgpuOwnedTextureResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def attach_webgpu_surface(
+        self,
+        descriptor: WebgpuSurfaceDescriptor | None = None,
+        options: RenderSessionAttachOptions | None = None,
+    ) -> MapAttachWebgpuSurfaceResult:
+        """Starts attachment of a WebGPU surface target.
+
+        See `mln_map_attach_webgpu_surface` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+        """
+        raw = self._native.attach_webgpu_surface(descriptor, options)
+        return MapAttachWebgpuSurfaceResult(
+            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
+            completion=raw["completion"],
+        )
+
+    def begin_command_group(self) -> Future[CommandCompletion]:
+        """Begins a command group, which holds this map's render updates until
+        the group ends.
+
+        See `mln_map_begin_command_group` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.begin_command_group()
+
     def camera_for_geometry(
         self, geometry: bytes, fit_options: CameraFitOptions | None = None
     ) -> Future[CameraOptions]:
@@ -567,28 +765,6 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: CameraOptions._from_native(value),
         )
 
-    def camera_query(self) -> Future[CameraQueryResult]:
-        """Starts an ordered camera read.
-
-        See `mln_map_camera_query` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        return map_future(
-            self._native.camera_query(),
-            lambda value: CameraQueryResult._from_native(value),
-        )
-
-    def camera_snapshot_get(self) -> MapCameraSnapshotGetResult:
-        """Copies the camera from the latest immutable map snapshot.
-
-        See `mln_map_camera_snapshot_get` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-        """
-        raw = self._native.camera_snapshot_get()
-        return MapCameraSnapshotGetResult(
-            CameraOptions._from_native(raw["camera"]), raw["generation"]
-        )
-
     def cancel_transitions(self) -> Future[CommandCompletion]:
         """Cancels the camera transitions running when this command commits.
 
@@ -597,61 +773,16 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.cancel_transitions()
 
-    def copy_layer_source_id(self, layer_id: str) -> Future[str | None]:
-        """Copies one layer's source ID.
+    def create_projection(self) -> Future[MapProjectionHandle]:
+        """Starts creation of a standalone projection from the map's ordered
+        transform state.
 
-        See `mln_map_copy_layer_source_id` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        See `mln_map_create_projection` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
         """
-        return self._native.copy_layer_source_id(layer_id)
-
-    def copy_layer_source_layer(self, layer_id: str) -> Future[str | None]:
-        """Copies one layer's source-layer ID.
-
-        See `mln_map_copy_layer_source_layer` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_layer_source_layer(layer_id)
-
-    def copy_style_image_premultiplied_rgba8(
-        self, image_id: str
-    ) -> Future[bytes | None]:
-        """Copies one runtime style image as tightly packed premultiplied RGBA8
-        pixels.
-
-        See `mln_map_copy_style_image_premultiplied_rgba8` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_style_image_premultiplied_rgba8(image_id)
-
-    def copy_style_image_stretches(
-        self, image_id: str
-    ) -> Future[StyleImageStretchesResult | None]:
-        """Copies one runtime style image's stretchable intervals.
-
-        See `mln_map_copy_style_image_stretches` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return map_future(
-            self._native.copy_style_image_stretches(image_id),
-            lambda value: _maybe(StyleImageStretchesResult._from_native, value),
+        return _adopt_future(
+            self._native.create_projection(), "MapProjectionHandle", None
         )
-
-    def copy_style_source_attribution(self, source_id: str) -> Future[str | None]:
-        """Copies one style source attribution string.
-
-        See `mln_map_copy_style_source_attribution` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_style_source_attribution(source_id)
-
-    def copy_style_source_url(self, source_id: str) -> Future[str | None]:
-        """Copies one style source URL.
-
-        See `mln_map_copy_style_source_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.copy_style_source_url(source_id)
 
     def dump_debug_logs(self) -> Future[CommandCompletion]:
         """Submits an ordered debug-log command.
@@ -660,6 +791,37 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
         return self._native.dump_debug_logs()
+
+    def end_command_group(self) -> Future[CommandCompletion]:
+        """Ends the innermost command group that `mln_map_begin_command_group()`
+        began.
+
+        See `mln_map_end_command_group` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.end_command_group()
+
+    def get_camera(self) -> Future[CameraQueryResult]:
+        """Starts an ordered camera read.
+
+        See `mln_map_get_camera` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        return map_future(
+            self._native.get_camera(),
+            lambda value: CameraQueryResult._from_native(value),
+        )
+
+    def get_camera_snapshot(self) -> MapGetCameraSnapshotResult:
+        """Copies the camera from the latest immutable map snapshot.
+
+        See `mln_map_get_camera_snapshot` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+        """
+        raw = self._native.get_camera_snapshot()
+        return MapGetCameraSnapshotResult(
+            CameraOptions._from_native(raw["camera"]), raw["generation"]
+        )
 
     def get_feature_state(self, selector: FeatureStateSelector) -> Future[bytes]:
         """Starts an ordered read of per-feature state from this map.
@@ -681,7 +843,7 @@ class _MapHandleOperations(GeneratedOperations):
 
     def get_image_source_coordinates(
         self, source_id: str
-    ) -> Future[tuple[LatLng, ...] | None]:
+    ) -> Future[tuple[LatLng, ...]]:
         """Copies image source coordinates.
 
         See `mln_map_get_image_source_coordinates` in the
@@ -689,52 +851,55 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return map_future(
             self._native.get_image_source_coordinates(source_id),
-            lambda value: (
-                None
-                if value is None
-                else (tuple(LatLng._from_native(item) for item in value))
-            ),
+            lambda value: tuple(LatLng._from_native(item) for item in value),
         )
 
-    def get_layer_filter(self, layer_id: str) -> Future[bytes | None]:
-        """Serializes one layer filter as a style-spec JSON value.
+    def get_loaded_style_json(self) -> Future[bytes]:
+        """Starts an ordered copy of the last successfully parsed style
+        document.
 
-        See `mln_map_get_layer_filter` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        See `mln_map_get_loaded_style_json` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return self._native.get_layer_filter(layer_id)
+        return self._native.get_loaded_style_json()
 
-    def get_layer_property(
-        self, layer_id: str, property_name: str
-    ) -> Future[bytes | None]:
-        """Serializes one layer property as a style-spec JSON value.
+    def get_snapshot(self) -> MapSnapshot:
+        """Copies the latest immutable state published by the map worker.
 
-        See `mln_map_get_layer_property` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        See `mln_map_get_snapshot` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return self._native.get_layer_property(layer_id, property_name)
+        return MapSnapshot._from_native(self._native.get_snapshot())
 
-    def get_style_image_info(self, image_id: str) -> Future[StyleImageResult | None]:
+    def get_style_image(self, image_id: str) -> Future[StyleImageInfo | None]:
         """Copies one complete runtime style image.
 
-        See `mln_map_get_style_image_info` in the
+        See `mln_map_get_style_image` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.get_style_image_info(image_id),
-            lambda value: _maybe(StyleImageResult._from_native, value),
+            self._native.get_style_image(image_id),
+            lambda value: _maybe(StyleImageInfo._from_native, value),
         )
 
-    def get_style_layer_info(self, layer_id: str) -> Future[StyleLayerResult | None]:
-        """Copies complete metadata for one style layer.
+    def get_style_layer(self, layer_id: str) -> Future[StyleLayerInfo | None]:
+        """Copies the complete metadata of one style layer.
 
-        See `mln_map_get_style_layer_info` in the
+        See `mln_map_get_style_layer` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.get_style_layer_info(layer_id),
-            lambda value: _maybe(StyleLayerResult._from_native, value),
+            self._native.get_style_layer(layer_id),
+            lambda value: _maybe(StyleLayerInfo._from_native, value),
         )
+
+    def get_style_layer_filter(self, layer_id: str) -> Future[bytes | None]:
+        """Serializes one layer filter as a style-spec JSON value.
+
+        See `mln_map_get_style_layer_filter` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.get_style_layer_filter(layer_id)
 
     def get_style_layer_json(self, layer_id: str) -> Future[bytes | None]:
         """Serializes one style layer as a full style-spec layer JSON object.
@@ -744,6 +909,16 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.get_style_layer_json(layer_id)
 
+    def get_style_layer_property(
+        self, layer_id: str, property_name: str
+    ) -> Future[bytes | None]:
+        """Serializes one layer property as a style-spec JSON value.
+
+        See `mln_map_get_style_layer_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.get_style_layer_property(layer_id, property_name)
+
     def get_style_light_property(self, property_name: str) -> Future[bytes | None]:
         """Serializes one style light property as a style-spec JSON value.
 
@@ -752,28 +927,15 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.get_style_light_property(property_name)
 
-    def get_style_source_info(self, source_id: str) -> Future[StyleSourceResult | None]:
-        """Copies complete metadata for one style source.
+    def get_style_source(self, source_id: str) -> Future[StyleSourceInfo | None]:
+        """Copies the complete metadata of one style source.
 
-        See `mln_map_get_style_source_info` in the
+        See `mln_map_get_style_source` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.get_style_source_info(source_id),
-            lambda value: _maybe(StyleSourceResult._from_native, value),
-        )
-
-    def get_style_source_tile_urls(
-        self, source_id: str
-    ) -> Future[StyleSourceTileUrlsResult | None]:
-        """Copies one style source's inline TileJSON tile URLs.
-
-        See `mln_map_get_style_source_tile_urls` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return map_future(
-            self._native.get_style_source_tile_urls(source_id),
-            lambda value: _maybe(StyleSourceTileUrlsResult._from_native, value),
+            self._native.get_style_source(source_id),
+            lambda value: _maybe(StyleSourceInfo._from_native, value),
         )
 
     def get_style_transition_options(self) -> Future[StyleTransitionOptions]:
@@ -786,6 +948,14 @@ class _MapHandleOperations(GeneratedOperations):
             self._native.get_style_transition_options(),
             lambda value: StyleTransitionOptions._from_native(value),
         )
+
+    def get_style_url(self) -> Future[str]:
+        """Starts an ordered copy of the last requested style URL.
+
+        See `mln_map_get_style_url` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.get_style_url()
 
     def invalidate_custom_geometry_source_region(
         self, source_id: str, bounds: LatLngBounds
@@ -894,18 +1064,7 @@ class _MapHandleOperations(GeneratedOperations):
             lambda value: tuple(LatLng._from_native(item) for item in value),
         )
 
-    def list_style_layer_ids(self) -> Future[tuple[str, ...]]:
-        """Copies style layer IDs in style order.
-
-        See `mln_map_list_style_layer_ids` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return map_future(
-            self._native.list_style_layer_ids(),
-            lambda value: tuple(item for item in value),
-        )
-
-    def list_style_layers(self) -> Future[tuple[StyleLayerEntry, ...]]:
+    def list_style_layers(self) -> Future[tuple[StyleLayerInfo, ...]]:
         """Starts an ordered query of every style layer in style order.
 
         See `mln_map_list_style_layers` in the
@@ -913,28 +1072,19 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return map_future(
             self._native.list_style_layers(),
-            lambda value: tuple(StyleLayerEntry._from_native(item) for item in value),
+            lambda value: tuple(StyleLayerInfo._from_native(item) for item in value),
         )
 
-    def list_style_source_ids(self) -> Future[tuple[str, ...]]:
-        """Copies style source IDs in style order.
+    def list_style_sources(self) -> Future[tuple[StyleSourceInfo, ...]]:
+        """Lists every style source in style order.
 
-        See `mln_map_list_style_source_ids` in the
+        See `mln_map_list_style_sources` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
         """
         return map_future(
-            self._native.list_style_source_ids(),
-            lambda value: tuple(item for item in value),
+            self._native.list_style_sources(),
+            lambda value: tuple(StyleSourceInfo._from_native(item) for item in value),
         )
-
-    def loaded_style_json(self) -> Future[bytes]:
-        """Starts an ordered copy of the last successfully parsed style
-        document.
-
-        See `mln_map_loaded_style_json` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return self._native.loaded_style_json()
 
     def meters_per_pixel_at_latitude(self, latitude: float) -> Future[float]:
         """Starts an ordered query of meters per logical pixel at a latitude and
@@ -978,17 +1128,6 @@ class _MapHandleOperations(GeneratedOperations):
         return map_future(
             self._native.pixels_for_lat_lngs(coordinates),
             lambda value: tuple(ScreenPoint._from_native(item) for item in value),
-        )
-
-    def projection_create(self) -> Future[MapProjectionHandle]:
-        """Starts creation of a standalone projection from the map's ordered
-        transform state.
-
-        See `mln_map_projection_create` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-        """
-        return _adopt_future(
-            self._native.projection_create(), "MapProjectionHandle", None
         )
 
     def close(self) -> Future[None]:
@@ -1210,76 +1349,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_image_source_url(source_id, url)
 
-    def set_layer_filter(
-        self, layer_id: str, filter: bytes | None = None
-    ) -> Future[CommandCompletion]:
-        """Sets or clears one layer filter.
-
-        See `mln_map_set_layer_filter` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_layer_filter(layer_id, filter)
-
-    def set_layer_max_zoom(
-        self, layer_id: str, max_zoom: float
-    ) -> Future[CommandCompletion]:
-        """Sets the highest zoom at which one layer draws.
-
-        See `mln_map_set_layer_max_zoom` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_layer_max_zoom(layer_id, max_zoom)
-
-    def set_layer_min_zoom(
-        self, layer_id: str, min_zoom: float
-    ) -> Future[CommandCompletion]:
-        """Sets the lowest zoom at which one layer draws.
-
-        See `mln_map_set_layer_min_zoom` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_layer_min_zoom(layer_id, min_zoom)
-
-    def set_layer_property(
-        self, layer_id: str, property_name: str, value: bytes
-    ) -> Future[CommandCompletion]:
-        """Sets one layer property using its MapLibre style-spec property name.
-
-        See `mln_map_set_layer_property` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_layer_property(layer_id, property_name, value)
-
-    def set_layer_source_id(
-        self, layer_id: str, source_id: str
-    ) -> Future[CommandCompletion]:
-        """Sets one layer's source ID.
-
-        See `mln_map_set_layer_source_id` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_layer_source_id(layer_id, source_id)
-
-    def set_layer_source_layer(
-        self, layer_id: str, source_layer: str | None = None
-    ) -> Future[CommandCompletion]:
-        """Sets one layer's source-layer ID.
-
-        See `mln_map_set_layer_source_layer` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_layer_source_layer(layer_id, source_layer)
-
-    def set_layer_visibility(
-        self, layer_id: str, visibility: StyleLayerVisibility
-    ) -> Future[CommandCompletion]:
-        """Sets whether one layer draws.
-
-        See `mln_map_set_layer_visibility` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-        """
-        return self._native.set_layer_visibility(layer_id, visibility)
-
     def set_location_indicator_accuracy_radius(
         self, layer_id: str, radius: float
     ) -> Future[CommandCompletion]:
@@ -1365,6 +1434,76 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_style_json(json)
 
+    def set_style_layer_filter(
+        self, layer_id: str, filter: bytes | None = None
+    ) -> Future[CommandCompletion]:
+        """Sets or clears one layer filter.
+
+        See `mln_map_set_style_layer_filter` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_style_layer_filter(layer_id, filter)
+
+    def set_style_layer_max_zoom(
+        self, layer_id: str, max_zoom: float
+    ) -> Future[CommandCompletion]:
+        """Sets the highest zoom at which one layer draws.
+
+        See `mln_map_set_style_layer_max_zoom` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_style_layer_max_zoom(layer_id, max_zoom)
+
+    def set_style_layer_min_zoom(
+        self, layer_id: str, min_zoom: float
+    ) -> Future[CommandCompletion]:
+        """Sets the lowest zoom at which one layer draws.
+
+        See `mln_map_set_style_layer_min_zoom` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_style_layer_min_zoom(layer_id, min_zoom)
+
+    def set_style_layer_property(
+        self, layer_id: str, property_name: str, value: bytes
+    ) -> Future[CommandCompletion]:
+        """Sets one layer property using its MapLibre style-spec property name.
+
+        See `mln_map_set_style_layer_property` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_style_layer_property(layer_id, property_name, value)
+
+    def set_style_layer_source_id(
+        self, layer_id: str, source_id: str
+    ) -> Future[CommandCompletion]:
+        """Sets one layer's source ID.
+
+        See `mln_map_set_style_layer_source_id` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_style_layer_source_id(layer_id, source_id)
+
+    def set_style_layer_source_layer(
+        self, layer_id: str, source_layer: str | None = None
+    ) -> Future[CommandCompletion]:
+        """Sets one layer's source-layer ID.
+
+        See `mln_map_set_style_layer_source_layer` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_style_layer_source_layer(layer_id, source_layer)
+
+    def set_style_layer_visibility(
+        self, layer_id: str, visibility: StyleLayerVisibility
+    ) -> Future[CommandCompletion]:
+        """Sets whether one layer draws.
+
+        See `mln_map_set_style_layer_visibility` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+        """
+        return self._native.set_style_layer_visibility(layer_id, visibility)
+
     def set_style_light_json(self, light_json: bytes) -> Future[CommandCompletion]:
         """Sets the style light from a style-spec light JSON object.
 
@@ -1433,22 +1572,6 @@ class _MapHandleOperations(GeneratedOperations):
         """
         return self._native.set_viewport_options(options)
 
-    def snapshot_get(self) -> MapSnapshot:
-        """Copies the latest immutable state published by the map worker.
-
-        See `mln_map_snapshot_get` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return MapSnapshot._from_native(self._native.snapshot_get())
-
-    def style_url(self) -> Future[str]:
-        """Starts an ordered copy of the last requested style URL.
-
-        See `mln_map_style_url` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return self._native.style_url()
-
     def update_camera(
         self, update: CameraUpdate | None = None
     ) -> Future[CommandCompletion]:
@@ -1458,198 +1581,6 @@ class _MapHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
         """
         return self._native.update_camera(update)
-
-    def metal_borrowed_texture_attach(
-        self,
-        descriptor: MetalBorrowedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> MetalBorrowedTextureAttachResult:
-        """Starts attachment of a caller-owned Metal texture target.
-
-        See `mln_metal_borrowed_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.metal_borrowed_texture_attach(descriptor, options)
-        return MetalBorrowedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def metal_owned_texture_attach(
-        self,
-        descriptor: MetalOwnedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> MetalOwnedTextureAttachResult:
-        """Starts attachment of a session-owned Metal texture ring.
-
-        See `mln_metal_owned_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.metal_owned_texture_attach(descriptor, options)
-        return MetalOwnedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def metal_surface_attach(
-        self,
-        descriptor: MetalSurfaceDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> MetalSurfaceAttachResult:
-        """Starts attachment of a Metal surface target.
-
-        See `mln_metal_surface_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        raw = self._native.metal_surface_attach(descriptor, options)
-        return MetalSurfaceAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def opengl_borrowed_texture_attach(
-        self,
-        descriptor: OpenglBorrowedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> OpenglBorrowedTextureAttachResult:
-        """Starts attachment of a caller-owned OpenGL texture target.
-
-        See `mln_opengl_borrowed_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.opengl_borrowed_texture_attach(descriptor, options)
-        return OpenglBorrowedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def opengl_owned_texture_attach(
-        self,
-        descriptor: OpenglOwnedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> OpenglOwnedTextureAttachResult:
-        """Starts attachment of a session-owned OpenGL texture ring.
-
-        See `mln_opengl_owned_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.opengl_owned_texture_attach(descriptor, options)
-        return OpenglOwnedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def opengl_surface_attach(
-        self,
-        descriptor: OpenglSurfaceDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> OpenglSurfaceAttachResult:
-        """Starts attachment of an OpenGL surface target.
-
-        See `mln_opengl_surface_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        raw = self._native.opengl_surface_attach(descriptor, options)
-        return OpenglSurfaceAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def vulkan_borrowed_texture_attach(
-        self,
-        descriptor: VulkanBorrowedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> VulkanBorrowedTextureAttachResult:
-        """Starts attachment of a caller-owned Vulkan texture target.
-
-        See `mln_vulkan_borrowed_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.vulkan_borrowed_texture_attach(descriptor, options)
-        return VulkanBorrowedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def vulkan_owned_texture_attach(
-        self,
-        descriptor: VulkanOwnedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> VulkanOwnedTextureAttachResult:
-        """Starts attachment of a session-owned Vulkan texture ring.
-
-        See `mln_vulkan_owned_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.vulkan_owned_texture_attach(descriptor, options)
-        return VulkanOwnedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def vulkan_surface_attach(
-        self,
-        descriptor: VulkanSurfaceDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> VulkanSurfaceAttachResult:
-        """Starts attachment of a Vulkan surface target.
-
-        See `mln_vulkan_surface_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        raw = self._native.vulkan_surface_attach(descriptor, options)
-        return VulkanSurfaceAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def webgpu_borrowed_texture_attach(
-        self,
-        descriptor: WebgpuBorrowedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> WebgpuBorrowedTextureAttachResult:
-        """Starts attachment of a caller-owned WebGPU texture target.
-
-        See `mln_webgpu_borrowed_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.webgpu_borrowed_texture_attach(descriptor, options)
-        return WebgpuBorrowedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def webgpu_owned_texture_attach(
-        self,
-        descriptor: WebgpuOwnedTextureDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> WebgpuOwnedTextureAttachResult:
-        """Starts attachment of a session-owned WebGPU texture ring.
-
-        See `mln_webgpu_owned_texture_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        raw = self._native.webgpu_owned_texture_attach(descriptor, options)
-        return WebgpuOwnedTextureAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
-
-    def webgpu_surface_attach(
-        self,
-        descriptor: WebgpuSurfaceDescriptor | None = None,
-        options: RenderSessionAttachOptions | None = None,
-    ) -> WebgpuSurfaceAttachResult:
-        """Starts attachment of a WebGPU surface target.
-
-        See `mln_webgpu_surface_attach` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        raw = self._native.webgpu_surface_attach(descriptor, options)
-        return WebgpuSurfaceAttachResult(
-            session=_adopt_value(raw["session"], "RenderSessionHandle", self),
-            completion=raw["completion"],
-        )
 
 
 class _MapProjectionHandleOperations(GeneratedOperations):
@@ -1754,46 +1685,6 @@ class _RenderFrameBatchHandleOperations(GeneratedOperations):
 class _RenderSessionHandleOperations(GeneratedOperations):
     _native: _native._RenderSessionHandle
 
-    def metal_borrowed_texture_set_target(
-        self, descriptor: MetalBorrowedTextureDescriptor | None = None
-    ) -> Future[None]:
-        """Starts an ordered caller-owned Metal texture replacement.
-
-        See `mln_metal_borrowed_texture_set_target` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        return self._native.metal_borrowed_texture_set_target(descriptor)
-
-    def metal_surface_set_target(
-        self, descriptor: MetalSurfaceDescriptor | None = None
-    ) -> Future[None]:
-        """Starts an ordered Metal surface replacement.
-
-        See `mln_metal_surface_set_target` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        return self._native.metal_surface_set_target(descriptor)
-
-    def opengl_borrowed_texture_set_target(
-        self, descriptor: OpenglBorrowedTextureDescriptor | None = None
-    ) -> Future[None]:
-        """Starts an ordered caller-owned OpenGL texture replacement.
-
-        See `mln_opengl_borrowed_texture_set_target` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-        """
-        return self._native.opengl_borrowed_texture_set_target(descriptor)
-
-    def opengl_surface_set_target(
-        self, descriptor: OpenglSurfaceDescriptor | None = None
-    ) -> Future[None]:
-        """Starts an ordered OpenGL surface replacement.
-
-        See `mln_opengl_surface_set_target` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-        """
-        return self._native.opengl_surface_set_target(descriptor)
-
     def abandon(self) -> RenderAbandonResult:
         """Irreversibly closes control and mailboxes without graphics calls.
 
@@ -1830,6 +1721,21 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
         """
         return self._native.clear_data()
+
+    def create_projection(self) -> MapProjectionHandle:
+        """Copies the last completed rendered transform into an independent
+        projection. Callable from any thread. Returns invalid state before a
+        completed render, after an extent or target change, or after
+        detachment. The caller owns the returned projection, which remains
+        usable after the session is released. out_projection must point to a
+        null handle.
+
+        See `mln_render_session_create_projection` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+        """
+        return _adopt_value(
+            self._native.create_projection(), "MapProjectionHandle", None
+        )
 
     def close(self) -> None:
         """Retires a detached or abandoned session handle. The call is CPU-only
@@ -1888,21 +1794,6 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return RenderSessionSnapshot._from_native(self._native.get_snapshot())
 
-    def projection_create(self) -> MapProjectionHandle:
-        """Copies the last completed rendered transform into an independent
-        projection. Callable from any thread. Returns invalid state before a
-        completed render, after an extent or target change, or after
-        detachment. The caller owns the returned projection, which remains
-        usable after the session is released. out_projection must point to a
-        null handle.
-
-        See `mln_render_session_projection_create` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-        """
-        return _adopt_value(
-            self._native.projection_create(), "MapProjectionHandle", None
-        )
-
     def query_feature_extensions(
         self,
         source_id: str,
@@ -1953,6 +1844,18 @@ class _RenderSessionHandleOperations(GeneratedOperations):
             lambda value: tuple(QueriedFeature._from_native(item) for item in value),
         )
 
+    def read_texture(self) -> Future[TextureReadbackResult]:
+        """Reads back the latest frame of the session's owned texture as
+        premultiplied RGBA8.
+
+        See `mln_render_session_read_texture` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        return map_future(
+            self._native.read_texture(),
+            lambda value: TextureReadbackResult._from_native(value),
+        )
+
     def reduce_memory_use(self) -> Future[None]:
         """Starts best-effort release of renderer caches.
 
@@ -1993,69 +1896,89 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         """
         return self._native.service_driver_work(max_work)
 
-    def texture_read_premultiplied_rgba8(self) -> Future[TextureReadbackResult]:
-        """Starts readback of the latest rendered texture frame.
+    def set_metal_borrowed_texture_target(
+        self, descriptor: MetalBorrowedTextureDescriptor | None = None
+    ) -> Future[None]:
+        """Starts an ordered caller-owned Metal texture replacement.
 
-        See `mln_texture_read_premultiplied_rgba8` in the
+        See `mln_render_session_set_metal_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
-        return map_future(
-            self._native.texture_read_premultiplied_rgba8(),
-            lambda value: TextureReadbackResult._from_native(value),
-        )
+        return self._native.set_metal_borrowed_texture_target(descriptor)
 
-    def vulkan_borrowed_texture_set_target(
+    def set_metal_surface_target(
+        self, descriptor: MetalSurfaceDescriptor | None = None
+    ) -> Future[None]:
+        """Starts an ordered Metal surface replacement.
+
+        See `mln_render_session_set_metal_surface_target` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+        """
+        return self._native.set_metal_surface_target(descriptor)
+
+    def set_opengl_borrowed_texture_target(
+        self, descriptor: OpenglBorrowedTextureDescriptor | None = None
+    ) -> Future[None]:
+        """Starts an ordered caller-owned OpenGL texture replacement.
+
+        See `mln_render_session_set_opengl_borrowed_texture_target` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+        """
+        return self._native.set_opengl_borrowed_texture_target(descriptor)
+
+    def set_opengl_surface_target(
+        self, descriptor: OpenglSurfaceDescriptor | None = None
+    ) -> Future[None]:
+        """Starts an ordered OpenGL surface replacement.
+
+        See `mln_render_session_set_opengl_surface_target` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+        """
+        return self._native.set_opengl_surface_target(descriptor)
+
+    def set_vulkan_borrowed_texture_target(
         self, descriptor: VulkanBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
         """Starts an ordered caller-owned Vulkan texture replacement.
 
-        See `mln_vulkan_borrowed_texture_set_target` in the
+        See `mln_render_session_set_vulkan_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
-        return self._native.vulkan_borrowed_texture_set_target(descriptor)
+        return self._native.set_vulkan_borrowed_texture_target(descriptor)
 
-    def vulkan_surface_set_target(
+    def set_vulkan_surface_target(
         self, descriptor: VulkanSurfaceDescriptor | None = None
     ) -> Future[None]:
         """Starts an ordered Vulkan surface replacement.
 
-        See `mln_vulkan_surface_set_target` in the
+        See `mln_render_session_set_vulkan_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
-        return self._native.vulkan_surface_set_target(descriptor)
+        return self._native.set_vulkan_surface_target(descriptor)
 
-    def webgpu_borrowed_texture_set_target(
+    def set_webgpu_borrowed_texture_target(
         self, descriptor: WebgpuBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
         """Starts an ordered caller-owned WebGPU texture replacement.
 
-        See `mln_webgpu_borrowed_texture_set_target` in the
+        See `mln_render_session_set_webgpu_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
         """
-        return self._native.webgpu_borrowed_texture_set_target(descriptor)
+        return self._native.set_webgpu_borrowed_texture_target(descriptor)
 
-    def webgpu_surface_set_target(
+    def set_webgpu_surface_target(
         self, descriptor: WebgpuSurfaceDescriptor | None = None
     ) -> Future[None]:
         """Starts an ordered WebGPU surface replacement.
 
-        See `mln_webgpu_surface_set_target` in the
+        See `mln_render_session_set_webgpu_surface_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
         """
-        return self._native.webgpu_surface_set_target(descriptor)
+        return self._native.set_webgpu_surface_target(descriptor)
 
 
 class _ResourceRequestHandleOperations(GeneratedOperations):
     _native: _native._ResourceRequestHandle
-
-    def cancelled(self) -> bool:
-        """Reports whether MapLibre has cancelled a C API resource provider
-        request.
-
-        See `mln_resource_request_cancelled` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-        """
-        return self._native.cancelled()
 
     def complete(self, response: ResourceResponse) -> None:
         """Completes a C API resource provider request.
@@ -2064,6 +1987,15 @@ class _ResourceRequestHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
         return self._native.complete(response)
+
+    def is_cancelled(self) -> bool:
+        """Reports whether MapLibre has cancelled a C API resource provider
+        request.
+
+        See `mln_resource_request_is_cancelled` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
+        """
+        return self._native.is_cancelled()
 
     def close(self) -> None:
         return self._native.close()
@@ -2105,14 +2037,6 @@ class _ResourceTransformResponseScopeOperations(GeneratedOperations):
 class _RuntimeHandleOperations(GeneratedOperations):
     _native: _native._RuntimeHandle
 
-    def map_create(self, options: MapOptions | None = None) -> Future[MapHandle]:
-        """Creates a map on the runtime worker.
-
-        See `mln_map_create` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return _adopt_future(self._native.map_create(options), "MapHandle", self)
-
     def barrier(self) -> Future[None]:
         """Starts an ordered runtime barrier.
 
@@ -2145,6 +2069,35 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.clear_resource_transform()
 
+    def create_map(self, options: MapOptions | None = None) -> Future[MapHandle]:
+        """Creates a map on the runtime worker.
+
+        See `mln_runtime_create_map` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return _adopt_future(self._native.create_map(options), "MapHandle", self)
+
+    def create_offline_region(
+        self, definition: OfflineRegionDefinition, metadata: bytes
+    ) -> Future[OfflineRegionInfo]:
+        """Starts creating an offline region.
+
+        See `mln_runtime_create_offline_region` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return map_future(
+            self._native.create_offline_region(definition, metadata),
+            lambda value: OfflineRegionInfo._from_native(value),
+        )
+
+    def delete_offline_region(self, region_id: int) -> Future[None]:
+        """Deletes an offline region.
+
+        See `mln_runtime_delete_offline_region` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.delete_offline_region(region_id)
+
     def drain_events(self) -> EventBatchHandle | None:
         """Drains this runtime's queued events into a new owned batch.
 
@@ -2164,112 +2117,58 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return RuntimeEventMask(self._native.get_event_mask())
 
-    def offline_region_create(
-        self, definition: OfflineRegionDefinition, metadata: bytes
-    ) -> Future[OfflineRegionInfo]:
-        """Starts creating an offline region.
-
-        See `mln_runtime_offline_region_create` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return map_future(
-            self._native.offline_region_create(definition, metadata),
-            lambda value: OfflineRegionInfo._from_native(value),
-        )
-
-    def offline_region_delete(self, region_id: int) -> Future[None]:
-        """Deletes an offline region.
-
-        See `mln_runtime_offline_region_delete` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return self._native.offline_region_delete(region_id)
-
-    def offline_region_get(self, region_id: int) -> Future[OfflineRegionInfo | None]:
+    def get_offline_region(self, region_id: int) -> Future[OfflineRegionInfo | None]:
         """Starts getting one offline region by ID.
 
-        See `mln_runtime_offline_region_get` in the
+        See `mln_runtime_get_offline_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
         return map_future(
-            self._native.offline_region_get(region_id),
+            self._native.get_offline_region(region_id),
             lambda value: _maybe(OfflineRegionInfo._from_native, value),
         )
 
-    def offline_region_get_status(self, region_id: int) -> Future[OfflineRegionStatus]:
+    def get_offline_region_status(self, region_id: int) -> Future[OfflineRegionStatus]:
         """Starts getting the current download status for an offline region.
 
-        See `mln_runtime_offline_region_get_status` in the
+        See `mln_runtime_get_offline_region_status` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
         return map_future(
-            self._native.offline_region_get_status(region_id),
+            self._native.get_offline_region_status(region_id),
             lambda value: OfflineRegionStatus._from_native(value),
         )
 
-    def offline_region_invalidate(self, region_id: int) -> Future[None]:
+    def invalidate_offline_region(self, region_id: int) -> Future[None]:
         """Invalidates cached resources for an offline region.
 
-        See `mln_runtime_offline_region_invalidate` in the
+        See `mln_runtime_invalidate_offline_region` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
-        return self._native.offline_region_invalidate(region_id)
+        return self._native.invalidate_offline_region(region_id)
 
-    def offline_region_set_download_state(
-        self, region_id: int, input_state: OfflineRegionDownloadState
-    ) -> Future[None]:
-        """Sets an offline region's native download state.
-
-        See `mln_runtime_offline_region_set_download_state` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return self._native.offline_region_set_download_state(region_id, input_state)
-
-    def offline_region_set_observed(
-        self, region_id: int, observed: bool
-    ) -> Future[None]:
-        """Enables or disables runtime events for an offline region.
-
-        See `mln_runtime_offline_region_set_observed` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return self._native.offline_region_set_observed(region_id, observed)
-
-    def offline_region_update_metadata(
-        self, region_id: int, metadata: bytes
-    ) -> Future[OfflineRegionInfo]:
-        """Starts updating opaque binary metadata for an offline region.
-
-        See `mln_runtime_offline_region_update_metadata` in the
-        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-        """
-        return map_future(
-            self._native.offline_region_update_metadata(region_id, metadata),
-            lambda value: OfflineRegionInfo._from_native(value),
-        )
-
-    def offline_regions_list(self) -> Future[tuple[OfflineRegionInfo, ...]]:
+    def list_offline_regions(self) -> Future[tuple[OfflineRegionInfo, ...]]:
         """Starts listing the offline regions in the runtime database.
 
-        See `mln_runtime_offline_regions_list` in the
+        See `mln_runtime_list_offline_regions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
         return map_future(
-            self._native.offline_regions_list(),
+            self._native.list_offline_regions(),
             lambda value: tuple(OfflineRegionInfo._from_native(item) for item in value),
         )
 
-    def offline_regions_merge_database(
+    def merge_offline_regions(
         self, side_database_path: str
     ) -> Future[tuple[OfflineRegionInfo, ...]]:
         """Starts merging offline regions from another MapLibre offline
         database.
 
-        See `mln_runtime_offline_regions_merge_database` in the
+        See `mln_runtime_merge_offline_regions` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
         """
         return map_future(
-            self._native.offline_regions_merge_database(side_database_path),
+            self._native.merge_offline_regions(side_database_path),
             lambda value: tuple(OfflineRegionInfo._from_native(item) for item in value),
         )
 
@@ -2317,6 +2216,26 @@ class _RuntimeHandleOperations(GeneratedOperations):
         """
         return self._native.set_maximum_ambient_cache_size(size)
 
+    def set_offline_region_download_state(
+        self, region_id: int, input_state: OfflineRegionDownloadState
+    ) -> Future[None]:
+        """Sets an offline region's native download state.
+
+        See `mln_runtime_set_offline_region_download_state` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.set_offline_region_download_state(region_id, input_state)
+
+    def set_offline_region_observed(
+        self, region_id: int, observed: bool
+    ) -> Future[None]:
+        """Enables or disables runtime events for an offline region.
+
+        See `mln_runtime_set_offline_region_observed` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return self._native.set_offline_region_observed(region_id, observed)
+
     def set_resource_provider(self, provider: ResourceProvider) -> Future[None]:
         """Registers or replaces a runtime-scoped network resource provider.
 
@@ -2333,6 +2252,19 @@ class _RuntimeHandleOperations(GeneratedOperations):
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
         """
         return self._native.set_resource_transform(transform)
+
+    def update_offline_region_metadata(
+        self, region_id: int, metadata: bytes
+    ) -> Future[OfflineRegionInfo]:
+        """Starts updating opaque binary metadata for an offline region.
+
+        See `mln_runtime_update_offline_region_metadata` in the
+        [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+        """
+        return map_future(
+            self._native.update_offline_region_metadata(region_id, metadata),
+            lambda value: OfflineRegionInfo._from_native(value),
+        )
 
 
 def android_init(jni_env: int, jni_class: int, context: int) -> None:
@@ -2407,22 +2339,22 @@ def log_set_callback(handler: LogHandler) -> None:
     return _native.log_set_callback(handler)
 
 
-def network_status_get() -> NetworkStatus:
+def network_get_status() -> NetworkStatus:
     """Reads MapLibre Native's process-global network status.
 
-    See `mln_network_status_get` in the
+    See `mln_network_get_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
-    return NetworkStatus(_native.network_status_get())
+    return NetworkStatus(_native.network_get_status())
 
 
-def network_status_set(input_status: NetworkStatus) -> None:
+def network_set_status(input_status: NetworkStatus) -> None:
     """Sets MapLibre Native's process-global network status.
 
-    See `mln_network_status_set` in the
+    See `mln_network_set_status` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
-    return _native.network_status_set(input_status)
+    return _native.network_set_status(input_status)
 
 
 def opengl_supported_context_provider_mask() -> OpenglContextProviderFlag:

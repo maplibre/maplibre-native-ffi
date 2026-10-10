@@ -209,9 +209,9 @@ func TestOwnedTextureFrameReadsBackAsPixels(t *testing.T) {
 	r := newRenderFixture(t)
 	r.attach(t)
 	r.renderFrame(t)
-	readback, err := r.session.TextureReadPremultipliedRgba8()
+	readback, err := r.session.ReadTexture()
 	if err != nil {
-		t.Fatalf("TextureReadPremultipliedRgba8: %v", err)
+		t.Fatalf("ReadTexture: %v", err)
 	}
 	r.service(t, readback.Done(), "the readback")
 	image := await(t, readback)

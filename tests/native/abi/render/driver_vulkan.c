@@ -49,7 +49,7 @@ static void a_failed_attach_still_owns_the_session_it_published(void) {
   mln_render_session session = MLN_HANDLE_NULL;
   MLN_TEST_AWAIT_COMMAND(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_vulkan_owned_texture_attach(
+    mln_map_attach_vulkan_owned_texture(
       map, &descriptor, &options, &session, &completion.descriptor, NULL
     )
   );

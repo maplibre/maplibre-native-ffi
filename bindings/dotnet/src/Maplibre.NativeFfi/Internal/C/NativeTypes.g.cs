@@ -878,12 +878,13 @@ internal unsafe struct mln_source_feature_query_options
 
 internal unsafe struct mln_style_image_info
 {
-    public mln_style_image_info_field fields;
     public uint width;
     public uint height;
-    public uint stride;
-    public nuint byte_length;
+    public mln_style_image_info_field fields;
+    public mln_buffer_view pixels;
+    public mln_image_stretch* stretch_x;
     public nuint stretch_x_count;
+    public mln_image_stretch* stretch_y;
     public nuint stretch_y_count;
     public mln_image_content content;
     public uint text_fit_width;
@@ -907,55 +908,25 @@ internal unsafe struct mln_style_image_options
     public byte sdf;
 }
 
-internal unsafe struct mln_style_image_result
-{
-    public mln_style_image_info info;
-    public mln_buffer_view pixels;
-    public mln_image_stretch* stretch_x;
-    public nuint stretch_x_count;
-    public mln_image_stretch* stretch_y;
-    public nuint stretch_y_count;
-}
-
-internal unsafe struct mln_style_image_stretches_result
-{
-    public mln_image_stretch* stretch_x;
-    public nuint stretch_x_count;
-    public mln_image_stretch* stretch_y;
-    public nuint stretch_y_count;
-}
-
-internal unsafe struct mln_style_layer_entry
+internal unsafe struct mln_style_layer_info
 {
     public mln_buffer_view id;
     public mln_buffer_view type;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer;
-}
-
-internal unsafe struct mln_style_layer_info
-{
-    public mln_buffer_view type;
     public double min_zoom;
     public double max_zoom;
     public uint visibility;
 }
 
-internal unsafe struct mln_style_layer_result
-{
-    public mln_style_layer_info info;
-    public mln_buffer_view source_id;
-    public mln_buffer_view source_layer;
-}
-
 internal unsafe struct mln_style_source_info
 {
+    public mln_buffer_view id;
     public uint type;
     public mln_style_source_info_field fields;
-    public nuint id_size;
     public byte is_volatile;
-    public nuint attribution_size;
-    public nuint url_size;
+    public mln_buffer_view attribution;
+    public mln_buffer_view url;
     public mln_style_source_tile_info tilejson;
     public mln_lat_lng_bounds bounds;
     public uint tile_size;
@@ -963,27 +934,13 @@ internal unsafe struct mln_style_source_info
     public uint raster_encoding;
 }
 
-internal unsafe struct mln_style_source_result
-{
-    public mln_style_source_info info;
-    public mln_buffer_view attribution;
-    public mln_buffer_view url;
-    public mln_buffer_view* tile_urls;
-    public nuint tile_url_count;
-}
-
 internal unsafe struct mln_style_source_tile_info
 {
-    public nuint tile_count;
+    public mln_buffer_view* tile_urls;
+    public nuint tile_url_count;
     public double min_zoom;
     public double max_zoom;
     public uint scheme;
-}
-
-internal unsafe struct mln_style_source_tile_urls_result
-{
-    public mln_buffer_view* tile_urls;
-    public nuint tile_url_count;
 }
 
 internal unsafe struct mln_style_tile_source_options

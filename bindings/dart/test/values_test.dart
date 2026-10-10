@@ -25,9 +25,11 @@ void main() {
       '{"version":8,"sources":{},"layers":['
       '{"id":"a\\u0000b","type":"background"}]}',
     );
-    expect((await map.getStyleLayerInfo('a\u0000b'))?.info.type, 'background');
-    expect(await map.getStyleLayerInfo('a'), isNull);
-    expect(await map.listStyleLayerIds(), ['a\u0000b']);
+    expect((await map.getStyleLayer('a\u0000b'))?.type, 'background');
+    expect(await map.getStyleLayer('a'), isNull);
+    expect((await map.listStyleLayers()).map((layer) => layer.id), [
+      'a\u0000b',
+    ]);
   });
 
   test(

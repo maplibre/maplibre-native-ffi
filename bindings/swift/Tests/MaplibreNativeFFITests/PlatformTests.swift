@@ -15,7 +15,7 @@ import Testing
       try await runtime.setResourceProvider(provider: denyingProvider(
         routes: ["custom://exit.json": emptyStyle]
       ))
-      let map = try await runtime.mapCreate(options: MapOptions(
+      let map = try await runtime.createMap(options: MapOptions(
         initialExtent: LogicalExtent(width: 8, height: 8, scaleFactor: 1)
       ))
       try await map.setStyleUrl(url: "custom://exit.json")

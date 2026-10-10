@@ -68,7 +68,7 @@ internal expect object C {
 
   fun mln_gpu_sync_default(returned: Long): Unit
 
-  fun mln_http_header_transform_response_set(
+  fun mln_http_header_transform_response_set_header(
     response: Long,
     name: Long,
     nameSize: Long,
@@ -239,6 +239,116 @@ internal expect object C {
 
   fun mln_map_apply_camera_delta(map: Long, delta: Long, completion: Long, outDiagnostic: Long): Int
 
+  fun mln_map_attach_metal_borrowed_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_metal_owned_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_metal_surface(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_opengl_borrowed_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_opengl_owned_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_opengl_surface(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_vulkan_borrowed_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_vulkan_owned_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_vulkan_surface(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_webgpu_borrowed_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_webgpu_owned_texture(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_attach_webgpu_surface(
+    map: Long,
+    descriptor: Long,
+    options: Long,
+    outSession: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_begin_command_group(map: Long, completion: Long, outDiagnostic: Long): Int
+
   fun mln_map_camera_for_geometry(
     map: Long,
     geometry: Long,
@@ -264,64 +374,24 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_camera_query(map: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_camera_snapshot_get(
+  fun mln_map_create_projection(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
+
+  fun mln_map_dump_debug_logs(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_end_command_group(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_get_camera(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_get_camera_snapshot(
     map: Long,
     outCamera: Long,
     outGeneration: Long,
     outDiagnostic: Long,
   ): Int
-
-  fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_map_copy_layer_source_id(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_image_premultiplied_rgba8(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_image_stretches(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_source_attribution(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_copy_style_source_url(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_create(runtime: Long, options: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_map_dispose(map: Long, outDiagnostic: Long): Int
-
-  fun mln_map_dump_debug_logs(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_get_feature_state(
     map: Long,
@@ -339,24 +409,15 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_get_layer_filter(map: Long, layerId: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_get_loaded_style_json(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_get_layer_property(
-    map: Long,
-    layerId: Long,
-    propertyName: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_map_get_snapshot(map: Long, outSnapshot: Long, outDiagnostic: Long): Int
 
-  fun mln_map_get_style_image_info(
-    map: Long,
-    imageId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_map_get_style_image(map: Long, imageId: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_get_style_layer_info(
+  fun mln_map_get_style_layer(map: Long, layerId: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_get_style_layer_filter(
     map: Long,
     layerId: Long,
     completion: Long,
@@ -370,6 +431,14 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_map_get_style_layer_property(
+    map: Long,
+    layerId: Long,
+    propertyName: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_get_style_light_property(
     map: Long,
     propertyName: Long,
@@ -377,14 +446,7 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_get_style_source_info(
-    map: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_get_style_source_tile_urls(
+  fun mln_map_get_style_source(
     map: Long,
     sourceId: Long,
     completion: Long,
@@ -392,6 +454,8 @@ internal expect object C {
   ): Int
 
   fun mln_map_get_style_transition_options(map: Long, completion: Long, outDiagnostic: Long): Int
+
+  fun mln_map_get_style_url(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_invalidate_custom_geometry_source_region(
     map: Long,
@@ -456,13 +520,9 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_list_style_layer_ids(map: Long, completion: Long, outDiagnostic: Long): Int
-
   fun mln_map_list_style_layers(map: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_map_list_style_source_ids(map: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_map_loaded_style_json(map: Long, completion: Long, outDiagnostic: Long): Int
+  fun mln_map_list_style_sources(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_meters_per_pixel_at_latitude(
     map: Long,
@@ -497,8 +557,6 @@ internal expect object C {
   ): Int
 
   fun mln_map_projection_close(projection: Long, outDiagnostic: Long): Int
-
-  fun mln_map_projection_create(map: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_projection_get_camera(projection: Long, outCamera: Long, outDiagnostic: Long): Int
 
@@ -688,63 +746,6 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_set_layer_filter(
-    map: Long,
-    layerId: Long,
-    filter: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_set_layer_max_zoom(
-    map: Long,
-    layerId: Long,
-    maxZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_set_layer_min_zoom(
-    map: Long,
-    layerId: Long,
-    minZoom: Double,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_set_layer_property(
-    map: Long,
-    layerId: Long,
-    propertyName: Long,
-    value: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_set_layer_source_id(
-    map: Long,
-    layerId: Long,
-    sourceId: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_set_layer_source_layer(
-    map: Long,
-    layerId: Long,
-    sourceLayer: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_map_set_layer_visibility(
-    map: Long,
-    layerId: Long,
-    visibility: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_map_set_location_indicator_accuracy_radius(
     map: Long,
     layerId: Long,
@@ -799,6 +800,63 @@ internal expect object C {
 
   fun mln_map_set_style_json(map: Long, json: Long, completion: Long, outDiagnostic: Long): Int
 
+  fun mln_map_set_style_layer_filter(
+    map: Long,
+    layerId: Long,
+    filter: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_set_style_layer_max_zoom(
+    map: Long,
+    layerId: Long,
+    maxZoom: Double,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_set_style_layer_min_zoom(
+    map: Long,
+    layerId: Long,
+    minZoom: Double,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_set_style_layer_property(
+    map: Long,
+    layerId: Long,
+    propertyName: Long,
+    value: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_set_style_layer_source_id(
+    map: Long,
+    layerId: Long,
+    sourceId: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_set_style_layer_source_layer(
+    map: Long,
+    layerId: Long,
+    sourceLayer: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_map_set_style_layer_visibility(
+    map: Long,
+    layerId: Long,
+    visibility: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_set_style_light_json(
     map: Long,
     lightJson: Long,
@@ -840,115 +898,29 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_map_snapshot_get(map: Long, outSnapshot: Long, outDiagnostic: Long): Int
-
-  fun mln_map_style_url(map: Long, completion: Long, outDiagnostic: Long): Int
-
   fun mln_map_tile_options_default(returned: Long): Unit
 
   fun mln_map_update_camera(map: Long, update: Long, completion: Long, outDiagnostic: Long): Int
 
   fun mln_map_viewport_options_default(returned: Long): Unit
 
-  fun mln_metal_borrowed_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_metal_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_metal_borrowed_texture_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_metal_owned_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_metal_owned_texture_descriptor_default(returned: Long): Unit
 
-  fun mln_metal_surface_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_metal_surface_descriptor_default(returned: Long): Unit
 
-  fun mln_metal_surface_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_network_get_status(outStatus: Long, outDiagnostic: Long): Int
 
-  fun mln_network_status_get(outStatus: Long, outDiagnostic: Long): Int
-
-  fun mln_network_status_set(status: Int, outDiagnostic: Long): Int
-
-  fun mln_opengl_borrowed_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_network_set_status(status: Int, outDiagnostic: Long): Int
 
   fun mln_opengl_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_opengl_borrowed_texture_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_opengl_owned_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_opengl_owned_texture_descriptor_default(returned: Long): Unit
 
   fun mln_opengl_supported_context_provider_mask(): Int
 
-  fun mln_opengl_surface_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_opengl_surface_descriptor_default(returned: Long): Unit
-
-  fun mln_opengl_surface_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_plugin_get_register_function_v1(): Long
 
@@ -972,6 +944,12 @@ internal expect object C {
 
   fun mln_render_session_clear_data(session: Long, completion: Long, outDiagnostic: Long): Int
 
+  fun mln_render_session_create_projection(
+    session: Long,
+    outProjection: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_render_session_destroy(session: Long, outDiagnostic: Long): Int
 
   fun mln_render_session_detach(session: Long, completion: Long, outDiagnostic: Long): Int
@@ -993,12 +971,6 @@ internal expect object C {
   ): Int
 
   fun mln_render_session_get_snapshot(session: Long, outSnapshot: Long, outDiagnostic: Long): Int
-
-  fun mln_render_session_projection_create(
-    session: Long,
-    outProjection: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_render_session_query_feature_extensions(
     session: Long,
@@ -1027,6 +999,8 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_render_session_read_texture(session: Long, completion: Long, outDiagnostic: Long): Int
+
   fun mln_render_session_reduce_memory_use(
     session: Long,
     completion: Long,
@@ -1049,6 +1023,62 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_render_session_set_metal_borrowed_texture_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_set_metal_surface_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_set_opengl_borrowed_texture_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_set_opengl_surface_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_set_vulkan_borrowed_texture_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_set_vulkan_surface_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_set_webgpu_borrowed_texture_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_render_session_set_webgpu_surface_target(
+    session: Long,
+    descriptor: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_render_target_extent_physical_size(
     extent: Long,
     outWidth: Long,
@@ -1064,9 +1094,9 @@ internal expect object C {
 
   fun mln_rendered_query_geometry_point(point: Long, returned: Long): Unit
 
-  fun mln_resource_request_cancelled(handle: Long, outCancelled: Long, outDiagnostic: Long): Int
-
   fun mln_resource_request_complete(handle: Long, response: Long, outDiagnostic: Long): Int
+
+  fun mln_resource_request_is_cancelled(handle: Long, outCancelled: Long, outDiagnostic: Long): Int
 
   fun mln_resource_request_release(handle: Long): Unit
 
@@ -1104,13 +1134,14 @@ internal expect object C {
 
   fun mln_runtime_create(options: Long, outRuntime: Long, outDiagnostic: Long): Int
 
-  fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int
+  fun mln_runtime_create_map(
+    runtime: Long,
+    options: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
 
-  fun mln_runtime_drain_events(runtime: Long, outBatch: Long, outDiagnostic: Long): Int
-
-  fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int
-
-  fun mln_runtime_offline_region_create(
+  fun mln_runtime_create_offline_region(
     runtime: Long,
     definition: Long,
     metadata: Long,
@@ -1119,62 +1150,43 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
-  fun mln_runtime_offline_region_delete(
+  fun mln_runtime_delete_offline_region(
     runtime: Long,
     regionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
 
-  fun mln_runtime_offline_region_get(
+  fun mln_runtime_dispose(runtime: Long, outDiagnostic: Long): Int
+
+  fun mln_runtime_drain_events(runtime: Long, outBatch: Long, outDiagnostic: Long): Int
+
+  fun mln_runtime_get_event_mask(runtime: Long, outMask: Long, outDiagnostic: Long): Int
+
+  fun mln_runtime_get_offline_region(
     runtime: Long,
     regionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
 
-  fun mln_runtime_offline_region_get_status(
+  fun mln_runtime_get_offline_region_status(
     runtime: Long,
     regionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
 
-  fun mln_runtime_offline_region_invalidate(
+  fun mln_runtime_invalidate_offline_region(
     runtime: Long,
     regionId: Long,
     completion: Long,
     outDiagnostic: Long,
   ): Int
 
-  fun mln_runtime_offline_region_set_download_state(
-    runtime: Long,
-    regionId: Long,
-    state: Int,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
+  fun mln_runtime_list_offline_regions(runtime: Long, completion: Long, outDiagnostic: Long): Int
 
-  fun mln_runtime_offline_region_set_observed(
-    runtime: Long,
-    regionId: Long,
-    observed: Boolean,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_runtime_offline_region_update_metadata(
-    runtime: Long,
-    regionId: Long,
-    metadata: Long,
-    metadataSize: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_runtime_offline_regions_list(runtime: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_runtime_offline_regions_merge_database(
+  fun mln_runtime_merge_offline_regions(
     runtime: Long,
     sideDatabasePath: Long,
     completion: Long,
@@ -1208,6 +1220,22 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_runtime_set_offline_region_download_state(
+    runtime: Long,
+    regionId: Long,
+    state: Int,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  fun mln_runtime_set_offline_region_observed(
+    runtime: Long,
+    regionId: Long,
+    observed: Boolean,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_runtime_set_resource_provider(
     runtime: Long,
     provider: Long,
@@ -1222,6 +1250,15 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_runtime_update_offline_region_metadata(
+    runtime: Long,
+    regionId: Long,
+    metadata: Long,
+    metadataSize: Long,
+    completion: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_source_feature_query_options_default(returned: Long): Unit
 
   fun mln_style_image_options_default(returned: Long): Unit
@@ -1232,103 +1269,15 @@ internal expect object C {
 
   fun mln_supported_render_backend_mask(): Int
 
-  fun mln_texture_read_premultiplied_rgba8(
-    session: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_vulkan_borrowed_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_vulkan_borrowed_texture_descriptor_default(returned: Long): Unit
-
-  fun mln_vulkan_borrowed_texture_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_vulkan_owned_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_vulkan_owned_texture_descriptor_default(returned: Long): Unit
 
-  fun mln_vulkan_surface_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_vulkan_surface_descriptor_default(returned: Long): Unit
-
-  fun mln_vulkan_surface_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_webgpu_borrowed_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_webgpu_borrowed_texture_descriptor_default(returned: Long): Unit
 
-  fun mln_webgpu_borrowed_texture_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_webgpu_owned_texture_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_webgpu_owned_texture_descriptor_default(returned: Long): Unit
 
-  fun mln_webgpu_surface_attach(
-    map: Long,
-    descriptor: Long,
-    options: Long,
-    outSession: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
-
   fun mln_webgpu_surface_descriptor_default(returned: Long): Unit
-
-  fun mln_webgpu_surface_set_target(
-    session: Long,
-    descriptor: Long,
-    completion: Long,
-    outDiagnostic: Long,
-  ): Int
 }

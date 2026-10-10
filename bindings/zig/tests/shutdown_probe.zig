@@ -32,7 +32,7 @@ pub fn main() !void {
     options.value.event_wake = .{ .callback = ignoreWake };
     const runtime = try maplibre.runtimeCreate(allocator, options.value, null);
     try resolve(try maplibre.runtimeSetResourceProvider(allocator, runtime, .{ .callback = passThrough }, null));
-    const map = try resolve(try maplibre.mapCreate(allocator, runtime, try maplibre.mapOptionsDefault(), null));
+    const map = try resolve(try maplibre.runtimeCreateMap(allocator, runtime, try maplibre.mapOptionsDefault(), null));
     const style = try resolve(try maplibre.mapSetStyleJson(map, "{\"version\":8,\"sources\":{},\"layers\":[]}", null));
     try style.statusError();
     try resolve(try maplibre.runtimeBarrier(runtime, null));

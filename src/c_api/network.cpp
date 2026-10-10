@@ -6,7 +6,7 @@
 #include "maplibre_native_c.h"
 #include "resources/network_status.hpp"
 
-auto mln_network_status_get(
+auto mln_network_get_status(
   std::uint32_t* out_status, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -14,7 +14,7 @@ auto mln_network_status_get(
   });
 }
 
-auto mln_network_status_set(
+auto mln_network_set_status(
   std::uint32_t status, mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

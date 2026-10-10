@@ -606,13 +606,13 @@ static void a_region_invalidation_refetches_only_the_tiles_inside_it(void) {
 
 static uint32_t source_type(mln_map map, const char* id) {
   mln_test_completion info =
-    mln_test_completion_default(sizeof(mln_style_source_result));
-  MLN_TEST_OK(mln_map_get_style_source_info(
-    map, mln_test_view_of(id), &info.descriptor, NULL
-  ));
-  mln_style_source_result result = {0};
+    mln_test_completion_default(sizeof(mln_style_source_info));
+  MLN_TEST_OK(
+    mln_map_get_style_source(map, mln_test_view_of(id), &info.descriptor, NULL)
+  );
+  mln_style_source_info result = {0};
   MLN_TEST_OK(mln_test_completion_finish_value(&info, &result, sizeof(result)));
-  return result.info.type;
+  return result.type;
 }
 
 // Tile data and errors go to a tile inside its zoom level's grid of a custom

@@ -3168,7 +3168,7 @@ class SourceFeatureQueryOptions:
 
 @dataclass(frozen=True, slots=True)
 class StyleImageInfo:
-    """Fixed metadata for one runtime style image.
+    """One complete runtime style image, borrowed for a completion callback.
 
     See `mln_style_image_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
@@ -3176,10 +3176,9 @@ class StyleImageInfo:
 
     width: int
     height: int
-    stride: int
-    byte_length: int
-    stretch_x_count: int
-    stretch_y_count: int
+    pixels: bytes
+    stretch_x: tuple[ImageStretch, ...]
+    stretch_y: tuple[ImageStretch, ...]
     pixel_ratio: float
     sdf: bool
     content: ImageContent | None = None
@@ -3191,10 +3190,13 @@ class StyleImageInfo:
         return cls(
             width=raw["width"],
             height=raw["height"],
-            stride=raw["stride"],
-            byte_length=raw["byte_length"],
-            stretch_x_count=raw["stretch_x_count"],
-            stretch_y_count=raw["stretch_y_count"],
+            pixels=raw["pixels"],
+            stretch_x=tuple(
+                ImageStretch._from_native(item) for item in raw["stretch_x"]
+            ),
+            stretch_y=tuple(
+                ImageStretch._from_native(item) for item in raw["stretch_y"]
+            ),
             content=_maybe(ImageContent._from_native, raw["content"]),
             text_fit_width=_maybe(StyleImageTextFit, raw["text_fit_width"]),
             text_fit_height=_maybe(StyleImageTextFit, raw["text_fit_height"]),
@@ -3243,65 +3245,18 @@ class StyleImageOptions:
 
 
 @dataclass(frozen=True, slots=True)
-class StyleImageResult:
-    """Complete style image borrowed for a completion callback.
+class StyleLayerInfo:
+    """One style layer, borrowed for a completion callback.
 
-    See `mln_style_image_result` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    info: StyleImageInfo
-    pixels: bytes
-    stretch_x: tuple[ImageStretch, ...]
-    stretch_y: tuple[ImageStretch, ...]
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            info=StyleImageInfo._from_native(raw["info"]),
-            pixels=raw["pixels"],
-            stretch_x=tuple(
-                ImageStretch._from_native(item) for item in raw["stretch_x"]
-            ),
-            stretch_y=tuple(
-                ImageStretch._from_native(item) for item in raw["stretch_y"]
-            ),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class StyleImageStretchesResult:
-    """Borrowed image-stretch arrays available during a completion callback.
-
-    See `mln_style_image_stretches_result` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    stretch_x: tuple[ImageStretch, ...]
-    stretch_y: tuple[ImageStretch, ...]
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            stretch_x=tuple(
-                ImageStretch._from_native(item) for item in raw["stretch_x"]
-            ),
-            stretch_y=tuple(
-                ImageStretch._from_native(item) for item in raw["stretch_y"]
-            ),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class StyleLayerEntry:
-    """One style layer borrowed for a list completion callback.
-
-    See `mln_style_layer_entry` in the
+    See `mln_style_layer_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
     id: str
     type: str
+    min_zoom: float
+    max_zoom: float
+    visibility: StyleLayerVisibility
     source_id: str | None = None
     source_layer: str | None = None
 
@@ -3312,26 +3267,6 @@ class StyleLayerEntry:
             type=raw["type"],
             source_id=raw["source_id"],
             source_layer=raw["source_layer"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class StyleLayerInfo:
-    """Fixed layer metadata included in `mln_style_layer_result`.
-
-    See `mln_style_layer_info` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    type: str
-    min_zoom: float
-    max_zoom: float
-    visibility: StyleLayerVisibility
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            type=raw["type"],
             min_zoom=raw["min_zoom"],
             max_zoom=raw["max_zoom"],
             visibility=StyleLayerVisibility(raw["visibility"]),
@@ -3339,39 +3274,19 @@ class StyleLayerInfo:
 
 
 @dataclass(frozen=True, slots=True)
-class StyleLayerResult:
-    """Complete layer metadata borrowed for a completion callback.
-
-    See `mln_style_layer_result` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    info: StyleLayerInfo
-    source_id: str | None = None
-    source_layer: str | None = None
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            info=StyleLayerInfo._from_native(raw["info"]),
-            source_id=raw["source_id"],
-            source_layer=raw["source_layer"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
-    """Fixed source metadata included in `mln_style_source_result`.
+    """Complete metadata of one style source, borrowed for a completion
+    callback.
 
     See `mln_style_source_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
+    id: str
     type: StyleSourceType
-    id_size: int
     is_volatile: bool
-    attribution_size: int | None = None
-    url_size: int | None = None
+    attribution: str | None = None
+    url: str | None = None
     tilejson: StyleSourceTileInfo | None = None
     bounds: LatLngBounds | None = None
     tile_size: int | None = None
@@ -3381,11 +3296,11 @@ class StyleSourceInfo:
     @classmethod
     def _from_native(cls, raw):
         return cls(
+            id=raw["id"],
             type=StyleSourceType(raw["type"]),
-            id_size=raw["id_size"],
             is_volatile=raw["is_volatile"],
-            attribution_size=raw["attribution_size"],
-            url_size=raw["url_size"],
+            attribution=raw["attribution"],
+            url=raw["url"],
             tilejson=_maybe(StyleSourceTileInfo._from_native, raw["tilejson"]),
             bounds=_maybe(LatLngBounds._from_native, raw["bounds"]),
             tile_size=raw["tile_size"],
@@ -3395,39 +3310,14 @@ class StyleSourceInfo:
 
 
 @dataclass(frozen=True, slots=True)
-class StyleSourceResult:
-    """Complete source metadata borrowed for a completion callback.
-
-    See `mln_style_source_result` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    info: StyleSourceInfo
-    attribution: str | None = None
-    url: str | None = None
-    tile_urls: tuple[str, ...] | None = None
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            info=StyleSourceInfo._from_native(raw["info"]),
-            attribution=raw["attribution"],
-            url=raw["url"],
-            tile_urls=None
-            if raw["tile_urls"] is None
-            else (tuple(item for item in raw["tile_urls"])),
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class StyleSourceTileInfo:
-    """Inline tile metadata selected as one value by the source-info field mask.
+    """Inline TileJSON metadata of a tile source.
 
     See `mln_style_source_tile_info` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
     """
 
-    tile_count: int
+    tile_urls: tuple[str, ...]
     min_zoom: float
     max_zoom: float
     scheme: StyleTileScheme
@@ -3435,27 +3325,11 @@ class StyleSourceTileInfo:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            tile_count=raw["tile_count"],
+            tile_urls=tuple(item for item in raw["tile_urls"]),
             min_zoom=raw["min_zoom"],
             max_zoom=raw["max_zoom"],
             scheme=StyleTileScheme(raw["scheme"]),
         )
-
-
-@dataclass(frozen=True, slots=True)
-class StyleSourceTileUrlsResult:
-    """Borrowed inline TileJSON tile URLs available during a completion
-    callback.
-
-    See `mln_style_source_tile_urls_result` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    """
-
-    tile_urls: tuple[str, ...]
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(tile_urls=tuple(item for item in raw["tile_urls"]))
 
 
 @dataclass(frozen=True, slots=True)

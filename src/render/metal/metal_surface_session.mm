@@ -386,7 +386,8 @@ auto metal_surface_attach_start(
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Surface, options, capabilities,
-    out_session, completion, valueless_completion<&mln_metal_surface_attach>()
+    out_session, completion,
+    valueless_completion<&mln_map_attach_metal_surface>()
   );
 }
 
@@ -422,7 +423,8 @@ auto metal_surface_set_target_start(
         }
       );
     },
-    completion, valueless_completion<&mln_metal_surface_set_target>()
+    completion,
+    valueless_completion<&mln_render_session_set_metal_surface_target>()
   );
 }
 

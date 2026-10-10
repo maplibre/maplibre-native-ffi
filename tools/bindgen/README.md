@@ -43,6 +43,20 @@ category.
 | `event_batch`   | Drains queued events or frame results into an owned batch, or reports none queued |
 | `render_driver` | Services graphics work on the thread that the driver requires                     |
 
+## Name a declaration
+
+Name a function `mln_<owner>_<verb>[_<object>]`. The owner is the handle that
+the function acts on, its first parameter, so a binding's member reads as a verb
+on that object: `mln_map_get_style_layer`, `mln_runtime_create_map`,
+`mln_render_session_set_metal_surface_target`. A read uses `get_`, a read of
+every object uses `list_`, and a predicate uses `is_`. A callback helper names
+the record that it fills, as in `mln_resource_transform_response_set_url`. A
+function with no handle parameter names the subsystem or record that it belongs
+to: `mln_log_set_callback`, `mln_network_get_status`,
+`mln_camera_options_default`. A coordinate conversion names its result and its
+input, as in `mln_map_pixel_for_lat_lng`, and a function that reports a fixed
+fact of the library is a noun, as in `mln_c_version`.
+
 ## Follow the ABI rules
 
 Each declaration follows these rules, which every binding relies on:
@@ -97,14 +111,15 @@ Each declaration follows these rules, which every binding relies on:
   that native never reads, directly or embedded in an input.
 - An optional scalar or aggregate member of a struct names its bit in the
   struct's `fields` mask, a `uint32_t` whose `enum=` names a `kind=bitmask`
-  enum: `MLN_BINDING("mask=fields;bit=<constant>")`. Each optional member has
-  its own bit. Values that are present together form a record embedded under one
-  bit, and the schema rejects a bit that guards two members of one struct. An
-  array's count takes the array's presence and carries no mask or bit. Native
-  treats an unknown bit in an input mask as invalid. A pointer-shaped value,
-  such as a callback, an owned handle, a nul-terminated string, or a by-pointer
-  parameter, is optional through `nullable=true`. A buffer-view parameter,
-  result, or member that treats an empty view as absent is `optional=empty`.
+  enum: `MLN_BINDING("mask=fields;bit=<constant>")`. The mask names a sibling
+  member. Each optional member has its own bit. Values that are present together
+  form a record embedded under one bit, and the schema rejects a bit that guards
+  two members of one struct. An array's count takes the array's presence and
+  carries no mask or bit. Native treats an unknown bit in an input mask as
+  invalid. A pointer-shaped value, such as a callback, an owned handle, a
+  nul-terminated string, or a by-pointer parameter, is optional through
+  `nullable=true`. A buffer-view parameter, result, or member that treats an
+  empty view as absent is `optional=empty`.
 - A reserved member is `kind=reserved`, and every writer sets it to zero.
 - A handle output parameter owns the handle that it receives, and `*out_handle`
   must equal `MLN_HANDLE_NULL` on entry. Every other pointer is borrowed for the

@@ -12,7 +12,7 @@ public enum MaplibreErrorKind: Sendable, Equatable {
   case targetLost
   /// A nonblocking acquisition or service call has no result yet.
   case notReady
-  /// A command or operation named an ID with no live object behind it.
+  /// A call named an ID with no live object behind it.
   case notFound
   /// The loaded native library has a different C ABI version than the one
   /// this binding was generated for.

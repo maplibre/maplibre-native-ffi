@@ -139,7 +139,7 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_gpu_sync mln_gpu_sync_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_http_header_transform_response_set(
+    internal static partial mln_status mln_http_header_transform_response_set_header(
         mln_http_header_transform_response* response,
         sbyte* name,
         nuint name_size,
@@ -348,6 +348,133 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_metal_borrowed_texture(
+        MlnMap map,
+        mln_metal_borrowed_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_metal_owned_texture(
+        MlnMap map,
+        mln_metal_owned_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_metal_surface(
+        MlnMap map,
+        mln_metal_surface_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_opengl_borrowed_texture(
+        MlnMap map,
+        mln_opengl_borrowed_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_opengl_owned_texture(
+        MlnMap map,
+        mln_opengl_owned_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_opengl_surface(
+        MlnMap map,
+        mln_opengl_surface_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_vulkan_borrowed_texture(
+        MlnMap map,
+        mln_vulkan_borrowed_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_vulkan_owned_texture(
+        MlnMap map,
+        mln_vulkan_owned_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_vulkan_surface(
+        MlnMap map,
+        mln_vulkan_surface_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_webgpu_borrowed_texture(
+        MlnMap map,
+        mln_webgpu_borrowed_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_webgpu_owned_texture(
+        MlnMap map,
+        mln_webgpu_owned_texture_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_attach_webgpu_surface(
+        MlnMap map,
+        mln_webgpu_surface_descriptor* descriptor,
+        mln_render_session_attach_options* options,
+        MlnRenderSession* out_session,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_begin_command_group(
+        MlnMap map,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_camera_for_geometry(
         MlnMap map,
         mln_buffer_view geometry,
@@ -376,21 +503,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_camera_query(
-        MlnMap map,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_camera_snapshot_get(
-        MlnMap map,
-        mln_camera_options* out_camera,
-        ulong* out_generation,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_cancel_transitions(
         MlnMap map,
         mln_completion* completion,
@@ -398,57 +510,8 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_copy_layer_source_id(
+    internal static partial mln_status mln_map_create_projection(
         MlnMap map,
-        mln_buffer_view layer_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_copy_layer_source_layer(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_copy_style_image_premultiplied_rgba8(
-        MlnMap map,
-        mln_buffer_view image_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_copy_style_image_stretches(
-        MlnMap map,
-        mln_buffer_view image_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_copy_style_source_attribution(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_copy_style_source_url(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_create(
-        MlnRuntime runtime,
-        mln_map_options* options,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -460,6 +523,28 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_map_dump_debug_logs(
         MlnMap map,
         mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_end_command_group(
+        MlnMap map,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_get_camera(
+        MlnMap map,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_get_camera_snapshot(
+        MlnMap map,
+        mln_camera_options* out_camera,
+        ulong* out_generation,
         mln_diagnostic* out_diagnostic
     );
 
@@ -487,24 +572,21 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_layer_filter(
+    internal static partial mln_status mln_map_get_loaded_style_json(
         MlnMap map,
-        mln_buffer_view layer_id,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_layer_property(
+    internal static partial mln_status mln_map_get_snapshot(
         MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view property_name,
-        mln_completion* completion,
+        mln_map_snapshot* out_snapshot,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_style_image_info(
+    internal static partial mln_status mln_map_get_style_image(
         MlnMap map,
         mln_buffer_view image_id,
         mln_completion* completion,
@@ -512,7 +594,15 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_style_layer_info(
+    internal static partial mln_status mln_map_get_style_layer(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_get_style_layer_filter(
         MlnMap map,
         mln_buffer_view layer_id,
         mln_completion* completion,
@@ -528,6 +618,15 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_get_style_layer_property(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        mln_buffer_view property_name,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_get_style_light_property(
         MlnMap map,
         mln_buffer_view property_name,
@@ -536,15 +635,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_style_source_info(
-        MlnMap map,
-        mln_buffer_view source_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_get_style_source_tile_urls(
+    internal static partial mln_status mln_map_get_style_source(
         MlnMap map,
         mln_buffer_view source_id,
         mln_completion* completion,
@@ -553,6 +644,13 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_get_style_transition_options(
+        MlnMap map,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_get_style_url(
         MlnMap map,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
@@ -636,13 +734,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_list_style_layer_ids(
-        MlnMap map,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_list_style_layers(
         MlnMap map,
         mln_completion* completion,
@@ -650,14 +741,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_list_style_source_ids(
-        MlnMap map,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_loaded_style_json(
+    internal static partial mln_status mln_map_list_style_sources(
         MlnMap map,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
@@ -703,13 +787,6 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_projection_close(
         MlnMapProjection projection,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_projection_create(
-        MlnMap map,
-        mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 
@@ -973,70 +1050,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_layer_filter(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view* filter,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_layer_max_zoom(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        double max_zoom,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_layer_min_zoom(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        double min_zoom,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_layer_property(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view property_name,
-        mln_buffer_view value,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_layer_source_id(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view source_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_layer_source_layer(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        mln_buffer_view source_layer,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_set_layer_visibility(
-        MlnMap map,
-        mln_buffer_view layer_id,
-        uint visibility,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_location_indicator_accuracy_radius(
         MlnMap map,
         mln_buffer_view layer_id,
@@ -1109,6 +1122,70 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_layer_filter(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        mln_buffer_view* filter,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_layer_max_zoom(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        double max_zoom,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_layer_min_zoom(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        double min_zoom,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_layer_property(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        mln_buffer_view property_name,
+        mln_buffer_view value,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_layer_source_id(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        mln_buffer_view source_id,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_layer_source_layer(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        mln_buffer_view source_layer,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_map_set_style_layer_visibility(
+        MlnMap map,
+        mln_buffer_view layer_id,
+        uint visibility,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_map_set_style_light_json(
         MlnMap map,
         mln_buffer_view light_json,
@@ -1167,20 +1244,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_snapshot_get(
-        MlnMap map,
-        mln_map_snapshot* out_snapshot,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_map_style_url(
-        MlnMap map,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_map_tile_options mln_map_tile_options_default();
 
     [LibraryImport(LibraryName)]
@@ -1195,102 +1258,28 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_map_viewport_options mln_map_viewport_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_metal_borrowed_texture_attach(
-        MlnMap map,
-        mln_metal_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_metal_borrowed_texture_descriptor mln_metal_borrowed_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_metal_borrowed_texture_set_target(
-        MlnRenderSession session,
-        mln_metal_borrowed_texture_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_metal_owned_texture_attach(
-        MlnMap map,
-        mln_metal_owned_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_metal_owned_texture_descriptor mln_metal_owned_texture_descriptor_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_metal_surface_attach(
-        MlnMap map,
-        mln_metal_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_metal_surface_descriptor mln_metal_surface_descriptor_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_metal_surface_set_target(
-        MlnRenderSession session,
-        mln_metal_surface_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_network_status_get(
+    internal static partial mln_status mln_network_get_status(
         uint* out_status,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_network_status_set(
+    internal static partial mln_status mln_network_set_status(
         uint status,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_opengl_borrowed_texture_attach(
-        MlnMap map,
-        mln_opengl_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_opengl_borrowed_texture_descriptor mln_opengl_borrowed_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_opengl_borrowed_texture_set_target(
-        MlnRenderSession session,
-        mln_opengl_borrowed_texture_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_opengl_owned_texture_attach(
-        MlnMap map,
-        mln_opengl_owned_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_opengl_owned_texture_descriptor mln_opengl_owned_texture_descriptor_default();
@@ -1299,25 +1288,7 @@ internal static unsafe partial class NativeMethods
     internal static partial uint mln_opengl_supported_context_provider_mask();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_opengl_surface_attach(
-        MlnMap map,
-        mln_opengl_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_opengl_surface_descriptor mln_opengl_surface_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_opengl_surface_set_target(
-        MlnRenderSession session,
-        mln_opengl_surface_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
 
     [LibraryImport(LibraryName)]
     internal static partial void* mln_plugin_get_register_function_v1();
@@ -1377,6 +1348,13 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_create_projection(
+        MlnRenderSession session,
+        MlnMapProjection* out_projection,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_destroy(
         MlnRenderSession session,
         mln_diagnostic* out_diagnostic
@@ -1424,13 +1402,6 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_render_session_projection_create(
-        MlnRenderSession session,
-        MlnMapProjection* out_projection,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_session_query_feature_extensions(
         MlnRenderSession session,
         mln_buffer_view source_id,
@@ -1456,6 +1427,13 @@ internal static unsafe partial class NativeMethods
         MlnRenderSession session,
         mln_buffer_view source_id,
         mln_source_feature_query_options* options,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_read_texture(
+        MlnRenderSession session,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1491,6 +1469,70 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_metal_borrowed_texture_target(
+        MlnRenderSession session,
+        mln_metal_borrowed_texture_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_metal_surface_target(
+        MlnRenderSession session,
+        mln_metal_surface_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_opengl_borrowed_texture_target(
+        MlnRenderSession session,
+        mln_opengl_borrowed_texture_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_opengl_surface_target(
+        MlnRenderSession session,
+        mln_opengl_surface_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_vulkan_borrowed_texture_target(
+        MlnRenderSession session,
+        mln_vulkan_borrowed_texture_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_vulkan_surface_target(
+        MlnRenderSession session,
+        mln_vulkan_surface_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_webgpu_borrowed_texture_target(
+        MlnRenderSession session,
+        mln_webgpu_borrowed_texture_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_render_session_set_webgpu_surface_target(
+        MlnRenderSession session,
+        mln_webgpu_surface_descriptor* descriptor,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_render_target_extent_physical_size(
         mln_render_target_extent* extent,
         uint* out_width,
@@ -1518,16 +1560,16 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_resource_request_cancelled(
+    internal static partial mln_status mln_resource_request_complete(
         MlnResourceRequest handle,
-        bool* out_cancelled,
+        mln_resource_response* response,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_resource_request_complete(
+    internal static partial mln_status mln_resource_request_is_cancelled(
         MlnResourceRequest handle,
-        mln_resource_response* response,
+        bool* out_cancelled,
         mln_diagnostic* out_diagnostic
     );
 
@@ -1592,6 +1634,32 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_create_map(
+        MlnRuntime runtime,
+        mln_map_options* options,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_create_offline_region(
+        MlnRuntime runtime,
+        mln_offline_region_definition* definition,
+        byte* metadata,
+        nuint metadata_size,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_delete_offline_region(
+        MlnRuntime runtime,
+        long region_id,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_dispose(
         MlnRuntime runtime,
         mln_diagnostic* out_diagnostic
@@ -1612,17 +1680,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_create(
-        MlnRuntime runtime,
-        mln_offline_region_definition* definition,
-        byte* metadata,
-        nuint metadata_size,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_delete(
+    internal static partial mln_status mln_runtime_get_offline_region(
         MlnRuntime runtime,
         long region_id,
         mln_completion* completion,
@@ -1630,7 +1688,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_get(
+    internal static partial mln_status mln_runtime_get_offline_region_status(
         MlnRuntime runtime,
         long region_id,
         mln_completion* completion,
@@ -1638,7 +1696,7 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_get_status(
+    internal static partial mln_status mln_runtime_invalidate_offline_region(
         MlnRuntime runtime,
         long region_id,
         mln_completion* completion,
@@ -1646,50 +1704,14 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_invalidate(
-        MlnRuntime runtime,
-        long region_id,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_set_download_state(
-        MlnRuntime runtime,
-        long region_id,
-        uint state,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_set_observed(
-        MlnRuntime runtime,
-        long region_id,
-        byte observed,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_region_update_metadata(
-        MlnRuntime runtime,
-        long region_id,
-        byte* metadata,
-        nuint metadata_size,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_regions_list(
+    internal static partial mln_status mln_runtime_list_offline_regions(
         MlnRuntime runtime,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_runtime_offline_regions_merge_database(
+    internal static partial mln_status mln_runtime_merge_offline_regions(
         MlnRuntime runtime,
         sbyte* side_database_path,
         mln_completion* completion,
@@ -1738,6 +1760,24 @@ internal static unsafe partial class NativeMethods
     );
 
     [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_set_offline_region_download_state(
+        MlnRuntime runtime,
+        long region_id,
+        uint state,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_set_offline_region_observed(
+        MlnRuntime runtime,
+        long region_id,
+        byte observed,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
     internal static partial mln_status mln_runtime_set_resource_provider(
         MlnRuntime runtime,
         mln_resource_provider* provider,
@@ -1749,6 +1789,16 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_status mln_runtime_set_resource_transform(
         MlnRuntime runtime,
         mln_resource_transform* transform,
+        mln_completion* completion,
+        mln_diagnostic* out_diagnostic
+    );
+
+    [LibraryImport(LibraryName)]
+    internal static partial mln_status mln_runtime_update_offline_region_metadata(
+        MlnRuntime runtime,
+        long region_id,
+        byte* metadata,
+        nuint metadata_size,
         mln_completion* completion,
         mln_diagnostic* out_diagnostic
     );
@@ -1769,119 +1819,20 @@ internal static unsafe partial class NativeMethods
     internal static partial uint mln_supported_render_backend_mask();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_texture_read_premultiplied_rgba8(
-        MlnRenderSession session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_vulkan_borrowed_texture_attach(
-        MlnMap map,
-        mln_vulkan_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_vulkan_borrowed_texture_descriptor mln_vulkan_borrowed_texture_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_vulkan_borrowed_texture_set_target(
-        MlnRenderSession session,
-        mln_vulkan_borrowed_texture_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_vulkan_owned_texture_attach(
-        MlnMap map,
-        mln_vulkan_owned_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_vulkan_owned_texture_descriptor mln_vulkan_owned_texture_descriptor_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_vulkan_surface_attach(
-        MlnMap map,
-        mln_vulkan_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_vulkan_surface_set_target(
-        MlnRenderSession session,
-        mln_vulkan_surface_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_webgpu_borrowed_texture_attach(
-        MlnMap map,
-        mln_webgpu_borrowed_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_webgpu_borrowed_texture_descriptor mln_webgpu_borrowed_texture_descriptor_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_webgpu_borrowed_texture_set_target(
-        MlnRenderSession session,
-        mln_webgpu_borrowed_texture_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_webgpu_owned_texture_attach(
-        MlnMap map,
-        mln_webgpu_owned_texture_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_webgpu_owned_texture_descriptor mln_webgpu_owned_texture_descriptor_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_webgpu_surface_attach(
-        MlnMap map,
-        mln_webgpu_surface_descriptor* descriptor,
-        mln_render_session_attach_options* options,
-        MlnRenderSession* out_session,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_webgpu_surface_descriptor mln_webgpu_surface_descriptor_default();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_status mln_webgpu_surface_set_target(
-        MlnRenderSession session,
-        mln_webgpu_surface_descriptor* descriptor,
-        mln_completion* completion,
-        mln_diagnostic* out_diagnostic
-    );
 }

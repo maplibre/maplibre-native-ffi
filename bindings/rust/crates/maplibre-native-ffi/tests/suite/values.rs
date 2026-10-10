@@ -21,7 +21,7 @@ fn strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected(
     let loaded = wait_for(fixture.map().set_style_json(document));
     assert_eq!(loaded.disposition, CommandDisposition::Committed);
     assert_eq!(
-        wait_for(fixture.map().loaded_style_json()),
+        wait_for(fixture.map().get_loaded_style_json()),
         BACKGROUND_STYLE_JSON.as_bytes()
     );
 
@@ -29,7 +29,10 @@ fn strings_cross_as_terminated_and_explicit_length_and_embedded_nul_is_rejected(
     // sees exactly that URL.
     fixture.map().set_style_url("custom://style.json").unwrap();
     fixture.await_event_type(RuntimeEventType::MapStyleLoaded);
-    assert_eq!(wait_for(fixture.map().style_url()), "custom://style.json");
+    assert_eq!(
+        wait_for(fixture.map().get_style_url()),
+        "custom://style.json"
+    );
 
     // A terminated string cannot carry a NUL, so the binding rejects it before
     // any native call.
@@ -120,7 +123,7 @@ fn a_strided_batch_and_an_unknown_union_arm_decode_without_losing_data() {
 fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
     // An enum value this binding predates reaches native unchanged, and native
     // is what rejects it.
-    let error = network_status_set(NetworkStatus::Unknown(999_999)).unwrap_err();
+    let error = network_set_status(NetworkStatus::Unknown(999_999)).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
     assert!(error.diagnostic().contains("network status"), "{error}");
@@ -130,7 +133,7 @@ fn open_enums_keep_unknown_values_and_64_bit_masks_cross_whole() {
     let rejected = wait_for(
         fixture
             .map()
-            .set_layer_visibility("background", StyleLayerVisibility::Unknown(900)),
+            .set_style_layer_visibility("background", StyleLayerVisibility::Unknown(900)),
     );
     assert_eq!(rejected.disposition, CommandDisposition::Failed);
 
@@ -187,9 +190,9 @@ fn array_inputs_are_copied_when_they_are_submitted() {
 
     assert_eq!(
         wait_for(fixture.map().get_image_source_coordinates("image")),
-        Some(expected_coordinates)
+        expected_coordinates
     );
-    let copied = wait_for(fixture.map().get_style_image_info("icon")).unwrap();
+    let copied = wait_for(fixture.map().get_style_image("icon")).unwrap();
     assert_eq!(copied.pixels, expected_pixels);
 }
 

@@ -43,7 +43,7 @@ extern "C" {
  *   worker.
  */
 MLN_BINDING("execution=lifecycle;result=mln_map_projection")
-MLN_API mln_status mln_map_projection_create(
+MLN_API mln_status mln_map_create_projection(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

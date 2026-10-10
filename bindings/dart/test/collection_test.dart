@@ -54,7 +54,7 @@ Future<(MapHandle, WeakReference<RuntimeHandle>)>
 _mapWithoutItsRuntime() async {
   final runtime = runtimeCreate(runtimeOptionsDefault());
   final map = await within(
-    runtime.mapCreate(mapOptionsDefault()),
+    runtime.createMap(mapOptionsDefault()),
     'map creation',
   );
   return (map, WeakReference(runtime));
@@ -68,7 +68,7 @@ Future<WeakReference<MapHandle>> _droppedMapCreation(
   WeakReference<MapHandle>? delivered;
   unawaited(
     runtime
-        .mapCreate(mapOptionsDefault())
+        .createMap(mapOptionsDefault())
         .then((map) => delivered = WeakReference(map)),
   );
   // The creation's completion reaches the shared port before the barrier's.

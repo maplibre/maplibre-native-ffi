@@ -81,6 +81,8 @@ Future<List<T>> _queryList<T>(_CompletionValue<T> value, _NativeStart start) =>
     );
 
 /// Starts an operation whose completion carries an array or no array.
+// A generator shape that the current headers do not use.
+// ignore: unused_element
 Future<List<T>?> _queryOptionalList<T>(
   _CompletionValue<T> value,
   _NativeStart start,

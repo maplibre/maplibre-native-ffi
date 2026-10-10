@@ -42,7 +42,7 @@ public enum StyleSourceInfoField : uint
     RasterEncoding = 32,
 
     /// <summary>
-    /// The source declares an attribution string.
+    /// The source carries an attribution string, which may be empty.
     /// </summary>
     Attribution = 64,
 }

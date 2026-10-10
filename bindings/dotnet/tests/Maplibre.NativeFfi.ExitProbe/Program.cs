@@ -22,7 +22,7 @@ await runtime.SetResourceProviderAsync(
         }
     )
 );
-var map = await runtime.MapCreateAsync(MapOptions.Default);
+var map = await runtime.CreateMapAsync(MapOptions.Default);
 await map.SetStyleUrlAsync("exit-probe://style.json");
 var request = await held.Task.WaitAsync(TimeSpan.FromSeconds(30));
 

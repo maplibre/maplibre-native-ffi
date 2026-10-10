@@ -141,7 +141,7 @@ mln_status mln_test_render_read_back(
   uint8_t* out_pixels, size_t capacity
 ) {
   mln_test_completion readback = mln_test_completion_readback();
-  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
+  MLN_TEST_OK(mln_render_session_read_texture(
     fixture->session, &readback.descriptor, NULL
   ));
   const mln_status status =

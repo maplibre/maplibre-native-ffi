@@ -206,7 +206,7 @@ fn a_provider_hands_its_request_to_another_thread_and_answers_later() {
     fixture.map().set_style_url("custom://style.json").unwrap();
     let handle = requests.recv_timeout(timeout()).unwrap();
     std::thread::spawn(move || {
-        assert!(!handle.cancelled().unwrap());
+        assert!(!handle.is_cancelled().unwrap());
         handle
             .complete(&ok_response(BACKGROUND_STYLE_JSON))
             .unwrap();
@@ -266,7 +266,7 @@ fn registering_for_an_already_cancelled_request_reports_it_and_roots_nothing() {
     let (runtime, map) = fixture.into_parts();
     wait_for(map.release());
     await_condition("the request to report cancelled", || {
-        handle.cancelled().unwrap()
+        handle.is_cancelled().unwrap()
     });
 
     // Native reports the cancellation instead of accepting the callback, so

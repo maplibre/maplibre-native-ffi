@@ -48,12 +48,12 @@ import Testing
   #expect(camera.center == nil)
   #expect(camera.nativeValue().fields == MLN_CAMERA_OPTION_ZOOM.rawValue)
 
-  var source = mln_style_source_result()
-  source.info.fields = MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue
-  let copied = try StyleSourceResult(raw: source)
-  #expect(copied.info.tileSize == 0)
-  #expect(copied.info.bounds == nil)
-  #expect(copied.info.tilejson == nil)
+  var source = mln_style_source_info()
+  source.fields = MLN_STYLE_SOURCE_INFO_TILE_SIZE.rawValue
+  let copied = try StyleSourceInfo(raw: source)
+  #expect(copied.tileSize == 0)
+  #expect(copied.bounds == nil)
+  #expect(copied.tilejson == nil)
   #expect(copied.url == nil)
 }
 
@@ -67,13 +67,13 @@ import Testing
     let _: UInt32 = try NativeInputArena.count(Int(UInt32.max) + 1)
   }
 
-  var source = mln_style_source_result()
-  source.info.type = 700
-  source.info.fields = MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue
-  source.info.tilejson.scheme = 701
-  let copied = try StyleSourceResult(raw: source)
-  #expect(copied.info.type.rawValue == 700)
-  #expect(copied.info.tilejson?.scheme.rawValue == 701)
+  var source = mln_style_source_info()
+  source.type = 700
+  source.fields = MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue
+  source.tilejson.scheme = 701
+  let copied = try StyleSourceInfo(raw: source)
+  #expect(copied.type.rawValue == 700)
+  #expect(copied.tilejson?.scheme.rawValue == 701)
   #expect(RenderResult(rawValue: 99).rawValue == 99)
 
   let context = VulkanContextDescriptor(

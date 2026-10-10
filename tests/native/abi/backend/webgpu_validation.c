@@ -40,17 +40,20 @@ static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.webgpu_borrowed.physical_width = 0;
 }
 
-MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_webgpu_surface_attach)
-MLN_TEST_ATTACH_SUBMITTER(submit_owned_attach, mln_webgpu_owned_texture_attach)
+MLN_TEST_ATTACH_SUBMITTER(submit_surface_attach, mln_map_attach_webgpu_surface)
 MLN_TEST_ATTACH_SUBMITTER(
-  submit_borrowed_attach, mln_webgpu_borrowed_texture_attach
+  submit_owned_attach, mln_map_attach_webgpu_owned_texture
+)
+MLN_TEST_ATTACH_SUBMITTER(
+  submit_borrowed_attach, mln_map_attach_webgpu_borrowed_texture
 )
 #if !defined(MLN_FFI_TEST_BACKEND_WEBGPU)
 MLN_TEST_SET_TARGET_SUBMITTER(
-  submit_surface_set_target, mln_webgpu_surface_set_target
+  submit_surface_set_target, mln_render_session_set_webgpu_surface_target
 )
 MLN_TEST_SET_TARGET_SUBMITTER(
-  submit_borrowed_set_target, mln_webgpu_borrowed_texture_set_target
+  submit_borrowed_set_target,
+  mln_render_session_set_webgpu_borrowed_texture_target
 )
 #endif
 

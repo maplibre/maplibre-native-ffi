@@ -48,7 +48,7 @@ impl RenderTarget {
                     context: metal.context_descriptor(),
                 };
                 let session = Session::new(
-                    unsafe { map.metal_owned_texture_attach(&descriptor, &options) }?,
+                    unsafe { map.attach_metal_owned_texture(&descriptor, &options) }?,
                     &options,
                     mode,
                     wakes,
@@ -62,7 +62,7 @@ impl RenderTarget {
                 let texture = MetalBorrowedTexture::new(metal, viewport)?;
                 let session = Session::new(
                     unsafe {
-                        map.metal_borrowed_texture_attach(
+                        map.attach_metal_borrowed_texture(
                             &borrowed_descriptor(&texture, viewport),
                             &options,
                         )
@@ -86,7 +86,7 @@ impl RenderTarget {
                 );
                 Ok(Self::Surface {
                     session: Session::new(
-                        unsafe { map.metal_surface_attach(&descriptor, &options) }?,
+                        unsafe { map.attach_metal_surface(&descriptor, &options) }?,
                         &options,
                         mode,
                         wakes,
@@ -123,7 +123,7 @@ impl RenderTarget {
                 let completion = unsafe {
                     session
                         .handle()
-                        .metal_borrowed_texture_set_target(&borrowed_descriptor(
+                        .set_metal_borrowed_texture_target(&borrowed_descriptor(
                             &replacement,
                             viewport,
                         ))

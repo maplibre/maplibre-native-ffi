@@ -85,7 +85,7 @@ static mln_status attach(
     .user_data = &queue_lock,
     .release_user_data = session_releases_queue_lock,
   };
-  return mln_vulkan_owned_texture_attach(
+  return mln_map_attach_vulkan_owned_texture(
     map, &descriptor, &locked, out_session, completion, NULL
   );
 }

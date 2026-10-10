@@ -47,7 +47,7 @@ static void regions_listed(
       .callback = region_deleted,
       .user_data = cleanup,
     };
-    (void)mln_runtime_offline_region_delete(
+    (void)mln_runtime_delete_offline_region(
       cleanup->runtime, info->id, &completion, NULL
     );
     // #endregion delete
@@ -67,6 +67,6 @@ mln_status delete_other_regions(
   };
 
   // #region list
-  return mln_runtime_offline_regions_list(runtime, &completion, NULL);
+  return mln_runtime_list_offline_regions(runtime, &completion, NULL);
   // #endregion list
 }

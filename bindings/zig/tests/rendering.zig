@@ -22,7 +22,7 @@ fn renderAndReadBack(owned: *support.OwnedTexture) !void {
     const capabilities = try maplibre.renderSessionGetCapabilities(owned.session, null);
     try testing.expect(capabilities.flags.readback);
     _ = try owned.renderUntilRendered();
-    var image = try owned.resolve(try maplibre.textureReadPremultipliedRgba8(testing.allocator, owned.session, null));
+    var image = try owned.resolve(try maplibre.renderSessionReadTexture(testing.allocator, owned.session, null));
     defer image.deinit();
     try testing.expectEqual(extent.width, image.value.info.width);
     try testing.expectEqual(extent.height, image.value.info.height);

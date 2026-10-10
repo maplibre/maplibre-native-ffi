@@ -103,7 +103,7 @@ static void attach_and_destroy_here(void* context) {
     mln_render_session_attach_options_default();
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   mln_render_session session = MLN_HANDLE_NULL;
-  run->attach_status = mln_opengl_surface_attach(
+  run->attach_status = mln_map_attach_opengl_surface(
     run->map, &descriptor, &options, &session, &run->attach_completion, NULL
   );
   if (run->attach_status != MLN_STATUS_OK) return;

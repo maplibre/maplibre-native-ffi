@@ -14,7 +14,7 @@ static mln_status attach(
     mln_metal_owned_texture_descriptor_default();
   descriptor.extent = probe_extent;
   descriptor.context.device = context->metal_device;
-  return mln_metal_owned_texture_attach(
+  return mln_map_attach_metal_owned_texture(
     map, &descriptor, options, out_session, completion, NULL
   );
 }

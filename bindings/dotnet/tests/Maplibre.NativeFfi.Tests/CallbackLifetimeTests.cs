@@ -19,7 +19,7 @@ public sealed class CallbackLifetimeTests
 
         // Removing the source is what makes native release the registration.
         await fixture.Map.RemoveStyleSourceAsync("custom", TestWaits.Token);
-        Assert.Null(await fixture.Map.GetStyleSourceInfoAsync("custom", TestWaits.Token));
+        Assert.Null(await fixture.Map.GetStyleSourceAsync("custom", TestWaits.Token));
         Assert.False(Gc.IsAlive(accepted));
 
         // Native validates the zoom range before it takes the registration.
@@ -86,7 +86,7 @@ public sealed class CallbackLifetimeTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference RegisterCallbackCapturingItsMap(RuntimeHandle runtime)
     {
-        var map = runtime.MapCreateAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
         map.SetStyleJsonAsync(NativeFixture.EmptyStyle).GetAwaiter().GetResult();
         var added = map.AddCustomGeometrySourceAsync(
                 "captured-map",

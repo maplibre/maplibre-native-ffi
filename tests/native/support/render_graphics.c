@@ -196,7 +196,7 @@ bool mln_test_backend_attach(
     mln_metal_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
-  *out_status = mln_metal_owned_texture_attach(
+  *out_status = mln_map_attach_metal_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -208,7 +208,7 @@ bool mln_test_backend_attach(
   if (attach_queue_lock != NULL) {
     attach.queue_lock = *attach_queue_lock;
   }
-  *out_status = mln_vulkan_owned_texture_attach(
+  *out_status = mln_map_attach_vulkan_owned_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
@@ -216,7 +216,7 @@ bool mln_test_backend_attach(
     mln_opengl_owned_texture_descriptor_default();
   descriptor.extent = host_extent();
   descriptor.context = host_context(&state->context);
-  *out_status = mln_opengl_owned_texture_attach(
+  *out_status = mln_map_attach_opengl_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -317,7 +317,7 @@ static bool attach_borrowed_texture(
   }
   *out_state = state;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  *out_status = mln_metal_borrowed_texture_attach(
+  *out_status = mln_map_attach_metal_borrowed_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -325,11 +325,11 @@ static bool attach_borrowed_texture(
   if (attach_queue_lock != NULL) {
     attach.queue_lock = *attach_queue_lock;
   }
-  *out_status = mln_vulkan_borrowed_texture_attach(
+  *out_status = mln_map_attach_vulkan_borrowed_texture(
     map, &descriptor, &attach, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  *out_status = mln_opengl_borrowed_texture_attach(
+  *out_status = mln_map_attach_opengl_borrowed_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -359,15 +359,15 @@ static bool attach_surface(
   }
   *out_state = state;
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  *out_status = mln_metal_surface_attach(
+  *out_status = mln_map_attach_metal_surface(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  *out_status = mln_vulkan_surface_attach(
+  *out_status = mln_map_attach_vulkan_surface(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  *out_status = mln_opengl_surface_attach(
+  *out_status = mln_map_attach_opengl_surface(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -488,15 +488,15 @@ mln_status mln_test_render_fixture_set_texture(
     return MLN_STATUS_NATIVE_ERROR;
   }
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  return mln_metal_borrowed_texture_set_target(
+  return mln_render_session_set_metal_borrowed_texture_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  return mln_vulkan_borrowed_texture_set_target(
+  return mln_render_session_set_vulkan_borrowed_texture_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  return mln_opengl_borrowed_texture_set_target(
+  return mln_render_session_set_opengl_borrowed_texture_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif
@@ -515,15 +515,15 @@ mln_status mln_test_render_fixture_set_surface(
     return MLN_STATUS_NATIVE_ERROR;
   }
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  return mln_metal_surface_set_target(
+  return mln_render_session_set_metal_surface_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  return mln_vulkan_surface_set_target(
+  return mln_render_session_set_vulkan_surface_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #else
-  return mln_opengl_surface_set_target(
+  return mln_render_session_set_opengl_surface_target(
     fixture->session, &descriptor, completion, MLN_TEST_DIAGNOSTIC
   );
 #endif

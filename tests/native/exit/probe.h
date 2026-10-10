@@ -248,7 +248,8 @@ static inline mln_map probe_create_map(mln_runtime runtime) {
   const mln_completion completion = probe_latch_completion(&latch);
   const mln_map_options options = mln_map_options_default();
   probe_require(
-    mln_map_create(runtime, &options, &completion, NULL), "creating a map"
+    mln_runtime_create_map(runtime, &options, &completion, NULL),
+    "creating a map"
   );
   probe_require(probe_latch_wait(&latch), "creating a map");
   const mln_map map = latch.handle;

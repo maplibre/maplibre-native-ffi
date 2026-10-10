@@ -12,7 +12,7 @@ void main() {
     () async {
       final fixture = await openRuntime();
       final map = await fixture.openMap();
-      final projection = await map.projectionCreate();
+      final projection = await map.createProjection();
 
       projection.close();
       projection.close();
@@ -27,7 +27,7 @@ void main() {
 
       // A closed owner refuses use without reaching native code.
       expect(
-        map.snapshotGet,
+        map.getSnapshot,
         throwsA(
           isA<InvalidStateException>()
               .having((error) => error.nativeStatusCode, 'status', isNull)
@@ -44,7 +44,7 @@ void main() {
   test('a refused close leaves the handle usable for a later close', () async {
     final runtime = runtimeCreate(runtimeOptionsDefault());
     final map = await within(
-      runtime.mapCreate(mapOptionsDefault()),
+      runtime.createMap(mapOptionsDefault()),
       'map creation',
     );
     addTearDown(() async {
@@ -65,13 +65,13 @@ void main() {
   test('handles stay usable after an isolate hop', () async {
     final fixture = await openRuntime();
     final map = await fixture.openMap();
-    final before = map.snapshotGet();
+    final before = map.getSnapshot();
 
     // Awaiting another isolate can resume this one on a different thread,
     // and every handle and the per-isolate diagnostic must survive that.
     await Isolate.run(() {});
 
-    final camera = await within(map.cameraQuery(), 'camera query');
+    final camera = await within(map.getCamera(), 'camera query');
     expect(camera.generation, greaterThanOrEqualTo(before.generation));
     expect(
       () => fixture.runtime.setEventMask(

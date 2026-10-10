@@ -286,6 +286,184 @@ internal fun NativeArena.putCameraDelta(target: Long, value: CameraDelta) {
 internal fun NativeArena.writeCameraDelta(value: CameraDelta): Long =
   allocate(128, 8).also { putCameraDelta(it, value) }
 
+internal fun NativeArena.putMetalBorrowedTextureDescriptor(
+  target: Long,
+  value: MetalBorrowedTextureDescriptor,
+) {
+  C.mln_metal_borrowed_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  writeU32(target + 32, value.physicalWidth)
+  writeU32(target + 36, value.physicalHeight)
+  writeAddress(target + 40, value.texture.address)
+}
+
+internal fun NativeArena.writeMetalBorrowedTextureDescriptor(
+  value: MetalBorrowedTextureDescriptor
+): Long = allocate(48, 8).also { putMetalBorrowedTextureDescriptor(it, value) }
+
+internal fun NativeCall.putRenderSessionAttachOptions(
+  target: Long,
+  value: RenderSessionAttachOptions,
+) {
+  C.mln_render_session_attach_options_default(target)
+  writeU32(target + 4, value.driver.rawValue)
+  writeU32(target + 8, value.requestedTextureRingDepth)
+  putWake(target + 16, value.frameWake)
+  putWake(target + w(28, 40), value.driverWorkWake)
+  putQueueLock(target + w(40, 64), value.queueLock)
+}
+
+internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
+  allocate(w(56, 96), w(4, 8)).also { putRenderSessionAttachOptions(it, value) }
+
+internal fun NativeArena.putMetalOwnedTextureDescriptor(
+  target: Long,
+  value: MetalOwnedTextureDescriptor,
+) {
+  C.mln_metal_owned_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putMetalContextDescriptor(target + 32, value.context)
+}
+
+internal fun NativeArena.writeMetalOwnedTextureDescriptor(
+  value: MetalOwnedTextureDescriptor
+): Long = allocate(40, 8).also { putMetalOwnedTextureDescriptor(it, value) }
+
+internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
+  C.mln_metal_surface_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putMetalContextDescriptor(target + 32, value.context)
+  writeAddress(target + w(36, 40), value.layer.address)
+}
+
+internal fun NativeArena.writeMetalSurfaceDescriptor(value: MetalSurfaceDescriptor): Long =
+  allocate(w(40, 48), 8).also { putMetalSurfaceDescriptor(it, value) }
+
+internal fun NativeArena.putOpenglBorrowedTextureDescriptor(
+  target: Long,
+  value: OpenglBorrowedTextureDescriptor,
+) {
+  C.mln_opengl_borrowed_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  writeU32(target + 32, value.physicalWidth)
+  writeU32(target + 36, value.physicalHeight)
+  putOpenglContextDescriptor(target + 40, value.context)
+  writeU32(target + w(68, 88), value.texture)
+  writeU32(target + w(72, 92), value.target)
+}
+
+internal fun NativeArena.writeOpenglBorrowedTextureDescriptor(
+  value: OpenglBorrowedTextureDescriptor
+): Long = allocate(w(80, 96), 8).also { putOpenglBorrowedTextureDescriptor(it, value) }
+
+internal fun NativeArena.putOpenglOwnedTextureDescriptor(
+  target: Long,
+  value: OpenglOwnedTextureDescriptor,
+) {
+  C.mln_opengl_owned_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putOpenglContextDescriptor(target + 32, value.context)
+}
+
+internal fun NativeArena.writeOpenglOwnedTextureDescriptor(
+  value: OpenglOwnedTextureDescriptor
+): Long = allocate(w(64, 80), 8).also { putOpenglOwnedTextureDescriptor(it, value) }
+
+internal fun NativeArena.putOpenglSurfaceDescriptor(target: Long, value: OpenglSurfaceDescriptor) {
+  C.mln_opengl_surface_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putOpenglContextDescriptor(target + 32, value.context)
+  writeAddress(target + w(60, 80), value.surface.address)
+}
+
+internal fun NativeArena.writeOpenglSurfaceDescriptor(value: OpenglSurfaceDescriptor): Long =
+  allocate(w(64, 88), 8).also { putOpenglSurfaceDescriptor(it, value) }
+
+internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
+  target: Long,
+  value: VulkanBorrowedTextureDescriptor,
+) {
+  C.mln_vulkan_borrowed_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  writeU32(target + 32, value.physicalWidth)
+  writeU32(target + 36, value.physicalHeight)
+  putVulkanContextDescriptor(target + 40, value.context)
+  writeU64(target + w(72, 96), value.image)
+  writeU64(target + w(80, 104), value.imageView)
+  writeU32(target + w(88, 112), value.format)
+  writeU32(target + w(92, 116), value.initialLayout)
+  writeU32(target + w(96, 120), value.finalLayout)
+}
+
+internal fun NativeArena.writeVulkanBorrowedTextureDescriptor(
+  value: VulkanBorrowedTextureDescriptor
+): Long = allocate(w(104, 128), 8).also { putVulkanBorrowedTextureDescriptor(it, value) }
+
+internal fun NativeArena.putVulkanOwnedTextureDescriptor(
+  target: Long,
+  value: VulkanOwnedTextureDescriptor,
+) {
+  C.mln_vulkan_owned_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putVulkanContextDescriptor(target + 32, value.context)
+}
+
+internal fun NativeArena.writeVulkanOwnedTextureDescriptor(
+  value: VulkanOwnedTextureDescriptor
+): Long = allocate(w(64, 88), 8).also { putVulkanOwnedTextureDescriptor(it, value) }
+
+internal fun NativeArena.putVulkanSurfaceDescriptor(target: Long, value: VulkanSurfaceDescriptor) {
+  C.mln_vulkan_surface_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putVulkanContextDescriptor(target + 32, value.context)
+  writeU64(target + w(64, 88), value.surface)
+}
+
+internal fun NativeArena.writeVulkanSurfaceDescriptor(value: VulkanSurfaceDescriptor): Long =
+  allocate(w(72, 96), 8).also { putVulkanSurfaceDescriptor(it, value) }
+
+internal fun NativeArena.putWebgpuBorrowedTextureDescriptor(
+  target: Long,
+  value: WebgpuBorrowedTextureDescriptor,
+) {
+  C.mln_webgpu_borrowed_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  writeU32(target + 32, value.physicalWidth)
+  writeU32(target + 36, value.physicalHeight)
+  putWebgpuContextDescriptor(target + 40, value.context)
+  writeAddress(target + w(52, 64), value.texture.address)
+  writeAddress(target + w(56, 72), value.textureView.address)
+  writeU32(target + w(60, 80), value.format)
+}
+
+internal fun NativeArena.writeWebgpuBorrowedTextureDescriptor(
+  value: WebgpuBorrowedTextureDescriptor
+): Long = allocate(w(64, 88), 8).also { putWebgpuBorrowedTextureDescriptor(it, value) }
+
+internal fun NativeArena.putWebgpuOwnedTextureDescriptor(
+  target: Long,
+  value: WebgpuOwnedTextureDescriptor,
+) {
+  C.mln_webgpu_owned_texture_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putWebgpuContextDescriptor(target + 32, value.context)
+}
+
+internal fun NativeArena.writeWebgpuOwnedTextureDescriptor(
+  value: WebgpuOwnedTextureDescriptor
+): Long = allocate(w(48, 56), 8).also { putWebgpuOwnedTextureDescriptor(it, value) }
+
+internal fun NativeArena.putWebgpuSurfaceDescriptor(target: Long, value: WebgpuSurfaceDescriptor) {
+  C.mln_webgpu_surface_descriptor_default(target)
+  putRenderTargetExtent(target + 8, value.extent)
+  putWebgpuContextDescriptor(target + 32, value.context)
+  writeAddress(target + w(44, 56), value.surface.address)
+  writeU32(target + w(48, 64), value.format)
+}
+
+internal fun NativeArena.writeWebgpuSurfaceDescriptor(value: WebgpuSurfaceDescriptor): Long =
+  allocate(w(56, 72), 8).also { putWebgpuSurfaceDescriptor(it, value) }
+
 internal fun NativeArena.putCameraFitOptions(target: Long, value: CameraFitOptions) {
   C.mln_camera_fit_options_default(target)
   writeU32(target + 4, 0u)
@@ -586,244 +764,6 @@ internal fun NativeArena.putCameraUpdate(target: Long, value: CameraUpdate) {
 internal fun NativeArena.writeCameraUpdate(value: CameraUpdate): Long =
   allocate(208, 8).also { putCameraUpdate(it, value) }
 
-internal fun NativeArena.putMetalBorrowedTextureDescriptor(
-  target: Long,
-  value: MetalBorrowedTextureDescriptor,
-) {
-  C.mln_metal_borrowed_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  writeU32(target + 32, value.physicalWidth)
-  writeU32(target + 36, value.physicalHeight)
-  writeAddress(target + 40, value.texture.address)
-}
-
-internal fun NativeArena.writeMetalBorrowedTextureDescriptor(
-  value: MetalBorrowedTextureDescriptor
-): Long = allocate(48, 8).also { putMetalBorrowedTextureDescriptor(it, value) }
-
-internal fun NativeCall.putRenderSessionAttachOptions(
-  target: Long,
-  value: RenderSessionAttachOptions,
-) {
-  C.mln_render_session_attach_options_default(target)
-  writeU32(target + 4, value.driver.rawValue)
-  writeU32(target + 8, value.requestedTextureRingDepth)
-  putWake(target + 16, value.frameWake)
-  putWake(target + w(28, 40), value.driverWorkWake)
-  putQueueLock(target + w(40, 64), value.queueLock)
-}
-
-internal fun NativeCall.writeRenderSessionAttachOptions(value: RenderSessionAttachOptions): Long =
-  allocate(w(56, 96), w(4, 8)).also { putRenderSessionAttachOptions(it, value) }
-
-internal fun NativeArena.putMetalOwnedTextureDescriptor(
-  target: Long,
-  value: MetalOwnedTextureDescriptor,
-) {
-  C.mln_metal_owned_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putMetalContextDescriptor(target + 32, value.context)
-}
-
-internal fun NativeArena.writeMetalOwnedTextureDescriptor(
-  value: MetalOwnedTextureDescriptor
-): Long = allocate(40, 8).also { putMetalOwnedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putMetalSurfaceDescriptor(target: Long, value: MetalSurfaceDescriptor) {
-  C.mln_metal_surface_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putMetalContextDescriptor(target + 32, value.context)
-  writeAddress(target + w(36, 40), value.layer.address)
-}
-
-internal fun NativeArena.writeMetalSurfaceDescriptor(value: MetalSurfaceDescriptor): Long =
-  allocate(w(40, 48), 8).also { putMetalSurfaceDescriptor(it, value) }
-
-internal fun NativeArena.putOpenglBorrowedTextureDescriptor(
-  target: Long,
-  value: OpenglBorrowedTextureDescriptor,
-) {
-  C.mln_opengl_borrowed_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  writeU32(target + 32, value.physicalWidth)
-  writeU32(target + 36, value.physicalHeight)
-  putOpenglContextDescriptor(target + 40, value.context)
-  writeU32(target + w(68, 88), value.texture)
-  writeU32(target + w(72, 92), value.target)
-}
-
-internal fun NativeArena.writeOpenglBorrowedTextureDescriptor(
-  value: OpenglBorrowedTextureDescriptor
-): Long = allocate(w(80, 96), 8).also { putOpenglBorrowedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putOpenglOwnedTextureDescriptor(
-  target: Long,
-  value: OpenglOwnedTextureDescriptor,
-) {
-  C.mln_opengl_owned_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putOpenglContextDescriptor(target + 32, value.context)
-}
-
-internal fun NativeArena.writeOpenglOwnedTextureDescriptor(
-  value: OpenglOwnedTextureDescriptor
-): Long = allocate(w(64, 80), 8).also { putOpenglOwnedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putOpenglSurfaceDescriptor(target: Long, value: OpenglSurfaceDescriptor) {
-  C.mln_opengl_surface_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putOpenglContextDescriptor(target + 32, value.context)
-  writeAddress(target + w(60, 80), value.surface.address)
-}
-
-internal fun NativeArena.writeOpenglSurfaceDescriptor(value: OpenglSurfaceDescriptor): Long =
-  allocate(w(64, 88), 8).also { putOpenglSurfaceDescriptor(it, value) }
-
-internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
-  target: Long,
-  value: VulkanBorrowedTextureDescriptor,
-) {
-  C.mln_vulkan_borrowed_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  writeU32(target + 32, value.physicalWidth)
-  writeU32(target + 36, value.physicalHeight)
-  putVulkanContextDescriptor(target + 40, value.context)
-  writeU64(target + w(72, 96), value.image)
-  writeU64(target + w(80, 104), value.imageView)
-  writeU32(target + w(88, 112), value.format)
-  writeU32(target + w(92, 116), value.initialLayout)
-  writeU32(target + w(96, 120), value.finalLayout)
-}
-
-internal fun NativeArena.writeVulkanBorrowedTextureDescriptor(
-  value: VulkanBorrowedTextureDescriptor
-): Long = allocate(w(104, 128), 8).also { putVulkanBorrowedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putVulkanOwnedTextureDescriptor(
-  target: Long,
-  value: VulkanOwnedTextureDescriptor,
-) {
-  C.mln_vulkan_owned_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putVulkanContextDescriptor(target + 32, value.context)
-}
-
-internal fun NativeArena.writeVulkanOwnedTextureDescriptor(
-  value: VulkanOwnedTextureDescriptor
-): Long = allocate(w(64, 88), 8).also { putVulkanOwnedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putVulkanSurfaceDescriptor(target: Long, value: VulkanSurfaceDescriptor) {
-  C.mln_vulkan_surface_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putVulkanContextDescriptor(target + 32, value.context)
-  writeU64(target + w(64, 88), value.surface)
-}
-
-internal fun NativeArena.writeVulkanSurfaceDescriptor(value: VulkanSurfaceDescriptor): Long =
-  allocate(w(72, 96), 8).also { putVulkanSurfaceDescriptor(it, value) }
-
-internal fun NativeArena.putWebgpuBorrowedTextureDescriptor(
-  target: Long,
-  value: WebgpuBorrowedTextureDescriptor,
-) {
-  C.mln_webgpu_borrowed_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  writeU32(target + 32, value.physicalWidth)
-  writeU32(target + 36, value.physicalHeight)
-  putWebgpuContextDescriptor(target + 40, value.context)
-  writeAddress(target + w(52, 64), value.texture.address)
-  writeAddress(target + w(56, 72), value.textureView.address)
-  writeU32(target + w(60, 80), value.format)
-}
-
-internal fun NativeArena.writeWebgpuBorrowedTextureDescriptor(
-  value: WebgpuBorrowedTextureDescriptor
-): Long = allocate(w(64, 88), 8).also { putWebgpuBorrowedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putWebgpuOwnedTextureDescriptor(
-  target: Long,
-  value: WebgpuOwnedTextureDescriptor,
-) {
-  C.mln_webgpu_owned_texture_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putWebgpuContextDescriptor(target + 32, value.context)
-}
-
-internal fun NativeArena.writeWebgpuOwnedTextureDescriptor(
-  value: WebgpuOwnedTextureDescriptor
-): Long = allocate(w(48, 56), 8).also { putWebgpuOwnedTextureDescriptor(it, value) }
-
-internal fun NativeArena.putWebgpuSurfaceDescriptor(target: Long, value: WebgpuSurfaceDescriptor) {
-  C.mln_webgpu_surface_descriptor_default(target)
-  putRenderTargetExtent(target + 8, value.extent)
-  putWebgpuContextDescriptor(target + 32, value.context)
-  writeAddress(target + w(44, 56), value.surface.address)
-  writeU32(target + w(48, 64), value.format)
-}
-
-internal fun NativeArena.writeWebgpuSurfaceDescriptor(value: WebgpuSurfaceDescriptor): Long =
-  allocate(w(56, 72), 8).also { putWebgpuSurfaceDescriptor(it, value) }
-
-internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
-  C.mln_map_options_default(target)
-  putLogicalExtent(target + 8, value.initialExtent)
-  writeU32(target + 24, value.mapMode.rawValue)
-  writeBool(target + 28, value.fastPforEnabled)
-  writeU64(target + 32, value.eventMask.rawValue)
-}
-
-internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
-  allocate(40, 8).also { putMapOptions(it, value) }
-
-internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
-  writeU32(target, 72.toUInt())
-  when (val variant = value.data) {
-    is OfflineRegionDefinitionData.TilePyramid -> {
-      writeU32(target + 4, 1u)
-      putOfflineTilePyramidRegionDefinition(target + 8, variant.value)
-    }
-    is OfflineRegionDefinitionData.Geometry -> {
-      writeU32(target + 4, 2u)
-      putOfflineGeometryRegionDefinition(target + 8, variant.value)
-    }
-    is OfflineRegionDefinitionData.Unknown ->
-      throw IllegalArgumentException("unknown native union variants cannot be submitted")
-  }
-}
-
-internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefinition): Long =
-  allocate(72, 8).also { putOfflineRegionDefinition(it, value) }
-
-internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
-  writeU32(target, w(16, 32).toUInt())
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.httpHeaderTransformCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Long =
-  allocate(w(16, 32), w(4, 8)).also { putHttpHeaderTransform(it, value) }
-
-internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
-  writeU32(target, w(16, 32).toUInt())
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
-  allocate(w(16, 32), w(4, 8)).also { putResourceProvider(it, value) }
-
-internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
-  writeU32(target, w(16, 32).toUInt())
-  writeAddress(target + w(8, 16), registrations.register(value))
-  writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
-  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
-}
-
-internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
-  allocate(w(16, 32), w(4, 8)).also { putResourceTransform(it, value) }
-
 internal fun NativeArena.putEdgeInsets(target: Long, value: EdgeInsets) {
   writeF64(target, value.top)
   writeF64(target + 8, value.left)
@@ -958,6 +898,66 @@ internal fun NativeCall.putResourceRequestCancelHandler(
 internal fun NativeCall.writeResourceRequestCancelHandler(
   value: ResourceRequestCancelHandler
 ): Long = allocate(w(16, 32), w(4, 8)).also { putResourceRequestCancelHandler(it, value) }
+
+internal fun NativeArena.putMapOptions(target: Long, value: MapOptions) {
+  C.mln_map_options_default(target)
+  putLogicalExtent(target + 8, value.initialExtent)
+  writeU32(target + 24, value.mapMode.rawValue)
+  writeBool(target + 28, value.fastPforEnabled)
+  writeU64(target + 32, value.eventMask.rawValue)
+}
+
+internal fun NativeArena.writeMapOptions(value: MapOptions): Long =
+  allocate(40, 8).also { putMapOptions(it, value) }
+
+internal fun NativeArena.putOfflineRegionDefinition(target: Long, value: OfflineRegionDefinition) {
+  writeU32(target, 72.toUInt())
+  when (val variant = value.data) {
+    is OfflineRegionDefinitionData.TilePyramid -> {
+      writeU32(target + 4, 1u)
+      putOfflineTilePyramidRegionDefinition(target + 8, variant.value)
+    }
+    is OfflineRegionDefinitionData.Geometry -> {
+      writeU32(target + 4, 2u)
+      putOfflineGeometryRegionDefinition(target + 8, variant.value)
+    }
+    is OfflineRegionDefinitionData.Unknown ->
+      throw IllegalArgumentException("unknown native union variants cannot be submitted")
+  }
+}
+
+internal fun NativeArena.writeOfflineRegionDefinition(value: OfflineRegionDefinition): Long =
+  allocate(72, 8).also { putOfflineRegionDefinition(it, value) }
+
+internal fun NativeCall.putHttpHeaderTransform(target: Long, value: HttpHeaderTransform) {
+  writeU32(target, w(16, 32).toUInt())
+  writeAddress(target + w(8, 16), registrations.register(value))
+  writeAddress(target + w(4, 8), UpcallStubs.httpHeaderTransformCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeHttpHeaderTransform(value: HttpHeaderTransform): Long =
+  allocate(w(16, 32), w(4, 8)).also { putHttpHeaderTransform(it, value) }
+
+internal fun NativeCall.putResourceProvider(target: Long, value: ResourceProvider) {
+  writeU32(target, w(16, 32).toUInt())
+  writeAddress(target + w(8, 16), registrations.register(value))
+  writeAddress(target + w(4, 8), UpcallStubs.resourceProviderCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeResourceProvider(value: ResourceProvider): Long =
+  allocate(w(16, 32), w(4, 8)).also { putResourceProvider(it, value) }
+
+internal fun NativeCall.putResourceTransform(target: Long, value: ResourceTransform) {
+  writeU32(target, w(16, 32).toUInt())
+  writeAddress(target + w(8, 16), registrations.register(value))
+  writeAddress(target + w(4, 8), UpcallStubs.resourceTransformCallback)
+  writeAddress(target + w(12, 24), UpcallStubs.releaseRoot)
+}
+
+internal fun NativeCall.writeResourceTransform(value: ResourceTransform): Long =
+  allocate(w(16, 32), w(4, 8)).also { putResourceTransform(it, value) }
 
 internal fun readMetalOwnedTextureFrame(
   source: Long,
@@ -1457,84 +1457,6 @@ internal fun readEventBatchView(source: Long): EventBatchView =
 internal fun readCameraQueryResult(source: Long): CameraQueryResult =
   CameraQueryResult(generation = readU64(source), camera = readCameraOptions(source + 8))
 
-internal fun readStyleImageStretchesResult(source: Long): StyleImageStretchesResult =
-  StyleImageStretchesResult(
-    stretchX =
-      readArray(readAddress(source), readSize(source + w(4, 8)), 8.toLong()) { item ->
-        readImageStretch(item)
-      },
-    stretchY =
-      readArray(readAddress(source + w(8, 16)), readSize(source + w(12, 24)), 8.toLong()) { item ->
-        readImageStretch(item)
-      },
-  )
-
-internal fun readStyleImageResult(source: Long): StyleImageResult =
-  StyleImageResult(
-    info = readStyleImageInfo(source),
-    pixels = readView(source + w(60, 72)),
-    stretchX =
-      readArray(readAddress(source + w(68, 88)), readSize(source + w(72, 96)), 8.toLong()) { item ->
-        readImageStretch(item)
-      },
-    stretchY =
-      readArray(readAddress(source + w(76, 104)), readSize(source + w(80, 112)), 8.toLong()) { item
-        ->
-        readImageStretch(item)
-      },
-  )
-
-internal fun readStyleLayerResult(source: Long): StyleLayerResult =
-  StyleLayerResult(
-    info = readStyleLayerInfo(source),
-    sourceId = readViewString(source + w(32, 40)).takeIf { it.isNotEmpty() },
-    sourceLayer = readViewString(source + w(40, 56)).takeIf { it.isNotEmpty() },
-  )
-
-internal fun readStyleSourceResult(source: Long): StyleSourceResult =
-  StyleSourceResult(
-    info = readStyleSourceInfo(source),
-    attribution =
-      if ((readU32(source + 4) and 64u) != 0u) readViewString(source + w(104, 120)) else null,
-    url = if ((readU32(source + 4) and 1u) != 0u) readViewString(source + w(112, 136)) else null,
-    tileUrls =
-      if ((readU32(source + 4) and 2u) != 0u)
-        readArray(
-          readAddress(source + w(120, 152)),
-          readSize(source + w(124, 160)),
-          2 * NativeMemory.addressSize.toLong(),
-        ) { item ->
-          readViewString(item)
-        }
-      else null,
-  )
-
-internal fun readStyleSourceTileUrlsResult(source: Long): StyleSourceTileUrlsResult =
-  StyleSourceTileUrlsResult(
-    tileUrls =
-      readArray(
-        readAddress(source),
-        readSize(source + w(4, 8)),
-        2 * NativeMemory.addressSize.toLong(),
-      ) { item ->
-        readViewString(item)
-      }
-  )
-
-internal fun readLatLngBounds(source: Long): LatLngBounds =
-  LatLngBounds(southwest = readLatLng(source), northeast = readLatLng(source + 16))
-
-internal fun readStyleLayerEntry(source: Long): StyleLayerEntry =
-  StyleLayerEntry(
-    id = readViewString(source),
-    type = readViewString(source + w(8, 16)),
-    sourceId = readViewString(source + w(16, 32)).takeIf { it.isNotEmpty() },
-    sourceLayer = readViewString(source + w(24, 48)).takeIf { it.isNotEmpty() },
-  )
-
-internal fun readScreenPoint(source: Long): ScreenPoint =
-  ScreenPoint(x = readF64(source), y = readF64(source + 8))
-
 internal fun readMapSnapshot(source: Long): MapSnapshot =
   MapSnapshot(
     debugOptions = MapDebugOption(readU32(source + 4)),
@@ -1554,24 +1476,86 @@ internal fun readMapSnapshot(source: Long): MapSnapshot =
     freeCamera = readFreeCameraOptions(source + 392),
   )
 
-internal fun readOfflineRegionInfo(source: Long): OfflineRegionInfo =
-  OfflineRegionInfo(
-    id = readI64(source),
-    definition = readOfflineRegionDefinition(source + 8),
-    metadata = readBytes(readAddress(source + 80), readSize(source + w(84, 88))),
+internal fun readStyleImageInfo(source: Long): StyleImageInfo =
+  StyleImageInfo(
+    width = readU32(source),
+    height = readU32(source + 4),
+    pixels = readView(source + w(12, 16)),
+    stretchX =
+      readArray(readAddress(source + w(20, 32)), readSize(source + w(24, 40)), 8.toLong()) { item ->
+        readImageStretch(item)
+      },
+    stretchY =
+      readArray(readAddress(source + w(28, 48)), readSize(source + w(32, 56)), 8.toLong()) { item ->
+        readImageStretch(item)
+      },
+    content =
+      if ((readU32(source + 8) and 1u) != 0u) readImageContent(source + w(36, 64)) else null,
+    textFitWidth =
+      if ((readU32(source + 8) and 2u) != 0u) StyleImageTextFit(readU32(source + w(52, 80)))
+      else null,
+    textFitHeight =
+      if ((readU32(source + 8) and 4u) != 0u) StyleImageTextFit(readU32(source + w(56, 84)))
+      else null,
+    pixelRatio = readF32(source + w(60, 88)),
+    sdf = readBool(source + w(64, 92)),
   )
 
-internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
-  OfflineRegionStatus(
-    downloadState = OfflineRegionDownloadState(readU32(source)),
-    completedResourceCount = readU64(source + 8),
-    completedResourceSize = readU64(source + 16),
-    completedTileCount = readU64(source + 24),
-    requiredTileCount = readU64(source + 32),
-    completedTileSize = readU64(source + 40),
-    requiredResourceCount = readU64(source + 48),
-    requiredResourceCountIsPrecise = readBool(source + 56),
-    complete = readBool(source + 57),
+internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
+  StyleLayerInfo(
+    id = readViewString(source),
+    type = readViewString(source + w(8, 16)),
+    sourceId = readViewString(source + w(16, 32)).takeIf { it.isNotEmpty() },
+    sourceLayer = readViewString(source + w(24, 48)).takeIf { it.isNotEmpty() },
+    minZoom = readF64(source + w(32, 64)),
+    maxZoom = readF64(source + w(40, 72)),
+    visibility = StyleLayerVisibility(readU32(source + w(48, 80))),
+  )
+
+internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
+  StyleSourceInfo(
+    id = readViewString(source),
+    type = StyleSourceType(readU32(source + w(8, 16))),
+    isVolatile = readBool(source + w(16, 24)),
+    attribution =
+      if ((readU32(source + w(12, 20)) and 64u) != 0u) readViewString(source + w(20, 32)) else null,
+    url =
+      if ((readU32(source + w(12, 20)) and 1u) != 0u) readViewString(source + w(28, 48)) else null,
+    tilejson =
+      if ((readU32(source + w(12, 20)) and 2u) != 0u) readStyleSourceTileInfo(source + w(40, 64))
+      else null,
+    bounds =
+      if ((readU32(source + w(12, 20)) and 4u) != 0u) readLatLngBounds(source + w(72, 104))
+      else null,
+    tileSize =
+      if ((readU32(source + w(12, 20)) and 8u) != 0u) readU32(source + w(104, 136)) else null,
+    vectorEncoding =
+      if ((readU32(source + w(12, 20)) and 16u) != 0u)
+        StyleVectorTileEncoding(readU32(source + w(108, 140)))
+      else null,
+    rasterEncoding =
+      if ((readU32(source + w(12, 20)) and 32u) != 0u)
+        StyleRasterDemEncoding(readU32(source + w(112, 144)))
+      else null,
+  )
+
+internal fun readLatLngBounds(source: Long): LatLngBounds =
+  LatLngBounds(southwest = readLatLng(source), northeast = readLatLng(source + 16))
+
+internal fun readScreenPoint(source: Long): ScreenPoint =
+  ScreenPoint(x = readF64(source), y = readF64(source + 8))
+
+internal fun readRenderFrameBatchView(source: Long): RenderFrameBatchView =
+  RenderFrameBatchView(
+    results =
+      readStrided(
+        readAddress(source + 8),
+        readSize(source + w(12, 16)),
+        readU32(source + 4).toULong(),
+        48,
+      ) { item ->
+        readRenderFrameResult(item)
+      }
   )
 
 internal fun readRenderAbandonResult(source: Long): RenderAbandonResult =
@@ -1617,17 +1601,24 @@ internal fun readQueriedFeature(source: Long): QueriedFeature =
 internal fun readTextureReadbackResult(source: Long): TextureReadbackResult =
   TextureReadbackResult(data = readView(source), info = readTextureImageInfo(source + w(8, 16)))
 
-internal fun readRenderFrameBatchView(source: Long): RenderFrameBatchView =
-  RenderFrameBatchView(
-    results =
-      readStrided(
-        readAddress(source + 8),
-        readSize(source + w(12, 16)),
-        readU32(source + 4).toULong(),
-        48,
-      ) { item ->
-        readRenderFrameResult(item)
-      }
+internal fun readOfflineRegionInfo(source: Long): OfflineRegionInfo =
+  OfflineRegionInfo(
+    id = readI64(source),
+    definition = readOfflineRegionDefinition(source + 8),
+    metadata = readBytes(readAddress(source + 80), readSize(source + w(84, 88))),
+  )
+
+internal fun readOfflineRegionStatus(source: Long): OfflineRegionStatus =
+  OfflineRegionStatus(
+    downloadState = OfflineRegionDownloadState(readU32(source)),
+    completedResourceCount = readU64(source + 8),
+    completedResourceSize = readU64(source + 16),
+    completedTileCount = readU64(source + 24),
+    requiredTileCount = readU64(source + 32),
+    completedTileSize = readU64(source + 40),
+    requiredResourceCount = readU64(source + 48),
+    requiredResourceCountIsPrecise = readBool(source + 56),
+    complete = readBool(source + 57),
   )
 
 internal fun NativeCall.putWake(target: Long, value: Wake) {
@@ -1667,42 +1658,6 @@ internal fun NativeArena.putAnimationOptions(target: Long, value: AnimationOptio
 
 internal fun NativeArena.writeAnimationOptions(value: AnimationOptions): Long =
   allocate(72, 8).also { putAnimationOptions(it, value) }
-
-internal fun NativeArena.putVec3(target: Long, value: Vec3) {
-  writeF64(target, value.x)
-  writeF64(target + 8, value.y)
-  writeF64(target + 16, value.z)
-}
-
-internal fun NativeArena.writeVec3(value: Vec3): Long = allocate(24, 8).also { putVec3(it, value) }
-
-internal fun NativeArena.putQuaternion(target: Long, value: Quaternion) {
-  writeF64(target, value.x)
-  writeF64(target + 8, value.y)
-  writeF64(target + 16, value.z)
-  writeF64(target + 24, value.w)
-}
-
-internal fun NativeArena.writeQuaternion(value: Quaternion): Long =
-  allocate(32, 8).also { putQuaternion(it, value) }
-
-internal fun NativeArena.putImageStretch(target: Long, value: ImageStretch) {
-  writeF32(target, value.from)
-  writeF32(target + 4, value.to)
-}
-
-internal fun NativeArena.writeImageStretch(value: ImageStretch): Long =
-  allocate(8, 4).also { putImageStretch(it, value) }
-
-internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
-  writeF32(target, value.left)
-  writeF32(target + 4, value.top)
-  writeF32(target + 8, value.right)
-  writeF32(target + 12, value.bottom)
-}
-
-internal fun NativeArena.writeImageContent(value: ImageContent): Long =
-  allocate(16, 4).also { putImageContent(it, value) }
 
 internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
   if (value.lock == null && value.unlock == null) return
@@ -1767,6 +1722,50 @@ internal fun NativeArena.putWebgpuContextDescriptor(target: Long, value: WebgpuC
 internal fun NativeArena.writeWebgpuContextDescriptor(value: WebgpuContextDescriptor): Long =
   allocate(w(12, 24), w(4, 8)).also { putWebgpuContextDescriptor(it, value) }
 
+internal fun NativeArena.putVec3(target: Long, value: Vec3) {
+  writeF64(target, value.x)
+  writeF64(target + 8, value.y)
+  writeF64(target + 16, value.z)
+}
+
+internal fun NativeArena.writeVec3(value: Vec3): Long = allocate(24, 8).also { putVec3(it, value) }
+
+internal fun NativeArena.putQuaternion(target: Long, value: Quaternion) {
+  writeF64(target, value.x)
+  writeF64(target + 8, value.y)
+  writeF64(target + 16, value.z)
+  writeF64(target + 24, value.w)
+}
+
+internal fun NativeArena.writeQuaternion(value: Quaternion): Long =
+  allocate(32, 8).also { putQuaternion(it, value) }
+
+internal fun NativeArena.putImageStretch(target: Long, value: ImageStretch) {
+  writeF32(target, value.from)
+  writeF32(target + 4, value.to)
+}
+
+internal fun NativeArena.writeImageStretch(value: ImageStretch): Long =
+  allocate(8, 4).also { putImageStretch(it, value) }
+
+internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
+  writeF32(target, value.left)
+  writeF32(target + 4, value.top)
+  writeF32(target + 8, value.right)
+  writeF32(target + 12, value.bottom)
+}
+
+internal fun NativeArena.writeImageContent(value: ImageContent): Long =
+  allocate(16, 4).also { putImageContent(it, value) }
+
+internal fun NativeArena.putScreenLineString(target: Long, value: ScreenLineString) {
+  writeAddress(target, array(value.points, 16, 8) { at, item -> putScreenPoint(at, item) })
+  writeSize(target + w(4, 8), value.points.size.toULong())
+}
+
+internal fun NativeArena.writeScreenLineString(value: ScreenLineString): Long =
+  allocate(w(8, 16), w(4, 8)).also { putScreenLineString(it, value) }
+
 internal fun NativeArena.putOfflineTilePyramidRegionDefinition(
   target: Long,
   value: OfflineTilePyramidRegionDefinition,
@@ -1798,14 +1797,6 @@ internal fun NativeArena.putOfflineGeometryRegionDefinition(
 internal fun NativeArena.writeOfflineGeometryRegionDefinition(
   value: OfflineGeometryRegionDefinition
 ): Long = allocate(w(40, 48), 8).also { putOfflineGeometryRegionDefinition(it, value) }
-
-internal fun NativeArena.putScreenLineString(target: Long, value: ScreenLineString) {
-  writeAddress(target, array(value.points, 16, 8) { at, item -> putScreenPoint(at, item) })
-  writeSize(target + w(4, 8), value.points.size.toULong())
-}
-
-internal fun NativeArena.writeScreenLineString(value: ScreenLineString): Long =
-  allocate(w(8, 16), w(4, 8)).also { putScreenLineString(it, value) }
 
 internal fun readCanonicalTileId(source: Long): CanonicalTileId =
   CanonicalTileId(z = readU32(source), x = readU32(source + 4), y = readU32(source + 8))
@@ -1962,49 +1953,27 @@ internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent 
     message = message,
   )
 
-internal fun readStyleImageInfo(source: Long): StyleImageInfo =
-  StyleImageInfo(
-    width = readU32(source + 4),
-    height = readU32(source + 8),
-    stride = readU32(source + 12),
-    byteLength = readSize(source + 16),
-    stretchXCount = readSize(source + w(20, 24)),
-    stretchYCount = readSize(source + w(24, 32)),
-    content = if ((readU32(source) and 1u) != 0u) readImageContent(source + w(28, 40)) else null,
-    textFitWidth =
-      if ((readU32(source) and 2u) != 0u) StyleImageTextFit(readU32(source + w(44, 56))) else null,
-    textFitHeight =
-      if ((readU32(source) and 4u) != 0u) StyleImageTextFit(readU32(source + w(48, 60))) else null,
-    pixelRatio = readF32(source + w(52, 64)),
-    sdf = readBool(source + w(56, 68)),
-  )
-
-internal fun readStyleLayerInfo(source: Long): StyleLayerInfo =
-  StyleLayerInfo(
-    type = readViewString(source),
+internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
+  StyleSourceTileInfo(
+    tileUrls =
+      readArray(
+        readAddress(source),
+        readSize(source + w(4, 8)),
+        2 * NativeMemory.addressSize.toLong(),
+      ) { item ->
+        readViewString(item)
+      },
     minZoom = readF64(source + w(8, 16)),
     maxZoom = readF64(source + w(16, 24)),
-    visibility = StyleLayerVisibility(readU32(source + w(24, 32))),
+    scheme = StyleTileScheme(readU32(source + w(24, 32))),
   )
 
-internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
-  StyleSourceInfo(
-    type = StyleSourceType(readU32(source)),
-    idSize = readSize(source + 8),
-    isVolatile = readBool(source + w(12, 16)),
-    attributionSize =
-      if ((readU32(source + 4) and 64u) != 0u) readSize(source + w(16, 24)) else null,
-    urlSize = if ((readU32(source + 4) and 1u) != 0u) readSize(source + w(20, 32)) else null,
-    tilejson =
-      if ((readU32(source + 4) and 2u) != 0u) readStyleSourceTileInfo(source + w(24, 40)) else null,
-    bounds = if ((readU32(source + 4) and 4u) != 0u) readLatLngBounds(source + w(56, 72)) else null,
-    tileSize = if ((readU32(source + 4) and 8u) != 0u) readU32(source + w(88, 104)) else null,
-    vectorEncoding =
-      if ((readU32(source + 4) and 16u) != 0u) StyleVectorTileEncoding(readU32(source + w(92, 108)))
-      else null,
-    rasterEncoding =
-      if ((readU32(source + 4) and 32u) != 0u) StyleRasterDemEncoding(readU32(source + w(96, 112)))
-      else null,
+internal fun readTextureImageInfo(source: Long): TextureImageInfo =
+  TextureImageInfo(
+    width = readU32(source),
+    height = readU32(source + 4),
+    stride = readU32(source + 8),
+    byteLength = readSize(source + w(12, 16)),
   )
 
 internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition =
@@ -2021,14 +1990,6 @@ internal fun readOfflineRegionDefinition(source: Long): OfflineRegionDefinition 
           else -> OfflineRegionDefinitionData.Unknown(tag, NativeMemory.getBytes(source + 8, 64))
         }
       }
-  )
-
-internal fun readTextureImageInfo(source: Long): TextureImageInfo =
-  TextureImageInfo(
-    width = readU32(source),
-    height = readU32(source + 4),
-    stride = readU32(source + 8),
-    byteLength = readSize(source + w(12, 16)),
   )
 
 internal fun NativeArena.putUnitBezier(target: Long, value: UnitBezier) {
@@ -2136,14 +2097,6 @@ internal fun readRuntimeEventCameraTransitionFinished(
   source: Long
 ): RuntimeEventCameraTransitionFinished =
   RuntimeEventCameraTransitionFinished(transitionId = readU64(source))
-
-internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
-  StyleSourceTileInfo(
-    tileCount = readSize(source),
-    minZoom = readF64(source + 8),
-    maxZoom = readF64(source + 16),
-    scheme = StyleTileScheme(readU32(source + 24)),
-  )
 
 internal fun readOfflineTilePyramidRegionDefinition(
   source: Long

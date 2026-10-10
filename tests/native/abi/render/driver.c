@@ -179,7 +179,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   );
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_texture_read_premultiplied_rgba8(detached, &discard, NULL)
+    mln_render_session_read_texture(detached, &discard, NULL)
   );
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,

@@ -1018,7 +1018,7 @@ const (
 	StatusTargetLost Status = Status(C.MLN_STATUS_TARGET_LOST)
 	// A nonblocking acquisition or service call has no result yet.
 	StatusNotReady Status = Status(C.MLN_STATUS_NOT_READY)
-	// A command or operation named an ID with no live object behind it.
+	// A call named an ID with no live object behind it.
 	StatusNotFound Status = Status(C.MLN_STATUS_NOT_FOUND)
 )
 
@@ -1116,7 +1116,7 @@ const (
 	StyleSourceInfoFieldVectorEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING)
 	// The source exposes a DEM raster encoding.
 	StyleSourceInfoFieldRasterEncoding StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_RASTER_ENCODING)
-	// The source declares an attribution string.
+	// The source carries an attribution string, which may be empty.
 	StyleSourceInfoFieldAttribution StyleSourceInfoField = StyleSourceInfoField(C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION)
 )
 
@@ -4076,41 +4076,58 @@ func DefaultSourceFeatureQueryOptions() SourceFeatureQueryOptions {
 	return copySourceFeatureQueryOptions(C.mln_source_feature_query_options_default())
 }
 
-// StyleImageInfo corresponds to mln_style_image_info. Fixed metadata for one
-// runtime style image.
+// StyleImageInfo corresponds to mln_style_image_info. One complete runtime
+// style image, borrowed for a completion callback.
 //
 // See mln_style_image_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleImageInfo struct {
-	Width  uint32
+	// Image width in pixels.
+	Width uint32
+	// Image height in pixels.
 	Height uint32
-	// Native copied images are exposed as tightly packed premultiplied RGBA8.
-	Stride     uint32
-	ByteLength uint
-	// Interval counts for the stretchable axes.
-	StretchXCount uint
-	StretchYCount uint
-	// Content box, meaningful when fields contains CONTENT.
+	// Premultiplied RGBA8 pixels in tightly packed rows of width * 4 bytes, top row
+	// first.
+	Pixels []byte
+	// Horizontally stretchable intervals.
+	StretchX []ImageStretch
+	// Vertically stretchable intervals.
+	StretchY []ImageStretch
+	// Content box, when the image sets one.
 	Content *ImageContent
-	// One of mln_style_image_text_fit, meaningful when fields contains
-	// TEXT_FIT_WIDTH.
+	// How the image fits text horizontally, when it sets this.
 	TextFitWidth *StyleImageTextFit
-	// One of mln_style_image_text_fit, meaningful when fields contains
-	// TEXT_FIT_HEIGHT.
+	// How the image fits text vertically, when it sets this.
 	TextFitHeight *StyleImageTextFit
 	// Sprite pixel ratio.
 	PixelRatio float32
-	Sdf        bool
+	// Whether the image is a signed distance field icon.
+	Sdf bool
 }
 
 func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 	var result StyleImageInfo
 	result.Width = uint32(raw.width)
 	result.Height = uint32(raw.height)
-	result.Stride = uint32(raw.stride)
-	result.ByteLength = uint(raw.byte_length)
-	result.StretchXCount = uint(raw.stretch_x_count)
-	result.StretchYCount = uint(raw.stretch_y_count)
+	result.Pixels = bindingBytes(raw.pixels.data, uint64(raw.pixels.size))
+	result.StretchX = func() []ImageStretch {
+		length := bindingLength(uint64(raw.stretch_x_count))
+		result := make([]ImageStretch, length)
+		for i := range result {
+			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_x), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_x), unsafe.Alignof(*raw.stretch_x)))
+			result[i] = copyImageStretch(item)
+		}
+		return result
+	}()
+	result.StretchY = func() []ImageStretch {
+		length := bindingLength(uint64(raw.stretch_y_count))
+		result := make([]ImageStretch, length)
+		for i := range result {
+			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_y), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_y), unsafe.Alignof(*raw.stretch_y)))
+			result[i] = copyImageStretch(item)
+		}
+		return result
+	}()
 	result.Content = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_CONTENT != 0, func() ImageContent { return copyImageContent(raw.content) })
 	result.TextFitWidth = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_width) })
 	result.TextFitHeight = bindingPresent(raw.fields&C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT != 0, func() StyleImageTextFit { return StyleImageTextFit(raw.text_fit_height) })
@@ -4213,90 +4230,30 @@ func DefaultStyleImageOptions() StyleImageOptions {
 	return copyStyleImageOptions(C.mln_style_image_options_default())
 }
 
-// StyleImageResult corresponds to mln_style_image_result. Complete style image
-// borrowed for a completion callback.
+// StyleLayerInfo corresponds to mln_style_layer_info. One style layer, borrowed
+// for a completion callback.
 //
-// See mln_style_image_result in the C API reference:
+// See mln_style_layer_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleImageResult struct {
-	Info     StyleImageInfo
-	Pixels   []byte
-	StretchX []ImageStretch
-	StretchY []ImageStretch
-}
-
-func copyStyleImageResult(raw C.mln_style_image_result) StyleImageResult {
-	var result StyleImageResult
-	result.Info = copyStyleImageInfo(raw.info)
-	result.Pixels = bindingBytes(raw.pixels.data, uint64(raw.pixels.size))
-	result.StretchX = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_x_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_x), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_x), unsafe.Alignof(*raw.stretch_x)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	result.StretchY = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_y_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_y), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_y), unsafe.Alignof(*raw.stretch_y)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	return result
-}
-
-// StyleImageStretchesResult corresponds to mln_style_image_stretches_result.
-// Borrowed image-stretch arrays available during a completion callback.
-//
-// See mln_style_image_stretches_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleImageStretchesResult struct {
-	StretchX []ImageStretch
-	StretchY []ImageStretch
-}
-
-func copyStyleImageStretchesResult(raw C.mln_style_image_stretches_result) StyleImageStretchesResult {
-	var result StyleImageStretchesResult
-	result.StretchX = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_x_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_x), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_x), unsafe.Alignof(*raw.stretch_x)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	result.StretchY = func() []ImageStretch {
-		length := bindingLength(uint64(raw.stretch_y_count))
-		result := make([]ImageStretch, length)
-		for i := range result {
-			item := *(*C.mln_image_stretch)(bindingElement(unsafe.Pointer(raw.stretch_y), i, uint64(unsafe.Sizeof(C.mln_image_stretch{})), unsafe.Sizeof(*raw.stretch_y), unsafe.Alignof(*raw.stretch_y)))
-			result[i] = copyImageStretch(item)
-		}
-		return result
-	}()
-	return result
-}
-
-// StyleLayerEntry corresponds to mln_style_layer_entry. One style layer
-// borrowed for a list completion callback.
-//
-// See mln_style_layer_entry in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleLayerEntry struct {
-	Id          string
-	Type        string
-	SourceId    *string
+type StyleLayerInfo struct {
+	// Layer ID.
+	Id string
+	// The style-spec layer type string.
+	Type string
+	// Source ID. Empty for a layer type that takes no source.
+	SourceId *string
+	// Source-layer ID. Empty when the layer sets none.
 	SourceLayer *string
+	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
+	MinZoom float64
+	// Highest zoom at which the layer draws; INFINITY with no upper bound.
+	MaxZoom float64
+	// One of mln_style_layer_visibility.
+	Visibility StyleLayerVisibility
 }
 
-func copyStyleLayerEntry(raw C.mln_style_layer_entry) StyleLayerEntry {
-	var result StyleLayerEntry
+func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
+	var result StyleLayerInfo
 	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
 	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
 	result.SourceId = func() *string {
@@ -4313,104 +4270,47 @@ func copyStyleLayerEntry(raw C.mln_style_layer_entry) StyleLayerEntry {
 		value := bindingString(raw.source_layer.data, uint64(raw.source_layer.size))
 		return &value
 	}()
-	return result
-}
-
-// StyleLayerInfo corresponds to mln_style_layer_info. Fixed layer metadata
-// included in mln_style_layer_result.
-//
-// See mln_style_layer_info in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleLayerInfo struct {
-	// View of a static style-spec layer type string. It stays valid for the life of
-	// the process.
-	Type string
-	// Lowest zoom at which the layer draws; -INFINITY with no lower bound.
-	MinZoom float64
-	// Highest zoom at which the layer draws; INFINITY with no upper bound.
-	MaxZoom float64
-	// One of mln_style_layer_visibility.
-	Visibility StyleLayerVisibility
-}
-
-func copyStyleLayerInfo(raw C.mln_style_layer_info) StyleLayerInfo {
-	var result StyleLayerInfo
-	result.Type = bindingString(raw._type.data, uint64(raw._type.size))
 	result.MinZoom = float64(raw.min_zoom)
 	result.MaxZoom = float64(raw.max_zoom)
 	result.Visibility = StyleLayerVisibility(raw.visibility)
 	return result
 }
 
-// StyleLayerResult corresponds to mln_style_layer_result. Complete layer
-// metadata borrowed for a completion callback.
-//
-// See mln_style_layer_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleLayerResult struct {
-	Info StyleLayerInfo
-	// Source ID. Empty for a layer type that takes no source.
-	SourceId *string
-	// Source-layer ID. Empty when the layer sets none.
-	SourceLayer *string
-}
-
-func copyStyleLayerResult(raw C.mln_style_layer_result) StyleLayerResult {
-	var result StyleLayerResult
-	result.Info = copyStyleLayerInfo(raw.info)
-	result.SourceId = func() *string {
-		if raw.source_id.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.source_id.data, uint64(raw.source_id.size))
-		return &value
-	}()
-	result.SourceLayer = func() *string {
-		if raw.source_layer.size == 0 {
-			return nil
-		}
-		value := bindingString(raw.source_layer.data, uint64(raw.source_layer.size))
-		return &value
-	}()
-	return result
-}
-
-// StyleSourceInfo corresponds to mln_style_source_info. Fixed source metadata
-// included in mln_style_source_result.
+// StyleSourceInfo corresponds to mln_style_source_info. Complete metadata of
+// one style source, borrowed for a completion callback.
 //
 // See mln_style_source_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceInfo struct {
+	// Source ID.
+	Id string
 	// One of mln_style_source_type.
 	Type StyleSourceType
-	// Source ID byte length, excluding any null terminator.
-	IdSize uint
 	// Whether the source is marked volatile.
 	IsVolatile bool
-	// Attribution byte length, excluding any null terminator, meaningful when
-	// fields contains ATTRIBUTION.
-	AttributionSize *uint
-	// URL byte length, meaningful when fields contains URL.
-	UrlSize *uint
-	// Inline tile metadata, meaningful when fields contains TILEJSON.
+	// Attribution string, when the source sets one. It may be empty.
+	Attribution *string
+	// URL that the source loads from, when it has one.
+	Url *string
+	// Inline TileJSON metadata, when the source was defined with it.
 	Tilejson *StyleSourceTileInfo
-	// Geographic bounds, meaningful when fields contains BOUNDS.
+	// Geographic bounds, when inline TileJSON sets them.
 	Bounds *LatLngBounds
-	// Tile size in pixels, meaningful when fields contains TILE_SIZE.
+	// Tile size in pixels, for a tile source.
 	TileSize *uint32
-	// Vector encoding, meaningful when fields contains VECTOR_ENCODING.
+	// Vector tile encoding, for a vector source.
 	VectorEncoding *StyleVectorTileEncoding
-	// DEM encoding, meaningful when fields contains RASTER_ENCODING.
+	// DEM raster encoding, when inline TileJSON sets one.
 	RasterEncoding *StyleRasterDemEncoding
 }
 
 func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	var result StyleSourceInfo
+	result.Id = bindingString(raw.id.data, uint64(raw.id.size))
 	result.Type = StyleSourceType(raw._type)
-	result.IdSize = uint(raw.id_size)
 	result.IsVolatile = bool(raw.is_volatile)
-	result.AttributionSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() uint { return uint(raw.attribution_size) })
-	result.UrlSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() uint { return uint(raw.url_size) })
+	result.Attribution = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
+	result.Url = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
 	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo { return copyStyleSourceTileInfo(raw.tilejson) })
 	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
 	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
@@ -4419,48 +4319,17 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	return result
 }
 
-// StyleSourceResult corresponds to mln_style_source_result. Complete source
-// metadata borrowed for a completion callback.
-//
-// See mln_style_source_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleSourceResult struct {
-	Info        StyleSourceInfo
-	Attribution *string
-	Url         *string
-	TileUrls    []string
-}
-
-func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
-	var result StyleSourceResult
-	result.Info = copyStyleSourceInfo(raw.info)
-	result.Attribution = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() string { return bindingString(raw.attribution.data, uint64(raw.attribution.size)) })
-	result.Url = bindingPresent(raw.info.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() string { return bindingString(raw.url.data, uint64(raw.url.size)) })
-	if raw.info.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-		result.TileUrls = func() []string {
-			length := bindingLength(uint64(raw.tile_url_count))
-			result := make([]string, length)
-			for i := range result {
-				item := *(*C.mln_buffer_view)(bindingElement(unsafe.Pointer(raw.tile_urls), i, uint64(unsafe.Sizeof(*raw.tile_urls)), unsafe.Sizeof(*raw.tile_urls), unsafe.Alignof(*raw.tile_urls)))
-				result[i] = bindingString(item.data, uint64(item.size))
-			}
-			return result
-		}()
-	}
-	return result
-}
-
-// StyleSourceTileInfo corresponds to mln_style_source_tile_info. Inline tile
-// metadata selected as one value by the source-info field mask.
+// StyleSourceTileInfo corresponds to mln_style_source_tile_info. Inline
+// TileJSON metadata of a tile source.
 //
 // See mln_style_source_tile_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceTileInfo struct {
-	// Inline tile URL count.
-	TileCount uint
-	// Minimum zoom.
+	// Tile URL templates in TileJSON order.
+	TileUrls []string
+	// Lowest zoom level the TileJSON provides tiles for.
 	MinZoom float64
-	// Maximum zoom.
+	// Highest zoom level the TileJSON provides tiles for.
 	MaxZoom float64
 	// One of mln_style_tile_scheme.
 	Scheme StyleTileScheme
@@ -4468,22 +4337,6 @@ type StyleSourceTileInfo struct {
 
 func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileInfo {
 	var result StyleSourceTileInfo
-	result.TileCount = uint(raw.tile_count)
-	result.MinZoom = float64(raw.min_zoom)
-	result.MaxZoom = float64(raw.max_zoom)
-	result.Scheme = StyleTileScheme(raw.scheme)
-	return result
-}
-
-// StyleSourceTileUrlsResult corresponds to mln_style_source_tile_urls_result.
-// Borrowed inline TileJSON tile URLs available during a completion callback.
-//
-// See mln_style_source_tile_urls_result in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-type StyleSourceTileUrlsResult struct{ TileUrls []string }
-
-func copyStyleSourceTileUrlsResult(raw C.mln_style_source_tile_urls_result) StyleSourceTileUrlsResult {
-	var result StyleSourceTileUrlsResult
 	result.TileUrls = func() []string {
 		length := bindingLength(uint64(raw.tile_url_count))
 		result := make([]string, length)
@@ -4493,6 +4346,9 @@ func copyStyleSourceTileUrlsResult(raw C.mln_style_source_tile_urls_result) Styl
 		}
 		return result
 	}()
+	result.MinZoom = float64(raw.min_zoom)
+	result.MaxZoom = float64(raw.max_zoom)
+	result.Scheme = StyleTileScheme(raw.scheme)
 	return result
 }
 
@@ -5951,14 +5807,14 @@ func (receiver *GeojsonSourceDataHandle) Close() error {
 	return err
 }
 
-// Set sets one outgoing HTTP request header for the current transform
+// SetHeader sets one outgoing HTTP request header for the current transform
 // invocation.
 //
-// See mln_http_header_transform_response_set in the C API reference:
+// See mln_http_header_transform_response_set_header in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *HttpHeaderTransformResponseScope) Set(name string, value string) error {
-	return bindingDo(receiver.target(C.binding_operation_mln_http_header_transform_response_set), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_http_header_transform_response_set(receiver.native, (*C.char)(arena.bytes([]byte(name))), bindingCount[C.size_t](len(name)), (*C.char)(arena.bytes([]byte(value))), bindingCount[C.size_t](len(value)), diagnostic))
+func (receiver *HttpHeaderTransformResponseScope) SetHeader(name string, value string) error {
+	return bindingDo(receiver.target(C.binding_operation_mln_http_header_transform_response_set_header), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_http_header_transform_response_set_header(receiver.native, (*C.char)(arena.bytes([]byte(name))), bindingCount[C.size_t](len(name)), (*C.char)(arena.bytes([]byte(value))), bindingCount[C.size_t](len(value)), diagnostic))
 	})
 }
 
@@ -6189,6 +6045,265 @@ func (receiver *MapHandle) ApplyCameraDelta(delta CameraDelta) (*Future[CommandC
 	}, completionCommand)
 }
 
+type MapAttachMetalBorrowedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachMetalBorrowedTexture starts attachment of a caller-owned Metal texture
+// target.
+//
+// See mln_map_attach_metal_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachMetalBorrowedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_metal_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_metal_borrowed_texture(C.mln_map(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachMetalBorrowedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachMetalBorrowedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachMetalOwnedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachMetalOwnedTexture starts attachment of a session-owned Metal texture
+// ring.
+//
+// See mln_map_attach_metal_owned_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachMetalOwnedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_metal_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_metal_owned_texture(C.mln_map(raw), bindingStore(nativeMetalOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachMetalOwnedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachMetalOwnedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachMetalSurfaceResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachMetalSurface starts attachment of a Metal surface target.
+//
+// See mln_map_attach_metal_surface in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachMetalSurfaceResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_metal_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_metal_surface(C.mln_map(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachMetalSurfaceResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachMetalSurfaceResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachOpenglBorrowedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachOpenglBorrowedTexture starts attachment of a caller-owned OpenGL
+// texture target.
+//
+// See mln_map_attach_opengl_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachOpenglBorrowedTexture(descriptor OpenglBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachOpenglBorrowedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_opengl_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_opengl_borrowed_texture(C.mln_map(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachOpenglBorrowedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachOpenglBorrowedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachOpenglOwnedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachOpenglOwnedTexture starts attachment of a session-owned OpenGL texture
+// ring.
+//
+// See mln_map_attach_opengl_owned_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachOpenglOwnedTexture(descriptor OpenglOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachOpenglOwnedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_opengl_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_opengl_owned_texture(C.mln_map(raw), bindingStore(nativeOpenglOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachOpenglOwnedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachOpenglOwnedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachOpenglSurfaceResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachOpenglSurface starts attachment of an OpenGL surface target.
+//
+// See mln_map_attach_opengl_surface in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *MapHandle) AttachOpenglSurface(descriptor OpenglSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachOpenglSurfaceResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_opengl_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_opengl_surface(C.mln_map(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachOpenglSurfaceResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachOpenglSurfaceResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachVulkanBorrowedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachVulkanBorrowedTexture starts attachment of a caller-owned Vulkan
+// texture target.
+//
+// See mln_map_attach_vulkan_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachVulkanBorrowedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_vulkan_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_vulkan_borrowed_texture(C.mln_map(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachVulkanBorrowedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachVulkanBorrowedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachVulkanOwnedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachVulkanOwnedTexture starts attachment of a session-owned Vulkan texture
+// ring.
+//
+// See mln_map_attach_vulkan_owned_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachVulkanOwnedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_vulkan_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_vulkan_owned_texture(C.mln_map(raw), bindingStore(nativeVulkanOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachVulkanOwnedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachVulkanOwnedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachVulkanSurfaceResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachVulkanSurface starts attachment of a Vulkan surface target.
+//
+// See mln_map_attach_vulkan_surface in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachVulkanSurfaceResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_vulkan_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_vulkan_surface(C.mln_map(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachVulkanSurfaceResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachVulkanSurfaceResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachWebgpuBorrowedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachWebgpuBorrowedTexture starts attachment of a caller-owned WebGPU
+// texture target.
+//
+// See mln_map_attach_webgpu_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachWebgpuBorrowedTexture(descriptor WebgpuBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachWebgpuBorrowedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_webgpu_borrowed_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_webgpu_borrowed_texture(C.mln_map(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachWebgpuBorrowedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachWebgpuBorrowedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachWebgpuOwnedTextureResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachWebgpuOwnedTexture starts attachment of a session-owned WebGPU texture
+// ring.
+//
+// See mln_map_attach_webgpu_owned_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *MapHandle) AttachWebgpuOwnedTexture(descriptor WebgpuOwnedTextureDescriptor, options RenderSessionAttachOptions) (MapAttachWebgpuOwnedTextureResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_webgpu_owned_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_webgpu_owned_texture(C.mln_map(raw), bindingStore(nativeWebgpuOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachWebgpuOwnedTextureResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachWebgpuOwnedTextureResult{Session: adopted, Completion: future}
+	})
+}
+
+type MapAttachWebgpuSurfaceResult struct {
+	Session    *RenderSessionHandle
+	Completion *Future[struct{}]
+}
+
+// AttachWebgpuSurface starts attachment of a WebGPU surface target.
+//
+// See mln_map_attach_webgpu_surface in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *MapHandle) AttachWebgpuSurface(descriptor WebgpuSurfaceDescriptor, options RenderSessionAttachOptions) (MapAttachWebgpuSurfaceResult, error) {
+	var outSession C.mln_render_session
+	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_map_attach_webgpu_surface), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_attach_webgpu_surface(C.mln_map(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
+	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MapAttachWebgpuSurfaceResult {
+		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
+		arena.accept(adopted.bindingOwner)
+		return MapAttachWebgpuSurfaceResult{Session: adopted, Completion: future}
+	})
+}
+
+// BeginCommandGroup begins a command group, which holds this map's render
+// updates until the group ends.
+//
+// See mln_map_begin_command_group in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) BeginCommandGroup() (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_begin_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_begin_command_group(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
+}
+
 // CameraForGeometry starts an ordered query for a camera that fits a GeoJSON
 // geometry.
 //
@@ -6222,36 +6337,6 @@ func (receiver *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *Ca
 	}, completionOf(copyCameraOptions))
 }
 
-// CameraQuery starts an ordered camera read.
-//
-// See mln_map_camera_query in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) CameraQuery() (*Future[CameraQueryResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_query), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_camera_query(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyCameraQueryResult))
-}
-
-type MapCameraSnapshotGetResult struct {
-	Camera     CameraOptions
-	Generation uint64
-}
-
-// CameraSnapshotGet copies the camera from the latest immutable map snapshot.
-//
-// See mln_map_camera_snapshot_get in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
-func (receiver *MapHandle) CameraSnapshotGet() (MapCameraSnapshotGetResult, error) {
-	outCamera := C.mln_camera_options_default()
-	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
-	var outGeneration C.uint64_t
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_camera_snapshot_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_camera_snapshot_get(C.mln_map(raw), &outCamera, &outGeneration, diagnostic))
-	}, func(arena *bindingArena) MapCameraSnapshotGetResult {
-		return MapCameraSnapshotGetResult{Camera: copyCameraOptions(outCamera), Generation: uint64(outGeneration)}
-	})
-}
-
 // CancelTransitions cancels the camera transitions running when this command
 // commits.
 //
@@ -6263,76 +6348,15 @@ func (receiver *MapHandle) CancelTransitions() (*Future[CommandCompletion], erro
 	}, completionCommand)
 }
 
-// CopyLayerSourceId copies one layer's source ID.
+// CreateProjection starts creation of a standalone projection from the map's
+// ordered transform state.
 //
-// See mln_map_copy_layer_source_id in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyLayerSourceId(layerId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_layer_source_id), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_layer_source_id(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionOf(copyOptionalViewText))
-}
-
-// CopyLayerSourceLayer copies one layer's source-layer ID.
-//
-// See mln_map_copy_layer_source_layer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyLayerSourceLayer(layerId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_layer_source_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_layer_source_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionOf(copyOptionalViewText))
-}
-
-// CopyStyleImagePremultipliedRgba8 copies one runtime style image as tightly
-// packed premultiplied RGBA8 pixels.
-//
-// See mln_map_copy_style_image_premultiplied_rgba8 in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleImagePremultipliedRgba8(imageId string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_image_premultiplied_rgba8), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_image_premultiplied_rgba8(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
-}
-
-// CopyStyleImageStretches copies one runtime style image's stretchable
-// intervals.
-//
-// See mln_map_copy_style_image_stretches in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleImageStretches(imageId string) (*Future[*StyleImageStretchesResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_image_stretches), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_image_stretches(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleImageStretchesResult)))
-}
-
-// CopyStyleSourceAttribution copies one style source attribution string.
-//
-// See mln_map_copy_style_source_attribution in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleSourceAttribution(sourceId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_source_attribution), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_source_attribution(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewText)))
-}
-
-// CopyStyleSourceUrl copies one style source URL.
-//
-// See mln_map_copy_style_source_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) CopyStyleSourceUrl(sourceId string) (*Future[*string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_copy_style_source_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_copy_style_source_url(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewText)))
-}
-
-// MapCreate creates a map on the runtime worker.
-//
-// See mln_map_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) MapCreate(options MapOptions) (*Future[*MapHandle], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_create), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_create(C.mln_runtime(raw), bindingStore(nativeMapOptions(options, arena), arena), completion, diagnostic))
-	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }))
+// See mln_map_create_projection in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
+func (receiver *MapHandle) CreateProjection() (*Future[*MapProjectionHandle], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_create_projection), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_create_projection(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(func(raw C.mln_map_projection) *MapProjectionHandle { return adoptMapProjectionHandle(uint64(raw), nil) }))
 }
 
 // DumpDebugLogs submits an ordered debug-log command.
@@ -6343,6 +6367,47 @@ func (receiver *MapHandle) DumpDebugLogs() (*Future[CommandCompletion], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_dump_debug_logs), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_dump_debug_logs(C.mln_map(raw), completion, diagnostic))
 	}, completionCommand)
+}
+
+// EndCommandGroup ends the innermost command group that
+// mln_map_begin_command_group() began.
+//
+// See mln_map_end_command_group in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) EndCommandGroup() (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_end_command_group), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_end_command_group(C.mln_map(raw), completion, diagnostic))
+	}, completionCommand)
+}
+
+// GetCamera starts an ordered camera read.
+//
+// See mln_map_get_camera in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+func (receiver *MapHandle) GetCamera() (*Future[CameraQueryResult], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_camera), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_camera(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyCameraQueryResult))
+}
+
+type MapGetCameraSnapshotResult struct {
+	Camera     CameraOptions
+	Generation uint64
+}
+
+// GetCameraSnapshot copies the camera from the latest immutable map snapshot.
+//
+// See mln_map_get_camera_snapshot in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html
+func (receiver *MapHandle) GetCameraSnapshot() (MapGetCameraSnapshotResult, error) {
+	outCamera := C.mln_camera_options_default()
+	outCamera.size = C.uint32_t(unsafe.Sizeof(outCamera))
+	var outGeneration C.uint64_t
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_camera_snapshot), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_camera_snapshot(C.mln_map(raw), &outCamera, &outGeneration, diagnostic))
+	}, func(arena *bindingArena) MapGetCameraSnapshotResult {
+		return MapGetCameraSnapshotResult{Camera: copyCameraOptions(outCamera), Generation: uint64(outGeneration)}
+	})
 }
 
 // GetFeatureState starts an ordered read of per-feature state from this map.
@@ -6374,47 +6439,62 @@ func (receiver *MapHandle) GetGlobalState() (*Future[[]byte], error) {
 func (receiver *MapHandle) GetImageSourceCoordinates(sourceId string) (*Future[[]LatLng], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_image_source_coordinates), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_image_source_coordinates(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullableListOf(copyLatLng))
+	}, completionListOf(copyLatLng))
 }
 
-// GetLayerFilter serializes one layer filter as a style-spec JSON value.
+// GetLoadedStyleJson starts an ordered copy of the last successfully parsed
+// style document.
 //
-// See mln_map_get_layer_filter in the C API reference:
+// See mln_map_get_loaded_style_json in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) GetLoadedStyleJson() (*Future[[]byte], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_loaded_style_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_loaded_style_json(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyViewBytes))
+}
+
+// GetSnapshot copies the latest immutable state published by the map worker.
+//
+// See mln_map_get_snapshot in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) GetSnapshot() (MapSnapshot, error) {
+	var outSnapshot C.mln_map_snapshot
+	outSnapshot.size = C.uint32_t(unsafe.Sizeof(outSnapshot))
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_snapshot), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_snapshot(C.mln_map(raw), &outSnapshot, diagnostic))
+	}, func(arena *bindingArena) MapSnapshot {
+		return copyMapSnapshot(outSnapshot)
+	})
+}
+
+// GetStyleImage copies one complete runtime style image.
+//
+// See mln_map_get_style_image in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetLayerFilter(layerId string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_layer_filter(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+func (receiver *MapHandle) GetStyleImage(imageId string) (*Future[*StyleImageInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_image), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_image(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleImageInfo)))
+}
+
+// GetStyleLayer copies the complete metadata of one style layer.
+//
+// See mln_map_get_style_layer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) GetStyleLayer(layerId string) (*Future[*StyleLayerInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_layer(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleLayerInfo)))
+}
+
+// GetStyleLayerFilter serializes one layer filter as a style-spec JSON value.
+//
+// See mln_map_get_style_layer_filter in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) GetStyleLayerFilter(layerId string) (*Future[*[]byte], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_layer_filter(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
 	}, completionNullable(completionOf(copyViewBytes)))
-}
-
-// GetLayerProperty serializes one layer property as a style-spec JSON value.
-//
-// See mln_map_get_layer_property in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetLayerProperty(layerId string, propertyName string) (*Future[*[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyViewBytes)))
-}
-
-// GetStyleImageInfo copies one complete runtime style image.
-//
-// See mln_map_get_style_image_info in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleImageInfo(imageId string) (*Future[*StyleImageResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_image_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_image_info(C.mln_map(raw), bindingView(imageId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleImageResult)))
-}
-
-// GetStyleLayerInfo copies complete metadata for one style layer.
-//
-// See mln_map_get_style_layer_info in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleLayerInfo(layerId string) (*Future[*StyleLayerResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_layer_info(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleLayerResult)))
 }
 
 // GetStyleLayerJson serializes one style layer as a full style-spec layer JSON
@@ -6425,6 +6505,17 @@ func (receiver *MapHandle) GetStyleLayerInfo(layerId string) (*Future[*StyleLaye
 func (receiver *MapHandle) GetStyleLayerJson(layerId string) (*Future[*[]byte], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_layer_json(C.mln_map(raw), bindingView(layerId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyViewBytes)))
+}
+
+// GetStyleLayerProperty serializes one layer property as a style-spec JSON
+// value.
+//
+// See mln_map_get_style_layer_property in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) GetStyleLayerProperty(layerId string, propertyName string) (*Future[*[]byte], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), completion, diagnostic))
 	}, completionNullable(completionOf(copyViewBytes)))
 }
 
@@ -6439,24 +6530,14 @@ func (receiver *MapHandle) GetStyleLightProperty(propertyName string) (*Future[*
 	}, completionNullable(completionOf(copyViewBytes)))
 }
 
-// GetStyleSourceInfo copies complete metadata for one style source.
+// GetStyleSource copies the complete metadata of one style source.
 //
-// See mln_map_get_style_source_info in the C API reference:
+// See mln_map_get_style_source in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleSourceInfo(sourceId string) (*Future[*StyleSourceResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source_info), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_source_info(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleSourceResult)))
-}
-
-// GetStyleSourceTileUrls copies one style source's inline TileJSON tile URLs.
-//
-// See mln_map_get_style_source_tile_urls in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) GetStyleSourceTileUrls(sourceId string) (*Future[*StyleSourceTileUrlsResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source_tile_urls), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_get_style_source_tile_urls(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionNullable(completionOf(copyStyleSourceTileUrlsResult)))
+func (receiver *MapHandle) GetStyleSource(sourceId string) (*Future[*StyleSourceInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_source), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_source(C.mln_map(raw), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionNullable(completionOf(copyStyleSourceInfo)))
 }
 
 // GetStyleTransitionOptions reads the style's global transition options.
@@ -6467,6 +6548,16 @@ func (receiver *MapHandle) GetStyleTransitionOptions() (*Future[StyleTransitionO
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_transition_options), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_get_style_transition_options(C.mln_map(raw), completion, diagnostic))
 	}, completionOf(copyStyleTransitionOptions))
+}
+
+// GetStyleUrl starts an ordered copy of the last requested style URL.
+//
+// See mln_map_get_style_url in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *MapHandle) GetStyleUrl() (*Future[string], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_get_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_get_style_url(C.mln_map(raw), completion, diagnostic))
+	}, completionOf(copyViewText))
 }
 
 // InvalidateCustomGeometrySourceRegion invalidates custom geometry source data
@@ -6568,45 +6659,24 @@ func (receiver *MapHandle) LatLngsForPixelsUnwrapped(points []ScreenPoint) (*Fut
 	}, completionListOf(copyLatLng))
 }
 
-// ListStyleLayerIds copies style layer IDs in style order.
-//
-// See mln_map_list_style_layer_ids in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) ListStyleLayerIds() (*Future[[]string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_layer_ids), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_list_style_layer_ids(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyViewText))
-}
-
 // ListStyleLayers starts an ordered query of every style layer in style order.
 //
 // See mln_map_list_style_layers in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerEntry], error) {
+func (receiver *MapHandle) ListStyleLayers() (*Future[[]StyleLayerInfo], error) {
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_layers), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_list_style_layers(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyStyleLayerEntry))
+	}, completionListOf(copyStyleLayerInfo))
 }
 
-// ListStyleSourceIds copies style source IDs in style order.
+// ListStyleSources lists every style source in style order.
 //
-// See mln_map_list_style_source_ids in the C API reference:
+// See mln_map_list_style_sources in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) ListStyleSourceIds() (*Future[[]string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_source_ids), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_list_style_source_ids(C.mln_map(raw), completion, diagnostic))
-	}, completionListOf(copyViewText))
-}
-
-// LoadedStyleJson starts an ordered copy of the last successfully parsed style
-// document.
-//
-// See mln_map_loaded_style_json in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) LoadedStyleJson() (*Future[[]byte], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_loaded_style_json), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_loaded_style_json(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewBytes))
+func (receiver *MapHandle) ListStyleSources() (*Future[[]StyleSourceInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_list_style_sources), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_list_style_sources(C.mln_map(raw), completion, diagnostic))
+	}, completionListOf(copyStyleSourceInfo))
 }
 
 // MetersPerPixelAtLatitude starts an ordered query of meters per logical pixel
@@ -6660,17 +6730,6 @@ func (receiver *MapProjectionHandle) Close() error {
 	return bindingDo(bindingClosing(receiver.owner(), C.binding_operation_mln_map_projection_close), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_map_projection_close(C.mln_map_projection(raw), diagnostic))
 	})
-}
-
-// ProjectionCreate starts creation of a standalone projection from the map's
-// ordered transform state.
-//
-// See mln_map_projection_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html
-func (receiver *MapHandle) ProjectionCreate() (*Future[*MapProjectionHandle], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_projection_create), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_projection_create(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(func(raw C.mln_map_projection) *MapProjectionHandle { return adoptMapProjectionHandle(uint64(raw), nil) }))
 }
 
 // GetCamera copies the projection camera into out_camera.
@@ -7006,77 +7065,6 @@ func (receiver *MapHandle) SetImageSourceUrl(sourceId string, url string) (*Futu
 	}, completionCommand)
 }
 
-// SetLayerFilter sets or clears one layer filter.
-//
-// See mln_map_set_layer_filter in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLayerFilter(layerId string, filter *[]byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_layer_filter(C.mln_map(raw), bindingView(layerId, arena), bindingStoreOptional(filter, arena, bindingView[[]byte]), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLayerMaxZoom sets the highest zoom at which one layer draws.
-//
-// See mln_map_set_layer_max_zoom in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLayerMaxZoom(layerId string, maxZoom float64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_max_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_layer_max_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(maxZoom), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLayerMinZoom sets the lowest zoom at which one layer draws.
-//
-// See mln_map_set_layer_min_zoom in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLayerMinZoom(layerId string, minZoom float64) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_min_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_layer_min_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(minZoom), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLayerProperty sets one layer property using its MapLibre style-spec
-// property name.
-//
-// See mln_map_set_layer_property in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLayerSourceId sets one layer's source ID.
-//
-// See mln_map_set_layer_source_id in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLayerSourceId(layerId string, sourceId string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_source_id), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_layer_source_id(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLayerSourceLayer sets one layer's source-layer ID.
-//
-// See mln_map_set_layer_source_layer in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLayerSourceLayer(layerId string, sourceLayer *string) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_source_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_layer_source_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(sourceLayer, arena), completion, diagnostic))
-	}, completionCommand)
-}
-
-// SetLayerVisibility sets whether one layer draws.
-//
-// See mln_map_set_layer_visibility in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
-func (receiver *MapHandle) SetLayerVisibility(layerId string, visibility StyleLayerVisibility) (*Future[CommandCompletion], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_layer_visibility), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_set_layer_visibility(C.mln_map(raw), bindingView(layerId, arena), C.uint32_t(visibility), completion, diagnostic))
-	}, completionCommand)
-}
-
 // SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy
 // radius in meters.
 //
@@ -7160,6 +7148,77 @@ func (receiver *MapHandle) SetStyleJson(json []byte) (*Future[CommandCompletion]
 	}, completionCommand)
 }
 
+// SetStyleLayerFilter sets or clears one layer filter.
+//
+// See mln_map_set_style_layer_filter in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetStyleLayerFilter(layerId string, filter *[]byte) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_filter), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_layer_filter(C.mln_map(raw), bindingView(layerId, arena), bindingStoreOptional(filter, arena, bindingView[[]byte]), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetStyleLayerMaxZoom sets the highest zoom at which one layer draws.
+//
+// See mln_map_set_style_layer_max_zoom in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetStyleLayerMaxZoom(layerId string, maxZoom float64) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_max_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_layer_max_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(maxZoom), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetStyleLayerMinZoom sets the lowest zoom at which one layer draws.
+//
+// See mln_map_set_style_layer_min_zoom in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetStyleLayerMinZoom(layerId string, minZoom float64) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_min_zoom), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_layer_min_zoom(C.mln_map(raw), bindingView(layerId, arena), C.double(minZoom), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetStyleLayerProperty sets one layer property using its MapLibre style-spec
+// property name.
+//
+// See mln_map_set_style_layer_property in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetStyleLayerProperty(layerId string, propertyName string, value []byte) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_property), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_layer_property(C.mln_map(raw), bindingView(layerId, arena), bindingView(propertyName, arena), bindingView(value, arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetStyleLayerSourceId sets one layer's source ID.
+//
+// See mln_map_set_style_layer_source_id in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetStyleLayerSourceId(layerId string, sourceId string) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_source_id), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_layer_source_id(C.mln_map(raw), bindingView(layerId, arena), bindingView(sourceId, arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetStyleLayerSourceLayer sets one layer's source-layer ID.
+//
+// See mln_map_set_style_layer_source_layer in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetStyleLayerSourceLayer(layerId string, sourceLayer *string) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_source_layer), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_layer_source_layer(C.mln_map(raw), bindingView(layerId, arena), bindingOptionalView(sourceLayer, arena), completion, diagnostic))
+	}, completionCommand)
+}
+
+// SetStyleLayerVisibility sets whether one layer draws.
+//
+// See mln_map_set_style_layer_visibility in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
+func (receiver *MapHandle) SetStyleLayerVisibility(layerId string, visibility StyleLayerVisibility) (*Future[CommandCompletion], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_set_style_layer_visibility), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_map_set_style_layer_visibility(C.mln_map(raw), bindingView(layerId, arena), C.uint32_t(visibility), completion, diagnostic))
+	}, completionCommand)
+}
+
 // SetStyleLightJson sets the style light from a style-spec light JSON object.
 //
 // See mln_map_set_style_light_json in the C API reference:
@@ -7232,30 +7291,6 @@ func (receiver *MapHandle) SetViewportOptions(options MapViewportOptions) (*Futu
 	}, completionCommand)
 }
 
-// SnapshotGet copies the latest immutable state published by the map worker.
-//
-// See mln_map_snapshot_get in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) SnapshotGet() (MapSnapshot, error) {
-	var outSnapshot C.mln_map_snapshot
-	outSnapshot.size = C.uint32_t(unsafe.Sizeof(outSnapshot))
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_map_snapshot_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_snapshot_get(C.mln_map(raw), &outSnapshot, diagnostic))
-	}, func(arena *bindingArena) MapSnapshot {
-		return copyMapSnapshot(outSnapshot)
-	})
-}
-
-// StyleUrl starts an ordered copy of the last requested style URL.
-//
-// See mln_map_style_url in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *MapHandle) StyleUrl() (*Future[string], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_map_style_url), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_map_style_url(C.mln_map(raw), completion, diagnostic))
-	}, completionOf(copyViewText))
-}
-
 // UpdateCamera submits one atomic camera update.
 //
 // See mln_map_update_camera in the C API reference:
@@ -7266,162 +7301,26 @@ func (receiver *MapHandle) UpdateCamera(update CameraUpdate) (*Future[CommandCom
 	}, completionCommand)
 }
 
-type MetalBorrowedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// MetalBorrowedTextureAttach starts attachment of a caller-owned Metal texture
-// target.
+// NetworkGetStatus reads MapLibre Native's process-global network status.
 //
-// See mln_metal_borrowed_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) MetalBorrowedTextureAttach(descriptor MetalBorrowedTextureDescriptor, options RenderSessionAttachOptions) (MetalBorrowedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_metal_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_metal_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MetalBorrowedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return MetalBorrowedTextureAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// MetalBorrowedTextureSetTarget starts an ordered caller-owned Metal texture
-// replacement.
-//
-// See mln_metal_borrowed_texture_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) MetalBorrowedTextureSetTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_metal_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_metal_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-type MetalOwnedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// MetalOwnedTextureAttach starts attachment of a session-owned Metal texture
-// ring.
-//
-// See mln_metal_owned_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) MetalOwnedTextureAttach(descriptor MetalOwnedTextureDescriptor, options RenderSessionAttachOptions) (MetalOwnedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_metal_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_metal_owned_texture_attach(C.mln_map(raw), bindingStore(nativeMetalOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MetalOwnedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return MetalOwnedTextureAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-type MetalSurfaceAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// MetalSurfaceAttach starts attachment of a Metal surface target.
-//
-// See mln_metal_surface_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *MapHandle) MetalSurfaceAttach(descriptor MetalSurfaceDescriptor, options RenderSessionAttachOptions) (MetalSurfaceAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_metal_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_metal_surface_attach(C.mln_map(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) MetalSurfaceAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return MetalSurfaceAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// MetalSurfaceSetTarget starts an ordered Metal surface replacement.
-//
-// See mln_metal_surface_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) MetalSurfaceSetTarget(descriptor MetalSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_metal_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_metal_surface_set_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-// NetworkStatusGet reads MapLibre Native's process-global network status.
-//
-// See mln_network_status_get in the C API reference:
+// See mln_network_get_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func NetworkStatusGet() (NetworkStatus, error) {
+func NetworkGetStatus() (NetworkStatus, error) {
 	var outStatus C.uint32_t
-	return bindingGet(bindingGlobal(C.binding_operation_mln_network_status_get), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_network_status_get(&outStatus, diagnostic))
+	return bindingGet(bindingGlobal(C.binding_operation_mln_network_get_status), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_network_get_status(&outStatus, diagnostic))
 	}, func(arena *bindingArena) NetworkStatus {
 		return NetworkStatus(outStatus)
 	})
 }
 
-// NetworkStatusSet sets MapLibre Native's process-global network status.
+// NetworkSetStatus sets MapLibre Native's process-global network status.
 //
-// See mln_network_status_set in the C API reference:
+// See mln_network_set_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func NetworkStatusSet(status NetworkStatus) error {
-	return bindingDo(bindingGlobal(C.binding_operation_mln_network_status_set), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_network_status_set(C.uint32_t(status), diagnostic))
-	})
-}
-
-type OpenglBorrowedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// OpenglBorrowedTextureAttach starts attachment of a caller-owned OpenGL
-// texture target.
-//
-// See mln_opengl_borrowed_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) OpenglBorrowedTextureAttach(descriptor OpenglBorrowedTextureDescriptor, options RenderSessionAttachOptions) (OpenglBorrowedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_opengl_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) OpenglBorrowedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return OpenglBorrowedTextureAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// OpenglBorrowedTextureSetTarget starts an ordered caller-owned OpenGL texture
-// replacement.
-//
-// See mln_opengl_borrowed_texture_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) OpenglBorrowedTextureSetTarget(descriptor OpenglBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_opengl_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-type OpenglOwnedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// OpenglOwnedTextureAttach starts attachment of a session-owned OpenGL texture
-// ring.
-//
-// See mln_opengl_owned_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) OpenglOwnedTextureAttach(descriptor OpenglOwnedTextureDescriptor, options RenderSessionAttachOptions) (OpenglOwnedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_opengl_owned_texture_attach(C.mln_map(raw), bindingStore(nativeOpenglOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) OpenglOwnedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return OpenglOwnedTextureAttachResult{Session: adopted, Completion: future}
+func NetworkSetStatus(status NetworkStatus) error {
+	return bindingDo(bindingGlobal(C.binding_operation_mln_network_set_status), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_network_set_status(C.uint32_t(status), diagnostic))
 	})
 }
 
@@ -7434,36 +7333,6 @@ func OpenglSupportedContextProviderMask() (OpenglContextProviderFlag, error) {
 	return bindingDirect(bindingGlobal(C.binding_operation_mln_opengl_supported_context_provider_mask), func(arena *bindingArena, raw uint64) OpenglContextProviderFlag {
 		return OpenglContextProviderFlag(C.mln_opengl_supported_context_provider_mask())
 	})
-}
-
-type OpenglSurfaceAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// OpenglSurfaceAttach starts attachment of an OpenGL surface target.
-//
-// See mln_opengl_surface_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *MapHandle) OpenglSurfaceAttach(descriptor OpenglSurfaceDescriptor, options RenderSessionAttachOptions) (OpenglSurfaceAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_opengl_surface_attach(C.mln_map(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) OpenglSurfaceAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return OpenglSurfaceAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// OpenglSurfaceSetTarget starts an ordered OpenGL surface replacement.
-//
-// See mln_opengl_surface_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) OpenglSurfaceSetTarget(descriptor OpenglSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_opengl_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_opengl_surface_set_target(C.mln_render_session(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
 }
 
 // PluginGetRegisterFunctionV1 returns the process-wide mln_plugin_register_v1
@@ -7567,6 +7436,24 @@ func (receiver *RenderSessionHandle) ClearData() (*Future[struct{}], error) {
 	}, completionUnit)
 }
 
+// CreateProjection copies the last completed rendered transform into an
+// independent projection. Callable from any thread. Returns invalid state
+// before a completed render, after an extent or target change, or after
+// detachment. The caller owns the returned projection, which remains usable
+// after the session is released. out_projection must point to a null handle.
+//
+// See mln_render_session_create_projection in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
+func (receiver *RenderSessionHandle) CreateProjection() (*MapProjectionHandle, error) {
+	var outProjection C.mln_map_projection
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_create_projection), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_create_projection(C.mln_render_session(raw), &outProjection, diagnostic))
+	}, func(arena *bindingArena) *MapProjectionHandle {
+		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
+		return adopted
+	})
+}
+
 // Close retires a detached or abandoned session handle. The call is CPU-only
 // and may run on any native thread, including from one of the session's own
 // completions. If an abandonment is still in progress on another thread, this
@@ -7644,24 +7531,6 @@ func (receiver *RenderSessionHandle) GetSnapshot() (RenderSessionSnapshot, error
 	})
 }
 
-// ProjectionCreate copies the last completed rendered transform into an
-// independent projection. Callable from any thread. Returns invalid state
-// before a completed render, after an extent or target change, or after
-// detachment. The caller owns the returned projection, which remains usable
-// after the session is released. out_projection must point to a null handle.
-//
-// See mln_render_session_projection_create in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
-func (receiver *RenderSessionHandle) ProjectionCreate() (*MapProjectionHandle, error) {
-	var outProjection C.mln_map_projection
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_projection_create), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_render_session_projection_create(C.mln_render_session(raw), &outProjection, diagnostic))
-	}, func(arena *bindingArena) *MapProjectionHandle {
-		adopted := adoptMapProjectionHandle(uint64(outProjection), nil)
-		return adopted
-	})
-}
-
 // QueryFeatureExtensions starts a feature-extension query against the latest
 // driver state. The completion borrows one mln_buffer_view holding UTF-8 JSON
 // (value_count 1), valid only for the callback.
@@ -7695,6 +7564,17 @@ func (receiver *RenderSessionHandle) QuerySourceFeatures(sourceId string, option
 	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_query_source_features), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_render_session_query_source_features(C.mln_render_session(raw), bindingView(sourceId, arena), bindingStoreOptional(options, arena, nativeSourceFeatureQueryOptions), completion, diagnostic))
 	}, completionListOf(copyQueriedFeature))
+}
+
+// ReadTexture reads back the latest frame of the session's owned texture as
+// premultiplied RGBA8.
+//
+// See mln_render_session_read_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *RenderSessionHandle) ReadTexture() (*Future[TextureReadbackResult], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_read_texture), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_read_texture(C.mln_render_session(raw), completion, diagnostic))
+	}, completionOf(copyTextureReadbackResult))
 }
 
 // ReduceMemoryUse starts best-effort release of renderer caches.
@@ -7745,6 +7625,90 @@ func (receiver *RenderSessionHandle) ServiceDriverWork(maxWork uint) (uint, erro
 	}, func(arena *bindingArena) uint {
 		return uint(outServiced)
 	})
+}
+
+// SetMetalBorrowedTextureTarget starts an ordered caller-owned Metal texture
+// replacement.
+//
+// See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *RenderSessionHandle) SetMetalBorrowedTextureTarget(descriptor MetalBorrowedTextureDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_metal_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_metal_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeMetalBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetMetalSurfaceTarget starts an ordered Metal surface replacement.
+//
+// See mln_render_session_set_metal_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfaceDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_metal_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_metal_surface_target(C.mln_render_session(raw), bindingStore(nativeMetalSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetOpenglBorrowedTextureTarget starts an ordered caller-owned OpenGL texture
+// replacement.
+//
+// See mln_render_session_set_opengl_borrowed_texture_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *RenderSessionHandle) SetOpenglBorrowedTextureTarget(descriptor OpenglBorrowedTextureDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_opengl_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_opengl_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeOpenglBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetOpenglSurfaceTarget starts an ordered OpenGL surface replacement.
+//
+// See mln_render_session_set_opengl_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *RenderSessionHandle) SetOpenglSurfaceTarget(descriptor OpenglSurfaceDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_opengl_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_opengl_surface_target(C.mln_render_session(raw), bindingStore(nativeOpenglSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetVulkanBorrowedTextureTarget starts an ordered caller-owned Vulkan texture
+// replacement.
+//
+// See mln_render_session_set_vulkan_borrowed_texture_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *RenderSessionHandle) SetVulkanBorrowedTextureTarget(descriptor VulkanBorrowedTextureDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_vulkan_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_vulkan_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetVulkanSurfaceTarget starts an ordered Vulkan surface replacement.
+//
+// See mln_render_session_set_vulkan_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSurfaceDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_vulkan_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_vulkan_surface_target(C.mln_render_session(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetWebgpuBorrowedTextureTarget starts an ordered caller-owned WebGPU texture
+// replacement.
+//
+// See mln_render_session_set_webgpu_borrowed_texture_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+func (receiver *RenderSessionHandle) SetWebgpuBorrowedTextureTarget(descriptor WebgpuBorrowedTextureDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_webgpu_borrowed_texture_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_webgpu_borrowed_texture_target(C.mln_render_session(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetWebgpuSurfaceTarget starts an ordered WebGPU surface replacement.
+//
+// See mln_render_session_set_webgpu_surface_target in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
+func (receiver *RenderSessionHandle) SetWebgpuSurfaceTarget(descriptor WebgpuSurfaceDescriptor) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_render_session_set_webgpu_surface_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_render_session_set_webgpu_surface_target(C.mln_render_session(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
+	}, completionUnit)
 }
 
 type RenderTargetExtentPhysicalSizeResult struct {
@@ -7799,20 +7763,6 @@ func RenderedQueryGeometryPoint(point ScreenPoint) (RenderedQueryGeometry, error
 	})
 }
 
-// Cancelled reports whether MapLibre has cancelled a C API resource provider
-// request.
-//
-// See mln_resource_request_cancelled in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
-func (receiver *ResourceRequestHandle) Cancelled() (bool, error) {
-	var outCancelled C.bool
-	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_cancelled), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_resource_request_cancelled(C.mln_resource_request_handle(raw), &outCancelled, diagnostic))
-	}, func(arena *bindingArena) bool {
-		return bool(outCancelled)
-	})
-}
-
 // Complete completes a C API resource provider request.
 //
 // See mln_resource_request_complete in the C API reference:
@@ -7820,6 +7770,20 @@ func (receiver *ResourceRequestHandle) Cancelled() (bool, error) {
 func (receiver *ResourceRequestHandle) Complete(response ResourceResponse) error {
 	return bindingDo(bindingCompleting(receiver.owner(), C.binding_operation_mln_resource_request_complete), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_resource_request_complete(C.mln_resource_request_handle(raw), bindingStore(nativeResourceResponse(response, arena), arena), diagnostic))
+	})
+}
+
+// IsCancelled reports whether MapLibre has cancelled a C API resource provider
+// request.
+//
+// See mln_resource_request_is_cancelled in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
+func (receiver *ResourceRequestHandle) IsCancelled() (bool, error) {
+	var outCancelled C.bool
+	return bindingGet(bindingLive(receiver.owner(), C.binding_operation_mln_resource_request_is_cancelled), func(arena *bindingArena, raw uint64, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_resource_request_is_cancelled(C.mln_resource_request_handle(raw), &outCancelled, diagnostic))
+	}, func(arena *bindingArena) bool {
+		return bool(outCancelled)
 	})
 }
 
@@ -7929,6 +7893,36 @@ func RuntimeCreate(options RuntimeOptions) (*RuntimeHandle, error) {
 	})
 }
 
+// CreateMap creates a map on the runtime worker.
+//
+// See mln_runtime_create_map in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *RuntimeHandle) CreateMap(options MapOptions) (*Future[*MapHandle], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_create_map), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_create_map(C.mln_runtime(raw), bindingStore(nativeMapOptions(options, arena), arena), completion, diagnostic))
+	}, completionOf(func(raw C.mln_map) *MapHandle { return adoptMapHandle(uint64(raw), receiver) }))
+}
+
+// CreateOfflineRegion starts creating an offline region.
+//
+// See mln_runtime_create_offline_region in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *RuntimeHandle) CreateOfflineRegion(definition OfflineRegionDefinition, metadata []byte) (*Future[OfflineRegionInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_create_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_create_offline_region(C.mln_runtime(raw), bindingStore(nativeOfflineRegionDefinition(definition, arena), arena), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
+	}, completionOf(copyOfflineRegionInfo))
+}
+
+// DeleteOfflineRegion deletes an offline region.
+//
+// See mln_runtime_delete_offline_region in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *RuntimeHandle) DeleteOfflineRegion(regionId int64) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_delete_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_delete_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+	}, completionUnit)
+}
+
 // DrainEvents drains this runtime's queued events into a new owned batch.
 //
 // See mln_runtime_drain_events in the C API reference:
@@ -7956,108 +7950,56 @@ func (receiver *RuntimeHandle) GetEventMask() (RuntimeEventMask, error) {
 	})
 }
 
-// OfflineRegionCreate starts creating an offline region.
+// GetOfflineRegion starts getting one offline region by ID.
 //
-// See mln_runtime_offline_region_create in the C API reference:
+// See mln_runtime_get_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionCreate(definition OfflineRegionDefinition, metadata []byte) (*Future[OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_create), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_create(C.mln_runtime(raw), bindingStore(nativeOfflineRegionDefinition(definition, arena), arena), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
-	}, completionOf(copyOfflineRegionInfo))
-}
-
-// OfflineRegionDelete deletes an offline region.
-//
-// See mln_runtime_offline_region_delete in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionDelete(regionId int64) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_delete), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_delete(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
-	}, completionUnit)
-}
-
-// OfflineRegionGet starts getting one offline region by ID.
-//
-// See mln_runtime_offline_region_get in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionGet(regionId int64) (*Future[*OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_get), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_get(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+func (receiver *RuntimeHandle) GetOfflineRegion(regionId int64) (*Future[*OfflineRegionInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_get_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_get_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
 	}, completionNullable(completionOf(copyOfflineRegionInfo)))
 }
 
-// OfflineRegionGetStatus starts getting the current download status for an
+// GetOfflineRegionStatus starts getting the current download status for an
 // offline region.
 //
-// See mln_runtime_offline_region_get_status in the C API reference:
+// See mln_runtime_get_offline_region_status in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionGetStatus(regionId int64) (*Future[OfflineRegionStatus], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_get_status), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_get_status(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+func (receiver *RuntimeHandle) GetOfflineRegionStatus(regionId int64) (*Future[OfflineRegionStatus], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_get_offline_region_status), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_get_offline_region_status(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
 	}, completionOf(copyOfflineRegionStatus))
 }
 
-// OfflineRegionInvalidate invalidates cached resources for an offline region.
+// InvalidateOfflineRegion invalidates cached resources for an offline region.
 //
-// See mln_runtime_offline_region_invalidate in the C API reference:
+// See mln_runtime_invalidate_offline_region in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionInvalidate(regionId int64) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_invalidate), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_invalidate(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
+func (receiver *RuntimeHandle) InvalidateOfflineRegion(regionId int64) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_invalidate_offline_region), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_invalidate_offline_region(C.mln_runtime(raw), C.mln_offline_region_id(regionId), completion, diagnostic))
 	}, completionUnit)
 }
 
-// OfflineRegionSetDownloadState sets an offline region's native download state.
-//
-// See mln_runtime_offline_region_set_download_state in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionSetDownloadState(regionId int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_set_download_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_set_download_state(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.uint32_t(state), completion, diagnostic))
-	}, completionUnit)
-}
-
-// OfflineRegionSetObserved enables or disables runtime events for an offline
-// region.
-//
-// See mln_runtime_offline_region_set_observed in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionSetObserved(regionId int64, observed bool) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_set_observed), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_set_observed(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.bool(observed), completion, diagnostic))
-	}, completionUnit)
-}
-
-// OfflineRegionUpdateMetadata starts updating opaque binary metadata for an
-// offline region.
-//
-// See mln_runtime_offline_region_update_metadata in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionUpdateMetadata(regionId int64, metadata []byte) (*Future[OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_region_update_metadata), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_region_update_metadata(C.mln_runtime(raw), C.mln_offline_region_id(regionId), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
-	}, completionOf(copyOfflineRegionInfo))
-}
-
-// OfflineRegionsList starts listing the offline regions in the runtime
+// ListOfflineRegions starts listing the offline regions in the runtime
 // database.
 //
-// See mln_runtime_offline_regions_list in the C API reference:
+// See mln_runtime_list_offline_regions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionsList() (*Future[[]OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_regions_list), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_regions_list(C.mln_runtime(raw), completion, diagnostic))
+func (receiver *RuntimeHandle) ListOfflineRegions() (*Future[[]OfflineRegionInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_list_offline_regions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_list_offline_regions(C.mln_runtime(raw), completion, diagnostic))
 	}, completionListOf(copyOfflineRegionInfo))
 }
 
-// OfflineRegionsMergeDatabase starts merging offline regions from another
-// MapLibre offline database.
+// MergeOfflineRegions starts merging offline regions from another MapLibre
+// offline database.
 //
-// See mln_runtime_offline_regions_merge_database in the C API reference:
+// See mln_runtime_merge_offline_regions in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
-func (receiver *RuntimeHandle) OfflineRegionsMergeDatabase(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_offline_regions_merge_database), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_runtime_offline_regions_merge_database(C.mln_runtime(raw), arena.cstring(sideDatabasePath), completion, diagnostic))
+func (receiver *RuntimeHandle) MergeOfflineRegions(sideDatabasePath string) (*Future[[]OfflineRegionInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_merge_offline_regions), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_merge_offline_regions(C.mln_runtime(raw), arena.cstring(sideDatabasePath), completion, diagnostic))
 	}, completionListOf(copyOfflineRegionInfo))
 }
 
@@ -8114,6 +8056,27 @@ func (receiver *RuntimeHandle) SetMaximumAmbientCacheSize(size uint64) (*Future[
 	}, completionUnit)
 }
 
+// SetOfflineRegionDownloadState sets an offline region's native download state.
+//
+// See mln_runtime_set_offline_region_download_state in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *RuntimeHandle) SetOfflineRegionDownloadState(regionId int64, state OfflineRegionDownloadState) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_offline_region_download_state), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_offline_region_download_state(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.uint32_t(state), completion, diagnostic))
+	}, completionUnit)
+}
+
+// SetOfflineRegionObserved enables or disables runtime events for an offline
+// region.
+//
+// See mln_runtime_set_offline_region_observed in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *RuntimeHandle) SetOfflineRegionObserved(regionId int64, observed bool) (*Future[struct{}], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_set_offline_region_observed), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_set_offline_region_observed(C.mln_runtime(raw), C.mln_offline_region_id(regionId), C.bool(observed), completion, diagnostic))
+	}, completionUnit)
+}
+
 // SetResourceProvider registers or replaces a runtime-scoped network resource
 // provider.
 //
@@ -8136,6 +8099,17 @@ func (receiver *RuntimeHandle) SetResourceTransform(transform ResourceTransform)
 	}, completionUnit)
 }
 
+// UpdateOfflineRegionMetadata starts updating opaque binary metadata for an
+// offline region.
+//
+// See mln_runtime_update_offline_region_metadata in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html
+func (receiver *RuntimeHandle) UpdateOfflineRegionMetadata(regionId int64, metadata []byte) (*Future[OfflineRegionInfo], error) {
+	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_runtime_update_offline_region_metadata), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
+		return int32(C.mln_runtime_update_offline_region_metadata(C.mln_runtime(raw), C.mln_offline_region_id(regionId), (*C.uint8_t)(arena.bytes(metadata)), bindingCount[C.size_t](len(metadata)), completion, diagnostic))
+	}, completionOf(copyOfflineRegionInfo))
+}
+
 // SupportedRenderBackendMask reports the render backends available in this
 // native library build.
 //
@@ -8145,183 +8119,6 @@ func SupportedRenderBackendMask() (RenderBackendFlag, error) {
 	return bindingDirect(bindingGlobal(C.binding_operation_mln_supported_render_backend_mask), func(arena *bindingArena, raw uint64) RenderBackendFlag {
 		return RenderBackendFlag(C.mln_supported_render_backend_mask())
 	})
-}
-
-// TextureReadPremultipliedRgba8 starts readback of the latest rendered texture
-// frame.
-//
-// See mln_texture_read_premultiplied_rgba8 in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) TextureReadPremultipliedRgba8() (*Future[TextureReadbackResult], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_texture_read_premultiplied_rgba8), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_texture_read_premultiplied_rgba8(C.mln_render_session(raw), completion, diagnostic))
-	}, completionOf(copyTextureReadbackResult))
-}
-
-type VulkanBorrowedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// VulkanBorrowedTextureAttach starts attachment of a caller-owned Vulkan
-// texture target.
-//
-// See mln_vulkan_borrowed_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) VulkanBorrowedTextureAttach(descriptor VulkanBorrowedTextureDescriptor, options RenderSessionAttachOptions) (VulkanBorrowedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_vulkan_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) VulkanBorrowedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return VulkanBorrowedTextureAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// VulkanBorrowedTextureSetTarget starts an ordered caller-owned Vulkan texture
-// replacement.
-//
-// See mln_vulkan_borrowed_texture_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) VulkanBorrowedTextureSetTarget(descriptor VulkanBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_vulkan_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeVulkanBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-type VulkanOwnedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// VulkanOwnedTextureAttach starts attachment of a session-owned Vulkan texture
-// ring.
-//
-// See mln_vulkan_owned_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) VulkanOwnedTextureAttach(descriptor VulkanOwnedTextureDescriptor, options RenderSessionAttachOptions) (VulkanOwnedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_vulkan_owned_texture_attach(C.mln_map(raw), bindingStore(nativeVulkanOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) VulkanOwnedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return VulkanOwnedTextureAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-type VulkanSurfaceAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// VulkanSurfaceAttach starts attachment of a Vulkan surface target.
-//
-// See mln_vulkan_surface_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *MapHandle) VulkanSurfaceAttach(descriptor VulkanSurfaceDescriptor, options RenderSessionAttachOptions) (VulkanSurfaceAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_vulkan_surface_attach(C.mln_map(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) VulkanSurfaceAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return VulkanSurfaceAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// VulkanSurfaceSetTarget starts an ordered Vulkan surface replacement.
-//
-// See mln_vulkan_surface_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) VulkanSurfaceSetTarget(descriptor VulkanSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_vulkan_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_vulkan_surface_set_target(C.mln_render_session(raw), bindingStore(nativeVulkanSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-type WebgpuBorrowedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// WebgpuBorrowedTextureAttach starts attachment of a caller-owned WebGPU
-// texture target.
-//
-// See mln_webgpu_borrowed_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) WebgpuBorrowedTextureAttach(descriptor WebgpuBorrowedTextureDescriptor, options RenderSessionAttachOptions) (WebgpuBorrowedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_borrowed_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_webgpu_borrowed_texture_attach(C.mln_map(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) WebgpuBorrowedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return WebgpuBorrowedTextureAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// WebgpuBorrowedTextureSetTarget starts an ordered caller-owned WebGPU texture
-// replacement.
-//
-// See mln_webgpu_borrowed_texture_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *RenderSessionHandle) WebgpuBorrowedTextureSetTarget(descriptor WebgpuBorrowedTextureDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_borrowed_texture_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_webgpu_borrowed_texture_set_target(C.mln_render_session(raw), bindingStore(nativeWebgpuBorrowedTextureDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
-}
-
-type WebgpuOwnedTextureAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// WebgpuOwnedTextureAttach starts attachment of a session-owned WebGPU texture
-// ring.
-//
-// See mln_webgpu_owned_texture_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *MapHandle) WebgpuOwnedTextureAttach(descriptor WebgpuOwnedTextureDescriptor, options RenderSessionAttachOptions) (WebgpuOwnedTextureAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_owned_texture_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_webgpu_owned_texture_attach(C.mln_map(raw), bindingStore(nativeWebgpuOwnedTextureDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) WebgpuOwnedTextureAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return WebgpuOwnedTextureAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-type WebgpuSurfaceAttachResult struct {
-	Session    *RenderSessionHandle
-	Completion *Future[struct{}]
-}
-
-// WebgpuSurfaceAttach starts attachment of a WebGPU surface target.
-//
-// See mln_webgpu_surface_attach in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *MapHandle) WebgpuSurfaceAttach(descriptor WebgpuSurfaceDescriptor, options RenderSessionAttachOptions) (WebgpuSurfaceAttachResult, error) {
-	var outSession C.mln_render_session
-	return bindingStartWith(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_surface_attach), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_webgpu_surface_attach(C.mln_map(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), bindingStore(nativeRenderSessionAttachOptions(options, arena), arena), &outSession, completion, diagnostic))
-	}, completionUnit, func(arena *bindingArena, future *Future[struct{}]) WebgpuSurfaceAttachResult {
-		adopted := adoptRenderSessionHandle(uint64(outSession), receiver)
-		arena.accept(adopted.bindingOwner)
-		return WebgpuSurfaceAttachResult{Session: adopted, Completion: future}
-	})
-}
-
-// WebgpuSurfaceSetTarget starts an ordered WebGPU surface replacement.
-//
-// See mln_webgpu_surface_set_target in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html
-func (receiver *RenderSessionHandle) WebgpuSurfaceSetTarget(descriptor WebgpuSurfaceDescriptor) (*Future[struct{}], error) {
-	return bindingStart(bindingLive(receiver.owner(), C.binding_operation_mln_webgpu_surface_set_target), func(arena *bindingArena, raw uint64, completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-		return int32(C.mln_webgpu_surface_set_target(C.mln_render_session(raw), bindingStore(nativeWebgpuSurfaceDescriptor(descriptor, arena), arena), completion, diagnostic))
-	}, completionUnit)
 }
 
 //export mlnGo_mln_log_handler_callback

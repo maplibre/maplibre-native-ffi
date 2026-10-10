@@ -58,7 +58,7 @@ public enum Status : int
     NotReady = -9,
 
     /// <summary>
-    /// A command or operation named an ID with no live object behind it.
+    /// A call named an ID with no live object behind it.
     /// </summary>
     NotFound = -10,
 }

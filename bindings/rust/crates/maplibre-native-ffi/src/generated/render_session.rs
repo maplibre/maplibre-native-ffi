@@ -12,100 +12,6 @@ native_owner! {
 }
 
 impl RenderSessionHandle {
-    /// Starts an ordered caller-owned Metal texture replacement.
-    ///
-    /// See `mln_metal_borrowed_texture_set_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn metal_borrowed_texture_set_target(
-        &self,
-        descriptor: &MetalBorrowedTextureDescriptor,
-    ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_metal_borrowed_texture_set_target")?;
-        let descriptor = call.reference(&descriptor)?;
-        call.complete(
-            |session, completion, out_diagnostic| unsafe {
-                sys::mln_metal_borrowed_texture_set_target(
-                    session,
-                    descriptor,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
-    }
-
-    /// Starts an ordered Metal surface replacement.
-    ///
-    /// See `mln_metal_surface_set_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn metal_surface_set_target(
-        &self,
-        descriptor: &MetalSurfaceDescriptor,
-    ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_metal_surface_set_target")?;
-        let descriptor = call.reference(&descriptor)?;
-        call.complete(
-            |session, completion, out_diagnostic| unsafe {
-                sys::mln_metal_surface_set_target(session, descriptor, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
-    }
-
-    /// Starts an ordered caller-owned OpenGL texture replacement.
-    ///
-    /// See `mln_opengl_borrowed_texture_set_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn opengl_borrowed_texture_set_target(
-        &self,
-        descriptor: &OpenglBorrowedTextureDescriptor,
-    ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_opengl_borrowed_texture_set_target")?;
-        let descriptor = call.reference(&descriptor)?;
-        call.complete(
-            |session, completion, out_diagnostic| unsafe {
-                sys::mln_opengl_borrowed_texture_set_target(
-                    session,
-                    descriptor,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )
-    }
-
-    /// Starts an ordered OpenGL surface replacement.
-    ///
-    /// See `mln_opengl_surface_set_target` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn opengl_surface_set_target(
-        &self,
-        descriptor: &OpenglSurfaceDescriptor,
-    ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_opengl_surface_set_target")?;
-        let descriptor = call.reference(&descriptor)?;
-        call.complete(
-            |session, completion, out_diagnostic| unsafe {
-                sys::mln_opengl_surface_set_target(session, descriptor, completion, out_diagnostic)
-            },
-            completion::unit,
-        )
-    }
-
     /// Irreversibly closes control and mailboxes without graphics calls.
     ///
     /// See `mln_render_session_abandon` in the
@@ -167,6 +73,23 @@ impl RenderSessionHandle {
             },
             completion::unit,
         )
+    }
+
+    /// Copies the last completed rendered transform into an independent
+    /// projection. Callable from any thread. Returns invalid state before a
+    /// completed render, after an extent or target change, or after detachment.
+    /// The caller owns the returned projection, which remains usable after the
+    /// session is released. out_projection must point to a null handle.
+    ///
+    /// See `mln_render_session_create_projection` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+    pub fn create_projection(&self) -> Result<MapProjectionHandle> {
+        let mut call = self.inner.call("mln_render_session_create_projection")?;
+        let mut out_projection = sys::mln_map_projection(0);
+        call.status(|session, out_diagnostic| unsafe {
+            sys::mln_render_session_create_projection(session, &mut out_projection, out_diagnostic)
+        })?;
+        Ok(MapProjectionHandle::adopt(out_projection, None)?)
     }
 
     /// Retires a detached or abandoned session handle. The call is CPU-only and
@@ -275,23 +198,6 @@ impl RenderSessionHandle {
         Ok(unsafe { from_native(out_snapshot) }?)
     }
 
-    /// Copies the last completed rendered transform into an independent
-    /// projection. Callable from any thread. Returns invalid state before a
-    /// completed render, after an extent or target change, or after detachment.
-    /// The caller owns the returned projection, which remains usable after the
-    /// session is released. out_projection must point to a null handle.
-    ///
-    /// See `mln_render_session_projection_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-    pub fn projection_create(&self) -> Result<MapProjectionHandle> {
-        let mut call = self.inner.call("mln_render_session_projection_create")?;
-        let mut out_projection = sys::mln_map_projection(0);
-        call.status(|session, out_diagnostic| unsafe {
-            sys::mln_render_session_projection_create(session, &mut out_projection, out_diagnostic)
-        })?;
-        Ok(MapProjectionHandle::adopt(out_projection, None)?)
-    }
-
     /// Starts a feature-extension query against the latest driver state. The
     /// completion borrows one `mln_buffer_view` holding UTF-8 JSON (value_count
     /// 1), valid only for the callback.
@@ -390,6 +296,21 @@ impl RenderSessionHandle {
         )
     }
 
+    /// Reads back the latest frame of the session's owned texture as
+    /// premultiplied RGBA8.
+    ///
+    /// See `mln_render_session_read_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    pub fn read_texture(&self) -> Result<NativeFuture<TextureReadbackResult>> {
+        let call = self.inner.call("mln_render_session_read_texture")?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_read_texture(session, completion, out_diagnostic)
+            },
+            completion::value::<sys::mln_texture_readback_result, _>,
+        )
+    }
+
     /// Starts best-effort release of renderer caches.
     ///
     /// See `mln_render_session_reduce_memory_use` in the
@@ -454,36 +375,136 @@ impl RenderSessionHandle {
         Ok(out_serviced)
     }
 
-    /// Starts readback of the latest rendered texture frame.
+    /// Starts an ordered caller-owned Metal texture replacement.
     ///
-    /// See `mln_texture_read_premultiplied_rgba8` in the
+    /// See `mln_render_session_set_metal_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    pub fn texture_read_premultiplied_rgba8(&self) -> Result<NativeFuture<TextureReadbackResult>> {
-        let call = self.inner.call("mln_texture_read_premultiplied_rgba8")?;
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn set_metal_borrowed_texture_target(
+        &self,
+        descriptor: &MetalBorrowedTextureDescriptor,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_metal_borrowed_texture_target")?;
+        let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_texture_read_premultiplied_rgba8(session, completion, out_diagnostic)
+                sys::mln_render_session_set_metal_borrowed_texture_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
             },
-            completion::value::<sys::mln_texture_readback_result, _>,
+            completion::unit,
+        )
+    }
+
+    /// Starts an ordered Metal surface replacement.
+    ///
+    /// See `mln_render_session_set_metal_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn set_metal_surface_target(
+        &self,
+        descriptor: &MetalSurfaceDescriptor,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_metal_surface_target")?;
+        let descriptor = call.reference(&descriptor)?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_metal_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
+    /// Starts an ordered caller-owned OpenGL texture replacement.
+    ///
+    /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn set_opengl_borrowed_texture_target(
+        &self,
+        descriptor: &OpenglBorrowedTextureDescriptor,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_opengl_borrowed_texture_target")?;
+        let descriptor = call.reference(&descriptor)?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_opengl_borrowed_texture_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )
+    }
+
+    /// Starts an ordered OpenGL surface replacement.
+    ///
+    /// See `mln_render_session_set_opengl_surface_target` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn set_opengl_surface_target(
+        &self,
+        descriptor: &OpenglSurfaceDescriptor,
+    ) -> Result<NativeFuture<()>> {
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_opengl_surface_target")?;
+        let descriptor = call.reference(&descriptor)?;
+        call.complete(
+            |session, completion, out_diagnostic| unsafe {
+                sys::mln_render_session_set_opengl_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
         )
     }
 
     /// Starts an ordered caller-owned Vulkan texture replacement.
     ///
-    /// See `mln_vulkan_borrowed_texture_set_target` in the
+    /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn vulkan_borrowed_texture_set_target(
+    pub unsafe fn set_vulkan_borrowed_texture_target(
         &self,
         descriptor: &VulkanBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_vulkan_borrowed_texture_set_target")?;
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_vulkan_borrowed_texture_target")?;
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_vulkan_borrowed_texture_set_target(
+                sys::mln_render_session_set_vulkan_borrowed_texture_target(
                     session,
                     descriptor,
                     completion,
@@ -496,20 +517,27 @@ impl RenderSessionHandle {
 
     /// Starts an ordered Vulkan surface replacement.
     ///
-    /// See `mln_vulkan_surface_set_target` in the
+    /// See `mln_render_session_set_vulkan_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn vulkan_surface_set_target(
+    pub unsafe fn set_vulkan_surface_target(
         &self,
         descriptor: &VulkanSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_vulkan_surface_set_target")?;
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_vulkan_surface_target")?;
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_vulkan_surface_set_target(session, descriptor, completion, out_diagnostic)
+                sys::mln_render_session_set_vulkan_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
             },
             completion::unit,
         )
@@ -517,20 +545,22 @@ impl RenderSessionHandle {
 
     /// Starts an ordered caller-owned WebGPU texture replacement.
     ///
-    /// See `mln_webgpu_borrowed_texture_set_target` in the
+    /// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn webgpu_borrowed_texture_set_target(
+    pub unsafe fn set_webgpu_borrowed_texture_target(
         &self,
         descriptor: &WebgpuBorrowedTextureDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_webgpu_borrowed_texture_set_target")?;
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_webgpu_borrowed_texture_target")?;
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_webgpu_borrowed_texture_set_target(
+                sys::mln_render_session_set_webgpu_borrowed_texture_target(
                     session,
                     descriptor,
                     completion,
@@ -543,20 +573,27 @@ impl RenderSessionHandle {
 
     /// Starts an ordered WebGPU surface replacement.
     ///
-    /// See `mln_webgpu_surface_set_target` in the
+    /// See `mln_render_session_set_webgpu_surface_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     ///
     /// # Safety
     /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn webgpu_surface_set_target(
+    pub unsafe fn set_webgpu_surface_target(
         &self,
         descriptor: &WebgpuSurfaceDescriptor,
     ) -> Result<NativeFuture<()>> {
-        let mut call = self.inner.call("mln_webgpu_surface_set_target")?;
+        let mut call = self
+            .inner
+            .call("mln_render_session_set_webgpu_surface_target")?;
         let descriptor = call.reference(&descriptor)?;
         call.complete(
             |session, completion, out_diagnostic| unsafe {
-                sys::mln_webgpu_surface_set_target(session, descriptor, completion, out_diagnostic)
+                sys::mln_render_session_set_webgpu_surface_target(
+                    session,
+                    descriptor,
+                    completion,
+                    out_diagnostic,
+                )
             },
             completion::unit,
         )

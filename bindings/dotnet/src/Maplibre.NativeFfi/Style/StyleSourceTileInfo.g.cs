@@ -3,27 +3,34 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Inline tile metadata selected as one value by the source-info field mask.
+/// Inline TileJSON metadata of a tile source.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_source_tile_info</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="TileCount">
-/// Inline tile URL count.
-/// </param>
-/// <param name="MinZoom">
-/// Minimum zoom.
-/// </param>
-/// <param name="MaxZoom">
-/// Maximum zoom.
-/// </param>
-/// <param name="Scheme">
-/// One of <c>mln_style_tile_scheme</c>.
-/// </param>
-public readonly partial record struct StyleSourceTileInfo(
-    ulong TileCount,
-    double MinZoom,
-    double MaxZoom,
-    StyleTileScheme Scheme
-);
+public readonly record struct StyleSourceTileInfo
+{
+    public StyleSourceTileInfo(
+        string[] TileUrls,
+        double MinZoom,
+        double MaxZoom,
+        StyleTileScheme Scheme
+    )
+    {
+        this.TileUrls = TileUrls;
+        this.MinZoom = MinZoom;
+        this.MaxZoom = MaxZoom;
+        this.Scheme = Scheme;
+    }
+
+    public string[] TileUrls
+    {
+        get => TileUrlsStorage.ToArray();
+        init => TileUrlsStorage = ValueArray.Copy(value);
+    }
+    internal ValueArray<string> TileUrlsStorage { get; init; }
+    public double MinZoom { get; init; }
+    public double MaxZoom { get; init; }
+    public StyleTileScheme Scheme { get; init; }
+}

@@ -44,7 +44,7 @@ mln_status open_map(
     .callback = map_created,
     .user_data = out_map,
   };
-  return mln_map_create(runtime, &options, &completion, NULL);
+  return mln_runtime_create_map(runtime, &options, &completion, NULL);
   // #endregion map
 }
 

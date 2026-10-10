@@ -257,10 +257,10 @@ func passImageToCForTest(image *C.mln_premultiplied_rgba8_image) (err error) {
 	return nil
 }
 
-// mapCreateFailingAfterAdoptionForTest creates a map through a completion
+// createMapFailingAfterAdoptionForTest creates a map through a completion
 // whose conversion adopts the native map and then panics: a conversion that
 // fails while it owns a value.
-func mapCreateFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*MapHandle], error) {
+func createMapFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*MapHandle], error) {
 	return bindingCall(func() *Future[*MapHandle] {
 		arena := &bindingArena{}
 		defer arena.close()
@@ -269,7 +269,7 @@ func mapCreateFailingAfterAdoptionForTest(receiver *RuntimeHandle) (*Future[*Map
 		options := (*C.mln_map_options)(arena.allocate(unsafe.Sizeof(C.mln_map_options{})))
 		*options = nativeMapOptions(DefaultMapOptions(), arena)
 		future, err := startCompletion(func(completion *C.mln_completion, diagnostic *C.mln_diagnostic) int32 {
-			return int32(C.mln_map_create(C.mln_runtime(raw), options, completion, diagnostic))
+			return int32(C.mln_runtime_create_map(C.mln_runtime(raw), options, completion, diagnostic))
 		}, func(result *C.mln_completion_result) (*MapHandle, error) {
 			value, err := completionValue[C.mln_map](result)
 			if err != nil {

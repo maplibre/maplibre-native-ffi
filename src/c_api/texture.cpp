@@ -67,7 +67,7 @@ auto mln_render_target_extent_physical_size(
   });
 }
 
-auto mln_metal_owned_texture_attach(
+auto mln_map_attach_metal_owned_texture(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -80,7 +80,7 @@ auto mln_metal_owned_texture_attach(
   });
 }
 
-auto mln_metal_borrowed_texture_attach(
+auto mln_map_attach_metal_borrowed_texture(
   mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -93,7 +93,7 @@ auto mln_metal_borrowed_texture_attach(
   });
 }
 
-auto mln_vulkan_owned_texture_attach(
+auto mln_map_attach_vulkan_owned_texture(
   mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -106,7 +106,7 @@ auto mln_vulkan_owned_texture_attach(
   });
 }
 
-auto mln_vulkan_borrowed_texture_attach(
+auto mln_map_attach_vulkan_borrowed_texture(
   mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -119,7 +119,7 @@ auto mln_vulkan_borrowed_texture_attach(
   });
 }
 
-auto mln_opengl_owned_texture_attach(
+auto mln_map_attach_opengl_owned_texture(
   mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -132,7 +132,7 @@ auto mln_opengl_owned_texture_attach(
   });
 }
 
-auto mln_opengl_borrowed_texture_attach(
+auto mln_map_attach_opengl_borrowed_texture(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -145,7 +145,7 @@ auto mln_opengl_borrowed_texture_attach(
   });
 }
 
-auto mln_webgpu_owned_texture_attach(
+auto mln_map_attach_webgpu_owned_texture(
   mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -158,7 +158,7 @@ auto mln_webgpu_owned_texture_attach(
   });
 }
 
-auto mln_webgpu_borrowed_texture_attach(
+auto mln_map_attach_webgpu_borrowed_texture(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session, const mln_completion* completion,
@@ -171,7 +171,7 @@ auto mln_webgpu_borrowed_texture_attach(
   });
 }
 
-auto mln_metal_borrowed_texture_set_target(
+auto mln_render_session_set_metal_borrowed_texture_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -183,7 +183,7 @@ auto mln_metal_borrowed_texture_set_target(
   });
 }
 
-auto mln_vulkan_borrowed_texture_set_target(
+auto mln_render_session_set_vulkan_borrowed_texture_target(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -195,7 +195,7 @@ auto mln_vulkan_borrowed_texture_set_target(
   });
 }
 
-auto mln_opengl_borrowed_texture_set_target(
+auto mln_render_session_set_opengl_borrowed_texture_target(
   mln_render_session session,
   const mln_opengl_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -207,7 +207,7 @@ auto mln_opengl_borrowed_texture_set_target(
   });
 }
 
-auto mln_webgpu_borrowed_texture_set_target(
+auto mln_render_session_set_webgpu_borrowed_texture_target(
   mln_render_session session,
   const mln_webgpu_borrowed_texture_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -219,7 +219,7 @@ auto mln_webgpu_borrowed_texture_set_target(
   });
 }
 
-auto mln_texture_read_premultiplied_rgba8(
+auto mln_render_session_read_texture(
   mln_render_session session, const mln_completion* completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {

@@ -72,7 +72,7 @@ class GeneratedShapesTest {
           fieldOfView = 40.0,
         )
       map.updateCamera(CameraUpdate(camera = camera)).awaitCommitted()
-      val snapshot = map.cameraSnapshotGet().camera
+      val snapshot = map.getCameraSnapshot().camera
       assertEquals(12.0, assertNotNull(snapshot.center).latitude, 1e-6)
       assertEquals(34.0, assertNotNull(snapshot.center).longitude, 1e-6)
       assertEquals(123.0, assertNotNull(snapshot.centerAltitude), 1e-6)
@@ -87,12 +87,12 @@ class GeneratedShapesTest {
 
       // An update that sets only the zoom leaves every other field where it was.
       map.updateCamera(CameraUpdate(camera = CameraOptions(zoom = 6.0))).awaitCommitted()
-      val updated = map.cameraSnapshotGet().camera
+      val updated = map.getCameraSnapshot().camera
       assertEquals(6.0, assertNotNull(updated.zoom), 1e-6)
       assertEquals(25.0, assertNotNull(updated.bearing), 1e-6)
 
       map.setBounds(BoundOptions(unbounded = true)).awaitCommitted()
-      assertTrue(map.snapshotGet().bounds.unbounded)
+      assertTrue(map.getSnapshot().bounds.unbounded)
 
       // A selector's optional state key narrows a removal to one member.
       val selector = FeatureStateSelector("source", featureId = "feature")
@@ -126,8 +126,8 @@ class GeneratedShapesTest {
         val image = PremultipliedRgba8Image(width.toUInt(), width.toUInt(), stride.toUInt(), pixels)
         map.setStyleImage("image", image, StyleImageOptions()).awaitCommitted()
         // The submission copies the rows out of the padded stride, and the readback is unpadded.
-        val copied = map.copyStyleImagePremultipliedRgba8("image").awaitWithin("the image")
-        assertContentEquals(expected, copied)
+        val copied = map.getStyleImage("image").awaitWithin("the image")
+        assertContentEquals(expected, copied?.pixels)
       }
     }
   }
@@ -138,7 +138,7 @@ class GeneratedShapesTest {
       loadStyle("""{"version":8,"sources":{},"layers":[{"id":"bg","type":"background"}]}""")
       // The binding passes an unknown enum value through unchanged, and native rejects it.
       map
-        .setLayerVisibility("bg", StyleLayerVisibility(900u))
+        .setStyleLayerVisibility("bg", StyleLayerVisibility(900u))
         .awaitFailed(MaplibreStatus.INVALID_ARGUMENT)
 
       // A map's event source is its handle, whose top byte carries the handle kind.

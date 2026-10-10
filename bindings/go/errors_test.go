@@ -15,10 +15,10 @@ import (
 // that writes no diagnostic reports none even after an earlier call filled the
 // shared diagnostic buffer.
 func TestNativeStatusMapsToTypedErrors(t *testing.T) {
-	err := NetworkStatusSet(NetworkStatus(999_999))
+	err := NetworkSetStatus(NetworkStatus(999_999))
 	var native *Error
 	if !errors.As(err, &native) || !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("NetworkStatusSet(invalid) = %v, want an *Error wrapping ErrInvalidArgument", err)
+		t.Fatalf("NetworkSetStatus(invalid) = %v, want an *Error wrapping ErrInvalidArgument", err)
 	}
 	if status, ok := native.RawStatus(); !ok || status != -1 {
 		t.Fatalf("RawStatus() = %d, %v; want -1, true", status, ok)

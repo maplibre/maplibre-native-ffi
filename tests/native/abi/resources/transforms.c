@@ -191,7 +191,7 @@ static void a_header_needs_a_transform_invocation_and_a_valid_field(void) {
     .size = sizeof(mln_http_header_transform_response),
   };
   MLN_TEST_STATUS(
-    MLN_STATUS_INVALID_STATE, mln_http_header_transform_response_set(
+    MLN_STATUS_INVALID_STATE, mln_http_header_transform_response_set_header(
                                 &response, "X-Test", 6, "value", 5, NULL
                               )
   );
@@ -201,7 +201,7 @@ static void a_header_needs_a_transform_invocation_and_a_valid_field(void) {
     const header_case* row = &refused_headers[index];
     TEST_ASSERT_EQUAL_INT_MESSAGE(
       MLN_STATUS_INVALID_ARGUMENT,
-      mln_http_header_transform_response_set(
+      mln_http_header_transform_response_set_header(
         &response, row->name, row->name_size, row->value, row->value_size, NULL
       ),
       row->label
@@ -431,7 +431,7 @@ static mln_status add_token(
   token_transform* transform = user_data;
   atomic_fetch_add(&transform->calls, 1);
   atomic_store(&transform->last_kind, kind);
-  return mln_http_header_transform_response_set(
+  return mln_http_header_transform_response_set_header(
     out_response, token_header, sizeof(token_header) - 1, token_value,
     sizeof(token_value) - 1, NULL
   );

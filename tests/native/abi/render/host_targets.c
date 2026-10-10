@@ -32,7 +32,7 @@ static uint32_t render_frame(
 // when it is refused or of the completion when it is accepted.
 static mln_status read_back(const mln_test_render_fixture* fixture) {
   mln_test_completion readback = mln_test_completion_readback();
-  const mln_status submitted = mln_texture_read_premultiplied_rgba8(
+  const mln_status submitted = mln_render_session_read_texture(
     fixture->session, &readback.descriptor, NULL
   );
   if (submitted != MLN_STATUS_OK) {
@@ -198,7 +198,7 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
   descriptor.layer = info.metal_layer;
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
-    mln_metal_surface_set_target(
+    mln_render_session_set_metal_surface_target(
       fixture.session, &descriptor, &completion.descriptor, MLN_TEST_DIAGNOSTIC
     )
   );

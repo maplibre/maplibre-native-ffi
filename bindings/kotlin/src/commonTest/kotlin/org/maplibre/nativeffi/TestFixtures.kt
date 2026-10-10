@@ -174,7 +174,7 @@ internal suspend fun <T> withMap(
   block: suspend MapFixture.() -> T,
 ): T =
   RuntimeFixture.use(provider, runtimeOptions) {
-    val map = runtime.mapCreate(options).awaitWithin("the map")
+    val map = runtime.createMap(options).awaitWithin("the map")
     runThenRelease(listOf(map)) { MapFixture(this, map).block() }
   }
 

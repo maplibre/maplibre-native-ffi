@@ -433,18 +433,11 @@ class Values:
         )
 
     def mask_type(self, plan: ValuePlan, name: str) -> str:
-        current = plan
-        for segment in name.split("."):
-            control = next(field for field in current.fields if field.name == segment)
-            current = control.value
-        return self.native_type(current)
+        control = next(field for field in plan.fields if field.name == name)
+        return self.native_type(control.value)
 
     def mask_enum(self, plan: ValuePlan, name: str) -> str | None:
-        current, control = plan, None
-        for segment in name.split("."):
-            control = next(field for field in current.fields if field.name == segment)
-            current = control.value
-        assert control is not None
+        control = next(field for field in plan.fields if field.name == name)
         enum = typed_mask(control)
         if enum:
             self.mask_enums.add(enum)
@@ -716,10 +709,6 @@ class Values:
             presence = field.presence
             indent = "        "
             if presence and presence.mask:
-                if "." in presence.mask:
-                    lines.append(
-                        f"        native.{member(presence.mask)} &= ~{self.bit(plan, presence.mask, presence.bit)};"
-                    )
                 if put := self.put(plan, presence, field, expression):
                     lines.append(put)
                     continue

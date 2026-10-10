@@ -40,7 +40,7 @@ using mln::native_tests::SyncPointScope;
 // work below stand in for. Any surface attachment and any maintenance request
 // serves, because each one delivers no value.
 constexpr auto surface_attach_completion =
-  mln::core::valueless_completion<&mln_metal_surface_attach>();
+  mln::core::valueless_completion<&mln_map_attach_metal_surface>();
 constexpr auto driver_work_completion =
   mln::core::valueless_completion<&mln_render_session_reduce_memory_use>();
 
@@ -99,7 +99,7 @@ auto create_map(mln_runtime runtime) -> mln_map {
   const auto completion = descriptor(result);
   auto options = mln_map_options_default();
   options.map_mode = MLN_MAP_MODE_STATIC;
-  MLN_TEST_OK(mln_map_create(runtime, &options, &completion, nullptr));
+  MLN_TEST_OK(mln_runtime_create_map(runtime, &options, &completion, nullptr));
   TEST_ASSERT_TRUE(released(result));
   MLN_TEST_OK(result.status.load());
   return result.handle;
@@ -223,7 +223,7 @@ void unclaimed_creation_disposes_on_the_callback_thread() {
     ++static_cast<UnclaimedCreation*>(context)->result.releases;
     mln_test_pulse();
   };
-  MLN_TEST_OK(mln_map_create(runtime, nullptr, &completion, nullptr));
+  MLN_TEST_OK(mln_runtime_create_map(runtime, nullptr, &completion, nullptr));
   TEST_ASSERT_TRUE(released(creation.result));
   MLN_TEST_OK(creation.result.status.load());
   TEST_ASSERT_NULL_MESSAGE(
@@ -296,7 +296,7 @@ void failed_creation_releases_parent_reservation() {
   auto status = MLN_STATUS_OK;
   {
     const auto faults = AllocationFaults{};
-    status = mln_map_create(runtime, nullptr, &completion, nullptr);
+    status = mln_runtime_create_map(runtime, nullptr, &completion, nullptr);
   }
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, status);
   TEST_ASSERT_EQUAL_UINT(0, result.releases.load());
@@ -341,7 +341,7 @@ void disposal_waits_for_pending_child_creation() {
   park_worker(*live, worker);
   auto result = Result{};
   const auto completion = descriptor(result);
-  MLN_TEST_OK(mln_map_create(runtime, nullptr, &completion, nullptr));
+  MLN_TEST_OK(mln_runtime_create_map(runtime, nullptr, &completion, nullptr));
   MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
     return mln_runtime_dispose(runtime, nullptr);
   });

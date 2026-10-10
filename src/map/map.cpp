@@ -797,6 +797,7 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   void reset() override {
     const std::scoped_lock lock(latest_update_mutex_);
     latest_update_.reset();
+    held_update_.reset();
     repaint_demand_ = false;
   }
 
@@ -806,32 +807,29 @@ class HeadlessFrontend final : public mln::RendererFrontend {
       std::make_unique<ForwardingRendererObserver>(run_loop_, observer);
   }
 
-  // Store render state before publishing it to sessions and event consumers.
+  // Holds render state while a hold is open, and otherwise publishes it.
   void update(std::shared_ptr<mln::UpdateParameters> update) override {
-    std::function<void()> publish;
-    std::function<void()> publish_session;
-    {
+    if (hold_depth_ > 0) {
       const std::scoped_lock lock(latest_update_mutex_);
-      latest_update_ = std::move(update);
-      ++latest_update_generation_;
-      repaint_demand_ = true;
-      publish = publish_;
-      publish_session = session_publish_;
+      held_update_ = std::move(update);
+      return;
     }
-    if (publish) {
-      publish();
-    }
-    if (publish_session) {
-      publish_session();
-    }
-    if (
-      mln::core::event_selected(
-        event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-      )
-    ) {
-      mln::core::push_runtime_map_event(
-        runtime_, map_, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-      );
+    publish_update(std::move(update));
+  }
+
+  // Each update is a complete snapshot of the map, so while a hold is open
+  // only the newest one is kept, and the outermost release publishes it. Holds
+  // nest. Only commands on the map's run loop open or release one.
+  auto hold() -> void { ++hold_depth_; }
+  auto release() -> void {
+    if (hold_depth_ == 0) return;
+    if (--hold_depth_ == 0) {
+      auto held = std::shared_ptr<mln::UpdateParameters>{};
+      {
+        const std::scoped_lock lock(latest_update_mutex_);
+        held = std::move(held_update_);
+      }
+      if (held) publish_update(std::move(held));
     }
   }
 
@@ -910,18 +908,54 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   }
 
  private:
+  // Stores render state before publishing it to sessions and event consumers.
+  auto publish_update(std::shared_ptr<mln::UpdateParameters> update) -> void {
+    std::function<void()> publish;
+    std::function<void()> publish_session;
+    {
+      const std::scoped_lock lock(latest_update_mutex_);
+      latest_update_ = std::move(update);
+      ++latest_update_generation_;
+      repaint_demand_ = true;
+      publish = publish_;
+      publish_session = session_publish_;
+    }
+    if (publish) {
+      publish();
+    }
+    if (publish_session) {
+      publish_session();
+    }
+    if (
+      mln::core::event_selected(
+        event_state_->mask, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+      )
+    ) {
+      mln::core::push_runtime_map_event(
+        runtime_, map_, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+      );
+    }
+  }
+
   mln_runtime runtime_;
   mln_map map_;
   mln::util::RunLoop& run_loop_;
   std::shared_ptr<mln::core::MapEventState> event_state_;
   std::unique_ptr<ForwardingRendererObserver> observer_;
   mln::TaggedScheduler thread_pool_;
+  // Guards every field from latest_update_ through repaint_demand_. Render
+  // sessions read the published update from their own threads, and reset() can
+  // touch held_update_ outside a command when a disposed map retires.
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mln::UpdateParameters> latest_update_;
+  std::shared_ptr<mln::UpdateParameters> held_update_;
   std::function<void()> publish_;
   std::function<void()> session_publish_;
   uint64_t latest_update_generation_ = 0;
   bool repaint_demand_ = false;
+  // Not guarded: only commands and mbgl callbacks on the map's run loop touch
+  // it.
+  uint32_t hold_depth_ = 0;
 };
 
 }  // namespace mln::core
@@ -929,6 +963,35 @@ class HeadlessFrontend final : public mln::RendererFrontend {
 namespace {
 
 using mln::core::HeadlessFrontend;
+
+// Holds a command's render updates so the command publishes at most one: the
+// newest, when the scope closes. Close it before publishing the commit
+// snapshot, so the snapshot reports the update. On an exception the destructor
+// still publishes what the command already changed.
+class RenderUpdateScope {
+ public:
+  explicit RenderUpdateScope(HeadlessFrontend& frontend)
+      : frontend_(&frontend) {
+    frontend.hold();
+  }
+  RenderUpdateScope(const RenderUpdateScope&) = delete;
+  RenderUpdateScope(RenderUpdateScope&&) = delete;
+  auto operator=(const RenderUpdateScope&) -> RenderUpdateScope& = delete;
+  auto operator=(RenderUpdateScope&&) -> RenderUpdateScope& = delete;
+  ~RenderUpdateScope() {
+    try {
+      close();
+    } catch (...) {  // NOLINT(bugprone-empty-catch)
+    }
+  }
+
+  auto close() -> void {
+    if (frontend_ != nullptr) std::exchange(frontend_, nullptr)->release();
+  }
+
+ private:
+  HeadlessFrontend* frontend_;
+};
 
 auto validate_map_options(const mln_map_options* options) -> mln_status {
   if (options == nullptr) {
@@ -2470,12 +2533,15 @@ auto submit_map_command(
       auto message = std::string{};
       auto generation = uint64_t{0};
       try {
+        auto updates = RenderUpdateScope{*live->frontend};
         status = std::invoke(std::move(work), *live);
         // A diagnostic is the failure's text; completion.h promises the
         // message is empty on success, so a swallowed one is not attached.
         if (status != MLN_STATUS_OK) {
           message = thread_last_error_message();
-        } else {
+        }
+        updates.close();
+        if (status == MLN_STATUS_OK) {
           // Committed commands republish so snapshot reads observe the
           // commit.
           generation = publish_map_snapshot(*live);
@@ -2788,7 +2854,7 @@ auto create_map_start(
       }
       const auto map = (*pending)->value();
       (*pending)->transfer();
-      CompletionValue<&mln_map_create>::complete(completion_state, map);
+      CompletionValue<&mln_runtime_create_map>::complete(completion_state, map);
     });
   const auto submit_status = submit_runtime_operation(
     runtime_state, state, [runtime, effective, state]() mutable -> void {
@@ -2885,9 +2951,11 @@ auto map_resize(
         return;
       }
       try {
+        auto updates = RenderUpdateScope{*live->frontend};
         live->logical_extent.width = extent.width;
         live->logical_extent.height = extent.height;
         live->map->setSize(mln::Size{extent.width, extent.height});
+        updates.close();
         const auto generation = publish_map_snapshot(*live);
         complete_command(
           completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
@@ -3194,7 +3262,9 @@ auto map_request_repaint(mln_map map, const mln_completion* completion)
     [live = std::move(context.map), submission = std::move(context.control),
      completion_state](uint64_t) mutable -> void {
       try {
+        auto updates = RenderUpdateScope{*live->frontend};
         live->map->triggerRepaint();
+        updates.close();
         const auto generation = publish_map_snapshot(*live);
         complete_command(
           completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
@@ -3209,6 +3279,38 @@ auto map_request_repaint(mln_map map, const mln_completion* completion)
       }
     },
     completion_state
+  );
+}
+
+auto map_begin_command_group(mln_map map, const mln_completion* completion)
+  -> mln_status {
+  return submit_map_command(
+    map,
+    [](MapObject& live) -> mln_status {
+      live.frontend->hold();
+      ++live.command_group_depth;
+      return MLN_STATUS_OK;
+    },
+    completion
+  );
+}
+
+auto map_end_command_group(mln_map map, const mln_completion* completion)
+  -> mln_status {
+  return submit_map_command(
+    map,
+    [](MapObject& live) -> mln_status {
+      if (live.command_group_depth == 0) {
+        set_thread_error("map has no open command group");
+        return MLN_STATUS_INVALID_STATE;
+      }
+      --live.command_group_depth;
+      // The command's own update scope publishes the held update when this
+      // was the outermost group.
+      live.frontend->release();
+      return MLN_STATUS_OK;
+    },
+    completion
   );
 }
 
@@ -3255,6 +3357,14 @@ auto map_request_still_image_start(
         state->complete(
           MLN_STATUS_INVALID_STATE,
           "map already has a pending still-image request", {}
+        );
+        return;
+      }
+      // A held update is not published, so the request would bind to the
+      // generation of an update that predates it.
+      if (live->command_group_depth > 0) {
+        state->complete(
+          MLN_STATUS_INVALID_STATE, "map has an open command group", {}
         );
         return;
       }
@@ -3631,7 +3741,7 @@ auto map_remove_feature_state(
 
 auto map_loaded_style_json_start(mln_map map, const mln_completion* completion)
   -> mln_status {
-  return start_map_string_operation<&mln_map_loaded_style_json>(
+  return start_map_string_operation<&mln_map_get_loaded_style_json>(
     map, completion, [](MapObject& live) -> std::string {
       return live.map->getStyle().getJSON();
     }
@@ -3640,7 +3750,7 @@ auto map_loaded_style_json_start(mln_map map, const mln_completion* completion)
 
 auto map_style_url_start(mln_map map, const mln_completion* completion)
   -> mln_status {
-  return start_map_string_operation<&mln_map_style_url>(
+  return start_map_string_operation<&mln_map_get_style_url>(
     map, completion,
     [](MapObject& live) -> std::string { return live.map->getStyle().getURL(); }
   );
@@ -3727,7 +3837,9 @@ auto submit_camera_command(
      submission = std::move(context.control),
      completion_state](uint64_t) mutable -> void {
       try {
+        auto updates = RenderUpdateScope{*live->frontend};
         mutation(*live, map);
+        updates.close();
         const auto generation = publish_map_snapshot(*live);
         complete_command(
           completion_state, MLN_COMMAND_DISPOSITION_COMMITTED, MLN_STATUS_OK,
@@ -3928,23 +4040,23 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
   }
   auto submission = std::make_shared<ControlLease>(&live->control);
   auto completion_state = std::make_shared<Completion>(*completion);
-  auto state = std::make_shared<OperationObject>([completion_state](
-                                                   mln_status status,
-                                                   std::string diagnostic,
-                                                   std::any result
-                                                 ) {
-    auto* value = std::any_cast<mln_camera_query_result>(&result);
-    if (status != MLN_STATUS_OK || value == nullptr) {
-      complete_failure(
-        completion_state,
-        status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
-        status == MLN_STATUS_OK ? "camera query produced an invalid result"
-                                : std::move(diagnostic)
-      );
-      return;
-    }
-    CompletionValue<&mln_map_camera_query>::complete(completion_state, *value);
-  });
+  auto state =
+    std::make_shared<OperationObject>([completion_state](
+                                        mln_status status,
+                                        std::string diagnostic, std::any result
+                                      ) {
+      auto* value = std::any_cast<mln_camera_query_result>(&result);
+      if (status != MLN_STATUS_OK || value == nullptr) {
+        complete_failure(
+          completion_state,
+          status == MLN_STATUS_OK ? MLN_STATUS_NATIVE_ERROR : status,
+          status == MLN_STATUS_OK ? "camera query produced an invalid result"
+                                  : std::move(diagnostic)
+        );
+        return;
+      }
+      CompletionValue<&mln_map_get_camera>::complete(completion_state, *value);
+    });
   const auto runtime = live->runtime_state;
   const auto submit_status = submit_runtime_operation(
     runtime, state,
@@ -4320,7 +4432,7 @@ auto map_projection_create_start(mln_map map, const mln_completion* completion)
       return;
     }
     const auto handle = handle_table<MapProjectionObject>().insert(*projection);
-    CompletionValue<&mln_map_projection_create>::complete(
+    CompletionValue<&mln_map_create_projection>::complete(
       completion_state, handle
     );
   });

@@ -66,7 +66,7 @@ internal sealed class NativeFixture : IAsyncDisposable
         {
             await runtime.SetResourceProviderAsync(provider ?? DenyingProvider, TestWaits.Token);
             var map = await runtime
-                .MapCreateAsync(options ?? SmallMap)
+                .CreateMapAsync(options ?? SmallMap)
                 .WaitAsync(TestWaits.Deadline, TestWaits.Token);
             return new NativeFixture(runtime, map, events);
         }

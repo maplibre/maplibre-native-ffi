@@ -30,7 +30,7 @@ class OwnedTextureSessionTest {
       // One more frame, left for the test to acquire below.
       assertEquals(RenderResult.RENDERED, renderFrame().disposition)
 
-      val readback = complete(session.textureReadPremultipliedRgba8())
+      val readback = complete(session.readTexture())
       assertEquals(32u, readback.info.width)
       assertEquals(16u, readback.info.height)
       assertEquals(readback.info.stride.toULong() * 16uL, readback.info.byteLength)

@@ -141,7 +141,7 @@ void main() {
     () async {
       final runtime = runtimeCreate(runtimeOptionsDefault());
       // Constructing a map queues events, so the drain below has a batch.
-      final map = await runtime.mapCreate(mapOptionsDefault());
+      final map = await runtime.createMap(mapOptionsDefault());
       // A stride wider than this binding's own record is what a C API version
       // that added a payload member reports, so the decoder indexes by it.
       final eventSize = sizeOf<raw.mln_runtime_event>() + 8;

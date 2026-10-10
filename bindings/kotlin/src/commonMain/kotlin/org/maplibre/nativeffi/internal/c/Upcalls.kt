@@ -91,12 +91,29 @@ internal object Upcalls {
     }
 
   @JvmStatic
+  fun resourceRequestCancelHandlerCallback(userData: Long): Unit =
+    upcall<ResourceRequestCancelHandler, Unit>(
+      "mln_resource_request_cancel_callback",
+      userData,
+      Unit,
+      setOf(
+        "mln_resource_request_complete",
+        "mln_resource_request_is_cancelled",
+        "mln_resource_request_set_cancel_callback",
+        "mln_resource_request_release",
+      ),
+      { it.owner },
+    ) { value, scope ->
+      value.callback()
+    }
+
+  @JvmStatic
   fun httpHeaderTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
     upcall<HttpHeaderTransform, Int>(
       "mln_http_header_transform_callback",
       userData,
       -5,
-      setOf("mln_http_header_transform_response_set"),
+      setOf("mln_http_header_transform_response_set_header"),
       { outResponse },
     ) { value, scope ->
       value.callback(
@@ -115,7 +132,7 @@ internal object Upcalls {
       0,
       setOf(
         "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
+        "mln_resource_request_is_cancelled",
         "mln_resource_request_set_cancel_callback",
         "mln_resource_request_release",
       ),
@@ -144,23 +161,6 @@ internal object Upcalls {
         ResourceTransformResponse(outResponse, scope),
       )
       0
-    }
-
-  @JvmStatic
-  fun resourceRequestCancelHandlerCallback(userData: Long): Unit =
-    upcall<ResourceRequestCancelHandler, Unit>(
-      "mln_resource_request_cancel_callback",
-      userData,
-      Unit,
-      setOf(
-        "mln_resource_request_complete",
-        "mln_resource_request_cancelled",
-        "mln_resource_request_set_cancel_callback",
-        "mln_resource_request_release",
-      ),
-      { it.owner },
-    ) { value, scope ->
-      value.callback()
     }
 
   @JvmStatic
@@ -195,10 +195,10 @@ internal expect object UpcallStubs {
   val customGeometrySourceOptionsCancelTile: Long
   val customMvtVectorSourceOptionsFetchTile: Long
   val customMvtVectorSourceOptionsCancelTile: Long
+  val resourceRequestCancelHandlerCallback: Long
   val httpHeaderTransformCallback: Long
   val resourceProviderCallback: Long
   val resourceTransformCallback: Long
-  val resourceRequestCancelHandlerCallback: Long
   val wakeCallback: Long
   val queueLockLock: Long
   val queueLockUnlock: Long

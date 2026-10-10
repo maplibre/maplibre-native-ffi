@@ -100,7 +100,7 @@ private constructor(
       when (graphics) {
         is EglGraphicsContext -> {
           val replacement =
-            session.openglSurfaceSetTarget(
+            session.setOpenglSurfaceTarget(
               OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
             )
           map.resize(
@@ -206,7 +206,7 @@ private constructor(
       val attachment =
         when (graphics) {
           is EglGraphicsContext ->
-            map.openglSurfaceAttach(
+            map.attachOpenglSurface(
               OpenglSurfaceDescriptor(
                 viewport.extent,
                 graphics.descriptor,
@@ -215,7 +215,7 @@ private constructor(
               options,
             )
           is VulkanGraphicsContext ->
-            map.vulkanSurfaceAttach(
+            map.attachVulkanSurface(
               VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfaceHandle),
               options,
             )

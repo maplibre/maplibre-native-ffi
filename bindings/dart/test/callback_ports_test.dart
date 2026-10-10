@@ -78,7 +78,7 @@ void main() {
       final probe = singleCallbackPortProbeForTesting(map)!;
       // The mask reads back as the host set it, because the binding selects
       // no events of its own.
-      expect(map.snapshotGet().eventMask, _maskWithoutStyleLoaded);
+      expect(map.getSnapshot().eventMask, _maskWithoutStyleLoaded);
 
       await expectCommitted(map.setStyleJson(jsonBytes(emptyStyleJson)));
       await within(probe.released, 'the release after a style replacement');

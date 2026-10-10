@@ -108,7 +108,7 @@ public struct HttpHeaderTransform: Sendable {
 }
 
 private let allowedHttpHeaderTransformCallback: Set<String> =
-  ["mln_http_header_transform_response_set"]
+  ["mln_http_header_transform_response_set_header"]
 private func invokeHttpHeaderTransformCallback(
   user_data: UnsafeMutableRawPointer?,
   kind: UInt32,
@@ -419,7 +419,7 @@ public struct ResourceProvider: Sendable {
 
 private let allowedResourceProviderCallback: Set<String> = [
   "mln_resource_request_complete",
-  "mln_resource_request_cancelled",
+  "mln_resource_request_is_cancelled",
   "mln_resource_request_set_cancel_callback",
   "mln_resource_request_release",
 ]
@@ -646,7 +646,7 @@ public struct ResourceRequestCancelHandler: Sendable {
 
 private let allowedResourceRequestCancelHandlerCallback: Set<String> = [
   "mln_resource_request_complete",
-  "mln_resource_request_cancelled",
+  "mln_resource_request_is_cancelled",
   "mln_resource_request_set_cancel_callback",
   "mln_resource_request_release",
 ]

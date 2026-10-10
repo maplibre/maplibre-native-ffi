@@ -215,7 +215,7 @@ def declaration(values, value):
         )
         copied = decode(values, field.value, raw)
         if optional:
-            path = ".".join(identifier(part) for part in field.presence.mask.split("."))
+            path = identifier(field.presence.mask)
             bit = field.presence.bit
             present = f"raw.{path} & c.{bit} != 0"
             mark = f"raw.{path} |= c.{bit}"

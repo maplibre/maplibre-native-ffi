@@ -97,6 +97,15 @@ threads. Snapshot reads never call into mutable MapLibre map state. Each
 committed command completion reports the snapshot generation that its commit
 published, so a host can fence a snapshot read on it.
 
+A command publishes at most one render update, so no frame shows a command
+partly applied. A command group extends this to several commands, such as a
+layer and its filter. Between `mln_map_begin_command_group()` and the matching
+end, each command still commits and completes on its own, while the map holds
+its render updates. The end publishes the latest held update, so a frame shows
+either none of the group or all of it. A group also holds camera, gesture, and
+loading updates, so submit its commands and its end together, without waiting in
+between.
+
 ## Render session
 
 A render session renders one map to one render target. A map carries at most one
@@ -224,11 +233,11 @@ Each binding surfaces these channels in its own idiom: an exception, a result
 type, an asynchronous result, or an event stream. Render-driver calls report
 their graphics-thread failures in their returned status.
 
-A style entity that doesn't exist, such as a source, layer, or image ID, is
-reported through the completion. A command that targets it completes with
-`MLN_STATUS_NOT_FOUND`. A query that reads a whole entity succeeds with no
-value. A query that reads one attribute of a missing layer completes with
-`MLN_STATUS_NOT_FOUND`.
+A call that names an object that doesn't exist, such as a style source, layer,
+or image, or an offline region, reports it through the completion. A query that
+reads the whole object succeeds with no value. A command on it, or a query that
+reads one of its members, completes with `MLN_STATUS_NOT_FOUND`; such a query
+succeeds with no value only when the object exists and lacks that member.
 
 ## Layer plugins
 

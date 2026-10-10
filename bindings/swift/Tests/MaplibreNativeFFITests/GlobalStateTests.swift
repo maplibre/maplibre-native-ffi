@@ -162,7 +162,7 @@ struct GlobalStateTests {
             error is WakeFailure else { return }
       let refused: Bool
       do {
-        _ = try Maplibre.networkStatusGet()
+        _ = try Maplibre.networkGetStatus()
         refused = false
       } catch {
         refused = (error as? MaplibreError)?.kind == .invalidState

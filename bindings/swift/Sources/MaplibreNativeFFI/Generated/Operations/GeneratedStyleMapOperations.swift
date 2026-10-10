@@ -371,148 +371,6 @@ public extension MapHandle {
     }
   }
 
-  /// Copies one layer's source ID.
-  ///
-  /// See `mln_map_copy_layer_source_id` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func copyLayerSourceId(layerId bindingArg0: String) async throws -> String? {
-    try await nativeStart(
-      "mln_map_copy_layer_source_id",
-      convert: { result in try NativeCompletion.value(
-        result,
-        as: mln_buffer_view.self
-      ).size == 0 ? nil : try NativeCompletion.string(result) }
-    ) { raw, arena, completion, diagnostic in mln_map_copy_layer_source_id(
-      raw,
-      arena.view(bindingArg0),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Copies one layer's source-layer ID.
-  ///
-  /// See `mln_map_copy_layer_source_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func copyLayerSourceLayer(layerId bindingArg0: String) async throws
-    -> String?
-  {
-    try await nativeStart(
-      "mln_map_copy_layer_source_layer",
-      convert: { result in try NativeCompletion.value(
-        result,
-        as: mln_buffer_view.self
-      ).size == 0 ? nil : try NativeCompletion.string(result) }
-    ) { raw, arena, completion, diagnostic in mln_map_copy_layer_source_layer(
-      raw,
-      arena.view(bindingArg0),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Copies one runtime style image as tightly packed premultiplied RGBA8
-  /// pixels.
-  ///
-  /// See `mln_map_copy_style_image_premultiplied_rgba8` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func copyStyleImagePremultipliedRgba8(
-    imageId bindingArg0: String
-  ) async throws
-    -> Data?
-  {
-    try await nativeStart(
-      "mln_map_copy_style_image_premultiplied_rgba8",
-      convert: { result in
-        if result.pointee
-          .value_count == 0 { return nil }; return try NativeCompletion
-                  .data(result)
-      }
-    ) { raw, arena, completion, diagnostic in
-      mln_map_copy_style_image_premultiplied_rgba8(
-        raw,
-        arena.view(bindingArg0),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Copies one runtime style image's stretchable intervals.
-  ///
-  /// See `mln_map_copy_style_image_stretches` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func copyStyleImageStretches(imageId bindingArg0: String) async throws
-    -> StyleImageStretchesResult?
-  {
-    try await nativeStart(
-      "mln_map_copy_style_image_stretches",
-      convert: { result in
-        if result.pointee
-          .value_count ==
-          0
-        { return nil
-        }; return try StyleImageStretchesResult(raw: NativeCompletion.value(
-          result,
-          as: mln_style_image_stretches_result.self
-        ))
-      }
-    ) { raw, arena, completion, diagnostic in
-      mln_map_copy_style_image_stretches(
-        raw,
-        arena.view(bindingArg0),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Copies one style source attribution string.
-  ///
-  /// See `mln_map_copy_style_source_attribution` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func copyStyleSourceAttribution(sourceId bindingArg0: String) async throws
-    -> String?
-  {
-    try await nativeStart(
-      "mln_map_copy_style_source_attribution",
-      convert: { result in
-        if result.pointee
-          .value_count == 0 { return nil }; return try NativeCompletion
-                  .string(result)
-      }
-    ) { raw, arena, completion, diagnostic in
-      mln_map_copy_style_source_attribution(
-        raw,
-        arena.view(bindingArg0),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Copies one style source URL.
-  ///
-  /// See `mln_map_copy_style_source_url` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func copyStyleSourceUrl(sourceId bindingArg0: String) async throws
-    -> String?
-  {
-    try await nativeStart(
-      "mln_map_copy_style_source_url",
-      convert: { result in
-        if result.pointee
-          .value_count == 0 { return nil }; return try NativeCompletion
-                  .string(result)
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_copy_style_source_url(
-      raw,
-      arena.view(bindingArg0),
-      completion,
-      diagnostic
-    ) }
-  }
-
   /// Queries the global-state JSON object, including style defaults. Completion
   /// borrows one `mln_buffer_view` for the duration of the callback.
   ///
@@ -534,18 +392,14 @@ public extension MapHandle {
   /// See `mln_map_get_image_source_coordinates` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
   func getImageSourceCoordinates(sourceId bindingArg0: String) async throws
-    -> [LatLng]?
+    -> [LatLng]
   {
     try await nativeStart(
       "mln_map_get_image_source_coordinates",
-      convert: { result in
-        if result.pointee
-          .value == nil { return nil }; return try NativeCompletion
-                  .values(
-                    result,
-                    as: mln_lat_lng.self
-                  ).map { LatLng(raw: $0) }
-      }
+      convert: { result in try NativeCompletion.values(
+        result,
+        as: mln_lat_lng.self
+      ).map { LatLng(raw: $0) } }
     ) { raw, arena, completion, diagnostic in
       mln_map_get_image_source_coordinates(
         raw,
@@ -556,70 +410,26 @@ public extension MapHandle {
     }
   }
 
-  /// Serializes one layer filter as a style-spec JSON value.
-  ///
-  /// See `mln_map_get_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getLayerFilter(layerId bindingArg0: String) async throws -> Data? {
-    try await nativeStart(
-      "mln_map_get_layer_filter",
-      convert: { result in
-        if result.pointee
-          .value_count == 0 { return nil }; return try NativeCompletion
-                  .data(result)
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_layer_filter(
-      raw,
-      arena.view(bindingArg0),
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Serializes one layer property as a style-spec JSON value.
-  ///
-  /// See `mln_map_get_layer_property` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getLayerProperty(
-    layerId bindingArg0: String,
-    propertyName bindingArg1: String
-  ) async throws -> Data? {
-    try await nativeStart(
-      "mln_map_get_layer_property",
-      convert: { result in
-        if result.pointee
-          .value_count == 0 { return nil }; return try NativeCompletion
-                  .data(result)
-      }
-    ) { raw, arena, completion, diagnostic in mln_map_get_layer_property(
-      raw,
-      arena.view(bindingArg0),
-      arena.view(bindingArg1),
-      completion,
-      diagnostic
-    ) }
-  }
-
   /// Copies one complete runtime style image.
   ///
-  /// See `mln_map_get_style_image_info` in the
+  /// See `mln_map_get_style_image` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleImageInfo(imageId bindingArg0: String) async throws
-    -> StyleImageResult?
+  func getStyleImage(imageId bindingArg0: String) async throws
+    -> StyleImageInfo?
   {
     try await nativeStart(
-      "mln_map_get_style_image_info",
+      "mln_map_get_style_image",
       convert: { result in
         if result.pointee
           .value_count ==
           0
         { return nil
-        }; return try StyleImageResult(raw: NativeCompletion.value(
+        }; return try StyleImageInfo(raw: NativeCompletion.value(
           result,
-          as: mln_style_image_result.self
+          as: mln_style_image_info.self
         ))
       }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_image_info(
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_image(
       raw,
       arena.view(bindingArg0),
       completion,
@@ -627,26 +437,46 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies complete metadata for one style layer.
+  /// Copies the complete metadata of one style layer.
   ///
-  /// See `mln_map_get_style_layer_info` in the
+  /// See `mln_map_get_style_layer` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleLayerInfo(layerId bindingArg0: String) async throws
-    -> StyleLayerResult?
+  func getStyleLayer(layerId bindingArg0: String) async throws
+    -> StyleLayerInfo?
   {
     try await nativeStart(
-      "mln_map_get_style_layer_info",
+      "mln_map_get_style_layer",
       convert: { result in
         if result.pointee
           .value_count ==
           0
         { return nil
-        }; return try StyleLayerResult(raw: NativeCompletion.value(
+        }; return try StyleLayerInfo(raw: NativeCompletion.value(
           result,
-          as: mln_style_layer_result.self
+          as: mln_style_layer_info.self
         ))
       }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_info(
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer(
+      raw,
+      arena.view(bindingArg0),
+      completion,
+      diagnostic
+    ) }
+  }
+
+  /// Serializes one layer filter as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_style_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  func getStyleLayerFilter(layerId bindingArg0: String) async throws -> Data? {
+    try await nativeStart(
+      "mln_map_get_style_layer_filter",
+      convert: { result in
+        if result.pointee
+          .value_count == 0 { return nil }; return try NativeCompletion
+                  .data(result)
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_filter(
       raw,
       arena.view(bindingArg0),
       completion,
@@ -674,6 +504,30 @@ public extension MapHandle {
     ) }
   }
 
+  /// Serializes one layer property as a style-spec JSON value.
+  ///
+  /// See `mln_map_get_style_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  func getStyleLayerProperty(
+    layerId bindingArg0: String,
+    propertyName bindingArg1: String
+  ) async throws -> Data? {
+    try await nativeStart(
+      "mln_map_get_style_layer_property",
+      convert: { result in
+        if result.pointee
+          .value_count == 0 { return nil }; return try NativeCompletion
+                  .data(result)
+      }
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_layer_property(
+      raw,
+      arena.view(bindingArg0),
+      arena.view(bindingArg1),
+      completion,
+      diagnostic
+    ) }
+  }
+
   /// Serializes one style light property as a style-spec JSON value.
   ///
   /// See `mln_map_get_style_light_property` in the
@@ -696,60 +550,31 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies complete metadata for one style source.
+  /// Copies the complete metadata of one style source.
   ///
-  /// See `mln_map_get_style_source_info` in the
+  /// See `mln_map_get_style_source` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleSourceInfo(sourceId bindingArg0: String) async throws
-    -> StyleSourceResult?
+  func getStyleSource(sourceId bindingArg0: String) async throws
+    -> StyleSourceInfo?
   {
     try await nativeStart(
-      "mln_map_get_style_source_info",
+      "mln_map_get_style_source",
       convert: { result in
         if result.pointee
           .value_count ==
           0
         { return nil
-        }; return try StyleSourceResult(raw: NativeCompletion.value(
+        }; return try StyleSourceInfo(raw: NativeCompletion.value(
           result,
-          as: mln_style_source_result.self
+          as: mln_style_source_info.self
         ))
       }
-    ) { raw, arena, completion, diagnostic in mln_map_get_style_source_info(
+    ) { raw, arena, completion, diagnostic in mln_map_get_style_source(
       raw,
       arena.view(bindingArg0),
       completion,
       diagnostic
     ) }
-  }
-
-  /// Copies one style source's inline TileJSON tile URLs.
-  ///
-  /// See `mln_map_get_style_source_tile_urls` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func getStyleSourceTileUrls(sourceId bindingArg0: String) async throws
-    -> StyleSourceTileUrlsResult?
-  {
-    try await nativeStart(
-      "mln_map_get_style_source_tile_urls",
-      convert: { result in
-        if result.pointee
-          .value_count ==
-          0
-        { return nil
-        }; return try StyleSourceTileUrlsResult(raw: NativeCompletion.value(
-          result,
-          as: mln_style_source_tile_urls_result.self
-        ))
-      }
-    ) { raw, arena, completion, diagnostic in
-      mln_map_get_style_source_tile_urls(
-        raw,
-        arena.view(bindingArg0),
-        completion,
-        diagnostic
-      )
-    }
   }
 
   /// Reads the style's global transition options.
@@ -827,35 +652,17 @@ public extension MapHandle {
     }
   }
 
-  /// Copies style layer IDs in style order.
-  ///
-  /// See `mln_map_list_style_layer_ids` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func listStyleLayerIds() async throws -> [String] {
-    try await nativeStart(
-      "mln_map_list_style_layer_ids",
-      convert: { result in try NativeCompletion.values(
-        result,
-        as: mln_buffer_view.self
-      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
-    ) { raw, _, completion, diagnostic in mln_map_list_style_layer_ids(
-      raw,
-      completion,
-      diagnostic
-    ) }
-  }
-
   /// Starts an ordered query of every style layer in style order.
   ///
   /// See `mln_map_list_style_layers` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func listStyleLayers() async throws -> [StyleLayerEntry] {
+  func listStyleLayers() async throws -> [StyleLayerInfo] {
     try await nativeStart(
       "mln_map_list_style_layers",
       convert: { result in try NativeCompletion.values(
         result,
-        as: mln_style_layer_entry.self
-      ).map { try StyleLayerEntry(raw: $0) } }
+        as: mln_style_layer_info.self
+      ).map { try StyleLayerInfo(raw: $0) } }
     ) { raw, _, completion, diagnostic in mln_map_list_style_layers(
       raw,
       completion,
@@ -863,18 +670,18 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies style source IDs in style order.
+  /// Lists every style source in style order.
   ///
-  /// See `mln_map_list_style_source_ids` in the
+  /// See `mln_map_list_style_sources` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  func listStyleSourceIds() async throws -> [String] {
+  func listStyleSources() async throws -> [StyleSourceInfo] {
     try await nativeStart(
-      "mln_map_list_style_source_ids",
+      "mln_map_list_style_sources",
       convert: { result in try NativeCompletion.values(
         result,
-        as: mln_buffer_view.self
-      ).map { try NativeString.copyUTF8(data: $0.data, size: $0.size) } }
-    ) { raw, _, completion, diagnostic in mln_map_list_style_source_ids(
+        as: mln_style_source_info.self
+      ).map { try StyleSourceInfo(raw: $0) } }
+    ) { raw, _, completion, diagnostic in mln_map_list_style_sources(
       raw,
       completion,
       diagnostic
@@ -1163,148 +970,6 @@ public extension MapHandle {
     }
   }
 
-  /// Sets or clears one layer filter.
-  ///
-  /// See `mln_map_set_layer_filter` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLayerFilter(
-    layerId bindingArg0: String,
-    filter bindingArg1: Data? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_layer_filter") { raw, arena, completion, diagnostic in
-      mln_map_set_layer_filter(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.map { arena.store(arena.view($0)) },
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets the highest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_layer_max_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLayerMaxZoom(
-    layerId bindingArg0: String,
-    maxZoom bindingArg1: Double
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_layer_max_zoom") { raw, arena, completion, diagnostic in
-      mln_map_set_layer_max_zoom(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets the lowest zoom at which one layer draws.
-  ///
-  /// See `mln_map_set_layer_min_zoom` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLayerMinZoom(
-    layerId bindingArg0: String,
-    minZoom bindingArg1: Double
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_layer_min_zoom") { raw, arena, completion, diagnostic in
-      mln_map_set_layer_min_zoom(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1,
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets one layer property using its MapLibre style-spec property name.
-  ///
-  /// See `mln_map_set_layer_property` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLayerProperty(
-    layerId bindingArg0: String,
-    propertyName bindingArg1: String,
-    value bindingArg2: Data
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_layer_property") { raw, arena, completion, diagnostic in
-      mln_map_set_layer_property(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        arena.view(bindingArg2),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets one layer's source ID.
-  ///
-  /// See `mln_map_set_layer_source_id` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLayerSourceId(
-    layerId bindingArg0: String,
-    sourceId bindingArg1: String
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_layer_source_id") { raw, arena, completion, diagnostic in
-      mln_map_set_layer_source_id(
-        raw,
-        arena.view(bindingArg0),
-        arena.view(bindingArg1),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets one layer's source-layer ID.
-  ///
-  /// See `mln_map_set_layer_source_layer` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLayerSourceLayer(
-    layerId bindingArg0: String,
-    sourceLayer bindingArg1: String? = nil
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_layer_source_layer") { raw, arena, completion, diagnostic in
-      mln_map_set_layer_source_layer(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
-  /// Sets whether one layer draws.
-  ///
-  /// See `mln_map_set_layer_visibility` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-  @discardableResult
-  func setLayerVisibility(
-    layerId bindingArg0: String,
-    visibility bindingArg1: StyleLayerVisibility
-  ) async throws -> CommandCompletion {
-    try await nativeCommand("mln_map_set_layer_visibility") { raw, arena, completion, diagnostic in
-      mln_map_set_layer_visibility(
-        raw,
-        arena.view(bindingArg0),
-        bindingArg1.nativeValue(),
-        completion,
-        diagnostic
-      )
-    }
-  }
-
   /// Sets a location indicator layer accuracy radius in meters.
   ///
   /// See `mln_map_set_location_indicator_accuracy_radius` in the
@@ -1405,6 +1070,148 @@ public extension MapHandle {
         arena.view(bindingArg0),
         arena.store(bindingArg1.nativeValue(arena: arena)),
         bindingArg2.map { try arena.store($0.nativeValue(arena: arena)) },
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets or clears one layer filter.
+  ///
+  /// See `mln_map_set_style_layer_filter` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setStyleLayerFilter(
+    layerId bindingArg0: String,
+    filter bindingArg1: Data? = nil
+  ) async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_set_style_layer_filter") { raw, arena, completion, diagnostic in
+      mln_map_set_style_layer_filter(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.store(arena.view($0)) },
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets the highest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_style_layer_max_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setStyleLayerMaxZoom(
+    layerId bindingArg0: String,
+    maxZoom bindingArg1: Double
+  ) async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_set_style_layer_max_zoom") { raw, arena, completion, diagnostic in
+      mln_map_set_style_layer_max_zoom(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets the lowest zoom at which one layer draws.
+  ///
+  /// See `mln_map_set_style_layer_min_zoom` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setStyleLayerMinZoom(
+    layerId bindingArg0: String,
+    minZoom bindingArg1: Double
+  ) async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_set_style_layer_min_zoom") { raw, arena, completion, diagnostic in
+      mln_map_set_style_layer_min_zoom(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1,
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets one layer property using its MapLibre style-spec property name.
+  ///
+  /// See `mln_map_set_style_layer_property` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setStyleLayerProperty(
+    layerId bindingArg0: String,
+    propertyName bindingArg1: String,
+    value bindingArg2: Data
+  ) async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_set_style_layer_property") { raw, arena, completion, diagnostic in
+      mln_map_set_style_layer_property(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        arena.view(bindingArg2),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets one layer's source ID.
+  ///
+  /// See `mln_map_set_style_layer_source_id` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setStyleLayerSourceId(
+    layerId bindingArg0: String,
+    sourceId bindingArg1: String
+  ) async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_set_style_layer_source_id") { raw, arena, completion, diagnostic in
+      mln_map_set_style_layer_source_id(
+        raw,
+        arena.view(bindingArg0),
+        arena.view(bindingArg1),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets one layer's source-layer ID.
+  ///
+  /// See `mln_map_set_style_layer_source_layer` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setStyleLayerSourceLayer(
+    layerId bindingArg0: String,
+    sourceLayer bindingArg1: String? = nil
+  ) async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_set_style_layer_source_layer") { raw, arena, completion, diagnostic in
+      mln_map_set_style_layer_source_layer(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.map { arena.view($0) } ?? mln_buffer_view(),
+        completion,
+        diagnostic
+      )
+    }
+  }
+
+  /// Sets whether one layer draws.
+  ///
+  /// See `mln_map_set_style_layer_visibility` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+  @discardableResult
+  func setStyleLayerVisibility(
+    layerId bindingArg0: String,
+    visibility bindingArg1: StyleLayerVisibility
+  ) async throws -> CommandCompletion {
+    try await nativeCommand("mln_map_set_style_layer_visibility") { raw, arena, completion, diagnostic in
+      mln_map_set_style_layer_visibility(
+        raw,
+        arena.view(bindingArg0),
+        bindingArg1.nativeValue(),
         completion,
         diagnostic
       )

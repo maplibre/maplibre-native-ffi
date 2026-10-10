@@ -24,7 +24,7 @@ internal object VulkanRenderTarget {
       RenderTargetMode.NATIVE_SURFACE ->
         NativeSurfaceTarget(
           AttachedSession.attach(driver) { options ->
-            map.vulkanSurfaceAttach(
+            map.attachVulkanSurface(
               VulkanSurfaceDescriptor(
                 RenderTarget.extent(viewport),
                 session,
@@ -51,7 +51,7 @@ internal object VulkanRenderTarget {
     try {
       val attached =
         AttachedSession.attach(driver, RenderTarget.OWNED_TEXTURE_RING_DEPTH) { options ->
-          map.vulkanOwnedTextureAttach(
+          map.attachVulkanOwnedTexture(
             VulkanOwnedTextureDescriptor(RenderTarget.extent(viewport), session),
             options,
           )
@@ -76,7 +76,7 @@ internal object VulkanRenderTarget {
       compositor = VulkanTextureCompositor(context, viewport)
       val attached =
         AttachedSession.attach(driver) { options ->
-          map.vulkanBorrowedTextureAttach(borrowedDescriptor(session, viewport, image), options)
+          map.attachVulkanBorrowedTexture(borrowedDescriptor(session, viewport, image), options)
         }
       return BorrowedTexture(attached, map, context, session, compositor, image)
     } catch (error: RuntimeException) {
@@ -155,7 +155,7 @@ internal object VulkanRenderTarget {
       VulkanBorrowedImage.create(context, viewport)
 
     override fun setTarget(viewport: Viewport, replacement: VulkanBorrowedImage): Deferred<Unit> =
-      session.vulkanBorrowedTextureSetTarget(
+      session.setVulkanBorrowedTextureTarget(
         borrowedDescriptor(sessionContext, viewport, replacement)
       )
 

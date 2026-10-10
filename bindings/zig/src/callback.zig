@@ -209,7 +209,7 @@ test "a callback error reporter admits no native call" {
     const Probe = struct {
         var admitted: ?bool = null;
         fn report(_: []const u8, _: anyerror) void {
-            admitted = if (check("mln_network_status_get", 0)) |_| true else |_| false;
+            admitted = if (check("mln_network_get_status", 0)) |_| true else |_| false;
         }
     };
     const previous = setErrorReporter(Probe.report);
@@ -217,7 +217,7 @@ test "a callback error reporter admits no native call" {
     // The wake callback admits every native call, but its reporter does not.
     reportError("mln_wake_callback", error.NativeError);
     try std.testing.expectEqual(@as(?bool, false), Probe.admitted);
-    try check("mln_network_status_get", 0);
+    try check("mln_network_get_status", 0);
 }
 
 test "callback policies intersect nested scopes and restore outer admission" {

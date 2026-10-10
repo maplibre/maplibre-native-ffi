@@ -15,82 +15,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Starts an ordered caller-owned Metal texture replacement.
-   *
-   * See `mln_metal_borrowed_texture_set_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun metalBorrowedTextureSetTarget(
-    descriptor: MetalBorrowedTextureDescriptor
-  ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_metal_borrowed_texture_set_target") {
-      check(
-        C.mln_metal_borrowed_texture_set_target(
-          handle,
-          writeMetalBorrowedTextureDescriptor(descriptor),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Starts an ordered Metal surface replacement.
-   *
-   * See `mln_metal_surface_set_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun metalSurfaceSetTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_metal_surface_set_target") {
-      check(
-        C.mln_metal_surface_set_target(
-          handle,
-          writeMetalSurfaceDescriptor(descriptor),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Starts an ordered caller-owned OpenGL texture replacement.
-   *
-   * See `mln_opengl_borrowed_texture_set_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun openglBorrowedTextureSetTarget(
-    descriptor: OpenglBorrowedTextureDescriptor
-  ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_opengl_borrowed_texture_set_target") {
-      check(
-        C.mln_opengl_borrowed_texture_set_target(
-          handle,
-          writeOpenglBorrowedTextureDescriptor(descriptor),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Starts an ordered OpenGL surface replacement.
-   *
-   * See `mln_opengl_surface_set_target` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun openglSurfaceSetTarget(descriptor: OpenglSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_opengl_surface_set_target") {
-      check(
-        C.mln_opengl_surface_set_target(
-          handle,
-          writeOpenglSurfaceDescriptor(descriptor),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
    * Irreversibly closes control and mailboxes without graphics calls.
    *
    * See `mln_render_session_abandon` in the
@@ -141,6 +65,22 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   public fun clearData(): Deferred<Unit> =
     nativeUnit(this, binding, "mln_render_session_clear_data") {
       check(C.mln_render_session_clear_data(handle, completion, diagnostic))
+    }
+
+  /**
+   * Copies the last completed rendered transform into an independent projection. Callable from any
+   * thread. Returns invalid state before a completed render, after an extent or target change, or
+   * after detachment. The caller owns the returned projection, which remains usable after the
+   * session is released. out_projection must point to a null handle.
+   *
+   * See `mln_render_session_create_projection` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
+   */
+  public fun createProjection(): MapProjectionHandle =
+    nativeCall(this, binding, "mln_render_session_create_projection") {
+      val out = allocate(8, 8)
+      check(C.mln_render_session_create_projection(handle, out, diagnostic))
+      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
     }
 
   /**
@@ -228,22 +168,6 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       val out = sized(104, 8)
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
-    }
-
-  /**
-   * Copies the last completed rendered transform into an independent projection. Callable from any
-   * thread. Returns invalid state before a completed render, after an extent or target change, or
-   * after detachment. The caller owns the returned projection, which remains usable after the
-   * session is released. out_projection must point to a null handle.
-   *
-   * See `mln_render_session_projection_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-   */
-  public fun projectionCreate(): MapProjectionHandle =
-    nativeCall(this, binding, "mln_render_session_projection_create") {
-      val out = allocate(8, 8)
-      check(C.mln_render_session_projection_create(handle, out, diagnostic))
-      adopt(out, GeneratedOwnerDisposal::mapProjection) { MapProjectionHandle(it) }
     }
 
   /**
@@ -354,6 +278,22 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
+   * Reads back the latest frame of the session's owned texture as premultiplied RGBA8.
+   *
+   * See `mln_render_session_read_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun readTexture(): Deferred<TextureReadbackResult> =
+    nativeSubmit(
+      this,
+      binding,
+      "mln_render_session_read_texture",
+      { result -> readTextureReadbackResult(CompletionBridge.value(result)) },
+    ) {
+      check(C.mln_render_session_read_texture(handle, completion, diagnostic))
+    }
+
+  /**
    * Starts best-effort release of renderer caches.
    *
    * See `mln_render_session_reduce_memory_use` in the
@@ -407,33 +347,93 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
     }
 
   /**
-   * Starts readback of the latest rendered texture frame.
+   * Starts an ordered caller-owned Metal texture replacement.
    *
-   * See `mln_texture_read_premultiplied_rgba8` in the
+   * See `mln_render_session_set_metal_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun textureReadPremultipliedRgba8(): Deferred<TextureReadbackResult> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_texture_read_premultiplied_rgba8",
-      { result -> readTextureReadbackResult(CompletionBridge.value(result)) },
-    ) {
-      check(C.mln_texture_read_premultiplied_rgba8(handle, completion, diagnostic))
+  public fun setMetalBorrowedTextureTarget(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_render_session_set_metal_borrowed_texture_target") {
+      check(
+        C.mln_render_session_set_metal_borrowed_texture_target(
+          handle,
+          writeMetalBorrowedTextureDescriptor(descriptor),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Starts an ordered Metal surface replacement.
+   *
+   * See `mln_render_session_set_metal_surface_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
+  public fun setMetalSurfaceTarget(descriptor: MetalSurfaceDescriptor): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_render_session_set_metal_surface_target") {
+      check(
+        C.mln_render_session_set_metal_surface_target(
+          handle,
+          writeMetalSurfaceDescriptor(descriptor),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Starts an ordered caller-owned OpenGL texture replacement.
+   *
+   * See `mln_render_session_set_opengl_borrowed_texture_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun setOpenglBorrowedTextureTarget(
+    descriptor: OpenglBorrowedTextureDescriptor
+  ): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_render_session_set_opengl_borrowed_texture_target") {
+      check(
+        C.mln_render_session_set_opengl_borrowed_texture_target(
+          handle,
+          writeOpenglBorrowedTextureDescriptor(descriptor),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Starts an ordered OpenGL surface replacement.
+   *
+   * See `mln_render_session_set_opengl_surface_target` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
+  public fun setOpenglSurfaceTarget(descriptor: OpenglSurfaceDescriptor): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_render_session_set_opengl_surface_target") {
+      check(
+        C.mln_render_session_set_opengl_surface_target(
+          handle,
+          writeOpenglSurfaceDescriptor(descriptor),
+          completion,
+          diagnostic,
+        )
+      )
     }
 
   /**
    * Starts an ordered caller-owned Vulkan texture replacement.
    *
-   * See `mln_vulkan_borrowed_texture_set_target` in the
+   * See `mln_render_session_set_vulkan_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun vulkanBorrowedTextureSetTarget(
+  public fun setVulkanBorrowedTextureTarget(
     descriptor: VulkanBorrowedTextureDescriptor
   ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_vulkan_borrowed_texture_set_target") {
+    nativeUnit(this, binding, "mln_render_session_set_vulkan_borrowed_texture_target") {
       check(
-        C.mln_vulkan_borrowed_texture_set_target(
+        C.mln_render_session_set_vulkan_borrowed_texture_target(
           handle,
           writeVulkanBorrowedTextureDescriptor(descriptor),
           completion,
@@ -445,13 +445,13 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   /**
    * Starts an ordered Vulkan surface replacement.
    *
-   * See `mln_vulkan_surface_set_target` in the
+   * See `mln_render_session_set_vulkan_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  public fun vulkanSurfaceSetTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_vulkan_surface_set_target") {
+  public fun setVulkanSurfaceTarget(descriptor: VulkanSurfaceDescriptor): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_render_session_set_vulkan_surface_target") {
       check(
-        C.mln_vulkan_surface_set_target(
+        C.mln_render_session_set_vulkan_surface_target(
           handle,
           writeVulkanSurfaceDescriptor(descriptor),
           completion,
@@ -463,15 +463,15 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   /**
    * Starts an ordered caller-owned WebGPU texture replacement.
    *
-   * See `mln_webgpu_borrowed_texture_set_target` in the
+   * See `mln_render_session_set_webgpu_borrowed_texture_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun webgpuBorrowedTextureSetTarget(
+  public fun setWebgpuBorrowedTextureTarget(
     descriptor: WebgpuBorrowedTextureDescriptor
   ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_webgpu_borrowed_texture_set_target") {
+    nativeUnit(this, binding, "mln_render_session_set_webgpu_borrowed_texture_target") {
       check(
-        C.mln_webgpu_borrowed_texture_set_target(
+        C.mln_render_session_set_webgpu_borrowed_texture_target(
           handle,
           writeWebgpuBorrowedTextureDescriptor(descriptor),
           completion,
@@ -483,13 +483,13 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
   /**
    * Starts an ordered WebGPU surface replacement.
    *
-   * See `mln_webgpu_surface_set_target` in the
+   * See `mln_render_session_set_webgpu_surface_target` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
    */
-  public fun webgpuSurfaceSetTarget(descriptor: WebgpuSurfaceDescriptor): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_webgpu_surface_set_target") {
+  public fun setWebgpuSurfaceTarget(descriptor: WebgpuSurfaceDescriptor): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_render_session_set_webgpu_surface_target") {
       check(
-        C.mln_webgpu_surface_set_target(
+        C.mln_render_session_set_webgpu_surface_target(
           handle,
           writeWebgpuSurfaceDescriptor(descriptor),
           completion,

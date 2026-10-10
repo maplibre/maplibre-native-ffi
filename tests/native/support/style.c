@@ -322,7 +322,6 @@ void mln_test_style_serve(
 
 typedef struct list_probe {
   atomic_bool done;
-  bool entries;
   bool overflowed;
   mln_test_style_list list;
 } list_probe;
@@ -339,44 +338,35 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
     mln_test_style_entry* copy = &probe->list.entries[index];
     // Elements lie value_size bytes apart, as a binding built against an
     // older header steps through them.
-    const void* element =
-      (const unsigned char*)result->value + index * result->value_size;
-    if (probe->entries) {
-      const mln_style_layer_entry* entry = element;
-      fits &= copy_text(entry->id, copy->id, sizeof(copy->id));
-      fits &= copy_text(entry->type, copy->type, sizeof(copy->type));
-      fits &=
-        copy_text(entry->source_id, copy->source_id, sizeof(copy->source_id));
-      fits &= copy_text(
-        entry->source_layer, copy->source_layer, sizeof(copy->source_layer)
-      );
-    } else {
-      fits &=
-        copy_text(*(const mln_buffer_view*)element, copy->id, sizeof(copy->id));
-    }
+    const mln_style_layer_info* entry =
+      (const void*)((const unsigned char*)result->value +
+                    index * result->value_size);
+    fits &= copy_text(entry->id, copy->id, sizeof(copy->id));
+    fits &= copy_text(entry->type, copy->type, sizeof(copy->type));
+    fits &=
+      copy_text(entry->source_id, copy->source_id, sizeof(copy->source_id));
+    fits &= copy_text(
+      entry->source_layer, copy->source_layer, sizeof(copy->source_layer)
+    );
+    copy->min_zoom = entry->min_zoom;
+    copy->max_zoom = entry->max_zoom;
+    copy->visibility = entry->visibility;
   }
   probe->overflowed = !fits;
   mln_test_flag_set(&probe->done);
 }
 
-typedef mln_status (*list_query)(
-  mln_map map, const mln_completion* completion, mln_diagnostic* diagnostic
-);
-
-static mln_test_style_list run_list_query(
-  mln_map map, list_query query, bool entries
-) {
+mln_test_style_list mln_test_style_list_layers(mln_map map) {
   list_probe* probe = calloc(1, sizeof(*probe));
   TEST_ASSERT_NOT_NULL(probe);
   atomic_init(&probe->done, false);
-  probe->entries = entries;
   probe->list.status = MLN_STATUS_INVALID_STATE;
   const mln_completion completion = {
     .size = sizeof(mln_completion),
     .callback = copy_list,
     .user_data = probe,
   };
-  MLN_TEST_OK(query(map, &completion, MLN_TEST_DIAGNOSTIC));
+  MLN_TEST_OK(mln_map_list_style_layers(map, &completion, MLN_TEST_DIAGNOSTIC));
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_wait_for_flag(&probe->done), "the list query never completed"
   );
@@ -385,18 +375,6 @@ static mln_test_style_list run_list_query(
   free(probe);
   TEST_ASSERT_FALSE_MESSAGE(overflowed, overflow_message);
   return list;
-}
-
-mln_test_style_list mln_test_style_list_layer_ids(mln_map map) {
-  return run_list_query(map, mln_map_list_style_layer_ids, false);
-}
-
-mln_test_style_list mln_test_style_list_layers(mln_map map) {
-  return run_list_query(map, mln_map_list_style_layers, true);
-}
-
-mln_test_style_list mln_test_style_list_source_ids(mln_map map) {
-  return run_list_query(map, mln_map_list_style_source_ids, false);
 }
 
 mln_status mln_test_style_finish_text(

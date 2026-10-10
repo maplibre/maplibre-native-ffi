@@ -8,13 +8,13 @@ public extension MapHandle {
   /// transform
   /// state.
   ///
-  /// See `mln_map_projection_create` in the
+  /// See `mln_map_create_projection` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-  func projectionCreate() async throws -> MapProjectionHandle {
+  func createProjection() async throws -> MapProjectionHandle {
     try await nativeStart(
-      "mln_map_projection_create",
+      "mln_map_create_projection",
       copying: { try MapProjectionHandle(adopting: $0) }
-    ) { raw, _, completion, diagnostic in mln_map_projection_create(
+    ) { raw, _, completion, diagnostic in mln_map_create_projection(
       raw,
       completion,
       diagnostic

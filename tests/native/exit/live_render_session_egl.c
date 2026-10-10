@@ -29,7 +29,7 @@ static mln_status attach(
       }
     },
   };
-  return mln_opengl_owned_texture_attach(
+  return mln_map_attach_opengl_owned_texture(
     map, &descriptor, options, out_session, completion, NULL
   );
 }

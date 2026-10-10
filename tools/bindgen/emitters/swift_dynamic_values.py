@@ -336,7 +336,7 @@ def declaration(values, value):
         init.append(f"    self.{local} = {local}")
         capture = decode(values, f.value, raw)
         if optional:
-            path = ".".join(identifier(part) for part in f.presence.mask.split("."))
+            path = identifier(f.presence.mask)
             bit = f.presence.bit
             present = f"raw.{path} & {bit}.rawValue != 0"
             mark = f"raw.{path} |= {bit}.rawValue"

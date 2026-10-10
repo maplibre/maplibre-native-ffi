@@ -3,7 +3,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Fixed metadata for one runtime style image.
+/// One complete runtime style image, borrowed for a completion callback.
 /// </summary>
 /// <remarks>
 /// See <c>mln_style_image_info</c> in the <see
@@ -13,39 +13,27 @@ public sealed record StyleImageInfo
 {
     public uint Width { get; set; }
     public uint Height { get; set; }
-
-    /// <summary>
-    /// Native copied images are exposed as tightly packed premultiplied RGBA8.
-    /// </summary>
-    public uint Stride { get; set; }
-    public ulong ByteLength { get; set; }
-
-    /// <summary>
-    /// Interval counts for the stretchable axes.
-    /// </summary>
-    public ulong StretchXCount { get; set; }
-    public ulong StretchYCount { get; set; }
-
-    /// <summary>
-    /// Content box, meaningful when fields contains CONTENT.
-    /// </summary>
+    public byte[] Pixels
+    {
+        get => PixelsStorage.ToArray();
+        set => PixelsStorage = ValueArray.Copy(value);
+    }
+    internal ValueArray<byte> PixelsStorage { get; set; }
+    public ImageStretch[] StretchX
+    {
+        get => StretchXStorage.ToArray();
+        set => StretchXStorage = ValueArray.Copy(value);
+    }
+    internal ValueArray<ImageStretch> StretchXStorage { get; set; }
+    public ImageStretch[] StretchY
+    {
+        get => StretchYStorage.ToArray();
+        set => StretchYStorage = ValueArray.Copy(value);
+    }
+    internal ValueArray<ImageStretch> StretchYStorage { get; set; }
     public ImageContent? Content { get; set; }
-
-    /// <summary>
-    /// One of <c>mln_style_image_text_fit</c>, meaningful when fields contains
-    /// TEXT_FIT_WIDTH.
-    /// </summary>
     public StyleImageTextFit? TextFitWidth { get; set; }
-
-    /// <summary>
-    /// One of <c>mln_style_image_text_fit</c>, meaningful when fields contains
-    /// TEXT_FIT_HEIGHT.
-    /// </summary>
     public StyleImageTextFit? TextFitHeight { get; set; }
-
-    /// <summary>
-    /// Sprite pixel ratio.
-    /// </summary>
     public float PixelRatio { get; set; }
     public bool Sdf { get; set; }
 }

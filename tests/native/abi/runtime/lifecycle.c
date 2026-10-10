@@ -96,7 +96,7 @@ static void expect_runtime_calls_reject(
     mln_runtime_set_event_mask(handle, MLN_RUNTIME_EVENT_MASK_ALL, NULL)
   );
   MLN_TEST_STATUS(
-    expected, mln_map_create(handle, &map_options, &discard, NULL)
+    expected, mln_runtime_create_map(handle, &map_options, &discard, NULL)
   );
 }
 
@@ -138,7 +138,7 @@ static mln_status create_map_from(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
 ) {
   mln_test_completion completion = mln_test_completion_default(0);
-  const mln_status status = mln_map_create(
+  const mln_status status = mln_runtime_create_map(
     *(const mln_runtime*)context, descriptor, &completion.descriptor, diagnostic
   );
   // A rejected submission never runs or releases the completion.
@@ -157,7 +157,7 @@ static void map_creation_validates_its_options_and_completion(void) {
     sizeof(map_creation_cases) / sizeof(*map_creation_cases), &defaults,
     sizeof(defaults), create_map_from, &runtime
   );
-  MLN_TEST_INVALID(mln_map_create(runtime, &defaults, NULL, NULL));
+  MLN_TEST_INVALID(mln_runtime_create_map(runtime, &defaults, NULL, NULL));
   mln_test_destroy_runtime(runtime);
 }
 
@@ -196,12 +196,14 @@ static void style_functions_reject_null_inputs(void) {
   // A rejected style read never invokes or releases the completion, so the
   // caller still owns the user_data and releases it itself.
   mln_test_completion held = mln_test_completion_buffer_view();
-  MLN_TEST_INVALID(mln_map_loaded_style_json(map, NULL, NULL));
-  MLN_TEST_INVALID(mln_map_style_url(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_get_loaded_style_json(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_get_style_url(map, NULL, NULL));
   MLN_TEST_INVALID(
-    mln_map_loaded_style_json(MLN_HANDLE_NULL, &held.descriptor, NULL)
+    mln_map_get_loaded_style_json(MLN_HANDLE_NULL, &held.descriptor, NULL)
   );
-  MLN_TEST_INVALID(mln_map_style_url(MLN_HANDLE_NULL, &held.descriptor, NULL));
+  MLN_TEST_INVALID(
+    mln_map_get_style_url(MLN_HANDLE_NULL, &held.descriptor, NULL)
+  );
   TEST_ASSERT_FALSE(mln_test_completion_poll(&held));
   mln_test_completion_reject(&held);
   mln_test_completion_destroy(&held);
@@ -266,7 +268,7 @@ static void create_on_temporary_thread(void* argument) {
 
   mln_test_completion create_map = mln_test_completion_default(sizeof(mln_map));
   probe->status =
-    mln_map_create(probe->runtime, NULL, &create_map.descriptor, NULL);
+    mln_runtime_create_map(probe->runtime, NULL, &create_map.descriptor, NULL);
   if (probe->status == MLN_STATUS_OK) {
     probe->status = mln_test_completion_finish_value(
       &create_map, &probe->map, sizeof(probe->map)
@@ -300,7 +302,7 @@ static void runtime_and_map_outlive_the_creating_host_thread(void) {
   const mln_status barrier_status = mln_test_runtime_barrier(probe.runtime);
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
   const mln_status snapshot_status =
-    mln_map_snapshot_get(probe.map, &snapshot, NULL);
+    mln_map_get_snapshot(probe.map, &snapshot, NULL);
   const mln_status map_close_status = mln_test_map_close(probe.map);
   const mln_status runtime_close_status = mln_test_runtime_close(probe.runtime);
 

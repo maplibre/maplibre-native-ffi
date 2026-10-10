@@ -16,7 +16,7 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
         mln.MapHandle()
 
     with mln.runtime_create() as runtime:
-        with result(runtime.map_create()) as map_handle:
+        with result(runtime.create_map()) as map_handle:
             issued = map_handle.id
             assert not map_handle.closed
         assert map_handle.closed
@@ -24,7 +24,7 @@ def test_closing_twice_is_safe_and_a_closed_handle_refuses_use() -> None:
         # Events drained after close still name the handle that sent them.
         assert map_handle.id == issued
         with pytest.raises(mln.InvalidStateError, match="^MapHandle is closed$"):
-            map_handle.snapshot_get()
+            map_handle.get_snapshot()
     assert runtime.closed
     runtime.close()
 
@@ -54,7 +54,7 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
     handles: list[mln.ResourceRequestHandle] = []
     submitted = threading.Event()
     cancelled = threading.Event()
-    owners = {"map": result(harness.runtime.map_create())}
+    owners = {"map": result(harness.runtime.create_map())}
 
     def abandon_map(
         request: mln.ResourceRequest, handle: mln.ResourceRequestHandle
@@ -81,13 +81,13 @@ def test_a_handle_abandoned_on_a_callback_stack_is_reported_and_disposed(
 def test_a_child_keeps_its_parent_alive() -> None:
     runtime = mln.runtime_create()
     parent = weakref.ref(runtime)
-    map_handle = result(runtime.map_create())
+    map_handle = result(runtime.create_map())
     del runtime
     gc.collect()
 
     runtime = parent()
     assert runtime is not None
-    assert result(map_handle.camera_query()).generation > 0
+    assert result(map_handle.get_camera()).generation > 0
     result(map_handle.close())
     result(runtime.close())
 
@@ -133,7 +133,7 @@ runtime.set_resource_provider(
     m.ResourceProvider(lambda request, handle: m.ResourceProviderDecision.HANDLE)
 ).result(10)
 m.log_set_callback(m.LogHandler(lambda severity, event, code, message: 1))
-live = runtime.map_create().result(10)
+live = runtime.create_map().result(10)
 live.set_style_url("custom://never-answered.json")
 """
 

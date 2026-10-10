@@ -83,40 +83,6 @@ public extension MapHandle {
     ) }
   }
 
-  /// Starts an ordered camera read.
-  ///
-  /// See `mln_map_camera_query` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func cameraQuery() async throws -> CameraQueryResult {
-    try await nativeStart(
-      "mln_map_camera_query",
-      copying: CameraQueryResult.init(raw:)
-    ) { raw, _, completion, diagnostic in mln_map_camera_query(
-      raw,
-      completion,
-      diagnostic
-    ) }
-  }
-
-  /// Copies the camera from the latest immutable map snapshot.
-  ///
-  /// See `mln_map_camera_snapshot_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func cameraSnapshotGet() throws
-    -> (camera: CameraOptions, generation: UInt64)
-  {
-    var value0: mln_camera_options = mln_camera_options_default()
-    var value1: UInt64 = 0
-    return try nativeInvoke("mln_map_camera_snapshot_get") { raw, _, diagnostic in
-      mln_map_camera_snapshot_get(
-        raw,
-        &value0,
-        &value1,
-        diagnostic
-      )
-    } result: { (CameraOptions(raw: value0), value1) }
-  }
-
   /// Cancels the camera transitions running when this command commits.
   ///
   /// See `mln_map_cancel_transitions` in the
@@ -145,6 +111,40 @@ public extension MapHandle {
         diagnostic
       )
     }
+  }
+
+  /// Starts an ordered camera read.
+  ///
+  /// See `mln_map_get_camera` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  func getCamera() async throws -> CameraQueryResult {
+    try await nativeStart(
+      "mln_map_get_camera",
+      copying: CameraQueryResult.init(raw:)
+    ) { raw, _, completion, diagnostic in mln_map_get_camera(
+      raw,
+      completion,
+      diagnostic
+    ) }
+  }
+
+  /// Copies the camera from the latest immutable map snapshot.
+  ///
+  /// See `mln_map_get_camera_snapshot` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+  func getCameraSnapshot() throws
+    -> (camera: CameraOptions, generation: UInt64)
+  {
+    var value0: mln_camera_options = mln_camera_options_default()
+    var value1: UInt64 = 0
+    return try nativeInvoke("mln_map_get_camera_snapshot") { raw, _, diagnostic in
+      mln_map_get_camera_snapshot(
+        raw,
+        &value0,
+        &value1,
+        diagnostic
+      )
+    } result: { (CameraOptions(raw: value0), value1) }
   }
 
   /// Starts an ordered wrapped-bounds query for a copied camera.

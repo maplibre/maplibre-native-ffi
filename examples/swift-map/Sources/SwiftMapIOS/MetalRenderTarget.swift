@@ -68,7 +68,7 @@ final class MetalRenderTarget {
     viewport: Viewport,
     frameWake: Wake
   ) async throws -> MetalRenderTarget {
-    let attachment = try map.metalSurfaceAttach(
+    let attachment = try map.attachMetalSurface(
       descriptor: MetalSurfaceDescriptor(
         extent: viewport.extent,
         context: graphics.contextDescriptor,

@@ -29,7 +29,7 @@ def test_strings_cross_as_c_strings_and_as_sized_views(
     # The layer JSON crosses as sized UTF-8 bytes, and the ID comes back
     # through a lookup that takes it as a NUL-terminated string.
     result(map_handle.add_style_layer_json(layer.encode()))
-    assert result(map_handle.list_style_layer_ids()) == (layer_id,)
+    assert [entry.id for entry in result(map_handle.list_style_layers())] == [layer_id]
     stored = result(map_handle.get_style_layer_json(layer_id))
     assert stored is not None
     assert json.loads(stored)["id"] == layer_id
@@ -49,7 +49,7 @@ def test_absent_fields_stay_distinct_from_present_values(
     # Fields left as None are absent, so this update changes the zoom alone.
     _jump(map_handle, mln.CameraOptions(zoom=5.0, bearing=0.0))
 
-    camera = result(map_handle.camera_query()).camera
+    camera = result(map_handle.get_camera()).camera
     assert camera.center is not None
     assert camera.center.latitude == pytest.approx(10.0)
     assert camera.center.longitude == pytest.approx(20.0)
@@ -63,15 +63,17 @@ def test_absent_fields_stay_distinct_from_present_values(
             b'[{"id":"circles","type":"circle","source":"points"}]}'
         )
     )
-    assert result(map_handle.get_layer_filter("circles")) is None
-    result(map_handle.set_layer_filter("circles", b'["==",["get","kind"],"park"]'))
-    assert json.loads(result(map_handle.get_layer_filter("circles"))) == [
+    assert result(map_handle.get_style_layer_filter("circles")) is None
+    result(
+        map_handle.set_style_layer_filter("circles", b'["==",["get","kind"],"park"]')
+    )
+    assert json.loads(result(map_handle.get_style_layer_filter("circles"))) == [
         "==",
         ["get", "kind"],
         "park",
     ]
-    result(map_handle.set_layer_filter("circles", None))
-    assert result(map_handle.get_layer_filter("circles")) is None
+    result(map_handle.set_style_layer_filter("circles", None))
+    assert result(map_handle.get_style_layer_filter("circles")) is None
 
 
 def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
@@ -92,7 +94,7 @@ def test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native(
 
     unknown = mln.OfflineRegionDefinition(mln.UnknownVariant(999))
     with pytest.raises(mln.InvalidArgumentError) as raised:
-        harness.runtime.offline_region_create(unknown, b"")
+        harness.runtime.create_offline_region(unknown, b"")
     # Native saw the arm's tag and refused it; the binding passed it through.
     assert raised.value.native_status_code == mln.Status.INVALID_ARGUMENT.native_code
     assert "definition type is invalid" in raised.value.diagnostic
@@ -133,9 +135,10 @@ def test_an_array_input_is_copied_when_it_is_submitted(
     tiles.append("custom://appended/{z}/{x}/{y}.pbf")
 
     assert result(added).disposition == mln.CommandDisposition.COMMITTED
-    urls = result(map_handle.get_style_source_tile_urls("vector"))
-    assert urls is not None
-    assert urls.tile_urls == ("custom://tiles/{z}/{x}/{y}.pbf",)
+    source = result(map_handle.get_style_source("vector"))
+    assert source is not None
+    assert source.tilejson is not None
+    assert source.tilejson.tile_urls == ("custom://tiles/{z}/{x}/{y}.pbf",)
 
 
 def test_public_type_hints_resolve() -> None:
@@ -151,5 +154,5 @@ def test_public_type_hints_resolve() -> None:
 
     assert typing.get_type_hints(mln.MapHandle.set_style_json)["json"] is bytes
     assert typing.get_args(
-        typing.get_type_hints(mln.RuntimeHandle.map_create)["return"]
+        typing.get_type_hints(mln.RuntimeHandle.create_map)["return"]
     ) == (mln.MapHandle,)

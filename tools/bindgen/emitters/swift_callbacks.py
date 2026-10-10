@@ -112,9 +112,7 @@ def descriptor(values, plan):
             assignments.append(f"    self.{local} = {local}")
             captured = decode(values, field.value, "raw." + identifier(field.name))
             if optional:
-                path = ".".join(
-                    identifier(part) for part in field.presence.mask.split(".")
-                )
+                path = identifier(field.presence.mask)
                 bit = field.presence.bit
                 present = f"raw.{path} & {bit}.rawValue != 0"
                 mark = f"raw.{path} |= {bit}.rawValue"

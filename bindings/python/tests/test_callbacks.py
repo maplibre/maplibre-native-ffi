@@ -96,7 +96,7 @@ def test_a_registered_callback_does_not_keep_its_receiver_alive() -> None:
     )
     receiver["runtime"] = runtime
     owner = weakref.ref(runtime)
-    map_handle = result(runtime.map_create())
+    map_handle = result(runtime.create_map())
     result(map_handle.set_style_json(EMPTY_STYLE))
     assert woke.wait(TIMEOUT)
     result(map_handle.close())
@@ -170,7 +170,7 @@ def test_the_hook_that_receives_a_callback_exception_cannot_call_native(
         if not isinstance(report.exc_value, _WakeFailure):
             return
         try:
-            mln.network_status_get()
+            mln.network_get_status()
         except mln.InvalidStateError:
             refusals.append(True)
         else:
@@ -185,7 +185,7 @@ def test_the_hook_that_receives_a_callback_exception_cannot_call_native(
         replace(mln.RuntimeOptions.default(), event_wake=mln.Wake(wake))
     )
     try:
-        map_handle = result(runtime.map_create())
+        map_handle = result(runtime.create_map())
         result(map_handle.set_style_json(EMPTY_STYLE))
         assert reported.wait(TIMEOUT)
         result(map_handle.close())
@@ -209,7 +209,7 @@ def test_a_provider_can_answer_a_request_later_from_another_thread(
     map_handle.set_style_url("custom://later.json")
     assert provided.wait(TIMEOUT)
     handle = handles.pop()
-    assert handle.cancelled() is False
+    assert handle.is_cancelled() is False
 
     answer = threading.Thread(target=handle.complete, args=(ok_response(),))
     answer.start()
@@ -306,13 +306,13 @@ def test_a_registration_reported_as_rejected_is_not_rooted(harness: Harness) -> 
         provided.set()
 
     harness.routes["custom://discarded.json"] = hold
-    map_handle = harness.map_create()
+    map_handle = harness.create_map()
     map_handle.set_style_url("custom://discarded.json")
     assert provided.wait(TIMEOUT)
     handle = handles.pop()
     # Closing the map discards the request before a callback is registered.
     result(map_handle.close())
-    assert handle.cancelled() is True
+    assert handle.is_cancelled() is True
 
     callback = _Retiring()
     retired = callback.retired

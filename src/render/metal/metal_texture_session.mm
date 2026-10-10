@@ -196,7 +196,7 @@ auto metal_owned_texture_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_metal_owned_texture_attach>()
+    valueless_completion<&mln_map_attach_metal_owned_texture>()
   );
 }
 
@@ -241,7 +241,7 @@ auto metal_borrowed_texture_attach_start(
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
     out_session, completion,
-    valueless_completion<&mln_metal_borrowed_texture_attach>()
+    valueless_completion<&mln_map_attach_metal_borrowed_texture>()
   );
 }
 
@@ -272,7 +272,9 @@ auto metal_borrowed_texture_set_target_start(
         }
       );
     },
-    completion, valueless_completion<&mln_metal_borrowed_texture_set_target>()
+    completion,
+    valueless_completion<
+      &mln_render_session_set_metal_borrowed_texture_target>()
   );
 }
 

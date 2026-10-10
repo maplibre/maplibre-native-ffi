@@ -433,6 +433,377 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
+   * Starts attachment of a caller-owned Metal texture target.
+   *
+   * See `mln_map_attach_metal_borrowed_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachMetalBorrowedTexture(
+    descriptor: MetalBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_metal_borrowed_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_metal_borrowed_texture(
+            handle,
+            writeMetalBorrowedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a session-owned Metal texture ring.
+   *
+   * See `mln_map_attach_metal_owned_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachMetalOwnedTexture(
+    descriptor: MetalOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_metal_owned_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_metal_owned_texture(
+            handle,
+            writeMetalOwnedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a Metal surface target.
+   *
+   * See `mln_map_attach_metal_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
+  public fun attachMetalSurface(
+    descriptor: MetalSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_metal_surface") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_metal_surface(
+            handle,
+            writeMetalSurfaceDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a caller-owned OpenGL texture target.
+   *
+   * See `mln_map_attach_opengl_borrowed_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachOpenglBorrowedTexture(
+    descriptor: OpenglBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_opengl_borrowed_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_opengl_borrowed_texture(
+            handle,
+            writeOpenglBorrowedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a session-owned OpenGL texture ring.
+   *
+   * See `mln_map_attach_opengl_owned_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachOpenglOwnedTexture(
+    descriptor: OpenglOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_opengl_owned_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_opengl_owned_texture(
+            handle,
+            writeOpenglOwnedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of an OpenGL surface target.
+   *
+   * See `mln_map_attach_opengl_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
+  public fun attachOpenglSurface(
+    descriptor: OpenglSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_opengl_surface") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_opengl_surface(
+            handle,
+            writeOpenglSurfaceDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a caller-owned Vulkan texture target.
+   *
+   * See `mln_map_attach_vulkan_borrowed_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachVulkanBorrowedTexture(
+    descriptor: VulkanBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_vulkan_borrowed_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_vulkan_borrowed_texture(
+            handle,
+            writeVulkanBorrowedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a session-owned Vulkan texture ring.
+   *
+   * See `mln_map_attach_vulkan_owned_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachVulkanOwnedTexture(
+    descriptor: VulkanOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_vulkan_owned_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_vulkan_owned_texture(
+            handle,
+            writeVulkanOwnedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a Vulkan surface target.
+   *
+   * See `mln_map_attach_vulkan_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
+  public fun attachVulkanSurface(
+    descriptor: VulkanSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_vulkan_surface") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_vulkan_surface(
+            handle,
+            writeVulkanSurfaceDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a caller-owned WebGPU texture target.
+   *
+   * See `mln_map_attach_webgpu_borrowed_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachWebgpuBorrowedTexture(
+    descriptor: WebgpuBorrowedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_webgpu_borrowed_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_webgpu_borrowed_texture(
+            handle,
+            writeWebgpuBorrowedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a session-owned WebGPU texture ring.
+   *
+   * See `mln_map_attach_webgpu_owned_texture` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+   */
+  public fun attachWebgpuOwnedTexture(
+    descriptor: WebgpuOwnedTextureDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_webgpu_owned_texture") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_webgpu_owned_texture(
+            handle,
+            writeWebgpuOwnedTextureDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Starts attachment of a WebGPU surface target.
+   *
+   * See `mln_map_attach_webgpu_surface` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+   */
+  public fun attachWebgpuSurface(
+    descriptor: WebgpuSurfaceDescriptor,
+    options: RenderSessionAttachOptions,
+  ): RenderSessionAttachment =
+    nativeCall(this, binding, "mln_map_attach_webgpu_surface") {
+      attach(
+        { out, completion ->
+          C.mln_map_attach_webgpu_surface(
+            handle,
+            writeWebgpuSurfaceDescriptor(descriptor),
+            writeRenderSessionAttachOptions(options),
+            out,
+            completion,
+            diagnostic,
+          )
+        },
+        GeneratedOwnerDisposal::renderSession,
+        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
+        { it.bindingCallbacks },
+        { it.dispose() },
+        ::RenderSessionAttachment,
+      )
+    }
+
+  /**
+   * Begins a command group, which holds this map's render updates until the group ends.
+   *
+   * See `mln_map_begin_command_group` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun beginCommandGroup(): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_begin_command_group") {
+      check(C.mln_map_begin_command_group(handle, completion, diagnostic))
+    }
+
+  /**
    * Starts an ordered query for a camera that fits a GeoJSON geometry.
    *
    * See `mln_map_camera_for_geometry` in the
@@ -515,36 +886,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Starts an ordered camera read.
-   *
-   * See `mln_map_camera_query` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cameraQuery(): Deferred<CameraQueryResult> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_camera_query",
-      { result -> readCameraQueryResult(CompletionBridge.value(result)) },
-    ) {
-      check(C.mln_map_camera_query(handle, completion, diagnostic))
-    }
-
-  /**
-   * Copies the camera from the latest immutable map snapshot.
-   *
-   * See `mln_map_camera_snapshot_get` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cameraSnapshotGet(): MapCameraSnapshotGetResult =
-    nativeCall(this, binding, "mln_map_camera_snapshot_get") {
-      val out0 = sized(120, 8)
-      val out1 = allocate(8, 8)
-      check(C.mln_map_camera_snapshot_get(handle, out0, out1, diagnostic))
-      MapCameraSnapshotGetResult(camera = readCameraOptions(out0), generation = readU64(out1))
-    }
-
-  /**
    * Cancels the camera transitions running when this command commits.
    *
    * See `mln_map_cancel_transitions` in the
@@ -556,118 +897,21 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies one layer's source ID.
+   * Starts creation of a standalone projection from the map's ordered transform state.
    *
-   * See `mln_map_copy_layer_source_id` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   * See `mln_map_create_projection` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
    */
-  public fun copyLayerSourceId(layerId: String): Deferred<String?> =
-    nativeSubmit(
+  public fun createProjection(): Deferred<MapProjectionHandle> =
+    nativeSubmitOwned(
       this,
       binding,
-      "mln_map_copy_layer_source_id",
-      { result -> readViewString(CompletionBridge.value(result)).takeIf { it.isNotEmpty() } },
+      "mln_map_create_projection",
+      { MapProjectionHandle(it) },
+      GeneratedOwnerDisposal::mapProjection,
+      { it.close() },
     ) {
-      check(C.mln_map_copy_layer_source_id(handle, view(layerId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one layer's source-layer ID.
-   *
-   * See `mln_map_copy_layer_source_layer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyLayerSourceLayer(layerId: String): Deferred<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_layer_source_layer",
-      { result -> readViewString(CompletionBridge.value(result)).takeIf { it.isNotEmpty() } },
-    ) {
-      check(C.mln_map_copy_layer_source_layer(handle, view(layerId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
-   *
-   * See `mln_map_copy_style_image_premultiplied_rgba8` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleImagePremultipliedRgba8(imageId: String): Deferred<ByteArray?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_image_premultiplied_rgba8",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
-      },
-    ) {
-      check(
-        C.mln_map_copy_style_image_premultiplied_rgba8(
-          handle,
-          view(imageId),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Copies one runtime style image's stretchable intervals.
-   *
-   * See `mln_map_copy_style_image_stretches` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleImageStretches(imageId: String): Deferred<StyleImageStretchesResult?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_image_stretches",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleImageStretchesResult(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_copy_style_image_stretches(handle, view(imageId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one style source attribution string.
-   *
-   * See `mln_map_copy_style_source_attribution` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleSourceAttribution(sourceId: String): Deferred<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_source_attribution",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_copy_style_source_attribution(handle, view(sourceId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one style source URL.
-   *
-   * See `mln_map_copy_style_source_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun copyStyleSourceUrl(sourceId: String): Deferred<String?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_copy_style_source_url",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readViewString(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_copy_style_source_url(handle, view(sourceId), completion, diagnostic))
+      check(C.mln_map_create_projection(handle, completion, diagnostic))
     }
 
   /**
@@ -688,6 +932,47 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun dumpDebugLogs(): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_dump_debug_logs") {
       check(C.mln_map_dump_debug_logs(handle, completion, diagnostic))
+    }
+
+  /**
+   * Ends the innermost command group that `mln_map_begin_command_group()` began.
+   *
+   * See `mln_map_end_command_group` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun endCommandGroup(): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_end_command_group") {
+      check(C.mln_map_end_command_group(handle, completion, diagnostic))
+    }
+
+  /**
+   * Starts an ordered camera read.
+   *
+   * See `mln_map_get_camera` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  public fun getCamera(): Deferred<CameraQueryResult> =
+    nativeSubmit(
+      this,
+      binding,
+      "mln_map_get_camera",
+      { result -> readCameraQueryResult(CompletionBridge.value(result)) },
+    ) {
+      check(C.mln_map_get_camera(handle, completion, diagnostic))
+    }
+
+  /**
+   * Copies the camera from the latest immutable map snapshot.
+   *
+   * See `mln_map_get_camera_snapshot` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+   */
+  public fun getCameraSnapshot(): MapGetCameraSnapshotResult =
+    nativeCall(this, binding, "mln_map_get_camera_snapshot") {
+      val out0 = sized(120, 8)
+      val out1 = allocate(8, 8)
+      check(C.mln_map_get_camera_snapshot(handle, out0, out1, diagnostic))
+      MapGetCameraSnapshotResult(camera = readCameraOptions(out0), generation = readU64(out1))
     }
 
   /**
@@ -736,109 +1021,109 @@ public abstract class GeneratedMapOperations internal constructor() {
    * See `mln_map_get_image_source_coordinates` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getImageSourceCoordinates(sourceId: String): Deferred<List<LatLng>?> =
+  public fun getImageSourceCoordinates(sourceId: String): Deferred<List<LatLng>> =
     nativeSubmit(
       this,
       binding,
       "mln_map_get_image_source_coordinates",
       { result ->
-        if (CompletionBridge.valuePointer(result) == 0L) null
-        else
-          readStrided(
-            CompletionBridge.valuePointer(result),
-            CompletionBridge.valueCount(result),
-            CompletionBridge.valueSize(result),
-            16,
-          ) {
-            readLatLng(it)
-          }
+        readStrided(
+          CompletionBridge.valuePointer(result),
+          CompletionBridge.valueCount(result),
+          CompletionBridge.valueSize(result),
+          16,
+        ) {
+          readLatLng(it)
+        }
       },
     ) {
       check(C.mln_map_get_image_source_coordinates(handle, view(sourceId), completion, diagnostic))
     }
 
   /**
-   * Serializes one layer filter as a style-spec JSON value.
+   * Starts an ordered copy of the last successfully parsed style document.
    *
-   * See `mln_map_get_layer_filter` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   * See `mln_map_get_loaded_style_json` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getLayerFilter(layerId: String): Deferred<ByteArray?> =
+  public fun getLoadedStyleJson(): Deferred<ByteArray> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_layer_filter",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
-      },
+      "mln_map_get_loaded_style_json",
+      { result -> readView(CompletionBridge.value(result)) },
     ) {
-      check(C.mln_map_get_layer_filter(handle, view(layerId), completion, diagnostic))
+      check(C.mln_map_get_loaded_style_json(handle, completion, diagnostic))
     }
 
   /**
-   * Serializes one layer property as a style-spec JSON value.
+   * Copies the latest immutable state published by the map worker.
    *
-   * See `mln_map_get_layer_property` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   * See `mln_map_get_snapshot` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun getLayerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_layer_property",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readView(CompletionBridge.value(result))
-      },
-    ) {
-      check(
-        C.mln_map_get_layer_property(
-          handle,
-          view(layerId),
-          view(propertyName),
-          completion,
-          diagnostic,
-        )
-      )
+  public fun getSnapshot(): MapSnapshot =
+    nativeCall(this, binding, "mln_map_get_snapshot") {
+      val out = sized(456, 8)
+      check(C.mln_map_get_snapshot(handle, out, diagnostic))
+      readMapSnapshot(out)
     }
 
   /**
    * Copies one complete runtime style image.
    *
-   * See `mln_map_get_style_image_info` in the
+   * See `mln_map_get_style_image` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleImageInfo(imageId: String): Deferred<StyleImageResult?> =
+  public fun getStyleImage(imageId: String): Deferred<StyleImageInfo?> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_image_info",
+      "mln_map_get_style_image",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleImageResult(CompletionBridge.value(result))
+        else readStyleImageInfo(CompletionBridge.value(result))
       },
     ) {
-      check(C.mln_map_get_style_image_info(handle, view(imageId), completion, diagnostic))
+      check(C.mln_map_get_style_image(handle, view(imageId), completion, diagnostic))
     }
 
   /**
-   * Copies complete metadata for one style layer.
+   * Copies the complete metadata of one style layer.
    *
-   * See `mln_map_get_style_layer_info` in the
+   * See `mln_map_get_style_layer` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleLayerInfo(layerId: String): Deferred<StyleLayerResult?> =
+  public fun getStyleLayer(layerId: String): Deferred<StyleLayerInfo?> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_layer_info",
+      "mln_map_get_style_layer",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleLayerResult(CompletionBridge.value(result))
+        else readStyleLayerInfo(CompletionBridge.value(result))
       },
     ) {
-      check(C.mln_map_get_style_layer_info(handle, view(layerId), completion, diagnostic))
+      check(C.mln_map_get_style_layer(handle, view(layerId), completion, diagnostic))
+    }
+
+  /**
+   * Serializes one layer filter as a style-spec JSON value.
+   *
+   * See `mln_map_get_style_layer_filter` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun getStyleLayerFilter(layerId: String): Deferred<ByteArray?> =
+    nativeSubmit(
+      this,
+      binding,
+      "mln_map_get_style_layer_filter",
+      { result ->
+        if (CompletionBridge.valueCount(result) == 0uL) null
+        else readView(CompletionBridge.value(result))
+      },
+    ) {
+      check(C.mln_map_get_style_layer_filter(handle, view(layerId), completion, diagnostic))
     }
 
   /**
@@ -861,6 +1146,33 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
+   * Serializes one layer property as a style-spec JSON value.
+   *
+   * See `mln_map_get_style_layer_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun getStyleLayerProperty(layerId: String, propertyName: String): Deferred<ByteArray?> =
+    nativeSubmit(
+      this,
+      binding,
+      "mln_map_get_style_layer_property",
+      { result ->
+        if (CompletionBridge.valueCount(result) == 0uL) null
+        else readView(CompletionBridge.value(result))
+      },
+    ) {
+      check(
+        C.mln_map_get_style_layer_property(
+          handle,
+          view(layerId),
+          view(propertyName),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
    * Serializes one style light property as a style-spec JSON value.
    *
    * See `mln_map_get_style_light_property` in the
@@ -880,41 +1192,22 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies complete metadata for one style source.
+   * Copies the complete metadata of one style source.
    *
-   * See `mln_map_get_style_source_info` in the
+   * See `mln_map_get_style_source` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun getStyleSourceInfo(sourceId: String): Deferred<StyleSourceResult?> =
+  public fun getStyleSource(sourceId: String): Deferred<StyleSourceInfo?> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_get_style_source_info",
+      "mln_map_get_style_source",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleSourceResult(CompletionBridge.value(result))
+        else readStyleSourceInfo(CompletionBridge.value(result))
       },
     ) {
-      check(C.mln_map_get_style_source_info(handle, view(sourceId), completion, diagnostic))
-    }
-
-  /**
-   * Copies one style source's inline TileJSON tile URLs.
-   *
-   * See `mln_map_get_style_source_tile_urls` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun getStyleSourceTileUrls(sourceId: String): Deferred<StyleSourceTileUrlsResult?> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_get_style_source_tile_urls",
-      { result ->
-        if (CompletionBridge.valueCount(result) == 0uL) null
-        else readStyleSourceTileUrlsResult(CompletionBridge.value(result))
-      },
-    ) {
-      check(C.mln_map_get_style_source_tile_urls(handle, view(sourceId), completion, diagnostic))
+      check(C.mln_map_get_style_source(handle, view(sourceId), completion, diagnostic))
     }
 
   /**
@@ -931,6 +1224,22 @@ public abstract class GeneratedMapOperations internal constructor() {
       { result -> readStyleTransitionOptions(CompletionBridge.value(result)) },
     ) {
       check(C.mln_map_get_style_transition_options(handle, completion, diagnostic))
+    }
+
+  /**
+   * Starts an ordered copy of the last requested style URL.
+   *
+   * See `mln_map_get_style_url` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun getStyleUrl(): Deferred<String> =
+    nativeSubmit(
+      this,
+      binding,
+      "mln_map_get_style_url",
+      { result -> readViewString(CompletionBridge.value(result)) },
+    ) {
+      check(C.mln_map_get_style_url(handle, completion, diagnostic))
     }
 
   /**
@@ -1151,37 +1460,12 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies style layer IDs in style order.
-   *
-   * See `mln_map_list_style_layer_ids` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun listStyleLayerIds(): Deferred<List<String>> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_list_style_layer_ids",
-      { result ->
-        readStrided(
-          CompletionBridge.valuePointer(result),
-          CompletionBridge.valueCount(result),
-          CompletionBridge.valueSize(result),
-          2 * NativeMemory.addressSize,
-        ) {
-          readViewString(it)
-        }
-      },
-    ) {
-      check(C.mln_map_list_style_layer_ids(handle, completion, diagnostic))
-    }
-
-  /**
    * Starts an ordered query of every style layer in style order.
    *
    * See `mln_map_list_style_layers` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleLayers(): Deferred<List<StyleLayerEntry>> =
+  public fun listStyleLayers(): Deferred<List<StyleLayerInfo>> =
     nativeSubmit(
       this,
       binding,
@@ -1191,9 +1475,9 @@ public abstract class GeneratedMapOperations internal constructor() {
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          w(32, 64),
+          w(56, 88),
         ) {
-          readStyleLayerEntry(it)
+          readStyleLayerInfo(it)
         }
       },
     ) {
@@ -1201,44 +1485,28 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies style source IDs in style order.
+   * Lists every style source in style order.
    *
-   * See `mln_map_list_style_source_ids` in the
+   * See `mln_map_list_style_sources` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
    */
-  public fun listStyleSourceIds(): Deferred<List<String>> =
+  public fun listStyleSources(): Deferred<List<StyleSourceInfo>> =
     nativeSubmit(
       this,
       binding,
-      "mln_map_list_style_source_ids",
+      "mln_map_list_style_sources",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
           CompletionBridge.valueSize(result),
-          2 * NativeMemory.addressSize,
+          w(120, 152),
         ) {
-          readViewString(it)
+          readStyleSourceInfo(it)
         }
       },
     ) {
-      check(C.mln_map_list_style_source_ids(handle, completion, diagnostic))
-    }
-
-  /**
-   * Starts an ordered copy of the last successfully parsed style document.
-   *
-   * See `mln_map_loaded_style_json` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun loadedStyleJson(): Deferred<ByteArray> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_loaded_style_json",
-      { result -> readView(CompletionBridge.value(result)) },
-    ) {
-      check(C.mln_map_loaded_style_json(handle, completion, diagnostic))
+      check(C.mln_map_list_style_sources(handle, completion, diagnostic))
     }
 
   /**
@@ -1327,24 +1595,6 @@ public abstract class GeneratedMapOperations internal constructor() {
           diagnostic,
         )
       )
-    }
-
-  /**
-   * Starts creation of a standalone projection from the map's ordered transform state.
-   *
-   * See `mln_map_projection_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-   */
-  public fun projectionCreate(): Deferred<MapProjectionHandle> =
-    nativeSubmitOwned(
-      this,
-      binding,
-      "mln_map_projection_create",
-      { MapProjectionHandle(it) },
-      GeneratedOwnerDisposal::mapProjection,
-      { it.close() },
-    ) {
-      check(C.mln_map_projection_create(handle, completion, diagnostic))
     }
 
   /**
@@ -1726,131 +1976,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Sets or clears one layer filter.
-   *
-   * See `mln_map_set_layer_filter` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLayerFilter(
-    layerId: String,
-    filter: ByteArray? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_layer_filter") {
-      check(
-        C.mln_map_set_layer_filter(
-          handle,
-          view(layerId),
-          filter?.let { view(it) } ?: 0L,
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Sets the highest zoom at which one layer draws.
-   *
-   * See `mln_map_set_layer_max_zoom` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_layer_max_zoom") {
-      check(C.mln_map_set_layer_max_zoom(handle, view(layerId), maxZoom, completion, diagnostic))
-    }
-
-  /**
-   * Sets the lowest zoom at which one layer draws.
-   *
-   * See `mln_map_set_layer_min_zoom` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_layer_min_zoom") {
-      check(C.mln_map_set_layer_min_zoom(handle, view(layerId), minZoom, completion, diagnostic))
-    }
-
-  /**
-   * Sets one layer property using its MapLibre style-spec property name.
-   *
-   * See `mln_map_set_layer_property` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLayerProperty(
-    layerId: String,
-    propertyName: String,
-    valueValue: ByteArray,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_layer_property") {
-      check(
-        C.mln_map_set_layer_property(
-          handle,
-          view(layerId),
-          view(propertyName),
-          view(valueValue),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Sets one layer's source ID.
-   *
-   * See `mln_map_set_layer_source_id` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLayerSourceId(layerId: String, sourceId: String): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_layer_source_id") {
-      check(
-        C.mln_map_set_layer_source_id(handle, view(layerId), view(sourceId), completion, diagnostic)
-      )
-    }
-
-  /**
-   * Sets one layer's source-layer ID.
-   *
-   * See `mln_map_set_layer_source_layer` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLayerSourceLayer(
-    layerId: String,
-    sourceLayer: String? = null,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_layer_source_layer") {
-      check(
-        C.mln_map_set_layer_source_layer(
-          handle,
-          view(layerId),
-          view(sourceLayer ?: ""),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Sets whether one layer draws.
-   *
-   * See `mln_map_set_layer_visibility` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-   */
-  public fun setLayerVisibility(
-    layerId: String,
-    visibility: StyleLayerVisibility,
-  ): Deferred<CommandCompletion> =
-    nativeCommand(this, binding, "mln_map_set_layer_visibility") {
-      check(
-        C.mln_map_set_layer_visibility(
-          handle,
-          view(layerId),
-          visibility.rawValue.toInt(),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
    * Sets a location indicator layer accuracy radius in meters.
    *
    * See `mln_map_set_location_indicator_accuracy_radius` in the
@@ -2002,6 +2127,141 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
+   * Sets or clears one layer filter.
+   *
+   * See `mln_map_set_style_layer_filter` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setStyleLayerFilter(
+    layerId: String,
+    filter: ByteArray? = null,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_set_style_layer_filter") {
+      check(
+        C.mln_map_set_style_layer_filter(
+          handle,
+          view(layerId),
+          filter?.let { view(it) } ?: 0L,
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Sets the highest zoom at which one layer draws.
+   *
+   * See `mln_map_set_style_layer_max_zoom` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setStyleLayerMaxZoom(layerId: String, maxZoom: Double): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_set_style_layer_max_zoom") {
+      check(
+        C.mln_map_set_style_layer_max_zoom(handle, view(layerId), maxZoom, completion, diagnostic)
+      )
+    }
+
+  /**
+   * Sets the lowest zoom at which one layer draws.
+   *
+   * See `mln_map_set_style_layer_min_zoom` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setStyleLayerMinZoom(layerId: String, minZoom: Double): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_set_style_layer_min_zoom") {
+      check(
+        C.mln_map_set_style_layer_min_zoom(handle, view(layerId), minZoom, completion, diagnostic)
+      )
+    }
+
+  /**
+   * Sets one layer property using its MapLibre style-spec property name.
+   *
+   * See `mln_map_set_style_layer_property` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setStyleLayerProperty(
+    layerId: String,
+    propertyName: String,
+    valueValue: ByteArray,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_set_style_layer_property") {
+      check(
+        C.mln_map_set_style_layer_property(
+          handle,
+          view(layerId),
+          view(propertyName),
+          view(valueValue),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Sets one layer's source ID.
+   *
+   * See `mln_map_set_style_layer_source_id` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setStyleLayerSourceId(layerId: String, sourceId: String): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_set_style_layer_source_id") {
+      check(
+        C.mln_map_set_style_layer_source_id(
+          handle,
+          view(layerId),
+          view(sourceId),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Sets one layer's source-layer ID.
+   *
+   * See `mln_map_set_style_layer_source_layer` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setStyleLayerSourceLayer(
+    layerId: String,
+    sourceLayer: String? = null,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_set_style_layer_source_layer") {
+      check(
+        C.mln_map_set_style_layer_source_layer(
+          handle,
+          view(layerId),
+          view(sourceLayer ?: ""),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Sets whether one layer draws.
+   *
+   * See `mln_map_set_style_layer_visibility` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+   */
+  public fun setStyleLayerVisibility(
+    layerId: String,
+    visibility: StyleLayerVisibility,
+  ): Deferred<CommandCompletion> =
+    nativeCommand(this, binding, "mln_map_set_style_layer_visibility") {
+      check(
+        C.mln_map_set_style_layer_visibility(
+          handle,
+          view(layerId),
+          visibility.rawValue.toInt(),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
    * Sets the style light from a style-spec light JSON object.
    *
    * See `mln_map_set_style_light_json` in the
@@ -2119,35 +2379,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies the latest immutable state published by the map worker.
-   *
-   * See `mln_map_snapshot_get` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun snapshotGet(): MapSnapshot =
-    nativeCall(this, binding, "mln_map_snapshot_get") {
-      val out = sized(456, 8)
-      check(C.mln_map_snapshot_get(handle, out, diagnostic))
-      readMapSnapshot(out)
-    }
-
-  /**
-   * Starts an ordered copy of the last requested style URL.
-   *
-   * See `mln_map_style_url` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun styleUrl(): Deferred<String> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_map_style_url",
-      { result -> readViewString(CompletionBridge.value(result)) },
-    ) {
-      check(C.mln_map_style_url(handle, completion, diagnostic))
-    }
-
-  /**
    * Submits one atomic camera update.
    *
    * See `mln_map_update_camera` in the
@@ -2156,365 +2387,5 @@ public abstract class GeneratedMapOperations internal constructor() {
   public fun updateCamera(update: CameraUpdate): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_map_update_camera") {
       check(C.mln_map_update_camera(handle, writeCameraUpdate(update), completion, diagnostic))
-    }
-
-  /**
-   * Starts attachment of a caller-owned Metal texture target.
-   *
-   * See `mln_metal_borrowed_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun metalBorrowedTextureAttach(
-    descriptor: MetalBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_metal_borrowed_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_metal_borrowed_texture_attach(
-            handle,
-            writeMetalBorrowedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a session-owned Metal texture ring.
-   *
-   * See `mln_metal_owned_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun metalOwnedTextureAttach(
-    descriptor: MetalOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_metal_owned_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_metal_owned_texture_attach(
-            handle,
-            writeMetalOwnedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a Metal surface target.
-   *
-   * See `mln_metal_surface_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun metalSurfaceAttach(
-    descriptor: MetalSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_metal_surface_attach") {
-      attach(
-        { out, completion ->
-          C.mln_metal_surface_attach(
-            handle,
-            writeMetalSurfaceDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a caller-owned OpenGL texture target.
-   *
-   * See `mln_opengl_borrowed_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun openglBorrowedTextureAttach(
-    descriptor: OpenglBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_opengl_borrowed_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_opengl_borrowed_texture_attach(
-            handle,
-            writeOpenglBorrowedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a session-owned OpenGL texture ring.
-   *
-   * See `mln_opengl_owned_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun openglOwnedTextureAttach(
-    descriptor: OpenglOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_opengl_owned_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_opengl_owned_texture_attach(
-            handle,
-            writeOpenglOwnedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of an OpenGL surface target.
-   *
-   * See `mln_opengl_surface_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun openglSurfaceAttach(
-    descriptor: OpenglSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_opengl_surface_attach") {
-      attach(
-        { out, completion ->
-          C.mln_opengl_surface_attach(
-            handle,
-            writeOpenglSurfaceDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a caller-owned Vulkan texture target.
-   *
-   * See `mln_vulkan_borrowed_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun vulkanBorrowedTextureAttach(
-    descriptor: VulkanBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_vulkan_borrowed_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_vulkan_borrowed_texture_attach(
-            handle,
-            writeVulkanBorrowedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a session-owned Vulkan texture ring.
-   *
-   * See `mln_vulkan_owned_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun vulkanOwnedTextureAttach(
-    descriptor: VulkanOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_vulkan_owned_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_vulkan_owned_texture_attach(
-            handle,
-            writeVulkanOwnedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a Vulkan surface target.
-   *
-   * See `mln_vulkan_surface_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun vulkanSurfaceAttach(
-    descriptor: VulkanSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_vulkan_surface_attach") {
-      attach(
-        { out, completion ->
-          C.mln_vulkan_surface_attach(
-            handle,
-            writeVulkanSurfaceDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a caller-owned WebGPU texture target.
-   *
-   * See `mln_webgpu_borrowed_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun webgpuBorrowedTextureAttach(
-    descriptor: WebgpuBorrowedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_webgpu_borrowed_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_webgpu_borrowed_texture_attach(
-            handle,
-            writeWebgpuBorrowedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a session-owned WebGPU texture ring.
-   *
-   * See `mln_webgpu_owned_texture_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-   */
-  public fun webgpuOwnedTextureAttach(
-    descriptor: WebgpuOwnedTextureDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_webgpu_owned_texture_attach") {
-      attach(
-        { out, completion ->
-          C.mln_webgpu_owned_texture_attach(
-            handle,
-            writeWebgpuOwnedTextureDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
-    }
-
-  /**
-   * Starts attachment of a WebGPU surface target.
-   *
-   * See `mln_webgpu_surface_attach` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-   */
-  public fun webgpuSurfaceAttach(
-    descriptor: WebgpuSurfaceDescriptor,
-    options: RenderSessionAttachOptions,
-  ): RenderSessionAttachment =
-    nativeCall(this, binding, "mln_webgpu_surface_attach") {
-      attach(
-        { out, completion ->
-          C.mln_webgpu_surface_attach(
-            handle,
-            writeWebgpuSurfaceDescriptor(descriptor),
-            writeRenderSessionAttachOptions(options),
-            out,
-            completion,
-            diagnostic,
-          )
-        },
-        GeneratedOwnerDisposal::renderSession,
-        { RenderSessionHandle(it, this@GeneratedMapOperations as MapHandle) },
-        { it.bindingCallbacks },
-        { it.dispose() },
-        ::RenderSessionAttachment,
-      )
     }
 }

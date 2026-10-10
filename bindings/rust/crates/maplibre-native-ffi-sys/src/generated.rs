@@ -1253,12 +1253,13 @@ pub struct mln_source_feature_query_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_info {
-    pub fields: u32,
     pub width: u32,
     pub height: u32,
-    pub stride: u32,
-    pub byte_length: usize,
+    pub fields: u32,
+    pub pixels: mln_buffer_view,
+    pub stretch_x: *const mln_image_stretch,
     pub stretch_x_count: usize,
+    pub stretch_y: *const mln_image_stretch,
     pub stretch_y_count: usize,
     pub content: mln_image_content,
     pub text_fit_width: u32,
@@ -1283,54 +1284,24 @@ pub struct mln_style_image_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_style_image_result {
-    pub info: mln_style_image_info,
-    pub pixels: mln_buffer_view,
-    pub stretch_x: *const mln_image_stretch,
-    pub stretch_x_count: usize,
-    pub stretch_y: *const mln_image_stretch,
-    pub stretch_y_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_image_stretches_result {
-    pub stretch_x: *const mln_image_stretch,
-    pub stretch_x_count: usize,
-    pub stretch_y: *const mln_image_stretch,
-    pub stretch_y_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_layer_entry {
+pub struct mln_style_layer_info {
     pub id: mln_buffer_view,
     pub type_: mln_buffer_view,
     pub source_id: mln_buffer_view,
     pub source_layer: mln_buffer_view,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_layer_info {
-    pub type_: mln_buffer_view,
     pub min_zoom: f64,
     pub max_zoom: f64,
     pub visibility: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_style_layer_result {
-    pub info: mln_style_layer_info,
-    pub source_id: mln_buffer_view,
-    pub source_layer: mln_buffer_view,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_info {
+    pub id: mln_buffer_view,
     pub type_: u32,
     pub fields: u32,
-    pub id_size: usize,
     pub is_volatile: bool,
-    pub attribution_size: usize,
-    pub url_size: usize,
+    pub attribution: mln_buffer_view,
+    pub url: mln_buffer_view,
     pub tilejson: mln_style_source_tile_info,
     pub bounds: mln_lat_lng_bounds,
     pub tile_size: u32,
@@ -1339,26 +1310,12 @@ pub struct mln_style_source_info {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_style_source_result {
-    pub info: mln_style_source_info,
-    pub attribution: mln_buffer_view,
-    pub url: mln_buffer_view,
+pub struct mln_style_source_tile_info {
     pub tile_urls: *const mln_buffer_view,
     pub tile_url_count: usize,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_source_tile_info {
-    pub tile_count: usize,
     pub min_zoom: f64,
     pub max_zoom: f64,
     pub scheme: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_style_source_tile_urls_result {
-    pub tile_urls: *const mln_buffer_view,
-    pub tile_url_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1707,7 +1664,7 @@ unsafe extern "C" {
     pub fn mln_geojson_source_data_destroy(data: mln_geojson_source_data);
     pub fn mln_geojson_source_options_default() -> mln_geojson_source_options;
     pub fn mln_gpu_sync_default() -> mln_gpu_sync;
-    pub fn mln_http_header_transform_response_set(
+    pub fn mln_http_header_transform_response_set_header(
         response: *mut mln_http_header_transform_response,
         name: *const std::ffi::c_char,
         name_size: usize,
@@ -1870,6 +1827,107 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_attach_metal_borrowed_texture(
+        map: mln_map,
+        descriptor: *const mln_metal_borrowed_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_metal_owned_texture(
+        map: mln_map,
+        descriptor: *const mln_metal_owned_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_metal_surface(
+        map: mln_map,
+        descriptor: *const mln_metal_surface_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_opengl_borrowed_texture(
+        map: mln_map,
+        descriptor: *const mln_opengl_borrowed_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_opengl_owned_texture(
+        map: mln_map,
+        descriptor: *const mln_opengl_owned_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_opengl_surface(
+        map: mln_map,
+        descriptor: *const mln_opengl_surface_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_vulkan_borrowed_texture(
+        map: mln_map,
+        descriptor: *const mln_vulkan_borrowed_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_vulkan_owned_texture(
+        map: mln_map,
+        descriptor: *const mln_vulkan_owned_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_vulkan_surface(
+        map: mln_map,
+        descriptor: *const mln_vulkan_surface_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_webgpu_borrowed_texture(
+        map: mln_map,
+        descriptor: *const mln_webgpu_borrowed_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_webgpu_owned_texture(
+        map: mln_map,
+        descriptor: *const mln_webgpu_owned_texture_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_attach_webgpu_surface(
+        map: mln_map,
+        descriptor: *const mln_webgpu_surface_descriptor,
+        options: *const mln_render_session_attach_options,
+        out_session: *mut mln_render_session,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_begin_command_group(
+        map: mln_map,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_camera_for_geometry(
         map: mln_map,
         geometry: mln_buffer_view,
@@ -1892,61 +1950,13 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_camera_query(
-        map: mln_map,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_camera_snapshot_get(
-        map: mln_map,
-        out_camera: *mut mln_camera_options,
-        out_generation: *mut u64,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_cancel_transitions(
         map: mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_copy_layer_source_id(
+    pub fn mln_map_create_projection(
         map: mln_map,
-        layer_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_layer_source_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_image_premultiplied_rgba8(
-        map: mln_map,
-        image_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_image_stretches(
-        map: mln_map,
-        image_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_source_attribution(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_copy_style_source_url(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_create(
-        runtime: mln_runtime,
-        options: *const mln_map_options,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -1954,6 +1964,22 @@ unsafe extern "C" {
     pub fn mln_map_dump_debug_logs(
         map: mln_map,
         completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_end_command_group(
+        map: mln_map,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_get_camera(
+        map: mln_map,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_get_camera_snapshot(
+        map: mln_map,
+        out_camera: *mut mln_camera_options,
+        out_generation: *mut u64,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_get_feature_state(
@@ -1973,26 +1999,29 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_layer_filter(
+    pub fn mln_map_get_loaded_style_json(
         map: mln_map,
-        layer_id: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_layer_property(
+    pub fn mln_map_get_snapshot(
         map: mln_map,
-        layer_id: mln_buffer_view,
-        property_name: mln_buffer_view,
-        completion: *const mln_completion,
+        out_snapshot: *mut mln_map_snapshot,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_style_image_info(
+    pub fn mln_map_get_style_image(
         map: mln_map,
         image_id: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_style_layer_info(
+    pub fn mln_map_get_style_layer(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_get_style_layer_filter(
         map: mln_map,
         layer_id: mln_buffer_view,
         completion: *const mln_completion,
@@ -2004,25 +2033,31 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_get_style_layer_property(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        property_name: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_get_style_light_property(
         map: mln_map,
         property_name: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_get_style_source_info(
-        map: mln_map,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_get_style_source_tile_urls(
+    pub fn mln_map_get_style_source(
         map: mln_map,
         source_id: mln_buffer_view,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_get_style_transition_options(
+        map: mln_map,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_get_style_url(
         map: mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
@@ -2086,22 +2121,12 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_list_style_layer_ids(
-        map: mln_map,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_list_style_layers(
         map: mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_list_style_source_ids(
-        map: mln_map,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_loaded_style_json(
+    pub fn mln_map_list_style_sources(
         map: mln_map,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
@@ -2135,11 +2160,6 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_map_projection_close(
         projection: mln_map_projection,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_projection_create(
-        map: mln_map,
-        completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_projection_get_camera(
@@ -2339,56 +2359,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_set_layer_filter(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        filter: *const mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_layer_max_zoom(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        max_zoom: f64,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_layer_min_zoom(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        min_zoom: f64,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_layer_property(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        property_name: mln_buffer_view,
-        value: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_layer_source_id(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        source_id: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_layer_source_layer(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        source_layer: mln_buffer_view,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_set_layer_visibility(
-        map: mln_map,
-        layer_id: mln_buffer_view,
-        visibility: u32,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_set_location_indicator_accuracy_radius(
         map: mln_map,
         layer_id: mln_buffer_view,
@@ -2445,6 +2415,56 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_map_set_style_layer_filter(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        filter: *const mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_set_style_layer_max_zoom(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        max_zoom: f64,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_set_style_layer_min_zoom(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        min_zoom: f64,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_set_style_layer_property(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        property_name: mln_buffer_view,
+        value: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_set_style_layer_source_id(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        source_id: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_set_style_layer_source_layer(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        source_layer: mln_buffer_view,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_map_set_style_layer_visibility(
+        map: mln_map,
+        layer_id: mln_buffer_view,
+        visibility: u32,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_map_set_style_light_json(
         map: mln_map,
         light_json: mln_buffer_view,
@@ -2489,16 +2509,6 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_map_snapshot_get(
-        map: mln_map,
-        out_snapshot: *mut mln_map_snapshot,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_map_style_url(
-        map: mln_map,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_map_tile_options_default() -> mln_map_tile_options;
     pub fn mln_map_update_camera(
         map: mln_map,
@@ -2507,90 +2517,18 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_map_viewport_options_default() -> mln_map_viewport_options;
-    pub fn mln_metal_borrowed_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_metal_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_metal_borrowed_texture_descriptor_default() -> mln_metal_borrowed_texture_descriptor;
-    pub fn mln_metal_borrowed_texture_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_metal_borrowed_texture_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_metal_owned_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_metal_owned_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_metal_owned_texture_descriptor_default() -> mln_metal_owned_texture_descriptor;
-    pub fn mln_metal_surface_attach(
-        map: mln_map,
-        descriptor: *const mln_metal_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_metal_surface_descriptor_default() -> mln_metal_surface_descriptor;
-    pub fn mln_metal_surface_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_metal_surface_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_network_status_get(
+    pub fn mln_network_get_status(
         out_status: *mut u32,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_network_status_set(status: u32, out_diagnostic: *mut mln_diagnostic) -> mln_status;
-    pub fn mln_opengl_borrowed_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_opengl_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
+    pub fn mln_network_set_status(status: u32, out_diagnostic: *mut mln_diagnostic) -> mln_status;
     pub fn mln_opengl_borrowed_texture_descriptor_default() -> mln_opengl_borrowed_texture_descriptor;
-    pub fn mln_opengl_borrowed_texture_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_opengl_borrowed_texture_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_opengl_owned_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_opengl_owned_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_opengl_owned_texture_descriptor_default() -> mln_opengl_owned_texture_descriptor;
     pub fn mln_opengl_supported_context_provider_mask() -> u32;
-    pub fn mln_opengl_surface_attach(
-        map: mln_map,
-        descriptor: *const mln_opengl_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_opengl_surface_descriptor_default() -> mln_opengl_surface_descriptor;
-    pub fn mln_opengl_surface_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_opengl_surface_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_plugin_get_register_function_v1() -> mln_plugin_register_function_v1;
     pub fn mln_premultiplied_rgba8_image_default() -> mln_premultiplied_rgba8_image;
     pub fn mln_projected_meters_for_lat_lng(
@@ -2626,6 +2564,11 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_render_session_create_projection(
+        session: mln_render_session,
+        out_projection: *mut mln_map_projection,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_render_session_destroy(
         session: mln_render_session,
         out_diagnostic: *mut mln_diagnostic,
@@ -2659,11 +2602,6 @@ unsafe extern "C" {
         out_snapshot: *mut mln_render_session_snapshot,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_render_session_projection_create(
-        session: mln_render_session,
-        out_projection: *mut mln_map_projection,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_render_session_query_feature_extensions(
         session: mln_render_session,
         source_id: mln_buffer_view,
@@ -2685,6 +2623,11 @@ unsafe extern "C" {
         session: mln_render_session,
         source_id: mln_buffer_view,
         options: *const mln_source_feature_query_options,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_read_texture(
+        session: mln_render_session,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
@@ -2710,6 +2653,54 @@ unsafe extern "C" {
         out_serviced: *mut usize,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_render_session_set_metal_borrowed_texture_target(
+        session: mln_render_session,
+        descriptor: *const mln_metal_borrowed_texture_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_metal_surface_target(
+        session: mln_render_session,
+        descriptor: *const mln_metal_surface_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_opengl_borrowed_texture_target(
+        session: mln_render_session,
+        descriptor: *const mln_opengl_borrowed_texture_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_opengl_surface_target(
+        session: mln_render_session,
+        descriptor: *const mln_opengl_surface_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_vulkan_borrowed_texture_target(
+        session: mln_render_session,
+        descriptor: *const mln_vulkan_borrowed_texture_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_vulkan_surface_target(
+        session: mln_render_session,
+        descriptor: *const mln_vulkan_surface_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_webgpu_borrowed_texture_target(
+        session: mln_render_session,
+        descriptor: *const mln_webgpu_borrowed_texture_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_render_session_set_webgpu_surface_target(
+        session: mln_render_session,
+        descriptor: *const mln_webgpu_surface_descriptor,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_render_target_extent_physical_size(
         extent: *const mln_render_target_extent,
         out_width: *mut u32,
@@ -2725,14 +2716,14 @@ unsafe extern "C" {
     pub fn mln_rendered_query_geometry_point(
         point: mln_screen_point,
     ) -> mln_rendered_query_geometry;
-    pub fn mln_resource_request_cancelled(
-        handle: mln_resource_request_handle,
-        out_cancelled: *mut bool,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_resource_request_complete(
         handle: mln_resource_request_handle,
         response: *const mln_resource_response,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_resource_request_is_cancelled(
+        handle: mln_resource_request_handle,
+        out_cancelled: *mut bool,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_resource_request_release(handle: mln_resource_request_handle);
@@ -2777,6 +2768,26 @@ unsafe extern "C" {
         out_runtime: *mut mln_runtime,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_runtime_create_map(
+        runtime: mln_runtime,
+        options: *const mln_map_options,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_runtime_create_offline_region(
+        runtime: mln_runtime,
+        definition: *const mln_offline_region_definition,
+        metadata: *const u8,
+        metadata_size: usize,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_runtime_delete_offline_region(
+        runtime: mln_runtime,
+        region_id: mln_offline_region_id,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_runtime_dispose(
         runtime: mln_runtime,
         out_diagnostic: *mut mln_diagnostic,
@@ -2791,66 +2802,30 @@ unsafe extern "C" {
         out_mask: *mut u64,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_offline_region_create(
-        runtime: mln_runtime,
-        definition: *const mln_offline_region_definition,
-        metadata: *const u8,
-        metadata_size: usize,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_runtime_offline_region_delete(
+    pub fn mln_runtime_get_offline_region(
         runtime: mln_runtime,
         region_id: mln_offline_region_id,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_offline_region_get(
+    pub fn mln_runtime_get_offline_region_status(
         runtime: mln_runtime,
         region_id: mln_offline_region_id,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_offline_region_get_status(
+    pub fn mln_runtime_invalidate_offline_region(
         runtime: mln_runtime,
         region_id: mln_offline_region_id,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_offline_region_invalidate(
-        runtime: mln_runtime,
-        region_id: mln_offline_region_id,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_runtime_offline_region_set_download_state(
-        runtime: mln_runtime,
-        region_id: mln_offline_region_id,
-        state: u32,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_runtime_offline_region_set_observed(
-        runtime: mln_runtime,
-        region_id: mln_offline_region_id,
-        observed: bool,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_runtime_offline_region_update_metadata(
-        runtime: mln_runtime,
-        region_id: mln_offline_region_id,
-        metadata: *const u8,
-        metadata_size: usize,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_runtime_offline_regions_list(
+    pub fn mln_runtime_list_offline_regions(
         runtime: mln_runtime,
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
-    pub fn mln_runtime_offline_regions_merge_database(
+    pub fn mln_runtime_merge_offline_regions(
         runtime: mln_runtime,
         side_database_path: *const std::ffi::c_char,
         completion: *const mln_completion,
@@ -2885,6 +2860,20 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_runtime_set_offline_region_download_state(
+        runtime: mln_runtime,
+        region_id: mln_offline_region_id,
+        state: u32,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
+    pub fn mln_runtime_set_offline_region_observed(
+        runtime: mln_runtime,
+        region_id: mln_offline_region_id,
+        observed: bool,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_runtime_set_resource_provider(
         runtime: mln_runtime,
         provider: *const mln_resource_provider,
@@ -2897,92 +2886,23 @@ unsafe extern "C" {
         completion: *const mln_completion,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
+    pub fn mln_runtime_update_offline_region_metadata(
+        runtime: mln_runtime,
+        region_id: mln_offline_region_id,
+        metadata: *const u8,
+        metadata_size: usize,
+        completion: *const mln_completion,
+        out_diagnostic: *mut mln_diagnostic,
+    ) -> mln_status;
     pub fn mln_source_feature_query_options_default() -> mln_source_feature_query_options;
     pub fn mln_style_image_options_default() -> mln_style_image_options;
     pub fn mln_style_tile_source_options_default() -> mln_style_tile_source_options;
     pub fn mln_style_transition_options_default() -> mln_style_transition_options;
     pub fn mln_supported_render_backend_mask() -> u32;
-    pub fn mln_texture_read_premultiplied_rgba8(
-        session: mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_vulkan_borrowed_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_vulkan_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_vulkan_borrowed_texture_descriptor_default() -> mln_vulkan_borrowed_texture_descriptor;
-    pub fn mln_vulkan_borrowed_texture_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_vulkan_borrowed_texture_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_vulkan_owned_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_vulkan_owned_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_vulkan_owned_texture_descriptor_default() -> mln_vulkan_owned_texture_descriptor;
-    pub fn mln_vulkan_surface_attach(
-        map: mln_map,
-        descriptor: *const mln_vulkan_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_vulkan_surface_descriptor_default() -> mln_vulkan_surface_descriptor;
-    pub fn mln_vulkan_surface_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_vulkan_surface_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_webgpu_borrowed_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_webgpu_borrowed_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_webgpu_borrowed_texture_descriptor_default() -> mln_webgpu_borrowed_texture_descriptor;
-    pub fn mln_webgpu_borrowed_texture_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_webgpu_borrowed_texture_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
-    pub fn mln_webgpu_owned_texture_attach(
-        map: mln_map,
-        descriptor: *const mln_webgpu_owned_texture_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_webgpu_owned_texture_descriptor_default() -> mln_webgpu_owned_texture_descriptor;
-    pub fn mln_webgpu_surface_attach(
-        map: mln_map,
-        descriptor: *const mln_webgpu_surface_descriptor,
-        options: *const mln_render_session_attach_options,
-        out_session: *mut mln_render_session,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
     pub fn mln_webgpu_surface_descriptor_default() -> mln_webgpu_surface_descriptor;
-    pub fn mln_webgpu_surface_set_target(
-        session: mln_render_session,
-        descriptor: *const mln_webgpu_surface_descriptor,
-        completion: *const mln_completion,
-        out_diagnostic: *mut mln_diagnostic,
-    ) -> mln_status;
 }

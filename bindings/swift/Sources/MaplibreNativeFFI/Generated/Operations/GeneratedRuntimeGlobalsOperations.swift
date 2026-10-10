@@ -7,13 +7,14 @@ public extension HttpHeaderTransformResponse {
   /// Sets one outgoing HTTP request header for the current transform
   /// invocation.
   ///
-  /// See `mln_http_header_transform_response_set` in the
+  /// See `mln_http_header_transform_response_set_header` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  func set(name bindingArg0: String, value bindingArg2: String) throws {
-    try nativeInvoke(owner: self,
-                     "mln_http_header_transform_response_set")
-    { _, arena, diagnostic in
-      try mln_http_header_transform_response_set(
+  func setHeader(name bindingArg0: String, value bindingArg2: String) throws {
+    try nativeInvoke(
+      owner: self,
+      "mln_http_header_transform_response_set_header"
+    ) { _, arena, diagnostic in
+      try mln_http_header_transform_response_set_header(
         nativePointer,
         arena.view(bindingArg0).data?.assumingMemoryBound(to: CChar.self),
         NativeInputArena.count(bindingArg0.count),
@@ -28,12 +29,12 @@ public extension HttpHeaderTransformResponse {
 public extension Maplibre {
   /// Reads MapLibre Native's process-global network status.
   ///
-  /// See `mln_network_status_get` in the
+  /// See `mln_network_get_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func networkStatusGet() throws -> NetworkStatus {
+  static func networkGetStatus() throws -> NetworkStatus {
     var value0: UInt32 = 0
-    return try nativeInvoke("mln_network_status_get") { _, _, diagnostic in
-      mln_network_status_get(
+    return try nativeInvoke("mln_network_get_status") { _, _, diagnostic in
+      mln_network_get_status(
         &value0,
         diagnostic
       )
@@ -42,11 +43,11 @@ public extension Maplibre {
 
   /// Sets MapLibre Native's process-global network status.
   ///
-  /// See `mln_network_status_set` in the
+  /// See `mln_network_set_status` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
-  static func networkStatusSet(status bindingArg0: NetworkStatus) throws {
-    try nativeInvoke("mln_network_status_set") { _, _, diagnostic in
-      mln_network_status_set(
+  static func networkSetStatus(status bindingArg0: NetworkStatus) throws {
+    try nativeInvoke("mln_network_set_status") { _, _, diagnostic in
+      mln_network_set_status(
         bindingArg0.nativeValue(),
         diagnostic
       )

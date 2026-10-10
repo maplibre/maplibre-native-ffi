@@ -230,8 +230,7 @@ mln_status mln_keyword_combine(
 #ifdef MLN_PROTOCOL_PRESENCE_MASK
 // A bitmask presence mask whose bit guards an embedded record, in a record with
 // a default constructor that a caller passes by pointer. A snapshot nests it
-// beside a borrowed array, and a borrowed route reuses the nested bit through
-// the mask path camera.fields.
+// beside a borrowed array.
 typedef enum BIND("kind=bitmask") mln_camera_field : uint64_t {
   MLN_CAMERA_CENTER = 1ULL << 40,
   MLN_CAMERA_ZOOM = 2
@@ -252,22 +251,12 @@ typedef struct mln_snapshot {
   const mln_lat_lng* coordinates BIND("length=coordinate_count");
   size_t coordinate_count;
 } mln_snapshot;
-typedef struct mln_camera_route {
-  mln_camera camera;
-  const mln_lat_lng* stops
-    BIND("length=stop_count;mask=camera.fields;bit=MLN_CAMERA_CENTER");
-  size_t stop_count;
-} mln_camera_route;
 mln_camera mln_camera_default(void);
 mln_status mln_map_jump(
   mln_map map, const mln_camera* camera, mln_diagnostic* out_diagnostic
 );
 BIND("execution=query;result=mln_snapshot")
 mln_status mln_map_snapshot(
-  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
-);
-BIND("execution=query;result=mln_camera_route")
-mln_status mln_map_camera_route(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 #endif

@@ -363,24 +363,13 @@ mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
                 ),
                 require_complete=True,
             )
-
-    def test_a_nested_presence_bit_guards_a_member_of_each_record(self):
-        # The route reuses the camera's bit through the mask path
-        # camera.fields, as a source result reuses its info's bits.
-        api = bind(parse(groups=("presence_mask",)), require_complete=True)
-        route = api.values["mln_camera_route"]
-        stops = next(field for field in route.fields if field.name == "stops")
-        center = next(
-            field for field in api.values["mln_camera"].fields if field.name == "center"
-        )
-        self.assertEqual(
-            (stops.presence.mask, stops.presence.bit),
-            ("camera.fields", "MLN_CAMERA_CENTER"),
-        )
-        self.assertEqual(
-            (center.presence.mask, center.presence.bit),
-            ("fields", "MLN_CAMERA_CENTER"),
-        )
+        with self.assertRaisesRegex(ModelError, "mask must name a sibling field"):
+            bind(
+                self.parse(
+                    source.replace("mask=fields;bit=ZOOM", "mask=a.fields;bit=ZOOM")
+                ),
+                require_complete=True,
+            )
 
     def test_copied_values_hold_registrations_only_in_defaults(self):
         source = """

@@ -95,7 +95,7 @@ static mln_adapter_completion_record* create_map_record(
 ) {
   mln_completion completion =
     mln_test_adapter_completion(MLN_ADAPTER_COMPLETION_COPY_MAP, delivery);
-  MLN_TEST_OK(mln_map_create(runtime, NULL, &completion, NULL));
+  MLN_TEST_OK(mln_runtime_create_map(runtime, NULL, &completion, NULL));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&delivery->delivered));
   mln_adapter_completion_record* record = atomic_load(&delivery->record);
   TEST_ASSERT_NOT_NULL(record);
@@ -142,7 +142,9 @@ static void a_rejected_completion_never_reaches_its_listener(void) {
   mln_test_adapter_delivery delivery = {0};
   mln_completion completion =
     mln_test_adapter_completion(MLN_ADAPTER_COMPLETION_COPY_MAP, &delivery);
-  MLN_TEST_INVALID(mln_map_create(MLN_HANDLE_NULL, NULL, &completion, NULL));
+  MLN_TEST_INVALID(
+    mln_runtime_create_map(MLN_HANDLE_NULL, NULL, &completion, NULL)
+  );
   mln_adapter_completion_reject(&completion);
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&delivery.deliveries));
   mln_adapter_completion_reject(NULL);

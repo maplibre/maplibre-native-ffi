@@ -8,7 +8,7 @@
 
 static mln_map_snapshot read_snapshot(mln_map map) {
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   return snapshot;
 }
 
@@ -536,10 +536,10 @@ static void map_extent_snapshot_tracks_resize_and_fixes_scale_factor(void) {
   TEST_ASSERT_EQUAL_UINT32(96, snapshot.logical_extent.width);
   TEST_ASSERT_EQUAL_DOUBLE(1.1, snapshot.logical_extent.scale_factor);
 
-  MLN_TEST_INVALID(mln_map_snapshot_get(MLN_HANDLE_NULL, &snapshot, NULL));
+  MLN_TEST_INVALID(mln_map_get_snapshot(MLN_HANDLE_NULL, &snapshot, NULL));
   mln_map_snapshot undersized = {.size = sizeof(mln_map_snapshot) - 1};
-  MLN_TEST_INVALID(mln_map_snapshot_get(map, &undersized, NULL));
-  MLN_TEST_INVALID(mln_map_snapshot_get(map, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_get_snapshot(map, &undersized, NULL));
+  MLN_TEST_INVALID(mln_map_get_snapshot(map, NULL, NULL));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -626,7 +626,7 @@ static void submit_commands(void* argument) {
     mln_test_completion_destroy(&completion);
     state->statuses[index] = status;
     mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-    if (mln_map_snapshot_get(state->map, &snapshot, NULL) == MLN_STATUS_OK) {
+    if (mln_map_get_snapshot(state->map, &snapshot, NULL) == MLN_STATUS_OK) {
       state->snapshot_generations[index] = snapshot.generation;
     }
   }

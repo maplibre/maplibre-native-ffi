@@ -49,6 +49,9 @@ struct MapObject {
   uint64_t next_snapshot_generation = 1;
   std::atomic<uint64_t> latest_resize_submission{0};
   bool still_image_request_pending = false;
+  // Open command groups, counted on the runtime worker. Each one holds the
+  // frontend's render updates until its end.
+  uint32_t command_group_depth = 0;
   // Any-thread map-owned feature state; render sessions pull coalesced
   // snapshots and push diffs into their renderer.
   FeatureStateStore feature_state;

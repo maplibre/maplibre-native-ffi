@@ -455,6 +455,414 @@ impl MapHandle {
         })
     }
 
+    /// Starts attachment of a caller-owned Metal texture target.
+    ///
+    /// See `mln_map_attach_metal_borrowed_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_metal_borrowed_texture(
+        &self,
+        descriptor: &MetalBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_metal_borrowed_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_metal_borrowed_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a session-owned Metal texture ring.
+    ///
+    /// See `mln_map_attach_metal_owned_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_metal_owned_texture(
+        &self,
+        descriptor: &MetalOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_metal_owned_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_metal_owned_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a Metal surface target.
+    ///
+    /// See `mln_map_attach_metal_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_metal_surface(
+        &self,
+        descriptor: &MetalSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_metal_surface")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_metal_surface(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a caller-owned OpenGL texture target.
+    ///
+    /// See `mln_map_attach_opengl_borrowed_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_opengl_borrowed_texture(
+        &self,
+        descriptor: &OpenglBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_opengl_borrowed_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_opengl_borrowed_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a session-owned OpenGL texture ring.
+    ///
+    /// See `mln_map_attach_opengl_owned_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_opengl_owned_texture(
+        &self,
+        descriptor: &OpenglOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_opengl_owned_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_opengl_owned_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of an OpenGL surface target.
+    ///
+    /// See `mln_map_attach_opengl_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_opengl_surface(
+        &self,
+        descriptor: &OpenglSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_opengl_surface")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_opengl_surface(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a caller-owned Vulkan texture target.
+    ///
+    /// See `mln_map_attach_vulkan_borrowed_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_vulkan_borrowed_texture(
+        &self,
+        descriptor: &VulkanBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_vulkan_borrowed_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_vulkan_borrowed_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a session-owned Vulkan texture ring.
+    ///
+    /// See `mln_map_attach_vulkan_owned_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_vulkan_owned_texture(
+        &self,
+        descriptor: &VulkanOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_vulkan_owned_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_vulkan_owned_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a Vulkan surface target.
+    ///
+    /// See `mln_map_attach_vulkan_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_vulkan_surface(
+        &self,
+        descriptor: &VulkanSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_vulkan_surface")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_vulkan_surface(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a caller-owned WebGPU texture target.
+    ///
+    /// See `mln_map_attach_webgpu_borrowed_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_webgpu_borrowed_texture(
+        &self,
+        descriptor: &WebgpuBorrowedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_webgpu_borrowed_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_webgpu_borrowed_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a session-owned WebGPU texture ring.
+    ///
+    /// See `mln_map_attach_webgpu_owned_texture` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_webgpu_owned_texture(
+        &self,
+        descriptor: &WebgpuOwnedTextureDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_webgpu_owned_texture")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_webgpu_owned_texture(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Starts attachment of a WebGPU surface target.
+    ///
+    /// See `mln_map_attach_webgpu_surface` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
+    ///
+    /// # Safety
+    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
+    pub unsafe fn attach_webgpu_surface(
+        &self,
+        descriptor: &WebgpuSurfaceDescriptor,
+        options: &RenderSessionAttachOptions,
+    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
+        let mut call = self.inner.call("mln_map_attach_webgpu_surface")?;
+        let parent = self.inner.parent();
+        let mut out_session = sys::mln_render_session(0);
+        let descriptor = call.reference(&descriptor)?;
+        let options = call.reference(&options)?;
+        let future = call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_attach_webgpu_surface(
+                    map,
+                    descriptor,
+                    options,
+                    &mut out_session,
+                    completion,
+                    out_diagnostic,
+                )
+            },
+            completion::unit,
+        )?;
+        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
+    }
+
+    /// Begins a command group, which holds this map's render updates until the
+    /// group ends.
+    ///
+    /// See `mln_map_begin_command_group` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn begin_command_group(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_begin_command_group")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_begin_command_group(map, completion, out_diagnostic)
+        })
+    }
+
     /// Starts an ordered query for a camera that fits a GeoJSON geometry.
     ///
     /// See `mln_map_camera_for_geometry` in the
@@ -535,40 +943,6 @@ impl MapHandle {
         )
     }
 
-    /// Starts an ordered camera read.
-    ///
-    /// See `mln_map_camera_query` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn camera_query(&self) -> Result<NativeFuture<CameraQueryResult>> {
-        let call = self.inner.call("mln_map_camera_query")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_camera_query(map, completion, out_diagnostic)
-            },
-            completion::value::<sys::mln_camera_query_result, _>,
-        )
-    }
-
-    /// Copies the camera from the latest immutable map snapshot.
-    ///
-    /// See `mln_map_camera_snapshot_get` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn camera_snapshot_get(&self) -> Result<(CameraOptions, u64)> {
-        let mut call = self.inner.call("mln_map_camera_snapshot_get")?;
-        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
-        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
-        let mut out_generation: u64 = Default::default();
-        call.status(|map, out_diagnostic| unsafe {
-            sys::mln_map_camera_snapshot_get(
-                map,
-                &mut out_camera,
-                &mut out_generation,
-                out_diagnostic,
-            )
-        })?;
-        Ok((unsafe { from_native(out_camera) }?, out_generation))
-    }
-
     /// Cancels the camera transitions running when this command commits.
     ///
     /// See `mln_map_cancel_transitions` in the
@@ -580,121 +954,23 @@ impl MapHandle {
         })
     }
 
-    /// Copies one layer's source ID.
+    /// Starts creation of a standalone projection from the map's ordered
+    /// transform state.
     ///
-    /// See `mln_map_copy_layer_source_id` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_layer_source_id(&self, layer_id: &str) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_layer_source_id")?;
-        let layer_id = call.input(&layer_id)?;
+    /// See `mln_map_create_projection` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
+    pub fn create_projection(&self) -> Result<NativeFuture<MapProjectionHandle>> {
+        let call = self.inner.call("mln_map_create_projection")?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_layer_source_id(map, layer_id, completion, out_diagnostic)
+                sys::mln_map_create_projection(map, completion, out_diagnostic)
             },
-            |result| {
-                let value = completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { convert::nonempty(value) }?)
-            },
-        )
-    }
-
-    /// Copies one layer's source-layer ID.
-    ///
-    /// See `mln_map_copy_layer_source_layer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_layer_source_layer(&self, layer_id: &str) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_layer_source_layer")?;
-        let layer_id = call.input(&layer_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_layer_source_layer(map, layer_id, completion, out_diagnostic)
-            },
-            |result| {
-                let value = completion::copy_value::<sys::mln_buffer_view>(result)?;
-                Ok(unsafe { convert::nonempty(value) }?)
-            },
-        )
-    }
-
-    /// Copies one runtime style image as tightly packed premultiplied RGBA8
-    /// pixels.
-    ///
-    /// See `mln_map_copy_style_image_premultiplied_rgba8` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_image_premultiplied_rgba8(
-        &self,
-        image_id: &str,
-    ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self
-            .inner
-            .call("mln_map_copy_style_image_premultiplied_rgba8")?;
-        let image_id = call.input(&image_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_image_premultiplied_rgba8(
-                    map,
-                    image_id,
-                    completion,
-                    out_diagnostic,
+            move |result| {
+                MapProjectionHandle::adopt(
+                    completion::copy_value::<sys::mln_map_projection>(result)?,
+                    None,
                 )
             },
-            completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
-    /// Copies one runtime style image's stretchable intervals.
-    ///
-    /// See `mln_map_copy_style_image_stretches` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_image_stretches(
-        &self,
-        image_id: &str,
-    ) -> Result<NativeFuture<Option<StyleImageStretchesResult>>> {
-        let mut call = self.inner.call("mln_map_copy_style_image_stretches")?;
-        let image_id = call.input(&image_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_image_stretches(map, image_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_style_image_stretches_result, _>,
-        )
-    }
-
-    /// Copies one style source attribution string.
-    ///
-    /// See `mln_map_copy_style_source_attribution` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_source_attribution(
-        &self,
-        source_id: &str,
-    ) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_style_source_attribution")?;
-        let source_id = call.input(&source_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_source_attribution(
-                    map,
-                    source_id,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
-    /// Copies one style source URL.
-    ///
-    /// See `mln_map_copy_style_source_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn copy_style_source_url(&self, source_id: &str) -> Result<NativeFuture<Option<String>>> {
-        let mut call = self.inner.call("mln_map_copy_style_source_url")?;
-        let source_id = call.input(&source_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_copy_style_source_url(map, source_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_buffer_view, _>,
         )
     }
 
@@ -718,6 +994,52 @@ impl MapHandle {
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_dump_debug_logs(map, completion, out_diagnostic)
         })
+    }
+
+    /// Ends the innermost command group that `mln_map_begin_command_group()`
+    /// began.
+    ///
+    /// See `mln_map_end_command_group` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn end_command_group(&self) -> Result<NativeFuture<CommandCompletion>> {
+        let call = self.inner.call("mln_map_end_command_group")?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_end_command_group(map, completion, out_diagnostic)
+        })
+    }
+
+    /// Starts an ordered camera read.
+    ///
+    /// See `mln_map_get_camera` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn get_camera(&self) -> Result<NativeFuture<CameraQueryResult>> {
+        let call = self.inner.call("mln_map_get_camera")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_camera(map, completion, out_diagnostic)
+            },
+            completion::value::<sys::mln_camera_query_result, _>,
+        )
+    }
+
+    /// Copies the camera from the latest immutable map snapshot.
+    ///
+    /// See `mln_map_get_camera_snapshot` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
+    pub fn get_camera_snapshot(&self) -> Result<(CameraOptions, u64)> {
+        let mut call = self.inner.call("mln_map_get_camera_snapshot")?;
+        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
+        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
+        let mut out_generation: u64 = Default::default();
+        call.status(|map, out_diagnostic| unsafe {
+            sys::mln_map_get_camera_snapshot(
+                map,
+                &mut out_camera,
+                &mut out_generation,
+                out_diagnostic,
+            )
+        })?;
+        Ok((unsafe { from_native(out_camera) }?, out_generation))
     }
 
     /// Starts an ordered read of per-feature state from this map.
@@ -761,7 +1083,7 @@ impl MapHandle {
     pub fn get_image_source_coordinates(
         &self,
         source_id: &str,
-    ) -> Result<NativeFuture<Option<Vec<LatLng>>>> {
+    ) -> Result<NativeFuture<Vec<LatLng>>> {
         let mut call = self.inner.call("mln_map_get_image_source_coordinates")?;
         let source_id = call.input(&source_id)?;
         call.complete(
@@ -773,84 +1095,80 @@ impl MapHandle {
                     out_diagnostic,
                 )
             },
-            completion::optional_list::<sys::mln_lat_lng, _>,
+            completion::list::<sys::mln_lat_lng, _>,
+        )
+    }
+
+    /// Starts an ordered copy of the last successfully parsed style document.
+    ///
+    /// See `mln_map_get_loaded_style_json` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn get_loaded_style_json(&self) -> Result<NativeFuture<Vec<u8>>> {
+        let call = self.inner.call("mln_map_get_loaded_style_json")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_loaded_style_json(map, completion, out_diagnostic)
+            },
+            completion::value::<sys::mln_buffer_view, _>,
+        )
+    }
+
+    /// Copies the latest immutable state published by the map worker.
+    ///
+    /// See `mln_map_get_snapshot` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn get_snapshot(&self) -> Result<MapSnapshot> {
+        let mut call = self.inner.call("mln_map_get_snapshot")?;
+        let mut out_snapshot: sys::mln_map_snapshot = unsafe { std::mem::zeroed() };
+        out_snapshot.size = std::mem::size_of::<sys::mln_map_snapshot>() as _;
+        call.status(|map, out_diagnostic| unsafe {
+            sys::mln_map_get_snapshot(map, &mut out_snapshot, out_diagnostic)
+        })?;
+        Ok(unsafe { from_native(out_snapshot) }?)
+    }
+
+    /// Copies one complete runtime style image.
+    ///
+    /// See `mln_map_get_style_image` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn get_style_image(&self, image_id: &str) -> Result<NativeFuture<Option<StyleImageInfo>>> {
+        let mut call = self.inner.call("mln_map_get_style_image")?;
+        let image_id = call.input(&image_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_image(map, image_id, completion, out_diagnostic)
+            },
+            completion::optional::<sys::mln_style_image_info, _>,
+        )
+    }
+
+    /// Copies the complete metadata of one style layer.
+    ///
+    /// See `mln_map_get_style_layer` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn get_style_layer(&self, layer_id: &str) -> Result<NativeFuture<Option<StyleLayerInfo>>> {
+        let mut call = self.inner.call("mln_map_get_style_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_layer(map, layer_id, completion, out_diagnostic)
+            },
+            completion::optional::<sys::mln_style_layer_info, _>,
         )
     }
 
     /// Serializes one layer filter as a style-spec JSON value.
     ///
-    /// See `mln_map_get_layer_filter` in the
+    /// See `mln_map_get_style_layer_filter` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_layer_filter(&self, layer_id: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self.inner.call("mln_map_get_layer_filter")?;
+    pub fn get_style_layer_filter(&self, layer_id: &str) -> Result<NativeFuture<Option<Vec<u8>>>> {
+        let mut call = self.inner.call("mln_map_get_style_layer_filter")?;
         let layer_id = call.input(&layer_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_layer_filter(map, layer_id, completion, out_diagnostic)
+                sys::mln_map_get_style_layer_filter(map, layer_id, completion, out_diagnostic)
             },
             completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
-    /// Serializes one layer property as a style-spec JSON value.
-    ///
-    /// See `mln_map_get_layer_property` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_layer_property(
-        &self,
-        layer_id: &str,
-        property_name: &str,
-    ) -> Result<NativeFuture<Option<Vec<u8>>>> {
-        let mut call = self.inner.call("mln_map_get_layer_property")?;
-        let layer_id = call.input(&layer_id)?;
-        let property_name = call.input(&property_name)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_layer_property(
-                    map,
-                    layer_id,
-                    property_name,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::optional::<sys::mln_buffer_view, _>,
-        )
-    }
-
-    /// Copies one complete runtime style image.
-    ///
-    /// See `mln_map_get_style_image_info` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_image_info(
-        &self,
-        image_id: &str,
-    ) -> Result<NativeFuture<Option<StyleImageResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_image_info")?;
-        let image_id = call.input(&image_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_image_info(map, image_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_style_image_result, _>,
-        )
-    }
-
-    /// Copies complete metadata for one style layer.
-    ///
-    /// See `mln_map_get_style_layer_info` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_layer_info(
-        &self,
-        layer_id: &str,
-    ) -> Result<NativeFuture<Option<StyleLayerResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_layer_info")?;
-        let layer_id = call.input(&layer_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_layer_info(map, layer_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_style_layer_result, _>,
         )
     }
 
@@ -864,6 +1182,32 @@ impl MapHandle {
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_get_style_layer_json(map, layer_id, completion, out_diagnostic)
+            },
+            completion::optional::<sys::mln_buffer_view, _>,
+        )
+    }
+
+    /// Serializes one layer property as a style-spec JSON value.
+    ///
+    /// See `mln_map_get_style_layer_property` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn get_style_layer_property(
+        &self,
+        layer_id: &str,
+        property_name: &str,
+    ) -> Result<NativeFuture<Option<Vec<u8>>>> {
+        let mut call = self.inner.call("mln_map_get_style_layer_property")?;
+        let layer_id = call.input(&layer_id)?;
+        let property_name = call.input(&property_name)?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_layer_property(
+                    map,
+                    layer_id,
+                    property_name,
+                    completion,
+                    out_diagnostic,
+                )
             },
             completion::optional::<sys::mln_buffer_view, _>,
         )
@@ -892,39 +1236,21 @@ impl MapHandle {
         )
     }
 
-    /// Copies complete metadata for one style source.
+    /// Copies the complete metadata of one style source.
     ///
-    /// See `mln_map_get_style_source_info` in the
+    /// See `mln_map_get_style_source` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_source_info(
+    pub fn get_style_source(
         &self,
         source_id: &str,
-    ) -> Result<NativeFuture<Option<StyleSourceResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_source_info")?;
+    ) -> Result<NativeFuture<Option<StyleSourceInfo>>> {
+        let mut call = self.inner.call("mln_map_get_style_source")?;
         let source_id = call.input(&source_id)?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_source_info(map, source_id, completion, out_diagnostic)
+                sys::mln_map_get_style_source(map, source_id, completion, out_diagnostic)
             },
-            completion::optional::<sys::mln_style_source_result, _>,
-        )
-    }
-
-    /// Copies one style source's inline TileJSON tile URLs.
-    ///
-    /// See `mln_map_get_style_source_tile_urls` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn get_style_source_tile_urls(
-        &self,
-        source_id: &str,
-    ) -> Result<NativeFuture<Option<StyleSourceTileUrlsResult>>> {
-        let mut call = self.inner.call("mln_map_get_style_source_tile_urls")?;
-        let source_id = call.input(&source_id)?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_get_style_source_tile_urls(map, source_id, completion, out_diagnostic)
-            },
-            completion::optional::<sys::mln_style_source_tile_urls_result, _>,
+            completion::optional::<sys::mln_style_source_info, _>,
         )
     }
 
@@ -939,6 +1265,20 @@ impl MapHandle {
                 sys::mln_map_get_style_transition_options(map, completion, out_diagnostic)
             },
             completion::value::<sys::mln_style_transition_options, _>,
+        )
+    }
+
+    /// Starts an ordered copy of the last requested style URL.
+    ///
+    /// See `mln_map_get_style_url` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+    pub fn get_style_url(&self) -> Result<NativeFuture<String>> {
+        let call = self.inner.call("mln_map_get_style_url")?;
+        call.complete(
+            |map, completion, out_diagnostic| unsafe {
+                sys::mln_map_get_style_url(map, completion, out_diagnostic)
+            },
+            completion::value::<sys::mln_buffer_view, _>,
         )
     }
 
@@ -1140,59 +1480,31 @@ impl MapHandle {
         )
     }
 
-    /// Copies style layer IDs in style order.
-    ///
-    /// See `mln_map_list_style_layer_ids` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn list_style_layer_ids(&self) -> Result<NativeFuture<Vec<String>>> {
-        let call = self.inner.call("mln_map_list_style_layer_ids")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_list_style_layer_ids(map, completion, out_diagnostic)
-            },
-            completion::list::<sys::mln_buffer_view, _>,
-        )
-    }
-
     /// Starts an ordered query of every style layer in style order.
     ///
     /// See `mln_map_list_style_layers` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn list_style_layers(&self) -> Result<NativeFuture<Vec<StyleLayerEntry>>> {
+    pub fn list_style_layers(&self) -> Result<NativeFuture<Vec<StyleLayerInfo>>> {
         let call = self.inner.call("mln_map_list_style_layers")?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
                 sys::mln_map_list_style_layers(map, completion, out_diagnostic)
             },
-            completion::list::<sys::mln_style_layer_entry, _>,
+            completion::list::<sys::mln_style_layer_info, _>,
         )
     }
 
-    /// Copies style source IDs in style order.
+    /// Lists every style source in style order.
     ///
-    /// See `mln_map_list_style_source_ids` in the
+    /// See `mln_map_list_style_sources` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn list_style_source_ids(&self) -> Result<NativeFuture<Vec<String>>> {
-        let call = self.inner.call("mln_map_list_style_source_ids")?;
+    pub fn list_style_sources(&self) -> Result<NativeFuture<Vec<StyleSourceInfo>>> {
+        let call = self.inner.call("mln_map_list_style_sources")?;
         call.complete(
             |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_list_style_source_ids(map, completion, out_diagnostic)
+                sys::mln_map_list_style_sources(map, completion, out_diagnostic)
             },
-            completion::list::<sys::mln_buffer_view, _>,
-        )
-    }
-
-    /// Starts an ordered copy of the last successfully parsed style document.
-    ///
-    /// See `mln_map_loaded_style_json` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn loaded_style_json(&self) -> Result<NativeFuture<Vec<u8>>> {
-        let call = self.inner.call("mln_map_loaded_style_json")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_loaded_style_json(map, completion, out_diagnostic)
-            },
-            completion::value::<sys::mln_buffer_view, _>,
+            completion::list::<sys::mln_style_source_info, _>,
         )
     }
 
@@ -1275,26 +1587,6 @@ impl MapHandle {
                 )
             },
             completion::list::<sys::mln_screen_point, _>,
-        )
-    }
-
-    /// Starts creation of a standalone projection from the map's ordered
-    /// transform state.
-    ///
-    /// See `mln_map_projection_create` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html).
-    pub fn projection_create(&self) -> Result<NativeFuture<MapProjectionHandle>> {
-        let call = self.inner.call("mln_map_projection_create")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_projection_create(map, completion, out_diagnostic)
-            },
-            move |result| {
-                MapProjectionHandle::adopt(
-                    completion::copy_value::<sys::mln_map_projection>(result)?,
-                    None,
-                )
-            },
         )
     }
 
@@ -1699,143 +1991,6 @@ impl MapHandle {
         })
     }
 
-    /// Sets or clears one layer filter.
-    ///
-    /// See `mln_map_set_layer_filter` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_layer_filter(
-        &self,
-        layer_id: &str,
-        filter: Option<&[u8]>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_layer_filter")?;
-        let layer_id = call.input(&layer_id)?;
-        let filter = call.optional_reference(filter)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_layer_filter(map, layer_id, filter, completion, out_diagnostic)
-        })
-    }
-
-    /// Sets the highest zoom at which one layer draws.
-    ///
-    /// See `mln_map_set_layer_max_zoom` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_layer_max_zoom(
-        &self,
-        layer_id: &str,
-        max_zoom: f64,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_layer_max_zoom")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_layer_max_zoom(map, layer_id, max_zoom, completion, out_diagnostic)
-        })
-    }
-
-    /// Sets the lowest zoom at which one layer draws.
-    ///
-    /// See `mln_map_set_layer_min_zoom` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_layer_min_zoom(
-        &self,
-        layer_id: &str,
-        min_zoom: f64,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_layer_min_zoom")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_layer_min_zoom(map, layer_id, min_zoom, completion, out_diagnostic)
-        })
-    }
-
-    /// Sets one layer property using its MapLibre style-spec property name.
-    ///
-    /// See `mln_map_set_layer_property` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_layer_property(
-        &self,
-        layer_id: &str,
-        property_name: &str,
-        value_: &[u8],
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_layer_property")?;
-        let layer_id = call.input(&layer_id)?;
-        let property_name = call.input(&property_name)?;
-        let value_ = call.input(&value_)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_layer_property(
-                map,
-                layer_id,
-                property_name,
-                value_,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets one layer's source ID.
-    ///
-    /// See `mln_map_set_layer_source_id` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_layer_source_id(
-        &self,
-        layer_id: &str,
-        source_id: &str,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_layer_source_id")?;
-        let layer_id = call.input(&layer_id)?;
-        let source_id = call.input(&source_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_layer_source_id(map, layer_id, source_id, completion, out_diagnostic)
-        })
-    }
-
-    /// Sets one layer's source-layer ID.
-    ///
-    /// See `mln_map_set_layer_source_layer` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_layer_source_layer(
-        &self,
-        layer_id: &str,
-        source_layer: Option<&str>,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_layer_source_layer")?;
-        let layer_id = call.input(&layer_id)?;
-        let source_layer = call.input(&source_layer)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_layer_source_layer(
-                map,
-                layer_id,
-                source_layer,
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
-    /// Sets whether one layer draws.
-    ///
-    /// See `mln_map_set_layer_visibility` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-    pub fn set_layer_visibility(
-        &self,
-        layer_id: &str,
-        visibility: StyleLayerVisibility,
-    ) -> Result<NativeFuture<CommandCompletion>> {
-        let mut call = self.inner.call("mln_map_set_layer_visibility")?;
-        let layer_id = call.input(&layer_id)?;
-        call.command(|map, completion, out_diagnostic| unsafe {
-            sys::mln_map_set_layer_visibility(
-                map,
-                layer_id,
-                visibility.to_native(),
-                completion,
-                out_diagnostic,
-            )
-        })
-    }
-
     /// Sets a location indicator layer accuracy radius in meters.
     ///
     /// See `mln_map_set_location_indicator_accuracy_radius` in the
@@ -1996,6 +2151,161 @@ impl MapHandle {
         })
     }
 
+    /// Sets or clears one layer filter.
+    ///
+    /// See `mln_map_set_style_layer_filter` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_layer_filter(
+        &self,
+        layer_id: &str,
+        filter: Option<&[u8]>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_layer_filter")?;
+        let layer_id = call.input(&layer_id)?;
+        let filter = call.optional_reference(filter)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_layer_filter(map, layer_id, filter, completion, out_diagnostic)
+        })
+    }
+
+    /// Sets the highest zoom at which one layer draws.
+    ///
+    /// See `mln_map_set_style_layer_max_zoom` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_layer_max_zoom(
+        &self,
+        layer_id: &str,
+        max_zoom: f64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_layer_max_zoom")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_layer_max_zoom(
+                map,
+                layer_id,
+                max_zoom,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Sets the lowest zoom at which one layer draws.
+    ///
+    /// See `mln_map_set_style_layer_min_zoom` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_layer_min_zoom(
+        &self,
+        layer_id: &str,
+        min_zoom: f64,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_layer_min_zoom")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_layer_min_zoom(
+                map,
+                layer_id,
+                min_zoom,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Sets one layer property using its MapLibre style-spec property name.
+    ///
+    /// See `mln_map_set_style_layer_property` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_layer_property(
+        &self,
+        layer_id: &str,
+        property_name: &str,
+        value_: &[u8],
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_layer_property")?;
+        let layer_id = call.input(&layer_id)?;
+        let property_name = call.input(&property_name)?;
+        let value_ = call.input(&value_)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_layer_property(
+                map,
+                layer_id,
+                property_name,
+                value_,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Sets one layer's source ID.
+    ///
+    /// See `mln_map_set_style_layer_source_id` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_layer_source_id(
+        &self,
+        layer_id: &str,
+        source_id: &str,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_layer_source_id")?;
+        let layer_id = call.input(&layer_id)?;
+        let source_id = call.input(&source_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_layer_source_id(
+                map,
+                layer_id,
+                source_id,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Sets one layer's source-layer ID.
+    ///
+    /// See `mln_map_set_style_layer_source_layer` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_layer_source_layer(
+        &self,
+        layer_id: &str,
+        source_layer: Option<&str>,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_layer_source_layer")?;
+        let layer_id = call.input(&layer_id)?;
+        let source_layer = call.input(&source_layer)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_layer_source_layer(
+                map,
+                layer_id,
+                source_layer,
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
+    /// Sets whether one layer draws.
+    ///
+    /// See `mln_map_set_style_layer_visibility` in the
+    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+    pub fn set_style_layer_visibility(
+        &self,
+        layer_id: &str,
+        visibility: StyleLayerVisibility,
+    ) -> Result<NativeFuture<CommandCompletion>> {
+        let mut call = self.inner.call("mln_map_set_style_layer_visibility")?;
+        let layer_id = call.input(&layer_id)?;
+        call.command(|map, completion, out_diagnostic| unsafe {
+            sys::mln_map_set_style_layer_visibility(
+                map,
+                layer_id,
+                visibility.to_native(),
+                completion,
+                out_diagnostic,
+            )
+        })
+    }
+
     /// Sets the style light from a style-spec light JSON object.
     ///
     /// See `mln_map_set_style_light_json` in the
@@ -2115,34 +2425,6 @@ impl MapHandle {
         })
     }
 
-    /// Copies the latest immutable state published by the map worker.
-    ///
-    /// See `mln_map_snapshot_get` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn snapshot_get(&self) -> Result<MapSnapshot> {
-        let mut call = self.inner.call("mln_map_snapshot_get")?;
-        let mut out_snapshot: sys::mln_map_snapshot = unsafe { std::mem::zeroed() };
-        out_snapshot.size = std::mem::size_of::<sys::mln_map_snapshot>() as _;
-        call.status(|map, out_diagnostic| unsafe {
-            sys::mln_map_snapshot_get(map, &mut out_snapshot, out_diagnostic)
-        })?;
-        Ok(unsafe { from_native(out_snapshot) }?)
-    }
-
-    /// Starts an ordered copy of the last requested style URL.
-    ///
-    /// See `mln_map_style_url` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-    pub fn style_url(&self) -> Result<NativeFuture<String>> {
-        let call = self.inner.call("mln_map_style_url")?;
-        call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_map_style_url(map, completion, out_diagnostic)
-            },
-            completion::value::<sys::mln_buffer_view, _>,
-        )
-    }
-
     /// Submits one atomic camera update.
     ///
     /// See `mln_map_update_camera` in the
@@ -2153,401 +2435,5 @@ impl MapHandle {
         call.command(|map, completion, out_diagnostic| unsafe {
             sys::mln_map_update_camera(map, update, completion, out_diagnostic)
         })
-    }
-
-    /// Starts attachment of a caller-owned Metal texture target.
-    ///
-    /// See `mln_metal_borrowed_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn metal_borrowed_texture_attach(
-        &self,
-        descriptor: &MetalBorrowedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_metal_borrowed_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_metal_borrowed_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a session-owned Metal texture ring.
-    ///
-    /// See `mln_metal_owned_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn metal_owned_texture_attach(
-        &self,
-        descriptor: &MetalOwnedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_metal_owned_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_metal_owned_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a Metal surface target.
-    ///
-    /// See `mln_metal_surface_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn metal_surface_attach(
-        &self,
-        descriptor: &MetalSurfaceDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_metal_surface_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_metal_surface_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a caller-owned OpenGL texture target.
-    ///
-    /// See `mln_opengl_borrowed_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn opengl_borrowed_texture_attach(
-        &self,
-        descriptor: &OpenglBorrowedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_opengl_borrowed_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_opengl_borrowed_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a session-owned OpenGL texture ring.
-    ///
-    /// See `mln_opengl_owned_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn opengl_owned_texture_attach(
-        &self,
-        descriptor: &OpenglOwnedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_opengl_owned_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_opengl_owned_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of an OpenGL surface target.
-    ///
-    /// See `mln_opengl_surface_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn opengl_surface_attach(
-        &self,
-        descriptor: &OpenglSurfaceDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_opengl_surface_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_opengl_surface_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a caller-owned Vulkan texture target.
-    ///
-    /// See `mln_vulkan_borrowed_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn vulkan_borrowed_texture_attach(
-        &self,
-        descriptor: &VulkanBorrowedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_vulkan_borrowed_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_vulkan_borrowed_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a session-owned Vulkan texture ring.
-    ///
-    /// See `mln_vulkan_owned_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn vulkan_owned_texture_attach(
-        &self,
-        descriptor: &VulkanOwnedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_vulkan_owned_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_vulkan_owned_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a Vulkan surface target.
-    ///
-    /// See `mln_vulkan_surface_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn vulkan_surface_attach(
-        &self,
-        descriptor: &VulkanSurfaceDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_vulkan_surface_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_vulkan_surface_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a caller-owned WebGPU texture target.
-    ///
-    /// See `mln_webgpu_borrowed_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn webgpu_borrowed_texture_attach(
-        &self,
-        descriptor: &WebgpuBorrowedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_webgpu_borrowed_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_webgpu_borrowed_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a session-owned WebGPU texture ring.
-    ///
-    /// See `mln_webgpu_owned_texture_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn webgpu_owned_texture_attach(
-        &self,
-        descriptor: &WebgpuOwnedTextureDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_webgpu_owned_texture_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_webgpu_owned_texture_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
-    }
-
-    /// Starts attachment of a WebGPU surface target.
-    ///
-    /// See `mln_webgpu_surface_attach` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
-    ///
-    /// # Safety
-    /// Native graphics objects must have the types, lifetimes, and synchronization required by the C operation.
-    pub unsafe fn webgpu_surface_attach(
-        &self,
-        descriptor: &WebgpuSurfaceDescriptor,
-        options: &RenderSessionAttachOptions,
-    ) -> Result<(RenderSessionHandle, NativeFuture<()>)> {
-        let mut call = self.inner.call("mln_webgpu_surface_attach")?;
-        let parent = self.inner.parent();
-        let mut out_session = sys::mln_render_session(0);
-        let descriptor = call.reference(&descriptor)?;
-        let options = call.reference(&options)?;
-        let future = call.complete(
-            |map, completion, out_diagnostic| unsafe {
-                sys::mln_webgpu_surface_attach(
-                    map,
-                    descriptor,
-                    options,
-                    &mut out_session,
-                    completion,
-                    out_diagnostic,
-                )
-            },
-            completion::unit,
-        )?;
-        Ok((RenderSessionHandle::adopt(out_session, parent)?, future))
     }
 }

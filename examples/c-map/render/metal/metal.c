@@ -474,7 +474,7 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         metal_context_descriptor(target->as.owned.compositor.view.device);
-      status = mln_metal_owned_texture_attach(
+      status = mln_map_attach_metal_owned_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -484,7 +484,7 @@ app_error render_target_attach(
         borrowed_texture_descriptor(
           target->as.borrowed.texture, current_viewport
         );
-      status = mln_metal_borrowed_texture_attach(
+      status = mln_map_attach_metal_borrowed_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -496,7 +496,7 @@ app_error render_target_attach(
       descriptor.context =
         metal_context_descriptor(target->as.surface.view.device);
       descriptor.layer = target->as.surface.view.layer;
-      status = mln_metal_surface_attach(
+      status = mln_map_attach_metal_surface(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -559,9 +559,10 @@ static app_error resize_borrowed(
   const mln_metal_borrowed_texture_descriptor descriptor =
     borrowed_texture_descriptor(replacement, current_viewport);
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
-  const mln_status status = mln_metal_borrowed_texture_set_target(
-    target->session.handle, &descriptor, &completion, &diagnostic
-  );
+  const mln_status status =
+    mln_render_session_set_metal_borrowed_texture_target(
+      target->session.handle, &descriptor, &completion, &diagnostic
+    );
   texture_replacements_queue(&target->as.borrowed.replacements, entry, status);
   if (status != MLN_STATUS_OK) {
     release_object(&replacement);

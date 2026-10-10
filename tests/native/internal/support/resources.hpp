@@ -98,7 +98,7 @@ inline auto start_offline_download(mln_runtime runtime, const char* style_url)
   const std::uint8_t metadata[] = {1, 2, 3};
   auto creation = mln_test_completion_default(sizeof(mln_offline_region_info));
   if (
-    mln_runtime_offline_region_create(
+    mln_runtime_create_offline_region(
       runtime, &definition, metadata, sizeof(metadata), &creation.descriptor,
       nullptr
     ) != MLN_STATUS_OK
@@ -115,7 +115,7 @@ inline auto start_offline_download(mln_runtime runtime, const char* style_url)
     return false;
   }
   const auto download = mln_test_discard_completion();
-  return mln_runtime_offline_region_set_download_state(
+  return mln_runtime_set_offline_region_download_state(
            runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download,
            nullptr
          ) == MLN_STATUS_OK;

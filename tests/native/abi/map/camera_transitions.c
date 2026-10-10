@@ -43,7 +43,7 @@ static mln_map_snapshot read_settled_snapshot(
 ) {
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
-  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
   return snapshot;
 }
 
@@ -54,7 +54,7 @@ static mln_map_snapshot read_settled_snapshot(
 static mln_camera_options query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
-  MLN_TEST_OK(mln_map_camera_query(map, &query.descriptor, NULL));
+  MLN_TEST_OK(mln_map_get_camera(map, &query.descriptor, NULL));
   mln_camera_query_result result = {0};
   MLN_TEST_OK(
     mln_test_completion_finish_value(&query, &result, sizeof(result))

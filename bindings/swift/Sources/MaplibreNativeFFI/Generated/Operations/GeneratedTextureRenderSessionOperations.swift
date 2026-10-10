@@ -4,15 +4,34 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
+  /// Reads back the latest frame of the session's owned texture as
+  /// premultiplied
+  /// RGBA8.
+  ///
+  /// See `mln_render_session_read_texture` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+  func readTexture() async throws -> TextureReadbackResult {
+    try await nativeStart(
+      "mln_render_session_read_texture",
+      copying: { try TextureReadbackResult(raw: $0) }
+    ) { raw, _, completion, diagnostic in mln_render_session_read_texture(
+      raw,
+      completion,
+      diagnostic
+    ) }
+  }
+
   /// Starts an ordered caller-owned Metal texture replacement.
   ///
-  /// See `mln_metal_borrowed_texture_set_target` in the
+  /// See `mln_render_session_set_metal_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func metalBorrowedTextureSetTarget(
+  func setMetalBorrowedTextureTarget(
     descriptor bindingArg0: MetalBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit("mln_metal_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
-      mln_metal_borrowed_texture_set_target(
+    try await nativeUnit(
+      "mln_render_session_set_metal_borrowed_texture_target"
+    ) { raw, arena, completion, diagnostic in
+      mln_render_session_set_metal_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
         completion,
@@ -23,13 +42,15 @@ public extension RenderSessionHandle {
 
   /// Starts an ordered caller-owned OpenGL texture replacement.
   ///
-  /// See `mln_opengl_borrowed_texture_set_target` in the
+  /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func openglBorrowedTextureSetTarget(
+  func setOpenglBorrowedTextureTarget(
     descriptor bindingArg0: OpenglBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit("mln_opengl_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
-      try mln_opengl_borrowed_texture_set_target(
+    try await nativeUnit(
+      "mln_render_session_set_opengl_borrowed_texture_target"
+    ) { raw, arena, completion, diagnostic in
+      try mln_render_session_set_opengl_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
@@ -38,30 +59,17 @@ public extension RenderSessionHandle {
     }
   }
 
-  /// Starts readback of the latest rendered texture frame.
-  ///
-  /// See `mln_texture_read_premultiplied_rgba8` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func textureReadPremultipliedRgba8() async throws -> TextureReadbackResult {
-    try await nativeStart(
-      "mln_texture_read_premultiplied_rgba8",
-      copying: { try TextureReadbackResult(raw: $0) }
-    ) { raw, _, completion, diagnostic in mln_texture_read_premultiplied_rgba8(
-      raw,
-      completion,
-      diagnostic
-    ) }
-  }
-
   /// Starts an ordered caller-owned Vulkan texture replacement.
   ///
-  /// See `mln_vulkan_borrowed_texture_set_target` in the
+  /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func vulkanBorrowedTextureSetTarget(
+  func setVulkanBorrowedTextureTarget(
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit("mln_vulkan_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
-      mln_vulkan_borrowed_texture_set_target(
+    try await nativeUnit(
+      "mln_render_session_set_vulkan_borrowed_texture_target"
+    ) { raw, arena, completion, diagnostic in
+      mln_render_session_set_vulkan_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
         completion,
@@ -72,13 +80,15 @@ public extension RenderSessionHandle {
 
   /// Starts an ordered caller-owned WebGPU texture replacement.
   ///
-  /// See `mln_webgpu_borrowed_texture_set_target` in the
+  /// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func webgpuBorrowedTextureSetTarget(
+  func setWebgpuBorrowedTextureTarget(
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor
   ) async throws {
-    try await nativeUnit("mln_webgpu_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
-      mln_webgpu_borrowed_texture_set_target(
+    try await nativeUnit(
+      "mln_render_session_set_webgpu_borrowed_texture_target"
+    ) { raw, arena, completion, diagnostic in
+      mln_render_session_set_webgpu_borrowed_texture_target(
         raw,
         arena.store(bindingArg0.nativeValue()),
         completion,

@@ -303,7 +303,7 @@ func (handler panicLogHandler) Handle(_ context.Context, record slog.Record) err
 		}
 		return true
 	})
-	_, err := NetworkStatusGet()
+	_, err := NetworkGetStatus()
 	logged.refused = errors.Is(err, ErrInvalidState)
 	offer(handler, logged)
 	return nil
@@ -444,7 +444,7 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	receive(t, ran, "the cancel callback")
 	awaitCondition(t, "the cancel callback's release", func() bool { return rootCount(held.bindingOwner) == 0 })
 
-	other := await(t, submitted(f.runtime.MapCreate(DefaultMapOptions())))
+	other := await(t, submitted(f.runtime.CreateMap(DefaultMapOptions())))
 	if _, err := other.SetStyleUrl("custom://discarded.json"); err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +452,7 @@ func TestCancelCallbackIsRootedOnlyWhenStored(t *testing.T) {
 	await(t, submitted(other.Close()))
 	// Nothing signals a cancellation that has no callback to run.
 	awaitCondition(t, "the request's cancellation", func() bool {
-		cancelled, err := discarded.Cancelled()
+		cancelled, err := discarded.IsCancelled()
 		return err != nil || cancelled
 	})
 	cancelled, err := discarded.SetCancelCallback(ResourceRequestCancelHandler{Callback: func() { t.Error("a callback ran for an already cancelled request") }})

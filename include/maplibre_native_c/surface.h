@@ -133,7 +133,7 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_metal_surface_attach(
+MLN_API mln_status mln_map_attach_metal_surface(
   mln_map map, const mln_metal_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -172,7 +172,7 @@ MLN_API mln_status mln_metal_surface_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_vulkan_surface_attach(
+MLN_API mln_status mln_map_attach_vulkan_surface(
   mln_map map, const mln_vulkan_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -211,7 +211,7 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_opengl_surface_attach(
+MLN_API mln_status mln_map_attach_opengl_surface(
   mln_map map, const mln_opengl_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -249,7 +249,7 @@ MLN_API mln_status mln_opengl_surface_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=lifecycle")
-MLN_API mln_status mln_webgpu_surface_attach(
+MLN_API mln_status mln_map_attach_webgpu_surface(
   mln_map map, const mln_webgpu_surface_descriptor* descriptor,
   const mln_render_session_attach_options* options,
   mln_render_session* out_session MLN_BINDING("direction=out"),
@@ -278,7 +278,7 @@ MLN_API mln_status mln_webgpu_surface_attach(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_metal_surface_set_target(
+MLN_API mln_status mln_render_session_set_metal_surface_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -309,7 +309,7 @@ MLN_API mln_status mln_metal_surface_set_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_vulkan_surface_set_target(
+MLN_API mln_status mln_render_session_set_vulkan_surface_target(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -336,7 +336,7 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_opengl_surface_set_target(
+MLN_API mln_status mln_render_session_set_opengl_surface_target(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
@@ -366,7 +366,7 @@ MLN_API mln_status mln_opengl_surface_set_target(
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
 MLN_BINDING("execution=operation")
-MLN_API mln_status mln_webgpu_surface_set_target(
+MLN_API mln_status mln_render_session_set_webgpu_surface_target(
   mln_render_session session, const mln_webgpu_surface_descriptor* descriptor,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;

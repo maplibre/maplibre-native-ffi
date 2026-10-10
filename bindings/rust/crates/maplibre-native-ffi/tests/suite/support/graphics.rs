@@ -171,7 +171,7 @@ impl Graphics {
         // outlives the session.
         unsafe {
             match BACKEND {
-                BACKEND_METAL => map.metal_owned_texture_attach(
+                BACKEND_METAL => map.attach_metal_owned_texture(
                     &MetalOwnedTextureDescriptor {
                         extent,
                         context: MetalContextDescriptor {
@@ -180,7 +180,7 @@ impl Graphics {
                     },
                     options,
                 ),
-                BACKEND_VULKAN => map.vulkan_owned_texture_attach(
+                BACKEND_VULKAN => map.attach_vulkan_owned_texture(
                     &VulkanOwnedTextureDescriptor {
                         extent,
                         context: VulkanContextDescriptor {
@@ -195,7 +195,7 @@ impl Graphics {
                     },
                     options,
                 ),
-                BACKEND_WGL => map.opengl_owned_texture_attach(
+                BACKEND_WGL => map.attach_opengl_owned_texture(
                     &OpenglOwnedTextureDescriptor {
                         extent,
                         context: OpenglContextDescriptor {
@@ -209,7 +209,7 @@ impl Graphics {
                     },
                     options,
                 ),
-                _ => map.opengl_owned_texture_attach(
+                _ => map.attach_opengl_owned_texture(
                     &OpenglOwnedTextureDescriptor {
                         extent,
                         context: OpenglContextDescriptor {

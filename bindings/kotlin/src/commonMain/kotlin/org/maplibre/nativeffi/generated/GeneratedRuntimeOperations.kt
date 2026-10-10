@@ -14,24 +14,6 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
   internal val bindingCallbacks: CallbackOwner = CallbackOwner()
 
   /**
-   * Creates a map on the runtime worker.
-   *
-   * See `mln_map_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun mapCreate(options: MapOptions): Deferred<MapHandle> =
-    nativeSubmitOwned(
-      this,
-      binding,
-      "mln_map_create",
-      { MapHandle(it, this@GeneratedRuntimeOperations as RuntimeHandle) },
-      GeneratedOwnerDisposal::map,
-      { it.dispose() },
-    ) {
-      check(C.mln_map_create(handle, writeMapOptions(options), completion, diagnostic))
-    }
-
-  /**
    * Starts an ordered runtime barrier.
    *
    * See `mln_runtime_barrier` in the
@@ -76,6 +58,63 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
+   * Creates a map on the runtime worker.
+   *
+   * See `mln_runtime_create_map` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun createMap(options: MapOptions): Deferred<MapHandle> =
+    nativeSubmitOwned(
+      this,
+      binding,
+      "mln_runtime_create_map",
+      { MapHandle(it, this@GeneratedRuntimeOperations as RuntimeHandle) },
+      GeneratedOwnerDisposal::map,
+      { it.dispose() },
+    ) {
+      check(C.mln_runtime_create_map(handle, writeMapOptions(options), completion, diagnostic))
+    }
+
+  /**
+   * Starts creating an offline region.
+   *
+   * See `mln_runtime_create_offline_region` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun createOfflineRegion(
+    definition: OfflineRegionDefinition,
+    metadata: ByteArray,
+  ): Deferred<OfflineRegionInfo> =
+    nativeSubmit(
+      this,
+      binding,
+      "mln_runtime_create_offline_region",
+      { result -> readOfflineRegionInfo(CompletionBridge.value(result)) },
+    ) {
+      check(
+        C.mln_runtime_create_offline_region(
+          handle,
+          writeOfflineRegionDefinition(definition),
+          bytes(metadata),
+          metadata.size.toLong(),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Deletes an offline region.
+   *
+   * See `mln_runtime_delete_offline_region` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun deleteOfflineRegion(regionId: Long): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_runtime_delete_offline_region") {
+      check(C.mln_runtime_delete_offline_region(handle, regionId, completion, diagnostic))
+    }
+
+  /**
    * Consumes a runtime handle without observing its asynchronous retirement.
    *
    * See `mln_runtime_dispose` in the
@@ -114,170 +153,62 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
-   * Starts creating an offline region.
-   *
-   * See `mln_runtime_offline_region_create` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun offlineRegionCreate(
-    definition: OfflineRegionDefinition,
-    metadata: ByteArray,
-  ): Deferred<OfflineRegionInfo> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_runtime_offline_region_create",
-      { result -> readOfflineRegionInfo(CompletionBridge.value(result)) },
-    ) {
-      check(
-        C.mln_runtime_offline_region_create(
-          handle,
-          writeOfflineRegionDefinition(definition),
-          bytes(metadata),
-          metadata.size.toLong(),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Deletes an offline region.
-   *
-   * See `mln_runtime_offline_region_delete` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun offlineRegionDelete(regionId: Long): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_offline_region_delete") {
-      check(C.mln_runtime_offline_region_delete(handle, regionId, completion, diagnostic))
-    }
-
-  /**
    * Starts getting one offline region by ID.
    *
-   * See `mln_runtime_offline_region_get` in the
+   * See `mln_runtime_get_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun offlineRegionGet(regionId: Long): Deferred<OfflineRegionInfo?> =
+  public fun getOfflineRegion(regionId: Long): Deferred<OfflineRegionInfo?> =
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_offline_region_get",
+      "mln_runtime_get_offline_region",
       { result ->
         if (CompletionBridge.valueCount(result) == 0uL) null
         else readOfflineRegionInfo(CompletionBridge.value(result))
       },
     ) {
-      check(C.mln_runtime_offline_region_get(handle, regionId, completion, diagnostic))
+      check(C.mln_runtime_get_offline_region(handle, regionId, completion, diagnostic))
     }
 
   /**
    * Starts getting the current download status for an offline region.
    *
-   * See `mln_runtime_offline_region_get_status` in the
+   * See `mln_runtime_get_offline_region_status` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun offlineRegionGetStatus(regionId: Long): Deferred<OfflineRegionStatus> =
+  public fun getOfflineRegionStatus(regionId: Long): Deferred<OfflineRegionStatus> =
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_offline_region_get_status",
+      "mln_runtime_get_offline_region_status",
       { result -> readOfflineRegionStatus(CompletionBridge.value(result)) },
     ) {
-      check(C.mln_runtime_offline_region_get_status(handle, regionId, completion, diagnostic))
+      check(C.mln_runtime_get_offline_region_status(handle, regionId, completion, diagnostic))
     }
 
   /**
    * Invalidates cached resources for an offline region.
    *
-   * See `mln_runtime_offline_region_invalidate` in the
+   * See `mln_runtime_invalidate_offline_region` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun offlineRegionInvalidate(regionId: Long): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_offline_region_invalidate") {
-      check(C.mln_runtime_offline_region_invalidate(handle, regionId, completion, diagnostic))
-    }
-
-  /**
-   * Sets an offline region's native download state.
-   *
-   * See `mln_runtime_offline_region_set_download_state` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun offlineRegionSetDownloadState(
-    regionId: Long,
-    state: OfflineRegionDownloadState,
-  ): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_offline_region_set_download_state") {
-      check(
-        C.mln_runtime_offline_region_set_download_state(
-          handle,
-          regionId,
-          state.rawValue.toInt(),
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Enables or disables runtime events for an offline region.
-   *
-   * See `mln_runtime_offline_region_set_observed` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun offlineRegionSetObserved(regionId: Long, observed: Boolean): Deferred<Unit> =
-    nativeUnit(this, binding, "mln_runtime_offline_region_set_observed") {
-      check(
-        C.mln_runtime_offline_region_set_observed(
-          handle,
-          regionId,
-          observed,
-          completion,
-          diagnostic,
-        )
-      )
-    }
-
-  /**
-   * Starts updating opaque binary metadata for an offline region.
-   *
-   * See `mln_runtime_offline_region_update_metadata` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-   */
-  public fun offlineRegionUpdateMetadata(
-    regionId: Long,
-    metadata: ByteArray,
-  ): Deferred<OfflineRegionInfo> =
-    nativeSubmit(
-      this,
-      binding,
-      "mln_runtime_offline_region_update_metadata",
-      { result -> readOfflineRegionInfo(CompletionBridge.value(result)) },
-    ) {
-      check(
-        C.mln_runtime_offline_region_update_metadata(
-          handle,
-          regionId,
-          bytes(metadata),
-          metadata.size.toLong(),
-          completion,
-          diagnostic,
-        )
-      )
+  public fun invalidateOfflineRegion(regionId: Long): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_runtime_invalidate_offline_region") {
+      check(C.mln_runtime_invalidate_offline_region(handle, regionId, completion, diagnostic))
     }
 
   /**
    * Starts listing the offline regions in the runtime database.
    *
-   * See `mln_runtime_offline_regions_list` in the
+   * See `mln_runtime_list_offline_regions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun offlineRegionsList(): Deferred<List<OfflineRegionInfo>> =
+  public fun listOfflineRegions(): Deferred<List<OfflineRegionInfo>> =
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_offline_regions_list",
+      "mln_runtime_list_offline_regions",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -289,22 +220,20 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
         }
       },
     ) {
-      check(C.mln_runtime_offline_regions_list(handle, completion, diagnostic))
+      check(C.mln_runtime_list_offline_regions(handle, completion, diagnostic))
     }
 
   /**
    * Starts merging offline regions from another MapLibre offline database.
    *
-   * See `mln_runtime_offline_regions_merge_database` in the
+   * See `mln_runtime_merge_offline_regions` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
    */
-  public fun offlineRegionsMergeDatabase(
-    sideDatabasePath: String
-  ): Deferred<List<OfflineRegionInfo>> =
+  public fun mergeOfflineRegions(sideDatabasePath: String): Deferred<List<OfflineRegionInfo>> =
     nativeSubmit(
       this,
       binding,
-      "mln_runtime_offline_regions_merge_database",
+      "mln_runtime_merge_offline_regions",
       { result ->
         readStrided(
           CompletionBridge.valuePointer(result),
@@ -317,7 +246,7 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
       },
     ) {
       check(
-        C.mln_runtime_offline_regions_merge_database(
+        C.mln_runtime_merge_offline_regions(
           handle,
           cString(sideDatabasePath),
           completion,
@@ -398,6 +327,47 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
     }
 
   /**
+   * Sets an offline region's native download state.
+   *
+   * See `mln_runtime_set_offline_region_download_state` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun setOfflineRegionDownloadState(
+    regionId: Long,
+    state: OfflineRegionDownloadState,
+  ): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_runtime_set_offline_region_download_state") {
+      check(
+        C.mln_runtime_set_offline_region_download_state(
+          handle,
+          regionId,
+          state.rawValue.toInt(),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Enables or disables runtime events for an offline region.
+   *
+   * See `mln_runtime_set_offline_region_observed` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun setOfflineRegionObserved(regionId: Long, observed: Boolean): Deferred<Unit> =
+    nativeUnit(this, binding, "mln_runtime_set_offline_region_observed") {
+      check(
+        C.mln_runtime_set_offline_region_observed(
+          handle,
+          regionId,
+          observed,
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
    * Registers or replaces a runtime-scoped network resource provider.
    *
    * See `mln_runtime_set_resource_provider` in the
@@ -427,6 +397,34 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
         C.mln_runtime_set_resource_transform(
           handle,
           writeResourceTransform(transform),
+          completion,
+          diagnostic,
+        )
+      )
+    }
+
+  /**
+   * Starts updating opaque binary metadata for an offline region.
+   *
+   * See `mln_runtime_update_offline_region_metadata` in the
+   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+   */
+  public fun updateOfflineRegionMetadata(
+    regionId: Long,
+    metadata: ByteArray,
+  ): Deferred<OfflineRegionInfo> =
+    nativeSubmit(
+      this,
+      binding,
+      "mln_runtime_update_offline_region_metadata",
+      { result -> readOfflineRegionInfo(CompletionBridge.value(result)) },
+    ) {
+      check(
+        C.mln_runtime_update_offline_region_metadata(
+          handle,
+          regionId,
+          bytes(metadata),
+          metadata.size.toLong(),
           completion,
           diagnostic,
         )

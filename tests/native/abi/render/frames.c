@@ -37,9 +37,9 @@ static void texture_readback_copies_the_latest_rendered_frame(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_test_completion readback = mln_test_completion_readback();
-  MLN_TEST_OK(mln_texture_read_premultiplied_rgba8(
-    fixture.session, &readback.descriptor, NULL
-  ));
+  MLN_TEST_OK(
+    mln_render_session_read_texture(fixture.session, &readback.descriptor, NULL)
+  );
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
     mln_test_render_fixture_finish_operation(&fixture, &readback)

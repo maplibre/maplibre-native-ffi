@@ -28,7 +28,7 @@ internal object OpenGLRenderTarget {
       RenderTargetMode.NATIVE_SURFACE ->
         NativeSurfaceTarget(
           AttachedSession.attach(driver) { options ->
-            map.openglSurfaceAttach(
+            map.attachOpenglSurface(
               OpenglSurfaceDescriptor(
                 RenderTarget.extent(viewport),
                 descriptor(context),
@@ -52,7 +52,7 @@ internal object OpenGLRenderTarget {
     try {
       val attached =
         AttachedSession.attach(driver, RenderTarget.OWNED_TEXTURE_RING_DEPTH) { options ->
-          map.openglOwnedTextureAttach(
+          map.attachOpenglOwnedTexture(
             OpenglOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context)),
             options,
           )
@@ -76,7 +76,7 @@ internal object OpenGLRenderTarget {
       compositor = OpenGLTextureCompositor(context, viewport)
       val attached =
         AttachedSession.attach(driver) { options ->
-          map.openglBorrowedTextureAttach(borrowedDescriptor(context, viewport, texture), options)
+          map.attachOpenglBorrowedTexture(borrowedDescriptor(context, viewport, texture), options)
         }
       return BorrowedTexture(attached, map, context, compositor, texture)
     } catch (error: RuntimeException) {
@@ -167,7 +167,7 @@ internal object OpenGLRenderTarget {
       OpenGLBorrowedTexture(context, viewport)
 
     override fun setTarget(viewport: Viewport, replacement: OpenGLBorrowedTexture): Deferred<Unit> =
-      session.openglBorrowedTextureSetTarget(borrowedDescriptor(context, viewport, replacement))
+      session.setOpenglBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
 
     override fun draw(texture: OpenGLBorrowedTexture): Boolean {
       compositor.drawTexture(texture.texture())

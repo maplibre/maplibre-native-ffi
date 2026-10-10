@@ -57,7 +57,7 @@ final class TestGraphics: @unchecked Sendable {
   ) throws -> RenderSessionAttachment {
     switch backend {
     case MLN_TEST_GRAPHICS_BACKEND_METAL:
-      return try map.metalOwnedTextureAttach(
+      return try map.attachMetalOwnedTexture(
         descriptor: MetalOwnedTextureDescriptor(
           extent: extent,
           context: MetalContextDescriptor(device: pointer(context.metal_device))
@@ -65,7 +65,7 @@ final class TestGraphics: @unchecked Sendable {
         options: options
       )
     case MLN_TEST_GRAPHICS_BACKEND_VULKAN:
-      return try map.vulkanOwnedTextureAttach(
+      return try map.attachVulkanOwnedTexture(
         descriptor: VulkanOwnedTextureDescriptor(
           extent: extent,
           context: VulkanContextDescriptor(
@@ -82,7 +82,7 @@ final class TestGraphics: @unchecked Sendable {
       )
     default:
       let dedicated = options.driver == .coreWorker
-      return try map.openglOwnedTextureAttach(
+      return try map.attachOpenglOwnedTexture(
         descriptor: OpenglOwnedTextureDescriptor(
           extent: extent,
           context: OpenglContextDescriptor(

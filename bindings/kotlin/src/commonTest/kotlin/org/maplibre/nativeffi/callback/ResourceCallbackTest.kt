@@ -86,7 +86,7 @@ class ResourceCallbackTest {
 
       map.release().awaitWithin("the map release")
       cancelled.awaitWithin("the cancel callback")
-      assertTrue(request.cancelled())
+      assertTrue(request.isCancelled())
       // Release waits for a running cancel callback to return, and native releases the callback
       // once it has, so the root is gone once the request is.
       request.close()
@@ -186,7 +186,7 @@ class ResourceCallbackTest {
         // The handler runs on the transform's stack after its admission ends, where the binding
         // still refuses every native call.
         if (failure.cause === thrown)
-          reentry.complete(runCatching { GeneratedApi.networkStatusGet() }.exceptionOrNull())
+          reentry.complete(runCatching { GeneratedApi.networkGetStatus() }.exceptionOrNull())
       } ?: return@runSuspendTest
     try {
       withMap(

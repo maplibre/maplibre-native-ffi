@@ -98,8 +98,8 @@ static void style_loads_over_http_from_the_runner_origin(void) {
   // Checks which document loaded: a response from anywhere else lacks this
   // layer.
   mln_test_completion completion =
-    mln_test_completion_default(sizeof(mln_style_layer_result));
-  MLN_TEST_OK(mln_map_get_style_layer_info(
+    mln_test_completion_default(sizeof(mln_style_layer_info));
+  MLN_TEST_OK(mln_map_get_style_layer(
     map, mln_test_buffer_view(fixture_layer_id, strlen(fixture_layer_id)),
     &completion.descriptor, NULL
   ));

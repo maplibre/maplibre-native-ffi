@@ -385,7 +385,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
                 options =>
                     graphics switch
                     {
-                        MetalContext metal => map.MetalOwnedTextureAttach(
+                        MetalContext metal => map.AttachMetalOwnedTexture(
                             new MetalOwnedTextureDescriptor
                             {
                                 Extent = viewport.RenderTargetExtent,
@@ -393,7 +393,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
                             },
                             options
                         ),
-                        VulkanContext vulkan => map.VulkanOwnedTextureAttach(
+                        VulkanContext vulkan => map.AttachVulkanOwnedTexture(
                             new VulkanOwnedTextureDescriptor
                             {
                                 Extent = viewport.RenderTargetExtent,
@@ -401,7 +401,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
                             },
                             options
                         ),
-                        OpenGLContext openGl => map.OpenglOwnedTextureAttach(
+                        OpenGLContext openGl => map.AttachOpenglOwnedTexture(
                             new OpenglOwnedTextureDescriptor
                             {
                                 Extent = viewport.RenderTargetExtent,
@@ -550,15 +550,15 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
                     options =>
                         texture switch
                         {
-                            MetalBorrowedTexture metal => map.MetalBorrowedTextureAttach(
+                            MetalBorrowedTexture metal => map.AttachMetalBorrowedTexture(
                                 Describe(metal, viewport),
                                 options
                             ),
-                            VulkanBorrowedImage vulkan => map.VulkanBorrowedTextureAttach(
+                            VulkanBorrowedImage vulkan => map.AttachVulkanBorrowedTexture(
                                 Describe((VulkanContext)graphics, driver, vulkan, viewport),
                                 options
                             ),
-                            OpenGLBorrowedTexture openGl => map.OpenglBorrowedTextureAttach(
+                            OpenGLBorrowedTexture openGl => map.AttachOpenglBorrowedTexture(
                                 Describe((OpenGLContext)graphics, openGl, viewport),
                                 options
                             ),
@@ -620,13 +620,13 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
         {
             handover = replacement switch
             {
-                MetalBorrowedTexture metal => Session.MetalBorrowedTextureSetTargetAsync(
+                MetalBorrowedTexture metal => Session.SetMetalBorrowedTextureTargetAsync(
                     Describe(metal, viewport)
                 ),
-                VulkanBorrowedImage vulkan => Session.VulkanBorrowedTextureSetTargetAsync(
+                VulkanBorrowedImage vulkan => Session.SetVulkanBorrowedTextureTargetAsync(
                     Describe((VulkanContext)Graphics, Driver, vulkan, viewport)
                 ),
-                OpenGLBorrowedTexture openGl => Session.OpenglBorrowedTextureSetTargetAsync(
+                OpenGLBorrowedTexture openGl => Session.SetOpenglBorrowedTextureTargetAsync(
                     Describe((OpenGLContext)Graphics, openGl, viewport)
                 ),
                 _ => throw new InvalidOperationException(
@@ -765,7 +765,7 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
             options =>
                 graphics switch
                 {
-                    MetalContext metal => map.MetalSurfaceAttach(
+                    MetalContext metal => map.AttachMetalSurface(
                         new MetalSurfaceDescriptor
                         {
                             Extent = viewport.RenderTargetExtent,
@@ -775,7 +775,7 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
                         options
                     ),
                     // The host submits nothing in this mode, so the session shares its queue.
-                    VulkanContext vulkan => map.VulkanSurfaceAttach(
+                    VulkanContext vulkan => map.AttachVulkanSurface(
                         new VulkanSurfaceDescriptor
                         {
                             Extent = viewport.RenderTargetExtent,
@@ -784,7 +784,7 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
                         },
                         options
                     ),
-                    OpenGLContext openGl => map.OpenglSurfaceAttach(
+                    OpenGLContext openGl => map.AttachOpenglSurface(
                         new OpenglSurfaceDescriptor
                         {
                             Extent = viewport.RenderTargetExtent,

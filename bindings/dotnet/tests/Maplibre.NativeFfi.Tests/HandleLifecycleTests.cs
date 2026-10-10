@@ -12,7 +12,7 @@ public sealed class HandleLifecycleTests
     public async Task ClosingAHandleTwiceClosesItOnce()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = await runtime.MapCreateAsync(NativeFixture.SmallMap, TestWaits.Token);
+        var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
 
         await map.CloseAsync();
         await map.CloseAsync();
@@ -31,7 +31,7 @@ public sealed class HandleLifecycleTests
     public async Task ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds()
     {
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        using var map = await runtime.MapCreateAsync(NativeFixture.SmallMap, TestWaits.Token);
+        using var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
 
         var error = Assert.Throws<InvalidStateException>(() =>
         {
@@ -51,7 +51,7 @@ public sealed class HandleLifecycleTests
     public async Task AClosedHandleRejectsCallsBeforeTheyReachNative()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = await runtime.MapCreateAsync(NativeFixture.SmallMap, TestWaits.Token);
+        var map = await runtime.CreateMapAsync(NativeFixture.SmallMap, TestWaits.Token);
         await map.CloseAsync();
         await runtime.CloseAsync();
 
@@ -82,7 +82,7 @@ public sealed class HandleLifecycleTests
     private static (MapHandle Map, WeakReference Runtime) CreateMapOfUnreferencedRuntime()
     {
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
-        var map = runtime.MapCreateAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
+        var map = runtime.CreateMapAsync(NativeFixture.SmallMap).GetAwaiter().GetResult();
         return (map, new WeakReference(runtime));
     }
 
@@ -103,7 +103,7 @@ public sealed class HandleLifecycleTests
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference DropCreation(RuntimeHandle runtime) =>
-        new(runtime.MapCreateAsync(NativeFixture.SmallMap));
+        new(runtime.CreateMapAsync(NativeFixture.SmallMap));
 }
 
 #pragma warning restore xUnit1031

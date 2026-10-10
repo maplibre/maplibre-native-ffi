@@ -239,7 +239,7 @@ const MetalOwnedTextureBackend = struct {
 
     fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.metalOwnedTextureAttach(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachMetalOwnedTexture(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.compositor.view.device.value.?) },
         }, options, &diagnostic) catch |err| {
@@ -303,7 +303,7 @@ const MetalBorrowedTextureBackend = struct {
 
     fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.metalBorrowedTextureAttach(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachMetalBorrowedTexture(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -322,7 +322,7 @@ const MetalBorrowedTextureBackend = struct {
         const replacement = try createBorrowedTexture(self.compositor.view.device, viewport);
         errdefer replacement.release();
         var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.metalBorrowedTextureSetTarget(std.heap.smp_allocator, self.session.handle.?, .{
+        var completion = maplibre.renderSessionSetMetalBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
@@ -359,7 +359,7 @@ const MetalSurfaceBackend = struct {
 
     fn attach(self: *MetalSurfaceBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.metalSurfaceAttach(std.heap.smp_allocator, map.*, .{
+        const attachment = maplibre.mapAttachMetalSurface(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .context = .{ .device = (self.view.device.value.?) },
             .layer = (self.view.layer.value.?),

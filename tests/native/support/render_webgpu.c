@@ -172,7 +172,7 @@ bool mln_test_backend_attach(
   descriptor.extent.width = 64;
   descriptor.extent.height = 64;
   descriptor.context = context;
-  *out_status = mln_webgpu_owned_texture_attach(
+  *out_status = mln_map_attach_webgpu_owned_texture(
     map, &descriptor, options, out_session, completion, MLN_TEST_DIAGNOSTIC
   );
   return true;

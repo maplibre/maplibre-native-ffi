@@ -74,7 +74,7 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_TARGET_LOST = -8,
   /** A nonblocking acquisition or service call has no result yet. */
   MLN_STATUS_NOT_READY = -9,
-  /** A command or operation named an ID with no live object behind it. */
+  /** A call named an ID with no live object behind it. */
   MLN_STATUS_NOT_FOUND = -10,
 } mln_status;
 

@@ -197,7 +197,7 @@ test "a decision handle answers its request later from another thread" {
     try provider.install(fixture);
     const handle = try provider.take(fixture);
     defer maplibre.resourceRequestRelease(handle) catch {};
-    try testing.expect(!try maplibre.resourceRequestCancelled(handle, null));
+    try testing.expect(!try maplibre.resourceRequestIsCancelled(handle, null));
 
     var diagnostic: maplibre.Diagnostic = .{};
     try testing.expectError(error.InvalidString, maplibre.resourceRequestComplete(testing.allocator, handle, .{ .etag = "bad\x00tag" }, &diagnostic));
@@ -223,7 +223,7 @@ test "released request handle copies stay closed after later requests" {
     const stale = try provider.take(fixture);
     const stale_copy = stale;
     try maplibre.resourceRequestRelease(stale);
-    try testing.expectError(error.InvalidState, maplibre.resourceRequestCancelled(stale_copy, null));
+    try testing.expectError(error.InvalidState, maplibre.resourceRequestIsCancelled(stale_copy, null));
 
     const live = try provider.take(fixture);
     defer maplibre.resourceRequestRelease(live) catch {};
@@ -264,7 +264,7 @@ test "a registration that reports cancellation is never rooted" {
     // report it, so the wait checks the request again after each wake.
     try fixture.events.waitUntil(handle, struct {
         fn ready(request: maplibre.ResourceRequestHandle) anyerror!bool {
-            return maplibre.resourceRequestCancelled(request, null);
+            return maplibre.resourceRequestIsCancelled(request, null);
         }
     }.ready);
 

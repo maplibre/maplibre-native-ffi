@@ -468,7 +468,7 @@ app_error render_target_attach(
       descriptor.extent = render_target_extent(current_viewport);
       descriptor.context =
         vulkan_context_descriptor(&target->as.owned.compositor.context);
-      status = mln_vulkan_owned_texture_attach(
+      status = mln_map_attach_vulkan_owned_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -478,7 +478,7 @@ app_error render_target_attach(
         borrowed_image_descriptor(
           target, &target->as.borrowed.image, current_viewport
         );
-      status = mln_vulkan_borrowed_texture_attach(
+      status = mln_map_attach_vulkan_borrowed_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -491,7 +491,7 @@ app_error render_target_attach(
         vulkan_context_descriptor(&target->as.surface.context);
       descriptor.surface =
         vulkan_surface_to_abi(target->as.surface.context.surface);
-      status = mln_vulkan_surface_attach(
+      status = mln_map_attach_vulkan_surface(
         map, &descriptor, &options, &session, &completion, &diagnostic
       );
       break;
@@ -571,7 +571,7 @@ static app_error resize_borrowed(
   if (entry != nullptr) {
     const mln_vulkan_borrowed_texture_descriptor descriptor =
       borrowed_image_descriptor(target, replacement, current_viewport);
-    status = mln_vulkan_borrowed_texture_set_target(
+    status = mln_render_session_set_vulkan_borrowed_texture_target(
       target->session.handle, &descriptor, &completion, &diagnostic
     );
     texture_replacements_queue(
