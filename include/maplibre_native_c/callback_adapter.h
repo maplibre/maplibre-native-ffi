@@ -1,7 +1,7 @@
 /**
  * @file maplibre_native_c/callback_adapter.h
- * Public C API declarations for adapting native callbacks to host runtimes
- * that cannot run user code on a native callback thread.
+ * Binding-internal C declarations for adapting native callbacks to host
+ * runtimes that cannot run user code on a native callback thread.
  *
  * MapLibre callback contracts are synchronous: logging and resource providers
  * return an immediate decision, and borrowed request payloads expire when the
@@ -12,11 +12,9 @@
  * so host user code runs on its own execution context rather than on MapLibre
  * worker, network, logging, or render threads.
  *
- * Binding-internal support for host runtimes that cannot run user code on
- * native threads. It is not installed and carries no compatibility promise;
- * bindings in this repository generate against it from the source tree. Its
- * symbols stay exported because those bindings resolve them from the shipped
- * library.
+ * This header is not installed and carries no compatibility promise. The Dart
+ * binding and the native tests read it from the source tree, and its symbols
+ * stay exported because Dart resolves them from the shipped library.
  *
  * This header targets C23.
  */

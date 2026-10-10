@@ -341,7 +341,8 @@ MLN_API mln_status mln_acquired_frame_get_producer_sync(
  * - MLN_STATUS_INVALID_ARGUMENT when frame is null or points at an invalid
  *   handle, or consumer_completion is undersized.
  * - MLN_STATUS_INVALID_STATE when *frame has been released.
- * - MLN_STATUS_BUSY while a binding-owned borrowed view scope is active.
+ * - MLN_STATUS_BUSY while a scope from mln_acquired_frame_view_begin() is
+ *   active.
  * - MLN_STATUS_UNSUPPORTED when the backend does not support the named
  *   mln_gpu_sync_kind. The handle is not consumed.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -575,9 +576,9 @@ MLN_API mln_status mln_render_session_detach(
  * Returns:
  * - MLN_STATUS_OK when control is abandoned and *out_result describes what was
  *   quarantined.
- * - MLN_STATUS_BUSY when a borrowed view scope is active, a caller-driver call
- *   is in flight, or the caller is inside one of the session's driver calls.
- *   Nothing changes.
+ * - MLN_STATUS_BUSY when a scope from mln_acquired_frame_view_begin() is
+ *   active, a caller-driver call is in flight, or the caller is inside one of
+ *   the session's driver calls. Nothing changes.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, or
  *   out_result is null or undersized.
  * - MLN_STATUS_INVALID_STATE when session has been released, or the session
@@ -601,8 +602,9 @@ MLN_API mln_status mln_render_session_abandon(
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle.
  * - MLN_STATUS_INVALID_STATE when session has been released or is neither
  *   detached nor abandoned, or a detached session still has an acquired frame.
- * - MLN_STATUS_BUSY when pending abandonment still has active borrowed views
- *   or driver work. The session owner remains live.
+ * - MLN_STATUS_BUSY when pending abandonment still waits on a scope from
+ *   mln_acquired_frame_view_begin() or on driver work. The session owner
+ *   remains live.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_destroy(

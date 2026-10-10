@@ -707,6 +707,8 @@ mod download {
     }
 
     /// Headers in the checkout's domain directory that the install leaves out.
+    /// Keep in sync with the `EXCLUDE` patterns in `cmake/mln_ffi_install.cmake`
+    /// and `_uninstalledHeaders` in the Dart binding's `hook/build.dart`.
     const UNINSTALLED_HEADERS: [&str; 2] = [
         "maplibre_native_c/callback_adapter.h",
         "maplibre_native_c/callback_capture_generated.h",

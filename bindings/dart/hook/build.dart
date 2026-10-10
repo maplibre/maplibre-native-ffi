@@ -528,9 +528,18 @@ void _warnOnHeaderSkew(
   );
 }
 
+/// Headers in the checkout's domain directory that the install leaves out.
+/// Keep in sync with the `EXCLUDE` patterns in `cmake/mln_ffi_install.cmake`
+/// and `UNINSTALLED_HEADERS` in the Rust sys crate's `build.rs`.
+const _uninstalledHeaders = {
+  'maplibre_native_c/callback_adapter.h',
+  'maplibre_native_c/callback_capture_generated.h',
+};
+
 /// Digests the public C headers, keyed by their path under `include/`. Render
 /// backend dependencies install their own headers alongside ours, so this
-/// covers only the umbrella header and its domain directory.
+/// covers only the umbrella header and its domain directory, less the
+/// binding-internal headers that the install leaves out.
 Map<String, String>? _publicHeaders(Uri includeDirectory) {
   final umbrella = File.fromUri(
     includeDirectory.resolve('maplibre_native_c.h'),
@@ -552,6 +561,9 @@ Map<String, String>? _publicHeaders(Uri includeDirectory) {
         continue;
       }
       final name = entry.uri.path.substring(includeDirectory.path.length);
+      if (_uninstalledHeaders.contains(name)) {
+        continue;
+      }
       headers[name] = sha256.convert(entry.readAsBytesSync()).toString();
     }
   }

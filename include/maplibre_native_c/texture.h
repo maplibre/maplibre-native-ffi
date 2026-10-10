@@ -829,7 +829,9 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
  * Copies Metal-native metadata from an acquired frame.
  *
  * The texture and device pointers are borrowed and remain valid only until
- * mln_acquired_frame_release().
+ * mln_acquired_frame_release(). A host that may dispose the frame or its
+ * session from another thread uses them inside an
+ * mln_acquired_frame_view_begin() scope.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -852,7 +854,9 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
  * Copies Vulkan-native metadata from an acquired frame.
  *
  * The image and image view handles and the device pointer are borrowed and
- * remain valid only until mln_acquired_frame_release().
+ * remain valid only until mln_acquired_frame_release(). A host that may
+ * dispose the frame or its session from another thread uses them inside an
+ * mln_acquired_frame_view_begin() scope.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -875,7 +879,9 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
  * Copies OpenGL-native metadata from an acquired frame.
  *
  * The caller driver's context must be current on this thread. The texture name
- * is borrowed and remains valid only until mln_acquired_frame_release().
+ * is borrowed and remains valid only until mln_acquired_frame_release(). A
+ * host that may dispose the frame or its session from another thread uses it
+ * inside an mln_acquired_frame_view_begin() scope.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -898,7 +904,9 @@ MLN_API mln_status mln_acquired_frame_get_opengl_texture(
  * Copies WebGPU-native metadata from an acquired frame.
  *
  * The texture, view, and device pointers are borrowed and remain valid only
- * until mln_acquired_frame_release().
+ * until mln_acquired_frame_release(). A host that may dispose the frame or its
+ * session from another thread uses them inside an
+ * mln_acquired_frame_view_begin() scope.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
