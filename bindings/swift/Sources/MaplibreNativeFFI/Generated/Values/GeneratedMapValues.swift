@@ -413,10 +413,8 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_camera_options) {
-    center = raw.fields & MLN_CAMERA_OPTION_CENTER.rawValue != 0 ? LatLng(
-      latitude: raw.latitude,
-      longitude: raw.longitude
-    ) : nil
+    center = raw.fields & MLN_CAMERA_OPTION_CENTER
+      .rawValue != 0 ? LatLng(raw: raw.center) : nil
     centerAltitude = raw.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE
       .rawValue != 0 ? raw.center_altitude : nil
     padding = raw.fields & MLN_CAMERA_OPTION_PADDING
@@ -436,8 +434,8 @@ public struct CameraOptions: Equatable, Hashable, Sendable {
     var raw = mln_camera_options_default()
     raw.fields = 0
     if let item = center {
-      raw.fields |= MLN_CAMERA_OPTION_CENTER.rawValue; raw.latitude = item
-        .latitude; raw.longitude = item.longitude
+      raw.fields |= MLN_CAMERA_OPTION_CENTER.rawValue; raw.center = item
+        .nativeValue()
     }
     if let item = centerAltitude {
       raw.fields |= MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue; raw

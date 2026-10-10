@@ -227,16 +227,20 @@ typedef struct mln_edge_insets {
   double right;
 } mln_edge_insets;
 
+/** Geographic coordinate in degrees used by map and projection APIs. */
+typedef struct mln_lat_lng {
+  /** Latitude in degrees. Input latitude must be finite and within [-90, 90].
+   */
+  double latitude;
+  /** Longitude in degrees. Input longitude must be finite. */
+  double longitude;
+} mln_lat_lng MLN_BINDING("fields=ordered");
+
 /** Camera fields used by snapshots and camera updates. */
 typedef struct mln_camera_options {
   uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_camera_option_field");
-  double latitude MLN_BINDING(
-    "mask=fields;bit=MLN_CAMERA_OPTION_CENTER;group_type=mln_lat_lng"
-  );
-  double longitude MLN_BINDING(
-    "mask=fields;bit=MLN_CAMERA_OPTION_CENTER;group_type=mln_lat_lng"
-  );
+  mln_lat_lng center MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER");
   double center_altitude
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_OPTION_CENTER_ALTITUDE");
   mln_edge_insets padding
@@ -423,15 +427,6 @@ typedef struct mln_free_camera_options {
   mln_quaternion orientation
     MLN_BINDING("mask=fields;bit=MLN_FREE_CAMERA_OPTION_ORIENTATION");
 } mln_free_camera_options;
-
-/** Geographic coordinate in degrees used by map and projection APIs. */
-typedef struct mln_lat_lng {
-  /** Latitude in degrees. Input latitude must be finite and within [-90, 90].
-   */
-  double latitude;
-  /** Longitude in degrees. Input longitude must be finite. */
-  double longitude;
-} mln_lat_lng MLN_BINDING("fields=ordered");
 
 /** Optional fields for mln_feature_state_selector. */
 typedef enum MLN_BINDING(

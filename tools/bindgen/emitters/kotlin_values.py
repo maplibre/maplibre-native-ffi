@@ -141,7 +141,6 @@ class Values:
         self.bound = bound
         self.abi = Abi(bound.source)
         self.used = {}
-        self.groups = {}
         self.views = set()
         self.item_buffers = {}
         self.multiple = {}
@@ -254,9 +253,6 @@ class Values:
                     self.check(variant.value)
             else:
                 self.check(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.check(self.bound.values[group.type])
         self.used[value.native] = value
 
     def public(self, value):
@@ -283,49 +279,17 @@ class Values:
         return result + ("?" if value.nullable or value.optional else "")
 
     def members(self, value):
-        """The public members of a record: (name, type, fields, presence group)."""
-        fields = self.fields(value)
-        grouped = {
-            field: group
-            for group in value.presence_groups
-            if len(group.fields) > 1
-            for field in group.fields
-        }
-        seen, result = set(), []
-        for field in fields:
-            group = grouped.get(field.name)
-            if group:
-                key = (group.mask, group.bit)
-                if key in seen:
-                    continue
-                seen.add(key)
-                member = identifier(group.member)
-                group_name = (
-                    name(group.type)
-                    if group.type
-                    else name(value.native) + pascal(member)
-                )
-                if not group.type:
-                    self.groups[group_name] = tuple(
-                        f for f in fields if f.name in group.fields
-                    )
-                result.append(
-                    (
-                        member,
-                        group_name + "?",
-                        [f for f in fields if f.name in group.fields],
-                        group,
-                    )
-                )
-            else:
-                typ = (
-                    name(value.native) + pascal(field.name)
-                    if field.value.kind == "union"
-                    else self.public(field.value)
-                )
-                if field.presence and field.presence.mask and not typ.endswith("?"):
-                    typ += "?"
-                result.append((identifier(field.name), typ, [field], None))
+        """The public members of a record: (name, type, field)."""
+        result = []
+        for field in self.fields(value):
+            typ = (
+                name(value.native) + pascal(field.name)
+                if field.value.kind == "union"
+                else self.public(field.value)
+            )
+            if field.presence and field.presence.mask and not typ.endswith("?"):
+                typ += "?"
+            result.append((identifier(field.name), typ, field))
         return result
 
     def flag_name(self, value, flag):
@@ -368,8 +332,8 @@ class Values:
             return (
                 name(value.native) + "()"
                 if all(
-                    typ.endswith("?") or self.field_default(children[0])
-                    for _, typ, children, group in self.members(value)
+                    typ.endswith("?") or self.field_default(field)
+                    for _, typ, field in self.members(value)
                 )
                 else None
             )
@@ -443,16 +407,10 @@ class Values:
                     + "\n}"
                 )
             args = []
-            for member, typ, children, group in self.members(value):
-                default = (
-                    "null" if typ.endswith("?") else self.field_default(children[0])
-                )
+            for member, typ, field in self.members(value):
+                default = "null" if typ.endswith("?") else self.field_default(field)
                 args.append(
-                    (
-                        doc(self.bound, f"{value.native}.{children[0].name}", "  ")
-                        if not group
-                        else ""
-                    )
+                    doc(self.bound, f"{value.native}.{field.name}", "  ")
                     + f"  public val {member}: {typ}"
                     + (" = " + default if default is not None else "")
                 )
@@ -474,7 +432,7 @@ class Values:
                 args = [arg.replace("public val ", "") for arg in args]
                 getters = [
                     f"  private val stored{pascal(member.strip('`'))}: {typ} = {member}\n  public val {member}: {typ} get() {{ bindingScope?.ensureActive(); return stored{pascal(member.strip('`'))} }}"
-                    for member, typ, _, _ in self.members(value)
+                    for member, typ, _ in self.members(value)
                 ]
                 result.append(
                     f"{doc(self.bound, value.native)}public class {public}(\n"
@@ -489,15 +447,6 @@ class Values:
                     + ",\n".join(args)
                     + "\n)"
                 )
-        for public, fields in self.groups.items():
-            args = []
-            for field in fields:
-                default = self.field_default(field)
-                args.append(
-                    f"  public val {identifier(field.name)}: {self.public(field.value)}"
-                    + (f" = {default}" if default is not None else "")
-                )
-            result.append(f"public data class {public}(\n" + ",\n".join(args) + "\n)")
         for public, (field, value) in self.attachments.items():
             result.append(
                 f"public data class {public}(public val {field}: {self.public(value)}, public val ready: kotlinx.coroutines.Deferred<Unit>)"
@@ -697,20 +646,17 @@ class Values:
             lines.append(
                 f"  if (value.{member}) {self.mark(value, flag.mask, flag.name)}"
             )
-        for member, _typ, children, group in self.members(value):
-            first = children[0]
-            if first.value.kind == "union":
-                lines += self.union_write(value, first, f"value.{member}")
+        for member, _typ, field in self.members(value):
+            if field.value.kind == "union":
+                lines += self.union_write(value, field, f"value.{member}")
                 continue
-            presence = group or first.presence
+            presence = field.presence
             optional = bool(presence and presence.mask)
             body = []
             local = "it" if optional else f"value.{member}"
             if optional:
                 body.append(self.mark(value, presence.mask, presence.bit))
-            for field in children:
-                expression = local + ("." + identifier(field.name) if group else "")
-                body += self.field_write(value, field, expression)
+            body += self.field_write(value, field, local)
             if optional:
                 lines.append(f"  value.{member}?.let {{")
                 lines += ["    " + line for line in body]
@@ -900,23 +846,12 @@ class Values:
             arguments.append(
                 f"{self.flag_name(value, flag)} = {self.present('source', value, flag.mask, flag.name)}"
             )
-        for member, typ, children, group in self.members(value):
-            first = children[0]
-            if first.value.kind == "union":
-                arguments.append(f"{member} = {self.union_read(value, first)}")
+        for member, _typ, field in self.members(value):
+            if field.value.kind == "union":
+                arguments.append(f"{member} = {self.union_read(value, field)}")
                 continue
-            copied = []
-            for field in children:
-                decoded = self.field_read(value, field, scope)
-                copied.append(
-                    (identifier(field.name) + " = " if group else "") + decoded
-                )
-            decoded = (
-                f"{typ.removesuffix('?')}(" + ", ".join(copied) + ")"
-                if group
-                else copied[0]
-            )
-            presence = group or first.presence
+            decoded = self.field_read(value, field, scope)
+            presence = field.presence
             if presence and presence.mask:
                 decoded = f"if ({self.present('source', value, presence.mask, presence.bit)}) {decoded} else null"
             arguments.append(f"{member} = {decoded}")

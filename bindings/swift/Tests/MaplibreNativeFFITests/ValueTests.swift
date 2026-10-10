@@ -70,7 +70,7 @@ import Testing
   var source = mln_style_source_result()
   source.info.type = 700
   source.info.fields = MLN_STYLE_SOURCE_INFO_TILEJSON.rawValue
-  source.info.scheme = 701
+  source.info.tilejson.scheme = 701
   let copied = try StyleSourceResult(raw: source)
   #expect(copied.info.type.rawValue == 700)
   #expect(copied.info.tilejson?.scheme.rawValue == 701)

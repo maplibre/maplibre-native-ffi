@@ -86,16 +86,10 @@ def common(values):
             )
         elif value.registration:
             parameters = []
-            for member, typ, children, group in values.members(value):
-                default = (
-                    "null" if typ.endswith("?") else values.field_default(children[0])
-                )
+            for member, typ, field in values.members(value):
+                default = "null" if typ.endswith("?") else values.field_default(field)
                 parameters.append(
-                    (
-                        doc(values.bound, f"{value.native}.{children[0].name}", "  ")
-                        if not group
-                        else ""
-                    )
+                    doc(values.bound, f"{value.native}.{field.name}", "  ")
                     + f"  public val {member}: {typ}"
                     + (f" = {default}" if default else "")
                 )
@@ -399,12 +393,7 @@ def put_function(value, values):
                 f"{values.size(value.native)}.toUInt()",
             )
         )
-    for member, _typ, children, group in values.members(value):
-        if group:
-            raise Unsupported(
-                "callback descriptor presence group needs recursive preparation"
-            )
-        field = children[0]
+    for member, _typ, field in values.members(value):
         if field in callbacks:
             continue
         expression = "value." + member
@@ -457,8 +446,7 @@ def read_function(value, values):
     public_name = name(value.native)
     callbacks = [f for f in value.fields if f.name in value.registration.callbacks]
     arguments = []
-    for member, _typ, children, _group in values.members(value):
-        field = children[0]
+    for member, _typ, field in values.members(value):
         if field in callbacks:
             arguments.append(f"{member} = null")
             continue

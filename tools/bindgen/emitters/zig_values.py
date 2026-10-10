@@ -127,9 +127,6 @@ class Values:
                     [f"Zig: {value.native}: variant requires tag decoding"]
                 )
             self.add(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.add(self.bound.values[group.type])
         self.used[value.native] = value
 
     def capture(self, value, source):
@@ -190,41 +187,13 @@ class Values:
             writes.append(
                 f"        if (self.{local}) raw.{flag.mask} |= c.{flag.name};"
             )
-        grouped = {
-            name
-            for group in value.presence_groups
-            if len(group.fields) > 1
-            for name in group.fields
-        }
-        for group in value.presence_groups:
-            if len(group.fields) == 1:
-                continue
-            child = self.bound.values[group.type]
-            local = identifier(group.member)
-            fields.append(f"    {local}: ?{self.public(child)} = null,")
-            writes.append(
-                f"        if (self.{local}) |item| {{ raw.{identifier(group.mask)} |= c.{group.bit}; "
-                + " ".join(
-                    f"raw.{identifier(name)} = {self.materialize(next(f.value for f in value.fields if f.name == name), 'item.' + identifier(name))};"
-                    for name in group.fields
-                )
-                + " }"
-            )
-            copies.append(
-                f"            .{local} = if (raw.{identifier(group.mask)} & c.{group.bit} != 0) .{{ "
-                + ", ".join(
-                    f".{identifier(name)} = {self.capture(next(f.value for f in value.fields if f.name == name), 'raw.' + identifier(name))}"
-                    for name in group.fields
-                )
-                + " } else null,"
-            )
         for field in value.fields:
             local = identifier(field.name)
             if field.role == "size":
                 if not value.default:
                     writes.append(f"        raw.{local} = @sizeOf(c.{value.native});")
                 continue
-            if not field.public or field.name in grouped:
+            if not field.public:
                 continue
             optional = field.presence and field.presence.mask
             initial = "null" if optional else field_default(self, field)

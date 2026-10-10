@@ -144,7 +144,7 @@ internal static unsafe class GeneratedValues
         new()
         {
             Center = value.fields.HasFlag(MLN_CAMERA_OPTION_CENTER)
-                ? new LatLng(value.latitude, value.longitude)
+                ? CopyLatLng(value.center)
                 : null,
             CenterAltitude = value.fields.HasFlag(MLN_CAMERA_OPTION_CENTER_ALTITUDE)
                 ? value.center_altitude
@@ -167,12 +167,12 @@ internal static unsafe class GeneratedValues
         var native = NativeMethods.mln_camera_options_default();
         native.fields = 0;
         native.size = (uint)sizeof(mln_camera_options);
-        if (value.Center is { } fieldCenter)
-        {
-            native.fields |= MLN_CAMERA_OPTION_CENTER;
-            native.latitude = fieldCenter.Latitude;
-            native.longitude = fieldCenter.Longitude;
-        }
+        native.fields |= Put(
+            value.Center,
+            ref native.center,
+            MLN_CAMERA_OPTION_CENTER,
+            NativeLatLng
+        );
         native.fields |= Put(
             value.CenterAltitude,
             ref native.center_altitude,
@@ -2743,12 +2743,7 @@ internal static unsafe class GeneratedValues
                 ? (ulong)value.url_size
                 : null,
             Tilejson = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_TILEJSON)
-                ? new StyleSourceTileInfo(
-                    (ulong)value.tile_count,
-                    value.min_zoom,
-                    value.max_zoom,
-                    (StyleTileScheme)value.scheme
-                )
+                ? CopyStyleSourceTileInfo(value.tilejson)
                 : null,
             Bounds = value.fields.HasFlag(MLN_STYLE_SOURCE_INFO_BOUNDS)
                 ? CopyLatLngBounds(value.bounds)
@@ -2784,14 +2779,12 @@ internal static unsafe class GeneratedValues
             MLN_STYLE_SOURCE_INFO_URL,
             static present => checked((nuint)present)
         );
-        if (value.Tilejson is { } fieldTilejson)
-        {
-            native.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-            native.tile_count = checked((nuint)fieldTilejson.TileCount);
-            native.min_zoom = fieldTilejson.MinZoom;
-            native.max_zoom = fieldTilejson.MaxZoom;
-            native.scheme = (uint)fieldTilejson.Scheme;
-        }
+        native.fields |= Put(
+            value.Tilejson,
+            ref native.tilejson,
+            MLN_STYLE_SOURCE_INFO_TILEJSON,
+            NativeStyleSourceTileInfo
+        );
         native.fields |= Put(
             value.Bounds,
             ref native.bounds,

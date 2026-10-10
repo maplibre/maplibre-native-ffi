@@ -403,11 +403,7 @@ pub const CameraOptions = struct {
     pub fn toNative(self: CameraOptions) c.mln_camera_options {
         var raw = c.mln_camera_options_default();
         raw.fields = 0;
-        if (self.center) |item| {
-            raw.fields |= c.MLN_CAMERA_OPTION_CENTER;
-            raw.latitude = item.latitude;
-            raw.longitude = item.longitude;
-        }
+        marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_CENTER, &raw.center, self.center);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_CENTER_ALTITUDE, &raw.center_altitude, self.center_altitude);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_PADDING, &raw.padding, self.padding);
         marshal.present(&raw.fields, c.MLN_CAMERA_OPTION_ANCHOR, &raw.anchor, self.anchor);
@@ -420,7 +416,7 @@ pub const CameraOptions = struct {
     }
     pub fn fromNative(raw: c.mln_camera_options) CameraOptions {
         return .{
-            .center = if (raw.fields & c.MLN_CAMERA_OPTION_CENTER != 0) .{ .latitude = raw.latitude, .longitude = raw.longitude } else null,
+            .center = if (raw.fields & c.MLN_CAMERA_OPTION_CENTER != 0) LatLng.fromNative(raw.center) else null,
             .center_altitude = if (raw.fields & c.MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0) raw.center_altitude else null,
             .padding = if (raw.fields & c.MLN_CAMERA_OPTION_PADDING != 0) EdgeInsets.fromNative(raw.padding) else null,
             .anchor = if (raw.fields & c.MLN_CAMERA_OPTION_ANCHOR != 0) ScreenPoint.fromNative(raw.anchor) else null,
@@ -4325,7 +4321,6 @@ pub const StyleRasterDemEncoding = enum(u32) {
 /// See `mln_style_source_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceInfo = struct {
-    tilejson: ?StyleSourceTileInfo = null,
     /// One of `mln_style_source_type`.
     type: StyleSourceType = std.mem.zeroes(StyleSourceType),
     /// Source ID byte length, excluding any null terminator.
@@ -4337,6 +4332,8 @@ pub const StyleSourceInfo = struct {
     attribution_size: ?usize = null,
     /// URL byte length, meaningful when fields contains URL.
     url_size: ?usize = null,
+    /// Inline tile metadata, meaningful when fields contains TILEJSON.
+    tilejson: ?StyleSourceTileInfo = null,
     /// Geographic bounds, meaningful when fields contains BOUNDS.
     bounds: ?LatLngBounds = null,
     /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
@@ -4348,19 +4345,13 @@ pub const StyleSourceInfo = struct {
     pub fn toNative(self: StyleSourceInfo) c.mln_style_source_info {
         var raw = std.mem.zeroes(c.mln_style_source_info);
         raw.fields = 0;
-        if (self.tilejson) |item| {
-            raw.fields |= c.MLN_STYLE_SOURCE_INFO_TILEJSON;
-            raw.tile_count = item.tile_count;
-            raw.min_zoom = item.min_zoom;
-            raw.max_zoom = item.max_zoom;
-            raw.scheme = item.scheme.toNative();
-        }
         raw.size = @sizeOf(c.mln_style_source_info);
         raw.type = self.type.toNative();
         raw.id_size = self.id_size;
         raw.is_volatile = self.is_volatile;
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION, &raw.attribution_size, self.attribution_size);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_URL, &raw.url_size, self.url_size);
+        marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILEJSON, &raw.tilejson, self.tilejson);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_BOUNDS, &raw.bounds, self.bounds);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_TILE_SIZE, &raw.tile_size, self.tile_size);
         marshal.present(&raw.fields, c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING, &raw.vector_encoding, self.vector_encoding);
@@ -4369,12 +4360,12 @@ pub const StyleSourceInfo = struct {
     }
     pub fn fromNative(raw: c.mln_style_source_info) StyleSourceInfo {
         return .{
-            .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) .{ .tile_count = raw.tile_count, .min_zoom = raw.min_zoom, .max_zoom = raw.max_zoom, .scheme = StyleTileScheme.fromNative(raw.scheme) } else null,
             .type = StyleSourceType.fromNative(raw.type),
             .id_size = raw.id_size,
             .is_volatile = raw.is_volatile,
             .attribution_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0) raw.attribution_size else null,
             .url_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_URL != 0) raw.url_size else null,
+            .tilejson = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILEJSON != 0) StyleSourceTileInfo.fromNative(raw.tilejson) else null,
             .bounds = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_BOUNDS != 0) LatLngBounds.fromNative(raw.bounds) else null,
             .tile_size = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0) raw.tile_size else null,
             .vector_encoding = if (raw.fields & c.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0) StyleVectorTileEncoding.fromNative(raw.vector_encoding) else null,
@@ -4465,9 +4456,13 @@ pub const StyleSourceResult = struct {
 /// See `mln_style_source_tile_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 pub const StyleSourceTileInfo = struct {
+    /// Inline tile URL count.
     tile_count: usize = std.mem.zeroes(usize),
+    /// Minimum zoom.
     min_zoom: f64 = std.mem.zeroes(f64),
+    /// Maximum zoom.
     max_zoom: f64 = std.mem.zeroes(f64),
+    /// One of `mln_style_tile_scheme`.
     scheme: StyleTileScheme = std.mem.zeroes(StyleTileScheme),
     pub fn toNative(self: StyleSourceTileInfo) c.mln_style_source_tile_info {
         var raw = std.mem.zeroes(c.mln_style_source_tile_info);

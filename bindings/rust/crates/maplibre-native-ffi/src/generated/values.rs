@@ -377,8 +377,7 @@ impl ToNative<sys::mln_camera_options> for CameraOptions {
         raw.fields = 0;
         if let Some(item) = &self.center {
             raw.fields |= sys::MLN_CAMERA_OPTION_CENTER;
-            raw.latitude = item.latitude;
-            raw.longitude = item.longitude;
+            raw.center = to_native(&*item, arena)?;
         }
         if let Some(item) = &self.center_altitude {
             raw.fields |= sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE;
@@ -418,14 +417,9 @@ impl ToNative<sys::mln_camera_options> for CameraOptions {
 impl FromNative<sys::mln_camera_options> for CameraOptions {
     unsafe fn from_native(raw: sys::mln_camera_options) -> Result<Self> {
         Ok(Self {
-            center: if raw.fields & sys::MLN_CAMERA_OPTION_CENTER != 0 {
-                Some(LatLng {
-                    latitude: raw.latitude,
-                    longitude: raw.longitude,
-                })
-            } else {
-                None
-            },
+            center: unsafe {
+                convert::present(raw.fields, sys::MLN_CAMERA_OPTION_CENTER, raw.center)
+            }?,
             center_altitude: (raw.fields & sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0)
                 .then_some(raw.center_altitude),
             padding: unsafe {
@@ -5455,7 +5449,6 @@ pub enum StyleRasterDemEncoding: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleSourceInfo {
-    pub tilejson: Option<StyleSourceTileInfo>,
     /// One of `mln_style_source_type`.
     pub r#type: StyleSourceType,
     /// Source ID byte length, excluding any null terminator.
@@ -5467,6 +5460,8 @@ pub struct StyleSourceInfo {
     pub attribution_size: Option<usize>,
     /// URL byte length, meaningful when fields contains URL.
     pub url_size: Option<usize>,
+    /// Inline tile metadata, meaningful when fields contains TILEJSON.
+    pub tilejson: Option<StyleSourceTileInfo>,
     /// Geographic bounds, meaningful when fields contains BOUNDS.
     pub bounds: Option<LatLngBounds>,
     /// Tile size in pixels, meaningful when fields contains TILE_SIZE.
@@ -5479,22 +5474,19 @@ pub struct StyleSourceInfo {
 impl FromNative<sys::mln_style_source_info> for StyleSourceInfo {
     unsafe fn from_native(raw: sys::mln_style_source_info) -> Result<Self> {
         Ok(Self {
-            tilejson: if raw.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0 {
-                Some(StyleSourceTileInfo {
-                    tile_count: raw.tile_count,
-                    min_zoom: raw.min_zoom,
-                    max_zoom: raw.max_zoom,
-                    scheme: unsafe { from_native(raw.scheme) }?,
-                })
-            } else {
-                None
-            },
             r#type: unsafe { from_native(raw.type_) }?,
             id_size: raw.id_size,
             is_volatile: raw.is_volatile,
             attribution_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0)
                 .then_some(raw.attribution_size),
             url_size: (raw.fields & sys::MLN_STYLE_SOURCE_INFO_URL != 0).then_some(raw.url_size),
+            tilejson: unsafe {
+                convert::present(
+                    raw.fields,
+                    sys::MLN_STYLE_SOURCE_INFO_TILEJSON,
+                    raw.tilejson,
+                )
+            }?,
             bounds: unsafe {
                 convert::present(raw.fields, sys::MLN_STYLE_SOURCE_INFO_BOUNDS, raw.bounds)
             }?,
@@ -5581,9 +5573,13 @@ impl FromNative<sys::mln_style_source_result> for StyleSourceResult {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleSourceTileInfo {
+    /// Inline tile URL count.
     pub tile_count: usize,
+    /// Minimum zoom.
     pub min_zoom: f64,
+    /// Maximum zoom.
     pub max_zoom: f64,
+    /// One of `mln_style_tile_scheme`.
     pub scheme: StyleTileScheme,
 }
 impl StyleSourceTileInfo {

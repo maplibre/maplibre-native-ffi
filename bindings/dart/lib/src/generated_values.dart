@@ -2699,9 +2699,17 @@ final class StyleSourceTileInfo extends _Value {
     this.maxZoom = 0,
     this.scheme = const StyleTileScheme.fromRawValue(0),
   });
+
+  /// Inline tile URL count.
   final int tileCount;
+
+  /// Minimum zoom.
   final double minZoom;
+
+  /// Maximum zoom.
   final double maxZoom;
+
+  /// One of `mln_style_tile_scheme`.
   final StyleTileScheme scheme;
 
   @override
@@ -2741,6 +2749,8 @@ final class StyleSourceInfo extends _Value {
 
   /// URL byte length, meaningful when fields contains URL.
   final int? urlSize;
+
+  /// Inline tile metadata, meaningful when fields contains TILEJSON.
   final StyleSourceTileInfo? tilejson;
 
   /// Geographic bounds, meaningful when fields contains BOUNDS.

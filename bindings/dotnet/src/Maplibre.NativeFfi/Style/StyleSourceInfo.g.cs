@@ -36,6 +36,10 @@ public sealed record StyleSourceInfo
     /// URL byte length, meaningful when fields contains URL.
     /// </summary>
     public ulong? UrlSize { get; set; }
+
+    /// <summary>
+    /// Inline tile metadata, meaningful when fields contains TILEJSON.
+    /// </summary>
     public StyleSourceTileInfo? Tilejson { get; set; }
 
     /// <summary>

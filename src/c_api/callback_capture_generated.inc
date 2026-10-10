@@ -14,11 +14,7 @@ auto capture_mln_camera_options(
   auto result = source;
   if ((source.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
   } else {
-    result.latitude = {};
-  }
-  if ((source.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
-  } else {
-    result.longitude = {};
+    result.center = {};
   }
   if ((source.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
   } else {
@@ -61,11 +57,7 @@ auto capture_mln_camera_query_result(
   auto result = source;
   if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
   } else {
-    result.camera.latitude = {};
-  }
-  if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER) != 0) {
-  } else {
-    result.camera.longitude = {};
+    result.camera.center = {};
   }
   if ((source.camera.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
   } else {
@@ -279,19 +271,7 @@ auto capture_mln_style_source_result(
   }
   if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
   } else {
-    result.info.tile_count = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.min_zoom = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.max_zoom = {};
-  }
-  if ((source.info.fields & MLN_STYLE_SOURCE_INFO_TILEJSON) != 0) {
-  } else {
-    result.info.scheme = {};
+    result.info.tilejson = {};
   }
   if ((source.info.fields & MLN_STYLE_SOURCE_INFO_BOUNDS) != 0) {
   } else {

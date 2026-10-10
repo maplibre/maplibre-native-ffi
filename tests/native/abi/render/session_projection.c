@@ -48,8 +48,8 @@ static void expect_center(
 ) {
   mln_camera_options camera = {.size = sizeof(mln_camera_options)};
   MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, latitude, camera.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-6, longitude, camera.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, latitude, camera.center.latitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, longitude, camera.center.longitude);
   TEST_ASSERT_DOUBLE_WITHIN(1e-6, zoom, camera.zoom);
 }
 
@@ -126,8 +126,8 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   expect_malformed_requests_rejected(&fixture, true);
   mln_camera_update update = mln_camera_update_default();
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  update.camera.latitude = 12.0;
-  update.camera.longitude = 34.0;
+  update.camera.center.latitude = 12.0;
+  update.camera.center.longitude = 34.0;
   update.camera.zoom = 3.0;
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
@@ -143,8 +143,8 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   MLN_TEST_OK(mln_map_projection_close(after, NULL));
 
   // Back to the origin, so it lies at the center of the resized target.
-  update.camera.latitude = 0.0;
-  update.camera.longitude = 0.0;
+  update.camera.center.latitude = 0.0;
+  update.camera.center.longitude = 0.0;
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );

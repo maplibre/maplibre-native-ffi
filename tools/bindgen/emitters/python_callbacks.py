@@ -38,9 +38,6 @@ def validate(values, plan):
     for field in plain.fields:
         if field.public:
             values.supported(field.value, input=True)
-    for group in plain.presence_groups:
-        if len(group.fields) > 1:
-            values.supported(values.group_value(plain, group), input=True)
     for name in descriptor.callbacks:
         field = next(f for f in plan.fields if f.name == name)
         callback = values.api.callbacks[field.value.native]

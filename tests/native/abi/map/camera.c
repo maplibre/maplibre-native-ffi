@@ -19,8 +19,8 @@ static mln_camera_options test_camera(void) {
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
                   MLN_CAMERA_OPTION_PADDING | MLN_CAMERA_OPTION_ANCHOR;
-  camera.latitude = 37.7749;
-  camera.longitude = -122.4194;
+  camera.center.latitude = 37.7749;
+  camera.center.longitude = -122.4194;
   camera.zoom = 11.0;
   camera.bearing = 12.0;
   camera.pitch = 30.0;
@@ -98,7 +98,7 @@ static void camera_unknown_field(void* descriptor) {
 static void camera_latitude_past_the_pole(void* descriptor) {
   mln_camera_options* camera = &((mln_camera_update*)descriptor)->camera;
   camera->fields = MLN_CAMERA_OPTION_CENTER;
-  camera->latitude = 90.5;
+  camera->center.latitude = 90.5;
 }
 static void camera_nan_zoom(void* descriptor) {
   mln_camera_options* camera = &((mln_camera_update*)descriptor)->camera;
@@ -211,12 +211,12 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   TEST_ASSERT_GREATER_THAN_UINT64(before.generation, command_generation);
   mln_test_completion_destroy(&command);
 
-  update.camera.longitude = 12.0;
+  update.camera.center.longitude = 12.0;
   update.camera.zoom = 1.0;
   update.camera.padding.left = 999.0;
 
   const mln_camera_query_result result = query_camera(map);
-  TEST_ASSERT_EQUAL_DOUBLE(-122.4194, result.camera.longitude);
+  TEST_ASSERT_EQUAL_DOUBLE(-122.4194, result.camera.center.longitude);
   TEST_ASSERT_EQUAL_DOUBLE(11.0, result.camera.zoom);
   TEST_ASSERT_EQUAL_DOUBLE(2.0, result.camera.padding.left);
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, result.generation);
@@ -224,7 +224,7 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   mln_map_snapshot after = {.size = sizeof(mln_map_snapshot)};
   MLN_TEST_OK(mln_map_snapshot_get(map, &after, NULL));
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, after.generation);
-  TEST_ASSERT_EQUAL_DOUBLE(-122.4194, after.camera.longitude);
+  TEST_ASSERT_EQUAL_DOUBLE(-122.4194, after.camera.center.longitude);
 
   mln_camera_options published = mln_camera_options_default();
   uint64_t published_generation = 0;
@@ -247,8 +247,7 @@ static const camera_row camera_rows[] = {
   {"center",
    {.size = sizeof(mln_camera_options),
     .fields = MLN_CAMERA_OPTION_CENTER,
-    .latitude = -33.8688,
-    .longitude = 151.2093}},
+    .center = {.latitude = -33.8688, .longitude = 151.2093}}},
   {"zoom",
    {.size = sizeof(mln_camera_options),
     .fields = MLN_CAMERA_OPTION_ZOOM,
@@ -284,10 +283,10 @@ static void assert_camera_field(
   );
   if ((sent->fields & MLN_CAMERA_OPTION_CENTER) != 0U) {
     TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->latitude, got->latitude, label
+      1e-9, sent->center.latitude, got->center.latitude, label
     );
     TEST_ASSERT_DOUBLE_WITHIN_MESSAGE(
-      1e-9, sent->longitude, got->longitude, label
+      1e-9, sent->center.longitude, got->center.longitude, label
     );
   }
   if ((sent->fields & MLN_CAMERA_OPTION_ZOOM) != 0U) {
@@ -468,8 +467,8 @@ static void every_camera_delta_kind_follows_its_convention(void) {
   mln_camera_options start = mln_camera_options_default();
   start.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                  MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
-  start.latitude = 10.0;
-  start.longitude = 20.0;
+  start.center.latitude = 10.0;
+  start.center.longitude = 20.0;
   start.zoom = 4.0;
   jump(map, start);
   const mln_screen_point center = {.x = 128.0, .y = 128.0};
@@ -478,7 +477,7 @@ static void every_camera_delta_kind_follows_its_convention(void) {
        index += 1) {
     const delta_row* row = &delta_rows[index];
     const mln_camera_options before = query_camera(map).camera;
-    const mln_lat_lng before_center = {before.latitude, before.longitude};
+    const mln_lat_lng before_center = before.center;
     const mln_lat_lng moved_to_center = coordinate_at(
       map, (mln_screen_point){
              .x = center.x - row->offset.x, .y = center.y - row->offset.y
@@ -506,7 +505,7 @@ static void every_camera_delta_kind_follows_its_convention(void) {
     mln_test_completion_destroy(&completion);
 
     const mln_camera_options after = query_camera(map).camera;
-    const mln_lat_lng after_center = {after.latitude, after.longitude};
+    const mln_lat_lng after_center = after.center;
     double expected_zoom = before.zoom;
     double expected_bearing = before.bearing;
     double expected_pitch = before.pitch;
@@ -699,7 +698,7 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   const mln_camera_options fitted = camera_for_bounds(map, region, NULL);
   TEST_ASSERT_TRUE(fitted.fields & MLN_CAMERA_OPTION_CENTER);
   TEST_ASSERT_TRUE(fitted.fields & MLN_CAMERA_OPTION_ZOOM);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, -122.5, fitted.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, -122.5, fitted.center.longitude);
 
   const mln_lat_lng_bounds visible = bounds_for_camera(map, &fitted, false);
   TEST_ASSERT_TRUE(
@@ -748,8 +747,12 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
   ));
   const mln_camera_options coordinate_fit =
     finish_camera_query(&from_coordinates);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, fitted.latitude, coordinate_fit.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, fitted.longitude, coordinate_fit.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, fitted.center.latitude, coordinate_fit.center.latitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, fitted.center.longitude, coordinate_fit.center.longitude
+  );
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, fitted.zoom, coordinate_fit.zoom);
 
   mln_test_completion from_geometry =
@@ -762,8 +765,12 @@ static void camera_fits_round_trip_through_the_visible_bounds(void) {
     NULL, &from_geometry.descriptor, NULL
   ));
   const mln_camera_options geometry_fit = finish_camera_query(&from_geometry);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, fitted.latitude, geometry_fit.latitude);
-  TEST_ASSERT_DOUBLE_WITHIN(1e-9, fitted.longitude, geometry_fit.longitude);
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, fitted.center.latitude, geometry_fit.center.latitude
+  );
+  TEST_ASSERT_DOUBLE_WITHIN(
+    1e-9, fitted.center.longitude, geometry_fit.center.longitude
+  );
   TEST_ASSERT_DOUBLE_WITHIN(1e-9, fitted.zoom, geometry_fit.zoom);
 
   // Padding leaves less of the viewport for the region, so the fit zooms out.
@@ -796,11 +803,11 @@ static void visible_bounds_unwrap_across_the_antimeridian(void) {
   mln_map map = create_square_map(runtime, 512);
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  camera.latitude = 0.0;
+  camera.center.latitude = 0.0;
   // A center on the antimeridian itself unprojects to 180 or -180 depending
   // on floating-point rounding, which flips the hull to the other side, so the
   // center sits just west of it.
-  camera.longitude = 170.0;
+  camera.center.longitude = 170.0;
   camera.zoom = 1.0;
 
   // At zoom 1 the world is 1024 pixels wide, so 512 pixels span 180 degrees.
@@ -825,11 +832,11 @@ static void visible_bounds_unwrap_across_the_antimeridian(void) {
 static double jumped_longitude(mln_map map, double longitude) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  camera.latitude = 0.0;
-  camera.longitude = longitude;
+  camera.center.latitude = 0.0;
+  camera.center.longitude = longitude;
   camera.zoom = 2.0;
   jump(map, camera);
-  return query_camera(map).camera.longitude;
+  return query_camera(map).camera.center.longitude;
 }
 
 static mln_bound_options read_bounds(mln_runtime runtime, mln_map map) {

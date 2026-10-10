@@ -1646,10 +1646,12 @@ auto map_get_style_source_info(
   }
 
   out_info->fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  out_info->tile_count = tileset->tiles.size();
-  out_info->min_zoom = tileset->zoomRange.min;
-  out_info->max_zoom = tileset->zoomRange.max;
-  out_info->scheme = to_c_tile_scheme(tileset->scheme);
+  out_info->tilejson = mln_style_source_tile_info{
+    .tile_count = tileset->tiles.size(),
+    .min_zoom = static_cast<double>(tileset->zoomRange.min),
+    .max_zoom = static_cast<double>(tileset->zoomRange.max),
+    .scheme = to_c_tile_scheme(tileset->scheme),
+  };
   if (tileset->bounds) {
     out_info->fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
     out_info->bounds = from_native_lat_lng_bounds(*tileset->bounds);

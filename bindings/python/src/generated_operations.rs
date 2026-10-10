@@ -166,14 +166,7 @@ fn generated_copy_mln_camera_options(
         generated_optional(
             py,
             value.fields & sys::MLN_CAMERA_OPTION_CENTER != 0,
-            || {
-                Ok({
-                    let inner = PyDict::new(py);
-                    inner.set_item("latitude", generated_value(py, value.latitude)?)?;
-                    inner.set_item("longitude", generated_value(py, value.longitude)?)?;
-                    inner.into_any().unbind()
-                })
-            },
+            || generated_copy_mln_lat_lng(py, &value.center),
         )?,
     )?;
     dict.set_item(
@@ -2234,16 +2227,7 @@ fn generated_copy_mln_style_source_info(
         generated_optional(
             py,
             value.fields & sys::MLN_STYLE_SOURCE_INFO_TILEJSON != 0,
-            || {
-                Ok({
-                    let inner = PyDict::new(py);
-                    inner.set_item("tile_count", generated_value(py, value.tile_count)?)?;
-                    inner.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
-                    inner.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
-                    inner.set_item("scheme", generated_value(py, value.scheme)?)?;
-                    inner.into_any().unbind()
-                })
-            },
+            || generated_copy_mln_style_source_tile_info(py, &value.tilejson),
         )?,
     )?;
     dict.set_item(
@@ -2320,6 +2304,18 @@ fn generated_copy_mln_style_source_result(
             },
         )?,
     )?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_style_source_tile_info(
+    py: Python<'_>,
+    value: &sys::mln_style_source_tile_info,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("tile_count", generated_value(py, value.tile_count)?)?;
+    dict.set_item("min_zoom", generated_value(py, value.min_zoom)?)?;
+    dict.set_item("max_zoom", generated_value(py, value.max_zoom)?)?;
+    dict.set_item("scheme", generated_value(py, value.scheme)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2873,8 +2869,7 @@ fn generated_input_mln_camera_options<'py>(
     raw.size = std::mem::size_of::<sys::mln_camera_options>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "center")? {
-        raw.latitude = field.getattr("latitude")?.extract::<f64>()?;
-        raw.longitude = field.getattr("longitude")?.extract::<f64>()?;
+        raw.center = generated_input_mln_lat_lng(&field, storage)?;
         raw.fields |= sys::MLN_CAMERA_OPTION_CENTER;
     }
     if let Some(field) = generated_present(value, "center_altitude")? {

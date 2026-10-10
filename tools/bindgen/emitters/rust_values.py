@@ -73,9 +73,6 @@ class Values:
                     f"{value.native}: variant capture requires its discriminant"
                 )
             self.check(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.check(self.bound.values[group.type])
 
     def add(self, value: ValuePlan, direction: str = "both") -> str:
         """Uses `value`, which converts to native for "in", from native for
@@ -118,9 +115,6 @@ class Values:
                 for field in value.fields:
                     if field.role == "value":
                         self.add(field.value, added)
-                for group in value.presence_groups:
-                    if group.type:
-                        self.add(self.bound.values[group.type], added)
         return self.public(value)
 
     def name(self, value: ValuePlan) -> str:

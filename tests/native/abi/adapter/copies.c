@@ -155,8 +155,7 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
 
   const mln_camera_options camera = {
     .size = sizeof(mln_camera_options),
-    .latitude = 1.0,
-    .longitude = 2.0,
+    .center = {.latitude = 1.0, .longitude = 2.0},
     .center_altitude = 3.0,
     .padding = {1.0, 1.0, 1.0, 1.0},
     .anchor = {1.0, 1.0},
@@ -174,8 +173,8 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
   const mln_camera_options* copied_camera = record->result.value;
   TEST_ASSERT_EQUAL_UINT32(0, copied_camera->fields);
   TEST_ASSERT_TRUE(all_zero(
-    &copied_camera->latitude,
-    sizeof(mln_camera_options) - offsetof(mln_camera_options, latitude)
+    &copied_camera->center,
+    sizeof(mln_camera_options) - offsetof(mln_camera_options, center)
   ));
   mln_adapter_completion_record_destroy(record);
 
@@ -239,10 +238,8 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
         .size = sizeof(mln_style_source_info),
         .attribution_size = 3,
         .url_size = 3,
-        .tile_count = 1,
-        .min_zoom = 1.0,
-        .max_zoom = 2.0,
-        .scheme = 1,
+        .tilejson =
+          {.tile_count = 1, .min_zoom = 1.0, .max_zoom = 2.0, .scheme = 1},
         .bounds = {{1.0, 1.0}, {2.0, 2.0}},
         .tile_size = 512,
         .vector_encoding = 1,
@@ -261,8 +258,9 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
   const mln_style_source_result* copied_source = record->result.value;
   TEST_ASSERT_EQUAL_size_t(0, copied_source->info.attribution_size);
   TEST_ASSERT_EQUAL_size_t(0, copied_source->info.url_size);
-  TEST_ASSERT_EQUAL_size_t(0, copied_source->info.tile_count);
-  TEST_ASSERT_EQUAL_DOUBLE(0.0, copied_source->info.max_zoom);
+  TEST_ASSERT_TRUE(all_zero(
+    &copied_source->info.tilejson, sizeof(copied_source->info.tilejson)
+  ));
   TEST_ASSERT_TRUE(
     all_zero(&copied_source->info.bounds, sizeof(copied_source->info.bounds))
   );

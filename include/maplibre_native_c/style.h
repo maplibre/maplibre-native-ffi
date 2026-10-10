@@ -281,9 +281,13 @@ typedef enum mln_location_indicator_image_kind : uint32_t {
 
 /** Inline tile metadata selected as one value by the source-info field mask. */
 typedef struct mln_style_source_tile_info {
+  /** Inline tile URL count. */
   size_t tile_count;
+  /** Minimum zoom. */
   double min_zoom;
+  /** Maximum zoom. */
   double max_zoom;
+  /** One of mln_style_tile_scheme. */
   uint32_t scheme MLN_BINDING("enum=mln_style_tile_scheme");
 } mln_style_source_tile_info;
 
@@ -306,26 +310,9 @@ typedef struct mln_style_source_info {
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
   /** URL byte length, meaningful when fields contains URL. */
   size_t url_size MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_URL");
-  /** Inline tile URL count, meaningful when fields contains TILEJSON. */
-  size_t tile_count MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** Minimum zoom, meaningful when fields contains TILEJSON. */
-  double min_zoom MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** Maximum zoom, meaningful when fields contains TILEJSON. */
-  double max_zoom MLN_BINDING(
-    "mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;group_type=mln_style_"
-    "source_tile_info"
-  );
-  /** One of mln_style_tile_scheme, meaningful when fields contains TILEJSON. */
-  uint32_t scheme MLN_BINDING(
-    "enum=mln_style_tile_scheme;mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON;"
-    "group_type=mln_style_source_tile_info"
-  );
+  /** Inline tile metadata, meaningful when fields contains TILEJSON. */
+  mln_style_source_tile_info tilejson
+    MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_TILEJSON");
   /** Geographic bounds, meaningful when fields contains BOUNDS. */
   mln_lat_lng_bounds bounds
     MLN_BINDING("mask=fields;bit=MLN_STYLE_SOURCE_INFO_BOUNDS");

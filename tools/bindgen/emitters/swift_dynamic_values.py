@@ -2,15 +2,12 @@
 
 from dataclasses import replace
 
-from .swift import camel, doc, identifier, name
+from .swift import camel, doc, identifier
 
 
 def dynamic(value):
     return (
         bool(value.registration)
-        or any(
-            len(group.fields) > 1 and not group.type for group in value.presence_groups
-        )
         or value.kind in {"buffer", "array", "reference", "union"}
         or any(dynamic(f.value) for f in value.fields if f.role == "value")
     )
@@ -267,57 +264,8 @@ def declaration(values, value):
     for field in value.fields:
         if field.role == "presence_mask":
             encode_lines.append(f"    raw.{identifier(field.name)} = 0")
-    group_declarations = []
-    grouped = set()
-    for group in value.presence_groups:
-        if len(group.fields) < 2:
-            continue
-        grouped.update(group.fields)
-        local = identifier(camel(group.member))
-        members = [field for field in value.fields if field.name in group.fields]
-        group_type = (
-            values.public(values.bound.values[group.type])
-            if group.type
-            else typ + name(group.member)
-        )
-        if not group.type:
-            group_fields = "\n".join(
-                f"  public var {identifier(camel(field.name))}: {values.public(field.value)}"
-                for field in members
-            )
-            group_args = ", ".join(
-                f"{identifier(camel(field.name))}: {values.public(field.value)}"
-                for field in members
-            )
-            group_init = "\n".join(
-                f"    self.{identifier(camel(field.name))} = {identifier(camel(field.name))}"
-                for field in members
-            )
-            group_declarations.append(
-                f"public struct {group_type}: Equatable, Hashable, Sendable {{\n{group_fields}\n  public init({group_args}) {{\n{group_init}\n  }}\n}}\n"
-            )
-        fields.append(f"  public var {local}: {group_type}?")
-        args.append(f"{local}: {group_type}? = nil")
-        init.append(f"    self.{local} = {local}")
-        path = ".".join(identifier(part) for part in group.mask.split("."))
-        present = f"raw.{path} & {group.bit}.rawValue != 0"
-        mark = f"raw.{path} |= {group.bit}.rawValue"
-        captured = ", ".join(
-            f"{identifier(camel(field.name))}: {decode(values, field.value, 'raw.' + identifier(field.name))}"
-            for field in members
-        )
-        decode_lines.append(
-            f"    self.{local} = {present} ? {group_type}({captured}) : nil"
-        )
-        materialized = "; ".join(
-            f"raw.{identifier(field.name)} = {encode(values, field.value, 'item.' + identifier(camel(field.name)))}"
-            for field in members
-        )
-        encode_lines.append(
-            f"    if let item = self.{local} {{ {mark}; {materialized} }}"
-        )
     for f in value.fields:
-        if f.name in controls or f.name in grouped:
+        if f.name in controls:
             continue
         raw, local = f"raw.{identifier(f.name)}", identifier(camel(f.name))
         if f.role == "size":
@@ -414,9 +362,7 @@ def declaration(values, value):
         encode_lines = [
             '    throw NativeStringError("borrowed arena snapshots cannot be submitted")'
         ]
-    return (
-        "\n".join(group_declarations)
-        + f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
+    return f"""{doc(values.bound, value.native)}public struct {typ}: {conformances} {{
 {chr(10).join(fields)}
   public static var `default`: Self {{ {f"try! Self(raw: {initial})" if value.default else "Self()"} }}
 {chr(10).join(constructors)}
@@ -433,4 +379,3 @@ def declaration(values, value):
   }}
 }}
 """
-    )

@@ -1213,8 +1213,8 @@ def emit(api: Api | BoundApi) -> Emission:
         name = public_type(native)
         directory = directory_for(api.records_by_name[native].location.path)
         properties = "".join(
-            f"    public {values.member_type(value, member, fields)} {member} => scope.Active(value).{member};\n"
-            for member, fields in values.members(value)
+            f"    public {values.member_type(value, member, field)} {member} => scope.Active(value).{member};\n"
+            for member, field in values.members(value)
         )
         files[f"{directory}/{name}View.g.cs"] = (
             HEADER + f"namespace {NAMESPACE};\n\npublic sealed class {name}View\n{{\n"

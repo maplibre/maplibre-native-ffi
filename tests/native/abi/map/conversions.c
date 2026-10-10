@@ -37,8 +37,8 @@ static void conversions_agree_singly_and_in_batches_and_invert(void) {
   mln_map map = mln_test_create_map_with_options(runtime, &options);
   mln_camera_update update = mln_camera_update_default();
   update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-  update.camera.latitude = 0.0;
-  update.camera.longitude = 0.0;
+  update.camera.center.latitude = 0.0;
+  update.camera.center.longitude = 0.0;
   update.camera.zoom = 2.0;
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)

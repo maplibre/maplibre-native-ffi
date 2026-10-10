@@ -73,8 +73,7 @@ internal unsafe struct mln_camera_options
 {
     public uint size;
     public mln_camera_option_field fields;
-    public double latitude;
-    public double longitude;
+    public mln_lat_lng center;
     public double center_altitude;
     public mln_edge_insets padding;
     public mln_screen_point anchor;
@@ -965,10 +964,7 @@ internal unsafe struct mln_style_source_info
     public byte is_volatile;
     public nuint attribution_size;
     public nuint url_size;
-    public nuint tile_count;
-    public double min_zoom;
-    public double max_zoom;
-    public uint scheme;
+    public mln_style_source_tile_info tilejson;
     public mln_lat_lng_bounds bounds;
     public uint tile_size;
     public uint vector_encoding;

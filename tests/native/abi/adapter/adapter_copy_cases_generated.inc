@@ -68,9 +68,8 @@ static const void* mln_adapter_copy_case_camera_options_value(size_t* count) {
   static mln_camera_options values[1];
   values[0].size = sizeof(values[0]);
   values[0].fields |= MLN_CAMERA_OPTION_CENTER;
-  values[0].latitude = 1.5;
-  values[0].fields |= MLN_CAMERA_OPTION_CENTER;
-  values[0].longitude = 2.5;
+  values[0].center.latitude = 1.5;
+  values[0].center.longitude = 2.5;
   values[0].fields |= MLN_CAMERA_OPTION_CENTER_ALTITUDE;
   values[0].center_altitude = 3.5;
   values[0].fields |= MLN_CAMERA_OPTION_PADDING;
@@ -102,8 +101,10 @@ static bool mln_adapter_copy_case_camera_options_matches(
   const mln_camera_options* source = (const mln_camera_options*)source_value;
   for (size_t index = 0; index < count; ++index) {
     if (copy[index].fields != source[index].fields) return false;
-    if (copy[index].latitude != source[index].latitude) return false;
-    if (copy[index].longitude != source[index].longitude) return false;
+    if (copy[index].center.latitude != source[index].center.latitude)
+      return false;
+    if (copy[index].center.longitude != source[index].center.longitude)
+      return false;
     if (copy[index].center_altitude != source[index].center_altitude)
       return false;
     if (copy[index].padding.top != source[index].padding.top) return false;
@@ -130,9 +131,8 @@ static const void* mln_adapter_copy_case_camera_query_result_value(
   values[0].generation = 1;
   values[0].camera.size = sizeof(values[0].camera);
   values[0].camera.fields |= MLN_CAMERA_OPTION_CENTER;
-  values[0].camera.latitude = 2.5;
-  values[0].camera.fields |= MLN_CAMERA_OPTION_CENTER;
-  values[0].camera.longitude = 3.5;
+  values[0].camera.center.latitude = 2.5;
+  values[0].camera.center.longitude = 3.5;
   values[0].camera.fields |= MLN_CAMERA_OPTION_CENTER_ALTITUDE;
   values[0].camera.center_altitude = 4.5;
   values[0].camera.fields |= MLN_CAMERA_OPTION_PADDING;
@@ -167,9 +167,14 @@ static bool mln_adapter_copy_case_camera_query_result_matches(
   for (size_t index = 0; index < count; ++index) {
     if (copy[index].generation != source[index].generation) return false;
     if (copy[index].camera.fields != source[index].camera.fields) return false;
-    if (copy[index].camera.latitude != source[index].camera.latitude)
+    if (
+      copy[index].camera.center.latitude != source[index].camera.center.latitude
+    )
       return false;
-    if (copy[index].camera.longitude != source[index].camera.longitude)
+    if (
+      copy[index].camera.center.longitude !=
+      source[index].camera.center.longitude
+    )
       return false;
     if (
       copy[index].camera.center_altitude != source[index].camera.center_altitude
@@ -874,13 +879,10 @@ static const void* mln_adapter_copy_case_style_source_result_value(
   values[0].info.fields |= MLN_STYLE_SOURCE_INFO_URL;
   values[0].info.url_size = 3;
   values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.tile_count = 4;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.min_zoom = 5.5;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.max_zoom = 6.5;
-  values[0].info.fields |= MLN_STYLE_SOURCE_INFO_TILEJSON;
-  values[0].info.scheme = MLN_STYLE_TILE_SCHEME_XYZ;
+  values[0].info.tilejson.tile_count = 4;
+  values[0].info.tilejson.min_zoom = 5.5;
+  values[0].info.tilejson.max_zoom = 6.5;
+  values[0].info.tilejson.scheme = MLN_STYLE_TILE_SCHEME_XYZ;
   values[0].info.fields |= MLN_STYLE_SOURCE_INFO_BOUNDS;
   values[0].info.bounds.southwest.latitude = 7.5;
   values[0].info.bounds.southwest.longitude = 8.5;
@@ -927,11 +929,21 @@ static bool mln_adapter_copy_case_style_source_result_matches(
     )
       return false;
     if (copy[index].info.url_size != source[index].info.url_size) return false;
-    if (copy[index].info.tile_count != source[index].info.tile_count)
+    if (
+      copy[index].info.tilejson.tile_count !=
+      source[index].info.tilejson.tile_count
+    )
       return false;
-    if (copy[index].info.min_zoom != source[index].info.min_zoom) return false;
-    if (copy[index].info.max_zoom != source[index].info.max_zoom) return false;
-    if (copy[index].info.scheme != source[index].info.scheme) return false;
+    if (
+      copy[index].info.tilejson.min_zoom != source[index].info.tilejson.min_zoom
+    )
+      return false;
+    if (
+      copy[index].info.tilejson.max_zoom != source[index].info.tilejson.max_zoom
+    )
+      return false;
+    if (copy[index].info.tilejson.scheme != source[index].info.tilejson.scheme)
+      return false;
     if (
       copy[index].info.bounds.southwest.latitude !=
       source[index].info.bounds.southwest.latitude

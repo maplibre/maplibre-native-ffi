@@ -229,8 +229,9 @@ mln_status mln_keyword_combine(
 #endif
 
 #ifdef MLN_PROTOCOL_PRESENCE_MASK
-// A bitmask presence group with a default constructor, nested in a snapshot
-// that also carries a borrowed array.
+// A bitmask presence mask whose bit guards an embedded record, in a record with
+// a default constructor. A snapshot nests it beside a borrowed array, and a
+// borrowed route reuses the nested bit through the mask path camera.fields.
 typedef enum BIND("kind=bitmask") mln_camera_field : uint64_t {
   MLN_CAMERA_CENTER = 1ULL << 40,
   MLN_CAMERA_ZOOM = 2
@@ -242,10 +243,7 @@ typedef struct mln_lat_lng {
 typedef struct mln_camera {
   uint32_t abi_size BIND("kind=size");
   uint64_t fields BIND("enum=mln_camera_field");
-  double latitude
-    BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
-  double longitude
-    BIND("mask=fields;bit=MLN_CAMERA_CENTER;group_type=mln_lat_lng");
+  mln_lat_lng center BIND("mask=fields;bit=MLN_CAMERA_CENTER");
   double zoom BIND("mask=fields;bit=MLN_CAMERA_ZOOM");
 } mln_camera;
 typedef struct mln_snapshot {
@@ -254,9 +252,19 @@ typedef struct mln_snapshot {
   const mln_lat_lng* coordinates BIND("length=coordinate_count");
   size_t coordinate_count;
 } mln_snapshot;
+typedef struct mln_camera_route {
+  mln_camera camera;
+  const mln_lat_lng* stops
+    BIND("length=stop_count;mask=camera.fields;bit=MLN_CAMERA_CENTER");
+  size_t stop_count;
+} mln_camera_route;
 mln_camera mln_camera_default(void);
 BIND("execution=query;result=mln_snapshot")
 mln_status mln_map_snapshot(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+BIND("execution=query;result=mln_camera_route")
+mln_status mln_map_camera_route(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 #endif
@@ -321,8 +329,8 @@ mln_status mln_map_set_label(
 #ifdef MLN_PROTOCOL_PLAN_NAMES
 // Names that the semantic plan derives once for every binding: a handle whose
 // operations begin with a prefix other than its type name, a record whose field
-// order is its meaning, and presence groups whose record name shares no prefix
-// with its bit constants.
+// order is its meaning, and a mask flag whose record name shares no prefix with
+// its bit constants.
 typedef uint64_t mln_pass_handle BIND(
   "kind=handle;release=mln_pass_close;dispose=mln_pass_close;prefix=mln_pass"
 );
@@ -339,20 +347,13 @@ typedef enum BIND("kind=bitmask") mln_frame_window_field : uint32_t {
   MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN = 1u << 0u,
   MLN_FRAME_WINDOW_FIELD_SCALE = 1u << 1u,
   MLN_FRAME_WINDOW_FIELD_LOCKED = 1u << 2u,
-  MLN_FRAME_WINDOW_FIELD_EXTENT = 1u << 3u,
 } mln_frame_window_field;
 typedef struct mln_frame_window {
   uint32_t size;
   uint32_t fields BIND("enum=mln_frame_window_field");
-  double x BIND(
-    "mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN;group_type=mln_point"
-  );
-  double y BIND(
-    "mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN;group_type=mln_point"
-  );
+  mln_point view_origin
+    BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN");
   double scale BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_SCALE");
-  double width BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_EXTENT");
-  double height BIND("mask=fields;bit=MLN_FRAME_WINDOW_FIELD_EXTENT");
 } mln_frame_window;
 mln_status mln_pass_set_window(
   mln_pass_handle pass, const mln_frame_window* window,

@@ -4,7 +4,6 @@ import os
 from dataclasses import replace
 
 from ..model import ModelError
-from ..semantic import ValuePlan
 from .go import doc, name, native_identifier
 
 
@@ -93,7 +92,7 @@ class Values:
             self.require(value.element, input)
         elif value.kind == "record":
             members = list(self.members(value))
-            names = [member for member, _, _, _ in members]
+            names = [member for member, _, _ in members]
             if len(names) != len(set(names)):
                 self.fail(value, "public field names collide")
             self.records[value.native] = value
@@ -102,9 +101,6 @@ class Values:
             for f in value.fields:
                 if f.public:
                     self.require(f.value, input)
-            for group in value.presence_groups:
-                if len(group.fields) > 1:
-                    self.require(self.group(value, group), input)
         elif value.kind == "union":
             if not value.tag:
                 self.fail(value, "union requires a discriminator")
@@ -157,52 +153,22 @@ class Values:
     def owner(self, native):
         return name(self.api.handles[native].stem) + "Handle"
 
-    def group(self, value, group):
-        if group.type:
-            return self.api.values[group.type]
-        prefix = os.path.commonprefix(group.fields).rsplit("_", 1)[0] + "_"
-        fields = tuple(
-            replace(
-                next(f for f in value.fields if f.name == n),
-                name=n.removeprefix(prefix),
-                presence=None,
-            )
-            for n in group.fields
-        )
-        return ValuePlan(
-            kind="record",
-            native=value.native + "_" + group.member,
-            ctype=value.ctype,
-            fields=fields,
-        )
-
     def members(self, value):
-        groups = {
-            n: g for g in value.presence_groups if len(g.fields) > 1 for n in g.fields
-        }
         for f in value.fields:
             if not f.public:
                 continue
             arena = self.arenas.get(value.native)
             if arena and f.name in {arena.offset, arena.length}:
                 continue
-            if f.name in groups:
-                group = groups[f.name]
-                if group.fields[0] != f.name:
-                    continue
-                member = name(group.member)
-                yield member, replace(self.group(value, group), nullable=True), f, group
-            else:
-                yield (
-                    name(f.name),
-                    replace(f.value, nullable=True)
-                    if f.presence and f.presence.mask
-                    else f.value,
-                    f,
-                    None,
-                )
+            yield (
+                name(f.name),
+                replace(f.value, nullable=True)
+                if f.presence and f.presence.mask
+                else f.value,
+                f,
+            )
         for flag in value.mask_flags:
-            yield name(flag.member), None, flag, None
+            yield name(flag.member), None, flag
 
     def copy(self, value, expr, scope="raw"):
         if expr.startswith("*"):
@@ -426,11 +392,9 @@ class Values:
                     doc(self.api, source.name, None)
                     if v is None
                     else doc(self.api, f"{native}.{source.name}", None)
-                    if group is None
-                    else ""
                 )
                 + f"{member} {self.type(v) if v else 'bool'}"
-                for member, v, source, group in members
+                for member, v, source in members
             ]
             if value.registration:
                 for member in value.registration.callbacks:
@@ -455,7 +419,7 @@ class Values:
                 continue
             if native in self.api.returned:
                 lines = []
-                for member, v, f, group in members:
+                for member, v, f in members:
                     if v and v.registration:
                         # A copy leaves a registration unset.
                         continue
@@ -464,17 +428,7 @@ class Values:
                             f"result.{member} = raw.{field(f.mask)} & C.{f.name} != 0"
                         )
                         continue
-                    if group:
-                        inner = self.group(value, group)
-                        body = "; ".join(
-                            f"inner.{name(child.name)} = {self.copy(child.value, 'raw.' + field(source))}"
-                            for child, source in zip(
-                                inner.fields, group.fields, strict=True
-                            )
-                        )
-                        convert = f"func() {public(inner.native)} {{ var inner {public(inner.native)}; {body}; return inner }}()"
-                    else:
-                        convert = self.copy(f.value, "raw." + field(f.name))
+                    convert = self.copy(f.value, "raw." + field(f.name))
                     if f.presence and f.presence.mask:
                         condition = (
                             f"raw.{field(f.presence.mask)} & C.{f.presence.bit} != 0"
@@ -484,11 +438,7 @@ class Values:
                                 f"if {condition} {{ result.{member} = {convert} }}"
                             )
                         else:
-                            copied = (
-                                public(inner.native)
-                                if group
-                                else self.type(replace(v, nullable=False))
-                            )
+                            copied = self.type(replace(v, nullable=False))
                             lines.append(
                                 f"result.{member} = bindingPresent({condition}, func() {copied} {{ return {convert} }})"
                             )
@@ -507,7 +457,7 @@ class Values:
                         )
                     elif f.role == "presence_mask":
                         lines.append(f"raw.{field(f.name)} = 0")
-                for member, v, f, group in members:
+                for member, v, f in members:
                     expr = "input." + member
                     if v is None:
                         lines.append(
@@ -530,29 +480,16 @@ class Values:
                             body = f"if {expr} == nil {{ raw.{field(v.tag)} = C.{v.empty_variant[0]} }} else {{ {body} }}"
                         lines.append(body)
                         continue
-                    if group:
-                        inner = self.group(value, group)
-                        body = "; ".join(
-                            self.native(
-                                child.value,
-                                expr + "." + name(child.name),
-                                "raw." + field(dest),
-                            )
-                            for child, dest in zip(
-                                inner.fields, group.fields, strict=True
-                            )
-                        )
-                    else:
-                        body = self.native(
-                            f.value,
-                            "(*" + expr + ")"
-                            if f.presence and f.presence.mask and v.kind != "array"
-                            else expr,
-                            "raw." + field(f.name),
-                        )
+                    body = self.native(
+                        f.value,
+                        "(*" + expr + ")"
+                        if f.presence and f.presence.mask and v.kind != "array"
+                        else expr,
+                        "raw." + field(f.name),
+                    )
                     if f.presence and f.presence.mask:
                         mask = f"raw.{field(f.presence.mask)} |= C.{f.presence.bit}"
-                        convert = None if group else self.converter(f.value)
+                        convert = self.converter(f.value)
                         if convert:
                             lines.append(
                                 f"bindingMasked(&raw.{field(f.presence.mask)}, C.{f.presence.bit}, &raw.{field(f.name)}, {expr}, arena, {convert})"
@@ -575,7 +512,7 @@ class Values:
             chunks.append(
                 f"type {typename} struct {{ value {public(native)}; scope *bindingScope }}"
             )
-            for member, v, _, _ in self.members(value):
+            for member, v, _ in self.members(value):
                 result = self.type(v) if v else "bool"
                 method = (
                     "Unsafe" + member

@@ -153,10 +153,6 @@ class Values:
             if not field.public:
                 continue
             self.supported(field.value, input=input)
-        for group in plan.presence_groups:
-            if len(group.fields) > 1:
-                grouped = self.group_value(plan, group)
-                self.records[grouped.native] = grouped
         self.records[plan.native] = plan
         if input:
             self.inputs[plan.native] = plan
@@ -193,25 +189,6 @@ class Values:
             self.fail(plan, "missing public value type")
         return result + (" | None" if optional(plan) else "")
 
-    def group_value(self, plan, group):
-        if group.type:
-            return self.api.values[group.type]
-        prefix = os.path.commonprefix(group.fields).rsplit("_", 1)[0] + "_"
-        fields = tuple(
-            replace(
-                next(f for f in plan.fields if f.name == name),
-                name=name.removeprefix(prefix),
-                presence=None,
-            )
-            for name in group.fields
-        )
-        return ValuePlan(
-            kind="record",
-            native=plan.native + "_" + group.member,
-            ctype=plan.ctype,
-            fields=fields,
-        )
-
     def variant_name(self, plan, field):
         parent = next(
             (
@@ -226,34 +203,17 @@ class Values:
         return public_name(parent.native) + public_name(field.name) + "Variant"
 
     def members(self, plan: ValuePlan):
-        grouped = {
-            name: group
-            for group in plan.presence_groups
-            if len(group.fields) > 1
-            for name in group.fields
-        }
         for field in plan.fields:
             if not field.public:
                 continue
-            if field.name in grouped:
-                group = grouped[field.name]
-                if field.name != group.fields[0]:
-                    continue
-                yield (
-                    group.member,
-                    replace(self.group_value(plan, group), nullable=True),
-                    field,
-                    group,
-                )
-            else:
-                value = (
-                    replace(field.value, nullable=True)
-                    if field.presence and field.presence.mask
-                    else field.value
-                )
-                yield field_name(field.name), value, field, None
+            value = (
+                replace(field.value, nullable=True)
+                if field.presence and field.presence.mask
+                else field.value
+            )
+            yield field_name(field.name), value, field
         for flag in plan.mask_flags:
-            yield flag.member, None, flag, None
+            yield flag.member, None, flag
 
     def copy(self, plan: ValuePlan, expr: str, *, scope: str = "value") -> str:
         """An expression that copies the C value `expr` into a Python object."""
@@ -469,7 +429,7 @@ class Values:
                 lines.append(
                     f"raw.{rust_field(field.name)} = {'false' if field.value.ctype.canonical in {'bool', '_Bool'} else '0'};"
                 )
-        for member, value, field, group in self.members(plan):
+        for member, value, field in self.members(plan):
             lines.append(f'let field = value.getattr("{member}")?;')
             if value is not None and value.kind == "union":
                 arms = []
@@ -490,23 +450,9 @@ class Values:
                     f"if field.extract::<bool>()? {{ raw.{rust_field(field.mask)} |= sys::{field.name}; }}"
                 )
                 continue
-            statements = []
-            if group:
-                gp = self.group_value(plan, group)
-                for child, dest in zip(
-                    [f for f in gp.fields if f.role == "value"],
-                    group.fields,
-                    strict=True,
-                ):
-                    statements.append(
-                        f"raw.{rust_field(dest)} = {self.input(child.value, f'field.getattr({child.name!r})?')};".replace(
-                            "'", '"'
-                        )
-                    )
-            else:
-                statements.append(
-                    f"raw.{rust_field(field.name)} = {self.input(field.value, 'field')};"
-                )
+            statements = [
+                f"raw.{rust_field(field.name)} = {self.input(field.value, 'field')};"
+            ]
             if field.presence and field.presence.mask:
                 statements.append(
                     f"raw.{rust_field(field.presence.mask)} |= sys::{field.presence.bit};"
@@ -613,7 +559,7 @@ class Values:
         name = plan.native
         rust, python = [], []
         fields, copies, public_copies = list(extra_fields), [], []
-        for member, value, field, group in self.members(plan):
+        for member, value, field in self.members(plan):
             arena = self.item_buffers.get(name)
             if arena and member in {arena.offset, arena.length}:
                 continue
@@ -633,19 +579,7 @@ class Values:
                 unset = "None" if optional(value) else public_name(value.native) + "()"
                 public_copies.append(f"{member}={unset}")
                 continue
-            if group:
-                group_value = self.group_value(plan, group)
-                inner = " ".join(
-                    f'inner.set_item("{f.name}", {self.copy(f.value, "value." + rust_field(source))})?;'
-                    for f, source in zip(
-                        [f for f in group_value.fields if f.role == "value"],
-                        group.fields,
-                        strict=True,
-                    )
-                )
-                copy = f"{{ let inner = PyDict::new(py); {inner} inner.into_any().unbind() }}"
-            else:
-                copy = self.copy(field.value, "value." + rust_field(field.name))
+            copy = self.copy(field.value, "value." + rust_field(field.name))
             if field.presence and field.presence.mask:
                 present = f"value.{rust_field(field.presence.mask)} & sys::{field.presence.bit} != 0"
                 copy = optional_copy(present, copy)

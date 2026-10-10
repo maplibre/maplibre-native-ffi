@@ -3304,9 +3304,13 @@ public data class StyleLayerResult(
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
  */
 public data class StyleSourceTileInfo(
+  /** Inline tile URL count. */
   public val tileCount: ULong = 0uL,
+  /** Minimum zoom. */
   public val minZoom: Double = 0.0,
+  /** Maximum zoom. */
   public val maxZoom: Double = 0.0,
+  /** One of `mln_style_tile_scheme`. */
   public val scheme: StyleTileScheme = StyleTileScheme(0u),
 )
 
@@ -3330,6 +3334,7 @@ public data class StyleSourceInfo(
   public val attributionSize: ULong? = null,
   /** URL byte length, meaningful when fields contains URL. */
   public val urlSize: ULong? = null,
+  /** Inline tile metadata, meaningful when fields contains TILEJSON. */
   public val tilejson: StyleSourceTileInfo? = null,
   /** Geographic bounds, meaningful when fields contains BOUNDS. */
   public val bounds: LatLngBounds? = null,

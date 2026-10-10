@@ -1034,9 +1034,7 @@ auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
   }
 
   if ((camera->fields & MLN_CAMERA_OPTION_CENTER) != 0U) {
-    const auto status = validate_lat_lng(
-      mln_lat_lng{.latitude = camera->latitude, .longitude = camera->longitude}
-    );
+    const auto status = validate_lat_lng(camera->center);
     if (status != MLN_STATUS_OK) {
       return status;
     }
@@ -1614,7 +1612,7 @@ auto from_native_edge_insets(const mln::EdgeInsets& insets) -> mln_edge_insets;
 auto to_native_camera(const mln_camera_options& camera) -> mln::CameraOptions {
   auto result = mln::CameraOptions{};
   if ((camera.fields & MLN_CAMERA_OPTION_CENTER) != 0U) {
-    result.withCenter(mln::LatLng{camera.latitude, camera.longitude});
+    result.withCenter(to_native_lat_lng(camera.center));
   }
   if ((camera.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0U) {
     result.withCenterAltitude(camera.center_altitude);
@@ -1648,8 +1646,7 @@ auto from_native_camera(const mln::CameraOptions& camera)
   auto result = mln::core::camera_options_default();
   if (camera.center) {
     result.fields |= MLN_CAMERA_OPTION_CENTER;
-    result.latitude = camera.center->latitude();
-    result.longitude = camera.center->longitude();
+    result.center = from_native_lat_lng(*camera.center);
   }
   if (camera.centerAltitude) {
     result.fields |= MLN_CAMERA_OPTION_CENTER_ALTITUDE;
@@ -2304,8 +2301,7 @@ auto camera_options_default() noexcept -> mln_camera_options {
   return mln_camera_options{
     .size = sizeof(mln_camera_options),
     .fields = 0,
-    .latitude = 0,
-    .longitude = 0,
+    .center = {.latitude = 0, .longitude = 0},
     .center_altitude = 0,
     .padding = {.top = 0, .left = 0, .bottom = 0, .right = 0},
     .anchor = {.x = 0, .y = 0},

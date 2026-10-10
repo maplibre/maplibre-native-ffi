@@ -31,7 +31,7 @@ def flattened(value, expression):
         and value.ctype.canonical not in {"float", "double"}
     ):
         return [expression]
-    if value.kind == "record" and not value.presence_groups:
+    if value.kind == "record":
         result = []
         for field in value.fields:
             if field.role != "value" or field.presence:

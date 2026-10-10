@@ -91,7 +91,6 @@ FIELD_KEYS = COMMON_KEYS | frozenset(
         "variant",
         "empty_variant",
         "kind",
-        "group_type",
         "stride",
         "item_name",
         "item_buffer",
@@ -846,6 +845,21 @@ def validate(api: Api) -> None:
         )
         if "fields" in record.metadata:
             errors.extend(ordered_errors(record, record.metadata["fields"], context))
+        # A presence bit guards one member, so a value that several fields
+        # describe together is a record embedded under that bit. An array's
+        # count names no bit: the array's own bit covers it. A member of
+        # another record may reuse the bit through a longer mask path.
+        guarded = set()
+        for field in record.fields:
+            if "mask" not in field.metadata:
+                continue
+            presence = (field.metadata["mask"], field.metadata.get("bit"))
+            if presence in guarded:
+                errors.append(
+                    f"{field.location}: {record.name}.{field.name}: presence bit "
+                    f"{presence[1]} guards more than one member; embed a record"
+                )
+            guarded.add(presence)
         for field in record.fields:
             fcontext = f"{field.location}: {record.name}.{field.name}"
             errors.extend(
@@ -980,35 +994,6 @@ def validate(api: Api) -> None:
                     errors.append(
                         f"{fcontext}: tagged union variants must have distinct values"
                     )
-            if "group_type" in field.metadata:
-                group_type = api.records_by_name.get(field.metadata["group_type"])
-                if group_type is None or "mask" not in field.metadata:
-                    errors.append(
-                        f"{fcontext}: group_type requires a record and masked presence"
-                    )
-                else:
-                    group_fields = [
-                        member
-                        for member in record.fields
-                        if member.metadata.get("mask") == field.metadata.get("mask")
-                        and member.metadata.get("bit") == field.metadata.get("bit")
-                    ]
-                    if any(
-                        member.metadata.get("group_type") != group_type.name
-                        for member in group_fields
-                    ):
-                        errors.append(
-                            f"{fcontext}: presence group members must agree on group_type"
-                        )
-                    if [
-                        (member.name, member.type.canonical) for member in group_fields
-                    ] != [
-                        (member.name, member.type.canonical)
-                        for member in group_type.fields
-                    ]:
-                        errors.append(
-                            f"{fcontext}: group_type fields must match presence group names and types"
-                        )
             if (
                 field.metadata.get("kind") == "size"
                 and field.type.canonical != "unsigned int"

@@ -36,19 +36,8 @@ class PlanNameTests(unittest.TestCase):
             (True, False),
         )
 
-    def test_presence_members_come_from_the_bit_enum(self):
+    def test_mask_flag_members_come_from_the_bit_enum(self):
         window = self.bind().values["mln_frame_window"]
-        self.assertEqual(
-            {
-                group.mask + ":" + str(group.bit): group.member
-                for group in window.presence_groups
-            },
-            {
-                "fields:MLN_FRAME_WINDOW_FIELD_VIEW_ORIGIN": "view_origin",
-                "fields:MLN_FRAME_WINDOW_FIELD_SCALE": "scale",
-                "fields:MLN_FRAME_WINDOW_FIELD_EXTENT": "extent",
-            },
-        )
         self.assertEqual([flag.member for flag in window.mask_flags], ["locked"])
 
     def test_ordered_fields_are_declared_on_a_record_of_plain_values(self):

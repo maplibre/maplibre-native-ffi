@@ -163,9 +163,6 @@ class Values:
         else:
             for field in self.fields(value):
                 self.check(field.value)
-        for group in value.presence_groups:
-            if len(group.fields) > 1 and group.type:
-                self.check(self.bound.values[group.type])
         self.used[value.native] = value
 
     def port_callbacks(self, value):
@@ -528,38 +525,13 @@ class Values:
         return result
 
     def members(self, value):
-        fields = self.fields(value)
-        grouped = {
-            name: group
-            for group in value.presence_groups
-            if len(group.fields) > 1
-            for name in group.fields
-        }
-        emitted = set()
+        """The public members of a record: (name, type, field)."""
         result = []
-        for field in fields:
-            group = grouped.get(field.name)
-            if group:
-                if group.mask in emitted:
-                    continue
-                emitted.add(group.mask)
-                name = identifier(group.member)
-                children = [f for f in fields if f.name in group.fields]
-                typ = (
-                    public_name(group.type)
-                    if group.type
-                    else "({"
-                    + ", ".join(
-                        f"{self.public(f.value)} {identifier(f.name)}" for f in children
-                    )
-                    + "})"
-                )
-                result.append((name, typ + "?", children, group))
-            else:
-                typ = self.public(field.value)
-                if field.presence and field.presence.mask and not typ.endswith("?"):
-                    typ += "?"
-                result.append((identifier(field.name), typ, [field], None))
+        for field in self.fields(value):
+            typ = self.public(field.value)
+            if field.presence and field.presence.mask and not typ.endswith("?"):
+                typ += "?"
+            result.append((identifier(field.name), typ, field))
         return result
 
     def enum_constant(self, bit):
@@ -600,12 +572,10 @@ class Values:
             if any(f.value.kind == "union" for f in value.fields):
                 return None
             args = []
-            for name, typ, children, group in self.members(value):
+            for _name, typ, field in self.members(value):
                 if typ.endswith("?"):
                     continue
-                if group:
-                    return None
-                default = self.field_default(children[0])
+                default = self.field_default(field)
                 if default is None:
                     return None
                 if value.ordered:
@@ -709,12 +679,7 @@ class Values:
             field.name: (callback, payload)
             for _, field, callback, payload in self.port_callbacks(value)
         }
-        for name, typ, children, group in self.members(value):
-            if group or len(children) != 1:
-                raise Unsupported(
-                    "port descriptor field grouping needs recursive preparation"
-                )
-            field = children[0]
+        for name, typ, field in self.members(value):
             fields.append(f"  final {typ} {name};")
             default = self.field_default(field)
             args.append(
@@ -773,9 +738,9 @@ class Values:
         )
         read_args = ", ".join(
             f"{name}: null"
-            if children[0].name in ports
-            else f"{name}: {self.copy(children[0].value, 'source.' + children[0].name)}"
-            for name, _, children, _ in self.members(value)
+            if field.name in ports
+            else f"{name}: {self.copy(field.value, 'source.' + field.name)}"
+            for name, _, field in self.members(value)
         )
         reader = (
             f"{public} _read{public}(raw.{value.native} source) => {public}({read_args});\n"
@@ -1072,13 +1037,9 @@ class Values:
             for flag in value.mask_flags:
                 flags.append((identifier(flag.member), flag))
             fields = "\n".join(
-                (
-                    doc(self.bound, f"{value.native}.{children[0].name}", "  ")
-                    if not group
-                    else ""
-                )
+                doc(self.bound, f"{value.native}.{field.name}", "  ")
                 + f"  final {typ} {name};"
-                for name, typ, children, group in members
+                for name, typ, field in members
             )
             fields += "\n" + "\n".join(
                 f"{doc(self.bound, flag.name, '  ')}  final bool {name};"
@@ -1087,8 +1048,8 @@ class Values:
             # A record whose field order is its meaning constructs positionally.
             positional = value.ordered
             args, initializers = [], []
-            for name, typ, children, group in members:
-                default = self.field_default(children[0]) if not group else None
+            for name, typ, field in members:
+                default = self.field_default(field)
                 copied = typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
                 if copied:
                     args.append(
@@ -1116,7 +1077,7 @@ class Values:
             if not positional:
                 signature = "{" + signature + "}"
             compared = ", ".join(
-                [name for name, _, _, _ in members] + [name for name, _ in flags]
+                [name for name, _, _ in members] + [name for name, _ in flags]
             )
             declarations.append(
                 f"final class {public} extends _Value {{\n  {'const ' if not initializers else ''}{public}({signature}){' : ' + ', '.join(initializers) if initializers else ''};\n{fields}\n  @override List<Object?> get _members => [{compared}];\n}}\n"
@@ -1147,85 +1108,67 @@ class Values:
                     f"  if (value.{name}) {{ {self.set_present(flag.mask, flag.name)} }}"
                 )
                 read.append(f"    {name}: {self.present(flag.mask, flag.name)},")
-            for name, typ, children, group in members:
-                presence = group or children[0].presence
+            for name, typ, field in members:
+                presence = field.presence
                 optional = presence and presence.mask
-                source = f"value.{name}" + ("!" if optional else "")
+                expression = f"value.{name}" + ("!" if optional else "")
                 if optional:
                     write += [
                         f"  if (value.{name} != null) {{",
                         "    " + self.set_present(presence.mask, presence.bit),
                     ]
-                decoded = []
-                for field in children:
-                    expression = source + (
-                        f".{identifier(field.name)}" if group else ""
+                native_field = f"result.ref.{field.name}"
+                capture = None
+                if (
+                    field.value.kind == "buffer"
+                    and field.value.buffer_form != "view"
+                    and field.value.length not in {None, "nul", "1"}
+                ):
+                    view = (
+                        f"nativeStringView({expression}, arena).value"
+                        if field.value.encoding == "utf8"
+                        else f"nativeBufferView({expression}, arena)"
                     )
-                    native_field = f"result.ref.{field.name}"
-                    if (
-                        field.value.kind == "buffer"
-                        and field.value.buffer_form != "view"
-                        and field.value.length not in {None, "nul", "1"}
-                    ):
-                        view = (
-                            f"nativeStringView({expression}, arena).value"
-                            if field.value.encoding == "utf8"
-                            else f"nativeBufferView({expression}, arena)"
-                        )
-                        write += [
-                            f"  final bytes{name} = {view};",
-                            f"  {native_field} = bytes{name}.data.cast();",
-                            f"  result.ref.{field.value.length} = bytes{name}.size;",
-                        ]
-                    elif field.value.kind == "array":
-                        child = field.value.element
-                        # A null list leaves the zeroed pointer and count.
-                        items = expression + "!" if field.value.nullable else expression
+                    write += [
+                        f"  final bytes{name} = {view};",
+                        f"  {native_field} = bytes{name}.data.cast();",
+                        f"  result.ref.{field.value.length} = bytes{name}.size;",
+                    ]
+                elif field.value.kind == "array":
+                    child = field.value.element
+                    # A null list leaves the zeroed pointer and count.
+                    items = expression + "!" if field.value.nullable else expression
+                    lines = [
+                        f"  {native_field} = arena<{self.ffi(child)}>({items}.isEmpty ? 1 : {items}.length);",
+                        f"  result.ref.{field.value.length} = {items}.length;",
+                        f"  for (var index = 0; index < {items}.length; index++) {{ {native_field}[index] = {self.native(child, items + '[index]')}; }}",
+                    ]
+                    if field.value.nullable:
                         lines = [
-                            f"  {native_field} = arena<{self.ffi(child)}>({items}.isEmpty ? 1 : {items}.length);",
-                            f"  result.ref.{field.value.length} = {items}.length;",
-                            f"  for (var index = 0; index < {items}.length; index++) {{ {native_field}[index] = {self.native(child, items + '[index]')}; }}",
+                            f"  if ({expression} != null) {{",
+                            *lines,
+                            "  }",
                         ]
-                        if field.value.nullable:
-                            lines = [
-                                f"  if ({expression} != null) {{",
-                                *lines,
-                                "  }",
-                            ]
-                        write += lines
-                    elif deferred and field.name == deferred[0].name:
-                        write += self.write_deferred_field(
-                            field, deferred[1], expression
-                        )
-                        decoded.append(
-                            f"{identifier(field.name)}: throwInvalidState('cannot copy a registered native callback')"
-                        )
-                        continue
-                    else:
-                        write.append(
-                            f"  {native_field} = {self.native(field.value, expression)};"
-                        )
-                    copied = self.copy(
+                    write += lines
+                elif deferred and field.name == deferred[0].name:
+                    write += self.write_deferred_field(field, deferred[1], expression)
+                    capture = (
+                        "throwInvalidState('cannot copy a registered native callback')"
+                    )
+                else:
+                    write.append(
+                        f"  {native_field} = {self.native(field.value, expression)};"
+                    )
+                if capture is None:
+                    capture = self.copy(
                         field.value,
                         "source." + field.name,
                         "source." + str(field.value.length),
                     )
                     if field.value.kind == "array" and field.value.nullable:
-                        copied = f"source.{field.name} == nullptr ? null : {copied}"
-                    decoded.append(f"{identifier(field.name)}: {copied}")
+                        capture = f"source.{field.name} == nullptr ? null : {capture}"
                 if optional:
                     write.append("  }")
-                if group and group.type and self.bound.values[group.type].ordered:
-                    decoded = [item.split(": ", 1)[1] for item in decoded]
-                capture = (
-                    (public_name(group.type) if group and group.type else "")
-                    + "("
-                    + ", ".join(decoded)
-                    + ",)"
-                    if group
-                    else decoded[0].split(": ", 1)[1]
-                )
-                if optional:
                     capture = f"{self.present(presence.mask, presence.bit)} ? {capture} : null"
                 read.append(f"    {name}: {capture},")
             write += ["  return result;", "}"]

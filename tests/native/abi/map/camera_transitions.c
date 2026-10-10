@@ -8,8 +8,8 @@ static mln_camera_options test_camera(void) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
                   MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
-  camera.latitude = 37.7749;
-  camera.longitude = -122.4194;
+  camera.center.latitude = 37.7749;
+  camera.center.longitude = -122.4194;
   camera.zoom = 11.0;
   camera.bearing = 12.0;
   camera.pitch = 30.0;

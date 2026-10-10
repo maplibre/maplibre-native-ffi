@@ -657,10 +657,8 @@ def render_scoped_views(bound, generated, values):
             continue
         emitted.add(public)
         getters = []
-        for name, typ, children, group in values.members(value):
-            native_pointer = (
-                len(children) == 1 and children[0].value.kind == "native_pointer"
-            )
+        for name, typ, field in values.members(value):
+            native_pointer = field.value.kind == "native_pointer"
             result = (
                 f"ScopedNativePointer(_value.{name}.address, checkValid: _scope.checkActive, debugName: '{public}.{name}')"
                 if native_pointer

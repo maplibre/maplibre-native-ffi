@@ -1575,14 +1575,7 @@ type CameraOptions struct {
 
 func copyCameraOptions(raw C.mln_camera_options) CameraOptions {
 	var result CameraOptions
-	result.Center = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER != 0, func() LatLng {
-		return func() LatLng {
-			var inner LatLng
-			inner.Latitude = float64(raw.latitude)
-			inner.Longitude = float64(raw.longitude)
-			return inner
-		}()
-	})
+	result.Center = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER != 0, func() LatLng { return copyLatLng(raw.center) })
 	result.CenterAltitude = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0, func() float64 { return float64(raw.center_altitude) })
 	result.Padding = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_PADDING != 0, func() EdgeInsets { return copyEdgeInsets(raw.padding) })
 	result.Anchor = bindingPresent(raw.fields&C.MLN_CAMERA_OPTION_ANCHOR != 0, func() ScreenPoint { return copyScreenPoint(raw.anchor) })
@@ -1598,11 +1591,7 @@ func nativeCameraOptions(input CameraOptions, arena *bindingArena) C.mln_camera_
 	raw := C.mln_camera_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
-	if input.Center != nil {
-		raw.latitude = C.double(input.Center.Latitude)
-		raw.longitude = C.double(input.Center.Longitude)
-		raw.fields |= C.MLN_CAMERA_OPTION_CENTER
-	}
+	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_CENTER, &raw.center, input.Center, arena, nativeLatLng)
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_CENTER_ALTITUDE, &raw.center_altitude, input.CenterAltitude, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_PADDING, &raw.padding, input.Padding, arena, nativeEdgeInsets)
 	bindingMasked(&raw.fields, C.MLN_CAMERA_OPTION_ANCHOR, &raw.anchor, input.Anchor, arena, nativeScreenPoint)
@@ -4401,7 +4390,8 @@ type StyleSourceInfo struct {
 	// fields contains ATTRIBUTION.
 	AttributionSize *uint
 	// URL byte length, meaningful when fields contains URL.
-	UrlSize  *uint
+	UrlSize *uint
+	// Inline tile metadata, meaningful when fields contains TILEJSON.
 	Tilejson *StyleSourceTileInfo
 	// Geographic bounds, meaningful when fields contains BOUNDS.
 	Bounds *LatLngBounds
@@ -4420,16 +4410,7 @@ func copyStyleSourceInfo(raw C.mln_style_source_info) StyleSourceInfo {
 	result.IsVolatile = bool(raw.is_volatile)
 	result.AttributionSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_ATTRIBUTION != 0, func() uint { return uint(raw.attribution_size) })
 	result.UrlSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_URL != 0, func() uint { return uint(raw.url_size) })
-	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo {
-		return func() StyleSourceTileInfo {
-			var inner StyleSourceTileInfo
-			inner.TileCount = uint(raw.tile_count)
-			inner.MinZoom = float64(raw.min_zoom)
-			inner.MaxZoom = float64(raw.max_zoom)
-			inner.Scheme = StyleTileScheme(raw.scheme)
-			return inner
-		}()
-	})
+	result.Tilejson = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILEJSON != 0, func() StyleSourceTileInfo { return copyStyleSourceTileInfo(raw.tilejson) })
 	result.Bounds = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_BOUNDS != 0, func() LatLngBounds { return copyLatLngBounds(raw.bounds) })
 	result.TileSize = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_TILE_SIZE != 0, func() uint32 { return uint32(raw.tile_size) })
 	result.VectorEncoding = bindingPresent(raw.fields&C.MLN_STYLE_SOURCE_INFO_VECTOR_ENCODING != 0, func() StyleVectorTileEncoding { return StyleVectorTileEncoding(raw.vector_encoding) })
@@ -4474,10 +4455,14 @@ func copyStyleSourceResult(raw C.mln_style_source_result) StyleSourceResult {
 // See mln_style_source_tile_info in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html
 type StyleSourceTileInfo struct {
+	// Inline tile URL count.
 	TileCount uint
-	MinZoom   float64
-	MaxZoom   float64
-	Scheme    StyleTileScheme
+	// Minimum zoom.
+	MinZoom float64
+	// Maximum zoom.
+	MaxZoom float64
+	// One of mln_style_tile_scheme.
+	Scheme StyleTileScheme
 }
 
 func copyStyleSourceTileInfo(raw C.mln_style_source_tile_info) StyleSourceTileInfo {

@@ -279,27 +279,52 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
             FieldInitial("256", 256),
         )
 
-    def test_mask_group_preserves_joint_presence(self):
+    def test_a_presence_bit_guards_one_member_of_a_record(self):
         source = """
 typedef enum BIND("kind=bitmask") fields : unsigned { CENTER = 1, ZOOM = 2 } fields;
 typedef struct options {
   unsigned fields BIND("enum=fields");
   double latitude BIND("mask=fields;bit=CENTER");
-  double longitude BIND("mask=fields;bit=CENTER");
-  double zoom BIND("mask=fields;bit=ZOOM");
+  double longitude BIND("mask=fields;bit=ZOOM");
 } options;
 mln_status write_options(const options *value, mln_diagnostic *out_diagnostic);
 """
         api = bind(self.parse(source), require_complete=True)
         value = api.operations[0].inputs[0].value.element
-        self.assertEqual(value.presence_groups[0].fields, ("latitude", "longitude"))
         self.assertEqual(value.fields[0].role, "presence_mask")
         self.assertEqual(value.fields[0].value.enum_kind, "bitmask")
+        with self.assertRaisesRegex(
+            ModelError,
+            r"options\.longitude: presence bit CENTER guards more than one "
+            "member; embed a record",
+        ):
+            bind(
+                self.parse(source.replace("bit=ZOOM", "bit=CENTER")),
+                require_complete=True,
+            )
         with self.assertRaisesRegex(ModelError, "both mask and bit"):
             bind(
                 self.parse(source.replace("mask=fields;bit=ZOOM", "mask=fields")),
                 require_complete=True,
             )
+
+    def test_a_nested_presence_bit_guards_a_member_of_each_record(self):
+        # The route reuses the camera's bit through the mask path
+        # camera.fields, as a source result reuses its info's bits.
+        api = bind(parse(groups=("presence_mask",)), require_complete=True)
+        route = api.values["mln_camera_route"]
+        stops = next(field for field in route.fields if field.name == "stops")
+        center = next(
+            field for field in api.values["mln_camera"].fields if field.name == "center"
+        )
+        self.assertEqual(
+            (stops.presence.mask, stops.presence.bit),
+            ("camera.fields", "MLN_CAMERA_CENTER"),
+        )
+        self.assertEqual(
+            (center.presence.mask, center.presence.bit),
+            ("fields", "MLN_CAMERA_CENTER"),
+        )
 
     def test_copied_values_hold_registrations_only_in_defaults(self):
         source = """

@@ -82,17 +82,6 @@ class DecisionPlan:
 
 
 @dataclass(frozen=True)
-class PresenceGroup:
-    mask: str
-    bit: str
-    fields: tuple[str, ...]
-    type: str | None = None
-    # The group's public member name, from its presence bit; see
-    # `presence_member`.
-    member: str = ""
-
-
-@dataclass(frozen=True)
 class MaskFlag:
     mask: str
     name: str
@@ -150,7 +139,6 @@ class ValuePlan:
     default: str | None = None
     tag: str | None = None
     empty_variant: tuple[str, int] | None = None
-    presence_groups: tuple[PresenceGroup, ...] = ()
     mask_flags: tuple[MaskFlag, ...] = ()
     registration: RegistrationDescriptorPlan | None = None
     response: CallbackResponsePlan | None = None
@@ -524,12 +512,6 @@ def enum_member_prefix(constants) -> str:
     return os.path.commonprefix(names).rsplit("_", 1)[0] + "_" if names else ""
 
 
-def presence_member(group_bit: str, enum_constants) -> str:
-    """Name a presence group after its bit constant, without the prefix that
-    its enum's constants share."""
-    return group_bit.removeprefix(enum_member_prefix(enum_constants)).lower()
-
-
 SCALAR_CANONICAL_TYPES = frozenset(
     {
         "void",
@@ -628,13 +610,6 @@ class Binder:
             and len(release.parameters) == 2
             and is_completion(release.parameters[1].type)
         )
-
-    def enum_constants(self, constant: str) -> tuple[str, ...]:
-        """The constants of the enum that declares `constant`."""
-        for enum in self.api.enums:
-            if any(item.name == constant for item in enum.values):
-                return tuple(item.name for item in enum.values)
-        return ()
 
     def scalar_carrier(self, type_: CType) -> str:
         """Preserve portable integer typedefs before Clang's host ABI expansion."""
@@ -884,34 +859,6 @@ class Binder:
                         None,
                     ),
                     ordered=record_metadata.get("fields") == "ordered",
-                    presence_groups=tuple(
-                        PresenceGroup(
-                            mask,
-                            bit,
-                            tuple(
-                                member.name
-                                for member in fields
-                                if member.presence
-                                and member.presence.mask == mask
-                                and member.presence.bit == bit
-                            ),
-                            next(
-                                (
-                                    member.metadata.get("group_type")
-                                    for member in record.fields
-                                    if member.metadata.get("mask") == mask
-                                    and member.metadata.get("bit") == bit
-                                ),
-                                None,
-                            ),
-                            presence_member(bit, self.enum_constants(bit)),
-                        )
-                        for mask, bit in dict.fromkeys(
-                            (member.presence.mask, member.presence.bit)
-                            for member in fields
-                            if member.presence and member.presence.mask
-                        )
-                    ),
                     response=self.response(record.name)
                     if record_metadata.get("kind") == "callback_response"
                     else None,
@@ -953,22 +900,6 @@ class Binder:
                     **common,
                 )
                 self.values[name] = value
-                for group in value.presence_groups:
-                    if group.type and group.type not in self.values:
-                        grouped = self.typedefs.get(group.type)
-                        grouped_type = (
-                            CType(
-                                "typedef",
-                                group.type,
-                                grouped.type.canonical,
-                                group.type,
-                            )
-                            if grouped
-                            else CType(
-                                "record", group.type, "struct " + group.type, group.type
-                            )
-                        )
-                        self.value(grouped_type, {}, context + " presence group")
                 return value
             finally:
                 self.resolving.remove(name)
@@ -1400,9 +1331,6 @@ class Binder:
                     f"{path}.{member.name}",
                     field=value.kind == "record" and member.presence is None,
                 )
-            for group in value.presence_groups:
-                if group.type:
-                    visit(self.values[group.type], path)
 
         for parameter in parameters:
             visit(parameter.value, f"{context} parameter {parameter.name}")

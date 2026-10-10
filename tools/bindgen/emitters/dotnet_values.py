@@ -195,9 +195,6 @@ class Values:
                         f"{plan.native}.{field.name}: unsupported presence expression"
                     )
             self.supported(field.value)
-        for group in plan.presence_groups:
-            if group.type:
-                self.record(group.type)
         self.plans[plan.native] = plan
 
     def fields(self, plan: ValuePlan) -> tuple[FieldPlan, ...]:
@@ -229,63 +226,17 @@ class Values:
             )
         return fields
 
-    def members(self, plan: ValuePlan) -> tuple[tuple[str, tuple[FieldPlan, ...]], ...]:
-        fields = self.fields(plan)
-        groups = {
-            (group.mask, group.bit): group.fields
-            for group in plan.presence_groups
-            if len(group.fields) > 1
-        }
-        emitted = set()
-        members = []
-        for field in fields:
-            key = (
-                (field.presence.mask, field.presence.bit)
-                if field.presence and field.presence.mask
-                else None
-            )
-            if key in groups:
-                if key in emitted:
-                    continue
-                emitted.add(key)
-                name = pascal(
-                    next(
-                        group.member
-                        for group in plan.presence_groups
-                        if (group.mask, group.bit) == key
-                    )
-                )
-                members.append(
-                    (name, tuple(item for item in fields if item.name in groups[key]))
-                )
-            else:
-                members.append((pascal(field.name), (field,)))
-        return tuple(members)
+    def members(self, plan: ValuePlan) -> tuple[tuple[str, FieldPlan], ...]:
+        return tuple((pascal(field.name), field) for field in self.fields(plan))
 
-    def member_type(
-        self, plan: ValuePlan, name: str, fields: tuple[FieldPlan, ...]
-    ) -> str:
-        group = next(
-            (
-                group
-                for group in plan.presence_groups
-                if group.fields == tuple(field.name for field in fields)
-            ),
-            None,
-        )
-        if fields[0].value.kind == "union":
+    def member_type(self, plan: ValuePlan, name: str, field: FieldPlan) -> str:
+        if field.value.kind == "union":
             return (
                 public_name(plan.native)
                 if self.union_only(plan)
                 else f"{public_name(plan.native)}.{name}Value"
             )
-        if group and group.type:
-            return public_name(group.type)
-        return (
-            f"{public_name(plan.native)}.{name}Value"
-            if len(fields) > 1
-            else self.public_type(fields[0].value)
-        )
+        return self.public_type(field.value)
 
     def public_type(self, plan: ValuePlan) -> str:
         if plan.kind == "handle":
@@ -553,69 +504,58 @@ class Values:
             return ""
         values = []
         members = self.members(plan)
-        for name, fields in members:
-            copied = []
-            for field in fields:
-                if (
-                    item_buffer := self.item_buffers.get(plan.native)
-                ) and field.name == item_buffer.field:
-                    copied.append("message")
-                elif field.value.stride:
-                    copied.append(
-                        f"Copy{public_name(plan.native)}{pascal(field.name)}(value)"
-                    )
-                elif field.value.registration or (
-                    plan.registration and field.value.kind == "callback"
-                ):
-                    # Native never returns callbacks, so a copy leaves them
-                    # unset.
-                    copied.append("default")
-                elif field.value.kind == "union":
-                    union = field.value
-                    tag = next(item for item in plan.fields if item.name == union.tag)
-                    arms = [
-                        f"({self.native_type(tag.value)}){self.constant(variant.presence.variant)} => new {self.member_type(plan, name, fields)}.{pascal(variant.name)}({self.copy(variant.value, f'value.{member(field.name)}.{member(variant.name)}')})"
-                        for variant in union.fields
-                    ]
-                    if union.empty_variant:
-                        arms.append(
-                            f"({self.native_type(tag.value)}){self.constant(union.empty_variant[0])} => new {self.member_type(plan, name, fields)}.None()"
-                        )
-                    raw_bytes = (
-                        f"NativeCallScope.CopyValueBytes(value.{member(field.name)})"
-                    )
-                    if plan.native in self.item_buffers:
-                        offset = f"(nuint)Marshal.OffsetOf<{plan.native}>(nameof({plan.native}.{member(field.name)}))"
-                        raw_bytes = f"record == null ? {raw_bytes} : NativeCallScope.CopyArray<byte>(record + {offset}, recordSize - {offset})"
+        for name, field in members:
+            if (
+                item_buffer := self.item_buffers.get(plan.native)
+            ) and field.name == item_buffer.field:
+                expression = "message"
+            elif field.value.stride:
+                expression = (
+                    f"Copy{public_name(plan.native)}{pascal(field.name)}(value)"
+                )
+            elif field.value.registration or (
+                plan.registration and field.value.kind == "callback"
+            ):
+                # Native never returns callbacks, so a copy leaves them
+                # unset.
+                expression = "default"
+            elif field.value.kind == "union":
+                union = field.value
+                tag = next(item for item in plan.fields if item.name == union.tag)
+                arms = [
+                    f"({self.native_type(tag.value)}){self.constant(variant.presence.variant)} => new {self.member_type(plan, name, field)}.{pascal(variant.name)}({self.copy(variant.value, f'value.{member(field.name)}.{member(variant.name)}')})"
+                    for variant in union.fields
+                ]
+                if union.empty_variant:
                     arms.append(
-                        f"_ => new {self.member_type(plan, name, fields)}.Unknown(({self.unknown_tag_type(tag.value)})value.{member(union.tag)}, {raw_bytes})"
+                        f"({self.native_type(tag.value)}){self.constant(union.empty_variant[0])} => new {self.member_type(plan, name, field)}.None()"
                     )
-                    copied.append(
-                        f"value.{member(union.tag)} switch {{ " + ", ".join(arms) + " }"
-                    )
-                else:
-                    copied.append(
-                        self.copy(
-                            field.value,
-                            f"value.{member(field.name)}",
-                            f"value.{member(field.value.length)}"
-                            if field.value.length
-                            else None,
-                        )
-                    )
-            expression = (
-                f"new {self.member_type(plan, name, fields)}({', '.join(copied)})"
-                if len(fields) > 1
-                else copied[0]
-            )
-            presence = fields[0].presence
+                raw_bytes = (
+                    f"NativeCallScope.CopyValueBytes(value.{member(field.name)})"
+                )
+                if plan.native in self.item_buffers:
+                    offset = f"(nuint)Marshal.OffsetOf<{plan.native}>(nameof({plan.native}.{member(field.name)}))"
+                    raw_bytes = f"record == null ? {raw_bytes} : NativeCallScope.CopyArray<byte>(record + {offset}, recordSize - {offset})"
+                arms.append(
+                    f"_ => new {self.member_type(plan, name, field)}.Unknown(({self.unknown_tag_type(tag.value)})value.{member(union.tag)}, {raw_bytes})"
+                )
+                expression = (
+                    f"value.{member(union.tag)} switch {{ " + ", ".join(arms) + " }"
+                )
+            else:
+                expression = self.copy(
+                    field.value,
+                    f"value.{member(field.name)}",
+                    f"value.{member(field.value.length)}"
+                    if field.value.length
+                    else None,
+                )
+            presence = field.presence
             if presence and presence.mask:
                 condition = self.has_bit(plan, presence.mask, presence.bit)
                 expression = f"{condition} ? {expression} : null"
             values.append(expression)
-        arrays = {
-            name: self.array_member(plan, name, fields) for name, fields in members
-        }
+        arrays = {name: self.array_member(plan, name, field) for name, field in members}
         if self.union_only(plan):
             copied = values[0]
         elif any(
@@ -629,7 +569,7 @@ class Values:
                         if arrays[name][0]
                         else f"{name} = {value}"
                     )
-                    for (name, fields), value in zip(members, values, strict=True)
+                    for (name, _), value in zip(members, values, strict=True)
                 )
                 + "".join(
                     f", {self.flag_name(flag)} = {self.has_bit(plan, flag.mask, flag.name)}"
@@ -683,15 +623,13 @@ class Values:
         need no check, because their storage reads back an empty array.
         """
         checks = []
-        for name, fields in self.members(plan):
-            value = fields[0].value
-            if (
-                len(fields) != 1
-                or value.kind in {"callback", "union"}
-                or (fields[0].presence and fields[0].presence.mask)
+        for name, field in self.members(plan):
+            value = field.value
+            if value.kind in {"callback", "union"} or (
+                field.presence and field.presence.mask
             ):
                 continue
-            type_ = self.member_type(plan, name, fields)
+            type_ = self.member_type(plan, name, field)
             reference = type_ == "string" or (
                 value.kind == "record" and self.declares_class(value)
             )
@@ -757,25 +695,25 @@ class Values:
                     f"            native.{member(field.name)} = value.{pascal(field.name)} is null ? null : &Invoke{public_name(plan.native)}{pascal(field.name)};"
                 )
             lines.append("        }")
-        for name, fields in self.members(plan):
-            if fields[0].value.kind == "callback":
+        for name, field in self.members(plan):
+            if field.value.kind == "callback":
                 continue
-            array, optional = self.array_member(plan, name, fields)
+            array, optional = self.array_member(plan, name, field)
             expression = (
                 "value"
                 if self.union_only(plan)
                 else f"value.{name}Storage{'?' if optional else ''}.Items"
-                if array and len(fields) == 1
+                if array
                 else f"value.{name}"
             )
-            presence = fields[0].presence
+            presence = field.presence
             indent = "        "
             if presence and presence.mask:
                 if "." in presence.mask:
                     lines.append(
                         f"        native.{member(presence.mask)} &= ~{self.bit(plan, presence.mask, presence.bit)};"
                     )
-                if put := self.put(plan, presence, fields, expression):
+                if put := self.put(plan, presence, field, expression):
                     lines.append(put)
                     continue
                 local = f"field{name}"
@@ -793,60 +731,7 @@ class Values:
                 local = f"field{name}"
                 lines.append(f"        var {local} = {expression};")
                 expression = local
-            for field in fields:
-                if field.value.kind == "union":
-                    tag = next(
-                        item for item in plan.fields if item.name == field.value.tag
-                    )
-                    lines.append(f"{indent}switch ({expression})")
-                    lines.append(f"{indent}{{")
-                    for variant in field.value.fields:
-                        lines.extend(
-                            [
-                                f"{indent}    case {self.member_type(plan, name, fields)}.{pascal(variant.name)} selected:",
-                                f"{indent}        native.{member(field.value.tag)} = ({self.native_type(tag.value)}){self.constant(variant.presence.variant)};",
-                                f"{indent}        native.{member(field.name)}.{member(variant.name)} = {self.encode(variant.value, 'selected.Value')};",
-                                f"{indent}        break;",
-                            ]
-                        )
-                    lines.append(
-                        f'{indent}    default: throw new ArgumentException("A union variant is required.", nameof(value));'
-                    )
-                    lines.append(f"{indent}}}")
-                    continue
-                source = (
-                    f"{expression}.{pascal(field.name)}"
-                    if len(fields) > 1
-                    else expression
-                )
-                if (
-                    field.value.kind == "buffer"
-                    and field.value.ctype.pointee
-                    and field.value.length != "nul"
-                ):
-                    local = "buffer" + pascal(field.name)
-                    method = "Utf8" if field.value.encoding == "utf8" else "Buffer"
-                    count = next(
-                        item for item in plan.fields if item.name == field.value.length
-                    )
-                    lines.append(f"{indent}var {local} = scope.{method}({source});")
-                    lines.append(
-                        f"{indent}native.{member(field.name)} = ({self.raw_type(field.value)}){local}.data;"
-                    )
-                    lines.append(
-                        f"{indent}native.{member(field.value.length)} = checked(({self.native_type(count.value)}){local}.size);"
-                    )
-                    continue
-                lines.append(
-                    f"{indent}native.{member(field.name)} = {self.encode(field.value, source)};"
-                )
-                if field.value.kind == "array" and field.value.length:
-                    count_field = next(
-                        item for item in plan.fields if item.name == field.value.length
-                    )
-                    lines.append(
-                        f"{indent}native.{member(field.value.length)} = checked(({self.native_type(count_field.value)}){source}.Length);"
-                    )
+            lines += self.field_encoding(plan, name, field, expression, indent)
             if presence and presence.mask:
                 lines.append("        }")
         for flag in plan.mask_flags:
@@ -855,15 +740,64 @@ class Values:
             )
         return "\n".join([*lines, "        return native;", "    }", ""])
 
-    def put(self, plan: ValuePlan, presence, fields, expression: str) -> str | None:
+    def field_encoding(
+        self, plan: ValuePlan, name: str, field: FieldPlan, expression: str, indent: str
+    ) -> list[str]:
+        """The statements that store one member's value."""
+        encoded = []
+        if field.value.kind == "union":
+            tag = next(item for item in plan.fields if item.name == field.value.tag)
+            encoded.append(f"{indent}switch ({expression})")
+            encoded.append(f"{indent}{{")
+            for variant in field.value.fields:
+                encoded.extend(
+                    [
+                        f"{indent}    case {self.member_type(plan, name, field)}.{pascal(variant.name)} selected:",
+                        f"{indent}        native.{member(field.value.tag)} = ({self.native_type(tag.value)}){self.constant(variant.presence.variant)};",
+                        f"{indent}        native.{member(field.name)}.{member(variant.name)} = {self.encode(variant.value, 'selected.Value')};",
+                        f"{indent}        break;",
+                    ]
+                )
+            encoded.append(
+                f'{indent}    default: throw new ArgumentException("A union variant is required.", nameof(value));'
+            )
+            encoded.append(f"{indent}}}")
+            return encoded
+        if (
+            field.value.kind == "buffer"
+            and field.value.ctype.pointee
+            and field.value.length != "nul"
+        ):
+            local = "buffer" + pascal(field.name)
+            method = "Utf8" if field.value.encoding == "utf8" else "Buffer"
+            count = next(
+                item for item in plan.fields if item.name == field.value.length
+            )
+            encoded.append(f"{indent}var {local} = scope.{method}({expression});")
+            encoded.append(
+                f"{indent}native.{member(field.name)} = ({self.raw_type(field.value)}){local}.data;"
+            )
+            encoded.append(
+                f"{indent}native.{member(field.value.length)} = checked(({self.native_type(count.value)}){local}.size);"
+            )
+            return encoded
+        encoded.append(
+            f"{indent}native.{member(field.name)} = {self.encode(field.value, expression)};"
+        )
+        if field.value.kind == "array" and field.value.length:
+            count_field = next(
+                item for item in plan.fields if item.name == field.value.length
+            )
+            encoded.append(
+                f"{indent}native.{member(field.value.length)} = checked(({self.native_type(count_field.value)}){expression}.Length);"
+            )
+        return encoded
+
+    def put(self, plan: ValuePlan, presence, field, expression: str) -> str | None:
         """One line that stores a present member and marks its bit.
 
-        A member that spans several fields, a union, or a counted buffer keeps
-        its explicit branch.
+        A union or a counted buffer keeps its explicit branch.
         """
-        if len(fields) != 1:
-            return None
-        field = fields[0]
         value = field.value
         if (
             not self.mask_enum(plan, presence.mask)
@@ -1044,13 +978,11 @@ class Values:
         )
 
     def array_member(
-        self, plan: ValuePlan, name: str, fields: tuple[FieldPlan, ...]
+        self, plan: ValuePlan, name: str, field: FieldPlan
     ) -> tuple[bool, bool]:
         """Whether a member is an array, and whether that array is optional."""
-        type_ = self.member_type(plan, name, fields)
-        optional = bool(
-            fields[0].presence and fields[0].presence.mask
-        ) or type_.endswith("?")
+        type_ = self.member_type(plan, name, field)
+        optional = bool(field.presence and field.presence.mask) or type_.endswith("?")
         return type_.removesuffix("?").endswith("[]"), optional
 
     def array_declaration(self, plan: ValuePlan) -> str:
@@ -1063,9 +995,9 @@ class Values:
         name = public_name(plan.native)
         accessor = "set" if masked else "init"
         properties, parameters, assignments = [], [], []
-        for member, fields in members:
-            type_ = self.member_type(plan, member, fields)
-            array, optional = self.array_member(plan, member, fields)
+        for member, field in members:
+            type_ = self.member_type(plan, member, field)
+            array, optional = self.array_member(plan, member, field)
             if optional and not type_.endswith("?"):
                 type_ += "?"
             parameters.append(f"{type_} {member}")
@@ -1085,13 +1017,13 @@ class Values:
                 "required "
                 if masked
                 and not optional
-                and (type_ == "string" or self.is_reference_type(fields[0].value))
+                and (type_ == "string" or self.is_reference_type(field.value))
                 else ""
             )
             properties.append(
                 self.initialized(
                     f"    public {required}{type_} {member} {{ get; {accessor}; }}",
-                    fields,
+                    field,
                 )
                 if masked
                 else f"    public {required}{type_} {member} {{ get; {accessor}; }}"
@@ -1144,37 +1076,26 @@ class Values:
             )
         declaration = self.value_declaration(plan)
         unions = []
-        for name, fields in self.members(plan):
-            if len(fields) > 1 and self.member_type(plan, name, fields).removesuffix(
-                "?"
-            ).startswith(public_name(plan.native) + "."):
-                parameters = ", ".join(
-                    f"{self.public_type(field.value)} {pascal(field.name)}"
-                    for field in fields
-                )
-                unions.append(
-                    f"    public readonly record struct {name}Value({parameters});\n"
-                )
-            if fields[0].value.kind != "union":
+        for name, field in self.members(plan):
+            union = field.value
+            if union.kind != "union":
                 continue
             unions.append(
                 f"    public abstract record {name}Value\n    {{\n        private {name}Value() {{ }}\n"
                 + "".join(
-                    f"        public sealed record {pascal(field.name)}({self.public_type(field.value)} Value) : {name}Value;\n"
-                    for field in fields[0].value.fields
+                    f"        public sealed record {pascal(variant.name)}({self.public_type(variant.value)} Value) : {name}Value;\n"
+                    for variant in union.fields
                 )
                 + (
                     f"        public sealed record None : {name}Value;\n"
-                    if fields[0].value.empty_variant
+                    if union.empty_variant
                     else ""
                 )
                 + self.unknown_variant(
                     name + "Value",
                     self.unknown_tag_type(
                         next(
-                            field.value
-                            for field in plan.fields
-                            if field.name == fields[0].value.tag
+                            item.value for item in plan.fields if item.name == union.tag
                         )
                     ),
                 )
@@ -1210,12 +1131,12 @@ class Values:
             "        }\n"
         )
 
-    def member_initial(self, fields: tuple[FieldPlan, ...]) -> str | None:
+    def member_initial(self, field: FieldPlan) -> str | None:
         """A member's annotated default, or None when its type's zero value is
         the native default. A record member takes its type's own defaults."""
-        if len(fields) != 1 or fields[0].presence:
+        if field.presence:
             return None
-        field, value = fields[0], fields[0].value
+        value = field.value
         initial = field.initial
         if initial is None:
             if value.kind == "record" and self.has_initials(value):
@@ -1233,12 +1154,12 @@ class Values:
     def has_initials(self, plan: ValuePlan) -> bool:
         """Whether a record's native default holds a nonzero member."""
         return any(
-            self.member_initial(fields) is not None for _, fields in self.members(plan)
+            self.member_initial(field) is not None for _, field in self.members(plan)
         )
 
-    def initialized(self, property_: str, fields: tuple[FieldPlan, ...]) -> str:
+    def initialized(self, property_: str, field: FieldPlan) -> str:
         """A property declaration that starts at the member's native default."""
-        initial = self.member_initial(fields)
+        initial = self.member_initial(field)
         return property_ if initial is None else f"{property_} = {initial};"
 
     def parameterless(self, plan: ValuePlan) -> str:
@@ -1250,13 +1171,13 @@ class Values:
         if not self.has_initials(plan):
             return ""
         arguments = []
-        for member, fields in self.members(plan):
-            initial = self.member_initial(fields)
-            type_ = self.member_type(plan, member, fields)
+        for member, field in self.members(plan):
+            initial = self.member_initial(field)
+            type_ = self.member_type(plan, member, field)
             if initial is not None:
                 arguments.append(initial)
             elif type_.endswith("?") or not (
-                type_ in {"string", "byte[]"} or self.is_reference_type(fields[0].value)
+                type_ in {"string", "byte[]"} or self.is_reference_type(field.value)
             ):
                 arguments.append("default")
             else:
@@ -1266,13 +1187,9 @@ class Values:
             f"        : this({', '.join(arguments)}) {{ }}\n"
         )
 
-    def member_doc(self, plan: ValuePlan, fields) -> str:
-        """The XML doc comment of a member that one field backs."""
-        if len(fields) != 1:
-            return ""
-        return docs.xml_comment(
-            self.bound.doc(f"{plan.native}.{fields[0].name}"), "    "
-        )
+    def member_doc(self, plan: ValuePlan, field: FieldPlan) -> str:
+        """The XML doc comment of a member."""
+        return docs.xml_comment(self.bound.doc(f"{plan.native}.{field.name}"), "    ")
 
     def value_declaration(self, plan: ValuePlan) -> str:
         fields = self.fields(plan)
@@ -1283,33 +1200,28 @@ class Values:
             return self.array_declaration(plan)
         if any(field.presence and field.presence.mask for field in fields):
             properties = []
-            for name, members in self.members(plan):
-                type_ = self.member_type(plan, name, members)
-                if (
-                    members[0].presence
-                    and members[0].presence.mask
-                    and not type_.endswith("?")
-                ):
+            for name, field in self.members(plan):
+                type_ = self.member_type(plan, name, field)
+                if field.presence and field.presence.mask and not type_.endswith("?"):
                     type_ += "?"
                 required = (
                     "required "
-                    if not members[0].presence
+                    if not field.presence
                     and (
                         type_ in {"string", "byte[]"}
                         or (
-                            members[0].value.kind == "record"
+                            field.value.kind == "record"
                             and any(
-                                field.presence
-                                for field in self.fields(members[0].value)
+                                member.presence for member in self.fields(field.value)
                             )
                         )
                     )
                     else ""
                 )
                 properties.append(
-                    self.member_doc(plan, members)
+                    self.member_doc(plan, field)
                     + self.initialized(
-                        f"    public {required}{type_} {name} {{ get; set; }}", members
+                        f"    public {required}{type_} {name} {{ get; set; }}", field
                     )
                 )
             properties.extend(
@@ -1325,15 +1237,14 @@ class Values:
         # A positional record documents each property as a parameter, in the
         # comment that the record's own summary begins.
         params = "".join(
-            docs.xml_param(self.bound.doc(f"{plan.native}.{members[0].name}"), name)
-            for name, members in self.members(plan)
-            if len(members) == 1
+            docs.xml_param(self.bound.doc(f"{plan.native}.{field.name}"), name)
+            for name, field in self.members(plan)
         )
         declaration = params + (
             f"public readonly partial record struct {public_name(plan.native)}("
             + ", ".join(
-                f"{self.member_type(plan, name, members)} {name}"
-                for name, members in self.members(plan)
+                f"{self.member_type(plan, name, field)} {name}"
+                for name, field in self.members(plan)
             )
             + ")"
         )

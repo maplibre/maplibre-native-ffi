@@ -318,8 +318,7 @@ Pointer<raw.mln_camera_options> _writeCameraOptions(
   result.ref = raw.mln_camera_options_default();
   if (value.center != null) {
     result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER;
-    result.ref.latitude = value.center!.latitude;
-    result.ref.longitude = value.center!.longitude;
+    result.ref.center = _writeLatLng(value.center!, arena).ref;
   }
   if (value.centerAltitude != null) {
     result.ref.fields |= raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
@@ -360,7 +359,7 @@ CameraOptions _readCameraOptions(
   raw.mln_camera_options source,
 ) => CameraOptions(
   center: (source.fields & raw.MLN_CAMERA_OPTION_CENTER) != 0
-      ? LatLng(source.latitude, source.longitude)
+      ? _readLatLng(source.center)
       : null,
   centerAltitude: (source.fields & raw.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0
       ? source.center_altitude
@@ -1266,6 +1265,15 @@ StyleLayerResult _readStyleLayerResult(raw.mln_style_layer_result source) =>
           : utf8.decode(_copyBufferView(source.source_layer)),
     );
 
+StyleSourceTileInfo _readStyleSourceTileInfo(
+  raw.mln_style_source_tile_info source,
+) => StyleSourceTileInfo(
+  tileCount: source.tile_count,
+  minZoom: source.min_zoom,
+  maxZoom: source.max_zoom,
+  scheme: StyleTileScheme.fromRawValue(source.scheme),
+);
+
 StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
     StyleSourceInfo(
       type: StyleSourceType.fromRawValue(source.type),
@@ -1279,12 +1287,7 @@ StyleSourceInfo _readStyleSourceInfo(raw.mln_style_source_info source) =>
           ? source.url_size
           : null,
       tilejson: (source.fields & raw.MLN_STYLE_SOURCE_INFO_TILEJSON) != 0
-          ? StyleSourceTileInfo(
-              tileCount: source.tile_count,
-              minZoom: source.min_zoom,
-              maxZoom: source.max_zoom,
-              scheme: StyleTileScheme.fromRawValue(source.scheme),
-            )
+          ? _readStyleSourceTileInfo(source.tilejson)
           : null,
       bounds: (source.fields & raw.MLN_STYLE_SOURCE_INFO_BOUNDS) != 0
           ? _readLatLngBounds(source.bounds)

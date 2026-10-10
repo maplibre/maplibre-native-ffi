@@ -339,8 +339,7 @@ internal fun NativeArena.putCameraOptions(target: Long, value: CameraOptions) {
   writeU32(target + 4, 0u)
   value.center?.let {
     markPresent(target + 4, 1u)
-    writeF64(target + 8, it.latitude)
-    writeF64(target + 16, it.longitude)
+    putLatLng(target + 8, it)
   }
   value.centerAltitude?.let {
     markPresent(target + 4, 16u)
@@ -1079,10 +1078,7 @@ internal fun readCameraFitOptions(source: Long): CameraFitOptions =
 
 internal fun readCameraOptions(source: Long): CameraOptions =
   CameraOptions(
-    center =
-      if ((readU32(source + 4) and 1u) != 0u)
-        LatLng(latitude = readF64(source + 8), longitude = readF64(source + 16))
-      else null,
+    center = if ((readU32(source + 4) and 1u) != 0u) readLatLng(source + 8) else null,
     centerAltitude = if ((readU32(source + 4) and 16u) != 0u) readF64(source + 24) else null,
     padding = if ((readU32(source + 4) and 32u) != 0u) readEdgeInsets(source + 32) else null,
     anchor = if ((readU32(source + 4) and 64u) != 0u) readScreenPoint(source + 64) else null,
@@ -1506,13 +1502,13 @@ internal fun readStyleSourceResult(source: Long): StyleSourceResult =
   StyleSourceResult(
     info = readStyleSourceInfo(source + 8),
     attribution =
-      if ((readU32(source + 16) and 64u) != 0u) readViewString(source + w(112, 136)) else null,
-    url = if ((readU32(source + 16) and 1u) != 0u) readViewString(source + w(120, 152)) else null,
+      if ((readU32(source + 16) and 64u) != 0u) readViewString(source + w(120, 136)) else null,
+    url = if ((readU32(source + 16) and 1u) != 0u) readViewString(source + w(128, 152)) else null,
     tileUrls =
       if ((readU32(source + 16) and 2u) != 0u)
         readArray(
-          readAddress(source + w(128, 168)),
-          readSize(source + w(132, 176)),
+          readAddress(source + w(136, 168)),
+          readSize(source + w(140, 176)),
           2 * NativeMemory.addressSize.toLong(),
         ) { item ->
           readViewString(item)
@@ -2004,21 +2000,15 @@ internal fun readStyleSourceInfo(source: Long): StyleSourceInfo =
       if ((readU32(source + 8) and 64u) != 0u) readSize(source + w(20, 32)) else null,
     urlSize = if ((readU32(source + 8) and 1u) != 0u) readSize(source + w(24, 40)) else null,
     tilejson =
-      if ((readU32(source + 8) and 2u) != 0u)
-        StyleSourceTileInfo(
-          tileCount = readSize(source + w(28, 48)),
-          minZoom = readF64(source + w(32, 56)),
-          maxZoom = readF64(source + w(40, 64)),
-          scheme = StyleTileScheme(readU32(source + w(48, 72))),
-        )
-      else null,
-    bounds = if ((readU32(source + 8) and 4u) != 0u) readLatLngBounds(source + w(56, 80)) else null,
-    tileSize = if ((readU32(source + 8) and 8u) != 0u) readU32(source + w(88, 112)) else null,
+      if ((readU32(source + 8) and 2u) != 0u) readStyleSourceTileInfo(source + w(32, 48)) else null,
+    bounds = if ((readU32(source + 8) and 4u) != 0u) readLatLngBounds(source + w(64, 80)) else null,
+    tileSize = if ((readU32(source + 8) and 8u) != 0u) readU32(source + w(96, 112)) else null,
     vectorEncoding =
-      if ((readU32(source + 8) and 16u) != 0u) StyleVectorTileEncoding(readU32(source + w(92, 116)))
+      if ((readU32(source + 8) and 16u) != 0u)
+        StyleVectorTileEncoding(readU32(source + w(100, 116)))
       else null,
     rasterEncoding =
-      if ((readU32(source + 8) and 32u) != 0u) StyleRasterDemEncoding(readU32(source + w(96, 120)))
+      if ((readU32(source + 8) and 32u) != 0u) StyleRasterDemEncoding(readU32(source + w(104, 120)))
       else null,
   )
 
@@ -2147,6 +2137,14 @@ internal fun readRuntimeEventCameraTransitionFinished(
   source: Long
 ): RuntimeEventCameraTransitionFinished =
   RuntimeEventCameraTransitionFinished(transitionId = readU64(source))
+
+internal fun readStyleSourceTileInfo(source: Long): StyleSourceTileInfo =
+  StyleSourceTileInfo(
+    tileCount = readSize(source),
+    minZoom = readF64(source + 8),
+    maxZoom = readF64(source + 16),
+    scheme = StyleTileScheme(readU32(source + 24)),
+  )
 
 internal fun readOfflineTilePyramidRegionDefinition(
   source: Long

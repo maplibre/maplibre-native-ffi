@@ -263,7 +263,7 @@ mln_status mln_map_metric(mln_map map, const mln_completion *completion, mln_dia
 """)
         self.assertNotIn("mln_map_metric", dotnet.coverage(api)["generated"])
 
-    def test_dotnet_values_preserve_grouped_presence_defaults_and_keyword_fields(self):
+    def test_dotnet_values_preserve_embedded_presence_defaults_and_keyword_fields(self):
         api = self.parse(
             """
 typedef struct mln_metric { double event; } mln_metric;
@@ -334,7 +334,8 @@ using static Maplibre.NativeFfi.Internal.Struct.NativeValues;
 namespace Maplibre.NativeFfi.Internal.C {
   static partial class NativeMethods {
     public static mln_camera mln_camera_default() => new() {
-      fields = MLN_CAMERA_CENTER | MLN_CAMERA_ZOOM, latitude = 80, longitude = 90, zoom = 99
+      fields = MLN_CAMERA_CENTER | MLN_CAMERA_ZOOM,
+      center = new mln_lat_lng { latitude = 80, longitude = 90 }, zoom = 99
     };
   }
 }
@@ -348,17 +349,19 @@ namespace Maplibre.NativeFfi.Internal.C {
     var absent = NativeCamera(new Camera());
     Check(absent.fields == 0 && absent.abi_size == sizeof(mln_camera));
     var zero = NativeCamera(new Camera { Center = new LatLng(0, 0), Zoom = 0 });
-    Check((ulong)zero.fields == ((1UL << 40) | 2) && zero.latitude == 0 && zero.longitude == 0 && zero.zoom == 0);
+    Check((ulong)zero.fields == ((1UL << 40) | 2) && zero.center.latitude == 0 && zero.center.longitude == 0 && zero.zoom == 0);
     var coordinates = stackalloc mln_lat_lng[2];
     coordinates[0] = new mln_lat_lng { latitude = 4, longitude = 5 };
     coordinates[1] = new mln_lat_lng { latitude = 6, longitude = 7 };
     var raw = new mln_snapshot {
       coordinates = coordinates, coordinate_count = 2,
       generation = 42,
-      camera = new mln_camera { fields = MLN_CAMERA_CENTER, latitude = 13, longitude = -9, zoom = 55 }
+      camera = new mln_camera {
+        fields = MLN_CAMERA_CENTER, center = new mln_lat_lng { latitude = 13, longitude = -9 }, zoom = 55
+      }
     };
     var copy = CopySnapshot(raw);
-    raw.camera.latitude = 100;
+    raw.camera.center.latitude = 100;
     Check(copy.Generation == 42 && copy.Camera.Center == new LatLng(13, -9) && copy.Camera.Zoom == null);
     coordinates[0].latitude = 99;
     Check(copy.Coordinates[0] == new LatLng(4, 5) && copy.Coordinates[1] == new LatLng(6, 7));

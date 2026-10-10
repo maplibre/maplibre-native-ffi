@@ -4188,8 +4188,7 @@ internal val mln_camera_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     JAVA_INT.withName("fields"),
-    JAVA_DOUBLE.withName("latitude"),
-    JAVA_DOUBLE.withName("longitude"),
+    mln_lat_lng.withName("center"),
     JAVA_DOUBLE.withName("center_altitude"),
     mln_edge_insets.withName("padding"),
     mln_screen_point.withName("anchor"),

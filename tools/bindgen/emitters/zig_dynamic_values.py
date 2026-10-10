@@ -3,7 +3,7 @@
 from dataclasses import replace
 
 from .rust_dynamic_values import dynamic
-from .zig import identifier, pascal
+from .zig import identifier
 from .zig_values import field_default
 
 
@@ -149,38 +149,6 @@ def declaration(values, value):
             value.registration.user_data,
             value.registration.release,
         }
-    grouped = set()
-    groups = []
-    for group in value.presence_groups:
-        if len(group.fields) < 2 or group.type:
-            continue
-        local = identifier(group.member)
-        name = typ + pascal(group.member)
-        members = [next(f for f in value.fields if f.name == n) for n in group.fields]
-        groups.append(
-            f"pub const {name} = struct {{ "
-            + ", ".join(
-                f"{identifier(f.name)}: {values.public(f.value)}" for f in members
-            )
-            + " };\n"
-        )
-        fields.append(f"    {local}: ?{name} = null,")
-        mask = ".".join(identifier(part) for part in group.mask.split("."))
-        present = f"raw.{mask} & c.{group.bit} != 0"
-        mark = f"raw.{mask} |= c.{group.bit}"
-        assigned = " ".join(
-            f"raw.{identifier(f.name)} = {encode(values, f.value, 'item.' + identifier(f.name))};"
-            for f in members
-        )
-        copied = ", ".join(
-            f".{identifier(f.name)} = {decode(values, f.value, 'raw.' + identifier(f.name))}"
-            for f in members
-        )
-        writes.append(f"        if (self.{local}) |item| {{ {mark}; {assigned} }}")
-        captures.append(
-            f"            .{local} = if ({present}) .{{ {copied} }} else null,"
-        )
-        grouped.update(group.fields)
     item_buffer = values.item_buffers.get(value.native)
     if item_buffer:
         fields.append(f"    {identifier(item_buffer.field)}: []const u8 = &.{{}},")
@@ -188,7 +156,7 @@ def declaration(values, value):
     for field in value.fields:
         if item_buffer and field.name in {item_buffer.offset, item_buffer.length}:
             continue
-        if field.name in grouped or field.name in hidden:
+        if field.name in hidden:
             continue
         raw = f"raw.{identifier(field.name)}"
         local = identifier(field.name)
@@ -295,9 +263,7 @@ def declaration(values, value):
         if not value.registration or value.native in values.bound.returned
         else ""
     )
-    return (
-        "".join(groups)
-        + f"""pub const {typ} = struct {{
+    return f"""pub const {typ} = struct {{
 {chr(10).join(fields)}
     pub fn toNative(self: {typ}, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.{value.native} {{
 {write_use}{roots_use}        var raw = {initial};
@@ -307,4 +273,3 @@ def declaration(values, value):
 {chr(10).join(trampolines)}
 {copy}}};
 """
-    )

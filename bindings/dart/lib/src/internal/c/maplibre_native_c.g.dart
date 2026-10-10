@@ -287,10 +287,7 @@ final class mln_camera_options extends Struct {
   external int size;
   @Uint32()
   external int fields;
-  @Double()
-  external double latitude;
-  @Double()
-  external double longitude;
+  external mln_lat_lng center;
   @Double()
   external double center_altitude;
   external mln_edge_insets padding;
@@ -1380,14 +1377,7 @@ final class mln_style_source_info extends Struct {
   external int attribution_size;
   @Size()
   external int url_size;
-  @Size()
-  external int tile_count;
-  @Double()
-  external double min_zoom;
-  @Double()
-  external double max_zoom;
-  @Uint32()
-  external int scheme;
+  external mln_style_source_tile_info tilejson;
   external mln_lat_lng_bounds bounds;
   @Uint32()
   external int tile_size;
