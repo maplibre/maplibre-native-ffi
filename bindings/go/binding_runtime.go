@@ -283,6 +283,11 @@ func (state *bindingState) unavailable() *Error {
 	return nil
 }
 
+// bindingAdopt wraps a handle that native transferred. Closing it explicitly is
+// the contract, so the collector's cleanup of a handle that is still open
+// disposes it and logs the leak through the default slog logger. A handle the
+// binding releases itself, such as a resource request it passes through, is
+// already closed when the cleanup runs, and logs nothing.
 func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64)) *bindingOwner {
 	if raw == 0 {
 		panic(bindingFailure{newBindingError(ErrNative, "native returned a null "+typeName)})
@@ -296,6 +301,7 @@ func bindingAdopt(raw uint64, parent any, typeName string, dispose func(uint64))
 		state.mu.Unlock()
 		if raw != 0 {
 			state.dispose(raw)
+			slog.Warn("maplibre: leaked handle; close it explicitly", "type", state.typeName, "handle", raw)
 		}
 	}, state)
 	return owner

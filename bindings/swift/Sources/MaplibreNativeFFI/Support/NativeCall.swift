@@ -17,6 +17,14 @@ protocol NativeReceiver: AnyObject {
   var handle: NativeHandleBox<Native> { get }
 }
 
+extension NativeReceiver {
+  /// Disposes the handle of an owner that the binding created but no caller
+  /// received, without reporting a leak.
+  func retireUnreceived() {
+    handle.retire()
+  }
+}
+
 /// How an operation reaches its receiver.
 enum NativeAccess {
   /// The call borrows the receiver, which holds off its close.

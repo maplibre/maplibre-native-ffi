@@ -2,10 +2,10 @@ import Foundation
 
 /// A failure that the binding contained because no caller could receive it.
 public enum MaplibreDiagnostic {
-  /// A handle that its owner dropped without closing, and that the binding
-  /// could not dispose. The handle stays live. `handle` is zero when the
-  /// leaked resource is a texture frame rather than a C API handle, which
-  /// `detail` then names.
+  /// A handle that its last owner released without closing it. The binding
+  /// disposed it unless `detail` reports that the disposal failed, in which
+  /// case the handle stays live. `handle` is zero when the leaked resource is
+  /// a texture frame rather than a C API handle, which `detail` then names.
   case leakedHandle(typeName: String, handle: UInt64, detail: String)
   /// An error that a callback threw, or that the binding met while decoding
   /// the callback's arguments. `callback` names the C callback type, such as

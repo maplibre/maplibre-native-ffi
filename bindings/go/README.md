@@ -16,8 +16,10 @@ reject access after the callback returns or from another OS thread.
 
 Callbacks receive copied values and scoped response objects. Their generated
 registration code retains Go closures until native retirement and enforces the
-callback operations declared in the headers. Explicit `Close` orders teardown;
-Go cleanup also retires abandoned owners and callback cycles.
+callback operations declared in the headers. Explicit `Close` orders teardown.
+Go cleanup also retires abandoned owners and callback cycles, and logs each
+owner that it disposes with `slog.Warn` on the default logger, with the handle
+type and the handle as attributes.
 
 Callback admission is per OS thread. While a callback runs, its goroutine is
 locked to the native thread and can make only the calls that the callback's

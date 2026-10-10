@@ -38,25 +38,36 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     state = .live(handle)
   }
 
+  /// Explicit close is the contract, so an open handle that its last owner
+  /// releases is a leak: deinit disposes it and reports it. A handle that the
+  /// binding drops itself, such as a creation that arrives after its wait is
+  /// cancelled, goes through retire() instead and is not reported.
   deinit {
     guard let handle = leakedHandle else { return }
-    if NativeCallbackGuard.isActive {
-      let retirement = NativeRetirement(
-        handle: handle,
-        parent: parent,
-        typeName: typeName
-      )
-      DispatchQueue.global().async { retirement.run() }
-    } else {
-      defer { withExtendedLifetime(parent) {} }
-      if !handle.disposeAbandoned() {
-        NativeDiagnostics.report(.leakedHandle(
-          typeName: typeName,
-          handle: handle.raw,
-          detail: ""
-        ))
-      }
+    NativeRetirement(
+      handle: handle,
+      parent: parent,
+      typeName: typeName,
+      reported: true
+    ).schedule()
+  }
+
+  /// Disposes a live handle that no caller ever received. Disposal reports
+  /// only a failure, since the binding, not its caller, dropped the handle.
+  func retire() {
+    let handle = lock.withLock { () -> Handle? in
+      guard case let .live(handle) = state, !pendingDecision, readers == 0,
+            claims == 0 else { return nil }
+      state = .closed
+      return handle
     }
+    guard let handle else { return }
+    NativeRetirement(
+      handle: handle,
+      parent: parent,
+      typeName: typeName,
+      reported: false
+    ).schedule()
   }
 
   var isClosed: Bool {
@@ -222,18 +233,31 @@ private final class NativeRetirement<Handle: NativeHandle>: @unchecked Sendable 
   let handle: Handle
   let parent: AnyObject?
   let typeName: String
-  init(handle: Handle, parent: AnyObject?, typeName: String) {
+  /// Whether a disposal that succeeds is still reported as a leak.
+  let reported: Bool
+  init(handle: Handle, parent: AnyObject?, typeName: String, reported: Bool) {
     self.handle = handle; self.parent = parent; self.typeName = typeName
+    self.reported = reported
   }
 
-  func run() {
-    defer { withExtendedLifetime(parent) {} }
-    if !handle.disposeAbandoned() {
-      NativeDiagnostics.report(.leakedHandle(
-        typeName: typeName,
-        handle: handle.raw,
-        detail: ""
-      ))
+  /// Disposes the handle now, or off the stack of the callback that is
+  /// running.
+  func schedule() {
+    if NativeCallbackGuard.isActive {
+      DispatchQueue.global().async { self.run() }
+    } else {
+      run()
     }
+  }
+
+  private func run() {
+    defer { withExtendedLifetime(parent) {} }
+    let disposed = handle.disposeAbandoned()
+    guard reported || !disposed else { return }
+    NativeDiagnostics.report(.leakedHandle(
+      typeName: typeName,
+      handle: handle.raw,
+      detail: disposed ? "" : "native disposal failed"
+    ))
   }
 }

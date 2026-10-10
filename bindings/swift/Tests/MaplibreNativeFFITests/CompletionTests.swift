@@ -100,8 +100,8 @@ private struct ConversionFailure: Error {}
   }
   creation.cancel()
   // A creation that finished before the cancellation reached it returns its
-  // map, which this test drops at once.
-  _ = try? await creation.value
+  // map, which this test then disposes.
+  if let map = try? await creation.value { try map.dispose() }
 
   var teardown: NativeFuture<Void>?
   try await awaitCondition("the abandoned map to retire") {

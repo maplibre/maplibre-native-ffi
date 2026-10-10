@@ -29,7 +29,8 @@ Native cannot receive a Swift error, so the binding catches an error that a
 callback throws and returns the callback's declared failure value to native. The
 binding reports the error as a `MaplibreDiagnostic.callbackError`, which names
 the C callback type, to the handler that `Maplibre.setDiagnosticHandler`
-installs. The same handler receives a `leakedHandle` diagnostic for a dropped
-handle that the binding could not dispose. Without a handler, each diagnostic
-goes to standard error. A `callbackError` reaches the handler on the native
-callback's stack, where the binding refuses every native call.
+installs. The same handler receives a `leakedHandle` diagnostic when the last
+reference to an open handle goes away; the binding disposes that handle, and the
+diagnostic's detail says when the disposal failed. Without a handler, each
+diagnostic goes to standard error. A `callbackError` reaches the handler on the
+native callback's stack, where the binding refuses every native call.
