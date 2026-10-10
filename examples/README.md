@@ -78,8 +78,9 @@ These rules hold in every example, and the code alone does not show why:
   after a resize.
 - After a frame result of target-not-ready, or a rendered frame that the host
   could not show, the host demands again after about one display refresh,
-  because no map-update event follows. The demand omits the render-if-needed
-  flag, because a frame that the host could not show consumed its update.
+  because neither causes a map-update event. The demand omits the
+  render-if-needed flag, because a frame that the host could not show consumed
+  its update.
 - A Vulkan core worker in a texture mode submits on a second queue from the
   graphics family, because the host compositor submits on its own queue at the
   same time. A device with one graphics queue, such as MoltenVK, uses the caller

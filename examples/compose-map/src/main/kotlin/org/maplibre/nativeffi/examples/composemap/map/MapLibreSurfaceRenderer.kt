@@ -145,8 +145,8 @@ internal class MapLibreSurfaceRenderer(
         NativeSurfaceRenderResult.Rendered
       }
       RenderResult.TARGET_NOT_READY -> {
-        // No map-update event follows a target that was not ready, so the next Compose frame
-        // retries. The map update stays pending.
+        // A target that was not ready does not cause a map-update event, so the next Compose frame
+        // retries. The retry keeps the force, because the demand that failed may have been forced.
         requestRender(force = true)
         NativeSurfaceRenderResult.Skipped
       }

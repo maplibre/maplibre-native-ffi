@@ -42,8 +42,8 @@ typedef struct frame_results {
   bool rendered;
   /// The map asked for another frame while it rendered one.
   bool needs_repaint;
-  /// The target could not produce a frame. The map update stays pending, and
-  /// the loop retries later because no map-update event follows.
+  /// The target could not produce a frame. The loop retries later, because
+  /// this result does not cause a map-update event.
   bool target_not_ready;
 } frame_results;
 

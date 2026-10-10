@@ -147,9 +147,9 @@ func (driver *callerDriver) HandleWakes() (bool, error) {
 
 // drainFrameResults drains every frame result and shows the newest rendered
 // frame. A rendered frame that asks for another, as during a paint
-// transition, demands it. No map-update event follows a target that was not
-// ready or a frame that missed the window, so a retry follows after about one
-// refresh. The retry is forced, because a frame that missed the window
+// transition, demands it. Neither a target that was not ready nor a frame that
+// missed the window causes a map-update event, so a retry follows after about
+// one refresh. The retry is forced, because a frame that missed the window
 // consumed its update.
 func (driver *callerDriver) drainFrameResults() (bool, error) {
 	batch, err := driver.session.DrainFrameResults()

@@ -62,10 +62,10 @@ static app_error show_frame_results(app* app) {
     return APP_OK;
   }
   if (results.target_not_ready || (results.rendered && !presented)) {
-    // No map-update event follows a target that was not ready or a frame that
-    // missed the window, so the retry waits about one display refresh. It
-    // forces the frame, because a frame that missed the window consumed its
-    // update.
+    // Neither a target that was not ready nor a frame that missed the window
+    // causes a map-update event, so the retry waits about one display
+    // refresh. It forces the frame, because a frame that missed the window
+    // consumed its update.
     app_event_push_after(APP_EVENT_RETRY_FRAME, frame_retry_milliseconds);
   } else if (results.needs_repaint) {
     MAP_TRY(render_session_request_frame(session, false, nullptr));

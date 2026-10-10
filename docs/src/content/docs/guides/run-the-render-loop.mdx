@@ -74,12 +74,12 @@ status and no batch.
 
 A rendered result means that a frame was presented or became available for
 acquisition or readback. No update and size pending wait for a newer map update,
-which the map publishes on its own. Target not ready leaves the map update
-pending, and no map update follows it, so it waits for host target readiness or
-a paced retry. Superseded means that a newer demand replaced this demand within
-the same coalescing boundary. Deadline missed means that work did not begin
-within the positive timeout. These outcomes have different retry conditions, so
-preserve them in host pacing.
+which the map publishes on its own. Target not ready consumes nothing and does
+not cause a map update, so it waits for host target readiness or a paced retry.
+Superseded means that a newer demand replaced this demand within the same
+coalescing boundary. Deadline missed means that work did not begin within the
+positive timeout. These outcomes have different retry conditions, so preserve
+them in host pacing.
 
 <Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
 

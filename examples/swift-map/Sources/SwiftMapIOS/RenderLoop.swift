@@ -133,8 +133,9 @@ final class RenderLoop {
     do {
       let results = try target.drainResults()
       if results.targetNotReady {
-        // No map-update event follows a target that was not ready, so the
-        // retry waits about one display refresh. The map update stays pending.
+        // A target that was not ready does not cause a map-update event, so
+        // the retry waits about one display refresh. The retry keeps the force,
+        // because the demand that failed may have been forced.
         Task { @MainActor [weak self] in
           try? await Task.sleep(nanoseconds: Self.frameRetryNanoseconds)
           self?.requestFrame(force: true)

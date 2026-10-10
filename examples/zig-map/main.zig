@@ -181,8 +181,8 @@ const App = struct {
             return;
         }
         if (results.target_not_ready or (results.rendered and !presented)) {
-            // No map-update event follows a target that was not ready or a
-            // frame that missed the window, so the retry waits about one
+            // Neither a target that was not ready nor a frame that missed the
+            // window causes a map-update event, so the retry waits about one
             // display refresh. It forces the frame, because a frame that
             // missed the window consumed its update.
             events.pushAfter(.retry_frame, frame_retry_ms);

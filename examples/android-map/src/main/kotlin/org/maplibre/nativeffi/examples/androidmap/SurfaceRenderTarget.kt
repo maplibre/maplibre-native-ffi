@@ -60,8 +60,8 @@ private constructor(
   }
 
   /**
-   * What one frame-result drain saw. No map-update event follows a target that was not ready, so
-   * the view retries on its next frame.
+   * What one frame-result drain saw. A target that was not ready does not cause a map-update event,
+   * so the view retries on its next frame.
    */
   data class Drained(val rendered: Boolean, val needsRepaint: Boolean, val targetNotReady: Boolean)
 

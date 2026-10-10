@@ -55,10 +55,10 @@ typedef enum mln_render_result : uint32_t {
    */
   MLN_RENDER_RESULT_SIZE_PENDING = 2,
   /**
-   * The target could not produce a frame. The map update stays pending, so a
-   * later render-if-needed demand still renders it. No map update follows this
-   * result, so the host demands again when the target can be ready, such as
-   * after a paced delay.
+   * The target could not produce a frame. The attempt consumes nothing, so a
+   * later demand with the same flags renders what this one would have. This
+   * result does not cause a map update, so the host demands again when the
+   * target can be ready, such as after a paced delay.
    */
   MLN_RENDER_RESULT_TARGET_NOT_READY = 3,
   /** A newer demand in the same coalescing boundary replaced this demand. */

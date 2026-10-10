@@ -137,8 +137,8 @@ internal class AndroidMapView(
       finishPendingDrawing()
       onRendered()
     }
-    // No map-update event follows a target that was not ready, so the next Choreographer frame
-    // retries. The result otherwise carries the map's own follow-up demand, so an ongoing
+    // A target that was not ready does not cause a map-update event, so the next Choreographer
+    // frame retries. The result otherwise carries the map's own follow-up demand, so an ongoing
     // transition needs no runtime event round trip.
     if (drained.targetNotReady) requestRedraw() else if (drained.needsRepaint) scheduleFrame()
   }
@@ -182,7 +182,7 @@ internal class AndroidMapView(
       target?.attached != false &&
         try {
           graphics?.releaseSurface {
-            // The context outlived the surface, so the session retargets to the context's pbuffer
+            // The context outlived the surface, so the session parks on the context's own surface
             // until a surface returns.
             followSurface("surface released")?.let { target?.await(it) }
           } == true
