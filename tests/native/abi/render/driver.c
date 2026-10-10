@@ -611,6 +611,57 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Disposing an attached session that has rendered gives queued work a terminal
+// result and retires the session, freeing the map's session slot. The wake's
+// release marks the point after which the session makes no graphics call, so
+// the host may destroy its device then.
+static void a_disposed_attached_session_releases_its_wakes_before_the_device(
+  void
+) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  atomic_bool released;
+  atomic_init(&released, false);
+  mln_render_session_attach_options options =
+    mln_render_session_attach_options_default();
+  options.requested_texture_ring_depth = 2;
+  options.frame_wake = (mln_wake){
+    .size = sizeof(mln_wake),
+    .callback = count_nothing,
+    .user_data = &released,
+    .release_user_data = flag_release,
+  };
+  mln_test_completion attach = mln_test_completion_default(0);
+  mln_test_render_fixture fixture = {0};
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &options, &attach.descriptor, &fixture
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
+  mln_test_completion_destroy(&attach);
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+
+  mln_test_completion queued = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_reduce_memory_use(
+    fixture.session, &queued.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_render_session_dispose(fixture.session, NULL));
+  // A core worker may run the command before it sees the disposal.
+  const mln_status queued_status = mln_test_completion_settle(&queued);
+  TEST_ASSERT_TRUE(
+    queued_status == MLN_STATUS_OK || queued_status == MLN_STATUS_TARGET_LOST
+  );
+  TEST_ASSERT_TRUE(mln_test_wait_for_flag(&released));
+  mln_test_render_fixture_destroy(&fixture);
+
+  mln_test_render_fixture other = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &other));
+  mln_test_render_fixture_destroy(&other);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static void retirement_wake(void* context) { (void)context; }
 static void retirement_release(void* context) {
   atomic_store((atomic_bool*)context, true);
@@ -648,5 +699,6 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_from_a_driver_completion_is_busy);
   RUN_TEST(abandon_from_an_attach_completion_is_busy);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);
+  RUN_TEST(a_disposed_attached_session_releases_its_wakes_before_the_device);
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
 }

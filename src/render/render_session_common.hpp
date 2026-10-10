@@ -621,6 +621,10 @@ struct mln_render_session_object
   // call while any wait.
   std::size_t abandon_waiters = 0;
   bool stop_worker = false;
+  // Disposal found an attached core-worker session with no acquired frame, so
+  // the worker detaches it and frees its graphics objects instead of
+  // quarantining them.
+  bool disposal_detach = false;
   bool destruction_started = false;
   bool attached = false;
   // Ticket of the newest accepted resize. An older ticket reaching the driver

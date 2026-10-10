@@ -579,14 +579,17 @@ MLN_API mln_status mln_render_session_destroy(
 ) MLN_NOEXCEPT;
 
 /**
- * Consumes a session and schedules CPU-side abandonment and destruction.
+ * Consumes a session and schedules its retirement and destruction.
  *
  * Admission uses storage and a cleanup worker reserved during attachment.
- * Native retirement waits for in-flight driver work, quarantines graphics
- * resources, and releases the map attachment. The host keeps its graphics
- * objects alive until the session's wake release callbacks run. Acquired frame
- * accessors report target loss after acceptance; their owners still release or
- * dispose those frames.
+ * Queued driver work completes with MLN_STATUS_TARGET_LOST. A core-worker
+ * session that is attached and has no acquired frame detaches on its worker
+ * after the in-flight call, which frees its graphics resources. Every other
+ * session is abandoned on the cleanup worker once in-flight driver work ends,
+ * which quarantines its graphics resources. Either way, retirement releases the
+ * map attachment. The host keeps its graphics objects alive until the session's
+ * wake release callbacks run. Acquired frame accessors report target loss after
+ * acceptance; their owners still release or dispose those frames.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
  * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been
