@@ -332,6 +332,13 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
   void deactivate() override {}
 
  private:
+  // One texture of the ring and its view, or empty.
+  struct ColorSlot {
+    WGPUTexture texture = nullptr;
+    WGPUTextureView view = nullptr;
+    mln::Size size{};
+  };
+
   // Submits the texture-to-buffer copy on the session's queue, ordered behind
   // the render commands already there, so it needs no fence of its own.
   auto copy_texture_into(
@@ -636,11 +643,6 @@ class WebGPUTextureBackend final : public mln::webgpu::RendererBackend,
     }
   }
 
-  struct ColorSlot {
-    WGPUTexture texture = nullptr;
-    WGPUTextureView view = nullptr;
-    mln::Size size{};
-  };
   bool owns_color_texture_ = false;
   WGPUTexture texture_ = nullptr;
   WGPUTextureView color_view_ = nullptr;

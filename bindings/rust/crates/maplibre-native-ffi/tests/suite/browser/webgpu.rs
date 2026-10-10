@@ -288,8 +288,10 @@ impl WebGpuBorrowedTexture {
             physical_width: self.width,
             physical_height: self.height,
             context: context.descriptor(),
-            texture: self.texture.cast::<std::ffi::c_void>(),
-            texture_view: self.texture_view.cast::<std::ffi::c_void>(),
+            textures: vec![WebgpuBorrowedTexture::new(
+                self.texture.cast::<std::ffi::c_void>(),
+                self.texture_view.cast::<std::ffi::c_void>(),
+            )],
             format: self.format,
         }
     }

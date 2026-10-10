@@ -209,7 +209,7 @@ impl WebGlBorrowedTexture {
             physical_width: self.width,
             physical_height: self.height,
             context: self.context.descriptor(),
-            texture: self.texture.0.get(),
+            textures: vec![OpenglBorrowedTexture::new(self.texture.0.get())],
             target: gl::TEXTURE_2D,
         }
     }
