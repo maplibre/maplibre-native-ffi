@@ -229,6 +229,45 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
   }
 }
 
+// A frame never shows part of a command group: one rendered while the group
+// is open still shows the map from before it, though its commands have
+// committed.
+static void a_frame_shows_a_command_group_whole_or_not_at_all(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  MLN_TEST_OK(mln_test_map_set_style_json(
+    map, MLN_BUFFER_LITERAL(
+           "{\"version\":8,\"sources\":{},\"transition\":{\"duration\":0},"
+           "\"layers\":[{\"id\":\"background\",\"type\":\"background\","
+           "\"paint\":{\"background-color\":\"#ff0000\"}}]}"
+         )
+  ));
+  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  expect_center_pixel(&fixture, red, "before the group");
+
+  MLN_TEST_AWAIT_OK(
+    mln_map_begin_command_group(map, &completion.descriptor, NULL)
+  );
+  set_property(map, "background-color", "\"#0000ff\"");
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 1);
+  mln_render_frame_batch_release(batch);
+  expect_center_pixel(&fixture, red, "inside the group");
+
+  set_property(map, "background-color", "\"#00ff00\"");
+  MLN_TEST_AWAIT_OK(
+    mln_map_end_command_group(map, &completion.descriptor, NULL)
+  );
+  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  expect_center_pixel(&fixture, green, "after the group");
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // How many render updates the map published for the commands before the
 // barrier.
 static size_t take_updates(mln_runtime runtime) {
@@ -619,6 +658,7 @@ static void frame_statistics_count_each_frame_and_its_draws(void) {
 
 MLN_TEST_GROUP {
   RUN_TEST(each_mutation_reaches_the_pixels_of_an_update_driven_host);
+  RUN_TEST(a_frame_shows_a_command_group_whole_or_not_at_all);
   RUN_TEST(each_mutation_publishes_a_render_update_only_when_it_changes);
   RUN_TEST(frame_results_report_whether_the_map_needs_another_frame);
 #ifdef COUNTS_DRAWS_PER_FRAME
