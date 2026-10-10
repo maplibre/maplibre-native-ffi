@@ -213,12 +213,13 @@ publishing prevents two commits from interleaving those uploads. Both snapshot
 and tagged release jobs reuse the CI-produced native archives and the same
 staged repository; they do not rebuild MapLibre Native.
 
-The main CI workflow runs the same staging and verification on every pull
-request and on `main`, using the native artifacts from the same run, so a change
-that breaks the publish pipeline fails before merge. Snapshot publication reuses
-the verified repository that the CI run on `main` uploaded, and adds only
-signing and the Central Portal upload. Tagged releases stage again at their
-release version, through the same workflow.
+CI runs the same staging and verification wherever it runs complete coverage: on
+`main`, on manual runs, and on pull requests labeled `ci:full` or opened by
+Dependabot. It uses the native artifacts from the same run, so a pull request
+with complete coverage catches a change that breaks the publish pipeline before
+merge. Snapshot publication reuses the verified repository that the CI run on
+`main` uploaded, and adds only signing and the Central Portal upload. Tagged
+releases stage again at their release version, through the same workflow.
 
 Verification checks:
 
@@ -253,3 +254,52 @@ validation fails the workflow with the deployment's errors. The merged, verified
 repository is the source of truth for both publication modes. Tagged releases
 gain one atomic Central deployment boundary, while snapshot uploads preserve
 leaf-first/root-last ordering on Central's mutable snapshot endpoint.
+
+## Local and pull-request publications
+
+A host under development can consume unreleased publications from a local Maven
+repository. The `local` operation builds each named native preset, then
+publishes the binding and the runtimes that those presets feed:
+
+```bash
+mise run //:kotlin:publish local macos-arm64-metal macos-arm64-vulkan macos-arm64-egl
+```
+
+The repository is `build/packages/kotlin/maven-local`. The default version is
+`0.1.0-local.<commit>`, with `.dirty` appended when the worktree has uncommitted
+changes, and the `MAPLIBRE_MAVEN_VERSION` environment variable overrides it. The
+task rejects a preset that the host cannot build before it builds anything.
+Android presets build against `ANDROID_HOME`; to use the pinned SDK, run
+`mise -E android run //:kotlin:publish local <preset>...`.
+
+The repository holds only the targets that the named presets feed, although each
+root module still names every target. Later runs add targets and backends to the
+repository. Each publish rewrites a backend's JVM runtime module, so that module
+holds only the classifiers from its latest publish; name every classifier of a
+backend in one run.
+
+A pull request with complete coverage publishes its verified repository the same
+way. The version is `0.1.0-pr<number>.<run id>`, where the run id is the one
+that `gh run download` takes. The artifact is `kotlin-maven-verified-<sha>`,
+named for the commit that the run tested, and CI retains it for seven days. This
+command places the repository in `maplibre-maven/kotlin-maven-verified-<sha>`:
+
+```bash
+gh run download <run id> --repo maplibre/maplibre-native-ffi \
+  --pattern 'kotlin-maven-verified-*' --dir maplibre-maven
+```
+
+Gradle takes each module from the first repository that holds it. `mavenLocal()`
+can hold a stale module at the same version, for example from an earlier
+publication of the same uncommitted worktree. Declare the downloaded or local
+repository as the exclusive source of the group:
+
+```kotlin
+repositories {
+  exclusiveContent {
+    forRepository { maven { url = uri("/path/to/maven-local") } }
+    filter { includeGroup("org.maplibre.nativeffi") }
+  }
+  mavenCentral()
+}
+```
