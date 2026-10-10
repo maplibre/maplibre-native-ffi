@@ -6,6 +6,7 @@ unsupported shapes; they never invent ownership or erased completion types.
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 
 from .model import Api, CType, Function, ModelError
@@ -163,6 +164,19 @@ INTEGER_RANGES = {
     "long long": (-(2**63), 2**63 - 1),
     "unsigned long long": (0, 2**64 - 1),
 }
+
+
+# The integer ranges a field's `default=` may name. A `long` takes the narrower
+# range of the targets where it is 32 bits.
+DEFAULT_RANGES = {
+    **INTEGER_RANGES,
+    "long": INTEGER_RANGES["int"],
+    "unsigned long": INTEGER_RANGES["unsigned int"],
+}
+INTEGER_LITERAL = re.compile(r"-?(0|[1-9][0-9]*)")
+DECIMAL_LITERAL = re.compile(r"-?(0|[1-9][0-9]*)\.[0-9]+")
+# The conventional `default` of each control role that has one.
+CONTROL_DEFAULTS = {"size": "sizeof", "reserved": "0"}
 
 
 def has_completion(function: Function) -> bool:
@@ -1305,8 +1319,107 @@ def validate(api: Api) -> None:
             )
         )
     errors.extend(reference_errors(api))
+    errors.extend(field_default_errors(api))
     if errors:
         raise ModelError(errors)
+
+
+def defaulted_records(api: Api) -> set[str]:
+    """The structs that a record default function returns, directly or nested
+    by value in a struct it returns."""
+    conventions = Conventions(api)
+    pending = [
+        typedef.name
+        for typedef in api.typedefs
+        if typedef.metadata.get("default") and typedef.name in api.records_by_name
+    ]
+    found: set[str] = set()
+    while pending:
+        name = pending.pop()
+        record = api.records_by_name.get(name)
+        if name in found or record is None or record.kind != "struct":
+            continue
+        found.add(name)
+        for field in record.fields:
+            type_ = conventions.resolve(field.type)
+            while type_.kind == "array" and type_.element is not None:
+                type_ = conventions.resolve(type_.element)
+            pending.append(type_.declaration or type_.spelling)
+    return found
+
+
+def field_default_errors(api: Api) -> list[str]:
+    """Check each field's `default=`: its value in its record's native default.
+
+    A control role keeps its conventional value. Any other field may state a
+    nonzero literal of its own type, or an enumerator of its enum, when it is
+    a plain value that a default function's result holds. A generated C test
+    checks the value against the default function.
+    """
+    conventions = Conventions(api)
+    defaulted = defaulted_records(api)
+    enums = {enum.name: enum for enum in api.enums}
+    errors = []
+    for record in api.records:
+        for field in record.fields:
+            literal = field.metadata.get("default")
+            if literal is None:
+                continue
+            context = f"{field.location}: {record.name}.{field.name}"
+            kind = field.metadata.get("kind")
+            if kind in CONTROL_DEFAULTS:
+                if literal != CONTROL_DEFAULTS[kind]:
+                    errors.append(f"{context}: a {kind} member's default is fixed")
+                continue
+            resolved = conventions.resolve(field.type)
+            if (
+                kind is not None
+                or field.metadata.keys() & {"mask", "tag", "variant"}
+                or resolved.kind in {"pointer", "array"}
+                or conventions.is_record(resolved)
+            ):
+                errors.append(f"{context}: default requires a plain value member")
+                continue
+            if record.name not in defaulted:
+                errors.append(
+                    f"{context}: default requires a record that a default "
+                    "function returns"
+                )
+                continue
+            enum = enums.get(
+                field.metadata.get("enum", field.type.declaration or "")
+            ) or enums.get(resolved.declaration or "")
+            canonical = resolved.canonical.removeprefix("const ")
+            if enum is not None:
+                values = {value.name: value.value for value in enum.values}
+                if literal not in values:
+                    errors.append(f"{context}: default names no {enum.name} value")
+                    continue
+                zero = values[literal] == 0
+            elif canonical in {"bool", "_Bool"}:
+                if literal not in {"true", "false"}:
+                    errors.append(f"{context}: default requires true")
+                    continue
+                zero = literal == "false"
+            elif canonical in {"float", "double"}:
+                if not DECIMAL_LITERAL.fullmatch(literal):
+                    errors.append(f"{context}: default requires a decimal with a point")
+                    continue
+                zero = float(literal) == 0
+            elif canonical in DEFAULT_RANGES:
+                low, high = DEFAULT_RANGES[canonical]
+                if not INTEGER_LITERAL.fullmatch(literal) or not (
+                    low <= int(literal) <= high
+                ):
+                    errors.append(f"{context}: default requires a decimal {canonical}")
+                    continue
+                zero = int(literal) == 0
+            else:
+                errors.append(f"{context}: default requires a scalar or enum")
+                continue
+            if zero:
+                errors.append(f"{context}: default={literal} restates zero")
+    return errors
 
 
 # Keys whose values name other declarations, by the kind of declaration named.

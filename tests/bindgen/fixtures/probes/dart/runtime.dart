@@ -91,3 +91,10 @@ NativeStringView nativeStringView(String value, Allocator allocator) {
 Uint8List _copyBufferView(raw.mln_buffer_view view) => view.size == 0
     ? Uint8List(0)
     : Uint8List.fromList(view.data.cast<Uint8>().asTypedList(view.size));
+
+int _nativeInteger(int value, int minimum, int maximum) {
+  if (value < minimum || value > maximum) {
+    throw NativeFailure(-1, 'integer is outside its native range');
+  }
+  return value;
+}

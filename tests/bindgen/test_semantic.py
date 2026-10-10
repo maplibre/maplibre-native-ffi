@@ -4,8 +4,9 @@ import unittest
 
 from support import parse
 
+from tools.bindgen import default_cases
 from tools.bindgen.model import ModelError
-from tools.bindgen.semantic import DefaultSupport, DisposeSupport, bind
+from tools.bindgen.semantic import DefaultSupport, DisposeSupport, FieldInitial, bind
 
 
 class SemanticTests(unittest.TestCase):
@@ -138,6 +139,126 @@ mln_status read_value(value *out BIND("direction=out"), mln_diagnostic *out_diag
                 self.parse(source.replace("variant=NUMBER", "variant=TEXT")),
                 require_complete=True,
             )
+
+    def test_field_defaults_resolve_to_typed_initials(self):
+        bound = bind(parse(groups=("defaults",)), require_complete=True)
+        settings = bound.values["mln_probe_settings"]
+        initials = {
+            field.name: field.initial
+            for plan in (settings, bound.values["mln_probe_extent"])
+            for field in plan.fields
+        }
+        self.assertEqual(
+            initials,
+            {
+                "size": None,
+                "extent": None,
+                "width": FieldInitial("256", 256),
+                "scale": FieldInitial("1.5", 1.5),
+                "mode": FieldInitial(
+                    "MLN_PROBE_MODE_SECOND", 2, "MLN_PROBE_MODE_SECOND", "second"
+                ),
+                "flags": FieldInitial(
+                    "MLN_PROBE_FLAG_ALL", 3, "MLN_PROBE_FLAG_ALL", "all"
+                ),
+                "heading": FieldInitial(
+                    "MLN_PROBE_FLAG_SOUTH", 2, "MLN_PROBE_FLAG_SOUTH", "south"
+                ),
+                "ratio": FieldInitial("0.25", 0.25),
+                "offset": FieldInitial("-3", -3),
+                "enabled": FieldInitial("true", True),
+                "count": None,
+            },
+        )
+        # The generated C case checks every field against the same values.
+        self.assertEqual(
+            [
+                (item.path, item.form, item.expected)
+                for item in default_cases.record_expectations(
+                    settings, "value", "settings"
+                )
+            ],
+            [
+                ("settings.size", "unsigned", "sizeof(mln_probe_settings)"),
+                ("settings.extent.width", "unsigned", "256"),
+                ("settings.extent.scale", "float", "1.5"),
+                ("settings.mode", "unsigned", "MLN_PROBE_MODE_SECOND"),
+                ("settings.flags", "unsigned", "MLN_PROBE_FLAG_ALL"),
+                ("settings.heading", "unsigned", "MLN_PROBE_FLAG_SOUTH"),
+                ("settings.ratio", "float", "0.25"),
+                ("settings.offset", "signed", "-3"),
+                ("settings.enabled", "unsigned", "true"),
+                ("settings.count", "signed", "0"),
+            ],
+        )
+
+    def test_field_defaults_state_only_nonzero_values_that_a_default_returns(self):
+        source = """
+typedef enum mode : unsigned { MODE_OFF = 0, MODE_ON = 1 } mode;
+typedef struct extent { unsigned width; } extent;
+typedef struct settings {
+  unsigned size;
+  bool has_zoom;
+  extent area;
+  unsigned level;
+  unsigned mode BIND("enum=mode");
+  double zoom BIND("mask=has_zoom");
+  unsigned reserved BIND("kind=reserved");
+} settings;
+settings settings_default(void);
+typedef struct loose { unsigned width; } loose;
+mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
+"""
+        self.assertEqual(
+            bind(self.parse(source), require_complete=True)
+            .values["settings"]
+            .fields[3]
+            .initial,
+            None,
+        )
+        for before, after, message in (
+            ("unsigned level;", 'unsigned level BIND("default=0");', "restates zero"),
+            (
+                'BIND("enum=mode")',
+                'BIND("enum=mode;default=MODE_OFF")',
+                "restates zero",
+            ),
+            ('BIND("enum=mode")', 'BIND("enum=mode;default=ON")', "names no mode"),
+            ("unsigned level;", 'unsigned level BIND("default=1.0");', "decimal"),
+            (
+                'BIND("mask=has_zoom")',
+                'BIND("mask=has_zoom;default=1.0")',
+                "plain value",
+            ),
+            ("extent area;", 'extent area BIND("default=1");', "plain value"),
+            (
+                'BIND("kind=reserved")',
+                'BIND("kind=reserved;default=1")',
+                "is fixed",
+            ),
+            (
+                "typedef struct loose { unsigned width; }",
+                'typedef struct loose { unsigned width BIND("default=1"); }',
+                "default function returns",
+            ),
+        ):
+            with (
+                self.subTest(after=after),
+                self.assertRaisesRegex(ModelError, message),
+            ):
+                bind(self.parse(source.replace(before, after)), require_complete=True)
+        # A record nested by value in a default may state its own defaults.
+        nested = source.replace(
+            "typedef struct extent { unsigned width; }",
+            'typedef struct extent { unsigned width BIND("default=256"); }',
+        )
+        self.assertEqual(
+            bind(self.parse(nested), require_complete=True)
+            .values["extent"]
+            .fields[0]
+            .initial,
+            FieldInitial("256", 256),
+        )
 
     def test_mask_group_preserves_joint_presence(self):
         source = """

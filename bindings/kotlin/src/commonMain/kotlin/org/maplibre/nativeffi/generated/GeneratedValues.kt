@@ -1382,7 +1382,7 @@ public data class CanonicalTileId(
 )
 
 public data class FrameDemand(
-  public val flags: FrameDemandFlag,
+  public val flags: FrameDemandFlag = FrameDemandFlag.IF_NEEDED,
   public val token: ULong = 0uL,
   public val coalescingBoundary: ULong = 0uL,
   public val timeoutNs: ULong = 0uL,
@@ -1427,16 +1427,16 @@ public data class ProjectedMeters(
 )
 
 public data class LogicalExtent(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
-  public val scaleFactor: Double = 0.0,
+  public val width: UInt = 256u,
+  public val height: UInt = 256u,
+  public val scaleFactor: Double = 1.0,
 )
 
 public data class MapOptions(
   public val initialExtent: LogicalExtent = LogicalExtent(),
   public val mapMode: MapMode = MapMode(0u),
   public val fastPforEnabled: Boolean = false,
-  public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
+  public val eventMask: RuntimeEventMask = RuntimeEventMask.ALL,
 )
 
 public data class MapTileOptions(
@@ -1456,15 +1456,15 @@ public data class MapViewportOptions(
 )
 
 public data class RenderTargetExtent(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
-  public val scaleFactor: Double = 0.0,
+  public val width: UInt = 256u,
+  public val height: UInt = 256u,
+  public val scaleFactor: Double = 1.0,
 )
 
 public data class MetalBorrowedTextureDescriptor(
   public val extent: RenderTargetExtent = RenderTargetExtent(),
-  public val physicalWidth: UInt = 0u,
-  public val physicalHeight: UInt = 0u,
+  public val physicalWidth: UInt = 256u,
+  public val physicalHeight: UInt = 256u,
   public val texture: NativePointer,
 )
 
@@ -1519,8 +1519,8 @@ public data class OpenglContextDescriptor(
 
 public data class OpenglBorrowedTextureDescriptor(
   public val extent: RenderTargetExtent = RenderTargetExtent(),
-  public val physicalWidth: UInt = 0u,
-  public val physicalHeight: UInt = 0u,
+  public val physicalWidth: UInt = 256u,
+  public val physicalHeight: UInt = 256u,
   public val context: OpenglContextDescriptor,
   public val texture: UInt = 0u,
   public val target: UInt = 0u,
@@ -1551,8 +1551,8 @@ public data class ProjectionMode(
 )
 
 public data class RenderSessionAttachOptions(
-  public val driver: RenderDriverKind,
-  public val requestedTextureRingDepth: UInt = 0u,
+  public val driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD,
+  public val requestedTextureRingDepth: UInt = 1u,
   public val frameWake: Wake = Wake(),
   public val driverWorkWake: Wake = Wake(),
 )
@@ -1586,7 +1586,7 @@ public data class RuntimeOptions(
   public val flags: UInt = 0u,
   public val assetPath: String? = null,
   public val cachePath: String? = null,
-  public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
+  public val eventMask: RuntimeEventMask = RuntimeEventMask.ALL,
   public val eventWake: Wake = Wake(),
 )
 
@@ -1612,7 +1612,7 @@ public data class StyleImageInfo(
   public val content: ImageContent? = null,
   public val textFitWidth: StyleImageTextFit? = null,
   public val textFitHeight: StyleImageTextFit? = null,
-  public val pixelRatio: Float = 0f,
+  public val pixelRatio: Float = 1.0f,
   public val sdf: Boolean = false,
 )
 
@@ -1664,14 +1664,14 @@ public data class VulkanContextDescriptor(
 
 public data class VulkanBorrowedTextureDescriptor(
   public val extent: RenderTargetExtent = RenderTargetExtent(),
-  public val physicalWidth: UInt = 0u,
-  public val physicalHeight: UInt = 0u,
+  public val physicalWidth: UInt = 256u,
+  public val physicalHeight: UInt = 256u,
   public val context: VulkanContextDescriptor,
   public val image: ULong = 0uL,
   public val imageView: ULong = 0uL,
   public val format: UInt = 0u,
   public val initialLayout: UInt = 0u,
-  public val finalLayout: UInt = 0u,
+  public val finalLayout: UInt = 5u,
 )
 
 public data class VulkanOwnedTextureDescriptor(
@@ -1693,8 +1693,8 @@ public data class WebgpuContextDescriptor(
 
 public data class WebgpuBorrowedTextureDescriptor(
   public val extent: RenderTargetExtent = RenderTargetExtent(),
-  public val physicalWidth: UInt = 0u,
-  public val physicalHeight: UInt = 0u,
+  public val physicalWidth: UInt = 256u,
+  public val physicalHeight: UInt = 256u,
   public val context: WebgpuContextDescriptor,
   public val texture: NativePointer,
   public val textureView: NativePointer,

@@ -1410,7 +1410,7 @@ final class RuntimeEventBatchView extends _Value {
 
 final class FrameDemand extends _Value {
   const FrameDemand({
-    this.flags = const FrameDemandFlag.fromRawValue(0),
+    this.flags = FrameDemandFlag.ifNeeded,
     required this.token,
     required this.coalescingBoundary,
     required this.timeoutNs,
@@ -1598,7 +1598,11 @@ final class StyleImageStretchesResult extends _Value {
 }
 
 final class LogicalExtent extends _Value {
-  const LogicalExtent({this.width = 0, this.height = 0, this.scaleFactor = 0});
+  const LogicalExtent({
+    this.width = 256,
+    this.height = 256,
+    this.scaleFactor = 1.0,
+  });
   final int width;
   final int height;
   final double scaleFactor;
@@ -1612,7 +1616,7 @@ final class MapOptions extends _Value {
     this.initialExtent = const LogicalExtent(),
     this.mapMode = const MapMode.fromRawValue(0),
     this.fastPforEnabled = false,
-    this.eventMask = const RuntimeEventMask.fromRawValue(0),
+    this.eventMask = RuntimeEventMask.all,
   });
   final LogicalExtent initialExtent;
   final MapMode mapMode;
@@ -1671,7 +1675,7 @@ final class StyleImageInfo extends _Value {
     this.content,
     this.textFitWidth,
     this.textFitHeight,
-    this.pixelRatio = 0,
+    this.pixelRatio = 1.0,
     this.sdf = false,
   });
   final int width;
@@ -2007,9 +2011,9 @@ final class MapSnapshot extends _Value {
 
 final class RenderTargetExtent extends _Value {
   const RenderTargetExtent({
-    this.width = 0,
-    this.height = 0,
-    this.scaleFactor = 0,
+    this.width = 256,
+    this.height = 256,
+    this.scaleFactor = 1.0,
   });
   final int width;
   final int height;
@@ -2022,8 +2026,8 @@ final class RenderTargetExtent extends _Value {
 final class MetalBorrowedTextureDescriptor extends _Value {
   const MetalBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
-    this.physicalWidth = 0,
-    this.physicalHeight = 0,
+    this.physicalWidth = 256,
+    this.physicalHeight = 256,
     this.texture = NativePointer.nullPointer,
   });
   final RenderTargetExtent extent;
@@ -2049,8 +2053,8 @@ final class Wake {
 
 final class RenderSessionAttachOptions extends _Value {
   const RenderSessionAttachOptions({
-    required this.driver,
-    this.requestedTextureRingDepth = 0,
+    this.driver = RenderDriverKind.callerGraphicsThread,
+    this.requestedTextureRingDepth = 1,
     this.frameWake = const Wake(),
     this.driverWorkWake = const Wake(),
   });
@@ -2195,8 +2199,8 @@ final class OpenglContextDescriptorDataUnknown
 final class OpenglBorrowedTextureDescriptor extends _Value {
   const OpenglBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
-    this.physicalWidth = 0,
-    this.physicalHeight = 0,
+    this.physicalWidth = 256,
+    this.physicalHeight = 256,
     required this.context,
     this.texture = 0,
     this.target = 0,
@@ -2475,7 +2479,7 @@ final class RuntimeOptions extends _Value {
     this.flags = 0,
     this.assetPath,
     this.cachePath,
-    this.eventMask = const RuntimeEventMask.fromRawValue(0),
+    this.eventMask = RuntimeEventMask.all,
     this.eventWake = const Wake(),
   });
   final int flags;
@@ -2897,14 +2901,14 @@ final class VulkanContextDescriptor extends _Value {
 final class VulkanBorrowedTextureDescriptor extends _Value {
   const VulkanBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
-    this.physicalWidth = 0,
-    this.physicalHeight = 0,
+    this.physicalWidth = 256,
+    this.physicalHeight = 256,
     this.context = const VulkanContextDescriptor(),
     required this.image,
     required this.imageView,
     this.format = 0,
     this.initialLayout = 0,
-    this.finalLayout = 0,
+    this.finalLayout = 5,
   });
   final RenderTargetExtent extent;
   final int physicalWidth;
@@ -2973,8 +2977,8 @@ final class WebgpuContextDescriptor extends _Value {
 final class WebgpuBorrowedTextureDescriptor extends _Value {
   const WebgpuBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
-    this.physicalWidth = 0,
-    this.physicalHeight = 0,
+    this.physicalWidth = 256,
+    this.physicalHeight = 256,
     this.context = const WebgpuContextDescriptor(),
     this.texture = NativePointer.nullPointer,
     this.textureView = NativePointer.nullPointer,

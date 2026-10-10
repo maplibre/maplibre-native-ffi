@@ -25,7 +25,7 @@ class ZigEmitterTests(unittest.TestCase):
     def test_generated_values_and_keyword_parameters_round_trip(self):
         zig_tool = require_tool(self, "zig", BINDING)
         header = protocol_header(
-            groups=("values", "keywords"),
+            groups=("values", "keywords", "defaults"),
             defines=("MLN_PROTOCOL_COMPLETION_RUNTIME",),
         )
         api = parse_sources({"api.h": header})

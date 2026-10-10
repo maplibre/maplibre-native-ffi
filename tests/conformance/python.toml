@@ -29,6 +29,7 @@
 "VAL-03" = "bindings/python/tests/test_values.py::test_a_strided_batch_decodes_and_an_unknown_union_arm_reaches_native"
 "VAL-04" = "bindings/python/tests/test_values.py::test_integers_are_range_checked_enums_stay_open_and_64_bit_values_round_trip"
 "VAL-05" = "bindings/python/tests/test_values.py::test_an_array_input_is_copied_when_it_is_submitted"
+"VAL-06" = { na = "A value's constructor takes every field, and MapOptions.default() returns a copy of the native default" }
 "VIEW-01" = "bindings/python/tests/test_render.py::test_a_frame_view_holds_its_owners_until_its_scope_ends"
 "REND-01" = "bindings/python/tests/test_render.py::test_an_owned_texture_renders_pixels_the_binding_reads_back"
 "REND-02" = "bindings/python/tests/test_render.py::test_a_caller_driven_session_is_serviced_from_a_python_thread"

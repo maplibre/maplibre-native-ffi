@@ -110,6 +110,15 @@ void main() {
     expect(await converted, expected);
   });
 
+  // A constructor's defaults come from the header's field annotations, so
+  // the record they build matches what the native default function returns.
+  test(
+    'a record built from its constructor defaults equals the native default',
+    () {
+      expect(const MapOptions(), mapOptionsDefault());
+    },
+  );
+
   test('byte-backed values own their storage and compare by content', () {
     final clusterProperties = Uint8List.fromList([1, 2, 3]);
     final geometry = Uint8List.fromList([4, 5, 6]);

@@ -39,6 +39,9 @@ void main() {
     'keyword parameters: ${entry.type} ${entry.defer} ${entry.raw}',
   );
 
+  // A record built from its constructor defaults equals the native default.
+  probeSettingsCheck(const ProbeSettings());
+
   try {
     probeRoundtrip(ProbeOptions(right: List.filled(9, point)));
     check(false, 'native failure was not reported');

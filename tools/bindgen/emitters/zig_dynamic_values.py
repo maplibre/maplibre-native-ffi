@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from .rust_dynamic_values import dynamic
 from .zig import identifier, pascal
+from .zig_values import field_default
 
 
 def public(values, value):
@@ -235,9 +236,7 @@ def declaration(values, value):
             if optional or public_type.startswith("?")
             else "&.{}"
             if public_type.startswith("[]")
-            else ".{}"
-            if field.value.kind == "record"
-            else "std.mem.zeroes(" + public_type + ")"
+            else field_default(values, field)
         )
         fields.append(
             f"    {local}: {'?' if optional else ''}{public_type} = {default},"

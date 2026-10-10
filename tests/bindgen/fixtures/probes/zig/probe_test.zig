@@ -45,3 +45,7 @@ test "generated calls report native failures through the diagnostic" {
     try std.testing.expectEqual(@as(?i32, -1), diagnostic.raw_status);
     try std.testing.expectEqualStrings("right holds more than 8 points", diagnostic.message());
 }
+
+test "generated record defaults equal the native default" {
+    try api.probeSettingsCheck(.{}, null);
+}

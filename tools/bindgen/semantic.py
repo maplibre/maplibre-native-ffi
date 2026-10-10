@@ -177,14 +177,35 @@ CONTROL_ROLES = frozenset(
 
 
 @dataclass(frozen=True)
+class FieldInitial:
+    """The nonzero value that a field holds in its record's native default.
+
+    `literal` is the annotation as written; `value` is the number it denotes.
+    For an enum field, `enumerator` names the constant and `member` is that
+    constant without its enum's shared prefix, in lower case.
+    """
+
+    literal: str
+    value: int | float | bool
+    enumerator: str | None = None
+    member: str | None = None
+
+
+@dataclass(frozen=True)
 class FieldPlan:
     name: str
     value: ValuePlan
     presence: Presence | None = None
+    # A control role's conventional value: `sizeof` for a size, `0` for
+    # reserved space.
     default: str | None = None
     # The field's `kind`, or "value". A role in CONTROL_ROLES marks state that
     # a binding writes or derives rather than a member a host sets or reads.
     role: str = "value"
+    # The field's annotated `default=`: its value in the record's native
+    # default, which a binding that builds the record from language defaults
+    # uses in place of zero.
+    initial: FieldInitial | None = None
 
     @property
     def public(self) -> bool:
@@ -406,6 +427,23 @@ def output_member(name: str) -> str:
 def public_stem(native: str) -> str:
     """A declaration's name without the C API's `mln_` namespace."""
     return native.removeprefix("mln_")
+
+
+def field_initial(value: ValuePlan, literal: str) -> FieldInitial:
+    """Resolve a field's `default=` annotation, which the schema checked."""
+    if value.kind == "enum":
+        constants = dict(value.enum_values)
+        return FieldInitial(
+            literal,
+            constants[literal],
+            literal,
+            literal.removeprefix(enum_member_prefix(constants)).lower(),
+        )
+    if literal == "true":
+        return FieldInitial(literal, True)
+    if "." in literal:
+        return FieldInitial(literal, float(literal))
+    return FieldInitial(literal, int(literal))
 
 
 def enum_member_prefix(constants) -> str:
@@ -727,13 +765,19 @@ class Binder:
                                 for key in ("mask", "bit", "tag", "variant")
                             }
                         )
+                    role = item.metadata.get("kind", "value")
+                    member_value = self.value(item.type, item.metadata, field_context)
+                    control_default = role in {"size", "reserved"}
                     fields.append(
                         FieldPlan(
                             item.name,
-                            self.value(item.type, item.metadata, field_context),
+                            member_value,
                             presence,
-                            item.metadata.get("default"),
-                            item.metadata.get("kind", "value"),
+                            item.metadata.get("default") if control_default else None,
+                            role,
+                            None
+                            if control_default or "default" not in item.metadata
+                            else field_initial(member_value, item.metadata["default"]),
                         )
                     )
                 storage_roles = {}

@@ -9,7 +9,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from . import copy_cases
+from . import copy_cases, default_cases
 from .compiler import compile_api
 from .frontend import parse_headers
 from .model import Api, ModelError
@@ -40,6 +40,7 @@ def render(api: Api, staging: Path) -> tuple[dict[str, str], dict]:
         raise ModelError(list(bound.diagnostics))
     outputs = native_capture.generate(bound)
     outputs.update(copy_cases.generate(bound))
+    outputs.update(default_cases.generate(bound))
     for directory, emitter in (
         ("bindings/go", go),
         ("bindings/dotnet/src/Maplibre.NativeFfi", dotnet),

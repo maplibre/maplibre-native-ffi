@@ -7,6 +7,23 @@ from ..semantic import ValuePlan
 from .zig import SCALARS, identifier, pascal
 
 
+def field_default(values, field) -> str:
+    """The Zig default of a required field: its annotated initial value, a
+    record's own field defaults, or zero."""
+    value, initial = field.value, field.initial
+    public = values.public(value)
+    if initial is None:
+        return ".{}" if value.kind == "record" else f"std.mem.zeroes({public})"
+    if value.kind != "enum":
+        return initial.literal
+    member = identifier(initial.member)
+    if value.enum_kind != "bitmask":
+        return f".{member}"
+    if initial.value & (initial.value - 1) == 0:
+        return f".{{ .{member} = true }}"
+    return f"{public}.{member}"
+
+
 class Values:
     def __init__(self, bound):
         self.bound = bound
@@ -201,11 +218,7 @@ class Values:
             if not field.public or field.name in grouped:
                 continue
             optional = field.presence and field.presence.mask
-            initial = (
-                "null"
-                if optional
-                else "std.mem.zeroes(" + self.public(field.value) + ")"
-            )
+            initial = "null" if optional else field_default(self, field)
             fields.append(
                 f"    {local}: {'?' if optional else ''}{self.public(field.value)} = {initial},"
             )

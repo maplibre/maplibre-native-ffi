@@ -88,7 +88,7 @@ def common(values):
             parameters = []
             for member, typ, children, _group in values.members(value):
                 default = (
-                    "null" if typ.endswith("?") else values.default(children[0].value)
+                    "null" if typ.endswith("?") else values.field_default(children[0])
                 )
                 parameters.append(
                     f"  public val {member}: {typ}"

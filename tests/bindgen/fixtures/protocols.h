@@ -17,7 +17,7 @@
 #if defined(MLN_PROTOCOL_VALUES) || defined(MLN_PROTOCOL_KEYWORDS) || \
   defined(MLN_PROTOCOL_PRESENCE_MASK) ||                              \
   defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                         \
-  defined(MLN_PROTOCOL_ABI_VERSION)
+  defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -149,6 +149,43 @@ mln_status mln_probe_nullable_text(
   const char* text BIND("length=text_size;nullable=true"), uint16_t text_size,
   mln_probe_text_result* out_result BIND("direction=out"),
   mln_diagnostic* out_diagnostic
+);
+#endif
+
+#ifdef MLN_PROTOCOL_DEFAULTS
+// A record whose native default holds nonzero values: a scalar of each kind,
+// an enumerator, a bitmask with one flag and with several, and a nested record
+// with defaults of its own. A binding builds it from language defaults.
+typedef enum mln_probe_mode : uint32_t {
+  MLN_PROBE_MODE_FIRST = 1,
+  MLN_PROBE_MODE_SECOND = 2,
+} mln_probe_mode;
+typedef enum BIND("kind=bitmask") mln_probe_flag : uint32_t {
+  MLN_PROBE_FLAG_NONE = 0,
+  MLN_PROBE_FLAG_NORTH = 1,
+  MLN_PROBE_FLAG_SOUTH = 2,
+  MLN_PROBE_FLAG_ALL = 3,
+} mln_probe_flag;
+typedef struct mln_probe_extent {
+  uint32_t width BIND("default=256");
+  double scale BIND("default=1.5");
+} mln_probe_extent;
+typedef struct mln_probe_settings {
+  uint32_t size;
+  mln_probe_extent extent;
+  uint32_t mode BIND("enum=mln_probe_mode;default=MLN_PROBE_MODE_SECOND");
+  uint32_t flags BIND("enum=mln_probe_flag;default=MLN_PROBE_FLAG_ALL");
+  uint32_t heading BIND("enum=mln_probe_flag;default=MLN_PROBE_FLAG_SOUTH");
+  float ratio BIND("default=0.25");
+  int32_t offset BIND("default=-3");
+  bool enabled BIND("default=true");
+  int32_t count;
+} mln_probe_settings;
+mln_probe_settings mln_probe_settings_default(void);
+// Succeeds when every field of `settings` equals the native default, and
+// otherwise names the first field that differs.
+mln_status mln_probe_settings_check(
+  mln_probe_settings settings, mln_diagnostic* out_diagnostic
 );
 #endif
 

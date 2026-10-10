@@ -31,6 +31,7 @@
 # slice length into a native count, which this test cannot allocate.
 "VAL-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::open_enums_keep_unknown_values_and_64_bit_masks_cross_whole"
 "VAL-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::array_inputs_are_copied_when_they_are_submitted"
+"VAL-06" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/values.rs::a_record_built_from_its_default_equals_the_native_default"
 "VIEW-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::a_frame_view_lasts_for_its_scope_and_its_owners_stay_busy_inside_it"
 # The browser build renders on WebGL and WebGPU in tests/suite/browser/mod.rs.
 "REND-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/render.rs::an_owned_texture_session_renders_a_frame_the_binding_reads_back"

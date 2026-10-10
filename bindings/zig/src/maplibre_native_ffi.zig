@@ -186,10 +186,10 @@ pub const CameraChangeMode = enum(u32) {
 
 pub const CameraDelta = struct {
     kind: CameraDeltaKind = std.mem.zeroes(CameraDeltaKind),
-    offset: ScreenPoint = std.mem.zeroes(ScreenPoint),
+    offset: ScreenPoint = .{},
     amount: f64 = std.mem.zeroes(f64),
     anchor: ?ScreenPoint = null,
-    animation: AnimationOptions = std.mem.zeroes(AnimationOptions),
+    animation: AnimationOptions = .{},
     pub fn toNative(self: CameraDelta) c.mln_camera_delta {
         var raw = c.mln_camera_delta_default();
         raw.has_anchor = false;
@@ -321,7 +321,7 @@ pub const CameraOptions = struct {
 
 pub const CameraQueryResult = struct {
     generation: u64 = std.mem.zeroes(u64),
-    camera: CameraOptions = std.mem.zeroes(CameraOptions),
+    camera: CameraOptions = .{},
     pub fn toNative(self: CameraQueryResult) c.mln_camera_query_result {
         var raw = std.mem.zeroes(c.mln_camera_query_result);
         raw.size = @sizeOf(c.mln_camera_query_result);
@@ -339,8 +339,8 @@ pub const CameraQueryResult = struct {
 
 pub const CameraUpdate = struct {
     mode: CameraUpdateMode = std.mem.zeroes(CameraUpdateMode),
-    camera: CameraOptions = std.mem.zeroes(CameraOptions),
-    animation: AnimationOptions = std.mem.zeroes(AnimationOptions),
+    camera: CameraOptions = .{},
+    animation: AnimationOptions = .{},
     gesture_phase: GesturePhase = std.mem.zeroes(GesturePhase),
     pub fn toNative(self: CameraUpdate) c.mln_camera_update {
         var raw = c.mln_camera_update_default();
@@ -681,7 +681,7 @@ pub const FeatureStateSelectorField = struct {
 };
 
 pub const FrameDemand = struct {
-    flags: FrameDemandFlag = std.mem.zeroes(FrameDemandFlag),
+    flags: FrameDemandFlag = .{ .if_needed = true },
     token: u64 = std.mem.zeroes(u64),
     coalescing_boundary: u64 = std.mem.zeroes(u64),
     timeout_ns: u64 = std.mem.zeroes(u64),
@@ -974,8 +974,8 @@ pub const LatLng = struct {
 };
 
 pub const LatLngBounds = struct {
-    southwest: LatLng = std.mem.zeroes(LatLng),
-    northeast: LatLng = std.mem.zeroes(LatLng),
+    southwest: LatLng = .{},
+    northeast: LatLng = .{},
     pub fn toNative(self: LatLngBounds) c.mln_lat_lng_bounds {
         var raw = std.mem.zeroes(c.mln_lat_lng_bounds);
         raw.southwest = self.southwest.toNative();
@@ -1048,9 +1048,9 @@ pub const LogSeverityMask = struct {
 };
 
 pub const LogicalExtent = struct {
-    width: u32 = std.mem.zeroes(u32),
-    height: u32 = std.mem.zeroes(u32),
-    scale_factor: f64 = std.mem.zeroes(f64),
+    width: u32 = 256,
+    height: u32 = 256,
+    scale_factor: f64 = 1.0,
     pub fn toNative(self: LogicalExtent) c.mln_logical_extent {
         var raw = std.mem.zeroes(c.mln_logical_extent);
         raw.width = self.width;
@@ -1095,10 +1095,10 @@ pub const MapMode = enum(u32) {
 };
 
 pub const MapOptions = struct {
-    initial_extent: LogicalExtent = std.mem.zeroes(LogicalExtent),
+    initial_extent: LogicalExtent = .{},
     map_mode: MapMode = std.mem.zeroes(MapMode),
     fast_pfor_enabled: bool = std.mem.zeroes(bool),
-    event_mask: RuntimeEventMask = std.mem.zeroes(RuntimeEventMask),
+    event_mask: RuntimeEventMask = RuntimeEventMask.all,
     pub fn toNative(self: MapOptions) c.mln_map_options {
         var raw = c.mln_map_options_default();
         raw.initial_extent = self.initial_extent.toNative();
@@ -1120,19 +1120,19 @@ pub const MapOptions = struct {
 pub const MapSnapshot = struct {
     debug_options: MapDebugOption = std.mem.zeroes(MapDebugOption),
     generation: u64 = std.mem.zeroes(u64),
-    camera: CameraOptions = std.mem.zeroes(CameraOptions),
-    logical_extent: LogicalExtent = std.mem.zeroes(LogicalExtent),
-    projection_mode: ProjectionMode = std.mem.zeroes(ProjectionMode),
-    viewport: MapViewportOptions = std.mem.zeroes(MapViewportOptions),
+    camera: CameraOptions = .{},
+    logical_extent: LogicalExtent = .{},
+    projection_mode: ProjectionMode = .{},
+    viewport: MapViewportOptions = .{},
     fully_loaded: bool = std.mem.zeroes(bool),
     rendering_stats_view_enabled: bool = std.mem.zeroes(bool),
     repaint_demand: bool = std.mem.zeroes(bool),
     gesture_in_progress: bool = std.mem.zeroes(bool),
     event_mask: RuntimeEventMask = std.mem.zeroes(RuntimeEventMask),
     latest_render_update_generation: u64 = std.mem.zeroes(u64),
-    tile: MapTileOptions = std.mem.zeroes(MapTileOptions),
-    bounds: BoundOptions = std.mem.zeroes(BoundOptions),
-    free_camera: FreeCameraOptions = std.mem.zeroes(FreeCameraOptions),
+    tile: MapTileOptions = .{},
+    bounds: BoundOptions = .{},
+    free_camera: FreeCameraOptions = .{},
     pub fn toNative(self: MapSnapshot) c.mln_map_snapshot {
         var raw = std.mem.zeroes(c.mln_map_snapshot);
         raw.size = @sizeOf(c.mln_map_snapshot);
@@ -1261,9 +1261,9 @@ pub const MapViewportOptions = struct {
 };
 
 pub const MetalBorrowedTextureDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    physical_width: u32 = std.mem.zeroes(u32),
-    physical_height: u32 = std.mem.zeroes(u32),
+    extent: RenderTargetExtent = .{},
+    physical_width: u32 = 256,
+    physical_height: u32 = 256,
     texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: MetalBorrowedTextureDescriptor) c.mln_metal_borrowed_texture_descriptor {
         var raw = c.mln_metal_borrowed_texture_descriptor_default();
@@ -1299,8 +1299,8 @@ pub const MetalContextDescriptor = struct {
 };
 
 pub const MetalOwnedTextureDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    context: MetalContextDescriptor = std.mem.zeroes(MetalContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    context: MetalContextDescriptor = .{},
     pub fn toNative(self: MetalOwnedTextureDescriptor) c.mln_metal_owned_texture_descriptor {
         var raw = c.mln_metal_owned_texture_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -1352,8 +1352,8 @@ pub const MetalOwnedTextureFrame = struct {
 };
 
 pub const MetalSurfaceDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    context: MetalContextDescriptor = std.mem.zeroes(MetalContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    context: MetalContextDescriptor = .{},
     layer: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     pub fn toNative(self: MetalSurfaceDescriptor) c.mln_metal_surface_descriptor {
         var raw = c.mln_metal_surface_descriptor_default();
@@ -1569,8 +1569,8 @@ pub const OfflineTilePyramidRegionDefinition = struct {
 
 pub const OpenglBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
-    physical_width: u32 = std.mem.zeroes(u32),
-    physical_height: u32 = std.mem.zeroes(u32),
+    physical_width: u32 = 256,
+    physical_height: u32 = 256,
     context: OpenglContextDescriptor = .{},
     texture: u32 = std.mem.zeroes(u32),
     target: u32 = std.mem.zeroes(u32),
@@ -2021,8 +2021,8 @@ pub const RenderResult = enum(u32) {
 };
 
 pub const RenderSessionAttachOptions = struct {
-    driver: RenderDriverKind = std.mem.zeroes(RenderDriverKind),
-    requested_texture_ring_depth: u32 = std.mem.zeroes(u32),
+    driver: RenderDriverKind = .caller_graphics_thread,
+    requested_texture_ring_depth: u32 = 1,
     frame_wake: Wake = .{},
     driver_work_wake: Wake = .{},
     pub fn toNative(self: RenderSessionAttachOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_render_session_attach_options {
@@ -2085,7 +2085,7 @@ pub const RenderSessionSnapshot = struct {
     state: RenderSessionState = std.mem.zeroes(RenderSessionState),
     driver: RenderDriverKind = std.mem.zeroes(RenderDriverKind),
     latest_result: RenderResult = std.mem.zeroes(RenderResult),
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
+    extent: RenderTargetExtent = .{},
     generation: u64 = std.mem.zeroes(u64),
     map_update_generation: u64 = std.mem.zeroes(u64),
     rendered_update_generation: u64 = std.mem.zeroes(u64),
@@ -2148,9 +2148,9 @@ pub const RenderSessionState = enum(u32) {
 };
 
 pub const RenderTargetExtent = struct {
-    width: u32 = std.mem.zeroes(u32),
-    height: u32 = std.mem.zeroes(u32),
-    scale_factor: f64 = std.mem.zeroes(f64),
+    width: u32 = 256,
+    height: u32 = 256,
+    scale_factor: f64 = 1.0,
     pub fn toNative(self: RenderTargetExtent) c.mln_render_target_extent {
         var raw = std.mem.zeroes(c.mln_render_target_extent);
         raw.size = @sizeOf(c.mln_render_target_extent);
@@ -2748,7 +2748,7 @@ pub const RuntimeEventOfflineRegionResponseError = struct {
 
 pub const RuntimeEventOfflineRegionStatus = struct {
     region_id: i64 = std.mem.zeroes(i64),
-    status: OfflineRegionStatus = std.mem.zeroes(OfflineRegionStatus),
+    status: OfflineRegionStatus = .{},
     pub fn toNative(self: RuntimeEventOfflineRegionStatus) c.mln_runtime_event_offline_region_status {
         var raw = std.mem.zeroes(c.mln_runtime_event_offline_region_status);
         raw.region_id = self.region_id;
@@ -2810,7 +2810,7 @@ pub const RuntimeEventRenderFrame = struct {
     mode: RenderMode = std.mem.zeroes(RenderMode),
     needs_repaint: bool = std.mem.zeroes(bool),
     placement_changed: bool = std.mem.zeroes(bool),
-    stats: RenderingStats = std.mem.zeroes(RenderingStats),
+    stats: RenderingStats = .{},
     pub fn toNative(self: RuntimeEventRenderFrame) c.mln_runtime_event_render_frame {
         var raw = std.mem.zeroes(c.mln_runtime_event_render_frame);
         raw.mode = self.mode.toNative();
@@ -2853,7 +2853,7 @@ pub const RuntimeEventSourceType = enum(u32) {
 
 pub const RuntimeEventTileAction = struct {
     operation: TileOperation = std.mem.zeroes(TileOperation),
-    tile_id: TileId = std.mem.zeroes(TileId),
+    tile_id: TileId = .{},
     pub fn toNative(self: RuntimeEventTileAction) c.mln_runtime_event_tile_action {
         var raw = std.mem.zeroes(c.mln_runtime_event_tile_action);
         raw.operation = self.operation.toNative();
@@ -2900,7 +2900,7 @@ pub const RuntimeOptions = struct {
     flags: u32 = std.mem.zeroes(u32),
     asset_path: ?[]const u8 = null,
     cache_path: ?[]const u8 = null,
-    event_mask: RuntimeEventMask = std.mem.zeroes(RuntimeEventMask),
+    event_mask: RuntimeEventMask = RuntimeEventMask.all,
     event_wake: Wake = .{},
     pub fn toNative(self: RuntimeOptions, allocator: std.mem.Allocator, roots: *callback.Roots) status.Error!c.mln_runtime_options {
         var raw = c.mln_runtime_options_default();
@@ -2925,8 +2925,8 @@ pub const RuntimeOptions = struct {
 };
 
 pub const ScreenBox = struct {
-    min: ScreenPoint = std.mem.zeroes(ScreenPoint),
-    max: ScreenPoint = std.mem.zeroes(ScreenPoint),
+    min: ScreenPoint = .{},
+    max: ScreenPoint = .{},
     pub fn toNative(self: ScreenBox) c.mln_screen_box {
         var raw = std.mem.zeroes(c.mln_screen_box);
         raw.min = self.min.toNative();
@@ -3055,7 +3055,7 @@ pub const StyleImageInfo = struct {
     content: ?ImageContent = null,
     text_fit_width: ?StyleImageTextFit = null,
     text_fit_height: ?StyleImageTextFit = null,
-    pixel_ratio: f32 = std.mem.zeroes(f32),
+    pixel_ratio: f32 = 1.0,
     sdf: bool = std.mem.zeroes(bool),
     pub fn toNative(self: StyleImageInfo) c.mln_style_image_info {
         var raw = c.mln_style_image_info_default();
@@ -3787,15 +3787,15 @@ pub const ViewportMode = enum(u32) {
 };
 
 pub const VulkanBorrowedTextureDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    physical_width: u32 = std.mem.zeroes(u32),
-    physical_height: u32 = std.mem.zeroes(u32),
-    context: VulkanContextDescriptor = std.mem.zeroes(VulkanContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    physical_width: u32 = 256,
+    physical_height: u32 = 256,
+    context: VulkanContextDescriptor = .{},
     image: u64 = std.mem.zeroes(u64),
     image_view: u64 = std.mem.zeroes(u64),
     format: u32 = std.mem.zeroes(u32),
     initial_layout: u32 = std.mem.zeroes(u32),
-    final_layout: u32 = std.mem.zeroes(u32),
+    final_layout: u32 = 5,
     pub fn toNative(self: VulkanBorrowedTextureDescriptor) c.mln_vulkan_borrowed_texture_descriptor {
         var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -3858,8 +3858,8 @@ pub const VulkanContextDescriptor = struct {
 };
 
 pub const VulkanOwnedTextureDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    context: VulkanContextDescriptor = std.mem.zeroes(VulkanContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    context: VulkanContextDescriptor = .{},
     pub fn toNative(self: VulkanOwnedTextureDescriptor) c.mln_vulkan_owned_texture_descriptor {
         var raw = c.mln_vulkan_owned_texture_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -3917,8 +3917,8 @@ pub const VulkanOwnedTextureFrame = struct {
 };
 
 pub const VulkanSurfaceDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    context: VulkanContextDescriptor = std.mem.zeroes(VulkanContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    context: VulkanContextDescriptor = .{},
     surface: u64 = std.mem.zeroes(u64),
     pub fn toNative(self: VulkanSurfaceDescriptor) c.mln_vulkan_surface_descriptor {
         var raw = c.mln_vulkan_surface_descriptor_default();
@@ -4009,10 +4009,10 @@ pub const WebglContextKind = enum(u32) {
 };
 
 pub const WebgpuBorrowedTextureDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    physical_width: u32 = std.mem.zeroes(u32),
-    physical_height: u32 = std.mem.zeroes(u32),
-    context: WebgpuContextDescriptor = std.mem.zeroes(WebgpuContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    physical_width: u32 = 256,
+    physical_height: u32 = 256,
+    context: WebgpuContextDescriptor = .{},
     texture: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     texture_view: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     format: u32 = std.mem.zeroes(u32),
@@ -4062,8 +4062,8 @@ pub const WebgpuContextDescriptor = struct {
 };
 
 pub const WebgpuOwnedTextureDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    context: WebgpuContextDescriptor = std.mem.zeroes(WebgpuContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    context: WebgpuContextDescriptor = .{},
     pub fn toNative(self: WebgpuOwnedTextureDescriptor) c.mln_webgpu_owned_texture_descriptor {
         var raw = c.mln_webgpu_owned_texture_descriptor_default();
         raw.extent = self.extent.toNative();
@@ -4118,8 +4118,8 @@ pub const WebgpuOwnedTextureFrame = struct {
 };
 
 pub const WebgpuSurfaceDescriptor = struct {
-    extent: RenderTargetExtent = std.mem.zeroes(RenderTargetExtent),
-    context: WebgpuContextDescriptor = std.mem.zeroes(WebgpuContextDescriptor),
+    extent: RenderTargetExtent = .{},
+    context: WebgpuContextDescriptor = .{},
     surface: ?*anyopaque = std.mem.zeroes(?*anyopaque),
     format: u32 = std.mem.zeroes(u32),
     pub fn toNative(self: WebgpuSurfaceDescriptor) c.mln_webgpu_surface_descriptor {

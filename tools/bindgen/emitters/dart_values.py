@@ -538,6 +538,15 @@ class Values:
             else f"result.ref.{mask} = true;"
         )
 
+    def field_default(self, field):
+        """A field's default: its annotated initial value, or its type's."""
+        value, initial = field.value, field.initial
+        if initial is None:
+            return self.default_expression(value)
+        if value.kind == "enum":
+            return f"{public_name(value.native)}.{identifier(initial.member)}"
+        return initial.literal
+
     def default_expression(self, value):
         if value.nullable or value.optional:
             return "null"
@@ -561,7 +570,7 @@ class Values:
                     continue
                 if group:
                     return None
-                default = self.default_expression(children[0].value)
+                default = self.field_default(children[0])
                 if default is None:
                     return None
                 if value.ordered:
@@ -672,7 +681,7 @@ class Values:
                 )
             field = children[0]
             fields.append(f"  final {typ} {name};")
-            default = self.default_expression(field.value)
+            default = self.field_default(field)
             args.append(
                 f"this.{name}"
                 if typ.endswith("?")
@@ -868,7 +877,7 @@ class Values:
         arguments, fields, writes, reads = [], [], [], []
         for field in members:
             name, typ = identifier(field.name), self.public(field.value)
-            default = self.default_expression(field.value)
+            default = self.field_default(field)
             arguments.append(
                 f"this.{name}"
                 if typ.endswith("?")
@@ -1038,9 +1047,7 @@ class Values:
             positional = value.ordered
             args, initializers = [], []
             for name, typ, children, group in members:
-                default = (
-                    self.default_expression(children[0].value) if not group else None
-                )
+                default = self.field_default(children[0]) if not group else None
                 copied = typ.startswith("List<") or typ.rstrip("?") == "Uint8List"
                 if copied:
                     args.append(

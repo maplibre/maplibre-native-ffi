@@ -35,6 +35,7 @@
 "VAL-03" = "bindings/zig/tests/values.zig::a strided event batch with an unknown payload arm decodes without loss"
 "VAL-04" = "bindings/zig/tests/values.zig::open enums keep unknown values and 64-bit carriers round-trip"
 "VAL-05" = "bindings/zig/tests/values.zig::an array input is copied at submission"
+"VAL-06" = "bindings/zig/tests/values.zig::a record built from its field defaults equals the native default"
 "VIEW-01" = "bindings/zig/tests/rendering.zig::a scoped frame view holds its frame until the scope returns"
 "REND-01" = "bindings/zig/tests/rendering.zig::an owned-texture session renders a frame that reads back as pixels"
 "REND-02" = "bindings/zig/tests/rendering.zig::a caller-driven session is serviced from a thread the test spawns"

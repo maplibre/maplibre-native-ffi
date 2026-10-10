@@ -31,11 +31,11 @@ typedef uint64_t mln_vulkan_non_dispatchable_handle;
 typedef struct mln_render_target_extent {
   uint32_t size;
   /** Logical map width in UI pixels. */
-  uint32_t width;
+  uint32_t width MLN_BINDING("default=256");
   /** Logical map height in UI pixels. */
-  uint32_t height;
+  uint32_t height MLN_BINDING("default=256");
   /** UI-to-device pixel scale. Must be positive and finite. */
-  double scale_factor;
+  double scale_factor MLN_BINDING("default=1.0");
 } mln_render_target_extent;
 
 /** Execution placement for one render session. */
@@ -73,12 +73,14 @@ typedef enum MLN_BINDING(
 typedef struct mln_render_session_attach_options {
   uint32_t size;
   /** One mln_render_driver_kind value. */
-  uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
+  uint32_t driver MLN_BINDING("enum=mln_render_driver_kind") MLN_BINDING(
+    "default=MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD"
+  );
   /**
    * Requested host-acquirable owned-texture slot count. Private targets grant
    * one slot regardless of this value. Ignored by other targets.
    */
-  uint32_t requested_texture_ring_depth;
+  uint32_t requested_texture_ring_depth MLN_BINDING("default=1");
   uint32_t reserved MLN_BINDING("kind=reserved");
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
   mln_wake frame_wake;

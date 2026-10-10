@@ -80,7 +80,7 @@ that every handwritten runtime is written against: the status enum, the
 diagnostic, the completion and its result, and the buffer view. No other rule
 reads a declaration's name.
 
-Two keys state what a C shape cannot:
+Three keys state what a C shape cannot:
 
 - `prefix=` on a handle names the prefix of its operations when that differs
   from the handle's type name, as `mln_resource_request` does for
@@ -89,6 +89,15 @@ Two keys state what a C shape cannot:
   of its meaning, as with coordinates, so a binding may construct it
   positionally. The schema rejects it on a record with control, pointer, or
   array members.
+- `default=` on a field states the nonzero value that the field holds in its
+  record's native default: a decimal integer, a decimal with a point, `true`, or
+  a constant of the field's enum. Dart, Kotlin, and Zig build a record from
+  language defaults instead of calling its default function, so they read this
+  value, and an unannotated field defaults to zero. The generated cases in
+  `tests/native/abi/base/defaults.c` check every default function against these
+  values. The schema accepts the key only on a plain scalar or enum field of a
+  record that a default function returns, directly or nested by value. The cases
+  skip optional fields, unions, and union tags, so those take no `default=`.
 
 No annotation names a callback's thread. Every generated binding treats a
 callback as able to run on any native thread, and each callback's header comment
@@ -125,6 +134,7 @@ case and escapes keywords:
 | `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
 | `OperationPlan.status`  | Whether the function returns the status enum                                                |
 | `OperationPlan.support` | The record default or handle disposal that the operation backs                              |
+| `FieldPlan.initial`     | The field's `default=`, resolved to a typed value and enum member, or none for zero         |
 
 ## Test a change
 

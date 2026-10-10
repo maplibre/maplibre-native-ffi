@@ -6,6 +6,7 @@
  */
 #define MLN_PROTOCOL_VALUES
 #define MLN_PROTOCOL_KEYWORDS
+#define MLN_PROTOCOL_DEFAULTS
 #include <stdlib.h>
 #include <string.h>
 
@@ -56,5 +57,43 @@ mln_status mln_keyword_combine(
   out_entry->type = defer - self;
   out_entry->defer = raw;
   out_entry->raw = bindingArg0;
+  return MLN_STATUS_OK;
+}
+
+mln_probe_settings mln_probe_settings_default(void) {
+  return (mln_probe_settings){
+    .size = sizeof(mln_probe_settings),
+    .extent = {.width = 256, .scale = 1.5},
+    .mode = MLN_PROBE_MODE_SECOND,
+    .flags = MLN_PROBE_FLAG_ALL,
+    .heading = MLN_PROBE_FLAG_SOUTH,
+    .ratio = 0.25F,
+    .offset = -3,
+    .enabled = true,
+  };
+}
+
+mln_status mln_probe_settings_check(
+  mln_probe_settings settings, mln_diagnostic* out_diagnostic
+) {
+  const mln_probe_settings expected = mln_probe_settings_default();
+  if (settings.size != expected.size) return fail(out_diagnostic, "size");
+  if (settings.extent.width != expected.extent.width) {
+    return fail(out_diagnostic, "extent.width");
+  }
+  if (settings.extent.scale != expected.extent.scale) {
+    return fail(out_diagnostic, "extent.scale");
+  }
+  if (settings.mode != expected.mode) return fail(out_diagnostic, "mode");
+  if (settings.flags != expected.flags) return fail(out_diagnostic, "flags");
+  if (settings.heading != expected.heading) {
+    return fail(out_diagnostic, "heading");
+  }
+  if (settings.ratio != expected.ratio) return fail(out_diagnostic, "ratio");
+  if (settings.offset != expected.offset) return fail(out_diagnostic, "offset");
+  if (settings.enabled != expected.enabled) {
+    return fail(out_diagnostic, "enabled");
+  }
+  if (settings.count != expected.count) return fail(out_diagnostic, "count");
   return MLN_STATUS_OK;
 }

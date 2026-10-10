@@ -325,6 +325,20 @@ class Values:
     def flag_name(self, value, flag):
         return identifier(flag.member)
 
+    def field_default(self, field):
+        """A field's default: its annotated initial value, or its type's."""
+        value, initial = field.value, field.initial
+        if initial is None:
+            return self.default(value)
+        if value.kind == "enum":
+            return f"{name(value.native)}.{initial.member.upper()}"
+        typ = self.public(value)
+        if typ == "Double":
+            return initial.literal
+        if typ == "Float":
+            return f"{initial.literal}f"
+        return literal(initial.value, typ)
+
     def default(self, value):
         if value.nullable or value.optional:
             return "null"
@@ -348,7 +362,7 @@ class Values:
             return (
                 name(value.native) + "()"
                 if all(
-                    typ.endswith("?") or self.default(children[0].value)
+                    typ.endswith("?") or self.field_default(children[0])
                     for _, typ, children, group in self.members(value)
                 )
                 else None
@@ -425,7 +439,7 @@ class Values:
             args = []
             for member, typ, children, _group in self.members(value):
                 default = (
-                    "null" if typ.endswith("?") else self.default(children[0].value)
+                    "null" if typ.endswith("?") else self.field_default(children[0])
                 )
                 args.append(
                     f"  public val {member}: {typ}"
@@ -465,7 +479,7 @@ class Values:
         for public, fields in self.groups.items():
             args = []
             for field in fields:
-                default = self.default(field.value)
+                default = self.field_default(field)
                 args.append(
                     f"  public val {identifier(field.name)}: {self.public(field.value)}"
                     + (f" = {default}" if default is not None else "")

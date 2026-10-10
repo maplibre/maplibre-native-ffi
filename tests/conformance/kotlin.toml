@@ -46,6 +46,7 @@
 "VAL-03" = "bindings/kotlin/src/nativeTest/kotlin/org/maplibre/nativeffi/runtime/RuntimeEventNativeTest.kt::aStridedBatchWithAnUnknownPayloadArmDecodesWithoutLoss"
 "VAL-04" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::openEnumsKeepUnknownValuesAnd64BitCarriersKeepTheirHighBits"
 "VAL-05" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::arrayInputsAreCopiedAtSubmission"
+"VAL-06" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/values/GeneratedShapesTest.kt::aRecordBuiltFromItsConstructorDefaultsEqualsTheNativeDefault"
 "VIEW-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aBorrowedFrameViewExpiresWithItsBlockAndHoldsOffItsRelease"
 "REND-01" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::anOwnedTextureFrameReadsBackAsPixels"
 "REND-02" = "bindings/kotlin/src/commonTest/kotlin/org/maplibre/nativeffi/render/OwnedTextureSessionTest.kt::aCallerDrivenSessionStaysOnTheGraphicsThreadItWasServicedFrom"
