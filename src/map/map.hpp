@@ -5,8 +5,11 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "completion/completion_result.hpp"
 #include "maplibre_native_c.h"
 
 namespace mln {
@@ -47,29 +50,6 @@ auto style_image_info_default() noexcept -> mln_style_image_info;
 auto style_transition_options_default() noexcept
   -> mln_style_transition_options;
 
-enum class StyleOperationKind : uint32_t {
-  SourceInfo = 0x5301,
-  SourceAttribution,
-  SourceUrl,
-  SourceTileUrls,
-  SourceIds,
-  ImageInfo,
-  ImageStretches,
-  ImagePixels,
-  ImageCoordinates,
-  LayerInfo,
-  LayerIds,
-  Layers,
-  LayerJson,
-  LightProperty,
-  GlobalState,
-  TransitionOptions,
-  LayerProperty,
-  LayerFilter,
-  LayerSourceLayer,
-  LayerSourceId
-};
-
 struct StyleLayerRecord {
   std::string id;
   std::string type;
@@ -96,15 +76,129 @@ struct StyleOperationResult {
 };
 
 using StyleWork = std::function<mln_status(MapObject&, StyleOperationResult&)>;
+using StyleDelivery =
+  void (*)(const mln_completion&, const StyleOperationResult&) noexcept;
+
+// Presents a style read's result as the C value that Function delivers. The
+// generated result table picks the arm, so the value type, its shape, and
+// whether a missing object completes without a value all come from the
+// function's header annotations.
+template <auto Function>
+auto deliver_style_result(
+  const mln_completion& descriptor, const StyleOperationResult& result
+) noexcept -> void {
+  using Value = CompletionValue<Function>;
+  using Type = typename Value::Type;
+  const auto view = [](const std::string& text) -> mln_buffer_view {
+    return {.data = text.data(), .size = text.size()};
+  };
+  const auto views = [&view](const std::vector<std::string>& strings) {
+    auto result = std::vector<mln_buffer_view>{};
+    result.reserve(strings.size());
+    for (const auto& string : strings) result.push_back(view(string));
+    return result;
+  };
+  if constexpr (Value::nullable) {
+    if (!result.found) {
+      Value::deliver_absent(descriptor);
+      return;
+    }
+  }
+  if constexpr (std::is_same_v<Type, mln_buffer_view> && Value::array) {
+    Value::deliver(descriptor, views(result.strings));
+  } else if constexpr (std::is_same_v<Type, mln_buffer_view>) {
+    Value::deliver(descriptor, view(result.bytes));
+  } else if constexpr (std::is_same_v<Type, mln_style_source_result>) {
+    const auto tile_urls = views(result.strings);
+    Value::deliver(
+      descriptor, {.size = sizeof(mln_style_source_result),
+                   .reserved = 0,
+                   .info = result.source_info,
+                   .attribution = view(result.attribution),
+                   .url = view(result.url),
+                   .tile_urls = tile_urls.data(),
+                   .tile_url_count = tile_urls.size()}
+    );
+  } else if constexpr (
+    std::is_same_v<Type, mln_style_source_tile_urls_result>
+  ) {
+    const auto tile_urls = views(result.strings);
+    Value::deliver(
+      descriptor, {.size = sizeof(mln_style_source_tile_urls_result),
+                   .reserved = 0,
+                   .tile_urls = tile_urls.data(),
+                   .tile_url_count = tile_urls.size()}
+    );
+  } else if constexpr (std::is_same_v<Type, mln_style_layer_entry>) {
+    auto layers = std::vector<mln_style_layer_entry>{};
+    layers.reserve(result.layers.size());
+    for (const auto& entry : result.layers) {
+      layers.push_back(
+        {.size = sizeof(mln_style_layer_entry),
+         .id = view(entry.id),
+         .type = view(entry.type),
+         .source_id = view(entry.source_id),
+         .source_layer = view(entry.source_layer)}
+      );
+    }
+    Value::deliver(descriptor, layers);
+  } else if constexpr (std::is_same_v<Type, mln_style_layer_result>) {
+    Value::deliver(
+      descriptor, {.size = sizeof(mln_style_layer_result),
+                   .reserved = 0,
+                   .info = result.layer_info,
+                   .source_id = view(result.source_id),
+                   .source_layer = view(result.source_layer)}
+    );
+  } else if constexpr (std::is_same_v<Type, mln_style_image_result>) {
+    Value::deliver(
+      descriptor, {.size = sizeof(mln_style_image_result),
+                   .reserved = 0,
+                   .info = result.image_info,
+                   .pixels = view(result.bytes),
+                   .stretch_x = result.stretch_x.data(),
+                   .stretch_x_count = result.stretch_x.size(),
+                   .stretch_y = result.stretch_y.data(),
+                   .stretch_y_count = result.stretch_y.size()}
+    );
+  } else if constexpr (std::is_same_v<Type, mln_style_image_stretches_result>) {
+    Value::deliver(
+      descriptor, {.size = sizeof(mln_style_image_stretches_result),
+                   .reserved = 0,
+                   .stretch_x = result.stretch_x.data(),
+                   .stretch_x_count = result.stretch_x.size(),
+                   .stretch_y = result.stretch_y.data(),
+                   .stretch_y_count = result.stretch_y.size()}
+    );
+  } else if constexpr (std::is_same_v<Type, mln_style_transition_options>) {
+    Value::deliver(descriptor, result.transition_options);
+  } else if constexpr (std::is_same_v<Type, mln_lat_lng> && Value::array) {
+    Value::deliver(descriptor, result.coordinates);
+  } else {
+    static_assert(
+      sizeof(Type) == 0, "style operation result type has no presentation"
+    );
+  }
+}
 
 auto submit_map_command(
   mln_map map, std::function<mln_status(MapObject&)> work,
   const mln_completion* completion
 ) -> mln_status;
 auto start_style_operation(
-  mln_map map, StyleOperationKind kind, StyleWork work,
+  mln_map map, StyleDelivery delivery, StyleWork work,
   const mln_completion* completion
 ) -> mln_status;
+
+// Runs work on the map's runtime worker and completes with Function's result.
+template <auto Function>
+auto start_style_operation(
+  mln_map map, StyleWork work, const mln_completion* completion
+) -> mln_status {
+  return start_style_operation(
+    map, &deliver_style_result<Function>, std::move(work), completion
+  );
+}
 auto validate_geojson_command_options(const mln_geojson_source_options* options)
   -> mln_status;
 enum class TileSourceOptionKind : uint8_t { Vector, Raster, RasterDEM };
@@ -132,36 +226,6 @@ auto validate_location_indicator_accuracy_radius_command(double radius)
   -> mln_status;
 auto validate_location_indicator_image_kind(uint32_t image_kind) -> mln_status;
 
-enum class GeometryOperationKind : uint32_t {
-  CameraForBounds = 0x4701,
-  CameraForCoordinates,
-  CameraForGeometry,
-  BoundsForCamera,
-  UnwrappedBoundsForCamera,
-  PixelForCoordinate,
-  CoordinateForPixel,
-  PixelsForCoordinates,
-  CoordinatesForPixels,
-  MetersPerPixel
-};
-
-struct GeometryOperationResult {
-  double meters_per_pixel = 0;
-  mln_camera_options camera{};
-  mln_lat_lng_bounds bounds{};
-  mln_screen_point point{};
-  mln_lat_lng coordinate{};
-  std::vector<mln_screen_point> points;
-  std::vector<mln_lat_lng> coordinates;
-};
-
-using GeometryWork =
-  std::function<mln_status(MapObject&, GeometryOperationResult&)>;
-
-auto start_geometry_operation(
-  mln_map map, GeometryOperationKind kind, GeometryWork work,
-  const mln_completion* completion
-) -> mln_status;
 auto create_map_start(
   mln_runtime runtime, const mln_map_options* options,
   const mln_completion* completion

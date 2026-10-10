@@ -2,10 +2,12 @@
 
 #include "completion/completion.hpp"
 
+#include "completion/completion_result.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 
 namespace mln::core {
+namespace {
 
 auto invoke_completion(
   const mln_completion& descriptor, mln_status status,
@@ -29,6 +31,27 @@ auto invoke_completion(
   } catch (...) {
     // Host callbacks must not unwind through the C boundary.
   }
+}
+
+}  // namespace
+
+auto ErasedCompletionValue::deliver(
+  const mln_completion& descriptor, const void* value, std::size_t count
+) noexcept -> void {
+  invoke_completion(
+    descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {}, value,
+    count
+  );
+}
+
+auto deliver_status(
+  const mln_completion& descriptor, mln_status status,
+  const std::string& diagnostic
+) noexcept -> void {
+  invoke_completion(
+    descriptor, status, MLN_COMMAND_DISPOSITION_COMMITTED, 0, diagnostic,
+    nullptr, 0
+  );
 }
 
 Completion::Completion(const mln_completion& descriptor)
@@ -144,15 +167,11 @@ auto validate_completion(const mln_completion* completion) -> mln_status {
 
 auto complete(
   const std::shared_ptr<Completion>& completion, mln_status status,
-  std::string diagnostic, const void* value, std::size_t value_count
+  std::string diagnostic
 ) noexcept -> void {
-  completion->resolve([status, diagnostic = std::move(diagnostic), value,
-                       value_count](const mln_completion& descriptor) {
-    invoke_completion(
-      descriptor, status, MLN_COMMAND_DISPOSITION_COMMITTED, 0, diagnostic,
-      value, value_count
-    );
-  });
+  completion->resolve([status, diagnostic = std::move(diagnostic)](
+                        const mln_completion& descriptor
+                      ) { deliver_status(descriptor, status, diagnostic); });
 }
 
 auto complete_command(

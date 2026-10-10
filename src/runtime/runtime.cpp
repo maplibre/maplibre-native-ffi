@@ -38,6 +38,7 @@
 #include "runtime/runtime.hpp"
 
 #include "completion/completion.hpp"
+#include "completion/completion_result.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "execution/process_exit.hpp"
 #include "execution/worker_thread.hpp"
@@ -72,21 +73,6 @@ struct HandleTraits<EventBatchObject> {
 }  // namespace mln::core
 
 namespace {
-enum : std::uint32_t {
-  MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
-  MLN_OFFLINE_OPERATION_REGION_CREATE = 2,
-  MLN_OFFLINE_OPERATION_REGION_GET = 3,
-  MLN_OFFLINE_OPERATION_REGIONS_LIST = 4,
-  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE = 5,
-  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA = 6,
-  MLN_OFFLINE_OPERATION_REGION_GET_STATUS = 7,
-  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED = 8,
-  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
-  MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
-  MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
-  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
-};
-
 // Each mask constant must be the bit of the event type it selects, written
 // against the shift rather than a literal, so an event type added without its
 // mask constant fails the build here instead of silently queueing nothing.
@@ -1586,12 +1572,83 @@ auto clear_http_header_transform(
 
 namespace {
 
-// Adapts one offline operation's native result to its completion. Each arm
-// names the result type its operation kind stores in the operation object.
+// Presents one offline operation's successful native result to its completion.
+using OfflinePresent =
+  void (*)(const std::shared_ptr<Completion>& completion, std::any result);
+
+auto present_nothing(const std::shared_ptr<Completion>& completion, std::any)
+  -> void {
+  complete(completion, MLN_STATUS_OK);
+}
+
+// Presents the regions that Function delivers: an OfflineRegionData, an
+// optional one when the result is nullable, or a vector of them for an array.
+template <auto Function>
+auto present_regions(
+  const std::shared_ptr<Completion>& completion, std::any result
+) -> void {
+  using Value = CompletionValue<Function>;
+  static_assert(std::is_same_v<typename Value::Type, mln_offline_region_info>);
+  if constexpr (Value::array) {
+    auto value =
+      std::any_cast<std::vector<OfflineRegionData>>(std::move(result));
+    completion->resolve([value =
+                           std::move(value)](const mln_completion& descriptor) {
+      auto info = std::vector<mln_offline_region_info>(value.size());
+      for (size_t index = 0; index < value.size(); ++index) {
+        info[index].size = sizeof(mln_offline_region_info);
+        if (fill_region_info(value[index], &info[index]) != MLN_STATUS_OK) {
+          deliver_status(
+            descriptor, MLN_STATUS_NATIVE_ERROR, thread_last_error_message()
+          );
+          return;
+        }
+      }
+      Value::deliver(descriptor, info);
+    });
+  } else {
+    auto value = std::optional<OfflineRegionData>{};
+    if constexpr (Value::nullable) {
+      value =
+        std::any_cast<std::optional<OfflineRegionData>>(std::move(result));
+      if (!value) {
+        completion->resolve([](const mln_completion& descriptor) {
+          Value::deliver_absent(descriptor);
+        });
+        return;
+      }
+    } else {
+      value = std::any_cast<OfflineRegionData>(std::move(result));
+    }
+    completion->resolve(
+      [value = std::move(*value)](const mln_completion& descriptor) {
+        auto info = mln_offline_region_info{};
+        info.size = sizeof(mln_offline_region_info);
+        if (fill_region_info(value, &info) != MLN_STATUS_OK) {
+          deliver_status(
+            descriptor, MLN_STATUS_NATIVE_ERROR, thread_last_error_message()
+          );
+          return;
+        }
+        Value::deliver(descriptor, info);
+      }
+    );
+  }
+}
+
+auto present_region_status(
+  const std::shared_ptr<Completion>& completion, std::any result
+) -> void {
+  CompletionValue<&mln_runtime_offline_region_get_status>::complete(
+    completion, std::any_cast<mln_offline_region_status>(std::move(result))
+  );
+}
+
+// Adapts one offline operation's native result to its completion.
 auto offline_operation_result_callback(
-  const std::shared_ptr<Completion>& completion, uint32_t kind
+  const std::shared_ptr<Completion>& completion, OfflinePresent present
 ) -> OperationObject::ResultCallback {
-  return [completion, kind](
+  return [completion, present](
            mln_status status, std::string diagnostic, std::any result
          ) mutable {
     if (status != MLN_STATUS_OK) {
@@ -1599,95 +1656,7 @@ auto offline_operation_result_callback(
       return;
     }
     try {
-      switch (kind) {
-        case MLN_OFFLINE_OPERATION_REGION_CREATE:
-        case MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA: {
-          auto value = std::any_cast<OfflineRegionData>(std::move(result));
-          completion->resolve(
-            [value = std::move(value)](const mln_completion& descriptor) {
-              auto info = mln_offline_region_info{};
-              info.size = sizeof(mln_offline_region_info);
-              if (fill_region_info(value, &info) != MLN_STATUS_OK) {
-                invoke_completion(
-                  descriptor, MLN_STATUS_NATIVE_ERROR,
-                  MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                  thread_last_error_message(), nullptr, 0
-                );
-                return;
-              }
-              invoke_completion(
-                descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                {}, &info, 1
-              );
-            }
-          );
-          return;
-        }
-        case MLN_OFFLINE_OPERATION_REGION_GET: {
-          auto value =
-            std::any_cast<std::optional<OfflineRegionData>>(std::move(result));
-          if (!value) {
-            complete(completion, MLN_STATUS_OK);
-            return;
-          }
-          completion->resolve(
-            [value = std::move(*value)](const mln_completion& descriptor) {
-              auto info = mln_offline_region_info{};
-              info.size = sizeof(mln_offline_region_info);
-              if (fill_region_info(value, &info) != MLN_STATUS_OK) {
-                invoke_completion(
-                  descriptor, MLN_STATUS_NATIVE_ERROR,
-                  MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                  thread_last_error_message(), nullptr, 0
-                );
-                return;
-              }
-              invoke_completion(
-                descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                {}, &info, 1
-              );
-            }
-          );
-          return;
-        }
-        case MLN_OFFLINE_OPERATION_REGIONS_LIST:
-        case MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE: {
-          auto value =
-            std::any_cast<std::vector<OfflineRegionData>>(std::move(result));
-          completion->resolve(
-            [value = std::move(value)](const mln_completion& descriptor) {
-              auto info = std::vector<mln_offline_region_info>(value.size());
-              for (size_t index = 0; index < value.size(); ++index) {
-                info[index].size = sizeof(mln_offline_region_info);
-                if (
-                  fill_region_info(value[index], &info[index]) != MLN_STATUS_OK
-                ) {
-                  invoke_completion(
-                    descriptor, MLN_STATUS_NATIVE_ERROR,
-                    MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                    thread_last_error_message(), nullptr, 0
-                  );
-                  return;
-                }
-              }
-              invoke_completion(
-                descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-                {}, info.data(), info.size()
-              );
-            }
-          );
-          return;
-        }
-        case MLN_OFFLINE_OPERATION_REGION_GET_STATUS:
-          complete_value(
-            completion, MLN_STATUS_OK, {},
-            std::any_cast<mln_offline_region_status>(std::move(result))
-          );
-          return;
-        default:
-          complete(completion, MLN_STATUS_OK);
-          return;
-      }
+      present(completion, std::move(result));
     } catch (...) {
       complete(
         completion, MLN_STATUS_NATIVE_ERROR,
@@ -1703,14 +1672,14 @@ auto offline_operation_result_callback(
 // runtime work.
 template <typename Schedule>
 auto submit_offline_operation(
-  const std::shared_ptr<RuntimeObject>& runtime, uint32_t kind,
+  const std::shared_ptr<RuntimeObject>& runtime, OfflinePresent present,
   const mln_completion* descriptor, Schedule schedule
 ) -> mln_status {
   const auto validation = validate_completion(descriptor);
   if (validation != MLN_STATUS_OK) return validation;
   auto completion = std::make_shared<Completion>(*descriptor);
   auto state = std::make_shared<OperationObject>(
-    offline_operation_result_callback(completion, kind)
+    offline_operation_result_callback(completion, present)
   );
   const auto status = submit_runtime_operation(
     runtime, state,
@@ -1766,7 +1735,7 @@ auto run_ambient_cache_operation_start(
   }
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_AMBIENT_CACHE, completion,
+    live, present_nothing, completion,
     [operation](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1805,7 +1774,7 @@ auto set_maximum_ambient_cache_size_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE, completion,
+    live, present_nothing, completion,
     [size](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1843,7 +1812,7 @@ auto offline_region_create_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_CREATE, completion,
+    live, present_regions<&mln_runtime_offline_region_create>, completion,
     [native_definition = std::move(native_definition),
      native_metadata = std::move(native_metadata)](
       const OfflineOperationState& state, const OfflineDatabase& database
@@ -1884,7 +1853,7 @@ auto offline_region_get_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_GET, completion,
+    live, present_regions<&mln_runtime_offline_region_get>, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -1930,7 +1899,7 @@ auto offline_regions_list_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGIONS_LIST, completion,
+    live, present_regions<&mln_runtime_offline_regions_list>, completion,
     [](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2008,7 +1977,8 @@ auto offline_regions_merge_database_start(
   }
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE, completion,
+    live, present_regions<&mln_runtime_offline_regions_merge_database>,
+    completion,
     [path = std::string{side_database_path}](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2057,7 +2027,8 @@ auto offline_region_update_metadata_start(
     std::memcpy(native_metadata.data(), metadata, metadata_size);
   }
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA, completion,
+    live, present_regions<&mln_runtime_offline_region_update_metadata>,
+    completion,
     [region_id, native_metadata = std::move(native_metadata)](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2123,7 +2094,7 @@ auto offline_region_get_status_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_GET_STATUS, completion,
+    live, present_region_status, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2180,7 +2151,7 @@ auto offline_region_set_observed_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED, completion,
+    live, present_nothing, completion,
     [region_id, observed, offline_event_state = live->offline_event_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2247,7 +2218,7 @@ auto offline_region_set_download_state_start(
   }
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE, completion,
+    live, present_nothing, completion,
     [region_id = request.region_id, download_state = *native_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2289,7 +2260,7 @@ auto offline_region_invalidate_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_INVALIDATE, completion,
+    live, present_nothing, completion,
     [region_id](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {
@@ -2334,7 +2305,7 @@ auto offline_region_delete_start(
   if (live == nullptr) return recorded_handle_fault_status();
 
   return submit_offline_operation(
-    live, MLN_OFFLINE_OPERATION_REGION_DELETE, completion,
+    live, present_nothing, completion,
     [region_id, offline_event_state = live->offline_event_state](
       const OfflineOperationState& state, const OfflineDatabase& database
     ) -> void {

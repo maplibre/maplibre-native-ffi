@@ -12,6 +12,7 @@
 #include "render/texture_session.hpp"
 
 #include "bytes/buffer.hpp"
+#include "completion/completion_result.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
@@ -588,9 +589,8 @@ auto texture_read_premultiplied_rgba8_start(
             .data = {.data = bytes.data(), .size = bytes.size()},
             .info = info,
           };
-          invoke_completion(
-            descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {},
-            &value, 1
+          CompletionValue<&mln_texture_read_premultiplied_rgba8>::deliver(
+            descriptor, value
           );
         });
       } else {

@@ -200,6 +200,35 @@ mln_status mln_map_snapshot(
 );
 #endif
 
+#ifdef MLN_PROTOCOL_COMPLETION_RESULTS
+// Completions in each shape of the native result table: one value, a nullable
+// value, an array, a nullable array, and a command that completes without one.
+typedef struct mln_tile_id {
+  double x;
+  double y;
+} mln_tile_id;
+BIND("execution=query;result=double")
+mln_status mln_map_zoom(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+BIND("execution=query;result=mln_tile_id;nullable=true")
+mln_status mln_map_find_tile(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+BIND("execution=query;result=mln_buffer_view;shape=array")
+mln_status mln_map_list_names(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+BIND("execution=query;result=mln_tile_id;shape=array;nullable=true")
+mln_status mln_map_visible_tiles(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+BIND("execution=command")
+mln_status mln_map_refresh(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
+);
+#endif
+
 #ifdef MLN_PROTOCOL_CONVENTIONS
 // Declarations annotated only where they depart from convention: a versioned
 // struct with its size and reserved members, UTF-8 text, a presence mask that

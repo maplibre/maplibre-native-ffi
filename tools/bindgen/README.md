@@ -97,6 +97,7 @@ the schema reports the name that does not resolve.
 | Conventions, accepted attributes, and signatures    | `schema.py`         |
 | Value shapes, presence, and ownership relationships | `semantic.py`       |
 | Native copies for deferred callbacks and results    | `native_capture.py` |
+| The value type that each completion delivers        | `native_results.py` |
 | Language syntax and runtime calls                   | `emitters/`         |
 
 Resolve a new relationship once in `semantic.py` and let every emitter consume
@@ -116,6 +117,15 @@ case and escapes keywords:
 | `FieldPlan.public`      | False for a control role: size, reserved, count, stride, arena, mask, tag, context, release |
 | `OperationPlan.status`  | Whether the function returns the status enum                                                |
 | `OperationPlan.support` | The record default or handle disposal that the operation backs                              |
+
+`native_results.py` writes `src/completion/completion_result_generated.inc`,
+which specializes `CompletionResult` for each function with a value result. The
+specialization records the C type that `result=` names and whether the value is
+an array or nullable. The native core delivers every completion value through
+`CompletionValue<&function>` in `src/completion/completion_result.hpp`, which
+takes its value type and shape from that table. A call site whose value
+disagrees with the header fails to compile, so the native library delivers the
+type that every binding reads.
 
 ## Test a change
 

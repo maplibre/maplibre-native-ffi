@@ -2,9 +2,7 @@
 // completion: delivery once, in order, and only after acceptance.
 
 #include <atomic>
-#include <cstdint>
 #include <memory>
-#include <string>
 #include <thread>
 
 #include "completion/completion.hpp"
@@ -62,9 +60,7 @@ void inline_resolution_waits_for_acceptance() {
   auto probe = CompletionProbe{};
   auto completion =
     std::make_shared<mln::core::Completion>(descriptor_for(probe));
-  mln::core::complete_value(
-    completion, MLN_STATUS_OK, std::string{}, std::uint32_t{7}
-  );
+  mln::core::complete(completion, MLN_STATUS_OK);
   TEST_ASSERT_EQUAL_UINT(0, probe.calls.load());
 
   completion->accept();
