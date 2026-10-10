@@ -14,6 +14,27 @@ public extension Maplibre {
     }
   }
 
+  /// Computes the physical device-pixel size of a logical extent.
+  ///
+  /// See `mln_logical_extent_physical_size` in the
+  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+  static func logicalExtentPhysicalSize(
+    extent bindingArg0: LogicalExtent
+  ) throws
+    -> (width: UInt32, height: UInt32)
+  {
+    var value0: UInt32 = 0
+    var value1: UInt32 = 0
+    return try nativeInvoke("mln_logical_extent_physical_size") { _, _, diagnostic in
+      mln_logical_extent_physical_size(
+        bindingArg0.nativeValue(),
+        &value0,
+        &value1,
+        diagnostic
+      )
+    } result: { (value0, value1) }
+  }
+
   /// Returns OpenGL context providers supported by this build.
   ///
   /// See `mln_opengl_supported_context_provider_mask` in the
@@ -42,26 +63,5 @@ public extension Maplibre {
         raw: mln_render_session_attach_options_default()
       )
     }
-  }
-
-  /// Computes the physical device-pixel size of a logical render target extent.
-  ///
-  /// See `mln_render_target_extent_physical_size` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-  static func renderTargetExtentPhysicalSize(
-    extent bindingArg0: RenderTargetExtent
-  ) throws
-    -> (width: UInt32, height: UInt32)
-  {
-    var value0: UInt32 = 0
-    var value1: UInt32 = 0
-    return try nativeInvoke("mln_render_target_extent_physical_size") { _, arena, diagnostic in
-      mln_render_target_extent_physical_size(
-        arena.store(bindingArg0.nativeValue()),
-        &value0,
-        &value1,
-        diagnostic
-      )
-    } result: { (value0, value1) }
   }
 }

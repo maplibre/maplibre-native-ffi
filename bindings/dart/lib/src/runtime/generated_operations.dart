@@ -1016,6 +1016,24 @@ void _deliverLogCallback(LogCallback callback, List<dynamic> message) {
   }
 }
 
+Pointer<raw.mln_logical_extent> _writeLogicalExtent(
+  LogicalExtent value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_logical_extent>();
+  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
+  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
+  result.ref.scale_factor = value.scaleFactor;
+  return result;
+}
+
+LogicalExtent _readLogicalExtent(raw.mln_logical_extent source) =>
+    LogicalExtent(
+      width: source.width,
+      height: source.height,
+      scaleFactor: source.scale_factor,
+    );
+
 Pointer<raw.mln_premultiplied_rgba8_image> _writePremultipliedRgba8Image(
   PremultipliedRgba8Image value,
   Arena arena,
@@ -1150,24 +1168,6 @@ StyleImageStretchesResult _readStyleImageStretchesResult(
     ),
   ),
 );
-
-Pointer<raw.mln_logical_extent> _writeLogicalExtent(
-  LogicalExtent value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_logical_extent>();
-  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
-  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
-  result.ref.scale_factor = value.scaleFactor;
-  return result;
-}
-
-LogicalExtent _readLogicalExtent(raw.mln_logical_extent source) =>
-    LogicalExtent(
-      width: source.width,
-      height: source.height,
-      scaleFactor: source.scale_factor,
-    );
 
 Pointer<raw.mln_map_options> _writeMapOptions(MapOptions value, Arena arena) {
   final result = arena<raw.mln_map_options>();
@@ -1660,26 +1660,6 @@ MapSnapshot _readMapSnapshot(raw.mln_map_snapshot source) => MapSnapshot(
   freeCamera: _readFreeCameraOptions(source.free_camera),
 );
 
-Pointer<raw.mln_render_target_extent> _writeRenderTargetExtent(
-  RenderTargetExtent value,
-  Arena arena,
-) {
-  final result = arena<raw.mln_render_target_extent>();
-  result.ref.size = sizeOf<raw.mln_render_target_extent>();
-  result.ref.width = _nativeInteger(value.width, 0, 4294967295);
-  result.ref.height = _nativeInteger(value.height, 0, 4294967295);
-  result.ref.scale_factor = value.scaleFactor;
-  return result;
-}
-
-RenderTargetExtent _readRenderTargetExtent(
-  raw.mln_render_target_extent source,
-) => RenderTargetExtent(
-  width: source.width,
-  height: source.height,
-  scaleFactor: source.scale_factor,
-);
-
 Pointer<raw.mln_metal_borrowed_texture_descriptor>
 _writeMetalBorrowedTextureDescriptor(
   MetalBorrowedTextureDescriptor value,
@@ -1687,7 +1667,7 @@ _writeMetalBorrowedTextureDescriptor(
 ) {
   final result = arena<raw.mln_metal_borrowed_texture_descriptor>();
   result.ref = raw.mln_metal_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
@@ -1705,7 +1685,7 @@ _writeMetalBorrowedTextureDescriptor(
 MetalBorrowedTextureDescriptor _readMetalBorrowedTextureDescriptor(
   raw.mln_metal_borrowed_texture_descriptor source,
 ) => MetalBorrowedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
   texture: NativePointer(source.texture.address),
@@ -1801,7 +1781,7 @@ _writeMetalOwnedTextureDescriptor(
 ) {
   final result = arena<raw.mln_metal_owned_texture_descriptor>();
   result.ref = raw.mln_metal_owned_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
   return result;
 }
@@ -1809,7 +1789,7 @@ _writeMetalOwnedTextureDescriptor(
 MetalOwnedTextureDescriptor _readMetalOwnedTextureDescriptor(
   raw.mln_metal_owned_texture_descriptor source,
 ) => MetalOwnedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readMetalContextDescriptor(source.context),
 );
 
@@ -1819,7 +1799,7 @@ Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
 ) {
   final result = arena<raw.mln_metal_surface_descriptor>();
   result.ref = raw.mln_metal_surface_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeMetalContextDescriptor(value.context, arena).ref;
   result.ref.layer = Pointer<Void>.fromAddress(value.layer.address).cast();
   return result;
@@ -1828,7 +1808,7 @@ Pointer<raw.mln_metal_surface_descriptor> _writeMetalSurfaceDescriptor(
 MetalSurfaceDescriptor _readMetalSurfaceDescriptor(
   raw.mln_metal_surface_descriptor source,
 ) => MetalSurfaceDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readMetalContextDescriptor(source.context),
   layer: NativePointer(source.layer.address),
 );
@@ -1971,7 +1951,7 @@ _writeOpenglBorrowedTextureDescriptor(
 ) {
   final result = arena<raw.mln_opengl_borrowed_texture_descriptor>();
   result.ref = raw.mln_opengl_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
@@ -1991,7 +1971,7 @@ _writeOpenglBorrowedTextureDescriptor(
 OpenglBorrowedTextureDescriptor _readOpenglBorrowedTextureDescriptor(
   raw.mln_opengl_borrowed_texture_descriptor source,
 ) => OpenglBorrowedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
   context: _readOpenglContextDescriptor(source.context),
@@ -2006,7 +1986,7 @@ _writeOpenglOwnedTextureDescriptor(
 ) {
   final result = arena<raw.mln_opengl_owned_texture_descriptor>();
   result.ref = raw.mln_opengl_owned_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
   return result;
 }
@@ -2014,7 +1994,7 @@ _writeOpenglOwnedTextureDescriptor(
 OpenglOwnedTextureDescriptor _readOpenglOwnedTextureDescriptor(
   raw.mln_opengl_owned_texture_descriptor source,
 ) => OpenglOwnedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readOpenglContextDescriptor(source.context),
 );
 
@@ -2024,7 +2004,7 @@ Pointer<raw.mln_opengl_surface_descriptor> _writeOpenglSurfaceDescriptor(
 ) {
   final result = arena<raw.mln_opengl_surface_descriptor>();
   result.ref = raw.mln_opengl_surface_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
   result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
   return result;
@@ -2033,7 +2013,7 @@ Pointer<raw.mln_opengl_surface_descriptor> _writeOpenglSurfaceDescriptor(
 OpenglSurfaceDescriptor _readOpenglSurfaceDescriptor(
   raw.mln_opengl_surface_descriptor source,
 ) => OpenglSurfaceDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readOpenglContextDescriptor(source.context),
   surface: NativePointer(source.surface.address),
 );
@@ -2059,7 +2039,7 @@ RenderSessionSnapshot _readRenderSessionSnapshot(
   state: RenderSessionState.fromRawValue(source.state),
   driver: RenderDriverKind.fromRawValue(source.driver),
   latestResult: RenderResult.fromRawValue(source.latest_result),
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   generation: uint64FromNative(source.generation),
   mapUpdateGeneration: uint64FromNative(source.map_update_generation),
   renderedUpdateGeneration: uint64FromNative(source.rendered_update_generation),
@@ -2879,7 +2859,7 @@ _writeVulkanBorrowedTextureDescriptor(
 ) {
   final result = arena<raw.mln_vulkan_borrowed_texture_descriptor>();
   result.ref = raw.mln_vulkan_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
@@ -2912,7 +2892,7 @@ _writeVulkanBorrowedTextureDescriptor(
 VulkanBorrowedTextureDescriptor _readVulkanBorrowedTextureDescriptor(
   raw.mln_vulkan_borrowed_texture_descriptor source,
 ) => VulkanBorrowedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
   context: _readVulkanContextDescriptor(source.context),
@@ -2930,7 +2910,7 @@ _writeVulkanOwnedTextureDescriptor(
 ) {
   final result = arena<raw.mln_vulkan_owned_texture_descriptor>();
   result.ref = raw.mln_vulkan_owned_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
   return result;
 }
@@ -2938,7 +2918,7 @@ _writeVulkanOwnedTextureDescriptor(
 VulkanOwnedTextureDescriptor _readVulkanOwnedTextureDescriptor(
   raw.mln_vulkan_owned_texture_descriptor source,
 ) => VulkanOwnedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readVulkanContextDescriptor(source.context),
 );
 
@@ -2948,7 +2928,7 @@ Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
 ) {
   final result = arena<raw.mln_vulkan_surface_descriptor>();
   result.ref = raw.mln_vulkan_surface_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
   result.ref.surface = uint64ToNative(
     value.surface,
@@ -2960,7 +2940,7 @@ Pointer<raw.mln_vulkan_surface_descriptor> _writeVulkanSurfaceDescriptor(
 VulkanSurfaceDescriptor _readVulkanSurfaceDescriptor(
   raw.mln_vulkan_surface_descriptor source,
 ) => VulkanSurfaceDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readVulkanContextDescriptor(source.context),
   surface: uint64FromNative(source.surface),
 );
@@ -2994,7 +2974,7 @@ _writeWebgpuBorrowedTextureDescriptor(
 ) {
   final result = arena<raw.mln_webgpu_borrowed_texture_descriptor>();
   result.ref = raw.mln_webgpu_borrowed_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.physical_width = _nativeInteger(
     value.physicalWidth,
     0,
@@ -3017,7 +2997,7 @@ _writeWebgpuBorrowedTextureDescriptor(
 WebgpuBorrowedTextureDescriptor _readWebgpuBorrowedTextureDescriptor(
   raw.mln_webgpu_borrowed_texture_descriptor source,
 ) => WebgpuBorrowedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
   context: _readWebgpuContextDescriptor(source.context),
@@ -3033,7 +3013,7 @@ _writeWebgpuOwnedTextureDescriptor(
 ) {
   final result = arena<raw.mln_webgpu_owned_texture_descriptor>();
   result.ref = raw.mln_webgpu_owned_texture_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
   return result;
 }
@@ -3041,7 +3021,7 @@ _writeWebgpuOwnedTextureDescriptor(
 WebgpuOwnedTextureDescriptor _readWebgpuOwnedTextureDescriptor(
   raw.mln_webgpu_owned_texture_descriptor source,
 ) => WebgpuOwnedTextureDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readWebgpuContextDescriptor(source.context),
 );
 
@@ -3051,7 +3031,7 @@ Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
 ) {
   final result = arena<raw.mln_webgpu_surface_descriptor>();
   result.ref = raw.mln_webgpu_surface_descriptor_default();
-  result.ref.extent = _writeRenderTargetExtent(value.extent, arena).ref;
+  result.ref.extent = _writeLogicalExtent(value.extent, arena).ref;
   result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
   result.ref.surface = Pointer<Void>.fromAddress(value.surface.address).cast();
   result.ref.format = _nativeInteger(value.format, 0, 4294967295);
@@ -3061,7 +3041,7 @@ Pointer<raw.mln_webgpu_surface_descriptor> _writeWebgpuSurfaceDescriptor(
 WebgpuSurfaceDescriptor _readWebgpuSurfaceDescriptor(
   raw.mln_webgpu_surface_descriptor source,
 ) => WebgpuSurfaceDescriptor(
-  extent: _readRenderTargetExtent(source.extent),
+  extent: _readLogicalExtent(source.extent),
   context: _readWebgpuContextDescriptor(source.context),
   surface: NativePointer(source.surface.address),
   format: source.format,
@@ -3444,6 +3424,26 @@ void logSetCallback(LogCallback callback) {
   }
 }
 
+/// Computes the physical device-pixel size of a logical extent.
+///
+/// See `mln_logical_extent_physical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+(int, int) logicalExtentPhysicalSize(LogicalExtent extent) =>
+    withNativeArena((arena) {
+      ensureAbiVersion();
+      final outWidth = arena<Uint32>();
+      final outHeight = arena<Uint32>();
+      _check(
+        raw.mln_logical_extent_physical_size(
+          _writeLogicalExtent(extent, arena).ref,
+          outWidth,
+          outHeight,
+          nativeDiagnostic,
+        ),
+      );
+      return (outWidth.value, outHeight.value);
+    });
+
 /// Returns map options initialized for this C API version.
 ///
 /// See `mln_map_options_default` in the
@@ -3624,26 +3624,6 @@ RenderSessionAttachOptions renderSessionAttachOptionsDefault() {
   final nativeResult = raw.mln_render_session_attach_options_default();
   return _readRenderSessionAttachOptions(nativeResult);
 }
-
-/// Computes the physical device-pixel size of a logical render target extent.
-///
-/// See `mln_render_target_extent_physical_size` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-(int, int) renderTargetExtentPhysicalSize(RenderTargetExtent extent) =>
-    withNativeArena((arena) {
-      ensureAbiVersion();
-      final outWidth = arena<Uint32>();
-      final outHeight = arena<Uint32>();
-      _check(
-        raw.mln_render_target_extent_physical_size(
-          _writeRenderTargetExtent(extent, arena),
-          outWidth,
-          outHeight,
-          nativeDiagnostic,
-        ),
-      );
-      return (outWidth.value, outHeight.value);
-    });
 
 /// Returns default rendered feature query options.
 ///
@@ -4608,28 +4588,6 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     (arena, completion) =>
         raw.mln_map_camera_query(_handle.raw, completion, nativeDiagnostic),
   );
-
-  /// Copies the camera from the latest immutable map snapshot.
-  ///
-  /// See `mln_map_camera_snapshot_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  (CameraOptions, BigInt) cameraSnapshotGet() => withNativeArena((arena) {
-    final outCamera = arena<raw.mln_camera_options>();
-    outCamera.ref = raw.mln_camera_options_default();
-    final outGeneration = arena<Uint64>();
-    _check(
-      raw.mln_map_camera_snapshot_get(
-        _handle.raw,
-        outCamera,
-        outGeneration,
-        nativeDiagnostic,
-      ),
-    );
-    return (
-      _readCameraOptions(outCamera.ref),
-      uint64FromNative(outGeneration.value),
-    );
-  });
 
   /// Cancels the camera transitions running when this command commits.
   ///
@@ -6969,10 +6927,10 @@ final class RenderSessionHandle implements Finalizable {
   ///
   /// See `mln_render_session_resize` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
-  Future<CommandCompletion> resize(RenderTargetExtent extent) => _command(
+  Future<CommandCompletion> resize(LogicalExtent extent) => _command(
     (arena, completion) => raw.mln_render_session_resize(
       _handle.raw,
-      _writeRenderTargetExtent(extent, arena),
+      _writeLogicalExtent(extent, arena).ref,
       completion,
       nativeDiagnostic,
     ),

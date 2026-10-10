@@ -85,7 +85,7 @@ import Testing
     getInstanceProcAddr: NativePointer(bitPattern: 0x90),
     getDeviceProcAddr: NativePointer(bitPattern: 0xA0)
   )
-  let extent = RenderTargetExtent(width: 64, height: 32, scaleFactor: 2)
+  let extent = LogicalExtent(width: 64, height: 32, scaleFactor: 2)
   let texture = VulkanBorrowedTextureDescriptor(
     extent: extent,
     physicalWidth: 128,

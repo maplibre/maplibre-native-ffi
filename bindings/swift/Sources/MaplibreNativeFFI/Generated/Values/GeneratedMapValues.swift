@@ -879,7 +879,7 @@ public struct LatLngBounds: Equatable, Hashable, Sendable {
   }
 }
 
-/// Logical map extent in UI pixels and device-pixel scale.
+/// Logical extent in UI pixels and the device-pixel scale.
 ///
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -888,9 +888,7 @@ public struct LogicalExtent: Equatable, Hashable, Sendable {
   public var width: UInt32
   /// Height in UI pixels. Defaults to 256.
   public var height: UInt32
-  /// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
-  /// creation, so `mln_map_resize()` accepts only the value the map was created
-  /// with.
+  /// Device pixels per UI pixel. Defaults to 1.0.
   public var scaleFactor: Double
   public static var `default`: Self {
     Self(raw: mln_logical_extent())
@@ -967,9 +965,8 @@ public struct MapMode: RawRepresentable, NativeOpenValue, Equatable, Hashable,
 /// See `mln_map_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 public struct MapOptions: Equatable, Hashable, Sendable {
-  /// Initial logical extent. Width and height must be positive. The scale
-  /// factor must be positive and finite, and fixes the map's scale factor for
-  /// its lifetime.
+  /// Initial logical extent. Width and height must be nonzero, and scale_factor
+  /// must be finite and positive. scale_factor is fixed for the map's lifetime.
   public var initialExtent: LogicalExtent
   /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
   public var mapMode: MapMode

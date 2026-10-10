@@ -20,9 +20,8 @@ use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 use maplibre_native_ffi::{
-    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, FrameDemandFlag, GpuSync, NativeFuture,
-    RenderDriverKind, RenderResult, RenderSessionAttachOptions, RenderSessionHandle,
-    RenderTargetExtent,
+    AcquiredFrameHandle, Error, ErrorKind, FrameDemand, FrameDemandFlag, GpuSync, LogicalExtent,
+    NativeFuture, RenderDriverKind, RenderResult, RenderSessionAttachOptions, RenderSessionHandle,
 };
 
 use crate::shell::{AppEvent, DriverWait, Wakes};
@@ -77,8 +76,8 @@ pub struct FrameResults {
     pub target_not_ready: bool,
 }
 
-pub fn extent(viewport: Viewport) -> RenderTargetExtent {
-    RenderTargetExtent::new(
+pub fn extent(viewport: Viewport) -> LogicalExtent {
+    LogicalExtent::new(
         viewport.logical_width,
         viewport.logical_height,
         viewport.scale_factor,
@@ -244,7 +243,7 @@ impl Session {
     /// pacing. A session resizes only while the host holds none of its frames.
     pub fn resize(&mut self, viewport: Viewport) -> maplibre_native_ffi::Result<()> {
         self.release_held()?;
-        self.session.resize(&extent(viewport))?;
+        self.session.resize(extent(viewport))?;
         Ok(())
     }
 

@@ -671,29 +671,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Copies the camera from the latest immutable map snapshot.
-    /// </summary>
-    /// <remarks>
-    /// See <c>mln_map_camera_snapshot_get</c> in the <see
-    /// href="https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html">C API reference</see>.
-    /// </remarks>
-    public (CameraOptions Camera, ulong Generation) CameraSnapshotGet()
-    {
-        using var read = state.Read(this, "mln_map_camera_snapshot_get");
-        var outCamera = new mln_camera_options { size = (uint)sizeof(mln_camera_options) };
-        ulong outGeneration = default;
-        Check(
-            NativeMethods.mln_map_camera_snapshot_get(
-                read.Handle,
-                &outCamera,
-                &outGeneration,
-                Diagnostic
-            )
-        );
-        return (CopyCameraOptions(outCamera), outGeneration);
-    }
-
-    /// <summary>
     /// Cancels the camera transitions running when this command commits.
     /// </summary>
     /// <remarks>

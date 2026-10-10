@@ -141,7 +141,8 @@ typedef struct mln_render_session_snapshot {
   uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
   /** Most recent terminal mln_render_result value. */
   uint32_t latest_result MLN_BINDING("enum=mln_render_result");
-  mln_render_target_extent extent;
+  /** Logical extent, including a resize the driver has not applied yet. */
+  mln_logical_extent extent;
   uint64_t generation;
   uint64_t map_update_generation;
   uint64_t rendered_update_generation;
@@ -419,9 +420,10 @@ MLN_API void mln_acquired_frame_view_end(
  *
  * Returns:
  * - MLN_STATUS_OK when the resize is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; extent or
- *   completion is null or undersized; the extent is not positive; or its
- *   scale_factor differs from the one the session attached with.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; completion
+ *   is null or undersized; extent has a zero width or height, or a
+ *   scale_factor that is not finite and positive; or extent.scale_factor
+ *   differs from the value fixed at attachment.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when the target is a caller-owned texture, which its
@@ -439,7 +441,7 @@ MLN_API void mln_acquired_frame_view_end(
  */
 MLN_BINDING("execution=command")
 MLN_API mln_status mln_render_session_resize(
-  mln_render_session session, const mln_render_target_extent* extent,
+  mln_render_session session, mln_logical_extent extent,
   const mln_completion* completion, mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

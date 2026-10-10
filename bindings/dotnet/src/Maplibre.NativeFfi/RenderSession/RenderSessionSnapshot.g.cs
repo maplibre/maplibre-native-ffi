@@ -18,11 +18,14 @@ namespace Maplibre.NativeFfi;
 /// <param name="LatestResult">
 /// Most recent terminal <c>mln_render_result</c> value.
 /// </param>
+/// <param name="Extent">
+/// Logical extent, including a resize the driver has not applied yet.
+/// </param>
 public readonly partial record struct RenderSessionSnapshot(
     RenderSessionState State,
     RenderDriverKind Driver,
     RenderResult LatestResult,
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     ulong Generation,
     ulong MapUpdateGeneration,
     ulong RenderedUpdateGeneration,
@@ -40,7 +43,7 @@ public readonly partial record struct RenderSessionSnapshot(
             default,
             default,
             default,
-            new RenderTargetExtent(),
+            new LogicalExtent(),
             default,
             default,
             default,

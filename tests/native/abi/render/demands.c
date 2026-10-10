@@ -243,22 +243,26 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
   );
   const mln_render_frame_result old_frame = take_one_result(&fixture);
 
-  mln_render_target_extent extent = {
-    .size = sizeof(mln_render_target_extent),
+  mln_logical_extent extent = {
     .width = 96,
     .height = 48,
     .scale_factor = 2.0,
   };
   mln_completion rejected_scale = mln_test_discard_completion();
   MLN_TEST_INVALID(
-    mln_render_session_resize(fixture.session, &extent, &rejected_scale, NULL)
+    mln_render_session_resize(fixture.session, extent, &rejected_scale, NULL)
   );
   extent.scale_factor = 1.0;
+  MLN_TEST_INVALID(mln_render_session_resize(
+    fixture.session,
+    (mln_logical_extent){.width = 0, .height = 48, .scale_factor = 1.0},
+    &rejected_scale, NULL
+  ));
   mln_test_render_request_forced(&fixture, 302);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, &extent, &completion.descriptor, NULL
+      fixture.session, extent, &completion.descriptor, NULL
     )
   );
   TEST_ASSERT_EQUAL_UINT64(
@@ -280,16 +284,16 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
     new_frame.extent_generation, snapshot.extent_generation
   );
 
-  mln_render_target_extent second = extent;
+  mln_logical_extent second = extent;
   second.width = 128;
   second.height = 72;
   mln_test_completion first_resize = mln_test_completion_default(0);
   mln_test_completion second_resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, &extent, &first_resize.descriptor, NULL
+    fixture.session, extent, &first_resize.descriptor, NULL
   ));
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, &second, &second_resize.descriptor, NULL
+    fixture.session, second, &second_resize.descriptor, NULL
   ));
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture, &first_resize)

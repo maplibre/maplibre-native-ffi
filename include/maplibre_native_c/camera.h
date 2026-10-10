@@ -159,26 +159,6 @@ MLN_API mln_status mln_map_set_tile_options(
 ) MLN_NOEXCEPT;
 
 /**
- * Copies the camera from the latest immutable map snapshot.
- *
- * The returned generation identifies the complete map snapshot that supplied
- * the camera. This function never reads mutable MapLibre state.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, out_camera is
- *   null or undersized, or out_generation is null.
- * - MLN_STATUS_INVALID_STATE when map has been released.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_BINDING("execution=snapshot")
-MLN_API mln_status mln_map_camera_snapshot_get(
-  mln_map map, mln_camera_options* out_camera MLN_BINDING("direction=out"),
-  uint64_t* out_generation MLN_BINDING("direction=out"),
-  mln_diagnostic* out_diagnostic
-) MLN_NOEXCEPT;
-
-/**
  * Submits one atomic camera update.
  *
  * The update is copied before return. The completion reports its terminal

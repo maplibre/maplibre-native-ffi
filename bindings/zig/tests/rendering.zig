@@ -7,7 +7,7 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native_ffi");
 const support = @import("fixture.zig");
 
-const extent = maplibre.RenderTargetExtent{ .width = 32, .height = 16, .scale_factor = 1.0 };
+const extent = maplibre.LogicalExtent{ .width = 32, .height = 16, .scale_factor = 1.0 };
 
 fn createFixture() !*support.Fixture {
     const fixture = try support.Fixture.create(.{ .extent = .{ .width = extent.width, .height = extent.height, .scale_factor = extent.scale_factor } });

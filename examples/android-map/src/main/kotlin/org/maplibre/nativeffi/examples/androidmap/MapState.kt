@@ -10,7 +10,6 @@ import org.maplibre.nativeffi.generated.CameraUpdate
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.GesturePhase
 import org.maplibre.nativeffi.generated.LatLng
-import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MapMode
 import org.maplibre.nativeffi.generated.RuntimeEventMask
@@ -43,12 +42,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
           .mapCreate(
             GeneratedApi.mapOptionsDefault()
               .copy(
-                initialExtent =
-                  LogicalExtent(
-                    initialViewport.logicalWidth.toUInt(),
-                    initialViewport.logicalHeight.toUInt(),
-                    initialViewport.scaleFactor,
-                  ),
+                initialExtent = initialViewport.extent,
                 mapMode = MapMode.CONTINUOUS,
                 eventMask = RuntimeEventMask.MAP_RENDER_UPDATE_AVAILABLE,
               )
@@ -97,7 +91,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
 
   /** Eases to the next whole zoom level, as `round(zoom) + 1`, about [anchor]. */
   fun zoomToNextWholeLevel(anchor: ScreenPoint) {
-    val zoom = map.cameraSnapshotGet().camera.zoom ?: 0.0
+    val zoom = map.snapshotGet().camera.zoom ?: 0.0
     map.applyCameraDelta(
       CameraDelta(
         scale = 2.0.pow(round(zoom) + 1.0 - zoom),
@@ -108,13 +102,7 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
   }
 
   fun resize(viewport: Viewport) {
-    map.resize(
-      LogicalExtent(
-        viewport.logicalWidth.toUInt(),
-        viewport.logicalHeight.toUInt(),
-        viewport.scaleFactor,
-      )
-    )
+    map.resize(viewport.extent)
   }
 
   private fun animation(durationMs: Double) = AnimationOptions(durationMs = durationMs)

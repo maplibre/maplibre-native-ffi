@@ -56,7 +56,7 @@ Future<void> abandonSession() async {
   var frames = Completer<void>();
   final attachment = TestGraphics.create().attachOwnedTexture(
     map,
-    const RenderTargetExtent(width: 32, height: 32, scaleFactor: 1),
+    const LogicalExtent(width: 32, height: 32, scaleFactor: 1),
     RenderSessionAttachOptions(
       driver: RenderDriverKind.coreWorker,
       requestedTextureRingDepth: 1,

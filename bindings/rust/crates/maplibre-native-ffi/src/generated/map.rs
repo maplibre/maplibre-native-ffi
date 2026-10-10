@@ -549,26 +549,6 @@ impl MapHandle {
         )
     }
 
-    /// Copies the camera from the latest immutable map snapshot.
-    ///
-    /// See `mln_map_camera_snapshot_get` in the
-    /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-    pub fn camera_snapshot_get(&self) -> Result<(CameraOptions, u64)> {
-        let mut call = self.inner.call("mln_map_camera_snapshot_get")?;
-        let mut out_camera: sys::mln_camera_options = unsafe { sys::mln_camera_options_default() };
-        out_camera.size = std::mem::size_of::<sys::mln_camera_options>() as _;
-        let mut out_generation: u64 = Default::default();
-        call.status(|map, out_diagnostic| unsafe {
-            sys::mln_map_camera_snapshot_get(
-                map,
-                &mut out_camera,
-                &mut out_generation,
-                out_diagnostic,
-            )
-        })?;
-        Ok((unsafe { from_native(out_camera) }?, out_generation))
-    }
-
     /// Cancels the camera transitions running when this command commits.
     ///
     /// See `mln_map_cancel_transitions` in the

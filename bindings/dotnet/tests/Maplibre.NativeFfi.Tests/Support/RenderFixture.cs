@@ -233,7 +233,7 @@ internal sealed class RenderFixture : IDisposable
 
     private RenderSessionHandle Attach()
     {
-        var extent = new RenderTargetExtent(Width, Height, 1);
+        var extent = new LogicalExtent(Width, Height, 1);
         var options = new RenderSessionAttachOptions
         {
             Driver = RenderDriverKind.CallerGraphicsThread,

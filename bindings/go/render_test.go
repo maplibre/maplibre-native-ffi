@@ -54,7 +54,7 @@ func newRenderFixture(t *testing.T) *renderFixture {
 		}
 	}
 
-	extent := RenderTargetExtent{Width: 32, Height: 16, ScaleFactor: 1}
+	extent := LogicalExtent{Width: 32, Height: 16, ScaleFactor: 1}
 	mapOptions := DefaultMapOptions()
 	mapOptions.InitialExtent = LogicalExtent{Width: extent.Width, Height: extent.Height, ScaleFactor: extent.ScaleFactor}
 	r := &renderFixture{

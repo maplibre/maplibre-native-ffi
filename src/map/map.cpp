@@ -90,6 +90,7 @@
 #include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
+#include "map/logical_extent.hpp"
 #include "map/map_internal.hpp"
 #include "maplibre_native_c.h"
 #include "operation/operation.hpp"
@@ -1064,15 +1065,12 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (
-    options->initial_extent.width == 0 || options->initial_extent.height == 0 ||
-    !std::isfinite(options->initial_extent.scale_factor) ||
-    options->initial_extent.scale_factor <= 0
-  ) {
-    mln::core::set_thread_error(
-      "initial extent dimensions and scale factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_logical_extent(
+    options->initial_extent,
+    "initial extent dimensions and scale factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
 
   switch (options->map_mode) {
@@ -3107,14 +3105,14 @@ auto map_resize(
   mln_map map, mln_logical_extent extent, const mln_completion* completion
 ) -> mln_status {
   const auto completion_status = validate_completion(completion);
-  if (
-    completion_status != MLN_STATUS_OK || extent.width == 0 ||
-    extent.height == 0 || !std::isfinite(extent.scale_factor) ||
-    extent.scale_factor <= 0
-  ) {
-    if (completion_status == MLN_STATUS_OK)
-      set_thread_error("extent must be valid");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (completion_status != MLN_STATUS_OK) {
+    return completion_status;
+  }
+  const auto extent_status = validate_logical_extent(
+    extent, "extent dimensions and scale factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
   auto context = MapSubmissionContext{};
   const auto acquire_status = acquire_map_submission(map, context);
@@ -3918,27 +3916,6 @@ auto map_set_event_mask(
     },
     completion_state
   );
-}
-
-auto map_camera_snapshot_get(
-  mln_map map, mln_camera_options* out_camera, uint64_t* out_generation
-) -> mln_status {
-  if (
-    out_camera == nullptr || out_camera->size < sizeof(mln_camera_options) ||
-    out_generation == nullptr
-  ) {
-    set_thread_error("camera output and generation must be valid");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto snapshot = mln_map_snapshot{};
-  snapshot.size = sizeof(mln_map_snapshot);
-  const auto status = map_snapshot_get(map, &snapshot);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-  *out_camera = snapshot.camera;
-  *out_generation = snapshot.generation;
-  return MLN_STATUS_OK;
 }
 
 namespace {

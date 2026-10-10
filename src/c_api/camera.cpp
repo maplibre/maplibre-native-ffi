@@ -48,15 +48,6 @@ auto mln_map_tile_options_default(void) noexcept -> mln_map_tile_options {
   return mln::core::map_tile_options_default();
 }
 
-auto mln_map_camera_snapshot_get(
-  mln_map map, mln_camera_options* out_camera, uint64_t* out_generation,
-  mln_diagnostic* out_diagnostic
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
-    return mln::core::map_camera_snapshot_get(map, out_camera, out_generation);
-  });
-}
-
 auto mln_map_update_camera(
   mln_map map, const mln_camera_update* update,
   const mln_completion* completion, mln_diagnostic* out_diagnostic

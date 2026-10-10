@@ -47,7 +47,7 @@ test "optional fields and masks round-trip through presence bits" {
         .mode = .jump,
         .camera = .{ .zoom = 5.0 },
     }, null));
-    const snapshot = try maplibre.mapCameraSnapshotGet(fixture.map, null);
+    const snapshot = try maplibre.mapSnapshotGet(fixture.map, null);
     try testing.expectEqual(@as(?f64, 5.0), snapshot.camera.zoom);
     try testing.expectApproxEqAbs(@as(f64, 30.0), snapshot.camera.pitch.?, 1e-9);
 

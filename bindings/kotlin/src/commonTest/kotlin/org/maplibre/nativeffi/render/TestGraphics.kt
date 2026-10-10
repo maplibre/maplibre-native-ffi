@@ -8,6 +8,7 @@ import kotlinx.coroutines.withContext
 import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
@@ -20,7 +21,6 @@ import org.maplibre.nativeffi.generated.OpenglOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.RenderBackendFlag
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
-import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.generated.WglContextDescriptor
@@ -116,7 +116,7 @@ internal object TestGraphics {
     options: RenderSessionAttachOptions,
   ): RenderSessionAttachment {
     val context = context()
-    val extent = RenderTargetExtent(width.toUInt(), height.toUInt(), 1.0)
+    val extent = LogicalExtent(width.toUInt(), height.toUInt(), 1.0)
     return when (backend) {
       TestBackend.METAL ->
         map.metalOwnedTextureAttach(

@@ -1774,7 +1774,7 @@ pub struct LogSeverityMask: u32 {
 }
 }
 
-/// Logical map extent in UI pixels and device-pixel scale.
+/// Logical extent in UI pixels and the device-pixel scale.
 ///
 /// See `mln_logical_extent` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1784,9 +1784,7 @@ pub struct LogicalExtent {
     pub width: u32,
     /// Height in UI pixels. Defaults to 256.
     pub height: u32,
-    /// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at
-    /// map creation, so `mln_map_resize()` accepts only the value the map was
-    /// created with.
+    /// Device pixels per UI pixel. Defaults to 1.0.
     pub scale_factor: f64,
 }
 impl LogicalExtent {
@@ -1854,9 +1852,9 @@ pub enum MapMode: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MapOptions {
-    /// Initial logical extent. Width and height must be positive. The scale
-    /// factor must be positive and finite, and fixes the map's scale factor for
-    /// its lifetime.
+    /// Initial logical extent. Width and height must be nonzero, and
+    /// scale_factor must be finite and positive. scale_factor is fixed for the
+    /// map's lifetime.
     pub initial_extent: LogicalExtent,
     /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
     pub map_mode: MapMode,
@@ -2180,8 +2178,9 @@ impl FromNative<sys::mln_map_viewport_options> for MapViewportOptions {
 pub struct MetalBorrowedTextureDescriptor {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
-    /// below.
-    pub extent: RenderTargetExtent,
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    pub extent: LogicalExtent,
     /// Physical texture width in device pixels. Must be positive. Defaults to
     /// 256.
     pub physical_width: u32,
@@ -2198,7 +2197,7 @@ impl Default for MetalBorrowedTextureDescriptor {
 }
 impl MetalBorrowedTextureDescriptor {
     pub const fn new(
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         physical_width: u32,
         physical_height: u32,
         texture: *mut std::ffi::c_void,
@@ -2271,8 +2270,9 @@ impl FromNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalOwnedTextureDescriptor {
-    /// Logical texture extent.
-    pub extent: RenderTargetExtent,
+    /// Logical texture extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Metal backend context. device is required.
     pub context: MetalContextDescriptor,
 }
@@ -2282,7 +2282,7 @@ impl Default for MetalOwnedTextureDescriptor {
     }
 }
 impl MetalOwnedTextureDescriptor {
-    pub const fn new(extent: RenderTargetExtent, context: MetalContextDescriptor) -> Self {
+    pub const fn new(extent: LogicalExtent, context: MetalContextDescriptor) -> Self {
         Self { extent, context }
     }
 }
@@ -2372,8 +2372,9 @@ impl FromNative<sys::mln_metal_owned_texture_frame> for MetalOwnedTextureFrame {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalSurfaceDescriptor {
-    /// Logical surface extent.
-    pub extent: RenderTargetExtent,
+    /// Logical surface extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Metal backend context. device is optional for Metal surfaces.
     pub context: MetalContextDescriptor,
     /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
@@ -2386,7 +2387,7 @@ impl Default for MetalSurfaceDescriptor {
 }
 impl MetalSurfaceDescriptor {
     pub const fn new(
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         context: MetalContextDescriptor,
         layer: *mut std::ffi::c_void,
     ) -> Self {
@@ -2713,8 +2714,9 @@ impl FromNative<sys::mln_offline_tile_pyramid_region_definition>
 pub struct OpenglBorrowedTextureDescriptor {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
-    /// below.
-    pub extent: RenderTargetExtent,
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    pub extent: LogicalExtent,
     /// Physical texture width in device pixels. Must be positive. Defaults to
     /// 256.
     pub physical_width: u32,
@@ -2903,8 +2905,9 @@ pub struct OpenglContextProviderFlag: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenglOwnedTextureDescriptor {
-    /// Logical texture extent.
-    pub extent: RenderTargetExtent,
+    /// Logical texture extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Borrowed OpenGL context provider data. Shared ownership creates a
     /// context whose texture frames the host can acquire. Dedicated EGL or
     /// transferred WebGL ownership creates a private core-worker context for
@@ -3015,8 +3018,9 @@ impl FromNative<sys::mln_opengl_owned_texture_frame> for OpenglOwnedTextureFrame
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OpenglSurfaceDescriptor {
-    /// Logical surface extent.
-    pub extent: RenderTargetExtent,
+    /// Logical surface extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Borrowed OpenGL context provider data.
     pub context: OpenglContextDescriptor,
     /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
@@ -3615,7 +3619,8 @@ pub struct RenderSessionSnapshot {
     pub driver: RenderDriverKind,
     /// Most recent terminal `mln_render_result` value.
     pub latest_result: RenderResult,
-    pub extent: RenderTargetExtent,
+    /// Logical extent, including a resize the driver has not applied yet.
+    pub extent: LogicalExtent,
     pub generation: u64,
     pub map_update_generation: u64,
     pub rendered_update_generation: u64,
@@ -3632,7 +3637,7 @@ impl RenderSessionSnapshot {
         state: RenderSessionState,
         driver: RenderDriverKind,
         latest_result: RenderResult,
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         generation: u64,
         map_update_generation: u64,
         rendered_update_generation: u64,
@@ -3696,48 +3701,6 @@ pub enum RenderSessionState: u32 {
     TargetLost = 5,
     Abandoned = 6,
 } Unknown
-}
-
-/// Logical render target extent in UI pixels.
-///
-/// See `mln_render_target_extent` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct RenderTargetExtent {
-    /// Logical map width in UI pixels. Defaults to 256.
-    pub width: u32,
-    /// Logical map height in UI pixels. Defaults to 256.
-    pub height: u32,
-    /// UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0.
-    pub scale_factor: f64,
-}
-impl RenderTargetExtent {
-    pub const fn new(width: u32, height: u32, scale_factor: f64) -> Self {
-        Self {
-            width,
-            height,
-            scale_factor,
-        }
-    }
-}
-impl ToNative<sys::mln_render_target_extent> for RenderTargetExtent {
-    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_render_target_extent> {
-        let mut raw: sys::mln_render_target_extent = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_render_target_extent>() as _;
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        Ok(raw)
-    }
-}
-impl FromNative<sys::mln_render_target_extent> for RenderTargetExtent {
-    unsafe fn from_native(raw: sys::mln_render_target_extent) -> Result<Self> {
-        Ok(Self {
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-        })
-    }
 }
 
 native_flags! {
@@ -5987,8 +5950,9 @@ pub enum ViewportMode: u32 {
 pub struct VulkanBorrowedTextureDescriptor {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
-    /// below.
-    pub extent: RenderTargetExtent,
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    pub extent: LogicalExtent,
     /// Physical image width in device pixels. Must be positive. Defaults to
     /// 256.
     pub physical_width: u32,
@@ -6016,7 +5980,7 @@ impl Default for VulkanBorrowedTextureDescriptor {
 }
 impl VulkanBorrowedTextureDescriptor {
     pub const fn new(
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         physical_width: u32,
         physical_height: u32,
         context: VulkanContextDescriptor,
@@ -6154,8 +6118,9 @@ impl FromNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor 
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VulkanOwnedTextureDescriptor {
-    /// Logical texture extent.
-    pub extent: RenderTargetExtent,
+    /// Logical texture extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Borrowed Vulkan context. All handles are required.
     pub context: VulkanContextDescriptor,
 }
@@ -6165,7 +6130,7 @@ impl Default for VulkanOwnedTextureDescriptor {
     }
 }
 impl VulkanOwnedTextureDescriptor {
-    pub const fn new(extent: RenderTargetExtent, context: VulkanContextDescriptor) -> Self {
+    pub const fn new(extent: LogicalExtent, context: VulkanContextDescriptor) -> Self {
         Self { extent, context }
     }
 }
@@ -6268,8 +6233,9 @@ impl FromNative<sys::mln_vulkan_owned_texture_frame> for VulkanOwnedTextureFrame
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VulkanSurfaceDescriptor {
-    /// Logical surface extent.
-    pub extent: RenderTargetExtent,
+    /// Logical surface extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Borrowed Vulkan context. All handles are required. The device must
     /// support VK_KHR_swapchain, and the queue family must support graphics and
     /// presentation to this descriptor's surface.
@@ -6284,7 +6250,7 @@ impl Default for VulkanSurfaceDescriptor {
 }
 impl VulkanSurfaceDescriptor {
     pub const fn new(
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         context: VulkanContextDescriptor,
         surface: u64,
     ) -> Self {
@@ -6425,8 +6391,11 @@ pub enum WebglContextKind: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebgpuBorrowedTextureDescriptor {
-    /// Logical texture extent.
-    pub extent: RenderTargetExtent,
+    /// Logical texture extent. The map viewport uses width and height and the
+    /// renderer uses scale_factor; the physical size is stated separately
+    /// below. A scale_factor that differs from the map's is accepted and logged
+    /// as a warning.
+    pub extent: LogicalExtent,
     /// Physical texture width in device pixels. Defaults to 256.
     pub physical_width: u32,
     /// Physical texture height in device pixels. Defaults to 256.
@@ -6447,7 +6416,7 @@ impl Default for WebgpuBorrowedTextureDescriptor {
 }
 impl WebgpuBorrowedTextureDescriptor {
     pub const fn new(
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         physical_width: u32,
         physical_height: u32,
         context: WebgpuContextDescriptor,
@@ -6551,8 +6520,9 @@ impl FromNative<sys::mln_webgpu_context_descriptor> for WebgpuContextDescriptor 
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebgpuOwnedTextureDescriptor {
-    /// Logical texture extent.
-    pub extent: RenderTargetExtent,
+    /// Logical texture extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Borrowed WebGPU context. device is required.
     pub context: WebgpuContextDescriptor,
 }
@@ -6562,7 +6532,7 @@ impl Default for WebgpuOwnedTextureDescriptor {
     }
 }
 impl WebgpuOwnedTextureDescriptor {
-    pub const fn new(extent: RenderTargetExtent, context: WebgpuContextDescriptor) -> Self {
+    pub const fn new(extent: LogicalExtent, context: WebgpuContextDescriptor) -> Self {
         Self { extent, context }
     }
 }
@@ -6660,8 +6630,9 @@ impl FromNative<sys::mln_webgpu_owned_texture_frame> for WebgpuOwnedTextureFrame
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WebgpuSurfaceDescriptor {
-    /// Logical surface extent.
-    pub extent: RenderTargetExtent,
+    /// Logical surface extent. A scale_factor that differs from the map's is
+    /// accepted and logged as a warning.
+    pub extent: LogicalExtent,
     /// Borrowed WebGPU context. device is required.
     pub context: WebgpuContextDescriptor,
     /// Borrowed WGPUSurface. Required, and must stay alive for the session. The
@@ -6679,7 +6650,7 @@ impl Default for WebgpuSurfaceDescriptor {
 }
 impl WebgpuSurfaceDescriptor {
     pub const fn new(
-        extent: RenderTargetExtent,
+        extent: LogicalExtent,
         context: WebgpuContextDescriptor,
         surface: *mut std::ffi::c_void,
         format: u32,

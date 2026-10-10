@@ -531,20 +531,6 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Copies the camera from the latest immutable map snapshot.
-   *
-   * See `mln_map_camera_snapshot_get` in the
-   * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-   */
-  public fun cameraSnapshotGet(): MapCameraSnapshotGetResult =
-    nativeCall(this, binding, "mln_map_camera_snapshot_get") {
-      val out0 = sized(120, 8)
-      val out1 = allocate(8, 8)
-      check(C.mln_map_camera_snapshot_get(handle, out0, out1, diagnostic))
-      MapCameraSnapshotGetResult(camera = readCameraOptions(out0), generation = readU64(out1))
-    }
-
-  /**
    * Cancels the camera transitions running when this command commits.
    *
    * See `mln_map_cancel_transitions` in the

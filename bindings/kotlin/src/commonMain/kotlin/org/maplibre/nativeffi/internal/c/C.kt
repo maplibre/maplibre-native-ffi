@@ -94,6 +94,13 @@ internal expect object C {
     outDiagnostic: Long,
   ): Int
 
+  fun mln_logical_extent_physical_size(
+    extent: Long,
+    outWidth: Long,
+    outHeight: Long,
+    outDiagnostic: Long,
+  ): Int
+
   fun mln_map_add_color_relief_layer(
     map: Long,
     layerId: Long,
@@ -274,13 +281,6 @@ internal expect object C {
   ): Int
 
   fun mln_map_camera_query(map: Long, completion: Long, outDiagnostic: Long): Int
-
-  fun mln_map_camera_snapshot_get(
-    map: Long,
-    outCamera: Long,
-    outGeneration: Long,
-    outDiagnostic: Long,
-  ): Int
 
   fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int
 
@@ -1062,13 +1062,6 @@ internal expect object C {
     session: Long,
     maxWork: Long,
     outServiced: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  fun mln_render_target_extent_physical_size(
-    extent: Long,
-    outWidth: Long,
-    outHeight: Long,
     outDiagnostic: Long,
   ): Int
 

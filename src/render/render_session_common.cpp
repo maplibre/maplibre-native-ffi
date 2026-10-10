@@ -56,33 +56,28 @@
 
 namespace mln::core {
 
-auto render_target_extent_physical_size(
-  const mln_render_target_extent* extent, uint32_t* out_width,
-  uint32_t* out_height
+auto logical_extent_physical_size(
+  mln_logical_extent extent, uint32_t* out_width, uint32_t* out_height
 ) -> mln_status {
-  if (extent == nullptr) {
-    set_thread_error("extent must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_width == nullptr || out_height == nullptr) {
     set_thread_error("out_width and out_height must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
-    *extent, "extent dimensions and scale_factor must be positive"
+  const auto extent_status = validate_logical_extent(
+    extent, "extent dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
   const auto physical_status = validate_physical_size(
-    extent->width, extent->height, extent->scale_factor,
+    extent.width, extent.height, extent.scale_factor,
     "scaled extent dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  *out_width = physical_dimension(extent->width, extent->scale_factor);
-  *out_height = physical_dimension(extent->height, extent->scale_factor);
+  *out_width = physical_dimension(extent.width, extent.scale_factor);
+  *out_height = physical_dimension(extent.height, extent.scale_factor);
   return MLN_STATUS_OK;
 }
 
@@ -142,8 +137,7 @@ auto opengl_owned_texture_descriptor_default() noexcept
   return mln_opengl_owned_texture_descriptor{
     .size = sizeof(mln_opengl_owned_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -157,8 +151,7 @@ auto opengl_borrowed_texture_descriptor_default() noexcept
   return mln_opengl_borrowed_texture_descriptor{
     .size = sizeof(mln_opengl_borrowed_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -176,8 +169,7 @@ auto webgpu_surface_descriptor_default() noexcept
   return mln_webgpu_surface_descriptor{
     .size = sizeof(mln_webgpu_surface_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -199,8 +191,7 @@ auto opengl_surface_descriptor_default() noexcept
   return mln_opengl_surface_descriptor{
     .size = sizeof(mln_opengl_surface_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -1595,6 +1586,8 @@ auto start_attach_render_session(
       );
     }
   };
+  // Logged before the commit, so a throw while logging unwinds the attach.
+  warn_on_scale_factor_mismatch(session->map, session->scale_factor);
   {
     // Nothing from here can fail, so the attachment commits under the queue
     // lock. The wakes and the completion are accepted before the driver can
@@ -1740,7 +1733,7 @@ auto validate_render_session_retarget(
 
 auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
-  const mln_render_target_extent& extent, uint32_t physical_width,
+  const mln_logical_extent& extent, uint32_t physical_width,
   uint32_t physical_height, const RenderTargetReplacer& replace
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
@@ -1799,7 +1792,7 @@ auto render_session_set_target(
 }
 
 auto surface_session_set_target(
-  mln_render_session session, const mln_render_target_extent& extent,
+  mln_render_session session, const mln_logical_extent& extent,
   const RenderTargetReplacer& replace
 ) -> mln_status {
   const auto physical_status = validate_physical_size(
@@ -2730,10 +2723,7 @@ auto render_session_get_snapshot(
     .driver = live->capabilities.driver,
     .latest_result = live->latest_result,
     .extent = live->pending_extent.value_or(
-      mln_render_target_extent{
-        sizeof(mln_render_target_extent), live->width, live->height,
-        live->scale_factor
-      }
+      mln_logical_extent{live->width, live->height, live->scale_factor}
     ),
     .generation = live->generation,
     .map_update_generation = live->map_update_generation,
@@ -3254,8 +3244,8 @@ void invalidate_unacquired_texture_frames_locked(
 
 auto make_ordered_resize_work(
   const std::shared_ptr<mln_render_session_object>& session,
-  const std::shared_ptr<OperationObject>& operation,
-  mln_render_target_extent extent, uint64_t ticket
+  const std::shared_ptr<OperationObject>& operation, mln_logical_extent extent,
+  uint64_t ticket
 ) -> RenderDriverWork {
   return RenderDriverWork{
     [session, operation, extent, ticket]() {
@@ -3334,15 +3324,11 @@ auto make_ordered_resize_work(
 }  // namespace
 
 auto render_session_resize_start(
-  mln_render_session session, const mln_render_target_extent* extent,
+  mln_render_session session, mln_logical_extent extent,
   const mln_completion* completion
 ) -> mln_status {
-  if (extent == nullptr) {
-    set_thread_error("extent must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto valid = validate_render_target_extent(
-    *extent, "render target dimensions and scale factor must be positive"
+  const auto valid = validate_logical_extent(
+    extent, "render target dimensions and scale factor must be positive"
   );
   if (valid != MLN_STATUS_OK) return valid;
   const auto live = lease_render_session(session);
@@ -3370,7 +3356,7 @@ auto render_session_resize_start(
     }
     // The renderer bakes its pixel ratio into compiled shaders, so a scale
     // factor the session did not attach with cannot be applied in place.
-    if (extent->scale_factor != live->scale_factor) {
+    if (extent.scale_factor != live->scale_factor) {
       set_thread_error(
         "render session scale_factor is fixed at attachment; destroy the "
         "session and attach again to change it"
@@ -3397,11 +3383,10 @@ auto render_session_resize_start(
     async
   );
   if (registered != MLN_STATUS_OK) return registered;
-  const auto copied = *extent;
   auto ticket = uint64_t{0};
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    live->pending_extent = copied;
+    live->pending_extent = extent;
     live->pending_changes = true;
     ticket = ++live->resize_submission;
     // An owned-texture ring may contain several completed frames. None of its
@@ -3409,13 +3394,7 @@ auto render_session_resize_start(
     // the first new-size frame when the host next acquires the oldest result.
     invalidate_unacquired_texture_frames_locked(*live);
   }
-  const auto post = map_post_resize(
-    live->map, mln_logical_extent{
-                 .width = copied.width,
-                 .height = copied.height,
-                 .scale_factor = copied.scale_factor
-               }
-  );
+  const auto post = map_post_resize(live->map, extent);
   if (post != MLN_STATUS_OK) {
     {
       // No driver work will clear the extent the snapshot is already
@@ -3437,7 +3416,7 @@ auto render_session_resize_start(
       // than this thread, delivers a completion that finishes early.
       async.completion->accept();
       push_driver_work_locked(
-        *live, make_ordered_resize_work(live, async.operation, copied, ticket),
+        *live, make_ordered_resize_work(live, async.operation, extent, ticket),
         wakes
       );
       return MLN_STATUS_OK;

@@ -222,6 +222,26 @@ pub fn log_set_callback(callback_: Option<LogCallback>) -> Result<()> {
     Ok(())
 }
 
+/// Computes the physical device-pixel size of a logical extent.
+///
+/// See `mln_logical_extent_physical_size` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
+pub fn logical_extent_physical_size(extent: LogicalExtent) -> Result<(u32, u32)> {
+    let mut call = Call::global("mln_logical_extent_physical_size")?;
+    let mut out_width: u32 = Default::default();
+    let mut out_height: u32 = Default::default();
+    let extent = call.input(&extent)?;
+    call.status(|_, out_diagnostic| unsafe {
+        sys::mln_logical_extent_physical_size(
+            extent,
+            &mut out_width,
+            &mut out_height,
+            out_diagnostic,
+        )
+    })?;
+    Ok((out_width, out_height))
+}
+
 /// Returns map options initialized for this C API version.
 ///
 /// See `mln_map_options_default` in the
@@ -404,27 +424,6 @@ pub fn render_session_attach_options_default() -> Result<RenderSessionAttachOpti
     let mut call = Call::global("mln_render_session_attach_options_default")?;
     let value = call.run(|_| unsafe { sys::mln_render_session_attach_options_default() });
     Ok(unsafe { from_native(value) }?)
-}
-
-/// Computes the physical device-pixel size of a logical render target
-/// extent.
-///
-/// See `mln_render_target_extent_physical_size` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-pub fn render_target_extent_physical_size(extent: &RenderTargetExtent) -> Result<(u32, u32)> {
-    let mut call = Call::global("mln_render_target_extent_physical_size")?;
-    let mut out_width: u32 = Default::default();
-    let mut out_height: u32 = Default::default();
-    let extent = call.reference(&extent)?;
-    call.status(|_, out_diagnostic| unsafe {
-        sys::mln_render_target_extent_physical_size(
-            extent,
-            &mut out_width,
-            &mut out_height,
-            out_diagnostic,
-        )
-    })?;
-    Ok((out_width, out_height))
 }
 
 /// Returns default rendered feature query options.

@@ -226,14 +226,7 @@ static void camera_snapshot_command_copy_and_disposition_are_ordered(void) {
   MLN_TEST_OK(mln_map_snapshot_get(map, &after, NULL));
   TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, after.generation);
   TEST_ASSERT_EQUAL_DOUBLE(-122.4194, after.camera.longitude);
-
-  mln_camera_options published = mln_camera_options_default();
-  uint64_t published_generation = 0;
-  MLN_TEST_OK(
-    mln_map_camera_snapshot_get(map, &published, &published_generation, NULL)
-  );
-  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(command_generation, published_generation);
-  TEST_ASSERT_EQUAL_DOUBLE(11.0, published.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(11.0, after.camera.zoom);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
@@ -344,13 +337,6 @@ static void every_camera_field_round_trips_through_the_snapshot(void) {
       queried.generation, snapshot.generation
     );
     assert_camera_field(row->label, &row->camera, &snapshot.camera);
-
-    mln_camera_options published = mln_camera_options_default();
-    uint64_t generation = 0;
-    MLN_TEST_OK(
-      mln_map_camera_snapshot_get(map, &published, &generation, NULL)
-    );
-    assert_camera_field(row->label, &row->camera, &published);
 
     // Every earlier row's field is still in place.
     for (size_t earlier = 0; earlier < index; earlier += 1) {
@@ -1139,10 +1125,6 @@ static void camera_calls_reject_what_they_cannot_express(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   {
-    uint64_t generation = 0;
-    mln_camera_options camera = mln_camera_options_default();
-    MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, NULL, &generation, NULL));
-    MLN_TEST_INVALID(mln_map_camera_snapshot_get(map, &camera, NULL, NULL));
     mln_completion rejected = mln_test_discard_completion();
     MLN_TEST_INVALID(mln_map_update_camera(map, NULL, &rejected, NULL));
     MLN_TEST_INVALID(mln_map_camera_query(map, NULL, NULL));

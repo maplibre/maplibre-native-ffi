@@ -19,8 +19,11 @@ extern "C" {
 /** Metal attachment options for a native surface. */
 typedef struct mln_metal_surface_descriptor {
   uint32_t size;
-  /** Logical surface extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /** Metal backend context. device is optional for Metal surfaces. */
   mln_metal_context_descriptor context;
   /** `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required. */
@@ -30,8 +33,11 @@ typedef struct mln_metal_surface_descriptor {
 /** Vulkan attachment options for a native surface. */
 typedef struct mln_vulkan_surface_descriptor {
   uint32_t size;
-  /** Logical surface extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /**
    * Borrowed Vulkan context. All handles are required. The device must support
    * VK_KHR_swapchain, and the queue family must support graphics and
@@ -45,8 +51,11 @@ typedef struct mln_vulkan_surface_descriptor {
 /** WebGPU attachment options for a native surface. */
 typedef struct mln_webgpu_surface_descriptor {
   uint32_t size;
-  /** Logical surface extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /** Borrowed WebGPU context. device is required. */
   mln_webgpu_context_descriptor context;
   /**
@@ -65,8 +74,11 @@ typedef struct mln_webgpu_surface_descriptor {
 /** OpenGL attachment options for a native surface. */
 typedef struct mln_opengl_surface_descriptor {
   uint32_t size;
-  /** Logical surface extent. */
-  mln_render_target_extent extent;
+  /**
+   * Logical surface extent. A scale_factor that differs from the map's is
+   * accepted and logged as a warning.
+   */
+  mln_logical_extent extent;
   /** Borrowed OpenGL context provider data. */
   mln_opengl_context_descriptor context;
   /**
@@ -119,9 +131,11 @@ mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or options
  *   enable a queue lock.
@@ -156,9 +170,11 @@ MLN_API mln_status mln_metal_surface_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -196,9 +212,11 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
  *   context provider is unavailable; the requested driver does not match the
@@ -234,9 +252,11 @@ MLN_API mln_status mln_opengl_surface_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; out_session is null or does not point to the null handle; or the
- *   requested driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; descriptor->extent has a zero width or height, a scale_factor that
+ *   is not finite and positive, or a scaled dimension past UINT32_MAX;
+ *   out_session is null or does not point to the null handle; or the
+ *   requested driver kind is unknown, or options carry a malformed wake or
+ *   queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
@@ -265,7 +285,9 @@ MLN_API mln_status mln_webgpu_surface_attach(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; or a required backend handle is null.
+ *   or completion is null or undersized; a required backend handle is null; or
+ *   descriptor->extent has a zero width or height, a scale_factor that is not
+ *   finite and positive, or a scaled dimension past UINT32_MAX.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
@@ -292,7 +314,9 @@ MLN_API mln_status mln_metal_surface_set_target(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; or a required backend handle is null.
+ *   or completion is null or undersized; a required backend handle is null; or
+ *   descriptor->extent has a zero width or height, a scale_factor that is not
+ *   finite and positive, or a scaled dimension past UINT32_MAX.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
@@ -323,7 +347,9 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; or a required backend handle is null.
+ *   or completion is null or undersized; a required backend handle is null; or
+ *   descriptor->extent has a zero width or height, a scale_factor that is not
+ *   finite and positive, or a scaled dimension past UINT32_MAX.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
@@ -350,7 +376,9 @@ MLN_API mln_status mln_opengl_surface_set_target(
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; or a required backend handle is null.
+ *   or completion is null or undersized; a required backend handle is null; or
+ *   descriptor->extent has a zero width or height, a scale_factor that is not
+ *   finite and positive, or a scaled dimension past UINT32_MAX.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or a texture frame is still acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the

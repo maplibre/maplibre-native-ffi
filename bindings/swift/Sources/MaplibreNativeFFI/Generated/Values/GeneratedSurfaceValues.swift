@@ -8,8 +8,9 @@ import Foundation
 /// See `mln_metal_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent.
-  public var extent: RenderTargetExtent
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Metal backend context. device is optional for Metal surfaces.
   public var context: MetalContextDescriptor
   /// `CAMetalLayer*` / `CA::MetalLayer*` retained by the session. Required.
@@ -19,7 +20,7 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = MetalSurfaceDescriptor.default.extent,
+    extent: LogicalExtent = MetalSurfaceDescriptor.default.extent,
     context: MetalContextDescriptor = MetalSurfaceDescriptor.default.context,
     layer: NativePointer = MetalSurfaceDescriptor.default.layer
   ) {
@@ -29,7 +30,7 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_metal_surface_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = MetalContextDescriptor(raw: raw.context)
     layer = NativePointer(bitPattern: unsafeBitCast(raw.layer, to: UInt.self))
   }
@@ -48,8 +49,9 @@ public struct MetalSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_opengl_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent.
-  public var extent: RenderTargetExtent
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Borrowed OpenGL context provider data.
   public var context: OpenglContextDescriptor
   /// Borrowed platform surface handle: an HDC for WGL and an EGLSurface for
@@ -61,7 +63,7 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = OpenglSurfaceDescriptor.default.extent,
+    extent: LogicalExtent = OpenglSurfaceDescriptor.default.extent,
     context: OpenglContextDescriptor = OpenglSurfaceDescriptor.default.context,
     surface: NativePointer = OpenglSurfaceDescriptor.default.surface
   ) {
@@ -74,7 +76,7 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
     raw: mln_opengl_surface_descriptor,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = try OpenglContextDescriptor(raw: raw.context)
     surface = NativePointer(bitPattern: unsafeBitCast(
       raw.surface,
@@ -99,8 +101,9 @@ public struct OpenglSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_vulkan_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent.
-  public var extent: RenderTargetExtent
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Borrowed Vulkan context. All handles are required. The device must support
   /// VK_KHR_swapchain, and the queue family must support graphics and
   /// presentation to this descriptor's surface.
@@ -112,7 +115,7 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = VulkanSurfaceDescriptor.default.extent,
+    extent: LogicalExtent = VulkanSurfaceDescriptor.default.extent,
     context: VulkanContextDescriptor = VulkanSurfaceDescriptor.default.context,
     surface: UInt64 = VulkanSurfaceDescriptor.default.surface
   ) {
@@ -122,7 +125,7 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_vulkan_surface_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = VulkanContextDescriptor(raw: raw.context)
     surface = raw.surface
   }
@@ -141,8 +144,9 @@ public struct VulkanSurfaceDescriptor: Equatable, Hashable, Sendable {
 /// See `mln_webgpu_surface_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 public struct WebgpuSurfaceDescriptor: Equatable, Hashable, Sendable {
-  /// Logical surface extent.
-  public var extent: RenderTargetExtent
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  public var extent: LogicalExtent
   /// Borrowed WebGPU context. device is required.
   public var context: WebgpuContextDescriptor
   /// Borrowed WGPUSurface. Required, and must stay alive for the session. The
@@ -157,7 +161,7 @@ public struct WebgpuSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   public init(
-    extent: RenderTargetExtent = WebgpuSurfaceDescriptor.default.extent,
+    extent: LogicalExtent = WebgpuSurfaceDescriptor.default.extent,
     context: WebgpuContextDescriptor = WebgpuSurfaceDescriptor.default.context,
     surface: NativePointer = WebgpuSurfaceDescriptor.default.surface,
     format: UInt32 = WebgpuSurfaceDescriptor.default.format
@@ -169,7 +173,7 @@ public struct WebgpuSurfaceDescriptor: Equatable, Hashable, Sendable {
   }
 
   init(raw: mln_webgpu_surface_descriptor) {
-    extent = RenderTargetExtent(raw: raw.extent)
+    extent = LogicalExtent(raw: raw.extent)
     context = WebgpuContextDescriptor(raw: raw.context)
     surface = NativePointer(bitPattern: unsafeBitCast(
       raw.surface,

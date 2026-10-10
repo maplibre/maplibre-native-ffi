@@ -240,14 +240,13 @@ app_error render_session_drain_results(
 app_error render_session_resize(
   render_session* session, viewport current_viewport
 ) {
-  const mln_render_target_extent extent =
-    render_target_extent(current_viewport);
+  const mln_logical_extent extent = render_target_extent(current_viewport);
   // A later resize supersedes this one, so a live resize needs no pacing.
   const mln_completion completion =
     diagnostics_completion("render session resize failed");
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status = mln_render_session_resize(
-    session->handle, &extent, &completion, &diagnostic
+    session->handle, extent, &completion, &diagnostic
   );
   if (status != MLN_STATUS_OK) {
     return log_failure(
@@ -426,9 +425,8 @@ void texture_replacements_take_any(
     replacements->oldest != nullptr ? take_oldest(replacements) : nullptr;
 }
 
-mln_render_target_extent render_target_extent(viewport current_viewport) {
-  return (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
+mln_logical_extent render_target_extent(viewport current_viewport) {
+  return (mln_logical_extent){
     .width = current_viewport.logical_width,
     .height = current_viewport.logical_height,
     .scale_factor = current_viewport.scale_factor,

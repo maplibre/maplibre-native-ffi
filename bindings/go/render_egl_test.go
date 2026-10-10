@@ -12,7 +12,7 @@ const (
 // A shared EGL context takes the caller driver, which runs on the thread the
 // fixture made that context current on.
 func attachOwnedTexture(
-	m *MapHandle, context testsupport.Context, extent RenderTargetExtent, options RenderSessionAttachOptions,
+	m *MapHandle, context testsupport.Context, extent LogicalExtent, options RenderSessionAttachOptions,
 ) (*RenderSessionHandle, *Future[struct{}], error) {
 	attachment, err := m.OpenglOwnedTextureAttach(OpenglOwnedTextureDescriptor{
 		Extent: extent,

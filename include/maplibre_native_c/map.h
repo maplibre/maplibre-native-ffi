@@ -158,17 +158,13 @@ typedef enum mln_map_mode : uint32_t {
   /** Produces one-off still images for a single tile. */
   MLN_MAP_MODE_TILE = 2,
 } mln_map_mode;
-/** Logical map extent in UI pixels and device-pixel scale. */
+/** Logical extent in UI pixels and the device-pixel scale. */
 typedef struct mln_logical_extent {
   /** Width in UI pixels. Defaults to 256. */
   uint32_t width MLN_BINDING("default=256");
   /** Height in UI pixels. Defaults to 256. */
   uint32_t height MLN_BINDING("default=256");
-  /**
-   * Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
-   * creation, so mln_map_resize() accepts only the value the map was created
-   * with.
-   */
+  /** Device pixels per UI pixel. Defaults to 1.0. */
   double scale_factor MLN_BINDING("default=1.0");
 } mln_logical_extent;
 
@@ -176,9 +172,8 @@ typedef struct mln_logical_extent {
 typedef struct mln_map_options {
   uint32_t size;
   /**
-   * Initial logical extent. Width and height must be positive. The scale
-   * factor must be positive and finite, and fixes the map's scale factor for
-   * its lifetime.
+   * Initial logical extent. Width and height must be nonzero, and scale_factor
+   * must be finite and positive. scale_factor is fixed for the map's lifetime.
    *
    * After creation, mln_map_resize() is the only function that changes the
    * width and height.
@@ -967,8 +962,10 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  *
  * Returns:
  * - MLN_STATUS_OK when the creation is accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle, options is
- *   null, undersized, or carries an invalid field, or completion is invalid.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is an invalid handle; options is
+ *   null, undersized, or carries an invalid field; options->initial_extent has
+ *   a zero width or height, or a scale_factor that is not finite and positive;
+ *   or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
@@ -1012,8 +1009,9 @@ MLN_API mln_status mln_map_snapshot_get(
  *
  * Returns:
  * - MLN_STATUS_OK when the resize was accepted.
- * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle, extent has a
- *   zero dimension or a non-finite, non-positive, or changed scale factor, or
+ * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; extent has a
+ *   zero width or height, or a scale_factor that is not finite and positive;
+ *   extent.scale_factor differs from the value the map was created with; or
  *   completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when command acceptance fails.

@@ -2,6 +2,9 @@
 // may service a caller driver, one session per map, maintenance commands in
 // frame order, detach, abandon, and disposal.
 
+#include <stdatomic.h>
+#include <string.h>
+
 #include "support/frames.h"
 #include "support/test_support.h"
 
@@ -139,8 +142,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   const mln_render_session detached = fixture.session;
   const mln_completion discard = mln_test_discard_completion();
   const mln_frame_demand demand = mln_frame_demand_default();
-  const mln_render_target_extent extent = {
-    .size = sizeof(mln_render_target_extent),
+  const mln_logical_extent extent = {
     .width = 32,
     .height = 32,
     .scale_factor = 1.0,
@@ -159,7 +161,7 @@ static void a_detached_session_frees_its_map_and_refuses_work(void) {
   );
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
-    mln_render_session_resize(detached, &extent, &discard, NULL)
+    mln_render_session_resize(detached, extent, &discard, NULL)
   );
   MLN_TEST_STATUS(
     MLN_STATUS_INVALID_STATE,
@@ -859,6 +861,49 @@ static void wakes_may_call_back_into_the_session(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Set from MapLibre's logging threads, so it lives in static storage that
+// outlives any registration a failing case leaves behind.
+static atomic_bool scale_mismatch_logged;
+
+static uint32_t record_scale_mismatch(
+  void* user_data, uint32_t severity, uint32_t event, int64_t code,
+  const char* message
+) {
+  (void)user_data;
+  (void)code;
+  if (
+    severity == MLN_LOG_SEVERITY_WARNING && event == MLN_LOG_EVENT_RENDER &&
+    message != NULL && strstr(message, "differs from the map") != NULL
+  ) {
+    mln_test_flag_set(&scale_mismatch_logged);
+  }
+  return 0;
+}
+
+// A target may attach at a scale factor other than the map's. The attach
+// succeeds and logs a warning, because the map still selects imagery for its
+// own scale factor.
+static void a_target_scale_that_differs_from_the_map_attaches_with_a_warning(
+  void
+) {
+  atomic_store(&scale_mismatch_logged, false);
+  MLN_TEST_OK(mln_log_set_callback(record_scale_mismatch, NULL, NULL, NULL));
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.initial_extent.scale_factor = 3.0;
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
+  mln_test_render_fixture fixture = {0};
+  const bool attached = mln_test_render_fixture_create(map, &fixture);
+  const bool logged =
+    attached && mln_test_wait_for_flag(&scale_mismatch_logged);
+  (void)mln_log_clear_callback(NULL);
+  TEST_ASSERT_TRUE(attached);
+  TEST_ASSERT_TRUE_MESSAGE(logged, "the attach logged no scale warning");
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(an_attached_session_holds_its_map_and_refuses_destroy);
   RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
@@ -871,4 +916,5 @@ MLN_TEST_GROUP {
   RUN_TEST(parent_first_disposal_retires_a_native_render_attachment);
   RUN_TEST(wakes_may_call_back_into_the_session);
   RUN_TEST(attach_checks_the_queue_lock);
+  RUN_TEST(a_target_scale_that_differs_from_the_map_attaches_with_a_warning);
 }

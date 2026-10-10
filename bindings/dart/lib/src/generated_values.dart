@@ -2280,6 +2280,30 @@ final class ProjectedMeters extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/logging_8h.html).
 typedef LogCallback = void Function(LogSeverity, LogEvent, int, String);
 
+/// Logical extent in UI pixels and the device-pixel scale.
+///
+/// See `mln_logical_extent` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
+final class LogicalExtent extends _Value {
+  const LogicalExtent({
+    this.width = 256,
+    this.height = 256,
+    this.scaleFactor = 1.0,
+  });
+
+  /// Width in UI pixels. Defaults to 256.
+  final int width;
+
+  /// Height in UI pixels. Defaults to 256.
+  final int height;
+
+  /// Device pixels per UI pixel. Defaults to 1.0.
+  final double scaleFactor;
+
+  @override
+  List<Object?> get _members => [width, height, scaleFactor];
+}
+
 /// Caller-owned premultiplied RGBA8 image pixels.
 ///
 /// See `mln_premultiplied_rgba8_image` in the
@@ -2397,32 +2421,6 @@ final class StyleImageStretchesResult extends _Value {
   List<Object?> get _members => [stretchX, stretchY];
 }
 
-/// Logical map extent in UI pixels and device-pixel scale.
-///
-/// See `mln_logical_extent` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
-final class LogicalExtent extends _Value {
-  const LogicalExtent({
-    this.width = 256,
-    this.height = 256,
-    this.scaleFactor = 1.0,
-  });
-
-  /// Width in UI pixels. Defaults to 256.
-  final int width;
-
-  /// Height in UI pixels. Defaults to 256.
-  final int height;
-
-  /// Device pixels per UI pixel. Defaults to 1.0. The renderer takes it at map
-  /// creation, so `mln_map_resize()` accepts only the value the map was created
-  /// with.
-  final double scaleFactor;
-
-  @override
-  List<Object?> get _members => [width, height, scaleFactor];
-}
-
 /// Options used when creating a map.
 ///
 /// See `mln_map_options` in the
@@ -2435,9 +2433,8 @@ final class MapOptions extends _Value {
     this.eventMask = RuntimeEventMask.all,
   });
 
-  /// Initial logical extent. Width and height must be positive. The scale
-  /// factor must be positive and finite, and fixes the map's scale factor for
-  /// its lifetime.
+  /// Initial logical extent. Width and height must be nonzero, and scale_factor
+  /// must be finite and positive. scale_factor is fixed for the map's lifetime.
   final LogicalExtent initialExtent;
 
   /// One of `mln_map_mode`. Defaults to `MLN_MAP_MODE_CONTINUOUS`.
@@ -3003,37 +3000,13 @@ final class MapSnapshot extends _Value {
   ];
 }
 
-/// Logical render target extent in UI pixels.
-///
-/// See `mln_render_target_extent` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-final class RenderTargetExtent extends _Value {
-  const RenderTargetExtent({
-    this.width = 256,
-    this.height = 256,
-    this.scaleFactor = 1.0,
-  });
-
-  /// Logical map width in UI pixels. Defaults to 256.
-  final int width;
-
-  /// Logical map height in UI pixels. Defaults to 256.
-  final int height;
-
-  /// UI-to-device pixel scale. Must be positive and finite. Defaults to 1.0.
-  final double scaleFactor;
-
-  @override
-  List<Object?> get _members => [width, height, scaleFactor];
-}
-
 /// Metal attachment options for a borrowed texture target.
 ///
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalBorrowedTextureDescriptor extends _Value {
   const MetalBorrowedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     this.texture = NativePointer.nullPointer,
@@ -3041,7 +3014,9 @@ final class MetalBorrowedTextureDescriptor extends _Value {
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
-  final RenderTargetExtent extent;
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  final LogicalExtent extent;
 
   /// Physical texture width in device pixels. Must be positive. Defaults to
   /// 256.
@@ -3134,12 +3109,13 @@ final class MetalContextDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalOwnedTextureDescriptor extends _Value {
   const MetalOwnedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.context = const MetalContextDescriptor(),
   });
 
-  /// Logical texture extent.
-  final RenderTargetExtent extent;
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Metal backend context. device is required.
   final MetalContextDescriptor context;
@@ -3154,13 +3130,14 @@ final class MetalOwnedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class MetalSurfaceDescriptor extends _Value {
   const MetalSurfaceDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.context = const MetalContextDescriptor(),
     this.layer = NativePointer.nullPointer,
   });
 
-  /// Logical surface extent.
-  final RenderTargetExtent extent;
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Metal backend context. device is optional for Metal surfaces.
   final MetalContextDescriptor context;
@@ -3315,7 +3292,7 @@ final class OpenglContextDescriptorDataUnknown
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglBorrowedTextureDescriptor extends _Value {
   const OpenglBorrowedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     required this.context,
@@ -3325,7 +3302,9 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
-  final RenderTargetExtent extent;
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  final LogicalExtent extent;
 
   /// Physical texture width in device pixels. Must be positive. Defaults to
   /// 256.
@@ -3362,12 +3341,13 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglOwnedTextureDescriptor extends _Value {
   const OpenglOwnedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     required this.context,
   });
 
-  /// Logical texture extent.
-  final RenderTargetExtent extent;
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Borrowed OpenGL context provider data. Shared ownership creates a context
   /// whose texture frames the host can acquire. Dedicated EGL or transferred
@@ -3384,13 +3364,14 @@ final class OpenglOwnedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class OpenglSurfaceDescriptor extends _Value {
   const OpenglSurfaceDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     required this.context,
     this.surface = NativePointer.nullPointer,
   });
 
-  /// Logical surface extent.
-  final RenderTargetExtent extent;
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Borrowed OpenGL context provider data.
   final OpenglContextDescriptor context;
@@ -3453,7 +3434,7 @@ final class RenderSessionSnapshot extends _Value {
     required this.state,
     required this.driver,
     this.latestResult = const RenderResult.fromRawValue(0),
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     required this.generation,
     required this.mapUpdateGeneration,
     required this.renderedUpdateGeneration,
@@ -3474,7 +3455,9 @@ final class RenderSessionSnapshot extends _Value {
 
   /// Most recent terminal `mln_render_result` value.
   final RenderResult latestResult;
-  final RenderTargetExtent extent;
+
+  /// Logical extent, including a resize the driver has not applied yet.
+  final LogicalExtent extent;
   final BigInt generation;
   final BigInt mapUpdateGeneration;
   final BigInt renderedUpdateGeneration;
@@ -4216,7 +4199,7 @@ final class VulkanContextDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTextureDescriptor extends _Value {
   const VulkanBorrowedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     this.context = const VulkanContextDescriptor(),
@@ -4229,7 +4212,9 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
-  final RenderTargetExtent extent;
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  final LogicalExtent extent;
 
   /// Physical image width in device pixels. Must be positive. Defaults to 256.
   final int physicalWidth;
@@ -4276,12 +4261,13 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanOwnedTextureDescriptor extends _Value {
   const VulkanOwnedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.context = const VulkanContextDescriptor(),
   });
 
-  /// Logical texture extent.
-  final RenderTargetExtent extent;
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Borrowed Vulkan context. All handles are required.
   final VulkanContextDescriptor context;
@@ -4296,13 +4282,14 @@ final class VulkanOwnedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class VulkanSurfaceDescriptor extends _Value {
   const VulkanSurfaceDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.context = const VulkanContextDescriptor(),
     required this.surface,
   });
 
-  /// Logical surface extent.
-  final RenderTargetExtent extent;
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Borrowed Vulkan context. All handles are required. The device must support
   /// VK_KHR_swapchain, and the queue family must support graphics and
@@ -4347,7 +4334,7 @@ final class WebgpuContextDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class WebgpuBorrowedTextureDescriptor extends _Value {
   const WebgpuBorrowedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     this.context = const WebgpuContextDescriptor(),
@@ -4356,8 +4343,11 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
     this.format = 0,
   });
 
-  /// Logical texture extent.
-  final RenderTargetExtent extent;
+  /// Logical texture extent. The map viewport uses width and height and the
+  /// renderer uses scale_factor; the physical size is stated separately below.
+  /// A scale_factor that differs from the map's is accepted and logged as a
+  /// warning.
+  final LogicalExtent extent;
 
   /// Physical texture width in device pixels. Defaults to 256.
   final int physicalWidth;
@@ -4395,12 +4385,13 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class WebgpuOwnedTextureDescriptor extends _Value {
   const WebgpuOwnedTextureDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.context = const WebgpuContextDescriptor(),
   });
 
-  /// Logical texture extent.
-  final RenderTargetExtent extent;
+  /// Logical texture extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Borrowed WebGPU context. device is required.
   final WebgpuContextDescriptor context;
@@ -4415,14 +4406,15 @@ final class WebgpuOwnedTextureDescriptor extends _Value {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
 final class WebgpuSurfaceDescriptor extends _Value {
   const WebgpuSurfaceDescriptor({
-    this.extent = const RenderTargetExtent(),
+    this.extent = const LogicalExtent(),
     this.context = const WebgpuContextDescriptor(),
     this.surface = NativePointer.nullPointer,
     this.format = 0,
   });
 
-  /// Logical surface extent.
-  final RenderTargetExtent extent;
+  /// Logical surface extent. A scale_factor that differs from the map's is
+  /// accepted and logged as a warning.
+  final LogicalExtent extent;
 
   /// Borrowed WebGPU context. device is required.
   final WebgpuContextDescriptor context;

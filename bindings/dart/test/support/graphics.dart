@@ -139,7 +139,7 @@ final class TestGraphics {
   /// the host's.
   RenderSessionAttachment attachOwnedTexture(
     MapHandle map,
-    RenderTargetExtent extent,
+    LogicalExtent extent,
     RenderSessionAttachOptions options,
   ) {
     final context = _context.ref;

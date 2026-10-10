@@ -98,25 +98,6 @@ public extension MapHandle {
     ) }
   }
 
-  /// Copies the camera from the latest immutable map snapshot.
-  ///
-  /// See `mln_map_camera_snapshot_get` in the
-  /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/camera_8h.html).
-  func cameraSnapshotGet() throws
-    -> (camera: CameraOptions, generation: UInt64)
-  {
-    var value0: mln_camera_options = mln_camera_options_default()
-    var value1: UInt64 = 0
-    return try nativeInvoke("mln_map_camera_snapshot_get") { raw, _, diagnostic in
-      mln_map_camera_snapshot_get(
-        raw,
-        &value0,
-        &value1,
-        diagnostic
-      )
-    } result: { (CameraOptions(raw: value0), value1) }
-  }
-
   /// Cancels the camera transitions running when this command commits.
   ///
   /// See `mln_map_cancel_transitions` in the

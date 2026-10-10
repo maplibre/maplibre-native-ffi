@@ -1731,7 +1731,7 @@ class LogSetCallbackRegistration:
 
 @dataclass(frozen=True, slots=True)
 class LogicalExtent:
-    """Logical map extent in UI pixels and device-pixel scale.
+    """Logical extent in UI pixels and the device-pixel scale.
 
     See `mln_logical_extent` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html).
@@ -1892,7 +1892,7 @@ class MetalBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     physical_width: int
     physical_height: int
     texture: int
@@ -1900,7 +1900,7 @@ class MetalBorrowedTextureDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             texture=raw["texture"],
@@ -1936,13 +1936,13 @@ class MetalOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: MetalContextDescriptor
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=MetalContextDescriptor._from_native(raw["context"]),
         )
 
@@ -1992,14 +1992,14 @@ class MetalSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: MetalContextDescriptor
     layer: int
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=MetalContextDescriptor._from_native(raw["context"]),
             layer=raw["layer"],
         )
@@ -2157,7 +2157,7 @@ class OpenglBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     physical_width: int
     physical_height: int
     context: OpenglContextDescriptor
@@ -2167,7 +2167,7 @@ class OpenglBorrowedTextureDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=OpenglContextDescriptor._from_native(raw["context"]),
@@ -2222,13 +2222,13 @@ class OpenglOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: OpenglContextDescriptor
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=OpenglContextDescriptor._from_native(raw["context"]),
         )
 
@@ -2282,14 +2282,14 @@ class OpenglSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: OpenglContextDescriptor
     surface: int
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=OpenglContextDescriptor._from_native(raw["context"]),
             surface=raw["surface"],
         )
@@ -2538,7 +2538,7 @@ class RenderSessionSnapshot:
     state: RenderSessionState
     driver: RenderDriverKind
     latest_result: RenderResult
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     generation: int
     map_update_generation: int
     rendered_update_generation: int
@@ -2556,7 +2556,7 @@ class RenderSessionSnapshot:
             state=RenderSessionState(raw["state"]),
             driver=RenderDriverKind(raw["driver"]),
             latest_result=RenderResult(raw["latest_result"]),
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             generation=raw["generation"],
             map_update_generation=raw["map_update_generation"],
             rendered_update_generation=raw["rendered_update_generation"],
@@ -2567,25 +2567,6 @@ class RenderSessionSnapshot:
             acquired_frame_count=raw["acquired_frame_count"],
             target_ready=raw["target_ready"],
             pending_changes=raw["pending_changes"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class RenderTargetExtent:
-    """Logical render target extent in UI pixels.
-
-    See `mln_render_target_extent` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
-    """
-
-    width: int
-    height: int
-    scale_factor: float
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            width=raw["width"], height=raw["height"], scale_factor=raw["scale_factor"]
         )
 
 
@@ -3552,7 +3533,7 @@ class VulkanBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     physical_width: int
     physical_height: int
     context: VulkanContextDescriptor
@@ -3565,7 +3546,7 @@ class VulkanBorrowedTextureDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=VulkanContextDescriptor._from_native(raw["context"]),
@@ -3620,13 +3601,13 @@ class VulkanOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: VulkanContextDescriptor
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=VulkanContextDescriptor._from_native(raw["context"]),
         )
 
@@ -3680,14 +3661,14 @@ class VulkanSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: VulkanContextDescriptor
     surface: int
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=VulkanContextDescriptor._from_native(raw["context"]),
             surface=raw["surface"],
         )
@@ -3744,7 +3725,7 @@ class WebgpuBorrowedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     physical_width: int
     physical_height: int
     context: WebgpuContextDescriptor
@@ -3755,7 +3736,7 @@ class WebgpuBorrowedTextureDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=WebgpuContextDescriptor._from_native(raw["context"]),
@@ -3796,13 +3777,13 @@ class WebgpuOwnedTextureDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: WebgpuContextDescriptor
 
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=WebgpuContextDescriptor._from_native(raw["context"]),
         )
 
@@ -3854,7 +3835,7 @@ class WebgpuSurfaceDescriptor:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/surface_8h.html).
     """
 
-    extent: RenderTargetExtent
+    extent: LogicalExtent
     context: WebgpuContextDescriptor
     surface: int
     format: int
@@ -3862,7 +3843,7 @@ class WebgpuSurfaceDescriptor:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            extent=RenderTargetExtent._from_native(raw["extent"]),
+            extent=LogicalExtent._from_native(raw["extent"]),
             context=WebgpuContextDescriptor._from_native(raw["context"]),
             surface=raw["surface"],
             format=raw["format"],

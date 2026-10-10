@@ -235,7 +235,7 @@ internal abstract class RenderTarget : IDisposable
 
     /// <summary>Follows a resized host. The session resize carries the new extent to the map.</summary>
     public virtual void Resize(Viewport viewport) =>
-        Session.ResizeAsync(viewport.RenderTargetExtent).ReportFailure("render session resize");
+        Session.ResizeAsync(viewport.LogicalExtent).ReportFailure("render session resize");
 
     /// <summary>
     /// Releases held frames, detaches, and destroys the session, then releases the mode's host
@@ -390,7 +390,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
                         MetalContext metal => map.MetalOwnedTextureAttach(
                             new MetalOwnedTextureDescriptor
                             {
-                                Extent = viewport.RenderTargetExtent,
+                                Extent = viewport.LogicalExtent,
                                 Context = metal.Descriptor(),
                             },
                             options
@@ -398,7 +398,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
                         VulkanContext vulkan => map.VulkanOwnedTextureAttach(
                             new VulkanOwnedTextureDescriptor
                             {
-                                Extent = viewport.RenderTargetExtent,
+                                Extent = viewport.LogicalExtent,
                                 Context = vulkan.Descriptor(),
                             },
                             options
@@ -406,7 +406,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
                         OpenGLContext openGl => map.OpenglOwnedTextureAttach(
                             new OpenglOwnedTextureDescriptor
                             {
-                                Extent = viewport.RenderTargetExtent,
+                                Extent = viewport.LogicalExtent,
                                 Context = openGl.Descriptor(requirePbufferConfig: true),
                             },
                             options
@@ -642,14 +642,7 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
             throw;
         }
         // A target replacement leaves the map's extent unchanged.
-        map.ResizeAsync(
-                new LogicalExtent(
-                    viewport.LogicalWidth,
-                    viewport.LogicalHeight,
-                    viewport.ScaleFactor
-                )
-            )
-            .ReportFailure("map resize");
+        map.ResizeAsync(viewport.LogicalExtent).ReportFailure("map resize");
         try
         {
             Await(handover);
@@ -704,7 +697,7 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
     ) =>
         new()
         {
-            Extent = viewport.RenderTargetExtent,
+            Extent = viewport.LogicalExtent,
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
             Texture = texture.Pointer,
@@ -718,7 +711,7 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
     ) =>
         new()
         {
-            Extent = viewport.RenderTargetExtent,
+            Extent = viewport.LogicalExtent,
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
             Context = context.Descriptor(),
@@ -736,7 +729,7 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
     ) =>
         new()
         {
-            Extent = viewport.RenderTargetExtent,
+            Extent = viewport.LogicalExtent,
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
             Context = context.Descriptor(requirePbufferConfig: true),
@@ -770,7 +763,7 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
                     MetalContext metal => map.MetalSurfaceAttach(
                         new MetalSurfaceDescriptor
                         {
-                            Extent = viewport.RenderTargetExtent,
+                            Extent = viewport.LogicalExtent,
                             Layer = metal.LayerPointer(),
                             Context = metal.Descriptor(),
                         },
@@ -780,7 +773,7 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
                     VulkanContext vulkan => map.VulkanSurfaceAttach(
                         new VulkanSurfaceDescriptor
                         {
-                            Extent = viewport.RenderTargetExtent,
+                            Extent = viewport.LogicalExtent,
                             Surface = vulkan.SurfaceHandle(),
                             Context = vulkan.Descriptor(),
                         },
@@ -789,7 +782,7 @@ internal sealed class NativeSurfaceRenderTarget : RenderTarget
                     OpenGLContext openGl => map.OpenglSurfaceAttach(
                         new OpenglSurfaceDescriptor
                         {
-                            Extent = viewport.RenderTargetExtent,
+                            Extent = viewport.LogicalExtent,
                             Surface = openGl.SurfacePointer(),
                             Context = openGl.Descriptor(requirePbufferConfig: false),
                         },

@@ -521,7 +521,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html">C API reference</see>.
     /// </remarks>
     public Task<CommandCompletion> ResizeAsync(
-        RenderTargetExtent extent,
+        LogicalExtent extent,
         CancellationToken cancellationToken = default
     )
     {
@@ -530,7 +530,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_resize(
                     Handle,
-                    scope.Value(NativeRenderTargetExtent(extent)),
+                    NativeLogicalExtent(extent),
                     completion,
                     diagnostic
                 ),

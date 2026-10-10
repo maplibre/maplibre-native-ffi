@@ -353,7 +353,7 @@ internal unsafe struct mln_map_viewport_options
 internal unsafe struct mln_metal_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public void* texture;
@@ -368,7 +368,7 @@ internal unsafe struct mln_metal_context_descriptor
 internal unsafe struct mln_metal_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_metal_context_descriptor context;
 }
 
@@ -388,7 +388,7 @@ internal unsafe struct mln_metal_owned_texture_frame
 internal unsafe struct mln_metal_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_metal_context_descriptor context;
     public void* layer;
 }
@@ -458,7 +458,7 @@ internal unsafe struct mln_offline_tile_pyramid_region_definition
 internal unsafe struct mln_opengl_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public mln_opengl_context_descriptor context;
@@ -490,7 +490,7 @@ internal unsafe struct mln_opengl_context_descriptor_data
 internal unsafe struct mln_opengl_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_opengl_context_descriptor context;
 }
 
@@ -512,7 +512,7 @@ internal unsafe struct mln_opengl_owned_texture_frame
 internal unsafe struct mln_opengl_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_opengl_context_descriptor context;
     public void* surface;
 }
@@ -613,7 +613,7 @@ internal unsafe struct mln_render_session_snapshot
     public uint state;
     public uint driver;
     public uint latest_result;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public ulong generation;
     public ulong map_update_generation;
     public ulong rendered_update_generation;
@@ -624,14 +624,6 @@ internal unsafe struct mln_render_session_snapshot
     public uint acquired_frame_count;
     public byte target_ready;
     public byte pending_changes;
-}
-
-internal unsafe struct mln_render_target_extent
-{
-    public uint size;
-    public uint width;
-    public uint height;
-    public double scale_factor;
 }
 
 internal unsafe struct mln_rendered_feature_query_options
@@ -1069,7 +1061,7 @@ internal unsafe struct mln_vec3
 internal unsafe struct mln_vulkan_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public mln_vulkan_context_descriptor context;
@@ -1095,7 +1087,7 @@ internal unsafe struct mln_vulkan_context_descriptor
 internal unsafe struct mln_vulkan_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_vulkan_context_descriptor context;
 }
 
@@ -1117,7 +1109,7 @@ internal unsafe struct mln_vulkan_owned_texture_frame
 internal unsafe struct mln_vulkan_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_vulkan_context_descriptor context;
     public ulong surface;
 }
@@ -1141,7 +1133,7 @@ internal unsafe struct mln_webgl_context_descriptor
 internal unsafe struct mln_webgpu_borrowed_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
     public mln_webgpu_context_descriptor context;
@@ -1161,7 +1153,7 @@ internal unsafe struct mln_webgpu_context_descriptor
 internal unsafe struct mln_webgpu_owned_texture_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_webgpu_context_descriptor context;
 }
 
@@ -1182,7 +1174,7 @@ internal unsafe struct mln_webgpu_owned_texture_frame
 internal unsafe struct mln_webgpu_surface_descriptor
 {
     public uint size;
-    public mln_render_target_extent extent;
+    public mln_logical_extent extent;
     public mln_webgpu_context_descriptor context;
     public void* surface;
     public uint format;

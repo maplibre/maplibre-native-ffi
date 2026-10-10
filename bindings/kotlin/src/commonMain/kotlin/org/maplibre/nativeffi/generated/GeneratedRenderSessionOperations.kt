@@ -225,7 +225,7 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    */
   public fun getSnapshot(): RenderSessionSnapshot =
     nativeCall(this, binding, "mln_render_session_get_snapshot") {
-      val out = sized(104, 8)
+      val out = sized(96, 8)
       check(C.mln_render_session_get_snapshot(handle, out, diagnostic))
       readRenderSessionSnapshot(out)
     }
@@ -381,11 +381,9 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
    * See `mln_render_session_resize` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
    */
-  public fun resize(extent: RenderTargetExtent): Deferred<CommandCompletion> =
+  public fun resize(extent: LogicalExtent): Deferred<CommandCompletion> =
     nativeCommand(this, binding, "mln_render_session_resize") {
-      check(
-        C.mln_render_session_resize(handle, writeRenderTargetExtent(extent), completion, diagnostic)
-      )
+      check(C.mln_render_session_resize(handle, writeLogicalExtent(extent), completion, diagnostic))
     }
 
   /**

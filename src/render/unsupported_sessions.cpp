@@ -21,15 +21,14 @@ auto validate_attach_map(mln_map map) -> mln_status {
   return validate_map_live(map, live_map);
 }
 
-auto validate_surface_extent(const mln_render_target_extent& extent)
-  -> mln_status {
+auto validate_surface_extent(const mln_logical_extent& extent) -> mln_status {
   return validate_physical_size(
     extent.width, extent.height, extent.scale_factor,
     "scaled surface dimensions are too large"
   );
 }
 
-auto validate_owned_texture_extent(const mln_render_target_extent& extent)
+auto validate_owned_texture_extent(const mln_logical_extent& extent)
   -> mln_status {
   return validate_physical_size(
     extent.width, extent.height, extent.scale_factor,

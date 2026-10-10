@@ -25,8 +25,7 @@ auto metal_owned_texture_descriptor_default() noexcept
   return mln_metal_owned_texture_descriptor{
     .size = sizeof(mln_metal_owned_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -43,8 +42,7 @@ auto metal_borrowed_texture_descriptor_default() noexcept
   return mln_metal_borrowed_texture_descriptor{
     .size = sizeof(mln_metal_borrowed_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -60,8 +58,7 @@ auto vulkan_owned_texture_descriptor_default() noexcept
   return mln_vulkan_owned_texture_descriptor{
     .size = sizeof(mln_vulkan_owned_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -84,8 +81,7 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
   return mln_vulkan_borrowed_texture_descriptor{
     .size = sizeof(mln_vulkan_borrowed_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -116,8 +112,7 @@ auto webgpu_owned_texture_descriptor_default() noexcept
   return mln_webgpu_owned_texture_descriptor{
     .size = sizeof(mln_webgpu_owned_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -136,8 +131,7 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
   return mln_webgpu_borrowed_texture_descriptor{
     .size = sizeof(mln_webgpu_borrowed_texture_descriptor),
     .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
+      mln_logical_extent{
         .width = 256,
         .height = 256,
         .scale_factor = 1.0,
@@ -168,7 +162,7 @@ auto validate_webgpu_owned_texture_descriptor(
     set_thread_error("mln_webgpu_owned_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -190,7 +184,7 @@ auto validate_webgpu_borrowed_texture_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -223,7 +217,7 @@ auto validate_metal_owned_texture_descriptor(
     set_thread_error("mln_metal_owned_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -243,7 +237,7 @@ auto validate_metal_borrowed_texture_descriptor(
     set_thread_error("mln_metal_borrowed_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -267,7 +261,7 @@ auto validate_vulkan_owned_texture_descriptor(
     set_thread_error("mln_vulkan_owned_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -291,7 +285,7 @@ auto validate_vulkan_borrowed_texture_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -370,7 +364,7 @@ auto validate_opengl_owned_texture_descriptor(
     set_thread_error("mln_opengl_owned_texture_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {
@@ -398,7 +392,7 @@ auto validate_opengl_borrowed_texture_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto extent_status = validate_render_target_extent(
+  const auto extent_status = validate_logical_extent(
     descriptor->extent, "texture dimensions and scale_factor must be positive"
   );
   if (extent_status != MLN_STATUS_OK) {

@@ -37,11 +37,7 @@ internal sealed class MapState : IDisposable
                 .MapCreateAsync(
                     MapOptions.Default with
                     {
-                        InitialExtent = new LogicalExtent(
-                            viewport.LogicalWidth,
-                            viewport.LogicalHeight,
-                            viewport.ScaleFactor
-                        ),
+                        InitialExtent = viewport.LogicalExtent,
                         MapMode = MapMode.Continuous,
                         EventMask = RuntimeEventMask.MapRenderUpdateAvailable,
                     }

@@ -10,18 +10,19 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Extent">
-/// Logical texture extent.
+/// Logical texture extent. A scale_factor that differs from the map's is
+/// accepted and logged as a warning.
 /// </param>
 /// <param name="Context">
 /// Metal backend context. device is required.
 /// </param>
 public readonly partial record struct MetalOwnedTextureDescriptor(
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     MetalContextDescriptor Context
 )
 {
     public MetalOwnedTextureDescriptor()
-        : this(new RenderTargetExtent(), default) { }
+        : this(new LogicalExtent(), default) { }
 
     public static MetalOwnedTextureDescriptor Default
     {

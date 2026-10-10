@@ -98,7 +98,6 @@
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionAttachOptions.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionCapabilities.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderSessionCapabilityFlag.g.cs linguist-generated=true
-/dotnet/src/Maplibre.NativeFfi/RenderTarget/RenderTargetExtent.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/VulkanContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/WebglContextDescriptor.g.cs linguist-generated=true
 /dotnet/src/Maplibre.NativeFfi/RenderTarget/WebglContextKind.g.cs linguist-generated=true

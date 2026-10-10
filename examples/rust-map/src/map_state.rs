@@ -6,10 +6,11 @@ use std::time::Duration;
 
 use maplibre_native_ffi::{
     AnimationOptions, CameraDelta, CameraOptions, CameraUpdate, CameraUpdateMode, GesturePhase,
-    LatLng, LogicalExtent, MapHandle, MapMode, MapOptions, RuntimeEventMask, RuntimeEventType,
-    RuntimeHandle, RuntimeOptions, ScreenPoint,
+    LatLng, MapHandle, MapMode, MapOptions, RuntimeEventMask, RuntimeEventType, RuntimeHandle,
+    RuntimeOptions, ScreenPoint,
 };
 
+use crate::render_target::extent;
 use crate::shell::{AppEvent, Wakes};
 use crate::viewport::Viewport;
 
@@ -35,11 +36,7 @@ impl MapState {
             .map_err(|error| format!("runtime creation failed: {error}"))?;
 
         let map_options = MapOptions {
-            initial_extent: LogicalExtent::new(
-                viewport.logical_width,
-                viewport.logical_height,
-                viewport.scale_factor,
-            ),
+            initial_extent: extent(viewport),
             map_mode: MapMode::Continuous,
             ..MapOptions::default()
         };
@@ -79,11 +76,7 @@ impl MapState {
     /// session cannot: a caller-owned texture the host sizes. Target
     /// replacement changes only the graphics resource.
     pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
-        self.map.resize(LogicalExtent {
-            width: viewport.logical_width,
-            height: viewport.logical_height,
-            scale_factor: viewport.scale_factor,
-        })?;
+        self.map.resize(extent(viewport))?;
         Ok(())
     }
 

@@ -203,7 +203,7 @@ impl WebGlBorrowedTexture {
         })
     }
 
-    pub(super) fn descriptor(&self, extent: RenderTargetExtent) -> OpenglBorrowedTextureDescriptor {
+    pub(super) fn descriptor(&self, extent: LogicalExtent) -> OpenglBorrowedTextureDescriptor {
         OpenglBorrowedTextureDescriptor {
             extent,
             physical_width: self.width,

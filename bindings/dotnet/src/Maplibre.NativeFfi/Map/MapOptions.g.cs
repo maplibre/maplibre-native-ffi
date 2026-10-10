@@ -10,9 +10,8 @@ namespace Maplibre.NativeFfi;
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="InitialExtent">
-/// Initial logical extent. Width and height must be positive. The scale factor
-/// must be positive and finite, and fixes the map's scale factor for its
-/// lifetime.
+/// Initial logical extent. Width and height must be nonzero, and scale_factor
+/// must be finite and positive. scale_factor is fixed for the map's lifetime.
 /// </param>
 /// <param name="MapMode">
 /// One of <c>mln_map_mode</c>. Defaults to <c>MLN_MAP_MODE_CONTINUOUS</c>.

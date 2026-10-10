@@ -11,7 +11,9 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 /// <param name="Extent">
 /// Logical texture extent. The map viewport uses width and height and the
-/// renderer uses scale_factor; the physical size is stated separately below.
+/// renderer uses scale_factor; the physical size is stated separately below. A
+/// scale_factor that differs from the map's is accepted and logged as a
+/// warning.
 /// </param>
 /// <param name="PhysicalWidth">
 /// Physical texture width in device pixels. Must be positive. Defaults to 256.
@@ -23,14 +25,14 @@ namespace Maplibre.NativeFfi;
 /// Borrowed <c>id&lt;MTLTexture&gt;</c> / <c>MTL::Texture*</c>. Required.
 /// </param>
 public readonly partial record struct MetalBorrowedTextureDescriptor(
-    RenderTargetExtent Extent,
+    LogicalExtent Extent,
     uint PhysicalWidth,
     uint PhysicalHeight,
     NativePointer Texture
 )
 {
     public MetalBorrowedTextureDescriptor()
-        : this(new RenderTargetExtent(), 256, 256, default) { }
+        : this(new LogicalExtent(), 256, 256, default) { }
 
     public static MetalBorrowedTextureDescriptor Default
     {

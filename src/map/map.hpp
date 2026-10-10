@@ -501,9 +501,6 @@ auto map_set_layer_max_zoom(
 auto map_set_layer_visibility(
   MapObject& live, mln_buffer_view layer_id, uint32_t visibility
 ) -> mln_status;
-auto map_camera_snapshot_get(
-  mln_map map, mln_camera_options* out_camera, uint64_t* out_generation
-) -> mln_status;
 auto map_update_camera(
   mln_map map, const mln_camera_update* update, const mln_completion* completion
 ) -> mln_status;

@@ -10,8 +10,8 @@ struct Viewport: Equatable {
   var scaleFactor: Double
   var isEmpty: Bool
 
-  var extent: RenderTargetExtent {
-    RenderTargetExtent(
+  var extent: LogicalExtent {
+    LogicalExtent(
       width: logicalWidth,
       height: logicalHeight,
       scaleFactor: scaleFactor
@@ -52,11 +52,7 @@ final class MapState {
     let map: MapHandle
     do {
       map = try await runtime.mapCreate(options: MapOptions(
-        initialExtent: LogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        ),
+        initialExtent: viewport.extent,
         mapMode: .continuous,
         eventMask: [.mapRenderUpdateAvailable]
       ))
@@ -138,7 +134,7 @@ final class MapState {
   /// from the zoom of the latest published camera snapshot.
   func zoomToNextStep(anchor: ScreenPoint, animation: AnimationOptions) {
     submit { [map] in
-      let zoom = try map.cameraSnapshotGet().camera.zoom ?? 0
+      let zoom = try map.snapshotGet().camera.zoom ?? 0
       _ = try await map.applyCameraDelta(delta: CameraDelta(
         scale: pow(2.0, (zoom.rounded() + 1) - zoom),
         anchor: anchor,

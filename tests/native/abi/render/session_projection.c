@@ -148,8 +148,7 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   MLN_TEST_AWAIT_OK(
     mln_map_update_camera(map, &update, &completion.descriptor, NULL)
   );
-  const mln_render_target_extent extent = {
-    .size = sizeof(mln_render_target_extent),
+  const mln_logical_extent extent = {
     .width = 32,
     .height = 16,
     .scale_factor = 1.0,
@@ -157,7 +156,7 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
     mln_render_session_resize(
-      fixture.session, &extent, &completion.descriptor, NULL
+      fixture.session, extent, &completion.descriptor, NULL
     )
   );
   expect_no_projection(&fixture);

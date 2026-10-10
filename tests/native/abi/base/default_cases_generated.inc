@@ -294,10 +294,6 @@ mln_metal_borrowed_texture_descriptor_default_holds_its_annotated_values(void) {
     (uint64_t)value.size, "mln_metal_borrowed_texture_descriptor.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_metal_borrowed_texture_descriptor.extent.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
     "mln_metal_borrowed_texture_descriptor.extent.width"
   );
@@ -329,10 +325,6 @@ mln_metal_owned_texture_descriptor_default_holds_its_annotated_values(void) {
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_metal_owned_texture_descriptor), (uint64_t)value.size,
     "mln_metal_owned_texture_descriptor.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_metal_owned_texture_descriptor.extent.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
@@ -367,10 +359,6 @@ static void mln_metal_surface_descriptor_default_holds_its_annotated_values(
     "mln_metal_surface_descriptor.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_metal_surface_descriptor.extent.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
     "mln_metal_surface_descriptor.extent.width"
   );
@@ -403,10 +391,6 @@ mln_opengl_borrowed_texture_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_opengl_borrowed_texture_descriptor),
     (uint64_t)value.size, "mln_opengl_borrowed_texture_descriptor.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_opengl_borrowed_texture_descriptor.extent.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
@@ -456,10 +440,6 @@ mln_opengl_owned_texture_descriptor_default_holds_its_annotated_values(void) {
     "mln_opengl_owned_texture_descriptor.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_opengl_owned_texture_descriptor.extent.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
     "mln_opengl_owned_texture_descriptor.extent.width"
   );
@@ -490,10 +470,6 @@ static void mln_opengl_surface_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_opengl_surface_descriptor), (uint64_t)value.size,
     "mln_opengl_surface_descriptor.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_opengl_surface_descriptor.extent.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
@@ -835,10 +811,6 @@ mln_vulkan_borrowed_texture_descriptor_default_holds_its_annotated_values(
     (uint64_t)value.size, "mln_vulkan_borrowed_texture_descriptor.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_vulkan_borrowed_texture_descriptor.extent.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
     "mln_vulkan_borrowed_texture_descriptor.extent.width"
   );
@@ -922,10 +894,6 @@ mln_vulkan_owned_texture_descriptor_default_holds_its_annotated_values(void) {
     "mln_vulkan_owned_texture_descriptor.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_vulkan_owned_texture_descriptor.extent.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
     "mln_vulkan_owned_texture_descriptor.extent.width"
   );
@@ -980,10 +948,6 @@ static void mln_vulkan_surface_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_vulkan_surface_descriptor), (uint64_t)value.size,
     "mln_vulkan_surface_descriptor.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_vulkan_surface_descriptor.extent.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
@@ -1045,10 +1009,6 @@ mln_webgpu_borrowed_texture_descriptor_default_holds_its_annotated_values(
     (uint64_t)value.size, "mln_webgpu_borrowed_texture_descriptor.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_webgpu_borrowed_texture_descriptor.extent.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
     "mln_webgpu_borrowed_texture_descriptor.extent.width"
   );
@@ -1107,10 +1067,6 @@ mln_webgpu_owned_texture_descriptor_default_holds_its_annotated_values(void) {
     "mln_webgpu_owned_texture_descriptor.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_webgpu_owned_texture_descriptor.extent.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,
     "mln_webgpu_owned_texture_descriptor.extent.width"
   );
@@ -1149,10 +1105,6 @@ static void mln_webgpu_surface_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)sizeof(mln_webgpu_surface_descriptor), (uint64_t)value.size,
     "mln_webgpu_surface_descriptor.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_render_target_extent), (uint64_t)value.extent.size,
-    "mln_webgpu_surface_descriptor.extent.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.extent.width,

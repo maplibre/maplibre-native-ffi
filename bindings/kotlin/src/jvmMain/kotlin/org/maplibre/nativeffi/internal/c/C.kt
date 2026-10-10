@@ -95,6 +95,15 @@ internal actual object C {
     Ffm.downcall("mln_log_set_async_severity_mask", JAVA_INT, JAVA_INT, JAVA_LONG)
   private val mln_log_set_callback =
     Ffm.downcall("mln_log_set_callback", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
+  private val mln_logical_extent_physical_size =
+    Ffm.downcall(
+      "mln_logical_extent_physical_size",
+      JAVA_INT,
+      mln_logical_extent,
+      JAVA_LONG,
+      JAVA_LONG,
+      JAVA_LONG,
+    )
   private val mln_map_add_color_relief_layer =
     Ffm.downcall(
       "mln_map_add_color_relief_layer",
@@ -316,15 +325,6 @@ internal actual object C {
     )
   private val mln_map_camera_query =
     Ffm.downcall("mln_map_camera_query", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_map_camera_snapshot_get =
-    Ffm.downcall(
-      "mln_map_camera_snapshot_get",
-      JAVA_INT,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-      JAVA_LONG,
-    )
   private val mln_map_cancel_transitions =
     Ffm.downcall("mln_map_cancel_transitions", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_map_copy_layer_source_id =
@@ -1265,19 +1265,17 @@ internal actual object C {
   private val mln_render_session_request_frame =
     Ffm.downcall("mln_render_session_request_frame", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_render_session_resize =
-    Ffm.downcall("mln_render_session_resize", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG, JAVA_LONG)
-  private val mln_render_session_service_driver_work =
     Ffm.downcall(
-      "mln_render_session_service_driver_work",
+      "mln_render_session_resize",
       JAVA_INT,
       JAVA_LONG,
-      JAVA_LONG,
+      mln_logical_extent,
       JAVA_LONG,
       JAVA_LONG,
     )
-  private val mln_render_target_extent_physical_size =
+  private val mln_render_session_service_driver_work =
     Ffm.downcall(
-      "mln_render_target_extent_physical_size",
+      "mln_render_session_service_driver_work",
       JAVA_INT,
       JAVA_LONG,
       JAVA_LONG,
@@ -1811,6 +1809,19 @@ internal actual object C {
   ): Int =
     mln_log_set_callback.invokeExact(callback, userData, releaseUserData, outDiagnostic) as Int
 
+  actual fun mln_logical_extent_physical_size(
+    extent: Long,
+    outWidth: Long,
+    outHeight: Long,
+    outDiagnostic: Long,
+  ): Int =
+    mln_logical_extent_physical_size.invokeExact(
+      Ffm.value(extent, mln_logical_extent),
+      outWidth,
+      outHeight,
+      outDiagnostic,
+    ) as Int
+
   actual fun mln_map_add_color_relief_layer(
     map: Long,
     layerId: Long,
@@ -2154,14 +2165,6 @@ internal actual object C {
 
   actual fun mln_map_camera_query(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_camera_query.invokeExact(map, completion, outDiagnostic) as Int
-
-  actual fun mln_map_camera_snapshot_get(
-    map: Long,
-    outCamera: Long,
-    outGeneration: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_map_camera_snapshot_get.invokeExact(map, outCamera, outGeneration, outDiagnostic) as Int
 
   actual fun mln_map_cancel_transitions(map: Long, completion: Long, outDiagnostic: Long): Int =
     mln_map_cancel_transitions.invokeExact(map, completion, outDiagnostic) as Int
@@ -3611,7 +3614,13 @@ internal actual object C {
     extent: Long,
     completion: Long,
     outDiagnostic: Long,
-  ): Int = mln_render_session_resize.invokeExact(session, extent, completion, outDiagnostic) as Int
+  ): Int =
+    mln_render_session_resize.invokeExact(
+      session,
+      Ffm.value(extent, mln_logical_extent),
+      completion,
+      outDiagnostic,
+    ) as Int
 
   actual fun mln_render_session_service_driver_work(
     session: Long,
@@ -3620,15 +3629,6 @@ internal actual object C {
     outDiagnostic: Long,
   ): Int =
     mln_render_session_service_driver_work.invokeExact(session, maxWork, outServiced, outDiagnostic)
-      as Int
-
-  actual fun mln_render_target_extent_physical_size(
-    extent: Long,
-    outWidth: Long,
-    outHeight: Long,
-    outDiagnostic: Long,
-  ): Int =
-    mln_render_target_extent_physical_size.invokeExact(extent, outWidth, outHeight, outDiagnostic)
       as Int
 
   actual fun mln_rendered_feature_query_options_default(returned: Long) {
@@ -4310,14 +4310,14 @@ internal val mln_gpu_sync: GroupLayout =
   )
 internal val mln_projected_meters: GroupLayout =
   Ffm.struct(JAVA_DOUBLE.withName("northing"), JAVA_DOUBLE.withName("easting"))
-internal val mln_canonical_tile_id: GroupLayout =
-  Ffm.struct(JAVA_INT.withName("z"), JAVA_INT.withName("x"), JAVA_INT.withName("y"))
 internal val mln_logical_extent: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("width"),
     JAVA_INT.withName("height"),
     JAVA_DOUBLE.withName("scale_factor"),
   )
+internal val mln_canonical_tile_id: GroupLayout =
+  Ffm.struct(JAVA_INT.withName("z"), JAVA_INT.withName("x"), JAVA_INT.withName("y"))
 internal val mln_map_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
@@ -4351,19 +4351,11 @@ internal val mln_map_viewport_options: GroupLayout =
     Ffm.pad(4),
     mln_edge_insets.withName("frustum_offset"),
   )
-internal val mln_render_target_extent: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("width"),
-    JAVA_INT.withName("height"),
-    Ffm.pad(4),
-    JAVA_DOUBLE.withName("scale_factor"),
-  )
 internal val mln_metal_borrowed_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
     ADDRESS.withName("texture"),
@@ -4374,14 +4366,14 @@ internal val mln_metal_owned_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_metal_context_descriptor.withName("context"),
   )
 internal val mln_metal_surface_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_metal_context_descriptor.withName("context"),
     ADDRESS.withName("layer"),
   )
@@ -4430,7 +4422,7 @@ internal val mln_opengl_borrowed_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
     mln_opengl_context_descriptor.withName("context"),
@@ -4441,14 +4433,14 @@ internal val mln_opengl_owned_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_opengl_context_descriptor.withName("context"),
   )
 internal val mln_opengl_surface_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_opengl_context_descriptor.withName("context"),
     ADDRESS.withName("surface"),
   )
@@ -4627,7 +4619,7 @@ internal val mln_vulkan_borrowed_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
     mln_vulkan_context_descriptor.withName("context"),
@@ -4642,14 +4634,14 @@ internal val mln_vulkan_owned_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_vulkan_context_descriptor.withName("context"),
   )
 internal val mln_vulkan_surface_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_vulkan_context_descriptor.withName("context"),
     JAVA_LONG.withName("surface"),
   )
@@ -4665,7 +4657,7 @@ internal val mln_webgpu_borrowed_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
     mln_webgpu_context_descriptor.withName("context"),
@@ -4678,14 +4670,14 @@ internal val mln_webgpu_owned_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_webgpu_context_descriptor.withName("context"),
   )
 internal val mln_webgpu_surface_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
     Ffm.pad(4),
-    mln_render_target_extent.withName("extent"),
+    mln_logical_extent.withName("extent"),
     mln_webgpu_context_descriptor.withName("context"),
     ADDRESS.withName("surface"),
     JAVA_INT.withName("format"),

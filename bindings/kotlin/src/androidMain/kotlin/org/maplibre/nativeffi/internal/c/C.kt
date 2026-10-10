@@ -152,6 +152,14 @@ internal actual object C {
   ): Int
 
   @JvmStatic
+  actual external fun mln_logical_extent_physical_size(
+    extent: Long,
+    outWidth: Long,
+    outHeight: Long,
+    outDiagnostic: Long,
+  ): Int
+
+  @JvmStatic
   actual external fun mln_map_add_color_relief_layer(
     map: Long,
     layerId: Long,
@@ -358,14 +366,6 @@ internal actual object C {
 
   @JvmStatic
   actual external fun mln_map_camera_query(map: Long, completion: Long, outDiagnostic: Long): Int
-
-  @JvmStatic
-  actual external fun mln_map_camera_snapshot_get(
-    map: Long,
-    outCamera: Long,
-    outGeneration: Long,
-    outDiagnostic: Long,
-  ): Int
 
   @JvmStatic
   actual external fun mln_map_cancel_transitions(
@@ -1418,14 +1418,6 @@ internal actual object C {
     session: Long,
     maxWork: Long,
     outServiced: Long,
-    outDiagnostic: Long,
-  ): Int
-
-  @JvmStatic
-  actual external fun mln_render_target_extent_physical_size(
-    extent: Long,
-    outWidth: Long,
-    outHeight: Long,
     outDiagnostic: Long,
   ): Int
 

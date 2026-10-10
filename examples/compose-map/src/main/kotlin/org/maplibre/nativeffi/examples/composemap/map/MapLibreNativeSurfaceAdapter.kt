@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.examples.composemap.surface.VulkanImageTarget
 import org.maplibre.nativeffi.examples.composemap.surface.WglContextHandles
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
+import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglBorrowedTextureDescriptor
@@ -23,7 +24,6 @@ import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionHandle
-import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.WglContextDescriptor
@@ -62,7 +62,7 @@ internal object MapLibreNativeSurfaceAdapter {
   private fun metalTarget(target: MetalTextureTarget, extent: SurfaceExtent): BorrowedTarget {
     val descriptor =
       MetalBorrowedTextureDescriptor(
-        extent.toRenderTargetExtent(),
+        extent.toLogicalExtent(),
         extent.physicalWidth.toUInt(),
         extent.physicalHeight.toUInt(),
         target.texture.toPointer(),
@@ -78,7 +78,7 @@ internal object MapLibreNativeSurfaceAdapter {
   private fun vulkanTarget(target: VulkanImageTarget, extent: SurfaceExtent): BorrowedTarget {
     val descriptor =
       VulkanBorrowedTextureDescriptor(
-        extent.toRenderTargetExtent(),
+        extent.toLogicalExtent(),
         extent.physicalWidth.toUInt(),
         extent.physicalHeight.toUInt(),
         target.context.toDescriptor(),
@@ -106,7 +106,7 @@ internal object MapLibreNativeSurfaceAdapter {
   private fun openGlTarget(target: OpenGlTextureTarget, extent: SurfaceExtent): BorrowedTarget {
     val descriptor =
       OpenglBorrowedTextureDescriptor(
-        extent.toRenderTargetExtent(),
+        extent.toLogicalExtent(),
         extent.physicalWidth.toUInt(),
         extent.physicalHeight.toUInt(),
         target.context.toDescriptor(),
@@ -163,8 +163,8 @@ internal object MapLibreNativeSurfaceAdapter {
   )
 }
 
-private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =
-  RenderTargetExtent(width.toUInt(), height.toUInt(), scaleFactor)
+private fun SurfaceExtent.toLogicalExtent(): LogicalExtent =
+  LogicalExtent(width.toUInt(), height.toUInt(), scaleFactor)
 
 private fun NativeHandle.toPointer(): NativePointer = NativePointer.ofAddress(address)
 

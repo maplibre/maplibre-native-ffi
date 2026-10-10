@@ -31,7 +31,7 @@ func newRuntimeMapState(v viewport, smoke bool, eventWake maplibre.Wake) (*runti
 	}
 	state := &runtimeMapState{runtime: runtimeHandle}
 	mapOptions := maplibre.DefaultMapOptions()
-	mapOptions.InitialExtent = maplibre.LogicalExtent{Width: v.logicalWidth, Height: v.logicalHeight, ScaleFactor: v.scaleFactor}
+	mapOptions.InitialExtent = v.extent()
 	// A map update becomes a frame demand; the frame result's repaint flag
 	// covers updates that a rendering frame asks for.
 	mapOptions.EventMask = maplibre.RuntimeEventMaskMapRenderUpdateAvailable

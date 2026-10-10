@@ -9,8 +9,8 @@ struct Viewport: Equatable {
   var scaleFactor: Double
   var isEmpty: Bool
 
-  var extent: RenderTargetExtent {
-    RenderTargetExtent(
+  var extent: LogicalExtent {
+    LogicalExtent(
       width: logicalWidth,
       height: logicalHeight,
       scaleFactor: scaleFactor
@@ -53,11 +53,7 @@ final class MapState {
     let map: MapHandle
     do {
       map = try await runtime.mapCreate(options: MapOptions(
-        initialExtent: LogicalExtent(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor
-        ),
+        initialExtent: viewport.extent,
         mapMode: .continuous,
         eventMask: [.mapRenderUpdateAvailable]
       ))

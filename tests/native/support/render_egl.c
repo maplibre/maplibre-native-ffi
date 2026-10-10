@@ -145,8 +145,7 @@ bool mln_test_dedicated_egl_surface_create(
   (void)mln_test_graphics_surface_get_info(state->surface, &surface);
   mln_opengl_surface_descriptor descriptor =
     mln_opengl_surface_descriptor_default();
-  descriptor.extent = (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
+  descriptor.extent = (mln_logical_extent){
     .width = surface.width,
     .height = surface.height,
     .scale_factor = 1.0,

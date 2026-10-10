@@ -6,7 +6,6 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
-import org.maplibre.nativeffi.generated.LogicalExtent
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.OpenglSurfaceDescriptor
 import org.maplibre.nativeffi.generated.RenderDriverKind
@@ -104,13 +103,7 @@ private constructor(
             session.openglSurfaceSetTarget(
               OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
             )
-          map.resize(
-            LogicalExtent(
-              viewport.logicalWidth.toUInt(),
-              viewport.logicalHeight.toUInt(),
-              viewport.scaleFactor,
-            )
-          )
+          map.resize(viewport.extent)
           replacement
         }
         is VulkanGraphicsContext -> session.resize(viewport.extent)
