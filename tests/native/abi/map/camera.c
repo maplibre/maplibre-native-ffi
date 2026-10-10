@@ -737,6 +737,72 @@ static void a_delta_publishes_its_pan_and_zoom_together(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static bool is_render_update_of(
+  const mln_runtime_event* event, const char* messages, void* context
+) {
+  (void)messages;
+  return event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE &&
+         event->source == *(const mln_map*)context;
+}
+
+// A two-finger gesture passes its centroid movement as offset and its new
+// centroid as anchor. The pan moves the coordinate at anchor - offset to the
+// anchor, and the zoom and turn keep it there, all in one render update.
+static void an_immediate_anchored_pan_keeps_the_dragged_coordinate(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = create_square_map(runtime, 256);
+  mln_camera_options start = mln_camera_options_default();
+  start.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  start.latitude = 10.0;
+  start.longitude = 20.0;
+  start.zoom = 4.0;
+  jump(map, start);
+  const mln_screen_point offset = {.x = 30.0, .y = -20.0};
+  const mln_screen_point anchor = {.x = 64.0, .y = 192.0};
+  const mln_lat_lng dragged = coordinate_at(
+    map, (mln_screen_point){.x = anchor.x - offset.x, .y = anchor.y - offset.y}
+  );
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  mln_test_drain_all(runtime);
+
+  mln_camera_delta delta = mln_camera_delta_default();
+  delta.fields = MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE |
+                 MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_ANCHOR;
+  delta.offset = offset;
+  delta.scale = 2.0;
+  delta.bearing = 20.0;
+  delta.anchor = anchor;
+  mln_test_completion completion = mln_test_completion_default(0);
+  MLN_TEST_OK(
+    mln_map_apply_camera_delta(map, &delta, &completion.descriptor, NULL)
+  );
+  MLN_TEST_OK(mln_test_completion_finish(&completion));
+  const uint64_t generation = mln_test_completion_generation(&completion);
+  mln_test_completion_destroy(&completion);
+
+  mln_map_projection projection = create_projection(map);
+  const mln_screen_point kept = projected_pixel(projection, dragged);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.x, kept.x);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-6, anchor.y, kept.y);
+  mln_camera_options camera = mln_camera_options_default();
+  MLN_TEST_OK(mln_map_projection_get_camera(projection, &camera, NULL));
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 5.0, camera.zoom);
+  TEST_ASSERT_DOUBLE_WITHIN(1e-9, 20.0, camera.bearing);
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_snapshot_get(map, &snapshot, NULL));
+  TEST_ASSERT_EQUAL_UINT64(
+    generation, snapshot.latest_render_update_generation
+  );
+  TEST_ASSERT_EQUAL_size_t(
+    1, mln_test_drain_counting_matching(runtime, is_render_update_of, &map)
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 static mln_status submit_delta_row(
   void* context, const void* descriptor, mln_diagnostic* diagnostic
 ) {
@@ -796,11 +862,14 @@ static void delta_nan_pitch(void* descriptor) {
 static void delta_anchor_alone(void* descriptor) {
   ((mln_camera_delta*)descriptor)->fields = MLN_CAMERA_DELTA_ANCHOR;
 }
-static void delta_anchored_pan(void* descriptor) {
+static void delta_animated_anchored_pan(void* descriptor) {
   mln_camera_delta* delta = descriptor;
-  delta->fields =
-    MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE | MLN_CAMERA_DELTA_ANCHOR;
+  delta->fields = MLN_CAMERA_DELTA_OFFSET | MLN_CAMERA_DELTA_SCALE |
+                  MLN_CAMERA_DELTA_BEARING | MLN_CAMERA_DELTA_ANCHOR;
   delta->scale = 2.0;
+  delta->bearing = 20.0;
+  delta->animation.fields = MLN_ANIMATION_OPTION_DURATION;
+  delta->animation.duration_ms = 300.0;
 }
 static void delta_nan_anchor(void* descriptor) {
   mln_camera_delta* delta = descriptor;
@@ -834,8 +903,8 @@ static const mln_test_validation_case delta_cases[] = {
    "bearing and pitch must be finite"},
   {"anchor alone", delta_anchor_alone, MLN_STATUS_INVALID_ARGUMENT,
    "requires scale, bearing, or pitch"},
-  {"anchored pan", delta_anchored_pan, MLN_STATUS_INVALID_ARGUMENT,
-   "cannot be combined with offset"},
+  {"animated anchored pan", delta_animated_anchored_pan,
+   MLN_STATUS_INVALID_ARGUMENT, "only without animation"},
   {"NaN anchor", delta_nan_anchor, MLN_STATUS_INVALID_ARGUMENT,
    "must be finite"},
   {"undersized animation", delta_undersized_animation,
@@ -1347,6 +1416,7 @@ MLN_TEST_GROUP {
   RUN_TEST(an_offset_moves_the_content_with_the_pointer);
   RUN_TEST(one_delta_turns_and_tilts_about_its_anchor);
   RUN_TEST(a_delta_publishes_its_pan_and_zoom_together);
+  RUN_TEST(an_immediate_anchored_pan_keeps_the_dragged_coordinate);
   RUN_TEST(camera_fits_round_trip_through_the_visible_bounds);
   RUN_TEST(visible_bounds_unwrap_across_the_antimeridian);
   RUN_TEST(camera_constraints_and_free_camera_reach_later_commands);

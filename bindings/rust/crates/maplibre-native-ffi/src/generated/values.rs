@@ -211,8 +211,7 @@ pub struct CameraDelta {
     pub offset: Option<ScreenPoint>,
     /// Positive zoom factor; 2 zooms in one level.
     pub scale: Option<f64>,
-    /// Degrees added to the bearing. An animated bearing change takes the
-    /// shorter way around, as `mln_camera_update` does.
+    /// Degrees added to the bearing.
     pub bearing: Option<f64>,
     /// Degrees added to the pitch; positive tilts further from straight down.
     pub pitch: Option<f64>,

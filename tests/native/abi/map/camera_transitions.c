@@ -405,7 +405,8 @@ static void an_animated_delta_replaces_the_running_one(void) {
 }
 
 // A delta carries its gesture phase like a camera update. A delta without
-// components commits only its phase.
+// components commits only its phase, and reports its transition ID before its
+// completion runs, as a release without inertia needs.
 static void a_delta_carries_its_gesture_phase(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -426,11 +427,20 @@ static void a_delta_carries_its_gesture_phase(void) {
   apply_delta(map, &delta);
   TEST_ASSERT_TRUE(read_settled_snapshot(runtime, map).gesture_in_progress);
 
+  TEST_ASSERT_EQUAL_DOUBLE(
+    12.0, read_settled_snapshot(runtime, map).camera.zoom
+  );
+  mln_test_drain_all(runtime);
+
+  delta = mln_camera_delta_default();
+  delta.animation.fields = MLN_ANIMATION_OPTION_TRANSITION_ID;
+  delta.animation.transition_id = 91;
   delta.gesture_phase = MLN_GESTURE_PHASE_END;
   apply_delta(map, &delta);
+  TEST_ASSERT_EQUAL_size_t(1, drain_finished(runtime, 91));
   snapshot = read_settled_snapshot(runtime, map);
   TEST_ASSERT_FALSE(snapshot.gesture_in_progress);
-  TEST_ASSERT_EQUAL_DOUBLE(13.0, snapshot.camera.zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(12.0, snapshot.camera.zoom);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

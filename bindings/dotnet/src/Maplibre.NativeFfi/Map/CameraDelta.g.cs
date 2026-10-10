@@ -22,8 +22,7 @@ public sealed record CameraDelta
     public double? Scale { get; set; }
 
     /// <summary>
-    /// Degrees added to the bearing. An animated bearing change takes the
-    /// shorter way around, as <c>mln_camera_update</c> does.
+    /// Degrees added to the bearing.
     /// </summary>
     public double? Bearing { get; set; }
 

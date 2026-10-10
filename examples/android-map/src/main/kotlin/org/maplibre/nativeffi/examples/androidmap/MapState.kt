@@ -81,12 +81,14 @@ internal class MapState(initialViewport: Viewport, eventWake: Wake, styleJson: S
     map.applyCameraDelta(CameraDelta(offset = ScreenPoint(deltaX, deltaY)))
   }
 
-  fun scaleBy(scale: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(CameraDelta(scale = scale, anchor = anchor))
-  }
-
-  fun adjustBearing(degrees: Double, anchor: ScreenPoint) {
-    map.applyCameraDelta(CameraDelta(bearing = degrees, anchor = anchor))
+  /**
+   * Pans by the centroid's movement, then scales and turns about the new centroid, in one delta, so
+   * no frame shows the pan without the zoom and turn.
+   */
+  fun pinchBy(offset: ScreenPoint, scale: Double, bearingDegrees: Double, centroid: ScreenPoint) {
+    map.applyCameraDelta(
+      CameraDelta(offset = offset, scale = scale, bearing = bearingDegrees, anchor = centroid)
+    )
   }
 
   fun adjustPitch(degrees: Double) {

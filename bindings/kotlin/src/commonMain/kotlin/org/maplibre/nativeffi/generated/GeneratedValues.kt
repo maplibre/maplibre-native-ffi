@@ -1968,10 +1968,7 @@ public data class CameraDelta(
   public val offset: ScreenPoint? = null,
   /** Positive zoom factor; 2 zooms in one level. */
   public val scale: Double? = null,
-  /**
-   * Degrees added to the bearing. An animated bearing change takes the shorter way around, as
-   * `mln_camera_update` does.
-   */
+  /** Degrees added to the bearing. */
   public val bearing: Double? = null,
   /** Degrees added to the pitch; positive tilts further from straight down. */
   public val pitch: Double? = null,

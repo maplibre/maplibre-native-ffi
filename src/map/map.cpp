@@ -4092,15 +4092,29 @@ auto validate_camera_delta(const mln_camera_delta* delta) -> mln_status {
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    if ((fields & MLN_CAMERA_DELTA_OFFSET) != 0U) {
-      set_thread_error("a camera delta anchor cannot be combined with offset");
-      return MLN_STATUS_INVALID_ARGUMENT;
-    }
     if (validate_screen_point(delta->anchor) != MLN_STATUS_OK) {
       return MLN_STATUS_INVALID_ARGUMENT;
     }
   }
-  return validate_animation_options(&delta->animation);
+  const auto& animation = delta->animation;
+  const auto animation_status = validate_animation_options(&animation);
+  if (animation_status != MLN_STATUS_OK) return animation_status;
+  // An anchored ease couples center with its fields, so an animated one would
+  // replace the animated pan. An immediate pan has already applied when the
+  // ease reads the camera.
+  constexpr auto anchored_pan =
+    static_cast<uint32_t>(MLN_CAMERA_DELTA_OFFSET) | MLN_CAMERA_DELTA_ANCHOR;
+  if (
+    (fields & anchored_pan) == anchored_pan &&
+    (animation.fields & MLN_ANIMATION_OPTION_DURATION) != 0U &&
+    animation.duration_ms > 0
+  ) {
+    set_thread_error(
+      "a camera delta anchor combines with offset only without animation"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
 }
 
 // The camera that a delta's scale, bearing, and pitch reach from the camera as
@@ -4136,9 +4150,10 @@ auto map_apply_camera_delta(
     map,
     [copied](MapObject& live) -> void {
       // The pan and the scale, bearing, and pitch change are separate MapLibre
-      // transitions, because an explicit center overrides an anchor. The
-      // transaction around this work publishes both in one snapshot and
-      // announces one render update for them.
+      // transitions, because an explicit center overrides an anchor. The ease
+      // reads the camera after the pan, so an immediate pan moves the camera
+      // that the anchor refers to. The transaction around this work publishes
+      // both in one snapshot and announces one render update for them.
       const auto pans = (copied.fields & MLN_CAMERA_DELTA_OFFSET) != 0U;
       const auto eases = (copied.fields & camera_delta_anchored_fields) != 0U;
       const auto transitions =

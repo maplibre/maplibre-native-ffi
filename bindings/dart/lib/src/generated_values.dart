@@ -1587,8 +1587,7 @@ final class CameraDelta extends _Value {
   /// Positive zoom factor; 2 zooms in one level.
   final double? scale;
 
-  /// Degrees added to the bearing. An animated bearing change takes the shorter
-  /// way around, as `mln_camera_update` does.
+  /// Degrees added to the bearing.
   final double? bearing;
 
   /// Degrees added to the pitch; positive tilts further from straight down.

@@ -1428,8 +1428,7 @@ type CameraDelta struct {
 	Offset *ScreenPoint
 	// Positive zoom factor; 2 zooms in one level.
 	Scale *float64
-	// Degrees added to the bearing. An animated bearing change takes the shorter
-	// way around, as mln_camera_update does.
+	// Degrees added to the bearing.
 	Bearing *float64
 	// Degrees added to the pitch; positive tilts further from straight down.
 	Pitch *float64

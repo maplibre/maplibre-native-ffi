@@ -69,8 +69,9 @@ total, because each delta composes with the camera it finds.
 
 <Code code={region(gestureSnippet, "drag")} lang="c" title="camera-gesture.c" />
 
-A pinch scales about an anchor. The anchor stays under the fingers while the map
-moves around it.
+A pinch pans by the movement of the centroid between the fingers and scales
+about the new centroid. One immediate delta carries both, so the coordinate under
+the fingers follows them and no frame shows the pan without the zoom.
 
 <Code code={region(gestureSnippet, "pinch")} lang="c" title="camera-gesture.c" />
 
@@ -83,7 +84,8 @@ A delta also carries a gesture phase, so the last delta of a gesture can end it.
 Submit the end phase for a completed gesture and the cancel phase for a
 cancelled one; the cancel phase also stops a running transition. An animated
 delta continues the gesture's momentum and takes the same animation options as
-an ease.
+an ease. A release without momentum submits a delta that selects no fields and
+changes only the phase.
 
 <Code code={region(gestureSnippet, "release")} lang="c" title="camera-gesture.c" />
 

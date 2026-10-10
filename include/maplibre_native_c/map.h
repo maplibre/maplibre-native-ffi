@@ -361,17 +361,21 @@ typedef enum MLN_BINDING("kind=bitmask") mln_camera_delta_field : uint32_t {
  * reached and replaces that component's transition, so queue animated deltas
  * only after the previous one has rendered or finished.
  *
- * OFFSET pans first, in the current camera's logical pixels: the map content
- * moves by offset, so positive x moves it right and positive y moves it down,
- * and a pointer drag delta passes through unchanged. The pan stops short of the
+ * OFFSET pans first, in the current camera's logical pixels: the content moves
+ * by offset, so positive x moves it right and positive y moves it down, and a
+ * pointer drag delta passes through unchanged. The pan stops short of the
  * horizon. SCALE, BEARING, and PITCH then change the camera about anchor when
- * ANCHOR is set, keeping the coordinate under anchor fixed, or about the center
- * otherwise. ANCHOR requires SCALE, BEARING, or PITCH, and cannot be combined
- * with OFFSET; submit a pan as its own delta.
+ * ANCHOR is set, keeping the coordinate under anchor in the panned camera
+ * fixed, or about the center otherwise. ANCHOR requires SCALE, BEARING, or
+ * PITCH. ANCHOR combines with OFFSET only for an immediate delta, one whose
+ * animation selects no DURATION or a zero duration; a two-finger gesture passes
+ * its centroid movement as offset and its new centroid as anchor. An animated
+ * bearing change takes the shorter way around.
  *
- * fields may be zero, in which case the delta changes only the gesture phase.
- * gesture_phase is applied around the camera write, as in mln_camera_update.
- * The command copies this struct before returning.
+ * fields may be zero, in which case the delta changes only the gesture phase
+ * and reports any transition_id at once. gesture_phase is applied around the
+ * camera write, as in mln_camera_update. The command copies this struct before
+ * returning.
  */
 typedef struct mln_camera_delta {
   uint32_t size;
@@ -381,10 +385,7 @@ typedef struct mln_camera_delta {
     MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_OFFSET");
   /** Positive zoom factor; 2 zooms in one level. */
   double scale MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_SCALE");
-  /**
-   * Degrees added to the bearing. An animated bearing change takes the shorter
-   * way around, as mln_camera_update does.
-   */
+  /** Degrees added to the bearing. */
   double bearing MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_BEARING");
   /** Degrees added to the pitch; positive tilts further from straight down. */
   double pitch MLN_BINDING("mask=fields;bit=MLN_CAMERA_DELTA_PITCH");

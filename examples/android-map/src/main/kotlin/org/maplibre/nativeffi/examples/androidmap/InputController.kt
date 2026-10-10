@@ -132,13 +132,17 @@ internal class InputController(context: Context, private val mapState: () -> Map
 
       var changed = false
       if (mode == Mode.SCALE_ROTATE) {
-        val anchor = screenPoint(current.centroidX, current.centroidY)
-        if (scale.isFinite() && abs(scale - 1.0) >= SCALE_EPSILON) {
-          mapState()?.scaleBy(scale, anchor)
-          changed = true
-        }
-        if (abs(deltaDegrees) >= ROTATION_EPSILON_DEGREES) {
-          mapState()?.adjustBearing(-deltaDegrees, anchor)
+        val scaled = scale.isFinite() && abs(scale - 1.0) >= SCALE_EPSILON
+        val rotated = abs(deltaDegrees) >= ROTATION_EPSILON_DEGREES
+        val offset = ScreenPoint(logicalDelta(current.centroidX - baseline.centroidX), deltaY)
+        if (scaled || rotated || offset.x != 0.0 || offset.y != 0.0) {
+          mapState()
+            ?.pinchBy(
+              offset = offset,
+              scale = if (scaled) scale else 1.0,
+              bearingDegrees = if (rotated) -deltaDegrees else 0.0,
+              centroid = screenPoint(current.centroidX, current.centroidY),
+            )
           changed = true
         }
       } else if (mode == Mode.SHOVE && deltaY != 0.0) {

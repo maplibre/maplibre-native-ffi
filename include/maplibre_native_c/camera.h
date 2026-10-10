@@ -231,8 +231,8 @@ MLN_API mln_status mln_map_update_camera(
  *   undersized, delta->fields carries an unknown bit, delta->gesture_phase is
  *   out of range, a selected offset, bearing, pitch, or anchor is not finite, a
  *   selected scale is not finite and positive, ANCHOR is selected without
- *   SCALE, BEARING, or PITCH or together with OFFSET, delta->animation is
- *   invalid, or completion is invalid.
+ *   SCALE, BEARING, or PITCH, ANCHOR and OFFSET are selected with a positive
+ *   animation duration, delta->animation is invalid, or completion is invalid.
  * - MLN_STATUS_INVALID_STATE when map has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *

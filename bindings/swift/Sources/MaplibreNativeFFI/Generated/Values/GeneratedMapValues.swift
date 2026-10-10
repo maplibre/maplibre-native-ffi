@@ -206,8 +206,7 @@ public struct CameraDelta: Equatable, Hashable, Sendable {
   public var offset: ScreenPoint?
   /// Positive zoom factor; 2 zooms in one level.
   public var scale: Double?
-  /// Degrees added to the bearing. An animated bearing change takes the shorter
-  /// way around, as `mln_camera_update` does.
+  /// Degrees added to the bearing.
   public var bearing: Double?
   /// Degrees added to the pitch; positive tilts further from straight down.
   public var pitch: Double?
