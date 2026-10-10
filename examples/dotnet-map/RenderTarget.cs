@@ -104,6 +104,8 @@ internal abstract class RenderTarget : IDisposable
     /// <summary>How long a frame that did not reach the window waits to retry, about one refresh.</summary>
     private const long RetryDelayMilliseconds = 16;
 
+    private static volatile bool graphicsKept;
+
     private readonly GlfwWake frames;
     private ulong nextToken;
     private bool demandOutstanding;
@@ -130,7 +132,7 @@ internal abstract class RenderTarget : IDisposable
         {
             try
             {
-                Session.Abandon();
+                Abandon(Session);
             }
             finally
             {
@@ -139,6 +141,13 @@ internal abstract class RenderTarget : IDisposable
             throw;
         }
     }
+
+    /// <summary>
+    /// Whether an abandon kept graphics objects until the process exits. A kept Vulkan object is a
+    /// child of the host's device, and a kept swapchain of its surface, so a Vulkan host then keeps
+    /// those until the process exits too.
+    /// </summary>
+    public static bool GraphicsKept => graphicsKept;
 
     protected IGraphicsContext Graphics { get; }
 
@@ -256,18 +265,25 @@ internal abstract class RenderTarget : IDisposable
         catch (Exception error)
         {
             Console.Error.WriteLine($"render session detach failed, abandoning: {error.Message}");
-            var abandoned = Session.Abandon();
-            if (abandoned.QuarantinedResourceCount > 0)
-            {
-                Console.Error.WriteLine(
-                    $"render session quarantined {abandoned.QuarantinedResourceCount} resources"
-                );
-            }
+            Abandon(Session);
         }
         finally
         {
             Session.Close();
             DisposeHost();
+        }
+    }
+
+    /// <summary>Ends the session's graphics work at once.</summary>
+    private static void Abandon(RenderSessionHandle session)
+    {
+        var abandoned = session.Abandon();
+        if (abandoned.QuarantinedResourceCount > 0)
+        {
+            graphicsKept = true;
+            Console.Error.WriteLine(
+                $"render session abandon kept {abandoned.QuarantinedResourceCount} resource groups until exit"
+            );
         }
     }
 

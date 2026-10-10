@@ -819,7 +819,9 @@ static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
 }
 
 // A session-owned ring that the host holds no frame of belongs to the session
-// alone, so abandon destroys it with the rest.
+// alone, so abandon destroys it with the rest. That includes a ring whose
+// frame the host released just before abandon, whether or not the driver has
+// run the release yet: CPU_COMPLETE attests that the host's GPU read is done.
 static void abandon_destroys_an_owned_texture_ring(void) {
   counter_reset();
   mln_runtime runtime = mln_test_create_runtime();
@@ -832,8 +834,9 @@ static void abandon_destroys_an_owned_texture_ring(void) {
     ),
     mln_test_graphics_last_error()
   );
-  render_one_frame(&fixture, 1);
+  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
   TEST_ASSERT_GREATER_THAN_INT(0, atomic_load(&live_objects[COUNTED_IMAGE]));
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, NULL, NULL));
 
   abandon_destroying_everything(fixture.session);
 

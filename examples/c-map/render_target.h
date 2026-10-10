@@ -69,6 +69,11 @@ mln_render_session_attach_options render_session_attach_options(
 /// Safe to call with no session attached.
 void render_session_close(render_session* session);
 
+/// Whether an abandon kept graphics objects until the process exits. A kept
+/// Vulkan object is a child of the host's device, and a kept swapchain of its
+/// surface, so a Vulkan host then keeps those until the process exits too.
+bool render_session_graphics_kept(void);
+
 /// Services every queued caller-driver item on the graphics thread.
 [[nodiscard]] app_error render_session_service(render_session* session);
 

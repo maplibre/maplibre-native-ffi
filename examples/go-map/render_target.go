@@ -237,7 +237,7 @@ func (driver *callerDriver) Close() error {
 		fmt.Printf("render session detach failed, abandoning: %v\n", detachErr)
 		abandoned, abandonErr := driver.session.Abandon()
 		if abandoned.QuarantinedResourceCount > 0 {
-			fmt.Printf("render session quarantined %d resources\n", abandoned.QuarantinedResourceCount)
+			fmt.Printf("render session abandon kept %d resource groups until exit\n", abandoned.QuarantinedResourceCount)
 		}
 		err = errors.Join(err, abandonErr)
 	}

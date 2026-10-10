@@ -215,24 +215,36 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         }
 
         closed = true;
+        // Objects that an abandoned session kept are children of the device and the surface, which
+        // then stay until the process exits, as does their instance.
+        var destroy = !RenderTarget.GraphicsKept;
         if (device.Handle != 0)
         {
             LockQueue();
             vk.DeviceWaitIdle(device);
             UnlockQueue();
-            vk.DestroyDevice(device, null);
+            if (destroy)
+            {
+                vk.DestroyDevice(device, null);
+            }
             device = default;
         }
 
         if (surface.Handle != 0)
         {
-            vkDestroySurfaceKHR(instance.Handle, surface.Handle, 0);
+            if (destroy)
+            {
+                vkDestroySurfaceKHR(instance.Handle, surface.Handle, 0);
+            }
             surface = default;
         }
 
         if (instance.Handle != 0)
         {
-            vk.DestroyInstance(instance, null);
+            if (destroy)
+            {
+                vk.DestroyInstance(instance, null);
+            }
             instance = default;
         }
 

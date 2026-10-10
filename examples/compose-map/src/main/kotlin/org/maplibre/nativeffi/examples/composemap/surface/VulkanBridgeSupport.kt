@@ -16,6 +16,15 @@ import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties
 import org.lwjgl.vulkan.VkQueueFamilyProperties
 
+/**
+ * Whether a render session's abandon kept graphics objects until the process exits. A kept Vulkan
+ * object is a child of the device it was made on, so each Vulkan context then keeps its device and
+ * instance until the process exits too.
+ */
+internal object VulkanDeviceRetention {
+  @Volatile var keepUntilExit = false
+}
+
 internal fun checkVulkan(status: Int, operation: String) {
   check(status == VK_SUCCESS) { "$operation failed with Vulkan status $status" }
 }

@@ -49,6 +49,10 @@ app_error render_session_service(render_session* session) {
   return APP_OK;
 }
 
+static bool graphics_kept = false;
+
+bool render_session_graphics_kept(void) { return graphics_kept; }
+
 /// Ends the session's graphics work at once, which completes any pending
 /// lifecycle submission with target loss.
 static void abandon(render_session* session) {
@@ -62,8 +66,9 @@ static void abandon(render_session* session) {
       "render session abandon failed", status, &diagnostic
     );
   } else if (result.quarantined_resource_count > 0) {
+    graphics_kept = true;
     fprintf(
-      stderr, "render session abandon quarantined %u resource groups\n",
+      stderr, "render session abandon kept %u resource groups until exit\n",
       result.quarantined_resource_count
     );
   }

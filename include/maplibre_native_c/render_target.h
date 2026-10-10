@@ -81,10 +81,11 @@ typedef void (*mln_queue_lock_release)(void* user_data);
  * thread, so a host that also uses that queue passes a lock here. Native code
  * calls lock and then unlock on the driver thread around each submission and
  * presentation on the queue, including the empty submission that waits for
- * the queue to drain. Abandon also takes it on the calling thread, around the
- * drains that its teardown submits. Native code holds the lock only for that
- * call, never across a wait. The host takes the same lock around its own calls
- * on the queue.
+ * the queue to drain. Abandon also takes it on the thread that abandons, which
+ * is the cleanup worker when mln_render_session_dispose() abandons the
+ * session, around the drains that its teardown submits. Native code holds the
+ * lock only for that call, never across a wait. The host takes the same lock
+ * around its own calls on the queue.
  *
  * Both callbacks are null to disable the lock, or both are set. A disabled
  * lock must not carry release_user_data, and size must still be

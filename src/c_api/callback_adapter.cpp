@@ -829,6 +829,17 @@ extern "C" MLN_API void mln_adapter_owner_finalize(void* token) noexcept {
   destroy_owner_token(token);
 }
 
+extern "C" MLN_API auto mln_adapter_render_session_abandon_at_exit(
+  mln_render_session session, mln_render_abandon_result* out_result,
+  mln_diagnostic* out_diagnostic
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary(out_diagnostic, [&] {
+    return mln::core::render_session_abandon_keeping_graphics(
+      session, out_result
+    );
+  });
+}
+
 extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
   void* user_data, std::uint32_t kind, const char* url,
   mln_resource_transform_response* out_response

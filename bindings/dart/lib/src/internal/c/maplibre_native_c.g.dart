@@ -2580,6 +2580,19 @@ external Pointer<Void> mln_adapter_owner_token_create(int handle);
 external void mln_adapter_owner_token_destroy(Pointer<Void> token);
 
 @Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_render_abandon_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_adapter_render_session_abandon_at_exit(
+  int session,
+  Pointer<mln_render_abandon_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
+
+@Native<
   Uint32 Function(
     Pointer<Void>,
     Pointer<mln_resource_request>,

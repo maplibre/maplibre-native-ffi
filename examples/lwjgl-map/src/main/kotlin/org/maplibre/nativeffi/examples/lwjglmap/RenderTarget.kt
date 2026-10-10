@@ -196,12 +196,7 @@ internal open class RenderTarget(
       await(session.detach())
     } catch (error: RuntimeException) {
       System.err.println("render session detach failed, abandoning: ${error.message}")
-      val abandoned = session.abandon()
-      if (abandoned.quarantinedResourceCount > 0u) {
-        System.err.println(
-          "render session quarantined ${abandoned.quarantinedResourceCount} resources"
-        )
-      }
+      abandon(session)
     } finally {
       session.close()
       closeHost()
@@ -214,6 +209,26 @@ internal open class RenderTarget(
 
     /** How long a frame that did not reach the window waits to retry, about one refresh. */
     const val RETRY_DELAY_NANOS = 16_000_000L
+
+    /**
+     * Whether an abandon kept graphics objects until the process exits. A kept Vulkan object is a
+     * child of the host's device, and a kept swapchain of its surface, so a Vulkan host then keeps
+     * those until the process exits too.
+     */
+    @Volatile
+    var graphicsKept = false
+      private set
+
+    /** Ends the session's graphics work at once. */
+    fun abandon(session: RenderSessionHandle) {
+      val abandoned = session.abandon()
+      if (abandoned.quarantinedResourceCount > 0u) {
+        graphicsKept = true
+        System.err.println(
+          "render session abandon kept ${abandoned.quarantinedResourceCount} resource groups until exit"
+        )
+      }
+    }
 
     /**
      * Selects the driver from the graphics API: a core worker wherever the target accepts one.
@@ -272,7 +287,7 @@ internal class AttachedSession(
       try {
         driver.await(attachment.session, attachment.ready)
       } catch (error: Throwable) {
-        runCatching { attachment.session.abandon() }.onFailure(error::addSuppressed)
+        runCatching { RenderTarget.abandon(attachment.session) }.onFailure(error::addSuppressed)
         runCatching { attachment.session.close() }.onFailure(error::addSuppressed)
         throw error
       }

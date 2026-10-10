@@ -37,6 +37,8 @@ typedef struct host_state {
   mln_test_graphics_surface* surface;
   mln_test_graphics_texture* extra_textures[EXTRA_TARGETS];
   mln_test_graphics_surface* extra_surfaces[EXTRA_TARGETS];
+  // Set by mln_test_render_fixture_keep_graphics_until_exit().
+  bool keep_until_exit;
 } host_state;
 
 static void report(const char* what) {
@@ -85,7 +87,7 @@ static host_state* host_state_create(void) {
 
 void mln_test_backend_destroy(void* opaque_state) {
   host_state* state = opaque_state;
-  if (state == NULL) {
+  if (state == NULL || state->keep_until_exit) {
     return;
   }
   for (size_t index = 0; index < EXTRA_TARGETS; index += 1) {
@@ -447,6 +449,15 @@ bool mln_test_render_fixture_read_texture(
     return false;
   }
   return true;
+}
+
+void mln_test_render_fixture_keep_graphics_until_exit(
+  const mln_test_render_fixture* fixture
+) {
+  host_state* state = fixture->backend_state;
+  if (state != NULL) {
+    state->keep_until_exit = true;
+  }
 }
 
 mln_test_graphics* mln_test_render_fixture_graphics(

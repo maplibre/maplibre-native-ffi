@@ -563,10 +563,12 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * a terminal result before graphics resources are destroyed.
  *
  * When a disposed frame or a failed release quarantined a slot of the texture
- * ring, the host's GPU may still read that slot's texture. Detach then releases
- * the ring and its graphics context without destroying them, and they stay
- * allocated until the process exits. Detach waits for the map's in-flight tile
- * work in that case, so the host may destroy its device once detach completes.
+ * ring, the host's GPU may still read that slot's texture. Detach then keeps
+ * the ring and its graphics context until the process exits, and destroys the
+ * rest. It waits for the map's in-flight tile work in that case, and once
+ * detach completes the host may destroy its graphics objects. The one
+ * exception is a kept Vulkan ring: it is a child of the host's VkDevice, so
+ * the host keeps the device until the process exits.
  *
  * Returns:
  * - MLN_STATUS_OK when the detach is accepted.
@@ -668,11 +670,12 @@ MLN_API mln_status mln_render_session_destroy(
  * session is abandoned on the cleanup worker once its in-flight driver work and
  * its scopes from mln_acquired_frame_view_begin() end, which disposes of its
  * graphics resources as mln_render_session_abandon() does. A session that
- * waits for those does not delay other
- * sessions' retirement. Either way, retirement releases the
- * map attachment. The host keeps its graphics objects alive until the session's
- * wake release callbacks run. Acquired frame accessors report target loss after
- * acceptance; their owners still release or dispose those frames.
+ * waits for those does not delay other sessions' retirement. Either way,
+ * retirement releases the map attachment. The host keeps its graphics objects
+ * alive until the session's wake release callbacks run, and keeps the parents
+ * of a kept Vulkan object until the process exits, as for
+ * mln_render_session_abandon(). Acquired frame accessors report target loss
+ * after acceptance; their owners still release or dispose those frames.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
  * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been

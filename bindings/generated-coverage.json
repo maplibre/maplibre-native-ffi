@@ -320,7 +320,7 @@
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc"
   ],
-  "function_count": 297,
+  "function_count": 298,
   "languages": {
     "dart": {
       "callback_adapters": {
@@ -2584,6 +2584,7 @@
     "mln_adapter_owner_finalize",
     "mln_adapter_owner_token_create",
     "mln_adapter_owner_token_destroy",
+    "mln_adapter_render_session_abandon_at_exit",
     "mln_adapter_resource_provider_rules_callback",
     "mln_adapter_resource_transform_rewrite_callback",
     "mln_adapter_routed_resource_provider_callback"

@@ -100,7 +100,9 @@ caller driver until the completion runs, then destroy the detached session
 handle from any thread. A session-owned texture ring is the exception when a
 frame was disposed instead of released with consumer synchronization: the host's
 GPU may still read that frame's texture, so detach keeps the ring allocated
-until the process exits.
+until the process exits. Once detach completes, the host may destroy its
+graphics objects, except the Vulkan device behind a kept ring, which stays until
+the process exits.
 
 Abandon is the failure path for a host that can no longer service graphics
 work. It closes control and mailboxes, invalidates graphics accessors, and

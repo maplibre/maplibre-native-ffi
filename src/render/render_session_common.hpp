@@ -998,6 +998,13 @@ auto render_session_dispose(mln_render_session session) -> mln_status;
 // through this.
 auto render_session_dispose_quarantined(mln_render_session session)
   -> mln_status;
+// Abandons a session as render_session_abandon does, except that it keeps
+// every graphics object until the process exits and makes no graphics call. A
+// host runtime's shutdown hook abandons through this, because the host's
+// graphics objects may already be gone by then.
+auto render_session_abandon_keeping_graphics(
+  mln_render_session session, mln_render_abandon_result* out_result
+) -> mln_status;
 auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status;
 // Features a query copied out of the renderer. The completion borrows views of
 // these strings, so the list stays alive until the callback returns.

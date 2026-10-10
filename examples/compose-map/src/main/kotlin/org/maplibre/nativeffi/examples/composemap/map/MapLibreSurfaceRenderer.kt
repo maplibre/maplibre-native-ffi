@@ -10,6 +10,7 @@ import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceSession
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
+import org.maplibre.nativeffi.examples.composemap.surface.VulkanDeviceRetention
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.MapHandle
@@ -320,7 +321,7 @@ internal class MapLibreSurfaceRenderer(
     try {
       await(attachment.session, attachment.ready)
     } catch (error: Throwable) {
-      runCatching { attachment.session.abandon() }
+      runCatching { abandon(attachment.session) }
       runCatching { attachment.session.close() }
       throw error
     }
@@ -340,12 +341,7 @@ internal class MapLibreSurfaceRenderer(
       await(session, session.detach())
     } catch (error: RuntimeException) {
       System.err.println("render session detach failed, abandoning: ${error.message}")
-      val abandoned = session.abandon()
-      if (abandoned.quarantinedResourceCount > 0u) {
-        System.err.println(
-          "render session quarantined ${abandoned.quarantinedResourceCount} resources"
-        )
-      }
+      abandon(session)
     } finally {
       session.close()
     }
@@ -355,8 +351,22 @@ internal class MapLibreSurfaceRenderer(
     val closing = renderSession
     renderSession = null
     closing?.session?.let { session ->
-      session.abandon()
+      abandon(session)
       session.close()
+    }
+  }
+
+  /**
+   * Ends the session's graphics work at once. Graphics objects that the abandon kept are children
+   * of the producer's Vulkan device, which then stays until the process exits.
+   */
+  private fun abandon(session: RenderSessionHandle) {
+    val abandoned = session.abandon()
+    if (abandoned.quarantinedResourceCount > 0u) {
+      VulkanDeviceRetention.keepUntilExit = true
+      System.err.println(
+        "render session abandon kept ${abandoned.quarantinedResourceCount} resource groups until exit"
+      )
     }
   }
 

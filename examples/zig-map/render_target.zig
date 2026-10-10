@@ -231,6 +231,15 @@ pub const Session = struct {
     }
 };
 
+var graphics_kept = std.atomic.Value(bool).init(false);
+
+/// Whether an abandon kept graphics objects until the process exits. A kept
+/// Vulkan object is a child of the host's device, and a kept swapchain of its
+/// surface, so a Vulkan host then keeps those until the process exits too.
+pub fn graphicsKept() bool {
+    return graphics_kept.load(.acquire);
+}
+
 /// Ends a session's graphics work at once, which completes any pending
 /// lifecycle submission with target loss.
 fn abandon(handle: maplibre.RenderSession) void {
@@ -241,7 +250,8 @@ fn abandon(handle: maplibre.RenderSession) void {
         return;
     };
     if (result.quarantined_resource_count > 0) {
-        std.debug.print("render session abandon quarantined {d} resource groups\n", .{result.quarantined_resource_count});
+        graphics_kept.store(true, .release);
+        std.debug.print("render session abandon kept {d} resource groups until exit\n", .{result.quarantined_resource_count});
     }
 }
 

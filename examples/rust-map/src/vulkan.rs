@@ -243,6 +243,12 @@ impl Drop for VulkanContext {
         // render target that borrowed them has closed or after process exit.
         unsafe {
             let _ = self.wait_idle();
+            // Objects that an abandoned session kept are children of the
+            // device and the surface, which then stay until the process
+            // exits, as does their instance.
+            if crate::render_target::graphics_kept() {
+                return;
+            }
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
             self.instance.destroy_instance(None);

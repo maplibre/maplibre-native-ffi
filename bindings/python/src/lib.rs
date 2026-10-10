@@ -249,14 +249,27 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
     }
 }
 
+unsafe extern "C" {
+    // Binding-internal export from maplibre_native_c/callback_adapter.h,
+    // which the sys crate does not bind.
+    fn mln_adapter_render_session_abandon_at_exit(
+        session: sys::mln_render_session,
+        out_result: *mut sys::mln_render_abandon_result,
+        out_diagnostic: *mut sys::mln_diagnostic,
+    ) -> sys::mln_status;
+}
+
 /// Ends a render session's graphics calls before shutdown disposes it.
 ///
 /// Disposal alone would detach an attached session on its worker while the
 /// process exits, and graphics drivers tear down their own state in exit
-/// handlers that can run first. Abandonment returns once the in-flight driver
-/// call has ended and the session's graphics objects are destroyed or kept, so
-/// the disposal that follows makes no graphics call. A session that refuses
-/// abandonment, such as one inside a caller-driven call, is disposed as it is.
+/// handlers that can run first. The host's own shutdown may also have
+/// destroyed the graphics objects behind the session already. This
+/// abandonment returns once the in-flight driver call has ended, makes no
+/// graphics call, and keeps the session's graphics objects until the process
+/// exits, so the disposal that follows makes no graphics call either. A
+/// session that refuses abandonment, such as one inside a caller-driven call,
+/// is disposed as it is.
 fn end_graphics_at_exit<T: 'static>(raw: u64) {
     if std::any::TypeId::of::<T>() != std::any::TypeId::of::<sys::mln_render_session>() {
         return;
@@ -270,7 +283,11 @@ fn end_graphics_at_exit<T: 'static>(raw: u64) {
     // SAFETY: the caller holds sole ownership of the live session, and result
     // is a writable, correctly sized output.
     let _ = unsafe {
-        sys::mln_render_session_abandon(sys::mln_render_session(raw), &mut result, ptr::null_mut())
+        mln_adapter_render_session_abandon_at_exit(
+            sys::mln_render_session(raw),
+            &mut result,
+            ptr::null_mut(),
+        )
     };
 }
 

@@ -4,6 +4,7 @@
 
 #include "context.h"
 
+#include "../../render_target.h"
 #include "util.h"
 
 static app_error has_instance_extension(const char* name, bool* out_found) {
@@ -220,14 +221,18 @@ app_error vulkan_context_init(vulkan_context* context, SDL_Window* window) {
 }
 
 void vulkan_context_deinit(vulkan_context* context) {
-  if (context->device != VK_NULL_HANDLE) {
-    vkDestroyDevice(context->device, nullptr);
-  }
-  if (context->surface != VK_NULL_HANDLE) {
-    SDL_Vulkan_DestroySurface(context->instance, context->surface, nullptr);
-  }
-  if (context->instance != VK_NULL_HANDLE) {
-    vkDestroyInstance(context->instance, nullptr);
+  // Objects that an abandoned session kept are children of the device and the
+  // surface, which then stay until the process exits, as does their instance.
+  if (!render_session_graphics_kept()) {
+    if (context->device != VK_NULL_HANDLE) {
+      vkDestroyDevice(context->device, nullptr);
+    }
+    if (context->surface != VK_NULL_HANDLE) {
+      SDL_Vulkan_DestroySurface(context->instance, context->surface, nullptr);
+    }
+    if (context->instance != VK_NULL_HANDLE) {
+      vkDestroyInstance(context->instance, nullptr);
+    }
   }
   if (context->queue_mutex != nullptr) {
     SDL_DestroyMutex(context->queue_mutex);

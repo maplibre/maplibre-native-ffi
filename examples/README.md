@@ -97,4 +97,7 @@ These rules hold in every example, and the code alone does not show why:
   because a target replacement leaves the map's extent unchanged.
 - A session fixes its scale factor at attachment, so a scale change reattaches.
 - The process never exits while a session can still make graphics calls: it
-  detaches, or abandons the session when detach fails.
+  detaches, or abandons the session when detach fails. When an abandon keeps
+  graphics objects until the process exits, a Vulkan example keeps its device,
+  surface, and instance that long too, because the kept objects are their
+  children.

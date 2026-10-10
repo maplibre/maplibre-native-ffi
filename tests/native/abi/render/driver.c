@@ -2,8 +2,13 @@
 // may service a caller driver, one session per map, maintenance commands in
 // frame order, detach, abandon, and disposal.
 
+#include "maplibre_native_c/callback_adapter.h"
 #include "support/frames.h"
 #include "support/test_support.h"
+
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#include "support/host_graphics.h"
+#endif
 
 static mln_render_session_snapshot read_snapshot(mln_render_session session) {
   mln_render_session_snapshot snapshot = {
@@ -403,6 +408,41 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
     mln_render_session_acquire_frame(fixture.session, &frame, NULL)
   );
 
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A host runtime's shutdown hook abandons a session without graphics calls,
+// because the host's own shutdown may already have destroyed the device: it
+// keeps the renderer and the backend of a session that rendered, even on a
+// backend whose objects mln_render_session_abandon() would destroy.
+static void abandon_at_exit_keeps_every_graphics_object(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+
+  mln_render_abandon_result abandoned = {
+    .size = sizeof(mln_render_abandon_result)
+  };
+  MLN_TEST_OK(mln_adapter_render_session_abandon_at_exit(
+    fixture.session, &abandoned, NULL
+  ));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(2, abandoned.quarantined_resource_count);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_SESSION_STATE_ABANDONED, read_snapshot(fixture.session).state
+  );
+
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture);
+#endif
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -874,6 +914,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_detached_session_frees_its_map_and_refuses_work);
   RUN_TEST(maintenance_commands_run_in_order_with_frames);
   RUN_TEST(abandon_completes_pending_work_and_invalidates_accessors);
+  RUN_TEST(abandon_at_exit_keeps_every_graphics_object);
   RUN_TEST(abandon_from_a_driver_completion_is_busy);
   RUN_TEST(abandon_from_an_attach_completion_is_busy);
   RUN_TEST(a_session_disposed_while_attaching_frees_the_map);

@@ -258,13 +258,16 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
   }
 
   override fun close() {
+    // Objects that an abandoned session kept are children of the device, which then stays until the
+    // process exits, as does its instance.
+    val destroy = !VulkanDeviceRetention.keepUntilExit
     device?.let {
       vkDeviceWaitIdle(it)
-      vkDestroyDevice(it, null)
+      if (destroy) vkDestroyDevice(it, null)
       device = null
     }
     instance?.let {
-      vkDestroyInstance(it, null)
+      if (destroy) vkDestroyInstance(it, null)
       instance = null
     }
   }

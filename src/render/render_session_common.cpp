@@ -3668,6 +3668,18 @@ auto render_session_abandon(
   return abandon_render_session(live, out_result);
 }
 
+auto render_session_abandon_keeping_graphics(
+  mln_render_session session, mln_render_abandon_result* out_result
+) -> mln_status {
+  if (out_result == nullptr || out_result->size < sizeof(*out_result)) {
+    set_thread_error("out_result must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto live = lease_render_session(session);
+  if (live == nullptr) return recorded_handle_fault_status();
+  return abandon_render_session(live, out_result, AbandonedGraphics::Keep);
+}
+
 namespace {
 // The graphics objects that abandon takes from a session, which nothing else
 // can reach once it has taken them. Whatever retirement leaves behind, such as
@@ -3703,7 +3715,8 @@ struct AbandonedObjects {
 // Destroys what abandon took from a session when that is safe on this thread,
 // keeps the rest until the process exits, and returns how many it kept.
 // `keep_ring` says the host's GPU may still read a texture of the session's
-// ring, which lives in the texture backend.
+// ring, which lives in the texture backend. The renderer goes either way, as
+// it does when detach keeps a ring: the host's GPU never reads its objects.
 auto retire_abandoned_objects(
   mln_render_session_object& session, AbandonedObjects& objects, bool keep_ring
 ) -> uint32_t {
@@ -3716,8 +3729,7 @@ auto retire_abandoned_objects(
   };
   // Once exit begins, the host's runtime and its graphics driver may already
   // be gone.
-  if (keep_ring || process_exiting() || !teardown_allowed())
-    return objects.keep();
+  if (process_exiting() || !teardown_allowed()) return objects.keep();
   const auto prepared = (objects.surface == nullptr ||
                          objects.surface->prepare_off_thread_teardown()) &&
                         (objects.texture == nullptr ||
@@ -3735,12 +3747,12 @@ auto retire_abandoned_objects(
     // The renderer draws through the backend, so it goes first.
     objects.renderer.reset();
     objects.surface.reset();
-    objects.texture.reset();
+    if (!keep_ring) objects.texture.reset();
     session.scheduler.discard();
     return MLN_STATUS_OK;
   };
   static_cast<void>(mln::c_api::with_autorelease_pool(destroy));
-  return 0;
+  return objects.keep();
 }
 
 auto abandon_render_session(
@@ -3844,13 +3856,7 @@ auto abandon_render_session(
     // under this lock, so both move out here. The graphics objects are
     // retired, and the wakes dropped, after the lock: destruction makes
     // graphics calls, and releasing host user data can run arbitrary host
-    // code. The host's GPU may still read the texture of a session-owned slot
-    // that a frame holds or that a disposed frame quarantined, and nothing
-    // tells native when that read ends, so such a ring is kept.
-    keep_ring = live->texture.mode == TextureSessionMode::Owned &&
-                std::ranges::any_of(live->texture.slots, [](const auto& slot) {
-                  return slot.acquired || slot.quarantined;
-                });
+    // code.
     objects.renderer = std::move(live->renderer);
     objects.surface = std::move(live->surface.backend);
     objects.texture = std::move(live->texture.backend);
@@ -3866,6 +3872,22 @@ auto abandon_render_session(
     for (auto& item : *queue) {
       if (item.abandon) item.abandon();
     }
+  }
+  // The host's GPU may still read the texture of a session-owned slot that a
+  // frame holds or that a disposed frame quarantined, and nothing tells native
+  // when that read ends, so such a ring is kept. This reads the slots after
+  // the loop above, which ran the releases still queued for the driver: each
+  // one let go of its slot without quarantining it. That is safe because
+  // CPU_COMPLETE is the only consumer sync a backend accepts, by which the
+  // host attests that its GPU read is done. A consumer sync that hands native
+  // a GPU wait would need that wait submitted to the session's queue before
+  // the drain that precedes teardown.
+  {
+    const auto lock = std::scoped_lock{live->control_mutex};
+    keep_ring = live->texture.mode == TextureSessionMode::Owned &&
+                std::ranges::any_of(live->texture.slots, [](const auto& slot) {
+                  return slot.acquired || slot.quarantined;
+                });
   }
   for (const auto& barrier : pending_barriers) {
     barrier.operation->complete(MLN_STATUS_TARGET_LOST, "target abandoned", {});

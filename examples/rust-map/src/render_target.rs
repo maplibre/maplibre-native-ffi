@@ -16,6 +16,7 @@ use std::collections::VecDeque;
 use std::error::Error as StdError;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
@@ -27,6 +28,16 @@ use maplibre_native_ffi::{
 
 use crate::shell::{AppEvent, DriverWait, Wakes};
 use crate::viewport::Viewport;
+
+static GRAPHICS_KEPT: AtomicBool = AtomicBool::new(false);
+
+/// Whether an abandon kept graphics objects until the process exits. A kept
+/// Vulkan object is a child of the host's device, and a kept swapchain of its
+/// surface, so a Vulkan host then keeps those until the process exits too.
+#[cfg_attr(not(maplibre_render_backend = "vulkan"), allow(dead_code))]
+pub fn graphics_kept() -> bool {
+    GRAPHICS_KEPT.load(Ordering::Acquire)
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
@@ -288,10 +299,13 @@ impl Session {
     /// lifecycle submission with target loss.
     pub fn abandon(&self) {
         match self.session.abandon() {
-            Ok(result) if result.quarantined_resource_count > 0 => eprintln!(
-                "render session abandon quarantined {} resource groups",
-                result.quarantined_resource_count
-            ),
+            Ok(result) if result.quarantined_resource_count > 0 => {
+                GRAPHICS_KEPT.store(true, Ordering::Release);
+                eprintln!(
+                    "render session abandon kept {} resource groups until exit",
+                    result.quarantined_resource_count
+                );
+            }
             Ok(_) => {}
             // A session that already released its target reports invalid
             // state.

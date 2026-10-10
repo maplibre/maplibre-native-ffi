@@ -77,6 +77,15 @@ bool mln_test_render_fixture_read_texture(
   const mln_test_render_fixture* fixture, uint8_t* pixels, size_t size
 );
 
+// Makes mln_test_render_fixture_destroy() leave the fixture's graphics object
+// and targets alive until the process exits, as a host does once abandon or
+// detach keeps a Vulkan object: the kept object is a child of the host's
+// device, and a kept swapchain of its surface too, so destroying either is
+// undefined behavior.
+void mln_test_render_fixture_keep_graphics_until_exit(
+  const mln_test_render_fixture* fixture
+);
+
 // The graphics object whose context a fixture from this header or from
 // mln_test_render_fixture_create() attached with.
 mln_test_graphics* mln_test_render_fixture_graphics(

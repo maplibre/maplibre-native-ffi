@@ -14,6 +14,10 @@
 #include "support/test_support.h"
 #include "testing/render_clock.hpp"
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#include "support/host_graphics.h"
+#endif
+
 namespace {
 
 using mln::native_tests::await;
@@ -552,6 +556,51 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
   destroy_fixture(fixture);
 }
 
+// A frame release that the host made before abandon lets go of its slot even
+// while the driver has yet to run it, because CPU_COMPLETE attests that the
+// host's GPU read is done. Abandon runs the queued release before it decides
+// what to keep, so it destroys a Vulkan or Metal ring with the rest. Holding
+// the driver keeps the release queued until the abandon, which no public fence
+// reaches.
+void abandon_destroys_a_ring_whose_frame_release_is_still_queued() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto frame = mln_test_render_and_acquire(&fixture.render, 141);
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, nullptr, nullptr));
+
+  auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
+  auto* releasing =
+    mln_test_thread_start(release_blocker_when_abandon_waits, &release);
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  const auto abandon_status =
+    mln_render_session_abandon(fixture.render.session, &result, nullptr);
+  release.abandon_returned.store(true);
+  mln_test_pulse();
+  mln_test_thread_join(releasing);
+  MLN_TEST_OK(abandon_status);
+  // OpenGL and WebGPU keep the renderer and the backend, which only their
+  // graphics thread may destroy.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_CLEAN, result.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(0, result.quarantined_resource_count);
+#else
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(2, result.quarantined_resource_count);
+#endif
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&blocker.completion, -1));
+  mln_test_completion_destroy(&blocker.completion);
+  blocker.submitted = false;
+  destroy_fixture(fixture);
+}
+
 struct ParkedDisposal {
   SyncPointScope* points;
   mln_acquired_frame first;
@@ -608,6 +657,11 @@ void a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result() {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
   );
+  // Detach keeps the quarantined ring, and a kept Vulkan ring is a child of
+  // the host's device.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
+#endif
   destroy_fixture(fixture);
 }
 
@@ -622,5 +676,6 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
   RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);
+  RUN_TEST(abandon_destroys_a_ring_whose_frame_release_is_still_queued);
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
 }

@@ -14,7 +14,8 @@
  *
  * This header is not installed and carries no compatibility promise. The Dart
  * binding and the native tests read it from the source tree, and its symbols
- * stay exported because Dart resolves them from the shipped library.
+ * stay exported because Dart and the Python extension resolve them from the
+ * shipped library.
  *
  * This header targets C23.
  */
@@ -29,11 +30,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "maplibre_native_c/base.h"     // IWYU pragma: export
-#include "maplibre_native_c/logging.h"  // IWYU pragma: export
-#include "maplibre_native_c/runtime.h"  // IWYU pragma: export
-#include "maplibre_native_c/style.h"    // IWYU pragma: export
-#include "maplibre_native_c/wake.h"     // IWYU pragma: export
+#include "maplibre_native_c/base.h"            // IWYU pragma: export
+#include "maplibre_native_c/logging.h"         // IWYU pragma: export
+#include "maplibre_native_c/render_session.h"  // IWYU pragma: export
+#include "maplibre_native_c/runtime.h"         // IWYU pragma: export
+#include "maplibre_native_c/style.h"           // IWYU pragma: export
+#include "maplibre_native_c/wake.h"            // IWYU pragma: export
 
 #ifdef __cplusplus
 extern "C" {
@@ -534,6 +536,25 @@ MLN_API void mln_adapter_owner_token_destroy(
  */
 MLN_API void mln_adapter_owner_finalize(
   void* token MLN_BINDING("kind=context")
+) MLN_NOEXCEPT;
+
+/**
+ * Abandons a render session during a host runtime's shutdown, keeping its
+ * graphics objects.
+ *
+ * Does what mln_render_session_abandon() does, including the wait for a core
+ * worker's in-flight driver call, except that it makes no graphics call: it
+ * keeps every graphics object of the session until the process exits, as
+ * mln_adapter_owner_finalize() does. A shutdown hook that ends a session's
+ * graphics calls before the process exits uses this, because the host's own
+ * shutdown may already have destroyed the graphics objects behind the session.
+ *
+ * Returns the statuses that mln_render_session_abandon() returns.
+ */
+MLN_API mln_status mln_adapter_render_session_abandon_at_exit(
+  mln_render_session session,
+  mln_render_abandon_result* out_result MLN_BINDING("direction=out"),
+  mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
 /**

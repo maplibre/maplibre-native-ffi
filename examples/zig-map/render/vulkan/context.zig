@@ -2,6 +2,7 @@ const std = @import("std");
 
 const c = @import("../../c.zig").c;
 const maplibre = @import("maplibre_native_ffi");
+const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 const util = @import("util.zig");
 
@@ -47,11 +48,16 @@ pub const Context = struct {
     /// Call only once the session that took the queue lock has been
     /// destroyed.
     pub fn deinit(self: *Context) void {
-        if (self.device != null) c.vkDestroyDevice(self.device, null);
-        if (!util.isNullHandle(self.surface)) {
-            c.SDL_Vulkan_DestroySurface(self.instance, self.surface, null);
+        // Objects that an abandoned session kept are children of the device
+        // and the surface, which then stay until the process exits, as does
+        // their instance.
+        if (!render_target.graphicsKept()) {
+            if (self.device != null) c.vkDestroyDevice(self.device, null);
+            if (!util.isNullHandle(self.surface)) {
+                c.SDL_Vulkan_DestroySurface(self.instance, self.surface, null);
+            }
+            if (self.instance != null) c.vkDestroyInstance(self.instance, null);
         }
-        if (self.instance != null) c.vkDestroyInstance(self.instance, null);
         c.SDL_DestroyMutex(self.queue_mutex);
     }
 

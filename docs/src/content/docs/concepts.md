@@ -50,9 +50,11 @@ abandon the session, or detach it and wait for the detach completion. For a
 session that a host graphics thread drives, stop driver service first. Abandon
 is synchronous, so an exit path can use it on a session that is mid-frame. The
 Python binding abandons every session that it still holds when the interpreter
-shuts down. A Dart isolate's shutdown finalizes its open sessions without
-starting graphics calls, but a driver call already in flight can outlast it, so
-a Dart host ends its sessions' graphics calls itself before exit.
+shuts down, without graphics calls: it keeps the sessions' graphics objects
+until the process exits, so a Vulkan host keeps its device that long. A Dart
+isolate's shutdown finalizes its open sessions without starting graphics calls,
+but a driver call already in flight can outlast it, so a Dart host ends its
+sessions' graphics calls itself before exit.
 
 ## Map
 

@@ -480,8 +480,10 @@ devices = []
 atexit.register(lambda: [device.close() for device in devices])
 target = OwnedTexture(Harness(), backend, _default_driver(backend))
 target.render_red()
-# An OpenGL context belongs to its graphics thread, which keeps it.
-if target.graphics is not None and backend not in ("egl", "wgl"):
+# An OpenGL context belongs to its graphics thread, which keeps it. The hook
+# keeps the session's Vulkan objects, which are children of the device, so a
+# Vulkan host keeps its device until the process exits.
+if target.graphics is not None and backend not in ("egl", "wgl", "vulkan"):
     devices.append(target.graphics)
 print("RENDERED", flush=True)
 """
