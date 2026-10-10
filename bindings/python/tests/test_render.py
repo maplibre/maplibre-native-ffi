@@ -8,11 +8,14 @@ from __future__ import annotations
 
 import contextlib
 import gc
+import subprocess
+import sys
 import threading
 import time
 import weakref
 from collections.abc import Callable
 from dataclasses import replace
+from pathlib import Path
 from types import TracebackType
 from typing import Self
 
@@ -459,3 +462,55 @@ def test_finalizing_a_sibling_frame_leaves_an_active_view_intact(
             assert target.with_texture(frame, inspect) != 0
             assert not frame.closed
         assert frame.closed
+
+
+_SHUTDOWN_WITH_AN_ATTACHED_SESSION = """
+import atexit
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from support import Harness
+from test_render import OwnedTexture, _default_driver
+
+backend = sys.argv[2]
+devices = []
+# Registered before the binding's exit hook, so it runs after that hook, as a
+# graphics driver's own exit teardown can. The device is destroyed while the
+# session is still open, which is safe only once its graphics calls ended.
+atexit.register(lambda: [device.close() for device in devices])
+target = OwnedTexture(Harness(), backend, _default_driver(backend))
+target.render_red()
+# An OpenGL context belongs to its graphics thread, which keeps it.
+if target.graphics is not None and backend not in ("egl", "wgl"):
+    devices.append(target.graphics)
+print("RENDERED", flush=True)
+"""
+
+
+@pytest.mark.skipif(
+    sys.platform in ("android", "ios"),
+    reason="an embedded interpreter has no executable to start",
+)
+@pytest.mark.parametrize("backend", BACKENDS)
+def test_interpreter_shutdown_with_an_attached_session_exits_cleanly(
+    backend: str,
+) -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            _SHUTDOWN_WITH_AN_ATTACHED_SESSION,
+            str(Path(__file__).parent),
+            backend,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=3 * TIMEOUT,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "RENDERED" in completed.stdout
+    assert "Exception ignored" not in completed.stderr
+    assert "Fatal Python error" not in completed.stderr
+    assert "panicked" not in completed.stderr

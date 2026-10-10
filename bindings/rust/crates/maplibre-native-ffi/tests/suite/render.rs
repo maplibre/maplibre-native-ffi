@@ -148,10 +148,7 @@ fn a_caller_driven_session_is_serviced_from_the_thread_that_claimed_it() {
 #[test]
 fn a_live_session_refuses_map_release_and_keeps_the_map_alive() {
     let _global = global_state();
-    let (sender, leaks) = mpsc::channel();
-    set_leak_reporter(Some(Box::new(move |leak| {
-        let _ = sender.send(leak);
-    })));
+    let reports = capture_reports();
 
     let graphics = Graphics::new();
     let (fixture, session) = rendering_fixture(&graphics);
@@ -166,18 +163,15 @@ fn a_live_session_refuses_map_release_and_keeps_the_map_alive() {
     session.close();
     wait_for(runtime.release());
 
-    set_leak_reporter(None);
-    let leaked: Vec<_> = leaks.try_iter().collect();
+    set_reporter(None);
+    let leaked = leaks(&reports);
     assert!(leaked.is_empty(), "{leaked:?}");
 }
 
 #[test]
 fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     let _global = global_state();
-    let (sender, leaks) = mpsc::channel();
-    set_leak_reporter(Some(Box::new(move |leak| {
-        let _ = sender.send(leak);
-    })));
+    let reports = capture_reports();
 
     let graphics = Graphics::new();
     let (fixture, session) = rendering_fixture(&graphics);
@@ -192,8 +186,8 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     // device until it does, so the device outlives the session's wakes.
     await_release(&wakes.released);
 
-    set_leak_reporter(None);
-    let leaked: Vec<_> = leaks.try_iter().collect();
+    set_reporter(None);
+    let leaked = leaks(&reports);
     assert!(leaked.is_empty(), "{leaked:?}");
 }
 
@@ -204,10 +198,7 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
 #[test]
 fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     let _global = global_state();
-    let (sender, leaks) = mpsc::channel();
-    set_leak_reporter(Some(Box::new(move |leak| {
-        let _ = sender.send(leak);
-    })));
+    let reports = capture_reports();
 
     let graphics = Graphics::new();
     let fixture = styled_fixture();
@@ -227,7 +218,7 @@ fn dropping_a_session_before_its_attachment_completes_reports_no_leak() {
     drop(options);
     await_release(&wakes.released);
 
-    set_leak_reporter(None);
-    let leaked: Vec<_> = leaks.try_iter().collect();
+    set_reporter(None);
+    let leaked = leaks(&reports);
     assert!(leaked.is_empty(), "{leaked:?}");
 }

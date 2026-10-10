@@ -77,10 +77,11 @@ func TestFailedCommandDispositionIsData(t *testing.T) {
 	}
 }
 
-// Await returns the context's error when the context ends first, and a nil
-// Future reports an error rather than blocking.
+// Await returns the context's error when the context ends first, even when the
+// result has already arrived, and a later Await still returns that result. A
+// nil Future reports an error rather than blocking.
 func TestAwaitEndsWithItsContext(t *testing.T) {
-	pending, _ := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
+	pending, deliver := int32CompletionForTest(func(value int32) (int32, error) { return value, nil })
 	cancelled, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := pending.Await(cancelled); !errors.Is(err, context.Canceled) {
@@ -90,6 +91,14 @@ func TestAwaitEndsWithItsContext(t *testing.T) {
 	defer cancel()
 	if _, err := pending.Await(expired); !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Await(expired) = %v, want context.DeadlineExceeded", err)
+	}
+	value := int32(7)
+	deliver(0, &value)
+	if _, err := pending.Await(cancelled); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Await(cancelled) after delivery = %v, want context.Canceled", err)
+	}
+	if got := await(t, pending); got != value {
+		t.Fatalf("Await() after a cancelled wait = %d, want %d", got, value)
 	}
 
 	var missing *Future[int32]

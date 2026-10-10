@@ -10,7 +10,7 @@
 "LIFE-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ClosingAHandleTwiceClosesItOnce"
 "LIFE-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::ARefusedCloseLeavesTheHandleUsableAndARetrySucceeds"
 "LIFE-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/NativeHandleStateTests.cs::ABorrowHoldsOffACloseFromAnotherThreadUntilItEnds"
-"LIFE-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::AnAbandonedHandleIsDisposedOrReportedAsALeak"
+"LIFE-04" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::AnAbandonedHandleIsDisposedAndReportedAsALeak"
 "LIFE-05" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/HandleLifecycleTests.cs::AChildKeepsItsParentAlive"
 "COMP-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ACompletionDeliversOnceAndAFailedConversionFaultsItsTask"
 "COMP-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/CompletionTests.cs::ARejectedSubmissionFreesItsCompletionState"
@@ -38,6 +38,6 @@
 # through their runtime assets; ci/dotnet_snapshot.py runs it.
 "PLAT-01" = "bindings/dotnet/tests/Maplibre.NativeFfi.PackageSmoke/Program.cs::LoadNativeLibrary"
 "PLAT-02" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/ProcessExitTests.cs::AProcessExitsCleanlyWithLiveHandlesAndCallbacks"
-"PLAT-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::UnreachableHandlesAreReclaimedWithoutLeaks"
+"PLAT-03" = "bindings/dotnet/tests/Maplibre.NativeFfi.Tests/LeakReportTests.cs::UnreachableHandlesAreReclaimedAndReported"
 # `mise run //examples/dotnet-map:smoke [preset]` runs this path.
 "EX-01" = "examples/dotnet-map/Shell.cs::smoke: rendered a frame"

@@ -29,7 +29,8 @@ public sealed class CompletionTests
                 first = *completion;
                 return mln_status.MLN_STATUS_OK;
             },
-            result => NativeCompletion.Value<int>(result)
+            result => NativeCompletion.Value<int>(result),
+            CancellationToken.None
         );
         var seven = 7;
         var eight = 8;
@@ -44,7 +45,8 @@ public sealed class CompletionTests
                 second = *completion;
                 return mln_status.MLN_STATUS_OK;
             },
-            result => NativeCompletion.Value<int>(result)
+            result => NativeCompletion.Value<int>(result),
+            CancellationToken.None
         );
         Deliver(second, null, 0);
         second.release_user_data(second.user_data);
@@ -84,7 +86,8 @@ public sealed class CompletionTests
                 {
                     GC.KeepAlive(captured);
                     return 0;
-                }
+                },
+                CancellationToken.None
             );
         });
         return (error, new WeakReference(captured));
@@ -124,5 +127,60 @@ public sealed class CompletionTests
 
         // The native request is still outstanding, and closing the map retires it.
         await fixture.Map.CloseAsync();
+
+        // Native creates this map although its wait ended before submission.
+        var created = fixture.Runtime.MapCreateAsync(NativeFixture.SmallMap, cancellation.Token);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => created);
+        await fixture.Runtime.BarrierAsync(TestWaits.Token);
+        // Runtime release refuses a runtime that still owns a map, so it succeeds only because
+        // the binding disposed the map that arrived after the wait.
+        await fixture.Runtime.CloseAsync().WaitAsync(TestWaits.Deadline, TestWaits.Token);
+    }
+
+    [Fact]
+    public async Task AValueThatArrivesAfterCancellationIsDisposed()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var (task, deliver) = SubmitHeld(cancellation.Token);
+
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => task);
+        var late = deliver();
+
+        Assert.True(late.Disposed);
+    }
+
+    private sealed class Probe : IDisposable
+    {
+        internal bool Disposed { get; private set; }
+
+        public void Dispose() => Disposed = true;
+    }
+
+    // The fake submission keeps its completion, and the returned delivery plays native's part.
+    private static unsafe (Task<Probe> Task, Func<Probe> Deliver) SubmitHeld(
+        CancellationToken cancellationToken
+    )
+    {
+        mln_completion held = default;
+        var probe = new Probe();
+        var task = NativeCompletion.Submit(
+            (completion, _) =>
+            {
+                held = *completion;
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ => probe,
+            cancellationToken
+        );
+        return (
+            task,
+            () =>
+            {
+                Deliver(held, null, 0);
+                held.release_user_data(held.user_data);
+                return probe;
+            }
+        );
     }
 }

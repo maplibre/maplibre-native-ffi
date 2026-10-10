@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.2
 
 // This manifest sits at the repository root rather than beside the sources it
 // describes, because SwiftPM resolves a package from the repository root and
@@ -42,6 +42,10 @@ let targets: [Target] = [
     name: "MaplibreNativeFFI",
     dependencies: ["CMaplibreNativeC"],
     path: "bindings/swift/Sources/MaplibreNativeFFI",
+    // An async operation runs on its caller's executor until it first
+    // suspends, which is after it submits to native, so operations that one
+    // actor starts in order reach native in that order.
+    swiftSettings: [.enableUpcomingFeature("NonisolatedNonsendingByDefault")],
     linkerSettings: [
       .linkedLibrary("c++", .when(platforms: [.iOS, .tvOS])),
       .linkedLibrary("objc", .when(platforms: [.iOS, .tvOS])),

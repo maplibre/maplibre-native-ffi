@@ -1,7 +1,9 @@
 package org.maplibre.nativeffi.callback
 
 import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.concurrent.atomics.update
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -11,6 +13,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.maplibre.nativeffi.EMPTY_STYLE_JSON
 import org.maplibre.nativeffi.awaitWithin
 import org.maplibre.nativeffi.denyingProvider
+import org.maplibre.nativeffi.error.CallbackException
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.generated.GeneratedApi
@@ -22,6 +25,7 @@ import org.maplibre.nativeffi.generated.ResourceTransform
 import org.maplibre.nativeffi.generated.ResourceTransformResponse
 import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
+import org.maplibre.nativeffi.interceptCallbackFailures
 import org.maplibre.nativeffi.runOnBackgroundThread
 import org.maplibre.nativeffi.runSuspendTest
 import org.maplibre.nativeffi.withMap
@@ -139,16 +143,63 @@ class ResourceCallbackTest {
 
   @Test
   fun aProviderThatThrowsFailsItsRequestAndLeavesTheRuntimeWorking(): Unit = runSuspendTest {
+    val thrown = IllegalStateException("provider failure")
     val provider = denyingProvider { request, _ ->
-      if (request.requestedUrl == STYLE_URL) throw IllegalStateException("provider failure")
+      if (request.requestedUrl == STYLE_URL) throw thrown
       null
     }
-    withMap(provider = provider) {
-      map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
-      // The binding contains the exception and answers native with a failed decision, which
-      // MapLibre reports as the style's loading failure.
-      awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
-      loadStyle()
+    val reports = AtomicReference(emptyList<CallbackException>())
+    val restore = interceptCallbackFailures { failure ->
+      // Other tests' callbacks may fail concurrently, so only this exception counts.
+      if (failure.cause === thrown) reports.update { it + failure }
+    }
+    try {
+      withMap(provider = provider) {
+        map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+        // The binding contains the exception and answers native with a failed decision, which
+        // MapLibre reports as the style's loading failure.
+        awaitMapEvent(RuntimeEventType.MAP_LOADING_FAILED)
+        loadStyle()
+      }
+    } finally {
+      restore?.invoke()
+    }
+    // The report reaches the platform's handler before native receives the decision.
+    if (restore != null) {
+      assertEquals(listOf("mln_resource_provider_callback"), reports.load().map { it.callback })
+    }
+  }
+
+  @Test
+  fun theHandlerOfAContainedExceptionCannotCallNative(): Unit = runSuspendTest {
+    val thrown = IllegalStateException("transform failure")
+    val reentry = CompletableDeferred<Throwable?>()
+    val restore =
+      interceptCallbackFailures { failure ->
+        // The handler runs on the transform's stack after its admission ends, where the binding
+        // still refuses every native call.
+        if (failure.cause === thrown)
+          reentry.complete(runCatching { GeneratedApi.networkStatusGet() }.exceptionOrNull())
+      } ?: return@runSuspendTest
+    try {
+      withMap(
+        provider =
+          denyingProvider { request, _ ->
+            if (request.requestedUrl == STYLE_URL) ResourceProviderDecision.PASS_THROUGH else null
+          }
+      ) {
+        runtime
+          .setResourceTransform(
+            ResourceTransform { _, url, _ -> if (url == STYLE_URL) throw thrown }
+          )
+          .awaitWithin("the transform")
+        map.setStyleUrl(STYLE_URL).awaitWithin("the style command")
+        val refusal = reentry.awaitWithin("the transform's report")
+        assertTrue(refusal is InvalidStateException, "a native call inside the handler: $refusal")
+        runtime.clearResourceTransform().awaitWithin("the transform clear")
+      }
+    } finally {
+      restore()
     }
   }
 

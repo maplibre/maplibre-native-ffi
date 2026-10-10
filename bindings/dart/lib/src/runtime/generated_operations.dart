@@ -6727,7 +6727,7 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
-  /// Consumes a session and schedules CPU-side abandonment and destruction.
+  /// Consumes a session and schedules its retirement and destruction.
   ///
   /// See `mln_render_session_dispose` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

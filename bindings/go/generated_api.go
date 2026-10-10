@@ -8359,7 +8359,8 @@ func mlnGo_mln_log_set_callback_registration_callback(native_user_data unsafe.Po
 	defer runtime.UnlockOSThread()
 	result = 0
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_log_callback", failure)
 			result = 0
 		}
 	}()
@@ -8376,7 +8377,8 @@ func mlnGo_mln_custom_geometry_source_options_fetch_tile(native_user_data unsafe
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_geometry_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8392,7 +8394,8 @@ func mlnGo_mln_custom_geometry_source_options_cancel_tile(native_user_data unsaf
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_geometry_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomGeometrySourceOptions](native_user_data)
@@ -8408,7 +8411,8 @@ func mlnGo_mln_custom_mvt_vector_source_options_fetch_tile(native_user_data unsa
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_mvt_vector_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
@@ -8424,7 +8428,8 @@ func mlnGo_mln_custom_mvt_vector_source_options_cancel_tile(native_user_data uns
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_custom_mvt_vector_source_tile_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[CustomMvtVectorSourceOptions](native_user_data)
@@ -8440,7 +8445,8 @@ func mlnGo_mln_wake_callback(native_user_data unsafe.Pointer) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_wake_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[Wake](native_user_data)
@@ -8456,7 +8462,8 @@ func mlnGo_mln_queue_lock_lock(native_user_data unsafe.Pointer) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
@@ -8472,7 +8479,8 @@ func mlnGo_mln_queue_lock_unlock(native_user_data unsafe.Pointer) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_queue_lock_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[QueueLock](native_user_data)
@@ -8488,7 +8496,8 @@ func mlnGo_mln_resource_request_set_cancel_callback_registration_callback(native
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_resource_request_cancel_callback", failure)
 		}
 	}()
 	callbacks, ok := bindingCallbackValue[ResourceRequestSetCancelCallbackRegistration](native_user_data)
@@ -8505,7 +8514,8 @@ func mlnGo_mln_http_header_transform_callback(native_user_data unsafe.Pointer, n
 	defer runtime.UnlockOSThread()
 	result = C.MLN_STATUS_NATIVE_ERROR
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_http_header_transform_callback", failure)
 			result = C.MLN_STATUS_NATIVE_ERROR
 		}
 	}()
@@ -8531,7 +8541,8 @@ func mlnGo_mln_resource_provider_callback(native_user_data unsafe.Pointer, nativ
 		runtime.KeepAlive(request)
 	}()
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_resource_provider_callback", failure)
 			result = C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH
 		}
 	}()
@@ -8549,7 +8560,8 @@ func mlnGo_mln_resource_transform_callback(native_user_data unsafe.Pointer, nati
 	defer runtime.UnlockOSThread()
 	result = C.MLN_STATUS_NATIVE_ERROR
 	defer func() {
-		if recover() != nil {
+		if failure := recover(); failure != nil {
+			bindingReportCallbackPanic("mln_resource_transform_callback", failure)
 			result = C.MLN_STATUS_NATIVE_ERROR
 		}
 	}()

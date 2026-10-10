@@ -1,6 +1,40 @@
 const std = @import("std");
 const status = @import("status.zig");
 
+/// Receives an error that a host callback returned, or that the binding met
+/// while decoding the callback's arguments, along with the C callback type
+/// that failed. Native cannot receive the error, so it gets the callback's
+/// failure value instead. A reporter may run on any native thread and must
+/// return quickly. It runs on the native callback's stack, where the binding
+/// refuses every native call with `error.InvalidState`.
+pub const ErrorReporter = *const fn (callback: []const u8, err: anyerror) void;
+
+// Native threads read this while the host may replace it, so every access is
+// atomic.
+var error_reporter: ErrorReporter = logError;
+
+/// Installs `reporter` for every later callback error, or restores the default,
+/// which logs a warning in the `maplibre_native_ffi` scope. Returns the reporter
+/// it replaced.
+pub fn setErrorReporter(reporter: ?ErrorReporter) ErrorReporter {
+    return @atomicRmw(ErrorReporter, &error_reporter, .Xchg, reporter orelse logError, .acq_rel);
+}
+
+/// Reports an error that the trampoline of `name` contained. The reporter
+/// admits no native call, whatever the callback itself may call.
+pub fn reportError(name: []const u8, err: anyerror) void {
+    var scope: Scope = .{};
+    scope.enter(&.{}, 0);
+    defer scope.leave();
+    @atomicLoad(ErrorReporter, &error_reporter, .acquire)(name, err);
+}
+
+fn logError(name: []const u8, err: anyerror) void {
+    // A warning rather than an error, since the test runner fails any test that
+    // logs an error.
+    std.log.scoped(.maplibre_native_ffi).warn("{s} failed and native received its fallback: {s}", .{ name, @errorName(err) });
+}
+
 threadlocal var current: ?*Scope = null;
 pub const Scope = struct {
     previous: ?*Scope = null,
@@ -152,6 +186,21 @@ pub fn finalize(task: *Finalizer) void {
     task.next = null;
     finalizer_ready.signal(finalizer_io.io());
     std.Io.Threaded.mutexUnlock(&finalizer_mutex);
+}
+
+test "a callback error reporter admits no native call" {
+    const Probe = struct {
+        var admitted: ?bool = null;
+        fn report(_: []const u8, _: anyerror) void {
+            admitted = if (check("mln_network_status_get", 0)) |_| true else |_| false;
+        }
+    };
+    const previous = setErrorReporter(Probe.report);
+    defer _ = setErrorReporter(previous);
+    // The wake callback admits every native call, but its reporter does not.
+    reportError("mln_wake_callback", error.NativeError);
+    try std.testing.expectEqual(@as(?bool, false), Probe.admitted);
+    try check("mln_network_status_get", 0);
 }
 
 test "callback policies intersect nested scopes and restore outer admission" {

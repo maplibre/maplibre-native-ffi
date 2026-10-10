@@ -52,7 +52,10 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_map_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<MapHandle> MapCreateAsync(MapOptions options)
+    public Task<MapHandle> MapCreateAsync(
+        MapOptions options,
+        CancellationToken cancellationToken = default
+    )
     {
         using var scope = new NativeCallScope(this, "mln_map_create");
         return scope.Query<MlnMap, MapHandle>(
@@ -63,7 +66,8 @@ public sealed unsafe partial class RuntimeHandle
                     completion,
                     diagnostic
                 ),
-            handle => MapHandle.Adopt(this, handle)
+            handle => MapHandle.Adopt(this, handle),
+            cancellationToken
         );
     }
 
@@ -459,8 +463,6 @@ public sealed unsafe partial class RuntimeHandle
     /// See <c>mln_runtime_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html">C API reference</see>.
     /// </remarks>
-    public void Close() => CloseAsync().GetAwaiter().GetResult();
-
     public Task CloseAsync()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_runtime_release");

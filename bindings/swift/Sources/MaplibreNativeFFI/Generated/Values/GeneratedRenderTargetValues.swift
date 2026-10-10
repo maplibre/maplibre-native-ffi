@@ -366,7 +366,10 @@ private func invokeQueueLockLock(user_data: UnsafeMutableRawPointer?) {
     .takeUnretainedValue()
   let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
   defer { admission.end() }
-  do { try box.value.lock?() } catch {}
+  do { try box.value.lock?() } catch { NativeDiagnostics.report(.callbackError(
+    callback: "mln_queue_lock_callback",
+    error: error
+  )) }
 }
 
 private func invokeQueueLockUnlock(user_data: UnsafeMutableRawPointer?) {
@@ -375,7 +378,12 @@ private func invokeQueueLockUnlock(user_data: UnsafeMutableRawPointer?) {
     .takeUnretainedValue()
   let admission = NativeCallbackGuard.enter(owner: nil, operations: [])
   defer { admission.end() }
-  do { try box.value.unlock?() } catch {}
+  do { try box.value.unlock?() } catch {
+    NativeDiagnostics.report(.callbackError(
+      callback: "mln_queue_lock_callback",
+      error: error
+    ))
+  }
 }
 
 /// Execution placement for one render session.

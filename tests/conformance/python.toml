@@ -16,7 +16,7 @@
 "COMP-02" = "bindings/python/tests/test_completions.py::test_a_rejected_submission_frees_its_future"
 "COMP-03" = "bindings/python/tests/test_completions.py::test_a_dropped_creation_result_retires_the_map_it_created"
 "COMP-04" = "bindings/python/tests/test_completions.py::test_a_failed_command_resolves_with_its_status"
-"COMP-05" = "bindings/python/tests/test_completions.py::test_waiting_on_accepted_work_times_out_and_cannot_cancel_it"
+"COMP-05" = "bindings/python/tests/test_completions.py::test_cancelling_a_wait_abandons_it_and_releases_the_late_map"
 "CB-01" = "bindings/python/tests/test_callbacks.py::test_a_registration_is_rooted_until_native_releases_it"
 "CB-02" = "bindings/python/tests/test_callbacks.py::test_a_registered_callback_does_not_keep_its_receiver_alive"
 "CB-03" = "bindings/python/tests/test_callbacks.py::test_a_callback_can_make_only_the_calls_its_policy_allows"

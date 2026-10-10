@@ -36,7 +36,11 @@ def _adopt_value(raw, owner, parent=None):
 
 
 def _adopt_future(source, owner, parent):
-    return map_future(source, lambda raw: _adopt_value(raw, owner, parent))
+    # A handle that arrives after its wait was cancelled gets no public owner,
+    # so it is disposed now, as collecting it would.
+    return map_future(
+        source, lambda raw: _adopt_value(raw, owner, parent), lambda raw: raw._dispose()
+    )
 
 
 def _with_view(owner, read, convert, callback):

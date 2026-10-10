@@ -68,6 +68,11 @@ enum class SyncPoint : std::uint8_t {
   // detaches it, and is about to return. No lock is held, so an abandon can
   // run while a detaching thread is parked here.
   RenderDetachQueued,
+  // A disposed core-worker session's worker has detached the session, freeing
+  // its graphics objects, and is about to hand the session to its teardown
+  // lane. It fires only when disposal detaches rather than quarantines. No
+  // lock is held.
+  RenderDisposalDetached,
   // A map's run loop handed MapLibre a finished frame of an update older than
   // the map's pending still-image request, reported as partial so that it
   // cannot complete the image.

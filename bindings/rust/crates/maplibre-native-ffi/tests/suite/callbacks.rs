@@ -118,7 +118,9 @@ fn a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime() {
 }
 
 #[test]
-fn a_panicking_callback_is_contained_and_its_request_fails() {
+fn a_failing_callback_is_contained_and_its_error_is_reported() {
+    let _global = global_state();
+    let reports = capture_reports();
     let fixture = Fixture::new();
     let calls = Arc::new(AtomicUsize::new(0));
     let counted = Arc::clone(&calls);
@@ -138,7 +140,47 @@ fn a_panicking_callback_is_contained_and_its_request_fails() {
     fixture.map().set_style_url("custom://style.json").unwrap();
     fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
     assert!(calls.load(Ordering::SeqCst) > 0);
+
+    // A transform's error leaves the URL as it was, and the reporter
+    // receives it, since native keeps only a status.
+    let deny = denying_provider().callback.unwrap();
+    wait_for(
+        fixture
+            .runtime()
+            .set_resource_provider(ResourceProvider::new(move |request, handle| {
+                if request.requested_url.as_deref() == Some("custom://transformed.json") {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                deny(request, handle)
+            })),
+    );
+    wait_for(
+        fixture.runtime().set_resource_transform(
+            ResourceTransform::default()
+                .with_callback(|_, _, _| Err(Error::invalid_argument("the transform refused"))),
+        ),
+    );
+    fixture
+        .map()
+        .set_style_url("custom://transformed.json")
+        .unwrap();
+    // The online source cannot load the untransformed URL.
+    fixture.await_event_type(RuntimeEventType::MapLoadingFailed);
+    set_reporter(None);
+    // Other tests may run callbacks concurrently, so only this test's error
+    // counts.
+    let refused = Error::invalid_argument("the transform refused");
+    let callbacks: Vec<_> = reports
+        .try_iter()
+        .filter_map(|report| match report {
+            Report::CallbackError { callback, error } if error == refused => Some(callback),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(callbacks, ["mln_resource_transform_callback"]);
+
     // The runtime keeps working.
+    wait_for(fixture.runtime().clear_resource_transform());
     wait_for(fixture.runtime().set_resource_provider(denying_provider()));
     fixture.barrier();
 }

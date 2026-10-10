@@ -257,39 +257,20 @@ pub fn releaseFrame(frame: *?maplibre.AcquiredFrame) void {
 
 /// The caller-owned textures a borrowed-texture target hands over on resize,
 /// oldest first. The session renders into a texture until its replacement
-/// completes, so each outgoing texture stays alive until then. A thread awaits
-/// each completion and posts a `target_replaced` app event.
+/// completes, so each outgoing texture stays alive until then. Each completion
+/// posts a `target_replaced` app event when it arrives.
 pub fn Replacements(comptime Texture: type) type {
     return struct {
         const Self = @This();
         const Entry = struct {
-            pending: *Pending,
+            completion: maplibre.Future(void),
             texture: Texture,
+            /// Whether the completion arrived and reported its outcome.
+            settled: bool = false,
+            failed: bool = false,
             /// The demand whose rendered frame shows the replacement, once
             /// its set_target has completed.
             shown_token: u64 = 0,
-        };
-        const Pending = struct {
-            completion: maplibre.Future(void),
-            thread: std.Thread = undefined,
-            done: std.atomic.Value(bool) = .init(false),
-            failed: bool = false,
-
-            fn run(self: *Pending) void {
-                var diagnostic: maplibre.Diagnostic = .{};
-                self.completion.wait(&diagnostic) catch |err| {
-                    diagnostics.logError("texture replacement failed", err, &diagnostic);
-                    self.failed = true;
-                };
-                self.done.store(true, .release);
-                events.push(.target_replaced);
-            }
-
-            fn destroy(self: *Pending) void {
-                self.thread.join();
-                self.completion.deinit();
-                std.heap.smp_allocator.destroy(self);
-            }
         };
 
         entries: std.ArrayList(Entry) = .empty,
@@ -299,14 +280,12 @@ pub fn Replacements(comptime Texture: type) type {
         }
 
         /// Queues the texture a set_target call handed over, with that call's
-        /// completion.
+        /// completion. On failure the caller keeps the completion.
         pub fn push(self: *Self, completion: maplibre.Future(void), texture: Texture) !void {
-            const pending = try std.heap.smp_allocator.create(Pending);
-            pending.* = .{ .completion = completion };
-            errdefer std.heap.smp_allocator.destroy(pending);
             try self.entries.ensureUnusedCapacity(std.heap.smp_allocator, 1);
-            pending.thread = try std.Thread.spawn(.{}, Pending.run, .{pending});
-            self.entries.appendAssumeCapacity(.{ .pending = pending, .texture = texture });
+            var owned = completion;
+            try owned.notify(events.wake(.target_replaced));
+            self.entries.appendAssumeCapacity(.{ .completion = owned, .texture = texture });
         }
 
         /// Takes the oldest replacement that a rendered frame has drawn
@@ -318,8 +297,17 @@ pub fn Replacements(comptime Texture: type) type {
         pub fn takeShown(self: *Self, session: *Session) !?Texture {
             if (self.entries.items.len == 0) return null;
             const oldest = &self.entries.items[0];
-            if (!oldest.pending.done.load(.acquire)) return null;
-            if (oldest.pending.failed) return types.AppError.ResizeFailed;
+            if (!oldest.settled) {
+                if (!try oldest.completion.poll()) return null;
+                // The completion arrived, so this wait returns at once.
+                var diagnostic: maplibre.Diagnostic = .{};
+                oldest.completion.wait(&diagnostic) catch |err| {
+                    diagnostics.logError("texture replacement failed", err, &diagnostic);
+                    oldest.failed = true;
+                };
+                oldest.settled = true;
+            }
+            if (oldest.failed) return types.AppError.ResizeFailed;
             if (oldest.shown_token == 0) oldest.shown_token = try session.requestFrame(true);
             if (session.rendered_token < oldest.shown_token) return null;
             return self.takeOldest();
@@ -333,8 +321,8 @@ pub fn Replacements(comptime Texture: type) type {
         }
 
         fn takeOldest(self: *Self) Texture {
-            const entry = self.entries.orderedRemove(0);
-            entry.pending.destroy();
+            var entry = self.entries.orderedRemove(0);
+            entry.completion.deinit();
             return entry.texture;
         }
     };

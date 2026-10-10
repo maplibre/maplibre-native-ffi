@@ -101,12 +101,13 @@ def parts(values, value):
             else ""
         )
         call = f"host(state.value.context{''.join(', ' + expression for expression in converted)})"
+        report = f'callback.reportError("{plan.native}", err);'
         if plan.result.ctype.kind == "void":
-            action = f"{call} catch return;"
+            action = f"{call} catch |err| {{ {report} return; }};"
         elif plan.status:
-            action = f"{call} catch |err| return status.rawStatus(err); return c.MLN_STATUS_OK;"
+            action = f"{call} catch |err| {{ {report} return status.rawStatus(err); }}; return c.MLN_STATUS_OK;"
         else:
-            action = f"const result = {call} catch {{ {fallback} }}; return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"
+            action = f"const result = {call} catch |err| {{ {report} {fallback} }}; return {'result' if plan.result.kind == 'scalar' else 'result.toNative()'};"
         decision_setup = ""
         if plan.decision:
             decision = plan.decision
@@ -115,7 +116,7 @@ def parts(values, value):
                 next(p.value for p in plan.parameters if p.name == decision.parameter)
             )
             decision_setup = f"const request = try {request_type}.beginDecision({raw_request}); errdefer _ = request.finishDecision(false); "
-            action = f"const result = {call} catch {{ return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
+            action = f"const result = {call} catch |err| {{ {report} return if (request.finishDecision(false)) c.{decision.accept} else c.{decision.pass_through}; }}; return if (request.finishDecision(result.toNative() == c.{decision.accept})) c.{decision.accept} else c.{decision.pass_through};"
         # Decode errors are contained at the C callback boundary.
         body = f"fn invoke({', '.join(names[p.name] + ': marshal.CallbackArg(c.' + plan.native + ', ' + str(i) + ')' for i, p in enumerate(plan.parameters))}) status.Error!marshal.CallbackResult(c.{plan.native}) {{ const state = {root_type}.get({names[plan.context]}); const host = state.value.{local} orelse {{ {fallback} }}; {scope} {decision_setup} "
         if any("allocator" in expression for expression in converted):
@@ -133,7 +134,7 @@ def parts(values, value):
             for i, p in enumerate(plan.parameters)
         )
         trampolines.append(
-            f"    fn {trampoline}({trampoline_signature}) callconv(.c) marshal.CallbackResult(c.{plan.native}) {{ return struct {{ {body} }}.invoke({args}) catch {{ {fallback} }}; }}"
+            f"    fn {trampoline}({trampoline_signature}) callconv(.c) marshal.CallbackResult(c.{plan.native}) {{ return struct {{ {body} }}.invoke({args}) catch |err| {{ {report} {fallback} }}; }}"
         )
     empty = " and ".join(
         f"self.{identifier(name)} == null" for name in registration.callbacks

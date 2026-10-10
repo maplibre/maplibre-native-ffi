@@ -11,6 +11,7 @@
 #include "completion/completion.hpp"
 #include "internal/support/allocation_faults.hpp"
 #include "internal/support/checks.hpp"
+#include "internal/support/driver_blocker.hpp"
 #include "internal/support/sync_points.hpp"
 #include "map/map.hpp"
 #include "map/map_internal.hpp"
@@ -19,8 +20,10 @@
 #include "operation/operation.hpp"
 #include "render/render_session_common.hpp"
 #include "runtime/runtime.hpp"
+#include "support/frames.h"
 #include "support/harness.h"
 #include "support/status.h"
+#include "support/test_support.h"
 #include "support/wait.h"
 #include "unity.h"
 
@@ -29,6 +32,7 @@ namespace {
 using mln::native_tests::AllocationFaults;
 using mln::native_tests::await;
 using mln::native_tests::BackgroundChecks;
+using mln::native_tests::DriverBlocker;
 using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
@@ -435,6 +439,7 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
   TEST_ASSERT_TRUE(released(attach));
   MLN_TEST_OK(attach.status.load());
   auto weak = std::weak_ptr{session};
+  auto sync_points = SyncPointScope{};
   auto driver = WorkerGate{};
   auto blocked = Result{};
   const auto blocked_completion = descriptor(blocked);
@@ -487,6 +492,126 @@ void disposal_retires_an_attached_graph_after_driver_quiescence() {
   ));
   TEST_ASSERT_EQUAL_UINT(1, blocked.releases.load());
   MLN_TEST_OK(blocked.status.load());
+  // The session has no backend to detach, so its worker falls back to the
+  // teardown lane's abandon.
+  TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
+}
+
+void flag_wake_release(void* context) {
+  static_cast<std::atomic_bool*>(context)->store(true);
+  mln_test_pulse();
+}
+
+// Attaches the preset's render fixture with a frame wake whose release sets
+// `released`, which happens once disposal has retired the session.
+void attach_observed(
+  mln_map map, mln_test_render_fixture& fixture, std::atomic_bool& released
+) {
+  auto options = mln_render_session_attach_options_default();
+  options.requested_texture_ring_depth = 2;
+  options.frame_wake = mln_wake{
+    .size = sizeof(mln_wake),
+    .callback = [](void*) {},
+    .user_data = &released,
+    .release_user_data = flag_wake_release,
+  };
+  auto attach = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_test_render_fixture_start_attach(
+    map, &options, &attach.descriptor, &fixture
+  ));
+  MLN_TEST_OK(mln_test_render_fixture_finish_operation(&fixture, &attach));
+  mln_test_completion_destroy(&attach);
+}
+
+auto wake_released(const std::atomic_bool& released) -> bool {
+  return await([&] { return released.load(); }, "the wake release");
+}
+
+// Disposing an attached core-worker session detaches it on its worker after
+// the call in flight, which frees its renderer rather than quarantining it.
+// Work queued behind that call completes as abandoned. A caller driver never
+// runs again after disposal, so its session is abandoned instead.
+void disposal_detaches_an_attached_core_worker_session() {
+  auto sync_points = SyncPointScope{};
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  auto released = std::atomic_bool{false};
+  auto fixture = mln_test_render_fixture{};
+  attach_observed(map, fixture, released);
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+  const auto core_worker = fixture.driver == MLN_RENDER_DRIVER_CORE_WORKER;
+  auto blocker = DriverBlocker{};
+  MLN_TEST_OK(blocker.submit(fixture.session));
+  if (core_worker)
+    TEST_ASSERT_TRUE(mln_test_gate_wait_entered(blocker.gate.get()));
+  auto queued = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_reduce_memory_use(
+    fixture.session, &queued.descriptor, nullptr
+  ));
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_render_session_dispose(fixture.session, nullptr);
+  });
+  mln_test_gate_release(blocker.gate.get());
+  MLN_TEST_STATUS(
+    core_worker ? MLN_STATUS_OK : MLN_STATUS_TARGET_LOST,
+    mln_test_completion_settle(&blocker.completion)
+  );
+  blocker.submitted = false;
+  MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, mln_test_completion_settle(&queued));
+  TEST_ASSERT_TRUE(wake_released(released));
+  TEST_ASSERT_EQUAL_INT(
+    core_worker ? 1 : 0, sync_points.hits(SyncPoint::RenderDisposalDetached)
+  );
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A session whose frame the host still holds keeps its target in the host's
+// hands, so disposal abandons it on every driver.
+void disposal_abandons_a_session_with_an_acquired_frame() {
+  auto sync_points = SyncPointScope{};
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  auto released = std::atomic_bool{false};
+  auto fixture = mln_test_render_fixture{};
+  attach_observed(map, fixture, released);
+  auto frame = mln_test_render_and_acquire(&fixture, 1);
+  MLN_TEST_ASSERT_OK_WITHOUT_ALLOCATIONS([&] {
+    return mln_render_session_dispose(fixture.session, nullptr);
+  });
+  MLN_TEST_OK(mln_acquired_frame_dispose(frame, nullptr));
+  TEST_ASSERT_TRUE(wake_released(released));
+  TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A finalizer can run while the process exits, when nothing waits for the
+// wake releases, so a finalized core-worker session quarantines its graphics
+// resources rather than detaching through graphics calls.
+void finalization_abandons_an_attached_session() {
+  auto sync_points = SyncPointScope{};
+  const auto runtime = mln_test_create_runtime();
+  const auto map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  auto released = std::atomic_bool{false};
+  auto fixture = mln_test_render_fixture{};
+  attach_observed(map, fixture, released);
+  mln_test_render_request_forced(&fixture, 1);
+  mln_render_frame_batch_release(mln_test_render_wait_for_results(&fixture, 1));
+  auto* const token = mln_adapter_owner_token_create(fixture.session);
+  TEST_ASSERT_NOT_NULL(token);
+  mln_adapter_owner_finalize(token);
+  TEST_ASSERT_TRUE(wake_released(released));
+  TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 void abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync() {
@@ -874,6 +999,9 @@ MLN_TEST_GROUP {
   RUN_TEST(a_serviced_driver_call_parks_its_retirement_without_stalling_others);
   RUN_TEST(failed_finalizer_token_creation_disposes_the_owner);
   RUN_TEST(disposal_retires_an_attached_graph_after_driver_quiescence);
+  RUN_TEST(disposal_detaches_an_attached_core_worker_session);
+  RUN_TEST(disposal_abandons_a_session_with_an_acquired_frame);
+  RUN_TEST(finalization_abandons_an_attached_session);
   RUN_TEST(
     abandoned_frame_preserves_its_session_owner_without_synthesizing_gpu_sync
   );

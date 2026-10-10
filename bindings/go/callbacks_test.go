@@ -1,10 +1,13 @@
 package maplibre
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	stdruntime "runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"weak"
@@ -163,13 +166,57 @@ func TestCallbackAdmissionPolicy(t *testing.T) {
 	failures.check(t)
 }
 
+// Admission is per OS thread. A goroutine that a callback starts runs on
+// another thread, so a call the callback may not make succeeds there while the
+// callback still runs. The callback waits only for the submission's acceptance,
+// which needs nothing from the callback's thread.
+func TestGoroutineFromCallbackIsNotRestricted(t *testing.T) {
+	f := newFixture(t)
+	failures := newFailureLog()
+	type barrier struct {
+		future *Future[struct{}]
+		err    error
+	}
+	barriers := make(chan barrier, 1)
+	var spawn sync.Once
+	await(t, submitted(f.runtime.SetResourceTransform(ResourceTransform{Callback: func(_ ResourceKind, _ string, _ *ResourceTransformResponseScope) Status {
+		spawn.Do(func() {
+			if _, err := f.runtime.Barrier(); !errors.Is(err, ErrInvalidState) {
+				failures.add("Barrier inside the transform = %v, want ErrInvalidState", err)
+			}
+			accepted := make(chan barrier, 1)
+			go func() {
+				future, err := f.runtime.Barrier()
+				accepted <- barrier{future, err}
+			}()
+			select {
+			case result := <-accepted:
+				barriers <- result
+			case <-time.After(testTimeout()):
+				failures.add("the goroutine's Barrier did not return while the transform ran")
+			}
+		})
+		return StatusOk
+	}})))
+	base := f.serveLoopback(t, map[string]string{"/style.json": emptyStyle})
+	if _, err := f.m.SetStyleUrl(base + "/style.json"); err != nil {
+		t.Fatal(err)
+	}
+	f.awaitEvent(t, "the style load", isStyleLoaded)
+	failures.check(t)
+	result := receive(t, barriers, "the goroutine's barrier")
+	if result.err != nil {
+		t.Fatalf("Barrier from the goroutine: %v", result.err)
+	}
+	await(t, result.future)
+}
+
 // A panic in a callback stays in the binding, which returns the callback's
 // declared failure value to native: a transform's rewrite is dropped, and a
-// provider's request passes through to the built-in sources. The binding
-// reports the panic nowhere else. A callback runs on a native thread with no
-// caller to return an error to, so the host sees the panic only as that
-// failure value's outcome, which this test observes.
+// provider's request passes through to the built-in sources. The binding logs
+// each panic through the default slog logger.
 func TestCallbackPanicIsContained(t *testing.T) {
+	panics := capturePanicLogs(t)
 	f := newFixture(t)
 	base := f.serveLoopback(t, map[string]string{"/original.json": emptyStyle})
 	panicked := make(chan struct{}, 1)
@@ -183,6 +230,9 @@ func TestCallbackPanicIsContained(t *testing.T) {
 	}
 	f.awaitEvent(t, "the style load from the original URL", isStyleLoaded)
 	receive(t, panicked, "the transform's panic")
+	if got := receive(t, panics, "the transform's panic log"); got != (callbackPanic{"mln_resource_transform_callback", "transform failed", true}) {
+		t.Fatalf("logged %+v", got)
+	}
 
 	await(t, submitted(f.runtime.ClearResourceTransform()))
 	await(t, submitted(f.runtime.SetResourceProvider(ResourceProvider{Callback: func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
@@ -192,6 +242,71 @@ func TestCallbackPanicIsContained(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.awaitEvent(t, "the pass-through's loading failure", isLoadingFailure("custom://unserved.json"))
+	if got := receive(t, panics, "the provider's panic log"); got != (callbackPanic{"mln_resource_provider_callback", "provider failed", true}) {
+		t.Fatalf("logged %+v", got)
+	}
+	select {
+	case extra := <-panics:
+		t.Fatalf("logged another panic: %+v", extra)
+	default:
+	}
+}
+
+// A panic log reaches its handler on the callback's stack, so the handler may
+// not reenter native, even from a callback such as the wake callback that
+// admits every native call.
+func TestCallbackPanicHandlerCannotCallNative(t *testing.T) {
+	panics := capturePanicLogs(t)
+	// A trampoline holds its thread while it reports, as this test does.
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+	bindingReportCallbackPanic("mln_wake_callback", "wake failed")
+	if got := receive(t, panics, "the wake's panic log"); got != (callbackPanic{"mln_wake_callback", "wake failed", true}) {
+		t.Fatalf("logged %+v", got)
+	}
+}
+
+// callbackPanic is one panic that the binding logged, and whether the binding
+// refused a native call from the log's handler.
+type callbackPanic struct {
+	callback, panic string
+	refused         bool
+}
+
+// capturePanicLogs routes the default slog logger's callback panics to the
+// returned channel until the test ends.
+func capturePanicLogs(t *testing.T) <-chan callbackPanic {
+	panics := make(chan callbackPanic, 16)
+	previous := slog.Default()
+	slog.SetDefault(slog.New(panicLogHandler(panics)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	return panics
+}
+
+type panicLogHandler chan<- callbackPanic
+
+func (panicLogHandler) Enabled(context.Context, slog.Level) bool   { return true }
+func (handler panicLogHandler) WithAttrs([]slog.Attr) slog.Handler { return handler }
+func (handler panicLogHandler) WithGroup(string) slog.Handler      { return handler }
+
+func (handler panicLogHandler) Handle(_ context.Context, record slog.Record) error {
+	if record.Level != slog.LevelError || record.Message != "maplibre: callback panicked" {
+		return nil
+	}
+	var logged callbackPanic
+	record.Attrs(func(attr slog.Attr) bool {
+		switch attr.Key {
+		case "callback":
+			logged.callback = attr.Value.String()
+		case "panic":
+			logged.panic = fmt.Sprint(attr.Value.Any())
+		}
+		return true
+	})
+	_, err := NetworkStatusGet()
+	logged.refused = errors.Is(err, ErrInvalidState)
+	offer(handler, logged)
+	return nil
 }
 
 // A provider can take a request and answer it later from another goroutine.

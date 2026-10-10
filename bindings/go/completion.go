@@ -60,10 +60,19 @@ func (future *Future[T]) Done() <-chan struct{} {
 }
 
 // Await blocks until native completes the work or the context is cancelled.
+// A cancelled context ends only this wait: native work continues, and a later
+// Await still returns its result. A handle that a creation delivers belongs to
+// the caller once Await returns it. The owner's cleanup retires the handle of a
+// Future that is dropped before any Await returns it.
 func (future *Future[T]) Await(ctx context.Context) (T, error) {
 	var zero T
 	if future == nil || future.state == nil {
 		return zero, newBindingError(ErrInvalidArgument, "Future is nil")
+	}
+	// A context that has already ended wins over a result that has arrived,
+	// so its outcome does not depend on timing.
+	if err := ctx.Err(); err != nil {
+		return zero, err
 	}
 	select {
 	case <-future.state.ready:

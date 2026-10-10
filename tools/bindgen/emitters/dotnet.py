@@ -357,8 +357,7 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
         return (
             owners[receiver],
             (
-                "    public void Close() => CloseAsync().GetAwaiter().GetResult();\n\n"
-                + method(
+                method(
                     "public Task CloseAsync()",
                     [guard, "state.Close();", "return teardown;"],
                 )
@@ -776,10 +775,13 @@ def emit_operation(plan: OperationPlan, bound: BoundApi) -> tuple[str, str, set[
             raise Unsupported("owned completion parent requires another input owner")
         result_type = f"Task<{owners[result]}>"
         name += "Async"
+        parameters.append("CancellationToken cancellationToken = default")
+        # A handle that arrives after cancellation is disposed, not leaked.
         body = prologue + [
             f"return scope.Query<{raw_handle(bound.handles[result])}, {owners[result]}>(",
             f"    {submission(function, arguments)},",
-            f"    handle => {owners[result]}.Adopt({parent}handle)",
+            f"    handle => {owners[result]}.Adopt({parent}handle),",
+            "    cancellationToken",
             ");",
         ]
     elif not asynchronous:

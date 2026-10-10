@@ -69,6 +69,11 @@ class SwiftEmitterTests(unittest.TestCase):
                 self,
                 "-swift-version",
                 "6",
+                # The package builds the binding module with this feature,
+                # which keeps an operation on its caller's executor until it
+                # submits.
+                "-enable-upcoming-feature",
+                "NonisolatedNonsendingByDefault",
                 "-module-name",
                 "Probe",
                 "-I",

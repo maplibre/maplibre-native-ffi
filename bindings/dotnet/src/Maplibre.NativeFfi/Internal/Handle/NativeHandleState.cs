@@ -110,33 +110,38 @@ internal sealed unsafe class NativeHandleState<T> : INativeReader
         }
     }
 
+    // Explicit close is the contract, so a collected open handle is always a host leak: the
+    // finalizer disposes it and reports it. The binding retires the handles it drops itself,
+    // such as a value that arrives after its wait is cancelled, explicitly and silently.
     private void FinalizeOwner()
     {
         // A constructor that rejected the null handle leaves nothing to finalize.
-        if (handle.Value == 0 || pendingDecision)
+        if (handle.Value == 0 || pendingDecision || closed)
             return;
-        if (!closed)
+        callbackOwner?.Retire();
+        string? failure = null;
+        try
         {
-            callbackOwner?.Retire();
-            try
-            {
-                if (
-                    disposeAbandoned is not null
-                    && disposeAbandoned(handle, null) == mln_status.MLN_STATUS_OK
-                )
-                {
-                    closed = true;
-                    return;
-                }
-            }
-            catch
-            {
-                // A finalizer reports failed retirement without unwinding.
-            }
-            NativeLeakReporter.Report(
-                $"Leaked {typeName} native handle 0x{handle.Value:x}; call Close() before releasing the wrapper."
-            );
+            if (disposeAbandoned is null)
+                failure = "it has no native disposal";
+            else if (
+                disposeAbandoned(handle, null) is var status
+                && status != mln_status.MLN_STATUS_OK
+            )
+                failure = $"native disposal failed with {status}";
+            else
+                closed = true;
         }
+        catch (Exception error)
+        {
+            // A finalizer reports failed retirement without unwinding.
+            failure = $"native disposal failed: {error.Message}";
+        }
+        NativeLeakReporter.Report(
+            failure is null
+                ? $"Leaked {typeName} native handle 0x{handle.Value:x}; it was disposed when collected. Close or dispose it explicitly."
+                : $"Leaked {typeName} native handle 0x{handle.Value:x}; {failure}, so it was not destroyed. Close or dispose it explicitly."
+        );
     }
 
     internal T IssuedHandle => handle;

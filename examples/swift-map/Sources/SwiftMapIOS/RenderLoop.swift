@@ -14,9 +14,6 @@ final class RenderLoop {
   let mapState: MapState
   private let target: MetalRenderTarget
   private var isClosed = false
-  /// Counts resizes, so a queued resize that a newer one supersedes is
-  /// skipped.
-  private var resizeCount = 0
   /// Whether the view is visible with the app in the foreground. Frame demand
   /// pauses otherwise, while the runtime keeps loading.
   var isPresenting = true {
@@ -67,16 +64,11 @@ final class RenderLoop {
     return loop
   }
 
-  /// Follows a new viewport. The resize queues behind the map's commands, and
-  /// the session carries the extent to the map.
+  /// Follows a new viewport. The resize reaches native in order with the
+  /// map's commands, and the session carries the extent to the map.
   func resize(_ viewport: Viewport) {
     guard !isClosed else { return }
-    resizeCount += 1
-    let count = resizeCount
-    mapState.submit { [weak self] in
-      guard let self, count == self.resizeCount else { return }
-      try await self.target.resize(viewport)
-    }
+    mapState.submit { [target] in try await target.resize(viewport) }
   }
 
   /// The session driver, for the startup log.

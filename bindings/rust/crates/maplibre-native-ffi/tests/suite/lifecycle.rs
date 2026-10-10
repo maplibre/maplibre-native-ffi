@@ -69,10 +69,7 @@ fn a_refused_close_leaves_the_runtime_usable_and_a_later_close_succeeds() {
 #[test]
 fn a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops() {
     let _global = global_state();
-    let (sender, leaks) = mpsc::channel();
-    set_leak_reporter(Some(Box::new(move |leak| {
-        let _ = sender.send(leak);
-    })));
+    let reports = capture_reports();
 
     let (runtime, map) = Fixture::new().into_parts();
     drop(runtime);
@@ -84,8 +81,8 @@ fn a_map_keeps_its_runtime_alive_after_the_runtime_handle_drops() {
     wait_for(map.release());
     drop(map);
 
-    set_leak_reporter(None);
-    let leaked: Vec<_> = leaks.try_iter().collect();
+    set_reporter(None);
+    let leaked = leaks(&reports);
     assert!(leaked.is_empty(), "{leaked:?}");
 }
 

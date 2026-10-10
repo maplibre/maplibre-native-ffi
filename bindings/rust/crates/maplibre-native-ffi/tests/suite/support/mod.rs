@@ -35,12 +35,34 @@ pub fn timeout() -> Duration {
     Duration::from_secs(10) * scale
 }
 
-/// Serializes the tests that change process-global state: the leak reporter,
+/// Serializes the tests that change process-global state: the reporter,
 /// the log callback, and the network status. Each one restores the default
 /// before it releases the guard.
 pub fn global_state() -> MutexGuard<'static, ()> {
     static LOCK: Mutex<()> = Mutex::new(());
     LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Installs a reporter that forwards every report to the returned receiver.
+/// The caller holds [`global_state`] and clears the reporter with
+/// `set_reporter(None)` before it releases the guard.
+pub fn capture_reports() -> mpsc::Receiver<Report> {
+    let (sender, reports) = mpsc::channel();
+    set_reporter(Some(Box::new(move |report| {
+        let _ = sender.send(report);
+    })));
+    reports
+}
+
+/// The handles that the captured reports name as leaked.
+pub fn leaks(reports: &mpsc::Receiver<Report>) -> Vec<NativeHandleLeak> {
+    reports
+        .try_iter()
+        .filter_map(|report| match report {
+            Report::LeakedHandle(leak) => Some(leak),
+            _ => None,
+        })
+        .collect()
 }
 
 /// A count of wakes that a waiter can block on.

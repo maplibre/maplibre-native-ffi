@@ -20,7 +20,7 @@
 "CB-01" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_registration_is_rooted_while_native_holds_it_and_a_rejected_one_is_released"
 "CB-02" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_registered_callback_does_not_keep_its_runtime_alive"
 "CB-03" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_callback_may_answer_its_request_but_not_fence_or_close_its_runtime"
-"CB-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_panicking_callback_is_contained_and_its_request_fails"
+"CB-04" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_failing_callback_is_contained_and_its_error_is_reported"
 "CB-05" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::a_provider_hands_its_request_to_another_thread_and_answers_later"
 "CB-06" = { na = "A transform's response borrows the callback's frame through a lifetime and holds a raw pointer, so it is neither 'static nor Send: the compiler rejects a use after the callback returns or from another thread" }
 "CB-07" = "bindings/rust/crates/maplibre-native-ffi/tests/suite/callbacks.rs::replacing_the_log_callback_releases_the_one_it_replaced"

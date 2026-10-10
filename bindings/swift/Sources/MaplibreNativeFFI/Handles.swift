@@ -46,4 +46,8 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
   func finishDecision(accepted: Bool) -> Bool {
     state.finishDecision(accepted: accepted)
   }
+
+  func retire() {
+    state.retire()
+  }
 }

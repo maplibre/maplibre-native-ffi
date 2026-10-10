@@ -7,6 +7,7 @@ pub mod decision;
 pub mod error;
 pub mod handle;
 pub mod ptr;
+pub mod report;
 pub mod string;
 #[cfg(feature = "abi-version-override")]
 pub use abi::set_abi_version_override;

@@ -14,7 +14,7 @@ mod webgl_gl;
 #[cfg(mln_render_backend = "webgpu")]
 mod webgpu;
 
-use std::sync::{Arc, mpsc};
+use std::sync::Arc;
 
 use maplibre_native_ffi::*;
 
@@ -147,10 +147,7 @@ fn a_provider_answers_a_style_request_in_the_browser() {
 
 #[test]
 fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
-    let (sender, leaks) = mpsc::channel();
-    set_leak_reporter(Some(Box::new(move |leak| {
-        let _ = sender.send(leak);
-    })));
+    let reports = capture_reports();
 
     let fixture = styled_fixture();
     let (context, session) = owned_texture_session(fixture.map());
@@ -162,7 +159,7 @@ fn dropping_an_attached_session_and_its_parents_disposes_the_graph() {
     drop(runtime);
     drop(context);
 
-    set_leak_reporter(None);
-    let leaked: Vec<_> = leaks.try_iter().collect();
+    set_reporter(None);
+    let leaked = leaks(&reports);
     assert!(leaked.is_empty(), "{leaked:?}");
 }

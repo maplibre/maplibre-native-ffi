@@ -14,6 +14,9 @@ void binding_policy_enter(binding_policy* policy);
 void binding_policy_leave(binding_policy* policy);
 bool binding_policy_check(uint32_t operation, uint64_t owner);
 uintptr_t binding_thread(void);
+// Refuses every native call on the calling thread until the matching leave.
+void binding_report_enter(void);
+void binding_report_leave(void);
 static inline void* binding_address(uintptr_t value) { return (void*)value; }
 // A cgo.Handle reaches native as the address of a C cell that holds it. The
 // handle itself is a small integer, and Go reports a pointer-typed variable,

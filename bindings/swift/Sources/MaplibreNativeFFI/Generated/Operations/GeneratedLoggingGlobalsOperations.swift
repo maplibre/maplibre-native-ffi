@@ -76,5 +76,8 @@ private func invokeMlnLogSetCallback(
     LogEvent(rawValue: event),
     code,
     NativeString.copyCString(message)
-  ) } catch { return 0 }
+  ) } catch { NativeDiagnostics.report(.callbackError(
+    callback: "mln_log_callback",
+    error: error
+  )); return 0 }
 }

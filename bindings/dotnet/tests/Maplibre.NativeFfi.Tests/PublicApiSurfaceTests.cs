@@ -120,13 +120,12 @@ public sealed class PublicApiSurfaceTests
     }
 
     // Every wrapper over a C completion hands the caller a task to await, so it takes a
-    // cancellation token. A create is the exception: its task carries the only reference to a
-    // native handle, and abandoning that task would leak it.
+    // cancellation token, including a create, whose handle the binding disposes when it arrives
+    // after cancellation. A close is the exception: it consumes its handle synchronously, and its
+    // task only reports retirement.
     [Fact]
-    public void CompletionWrappersTakeACancellationTokenUnlessTheyProduceAHandle()
+    public void CompletionWrappersTakeACancellationTokenUnlessTheyConsumeTheirHandle()
     {
-        var handleProducing = new[] { "MapCreateAsync", "ProjectionCreateAsync" };
-        var consumesTheHandle = new[] { "CloseAsync" };
         var violations = new List<string>();
 
         foreach (var type in typeof(Maplibre).Assembly.GetExportedTypes())
@@ -149,9 +148,7 @@ public sealed class PublicApiSurfaceTests
                 var takesToken = method
                     .GetParameters()
                     .Any(parameter => parameter.ParameterType == typeof(CancellationToken));
-                if (
-                    handleProducing.Contains(method.Name) || consumesTheHandle.Contains(method.Name)
-                )
+                if (method.Name == "CloseAsync")
                 {
                     if (takesToken)
                     {

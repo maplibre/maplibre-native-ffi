@@ -13,17 +13,21 @@ import org.maplibre.nativeffi.internal.memory.*
 internal object Upcalls {
   @JvmStatic
   fun completion(userData: Long, result: Long): Unit =
-    contain(Unit) { CompletionBridge.complete(userData, result) }
+    contain("mln_completion_callback", Unit) { CompletionBridge.complete(userData, result) }
 
   @JvmStatic
-  fun completionRelease(userData: Long): Unit = contain(Unit) { CompletionBridge.release(userData) }
+  fun completionRelease(userData: Long): Unit =
+    contain("mln_completion_release", Unit) { CompletionBridge.release(userData) }
 
   @JvmStatic
-  fun releaseRoot(userData: Long): Unit = contain(Unit) { CallbackRoots.release(userData) }
+  fun releaseRoot(userData: Long): Unit =
+    contain("release_user_data", Unit) { CallbackRoots.release(userData) }
 
   @JvmStatic
   fun logCallback(userData: Long, severity: Int, event: Int, code: Long, message: Long): Int =
-    upcall<GeneratedLogCallbackRegistration, Int>(userData, 0, setOf()) { value, scope ->
+    upcall<GeneratedLogCallbackRegistration, Int>("mln_log_callback", userData, 0, setOf()) {
+      value,
+      scope ->
       value
         .callback(
           LogSeverity(severity.toUInt()),
@@ -37,6 +41,7 @@ internal object Upcalls {
   @JvmStatic
   fun resourceRequestCancelCallback(userData: Long): Unit =
     upcall<GeneratedResourceRequestCancelCallbackRegistration, Unit>(
+      "mln_resource_request_cancel_callback",
       userData,
       Unit,
       setOf(
@@ -52,28 +57,48 @@ internal object Upcalls {
 
   @JvmStatic
   fun customGeometrySourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomGeometrySourceOptions, Unit>(userData, Unit, null) { value, scope ->
+    upcall<CustomGeometrySourceOptions, Unit>(
+      "mln_custom_geometry_source_tile_callback",
+      userData,
+      Unit,
+      null,
+    ) { value, scope ->
       val invoke = value.fetchTile ?: return@upcall Unit
       invoke(readCanonicalTileId(tileId))
     }
 
   @JvmStatic
   fun customGeometrySourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomGeometrySourceOptions, Unit>(userData, Unit, null) { value, scope ->
+    upcall<CustomGeometrySourceOptions, Unit>(
+      "mln_custom_geometry_source_tile_callback",
+      userData,
+      Unit,
+      null,
+    ) { value, scope ->
       val invoke = value.cancelTile ?: return@upcall Unit
       invoke(readCanonicalTileId(tileId))
     }
 
   @JvmStatic
   fun customMvtVectorSourceOptionsFetchTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomMvtVectorSourceOptions, Unit>(userData, Unit, null) { value, scope ->
+    upcall<CustomMvtVectorSourceOptions, Unit>(
+      "mln_custom_mvt_vector_source_tile_callback",
+      userData,
+      Unit,
+      null,
+    ) { value, scope ->
       val invoke = value.fetchTile ?: return@upcall Unit
       invoke(readCanonicalTileId(tileId))
     }
 
   @JvmStatic
   fun customMvtVectorSourceOptionsCancelTile(userData: Long, tileId: Long): Unit =
-    upcall<CustomMvtVectorSourceOptions, Unit>(userData, Unit, null) { value, scope ->
+    upcall<CustomMvtVectorSourceOptions, Unit>(
+      "mln_custom_mvt_vector_source_tile_callback",
+      userData,
+      Unit,
+      null,
+    ) { value, scope ->
       val invoke = value.cancelTile ?: return@upcall Unit
       invoke(readCanonicalTileId(tileId))
     }
@@ -81,6 +106,7 @@ internal object Upcalls {
   @JvmStatic
   fun httpHeaderTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
     upcall<HttpHeaderTransform, Int>(
+      "mln_http_header_transform_callback",
       userData,
       -5,
       setOf("mln_http_header_transform_response_set"),
@@ -97,6 +123,7 @@ internal object Upcalls {
   @JvmStatic
   fun resourceProviderCallback(userData: Long, request: Long, handle: Long): Int =
     upcall<ResourceProvider, Int>(
+      "mln_resource_provider_callback",
       userData,
       0,
       setOf(
@@ -109,7 +136,7 @@ internal object Upcalls {
     ) { value, scope ->
       val decisionOwner = ResourceRequestHandle(handle)
       decisionOwner.binding
-        .decide(decisionOwner) {
+        .decide(decisionOwner, "mln_resource_provider_callback") {
           value.callback(readResourceRequest(request), decisionOwner).rawValue
         }
         .toInt()
@@ -118,6 +145,7 @@ internal object Upcalls {
   @JvmStatic
   fun resourceTransformCallback(userData: Long, kind: Int, url: Long, outResponse: Long): Int =
     upcall<ResourceTransform, Int>(
+      "mln_resource_transform_callback",
       userData,
       -5,
       setOf("mln_resource_transform_response_set_url"),
@@ -133,21 +161,21 @@ internal object Upcalls {
 
   @JvmStatic
   fun wakeCallback(userData: Long): Unit =
-    upcall<Wake, Unit>(userData, Unit, null) { value, scope ->
+    upcall<Wake, Unit>("mln_wake_callback", userData, Unit, null) { value, scope ->
       val invoke = value.callback ?: return@upcall Unit
       invoke()
     }
 
   @JvmStatic
   fun queueLockLock(userData: Long): Unit =
-    upcall<QueueLock, Unit>(userData, Unit, setOf()) { value, scope ->
+    upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit, setOf()) { value, scope ->
       val invoke = value.lock ?: return@upcall Unit
       invoke()
     }
 
   @JvmStatic
   fun queueLockUnlock(userData: Long): Unit =
-    upcall<QueueLock, Unit>(userData, Unit, setOf()) { value, scope ->
+    upcall<QueueLock, Unit>("mln_queue_lock_callback", userData, Unit, setOf()) { value, scope ->
       val invoke = value.unlock ?: return@upcall Unit
       invoke()
     }

@@ -2,6 +2,7 @@ package org.maplibre.nativeffi
 
 import java.lang.ref.ReferenceQueue
 import java.lang.ref.WeakReference
+import org.maplibre.nativeffi.error.CallbackException
 
 internal actual class TestThread actual constructor(block: () -> Unit) {
   @Volatile private var failure: Throwable? = null
@@ -51,3 +52,17 @@ internal actual fun requestCollection() {
 
 private const val GC_WAIT_NANOS = 10_000_000_000L
 private const val GC_ROUND_MILLIS = 100L
+
+// A native callback thread has no handler of its own, so its thread group passes the failure to
+// the default handler.
+internal actual fun interceptCallbackFailures(sink: (CallbackException) -> Unit): (() -> Unit)? {
+  val previous = Thread.getDefaultUncaughtExceptionHandler()
+  Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+    when {
+      error is CallbackException -> sink(error)
+      previous != null -> previous.uncaughtException(thread, error)
+      else -> error.printStackTrace()
+    }
+  }
+  return { Thread.setDefaultUncaughtExceptionHandler(previous) }
+}

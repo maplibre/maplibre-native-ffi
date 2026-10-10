@@ -143,7 +143,7 @@ def trampoline(values, callback, name, host, state="Self"):
             if callback.failure not in {None, "contain"}
             else "Default::default()"
         )
-        run = f"callback::invoke_status({reentry(callback, locals_by_name)}, {failure}, || {host})"
+        run = f'callback::invoke_status("{callback.native}", {reentry(callback, locals_by_name)}, {failure}, || {host})'
     else:
         fallback = (
             "()"
@@ -160,7 +160,7 @@ def trampoline(values, callback, name, host, state="Self"):
             if raw == "()"
             else f"{{ let value = {host}; Ok({converted}) }}"
         )
-        run = f"callback::invoke({reentry(callback, locals_by_name)}, {fallback}, || {body})"
+        run = f'callback::invoke("{callback.native}", {reentry(callback, locals_by_name)}, {fallback}, || {body})'
     return (
         f'unsafe extern "C" fn {name}({raw_arguments}){returns} {{\n'
         f"    // SAFETY: native passes the registration that this trampoline's\n"
@@ -309,7 +309,7 @@ def decision_trampoline(values, callback, name, public):
     // SAFETY: native passes the registration that this trampoline's
     // descriptor transferred.
     let state = unsafe {{ callback::state::<Self>({locals_by_name[callback.context]}) }};
-    match callback::invoke(None, None, || Ok(Some(callback::require(&state.{public})?({copies}).to_native()))) {{
+    match callback::invoke("{callback.native}", None, None, || Ok(Some(callback::require(&state.{public})?({copies}).to_native()))) {{
         Some(sys::{decision.accept}) => request_state.finish_decision(true),
         Some(sys::{decision.pass_through}) => request_state.finish_decision(false),
         _ => request_state.finish_exception(),

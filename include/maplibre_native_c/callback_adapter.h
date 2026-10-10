@@ -523,7 +523,15 @@ MLN_API void mln_adapter_owner_token_destroy(
   void* token MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;
 
-/** Disposes the token's native owner and releases the token on any thread. */
+/**
+ * Disposes the token's native owner and releases the token on any thread.
+ *
+ * A render session is disposed as mln_render_session_dispose() disposes it,
+ * except that retirement always quarantines its graphics resources and never
+ * detaches it. An isolate's shutdown runs this finalizer while the process
+ * exits, when nothing waits for the session's wake releases, so retirement
+ * makes no graphics call after the one in flight.
+ */
 MLN_API void mln_adapter_owner_finalize(
   void* token MLN_BINDING("kind=context")
 ) MLN_NOEXCEPT;

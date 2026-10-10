@@ -1641,13 +1641,16 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_projection_create</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/projection_8h.html">C API reference</see>.
     /// </remarks>
-    public Task<MapProjectionHandle> ProjectionCreateAsync()
+    public Task<MapProjectionHandle> ProjectionCreateAsync(
+        CancellationToken cancellationToken = default
+    )
     {
         using var scope = new NativeCallScope(this, "mln_map_projection_create");
         return scope.Query<MlnMapProjection, MapProjectionHandle>(
             (completion, diagnostic) =>
                 NativeMethods.mln_map_projection_create(Handle, completion, diagnostic),
-            handle => MapProjectionHandle.Adopt(handle)
+            handle => MapProjectionHandle.Adopt(handle),
+            cancellationToken
         );
     }
 
@@ -1658,8 +1661,6 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     /// See <c>mln_map_release</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/map_8h.html">C API reference</see>.
     /// </remarks>
-    public void Close() => CloseAsync().GetAwaiter().GetResult();
-
     public Task CloseAsync()
     {
         NativeCallbackGuard.EnsureAllowed(this, "mln_map_release");

@@ -102,7 +102,8 @@ impl<'py> GeneratedCall<'py> {
     }
 
     /// Submits an operation whose completion transfers a handle, which
-    /// `discard` disposes when the interpreter has gone.
+    /// `discard` disposes when the interpreter has gone or the future was
+    /// cancelled first.
     unsafe fn complete_owned<C>(
         &mut self,
         submit: impl FnOnce(*const sys::mln_completion, *mut sys::mln_diagnostic) -> sys::mln_status,
@@ -265,6 +266,17 @@ macro_rules! generated_owner {
                 drop(callbacks);
             }
 
+            /// Disposes the handle as collecting this owner would, for a value
+            /// that a completion delivered and nothing adopted.
+            fn _dispose(&self) -> PyResult<()> {
+                let mut state = self.state();
+                if state.closing || state.active_reads != 0 {
+                    return Err(state.lifecycle_error("is in use"));
+                }
+                state.dispose_abandoned();
+                Ok(())
+            }
+
             fn _read_scope(&self, py: Python<'_>) -> PyResult<GeneratedReadScope> {
                 generated_check_reentry()?;
                 let read_scope: fn(Python<'_>, &Self) -> PyResult<GeneratedReadScope> = $read_scope;
@@ -282,11 +294,19 @@ fn generated_invoke<R>(failure: impl Fn() -> R, body: impl FnOnce(Python<'_>) ->
     match result {
         Ok(Some(Ok(result))) => result,
         Ok(Some(Err(error))) => {
-            Python::try_attach(|py| error.write_unraisable(py, None));
+            Python::try_attach(|py| generated_report_unraisable(py, error));
             failure()
         }
         _ => failure(),
     }
+}
+
+/// Reports an exception that a native callback raised to `sys.unraisablehook`.
+/// The hook runs on the native callback's stack, so it may make no native
+/// call, whatever the callback itself may call.
+fn generated_report_unraisable(py: Python<'_>, error: PyErr) {
+    let _policy = GeneratedCallbackPolicy::enter(&[], 0);
+    error.write_unraisable(py, None);
 }
 
 /// Converts a scalar, enum, or pointer value into a Python object.

@@ -24,3 +24,8 @@ bool binding_policy_check(uint32_t operation, uint64_t owner) {
   return true;
 }
 uintptr_t binding_thread(void) { return (uintptr_t)&current_policy; }
+// A report admits no native call, so no callback, and so no other report,
+// reaches its thread until it leaves. One policy per thread suffices.
+static _Thread_local binding_policy report_policy;
+void binding_report_enter(void) { binding_policy_enter(&report_policy); }
+void binding_report_leave(void) { binding_policy_leave(&report_policy); }

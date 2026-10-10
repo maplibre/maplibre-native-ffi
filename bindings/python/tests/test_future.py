@@ -1,7 +1,7 @@
 import asyncio
 import gc
 import weakref
-from concurrent.futures import Future
+from concurrent.futures import CancelledError, Future, as_completed, wait
 from threading import Event
 
 import pytest
@@ -48,14 +48,39 @@ def test_derived_future_reports_a_transform_failure(failure: BaseException) -> N
     assert raised.value is failure
 
 
-def test_accepted_derived_future_refuses_cancellation() -> None:
-    source: Future[int] = Future()
+def test_cancelling_a_derived_future_cancels_a_pending_source() -> None:
+    source: NativeFuture[int] = NativeFuture()
     result = map_future(source, lambda value: value)
 
-    assert result.cancel() is False
+    assert result.cancel() is True
+
+    assert source.cancelled()
+    with pytest.raises(CancelledError):
+        result.result(timeout=0)
+    # Both futures notify their waiters at once, though no completion has
+    # claimed the source.
+    assert wait([source, result], timeout=0).done == {source, result}
+    assert set(as_completed([source, result], timeout=0)) == {source, result}
+    # A late completion finds the source cancelled and takes no result.
+    assert source._claim() is False
+
+
+def test_a_value_that_arrives_after_cancellation_is_discarded() -> None:
+    source: NativeFuture[int] = NativeFuture()
+    # The native completion has claimed its source, so only the derived future
+    # can still be cancelled.
+    assert source.set_running_or_notify_cancel()
+    discarded: list[int] = []
+    result = map_future(source, lambda value: value, discarded.append)
+
+    assert result.cancel() is True
+    assert source.cancel() is False
+    assert wait([result], timeout=0).done == {result}
     source.set_result(42)
 
-    assert result.result(timeout=TIMEOUT) == 42
+    assert discarded == [42]
+    with pytest.raises(CancelledError):
+        result.result(timeout=0)
 
 
 def test_downstream_callback_failure_preserves_the_completed_result(caplog) -> None:

@@ -12,9 +12,9 @@
 # preset, since go-map drives OpenGL directly. Its smoke run renders one frame
 # in a hidden window.
 #
-# CB-04: the Go binding contains a callback's panic and reports it nowhere
-# else. The callback returns its declared failure value to native, and the
-# test observes that value's outcome.
+# CB-04: the Go binding contains a callback's panic and logs it through the
+# default slog logger. The callback returns its declared failure value to
+# native, and the test observes both that value's outcome and the log record.
 
 [cases]
 "ERR-01" = "bindings/go/errors_test.go::TestNativeStatusMapsToTypedErrors"
@@ -23,7 +23,7 @@
 "LIFE-01" = "bindings/go/lifecycle_test.go::TestClosingTwiceIsSafe"
 "LIFE-02" = "bindings/go/lifecycle_test.go::TestRefusedCloseLeavesTheHandleUsable"
 "LIFE-03" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
-"LIFE-04" = { na = "The Go binding has no leak reporter. runtime.AddCleanup disposes an abandoned handle on the runtime's cleanup goroutine, never on a callback stack; bindings/go/platform_test.go::TestCollectorRetiresUnclosedMaps covers that disposal." }
+"LIFE-04" = "bindings/go/platform_test.go::TestCollectorDisposesAndLogsALeakedHandle"
 "LIFE-05" = "bindings/go/lifecycle_test.go::TestChildKeepsItsParentAlive"
 "COMP-01" = "bindings/go/completion_test.go::TestCompletionDeliversExactlyOnce"
 "COMP-02" = "bindings/go/completion_test.go::TestRejectedSubmissionFreesItsCompletionState"

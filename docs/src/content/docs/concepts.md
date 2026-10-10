@@ -48,7 +48,11 @@ tear down their own state at exit before the library's exit handler runs. So
 before the process exits, end the graphics calls of every render session:
 abandon the session, or detach it and wait for the detach completion. For a
 session that a host graphics thread drives, stop driver service first. Abandon
-is synchronous, so an exit path can use it on a session that is mid-frame.
+is synchronous, so an exit path can use it on a session that is mid-frame. The
+Python binding abandons every session that it still holds when the interpreter
+shuts down. A Dart isolate's shutdown finalizes its open sessions without
+starting graphics calls, but a driver call already in flight can outlast it, so
+a Dart host ends its sessions' graphics calls itself before exit.
 
 ## Map
 
@@ -75,6 +79,18 @@ acceptance and later invokes one completion with its terminal disposition.
 Ordered queries and lifecycle transitions use typed completions. Bindings expose
 one-shot work through their normal future, promise, task, suspension, or
 explicit async idiom.
+
+Cancelling or timing out a binding's wait ends only that wait. The native work
+continues to its terminal disposition, and its completion still runs. When the
+host cancels the wait in the language's idiom, such as task cancellation, a
+cancellation token, cancelling the future, or dropping it, the binding releases
+a created handle that arrives afterward. A timeout that leaves the future
+uncancelled keeps the handle in the future for its other listeners. If the host
+then drops that future, the collector reclaims the handle and reports a leak
+where the binding reports leaks. A Go context ends one wait, and the collector
+retires and reports the handle of a dropped Go future. Dart futures have no
+cancellation, so a Dart wait can only time out, and the future still delivers
+its result.
 
 Published snapshots provide synchronous copies of state needed by UI and display
 threads. Snapshot reads never call into mutable MapLibre map state. Each
@@ -138,6 +154,12 @@ boundary. Every accepted demand produces one terminal result. Result records
 identify the token and the map-update, extent, and frame generations that the
 driver used. A direct frame-result wake callback remains armed until the host
 drains all frame results, so coalesced wakeups do not lose results.
+
+Disposing a session, as a binding does for a handle that it reclaims, ends the
+session without a completion. A core-worker session that is attached and has no
+acquired frame detaches on its worker and frees its graphics resources. Disposal
+abandons any other session, which quarantines those resources. In both cases the
+host keeps its graphics objects alive until the session's wakes are released.
 
 Host-acquirable owned texture targets negotiate a ring of one to three slots.
 Acquiring a frame leases one slot and returns producer-completion
@@ -244,3 +266,11 @@ close is in progress, and a close while a call or borrowed view still holds the
 handle each raise the binding's invalid-state error. That error carries no
 native status, and its message names the handle type and its state: closed,
 closing, or in use. Closing a handle that is already closed does nothing.
+
+Close every handle explicitly. A garbage-collected binding treats a handle that
+its collector reclaims while it is still open as a leak: the binding disposes
+the handle off any callback stack and reports the leak once, through its leak
+output. Swift treats a handle that it deinitializes while open the same way. A
+handle that the binding drops itself, such as a created handle that arrives
+after its wait is cancelled, retires without a report. Dropping a Rust handle is
+ordinary cleanup, and Rust reports only a disposal that fails.

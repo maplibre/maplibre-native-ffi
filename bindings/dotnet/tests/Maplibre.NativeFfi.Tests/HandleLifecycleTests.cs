@@ -14,8 +14,8 @@ public sealed class HandleLifecycleTests
         var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         var map = await runtime.MapCreateAsync(NativeFixture.SmallMap);
 
-        map.Close();
-        map.Close();
+        await map.CloseAsync();
+        await map.CloseAsync();
         await map.DisposeAsync();
         Assert.True(map.IsClosed);
 
@@ -33,7 +33,10 @@ public sealed class HandleLifecycleTests
         using var runtime = RuntimeHandle.Create(RuntimeOptions.Default);
         using var map = await runtime.MapCreateAsync(NativeFixture.SmallMap);
 
-        var error = Assert.Throws<InvalidStateException>(runtime.Close);
+        var error = Assert.Throws<InvalidStateException>(() =>
+        {
+            _ = runtime.CloseAsync();
+        });
         Assert.Equal((int)MaplibreStatus.InvalidState, error.RawStatus);
         Assert.Contains("live or pending children", error.Diagnostic, StringComparison.Ordinal);
         Assert.False(runtime.IsClosed);

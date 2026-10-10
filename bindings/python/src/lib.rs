@@ -159,8 +159,10 @@ impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
     }
 }
 
-impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
-    fn drop(&mut self) {
+impl<T: maplibre_core::handle::NativeHandle> NativeHandleState<T> {
+    /// Hands the live handle to the finalizer's silent disposal, which reports
+    /// a leak if native refuses it.
+    fn dispose_abandoned(&mut self) {
         let (Some(id), Some(dispose)) = (self.id, self.dispose_abandoned) else {
             return;
         };
@@ -176,6 +178,12 @@ impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
                 });
             }
         });
+    }
+}
+
+impl<T: maplibre_core::handle::NativeHandle> Drop for NativeHandleState<T> {
+    fn drop(&mut self) {
+        self.dispose_abandoned();
     }
 }
 
@@ -230,6 +238,7 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
             return;
         };
         drop(state);
+        end_graphics_at_exit::<T>(raw);
         // SAFETY: take_at_exit transferred sole ownership of the handle here.
         if unsafe { dispose(T::from_raw(raw)) } != sys::MLN_STATUS_OK {
             maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
@@ -238,6 +247,31 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
             });
         }
     }
+}
+
+/// Ends a render session's graphics calls before shutdown disposes it.
+///
+/// Disposal alone would detach an attached session on its worker while the
+/// process exits, and graphics drivers tear down their own state in exit
+/// handlers that can run first. Abandonment returns once the in-flight driver
+/// call has ended and makes no graphics call, so the disposal that follows
+/// only quarantines. A session that refuses abandonment, such as one inside a
+/// caller-driven call, is disposed as it is.
+fn end_graphics_at_exit<T: 'static>(raw: u64) {
+    if std::any::TypeId::of::<T>() != std::any::TypeId::of::<sys::mln_render_session>() {
+        return;
+    }
+    let mut result = sys::mln_render_abandon_result {
+        size: std::mem::size_of::<sys::mln_render_abandon_result>() as u32,
+        disposition: 0,
+        quarantined_resource_count: 0,
+        reserved: 0,
+    };
+    // SAFETY: the caller holds sole ownership of the live session, and result
+    // is a writable, correctly sized output.
+    let _ = unsafe {
+        sys::mln_render_session_abandon(sys::mln_render_session(raw), &mut result, ptr::null_mut())
+    };
 }
 
 struct ExitOwners {
@@ -300,9 +334,10 @@ unsafe extern "C" fn release_exit_release(user_data: *mut c_void) {
     drop(unsafe { Arc::from_raw(user_data.cast::<ExitRelease>()) });
 }
 
-/// Disposes every owner the interpreter still holds, then releases each root
-/// owner and waits for its retirement, so no native thread can call into a
-/// finalized interpreter.
+/// Disposes every owner the interpreter still holds, ending each render
+/// session's graphics calls first, then releases each root owner and waits
+/// for its retirement, so no native thread can call into a finalized
+/// interpreter.
 #[pyfunction]
 fn retire_owners_at_exit(py: Python<'_>) {
     let owners: Vec<Arc<dyn ExitOwner>> =
@@ -370,9 +405,9 @@ fn new_python_future(py: Python<'_>) -> PyResult<Bound<'_, PyAny>> {
         .import("maplibre_native_ffi._future")?
         .getattr("NativeFuture")?
         .call0()?;
-    // Native work is already running once its C submission is accepted. Mark
-    // the future accordingly so cancel() cannot claim that it stopped the work.
-    future.call_method0("set_running_or_notify_cancel")?;
+    // The future stays pending until its completion arrives, so cancel()
+    // abandons the wait. Native work continues to its terminal disposition
+    // either way.
     Ok(future)
 }
 
@@ -389,6 +424,22 @@ unsafe extern "C" fn complete_python_future(
         let bridge = unsafe { &*user_data.cast::<PyCompletionBridge>() };
         let result = unsafe { &*result };
         let attached = Python::try_attach(|py| {
+            // Claim the future before converting, as an executor claims its
+            // work. A future that cancel() abandoned first takes no value, so
+            // the binding disposes what the result transfers.
+            let claimed = bridge
+                .future
+                .bind(py)
+                .call_method0("_claim")
+                .and_then(|claimed| claimed.is_truthy());
+            match claimed {
+                Ok(true) => {}
+                Ok(false) => return true,
+                Err(error) => {
+                    error.write_unraisable(py, None);
+                    return true;
+                }
+            }
             let converted = if result.status == sys::MLN_STATUS_OK || bridge.accept_error_status {
                 match bridge
                     .convert
@@ -415,8 +466,11 @@ unsafe extern "C" fn complete_python_future(
             if let Err(error) = call {
                 error.write_unraisable(py, None);
             }
+            false
         });
-        if attached.is_none()
+        // Without an interpreter, or with an abandoned future, nothing adopts
+        // the value that the result transfers.
+        if attached.unwrap_or(true)
             && result.status == sys::MLN_STATUS_OK
             && let Some(discard) = bridge.discard
         {
@@ -436,7 +490,8 @@ unsafe extern "C" fn release_python_future(user_data: *mut c_void) {
 ///
 /// With `accept_error_status`, `convert` also receives a failed result, for a
 /// command whose completion reports its own disposition. `discard` disposes a
-/// value that the result transfers when the interpreter has already gone.
+/// value that the result transfers when nothing adopts it: the interpreter has
+/// already gone, or the caller cancelled the future first.
 fn submit_python_future<S, C>(
     py: Python<'_>,
     submit: S,

@@ -654,7 +654,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(None, (), || {
+        callback::invoke("mln_custom_geometry_source_tile_callback", None, (), || {
             callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -666,7 +666,7 @@ impl CustomGeometrySourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(None, (), || {
+        callback::invoke("mln_custom_geometry_source_tile_callback", None, (), || {
             callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
             Ok(())
         })
@@ -809,10 +809,15 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(None, (), || {
-            callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
-            Ok(())
-        })
+        callback::invoke(
+            "mln_custom_mvt_vector_source_tile_callback",
+            None,
+            (),
+            || {
+                callback::require(&state.fetch_tile)?(unsafe { from_native(tile_id) }?);
+                Ok(())
+            },
+        )
     }
     unsafe extern "C" fn cancel_tile_trampoline(
         user_data: *mut std::ffi::c_void,
@@ -821,10 +826,15 @@ impl CustomMvtVectorSourceOptions {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(None, (), || {
-            callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
-            Ok(())
-        })
+        callback::invoke(
+            "mln_custom_mvt_vector_source_tile_callback",
+            None,
+            (),
+            || {
+                callback::require(&state.cancel_tile)?(unsafe { from_native(tile_id) }?);
+                Ok(())
+            },
+        )
     }
 }
 impl ToNative<sys::mln_custom_mvt_vector_source_options> for CustomMvtVectorSourceOptions {
@@ -1454,6 +1464,7 @@ impl HttpHeaderTransform {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke_status(
+            "mln_http_header_transform_callback",
             Some((
                 &["mln_http_header_transform_response_set"],
                 out_response as usize as u64,
@@ -3271,7 +3282,7 @@ impl QueueLock {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(Some((&[], 0)), (), || {
+        callback::invoke("mln_queue_lock_callback", Some((&[], 0)), (), || {
             callback::require(&state.lock)?();
             Ok(())
         })
@@ -3280,7 +3291,7 @@ impl QueueLock {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(Some((&[], 0)), (), || {
+        callback::invoke("mln_queue_lock_callback", Some((&[], 0)), (), || {
             callback::require(&state.unlock)?();
             Ok(())
         })
@@ -3995,7 +4006,7 @@ impl ResourceProvider {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        match callback::invoke(None, None, || {
+        match callback::invoke("mln_resource_provider_callback", None, None, || {
             Ok(Some(
                 callback::require(&state.callback)?(
                     unsafe { convert::copy_reference(request) }?,
@@ -4271,6 +4282,7 @@ impl ResourceTransform {
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
         callback::invoke_status(
+            "mln_resource_transform_callback",
             Some((
                 &["mln_resource_transform_response_set_url"],
                 out_response as usize as u64,
@@ -6297,7 +6309,7 @@ impl Wake {
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<Self>(user_data) };
-        callback::invoke(None, (), || {
+        callback::invoke("mln_wake_callback", None, (), || {
             callback::require(&state.callback)?();
             Ok(())
         })
@@ -6755,7 +6767,7 @@ pub(crate) fn log_callback_registration(
         // SAFETY: native passes the registration that this trampoline's
         // descriptor transferred.
         let state = unsafe { callback::state::<LogCallback>(user_data) };
-        callback::invoke(Some((&[], 0)), 0, || {
+        callback::invoke("mln_log_callback", Some((&[], 0)), 0, || {
             let value = state(
                 unsafe { from_native(severity) }?,
                 unsafe { from_native(event) }?,
