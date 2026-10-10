@@ -24,7 +24,10 @@ typedef void (*mln_wake_release)(void* user_data);
  * Receiver wake callback copied by a successful owning call.
  *
  * Native code may invoke callback from any thread, and calls may coalesce or
- * overlap. The callback should only schedule receiver work and return. It must
+ * overlap. Native code holds none of the owner's internal locks while it
+ * invokes callback, so a callback may call the owner's functions, such as one
+ * that drains its queue. The callback should still only schedule receiver work
+ * and return, because it can run on a thread that is doing native work. It must
  * not destroy the object that owns the wake. Native code calls
  * release_user_data after all callback invocations have returned.
  *

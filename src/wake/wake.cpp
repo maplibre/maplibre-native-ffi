@@ -40,6 +40,11 @@ auto Wake::reject() noexcept -> void {
   descriptor_ = {};
 }
 
+auto Wake::close() noexcept -> void {
+  const auto lock = std::scoped_lock{mutex_};
+  closing_ = true;
+}
+
 auto Wake::notify() noexcept -> void {
   auto callback = mln_wake_callback{};
   auto* user_data = static_cast<void*>(nullptr);
