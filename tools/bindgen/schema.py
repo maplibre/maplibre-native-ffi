@@ -26,9 +26,11 @@ EXECUTIONS = frozenset(
 COMPLETION_EXECUTIONS = frozenset({"command", "query", "operation", "lifecycle"})
 ENCODINGS = frozenset({"utf8", "json", "bytes"})
 # The values that a header annotation may write for each key. Conventions fill
-# in the rest of a key's vocabulary, such as direction=in, shape=none,
+# in most of the rest of a key's vocabulary, such as direction=in, shape=none,
 # ownership=value, encoding=utf8, and reentry=allow, so a header never writes
-# them; an absent nullable or handle_access means false or live.
+# them; an absent nullable or handle_access means false or live. The semantic
+# layer in semantic.py supplies the remaining values: lifetime=completion for an
+# array completion result, and consumes=always for a release that returns void.
 ANNOTATION_VALUES = {
     "execution": EXECUTIONS - {"immediate"},
     "shape": frozenset({"array"}),
@@ -379,8 +381,10 @@ def apply_defaults(api: Api) -> Api:
 
     An explicit annotation that restates a default is an error, so the headers
     stay minimal and each annotation marks a real departure from convention. An
-    annotation also writes only a value in ANNOTATION_VALUES; the conventional
-    values that this step fills in are the only other values a key takes.
+    annotation also writes only a value in ANNOTATION_VALUES. This step fills in
+    a key's conventional values, and the semantic layer supplies the rest:
+    lifetime=completion for an array completion result, and consumes=always for
+    a release that returns void.
     """
     conventions = Conventions(api)
     errors: list[str] = []

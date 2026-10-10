@@ -49,8 +49,10 @@ The frontend completes each declaration's metadata with the conventions that
 `Conventions` in `schema.py` derives from its C shape, so every later stage
 reads a complete contract. An annotation states a departure from convention, and
 the schema rejects one that restates a default. An annotation writes only the
-values in `ANNOTATION_VALUES`; conventions supply each key's other values, such
-as `direction=in` and `shape=none`.
+values in `ANNOTATION_VALUES`. Conventions supply most of each key's other
+values, such as `direction=in` and `shape=none`, and the semantic layer supplies
+the rest: `lifetime=completion` for an array completion result, and
+`consumes=always` for a release that returns void.
 
 | Declaration                         | Default                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------ |

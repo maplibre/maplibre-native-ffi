@@ -21,9 +21,10 @@ run loop, and the runtime's own thread carries the work forward. One runtime may
 own multiple maps; their commands, queries, barriers, and release work share one
 ordered submission stream.
 
-A callback into host code runs on the thread that does its work: the runtime
-thread, a MapLibre worker, network, or render thread, or the submitting thread
-when work finishes inline. Each callback's header comment names its threads.
+A callback into host code may run on any thread: a runtime, MapLibre worker,
+network, logging, or render thread, the submitting thread when work finishes
+inline, or the host thread that closes the callback's owner. Each callback's
+header comment names its threads.
 
 Use a runtime barrier when later work must wait for every preceding submission
 to reach a terminal disposition. The runtime's direct event wake callback tells
