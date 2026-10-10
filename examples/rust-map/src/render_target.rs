@@ -78,8 +78,6 @@ impl Mode {
 /// What one drain of the frame-result queue found.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct FrameResults {
-    /// The drain found at least one result.
-    pub any: bool,
     /// A demand rendered a frame.
     pub rendered: bool,
     /// The map asked for another frame while it rendered one.
@@ -96,6 +94,11 @@ pub fn extent(viewport: Viewport) -> RenderTargetExtent {
     )
 }
 
+/// The textures of a borrowed ring. The host holds the newest frame until a
+/// newer one arrives, and the session never renders into a held frame's
+/// texture, so it renders into the other one meanwhile.
+pub const BORROWED_RING_DEPTH: usize = 2;
+
 pub fn driver_label(driver: RenderDriverKind) -> &'static str {
     match driver {
         RenderDriverKind::CoreWorker => "core-worker",
@@ -104,8 +107,9 @@ pub fn driver_label(driver: RenderDriverKind) -> &'static str {
 }
 
 /// Attach options for `driver` whose wakes post frame-result events and, for a
-/// caller driver, driver-work events to the winit loop. Only an owned texture
-/// has a ring.
+/// caller driver, driver-work events to the winit loop. An owned texture asks
+/// for a ring of [`BORROWED_RING_DEPTH`] slots; a borrowed ring's depth is its
+/// texture count.
 pub fn attach_options(
     wakes: &Wakes,
     mode: Mode,
@@ -113,7 +117,11 @@ pub fn attach_options(
 ) -> RenderSessionAttachOptions {
     let mut options = RenderSessionAttachOptions {
         driver,
-        requested_texture_ring_depth: if mode == Mode::OwnedTexture { 2 } else { 0 },
+        requested_texture_ring_depth: if mode == Mode::OwnedTexture {
+            BORROWED_RING_DEPTH as u32
+        } else {
+            0
+        },
         frame_wake: wakes.wake(AppEvent::FrameResults),
         ..RenderSessionAttachOptions::default()
     };
@@ -129,20 +137,8 @@ pub struct Session {
     session: RenderSessionHandle,
     driver: RenderDriverKind,
     presents: bool,
-    /// Whether the session and the host take turns with one texture, as a
-    /// core-worker borrowed texture does. The session owns it from a demand
-    /// until its result, and the host owns it until the compositor's reads
-    /// finish, so at most one demand is outstanding.
-    takes_turns: bool,
-    /// Whether a turn-taking session has a demand outstanding.
-    demand_outstanding: bool,
-    /// A demand that arrived while one was outstanding, sent once the
-    /// compositor is done. A forced one renders without a newer map update.
-    wanted: Option<bool>,
     next_token: u64,
-    /// The newest demand token with a rendered result.
-    rendered_token: u64,
-    /// The newest owned-texture frame, held until a newer one replaces it.
+    /// The newest texture frame, held until a newer one replaces it.
     held: Option<AcquiredFrameHandle>,
     driver_wait: DriverWait,
 }
@@ -159,13 +155,7 @@ impl Session {
             session: attachment.0,
             driver: options.driver,
             presents: mode == Mode::NativeSurface,
-            // A caller driver renders and composes on one thread, in order.
-            takes_turns: mode == Mode::BorrowedTexture
-                && options.driver == RenderDriverKind::CoreWorker,
-            demand_outstanding: false,
-            wanted: None,
             next_token: 0,
-            rendered_token: 0,
             held: None,
             driver_wait: wakes.driver_wait(),
         };
@@ -190,15 +180,9 @@ impl Session {
         Ok(())
     }
 
-    /// Demands a frame and returns the token whose result shows it. A forced
-    /// demand renders even without a newer map update, which a retry after a
-    /// frame that missed the window needs. While a turn-taking session has a
-    /// demand outstanding, the demand waits for [`Session::compositor_done`].
-    pub fn request_frame(&mut self, force: bool) -> maplibre_native_ffi::Result<u64> {
-        if self.demand_outstanding {
-            self.wanted = Some(force || self.wanted.unwrap_or(false));
-            return Ok(self.next_token + 1);
-        }
+    /// Demands a frame. A forced demand renders even without a newer map
+    /// update, which a retry after a frame that missed the window needs.
+    pub fn request_frame(&mut self, force: bool) -> maplibre_native_ffi::Result<()> {
         self.next_token += 1;
         let mut flags = FrameDemandFlag::empty();
         flags.set(FrameDemandFlag::IF_NEEDED, !force);
@@ -208,17 +192,6 @@ impl Session {
             token: self.next_token,
             ..FrameDemand::default()
         })?;
-        self.demand_outstanding = self.takes_turns;
-        Ok(self.next_token)
-    }
-
-    /// Ends the host's turn with a turn-taking session's texture after a drain
-    /// that found results, sending any demand that waited for it.
-    pub fn compositor_done(&mut self) -> maplibre_native_ffi::Result<()> {
-        self.demand_outstanding = false;
-        if let Some(force) = self.wanted.take() {
-            self.request_frame(force)?;
-        }
         Ok(())
     }
 
@@ -228,10 +201,7 @@ impl Session {
             return Ok(FrameResults::default());
         };
         let count = batch.count()?;
-        let mut results = FrameResults {
-            any: count > 0,
-            ..FrameResults::default()
-        };
+        let mut results = FrameResults::default();
         for index in 0..count {
             let result = batch.get(index)?;
             // No update and size pending wait for the map's next update,
@@ -241,7 +211,6 @@ impl Session {
                 RenderResult::Rendered => {
                     results.rendered = true;
                     results.needs_repaint = result.needs_repaint;
-                    self.rendered_token = self.rendered_token.max(result.token);
                 }
                 RenderResult::TargetNotReady => results.target_not_ready = true,
                 _ => {}
@@ -272,7 +241,9 @@ impl Session {
         Ok(if acquired { self.held.as_ref() } else { None })
     }
 
-    fn release_held(&mut self) -> maplibre_native_ffi::Result<()> {
+    /// Releases the held frame, if any. A session resizes or takes a
+    /// replacement ring only while the host holds none of its frames.
+    pub fn release_held(&mut self) -> maplibre_native_ffi::Result<()> {
         match self.held.take() {
             Some(frame) => frame.release(&GpuSync::default()),
             None => Ok(()),
@@ -335,10 +306,11 @@ impl Session {
     }
 }
 
-/// The caller-owned textures a borrowed-texture target hands over on resize,
-/// oldest first. The session renders into a texture until its replacement
-/// completes, so each outgoing texture stays alive until then. Each completion
-/// wakes the event loop with [`AppEvent::TargetReplaced`].
+/// The rings of caller-owned textures that a borrowed-texture target retires
+/// on resize, oldest first. The session renders into a ring until the
+/// replacement that retires it completes, so each retired ring stays alive
+/// until then. Each completion wakes the event loop with
+/// [`AppEvent::TargetReplaced`].
 pub struct Replacements<T> {
     entries: VecDeque<Replacement<T>>,
 }
@@ -347,10 +319,7 @@ struct Replacement<T> {
     completion: NativeFuture<()>,
     /// The completion's result, once it has arrived.
     outcome: Option<maplibre_native_ffi::Result<()>>,
-    texture: T,
-    /// The demand whose rendered frame shows the replacement, once its
-    /// set_target has completed.
-    shown_token: u64,
+    retired: T,
 }
 
 impl<T> Replacement<T> {
@@ -374,25 +343,25 @@ impl<T> Default for Replacements<T> {
 }
 
 impl<T> Replacements<T> {
-    /// Queues the texture a set_target call handed over, with that call's
-    /// completion.
-    pub fn push(&mut self, completion: NativeFuture<()>, texture: T, wakes: &Wakes) {
+    /// Queues the ring a set_target call retired, with that call's completion.
+    pub fn push(&mut self, completion: NativeFuture<()>, retired: T, wakes: &Wakes) {
         let mut replacement = Replacement {
             completion,
             outcome: None,
-            texture,
-            shown_token: 0,
+            retired,
         };
         replacement.poll(&wakes.waker(AppEvent::TargetReplaced));
         self.entries.push_back(replacement);
     }
 
-    /// Takes the oldest replacement that a rendered frame has drawn into, or
-    /// `None` when none has. A completed replacement holds no frame yet, so
-    /// the first call that finds it demands one. A failed replacement reports
-    /// its error and stays queued: the session may still render into it or the
-    /// texture before it, so neither is released before the session detaches.
-    pub fn take_shown(
+    /// Takes the oldest retired ring whose replacement has completed, or
+    /// `None` when none has. A replacement publishes no map update, and a
+    /// frame rendered before it can no longer be acquired, so taking one
+    /// demands a forced frame for the new ring. A failed replacement reports
+    /// its error and stays queued: the session may still render into the
+    /// retired ring or the new one, so neither is released before the session
+    /// detaches.
+    pub fn take_completed(
         &mut self,
         session: &mut Session,
         wakes: &Wakes,
@@ -406,20 +375,16 @@ impl<T> Replacements<T> {
             Some(Err(error)) => return Err(error.clone()),
             Some(Ok(())) => {}
         }
-        if oldest.shown_token == 0 {
-            oldest.shown_token = session.request_frame(true)?;
-        }
-        if session.rendered_token < oldest.shown_token {
-            return Ok(None);
-        }
-        Ok(self.entries.pop_front().map(|entry| entry.texture))
+        let retired = self.entries.pop_front().map(|entry| entry.retired);
+        session.request_frame(true)?;
+        Ok(retired)
     }
 
-    /// Takes every replacement whatever its state, for teardown after the
+    /// Takes every retired ring whatever its state, for teardown after the
     /// session detached. Only OpenGL textures need an explicit close.
     #[cfg(maplibre_render_backend = "opengl")]
     pub fn take_all(&mut self) -> impl Iterator<Item = T> + '_ {
-        self.entries.drain(..).map(|entry| entry.texture)
+        self.entries.drain(..).map(|entry| entry.retired)
     }
 }
 

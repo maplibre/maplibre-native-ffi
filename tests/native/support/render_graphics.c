@@ -33,7 +33,9 @@ typedef struct host_state {
   // False when the graphics object belongs to another fixture.
   bool owns_graphics;
   mln_test_graphics_context context;
-  mln_test_graphics_texture* texture;
+  // The borrowed ring's textures, in slot order.
+  mln_test_graphics_texture* textures[MLN_TEST_MAX_RING_DEPTH];
+  size_t texture_count;
   mln_test_graphics_surface* surface;
   mln_test_graphics_texture* extra_textures[EXTRA_TARGETS];
   mln_test_graphics_surface* extra_surfaces[EXTRA_TARGETS];
@@ -95,7 +97,9 @@ void mln_test_backend_destroy(void* opaque_state) {
     mln_test_graphics_texture_destroy(state->extra_textures[index]);
   }
   mln_test_graphics_surface_destroy(state->surface);
-  mln_test_graphics_texture_destroy(state->texture);
+  for (size_t index = 0; index < state->texture_count; index += 1) {
+    mln_test_graphics_texture_destroy(state->textures[index]);
+  }
   host_state_free(state);
 }
 
@@ -231,44 +235,60 @@ bool mln_test_backend_attach(
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 typedef mln_metal_borrowed_texture_descriptor borrowed_descriptor;
+typedef mln_metal_borrowed_texture borrowed_entry;
 typedef mln_metal_surface_descriptor surface_descriptor;
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
 typedef mln_vulkan_borrowed_texture_descriptor borrowed_descriptor;
+typedef mln_vulkan_borrowed_texture borrowed_entry;
 typedef mln_vulkan_surface_descriptor surface_descriptor;
 #else
 typedef mln_opengl_borrowed_texture_descriptor borrowed_descriptor;
+typedef mln_opengl_borrowed_texture borrowed_entry;
 typedef mln_opengl_surface_descriptor surface_descriptor;
 #endif
 
-// Describes `texture`, which the graphics object with `context` created, as a
-// borrowed target of the host size.
-static bool describe_texture(
+// Describes `textures`, which the graphics object with `context` created, as a
+// borrowed ring of the host size. The descriptor's array points at `entries`,
+// which has room for `count` entries.
+static bool describe_ring(
   const mln_test_graphics_context* context,
-  const mln_test_graphics_texture* texture, borrowed_descriptor* out
+  mln_test_graphics_texture* const* textures, size_t count,
+  borrowed_entry* entries, borrowed_descriptor* out
 ) {
   mln_test_graphics_texture_info info = {0};
-  if (!mln_test_graphics_texture_get_info(texture, &info)) {
-    report("the render fixture could not describe a texture");
-    return false;
+  for (size_t index = 0; index < count; index += 1) {
+    if (!mln_test_graphics_texture_get_info(textures[index], &info)) {
+      report("the render fixture could not describe a texture");
+      return false;
+    }
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+    entries[index] = (borrowed_entry){.texture = info.metal_texture};
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+    entries[index] = (borrowed_entry){
+      .image = info.vulkan_image,
+      .image_view = info.vulkan_image_view,
+    };
+#else
+    entries[index] = (borrowed_entry){.texture = info.opengl_texture};
+#endif
   }
+  // Every texture of the ring shares the last one's format and size.
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   (void)context;
   *out = mln_metal_borrowed_texture_descriptor_default();
-  out->texture = info.metal_texture;
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
   *out = mln_vulkan_borrowed_texture_descriptor_default();
   out->context = host_context(context);
-  out->image = info.vulkan_image;
-  out->image_view = info.vulkan_image_view;
   out->format = info.format;
   out->initial_layout = info.vulkan_initial_layout;
   out->final_layout = info.vulkan_final_layout;
 #else
   *out = mln_opengl_borrowed_texture_descriptor_default();
   out->context = host_context(context);
-  out->texture = info.opengl_texture;
   out->target = info.opengl_target;
 #endif
+  out->textures = entries;
+  out->texture_count = count;
   // Physical and logical sizes agree at a scale factor of 1.
   out->extent = host_extent();
   out->physical_width = info.width;
@@ -300,6 +320,9 @@ static bool describe_surface(
   return true;
 }
 
+// The depth of the ring that attach_borrowed_texture() attaches.
+static size_t attach_ring_depth = 1;
+
 static bool attach_borrowed_texture(
   mln_map map, const mln_render_session_attach_options* options,
   void** out_state, mln_render_session* out_session,
@@ -309,13 +332,20 @@ static bool attach_borrowed_texture(
   if (state == NULL) {
     return false;
   }
-  state->texture = mln_test_graphics_texture_create(
-    state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
-  );
+  for (size_t index = 0; index < attach_ring_depth; index += 1) {
+    state->textures[index] = mln_test_graphics_texture_create(
+      state->graphics, MLN_TEST_HOST_TARGET_SIZE, MLN_TEST_HOST_TARGET_SIZE
+    );
+    state->texture_count += state->textures[index] != NULL;
+  }
+  borrowed_entry entries[MLN_TEST_MAX_RING_DEPTH];
   borrowed_descriptor descriptor;
   if (
-    state->texture == NULL ||
-    !describe_texture(&state->context, state->texture, &descriptor)
+    state->texture_count != attach_ring_depth ||
+    !describe_ring(
+      &state->context, state->textures, state->texture_count, entries,
+      &descriptor
+    )
   ) {
     report("the render fixture could not create a borrowed texture");
     mln_test_backend_destroy(state);
@@ -388,9 +418,24 @@ bool mln_test_render_fixture_create_borrowed_texture(
   );
 }
 
+bool mln_test_render_fixture_create_borrowed_ring(
+  mln_map map, mln_test_render_fixture* fixture, size_t depth, uint32_t driver
+) {
+  if (depth == 0 || depth > MLN_TEST_MAX_RING_DEPTH) {
+    return false;
+  }
+  attach_ring_depth = depth;
+  const bool attached = mln_test_render_fixture_create_with_driver(
+    map, fixture, attach_borrowed_texture,
+    driver == MLN_TEST_PRESET_DRIVER ? mln_test_backend_driver() : driver
+  );
+  attach_ring_depth = 1;
+  return attached;
+}
+
 #if defined(MLN_FFI_TEST_BACKEND_VULKAN)
 bool mln_test_render_fixture_create_vulkan_borrowed_texture(
-  mln_map map, mln_test_render_fixture* fixture,
+  mln_map map, mln_test_render_fixture* fixture, size_t depth,
   mln_test_vulkan_device_proc_addr_wrap wrap,
   const mln_test_render_fixture* share, const mln_queue_lock* queue_lock
 ) {
@@ -398,8 +443,9 @@ bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   attach_queue_lock = queue_lock;
   shared_graphics =
     share == NULL ? NULL : mln_test_render_fixture_graphics(share);
-  const bool attached =
-    mln_test_render_fixture_create_with(map, fixture, attach_borrowed_texture);
+  const bool attached = mln_test_render_fixture_create_borrowed_ring(
+    map, fixture, depth, MLN_TEST_PRESET_DRIVER
+  );
   wrap_device_proc_addr = NULL;
   attach_queue_lock = NULL;
   shared_graphics = NULL;
@@ -440,15 +486,74 @@ bool mln_test_render_fixture_create_surface(
 bool mln_test_render_fixture_read_texture(
   const mln_test_render_fixture* fixture, uint8_t* pixels, size_t size
 ) {
-  const host_state* state = fixture->backend_state;
-  if (state == NULL || state->texture == NULL) {
+  mln_test_graphics_texture* texture =
+    mln_test_render_fixture_texture(fixture, 0);
+  if (texture == NULL) {
     return false;
   }
-  if (!mln_test_graphics_texture_read_rgba8(state->texture, pixels, size)) {
+  if (!mln_test_graphics_texture_read_rgba8(texture, pixels, size)) {
     report("the render fixture could not read its borrowed texture");
     return false;
   }
   return true;
+}
+
+mln_test_graphics_texture* mln_test_render_fixture_texture(
+  const mln_test_render_fixture* fixture, size_t index
+) {
+  const host_state* state = fixture->backend_state;
+  if (state == NULL || index >= state->texture_count) {
+    return NULL;
+  }
+  return state->textures[index];
+}
+
+uint64_t mln_test_texture_handle(const mln_test_graphics_texture* texture) {
+  mln_test_graphics_texture_info info = {0};
+  if (!mln_test_graphics_texture_get_info(texture, &info)) {
+    report("the render fixture could not describe a texture");
+    return 0;
+  }
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  return (uint64_t)(uintptr_t)info.metal_texture;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  return info.vulkan_image;
+#else
+  return info.opengl_texture;
+#endif
+}
+
+uint64_t mln_test_frame_texture_handle(
+  mln_acquired_frame frame, uint32_t* out_slot
+) {
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  mln_metal_texture_frame record = {.size = sizeof(record)};
+  if (
+    mln_acquired_frame_get_metal_texture(frame, &record, NULL) != MLN_STATUS_OK
+  ) {
+    return 0;
+  }
+  *out_slot = record.slot;
+  return (uint64_t)(uintptr_t)record.texture;
+#elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_vulkan_texture_frame record = {.size = sizeof(record)};
+  if (
+    mln_acquired_frame_get_vulkan_texture(frame, &record, NULL) != MLN_STATUS_OK
+  ) {
+    return 0;
+  }
+  *out_slot = record.slot;
+  return record.image;
+#else
+  mln_opengl_texture_frame record = {.size = sizeof(record)};
+  if (
+    mln_acquired_frame_get_opengl_texture(frame, &record, NULL) != MLN_STATUS_OK
+  ) {
+    return 0;
+  }
+  *out_slot = record.slot;
+  return record.texture;
+#endif
 }
 
 void mln_test_render_fixture_keep_graphics_until_exit(
@@ -503,15 +608,18 @@ mln_test_graphics_surface* mln_test_render_fixture_new_surface(
   return NULL;
 }
 
-mln_status mln_test_render_fixture_set_texture(
+mln_status mln_test_render_fixture_set_textures(
   const mln_test_render_fixture* fixture, mln_test_graphics* graphics,
-  const mln_test_graphics_texture* texture, const mln_completion* completion
+  mln_test_graphics_texture* const* textures, size_t count,
+  const mln_completion* completion
 ) {
   mln_test_graphics_context context = {0};
+  borrowed_entry entries[MLN_TEST_MAX_RING_DEPTH];
   borrowed_descriptor descriptor;
   if (
+    count > MLN_TEST_MAX_RING_DEPTH ||
     !mln_test_graphics_get_context(graphics, &context) ||
-    !describe_texture(&context, texture, &descriptor)
+    !describe_ring(&context, textures, count, entries, &descriptor)
   ) {
     return MLN_STATUS_NATIVE_ERROR;
   }

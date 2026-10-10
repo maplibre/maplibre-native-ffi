@@ -132,8 +132,10 @@ typedef struct mln_render_session_attach_options {
     "default=MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD"
   );
   /**
-   * Requested host-acquirable owned-texture slot count. Private targets grant
-   * one slot regardless of this value. Ignored by other targets. Defaults to 1.
+   * Requested slot count of a session-owned texture ring, from one to three.
+   * Private targets grant one slot regardless of this value. A borrowed
+   * texture ring's depth is its texture count, so borrowed and other targets
+   * ignore this value. Defaults to 1.
    */
   uint32_t requested_texture_ring_depth MLN_BINDING("default=1");
   uint32_t reserved MLN_BINDING("kind=reserved");
@@ -154,7 +156,10 @@ typedef struct mln_render_session_capabilities {
   uint32_t size;
   /** One mln_render_driver_kind value. */
   uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
-  /** Granted owned-texture slot count, or zero for a target without a ring. */
+  /**
+   * Granted texture ring depth: the slot count of a session-owned ring, or the
+   * texture count of a borrowed one. Zero for a surface.
+   */
   uint32_t texture_ring_depth;
   /** A bitwise OR of mln_render_session_capability_flag values. */
   uint32_t flags MLN_BINDING("enum=mln_render_session_capability_flag");

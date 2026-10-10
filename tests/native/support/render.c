@@ -146,12 +146,21 @@ bool mln_test_render_fixture_create_with(
   mln_map map, mln_test_render_fixture* fixture,
   mln_test_backend_attach_fn attach
 ) {
+  return mln_test_render_fixture_create_with_driver(
+    map, fixture, attach, mln_test_backend_driver()
+  );
+}
+
+bool mln_test_render_fixture_create_with_driver(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_backend_attach_fn attach, uint32_t driver
+) {
   if (map == MLN_HANDLE_NULL || fixture == NULL) {
     return false;
   }
   mln_test_render_reserve_session();
   *fixture = (mln_test_render_fixture){0};
-  fixture->driver = mln_test_backend_driver();
+  fixture->driver = driver;
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;

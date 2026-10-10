@@ -48,8 +48,6 @@ internal sealed class OpenGLBorrowedTexture : IDisposable
 
     public uint Texture => texture;
 
-    public uint Target => Texture2D;
-
     public void Dispose()
     {
         if (texture == 0)

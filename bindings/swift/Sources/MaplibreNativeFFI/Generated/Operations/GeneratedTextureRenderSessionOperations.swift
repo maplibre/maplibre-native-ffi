@@ -4,7 +4,8 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension RenderSessionHandle {
-  /// Starts an ordered caller-owned Metal texture replacement.
+  /// Starts an ordered replacement of every texture of a caller-owned Metal
+  /// ring.
   ///
   /// See `mln_metal_borrowed_texture_set_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -12,16 +13,17 @@ public extension RenderSessionHandle {
     descriptor bindingArg0: MetalBorrowedTextureDescriptor
   ) async throws {
     try await nativeUnit("mln_metal_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
-      mln_metal_borrowed_texture_set_target(
+      try mln_metal_borrowed_texture_set_target(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
         diagnostic
       )
     }
   }
 
-  /// Starts an ordered caller-owned OpenGL texture replacement.
+  /// Starts an ordered replacement of every texture of a caller-owned OpenGL
+  /// ring.
   ///
   /// See `mln_opengl_borrowed_texture_set_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -53,7 +55,8 @@ public extension RenderSessionHandle {
     ) }
   }
 
-  /// Starts an ordered caller-owned Vulkan texture replacement.
+  /// Starts an ordered replacement of every image of a caller-owned Vulkan
+  /// ring.
   ///
   /// See `mln_vulkan_borrowed_texture_set_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -61,16 +64,17 @@ public extension RenderSessionHandle {
     descriptor bindingArg0: VulkanBorrowedTextureDescriptor
   ) async throws {
     try await nativeUnit("mln_vulkan_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
-      mln_vulkan_borrowed_texture_set_target(
+      try mln_vulkan_borrowed_texture_set_target(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
         diagnostic
       )
     }
   }
 
-  /// Starts an ordered caller-owned WebGPU texture replacement.
+  /// Starts an ordered replacement of every texture of a caller-owned WebGPU
+  /// ring.
   ///
   /// See `mln_webgpu_borrowed_texture_set_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -78,9 +82,9 @@ public extension RenderSessionHandle {
     descriptor bindingArg0: WebgpuBorrowedTextureDescriptor
   ) async throws {
     try await nativeUnit("mln_webgpu_borrowed_texture_set_target") { raw, arena, completion, diagnostic in
-      mln_webgpu_borrowed_texture_set_target(
+      try mln_webgpu_borrowed_texture_set_target(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         completion,
         diagnostic
       )

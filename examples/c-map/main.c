@@ -68,9 +68,9 @@ static app_error show_frame_results(app* app) {
     // consumed its update.
     app_event_push_after(APP_EVENT_RETRY_FRAME, frame_retry_milliseconds);
   } else if (results.needs_repaint) {
-    MAP_TRY(render_session_request_frame(session, false, nullptr));
+    MAP_TRY(render_session_request_frame(session, false));
   }
-  return results.any ? render_session_compositor_done(session) : APP_OK;
+  return APP_OK;
 }
 
 static app_error handle_app_event(app* app, app_event_code code) {
@@ -79,18 +79,17 @@ static app_error handle_app_event(app* app, app_event_code code) {
     case APP_EVENT_RUNTIME_EVENTS: {
       bool render_update = false;
       MAP_TRY(map_state_drain_events(&app->map, &render_update));
-      return render_update
-               ? render_session_request_frame(session, false, nullptr)
-               : APP_OK;
+      return render_update ? render_session_request_frame(session, false)
+                           : APP_OK;
     }
     case APP_EVENT_DRIVER_WORK:
       return render_session_service(session);
     case APP_EVENT_TARGET_REPLACED:
-      return render_target_show_replacements(app->target);
+      return render_target_retire_replaced(app->target);
     case APP_EVENT_FRAME_RESULTS:
       return show_frame_results(app);
     case APP_EVENT_RETRY_FRAME:
-      return render_session_request_frame(session, true, nullptr);
+      return render_session_request_frame(session, true);
     case APP_EVENT_SMOKE_TIMEOUT:
       return APP_ERROR_SMOKE_FRAME_TIMED_OUT;
   }
@@ -140,7 +139,7 @@ static app_error render_loop(app* app, render_target_mode mode) {
   }
   // Updates the map published before attachment have no event left to demand
   // their frame.
-  MAP_TRY(render_session_request_frame(session, false, nullptr));
+  MAP_TRY(render_session_request_frame(session, false));
   app->running = true;
   while (app->running) {
     SDL_Event event;

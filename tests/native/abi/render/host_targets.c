@@ -1,4 +1,4 @@
-// Targets that the host creates: a session renders into a borrowed texture and
+// Targets that the host creates: a session renders into a borrowed ring and
 // presents to a surface, both made by tests/graphics for the preset's backend.
 // The browser presets have no such fixtures, because JavaScript owns their
 // canvases.
@@ -58,42 +58,148 @@ static mln_render_session_snapshot read_snapshot(
   return snapshot;
 }
 
-// A borrowed texture holds every pixel of the frame rendered into it. It has
-// no session-owned ring, so it has no frames to acquire or read back, and it
-// takes its size from its owner, so the session refuses a resize for it.
-static void a_borrowed_texture_holds_the_rendered_frame(void) {
+enum { pixel_count = MLN_TEST_HOST_TARGET_SIZE * MLN_TEST_HOST_TARGET_SIZE };
+
+static const uint8_t red[4] = {255, 0, 0, 255};
+static const uint8_t blue[4] = {0, 0, 255, 255};
+
+// Every pixel of `texture` holds `color`. Reading another graphics object's
+// texture leaves the fixture's OpenGL context as it was.
+static void expect_texture_color(
+  mln_test_graphics_texture* texture, const uint8_t color[4], const char* what
+) {
+  static uint8_t pixels[pixel_count * 4];
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_graphics_texture_read_rgba8(texture, pixels, sizeof(pixels)),
+    mln_test_graphics_last_error()
+  );
+  size_t matching = 0;
+  for (size_t index = 0; index < pixel_count; index += 1) {
+    matching += memcmp(&pixels[index * 4], color, 4) == 0;
+  }
+  TEST_ASSERT_EQUAL_size_t_MESSAGE(pixel_count, matching, what);
+}
+
+// Repaints the red style's background blue, with no transition, so the next
+// frame shows the change.
+static void paint_background_blue(mln_runtime runtime, mln_map map) {
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("bg"),
+    MLN_BUFFER_LITERAL("background-color-transition"),
+    MLN_BUFFER_LITERAL("{\"duration\":0}"), &completion.descriptor, NULL
+  ));
+  MLN_TEST_AWAIT_OK(mln_map_set_layer_property(
+    map, MLN_BUFFER_LITERAL("bg"), MLN_BUFFER_LITERAL("background-color"),
+    MLN_BUFFER_LITERAL("\"#0000ff\""), &completion.descriptor, NULL
+  ));
+  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
+}
+
+// Acquires the frame that a demand just rendered, and checks that it names the
+// ring texture of its slot. Returns that slot.
+static uint32_t acquire_ring_frame(
+  const mln_test_render_fixture* fixture, mln_acquired_frame* out_frame
+) {
+  MLN_TEST_OK(
+    mln_render_session_acquire_frame(fixture->session, out_frame, NULL)
+  );
+  uint32_t slot = UINT32_MAX;
+  const uint64_t texture = mln_test_frame_texture_handle(*out_frame, &slot);
+  TEST_ASSERT_LESS_THAN_UINT32(2, slot);
+  TEST_ASSERT_EQUAL_UINT64(
+    mln_test_texture_handle(mln_test_render_fixture_texture(fixture, slot)),
+    texture
+  );
+  return slot;
+}
+
+// A borrowed ring hands each rendered frame to the host through acquisition,
+// naming the host's texture for the frame's slot, and never renders into a
+// texture whose frame the host holds: with every frame held, a demand waits
+// for a release. The ring belongs to its owner, so the session reads nothing
+// back and refuses a resize.
+static void a_borrowed_ring_hands_each_frame_to_the_host(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_load_style_and_wait(
     runtime, map, mln_test_red_background_style_json
   );
   mln_test_render_fixture fixture = {0};
-  TEST_ASSERT_TRUE(
-    mln_test_render_fixture_create_borrowed_texture(map, &fixture)
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_borrowed_ring(
+      map, &fixture, 2, MLN_TEST_PRESET_DRIVER
+    ),
+    mln_test_graphics_last_error()
   );
-  TEST_ASSERT_EQUAL_UINT32(
-    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 7, 0)
+  mln_render_session_capabilities capabilities = {
+    .size = sizeof(mln_render_session_capabilities)
+  };
+  MLN_TEST_OK(
+    mln_render_session_get_capabilities(fixture.session, &capabilities, NULL)
   );
-  enum { pixel_count = MLN_TEST_HOST_TARGET_SIZE * MLN_TEST_HOST_TARGET_SIZE };
-  static uint8_t pixels[pixel_count * 4];
-  TEST_ASSERT_TRUE(
-    mln_test_render_fixture_read_texture(&fixture, pixels, sizeof(pixels))
+  TEST_ASSERT_EQUAL_UINT32(2, capabilities.texture_ring_depth);
+  TEST_ASSERT_EQUAL_HEX32(
+    MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+      MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC,
+    capabilities.flags
   );
-  size_t red_pixels = 0;
-  for (size_t index = 0; index < pixel_count; index += 1) {
-    const uint8_t* pixel = &pixels[index * 4];
-    red_pixels +=
-      pixel[0] == 255 && pixel[1] == 0 && pixel[2] == 0 && pixel[3] == 255;
-  }
-  TEST_ASSERT_EQUAL_size_t(pixel_count, red_pixels);
 
-  mln_acquired_frame frame = MLN_HANDLE_NULL;
-  MLN_TEST_STATUS(
-    MLN_STATUS_UNSUPPORTED, mln_render_session_acquire_frame(
-                              fixture.session, &frame, MLN_TEST_DIAGNOSTIC
-                            )
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 1, 0)
   );
-  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, frame);
+  mln_acquired_frame first = MLN_HANDLE_NULL;
+  const uint32_t first_slot = acquire_ring_frame(&fixture, &first);
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, first_slot), red,
+    "the first frame's texture"
+  );
+
+  paint_background_blue(runtime, map);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(&fixture, 2, 0)
+  );
+  mln_acquired_frame second = MLN_HANDLE_NULL;
+  const uint32_t second_slot = acquire_ring_frame(&fixture, &second);
+  TEST_ASSERT_NOT_EQUAL_UINT32(first_slot, second_slot);
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, second_slot), blue,
+    "the second frame's texture"
+  );
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, first_slot), red,
+    "the held first frame's texture"
+  );
+
+  // Both textures are held, so the next demand parks. The maintenance command
+  // runs after it on the driver, so once that completes the demand has had its
+  // chance to render.
+  mln_test_render_request_forced(&fixture, 3);
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_reduce_memory_use(
+      fixture.session, &completion.descriptor, NULL
+    )
+  );
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_STATUS(
+    MLN_STATUS_NOT_READY,
+    mln_render_session_drain_frame_results(fixture.session, &batch, NULL)
+  );
+  mln_test_render_release_frame(&first);
+  batch = mln_test_render_wait_for_results(&fixture, 1);
+  const mln_render_frame_result result = mln_test_render_batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(3, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  mln_acquired_frame third = MLN_HANDLE_NULL;
+  TEST_ASSERT_EQUAL_UINT32(first_slot, acquire_ring_frame(&fixture, &third));
+  expect_texture_color(
+    mln_test_render_fixture_texture(&fixture, first_slot), blue,
+    "the released texture after the parked demand"
+  );
+  mln_test_render_release_frame(&second);
+  mln_test_render_release_frame(&third);
+
   MLN_TEST_STATUS(MLN_STATUS_UNSUPPORTED, read_back(&fixture));
   const mln_render_target_extent smaller = {
     .size = sizeof(mln_render_target_extent),
@@ -216,7 +322,7 @@ static void a_surface_replacement_can_change_the_scale_factor(void) {
 
 MLN_TEST_GROUP {
 #if !defined(__EMSCRIPTEN__)
-  RUN_TEST(a_borrowed_texture_holds_the_rendered_frame);
+  RUN_TEST(a_borrowed_ring_hands_each_frame_to_the_host);
   RUN_TEST(a_surface_presents_frames_and_takes_a_resize);
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
   RUN_TEST(a_surface_replacement_can_change_the_scale_factor);

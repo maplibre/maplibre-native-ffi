@@ -32,7 +32,7 @@ impl AcquiredFrameHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_metal_texture<R>(
         &self,
-        callback: impl FnOnce(&MetalOwnedTextureFrame) -> R,
+        callback: impl FnOnce(&MetalTextureFrame) -> R,
     ) -> Result<R> {
         let mut call = self.inner.read("mln_acquired_frame_get_metal_texture")?;
         unsafe {
@@ -41,8 +41,8 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_view_end,
             )
         }?;
-        let mut out_frame: sys::mln_metal_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_metal_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_metal_texture_frame>() as _;
         call.status(|frame, out_diagnostic| unsafe {
             sys::mln_acquired_frame_get_metal_texture(frame, &mut out_frame, out_diagnostic)
         })?;
@@ -56,7 +56,7 @@ impl AcquiredFrameHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_opengl_texture<R>(
         &self,
-        callback: impl FnOnce(&OpenglOwnedTextureFrame) -> R,
+        callback: impl FnOnce(&OpenglTextureFrame) -> R,
     ) -> Result<R> {
         let mut call = self.inner.read("mln_acquired_frame_get_opengl_texture")?;
         unsafe {
@@ -65,8 +65,8 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_view_end,
             )
         }?;
-        let mut out_frame: sys::mln_opengl_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_opengl_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_opengl_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_opengl_texture_frame>() as _;
         call.status(|frame, out_diagnostic| unsafe {
             sys::mln_acquired_frame_get_opengl_texture(frame, &mut out_frame, out_diagnostic)
         })?;
@@ -115,7 +115,7 @@ impl AcquiredFrameHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_vulkan_texture<R>(
         &self,
-        callback: impl FnOnce(&VulkanOwnedTextureFrame) -> R,
+        callback: impl FnOnce(&VulkanTextureFrame) -> R,
     ) -> Result<R> {
         let mut call = self.inner.read("mln_acquired_frame_get_vulkan_texture")?;
         unsafe {
@@ -124,8 +124,8 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_view_end,
             )
         }?;
-        let mut out_frame: sys::mln_vulkan_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_vulkan_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_vulkan_texture_frame>() as _;
         call.status(|frame, out_diagnostic| unsafe {
             sys::mln_acquired_frame_get_vulkan_texture(frame, &mut out_frame, out_diagnostic)
         })?;
@@ -139,7 +139,7 @@ impl AcquiredFrameHandle {
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
     pub fn get_webgpu_texture<R>(
         &self,
-        callback: impl FnOnce(&WebgpuOwnedTextureFrame) -> R,
+        callback: impl FnOnce(&WebgpuTextureFrame) -> R,
     ) -> Result<R> {
         let mut call = self.inner.read("mln_acquired_frame_get_webgpu_texture")?;
         unsafe {
@@ -148,8 +148,8 @@ impl AcquiredFrameHandle {
                 sys::mln_acquired_frame_view_end,
             )
         }?;
-        let mut out_frame: sys::mln_webgpu_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_webgpu_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_webgpu_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_webgpu_texture_frame>() as _;
         call.status(|frame, out_diagnostic| unsafe {
             sys::mln_acquired_frame_get_webgpu_texture(frame, &mut out_frame, out_diagnostic)
         })?;

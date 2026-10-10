@@ -94,19 +94,17 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         swapchainStale = false;
     }
 
-    public bool Draw(VulkanOwnedTextureFrameView frame)
+    public bool Draw(VulkanTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0)
         {
-            throw new InvalidOperationException(
-                "MapLibre returned an empty Vulkan owned texture frame."
-            );
+            throw new InvalidOperationException("MapLibre returned an empty Vulkan texture frame.");
         }
 
         if (frame.Layout != (uint)ImageLayout.ShaderReadOnlyOptimal)
         {
             throw new InvalidOperationException(
-                $"MapLibre owned texture frame is not shader-readable: layout={frame.Layout}."
+                $"MapLibre texture frame is not shader-readable: layout={frame.Layout}."
             );
         }
 
@@ -118,7 +116,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         return DrawImageView(new ImageView(frame.ImageView));
     }
 
-    public bool DrawImageView(ImageView imageView)
+    private bool DrawImageView(ImageView imageView)
     {
         var fence = inFlight;
         VulkanContext.Check(

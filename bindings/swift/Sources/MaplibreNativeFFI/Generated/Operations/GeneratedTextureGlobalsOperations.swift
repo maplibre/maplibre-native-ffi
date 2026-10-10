@@ -12,7 +12,7 @@ public extension Maplibre {
     -> MetalBorrowedTextureDescriptor
   {
     try nativeDirect("mln_metal_borrowed_texture_descriptor_default") { _ in
-      MetalBorrowedTextureDescriptor(
+      try MetalBorrowedTextureDescriptor(
         raw: mln_metal_borrowed_texture_descriptor_default()
       )
     }
@@ -80,7 +80,7 @@ public extension Maplibre {
     -> VulkanBorrowedTextureDescriptor
   {
     try nativeDirect("mln_vulkan_borrowed_texture_descriptor_default") { _ in
-      VulkanBorrowedTextureDescriptor(
+      try VulkanBorrowedTextureDescriptor(
         raw: mln_vulkan_borrowed_texture_descriptor_default()
       )
     }
@@ -109,7 +109,7 @@ public extension Maplibre {
     -> WebgpuBorrowedTextureDescriptor
   {
     try nativeDirect("mln_webgpu_borrowed_texture_descriptor_default") { _ in
-      WebgpuBorrowedTextureDescriptor(
+      try WebgpuBorrowedTextureDescriptor(
         raw: mln_webgpu_borrowed_texture_descriptor_default()
       )
     }

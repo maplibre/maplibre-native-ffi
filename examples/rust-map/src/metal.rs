@@ -111,7 +111,7 @@ impl MetalTextureCompositor {
     pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
         frame.get_metal_texture(|metadata| {
             if metadata.width == 0 || metadata.height == 0 {
-                return Err(metal_error("owned Metal frame has an empty extent"));
+                return Err(metal_error("Metal frame has an empty extent"));
             }
             // SAFETY: the native view scope keeps this Metal texture live through drawing.
             let texture = unsafe {
@@ -120,7 +120,7 @@ impl MetalTextureCompositor {
                     .cast::<ProtocolObject<dyn MTLTexture>>()
                     .as_ref()
             }
-            .ok_or_else(|| metal_error("owned Metal frame has a null texture"))?;
+            .ok_or_else(|| metal_error("Metal frame has a null texture"))?;
             self.draw_texture(texture)
         })?
     }
@@ -128,7 +128,7 @@ impl MetalTextureCompositor {
     /// Samples texture into the layer's next drawable, and reports whether it
     /// presented. A minimized or occluded window has no drawable, so the frame
     /// is skipped rather than failed.
-    pub fn draw_texture(
+    fn draw_texture(
         &mut self,
         texture: &ProtocolObject<dyn MTLTexture>,
     ) -> maplibre_native_ffi::Result<bool> {
@@ -195,10 +195,6 @@ impl MetalBorrowedTexture {
     pub fn pointer(&self) -> *mut std::ffi::c_void {
         // SAFETY: The MTLTexture is retained by MetalBorrowedTexture for the session lifetime.
         Retained::as_ptr(&self.texture).cast_mut().cast()
-    }
-
-    pub fn texture(&self) -> &ProtocolObject<dyn MTLTexture> {
-        &self.texture
     }
 }
 

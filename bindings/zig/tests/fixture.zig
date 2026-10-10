@@ -338,11 +338,11 @@ pub const Graphics = struct {
 /// The frame view type that this build's backend hands to a scoped texture
 /// getter.
 pub const OwnedTextureFrame = if (build_options.supports_metal)
-    maplibre.MetalOwnedTextureFrame
+    maplibre.MetalTextureFrame
 else if (build_options.supports_vulkan)
-    maplibre.VulkanOwnedTextureFrame
+    maplibre.VulkanTextureFrame
 else
-    maplibre.OpenglOwnedTextureFrame;
+    maplibre.OpenglTextureFrame;
 
 /// Reads a scoped view of an acquired frame's texture on this build's backend.
 pub fn getOwnedTexture(comptime Result: type, frame: maplibre.AcquiredFrame, context: anytype, comptime use: *const fn (@TypeOf(context), OwnedTextureFrame) anyerror!Result) anyerror!Result {

@@ -70,7 +70,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned Metal texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned Metal
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_metal_borrowed_texture_set_target</c> in the <see
@@ -86,7 +87,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             (completion, diagnostic) =>
                 NativeMethods.mln_metal_borrowed_texture_set_target(
                     Handle,
-                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
                 ),
@@ -120,7 +121,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned OpenGL texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned OpenGL
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_opengl_borrowed_texture_set_target</c> in the <see
@@ -587,7 +589,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned Vulkan texture replacement.
+    /// Starts an ordered replacement of every image of a caller-owned Vulkan
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_vulkan_borrowed_texture_set_target</c> in the <see
@@ -603,7 +606,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             (completion, diagnostic) =>
                 NativeMethods.mln_vulkan_borrowed_texture_set_target(
                     Handle,
-                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
                 ),
@@ -637,7 +640,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned WebGPU texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned WebGPU
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_webgpu_borrowed_texture_set_target</c> in the <see
@@ -653,7 +657,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             (completion, diagnostic) =>
                 NativeMethods.mln_webgpu_borrowed_texture_set_target(
                     Handle,
-                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
                 ),

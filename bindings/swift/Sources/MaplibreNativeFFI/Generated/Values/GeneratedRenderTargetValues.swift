@@ -414,9 +414,10 @@ public struct RenderSessionAttachOptions: Sendable {
   /// One `mln_render_driver_kind` value. Defaults to
   /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
   public var driver: RenderDriverKind
-  /// Requested host-acquirable owned-texture slot count. Private targets grant
-  /// one slot regardless of this value. Ignored by other targets. Defaults to
-  /// 1.
+  /// Requested slot count of a session-owned texture ring, from one to three.
+  /// Private targets grant one slot regardless of this value. A borrowed
+  /// texture ring's depth is its texture count, so borrowed and other targets
+  /// ignore this value. Defaults to 1.
   public var requestedTextureRingDepth: UInt32
   /// Wakes the receiver when the frame-result queue becomes nonempty.
   public var frameWake: Wake
@@ -477,7 +478,8 @@ public struct RenderSessionAttachOptions: Sendable {
 public struct RenderSessionCapabilities: Equatable, Hashable, Sendable {
   /// One `mln_render_driver_kind` value.
   public var driver: RenderDriverKind
-  /// Granted owned-texture slot count, or zero for a target without a ring.
+  /// Granted texture ring depth: the slot count of a session-owned ring, or the
+  /// texture count of a borrowed one. Zero for a surface.
   public var textureRingDepth: UInt32
   /// A bitwise OR of `mln_render_session_capability_flag` values.
   public var flags: RenderSessionCapabilityFlag

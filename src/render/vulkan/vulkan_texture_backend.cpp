@@ -66,39 +66,27 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     create_framebuffers();
   }
 
-  // Whether a replacement image can use the render pass this resource already
-  // has, which needs the format and both layouts the pass was built around.
-  [[nodiscard]] auto matches_borrowed(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor
-  ) const -> bool {
-    return colorFormat == static_cast<vk::Format>(descriptor.format) &&
-           initial_layout_ ==
-             static_cast<vk::ImageLayout>(descriptor.initial_layout) &&
-           final_layout_ ==
-             static_cast<vk::ImageLayout>(descriptor.final_layout);
-  }
-
   // Renders into a different caller-owned image from here on. The caller has
   // already established that it matches the live render pass, which is kept,
   // and that the GPU is done with the outgoing image.
   void set_borrowed(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, uint32_t width,
-    uint32_t height
+    const mln_vulkan_borrowed_texture_descriptor& descriptor,
+    const mln_vulkan_borrowed_texture& texture, uint32_t width, uint32_t height
   ) {
     swapchainFramebuffers.clear();
     swapchainImages.clear();
-    init_borrowed(descriptor, width, height);
+    init_borrowed(descriptor, texture, width, height);
   }
 
   void init_borrowed(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, uint32_t width,
-    uint32_t height
+    const mln_vulkan_borrowed_texture_descriptor& descriptor,
+    const mln_vulkan_borrowed_texture& texture, uint32_t width, uint32_t height
   ) {
     usesBorrowedImage = true;
     borrowedImage =
-      vk::Image(mln::core::vulkan_handle_from_abi<VkImage>(descriptor.image));
+      vk::Image(mln::core::vulkan_handle_from_abi<VkImage>(texture.image));
     borrowedImageView = vk::ImageView(
-      mln::core::vulkan_handle_from_abi<VkImageView>(descriptor.image_view)
+      mln::core::vulkan_handle_from_abi<VkImageView>(texture.image_view)
     );
     colorFormat = static_cast<vk::Format>(descriptor.format);
     extent = vk::Extent2D(width, height);
@@ -385,16 +373,17 @@ VulkanTextureBackend::VulkanTextureBackend(
 }
 
 VulkanTextureBackend::VulkanTextureBackend(
-  const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size,
+  const VulkanBorrowedTarget& target, mln::Size size,
   std::shared_ptr<const QueueLock> queue_lock
 )
     : VulkanQueueAccess(std::move(queue_lock)),
       mln::vulkan::RendererBackend(mln::gfx::ContextMode::Unique),
       mln::gfx::HeadlessBackend(size),
-      descriptor_(owned_descriptor_from_borrowed(descriptor)),
-      borrowed_descriptor_(descriptor),
+      descriptor_(owned_descriptor_from_borrowed(target.descriptor)),
+      borrowed_descriptor_(target.descriptor),
+      borrowed_images_(target.textures),
       uses_borrowed_texture_(true),
-      ring_(0) {
+      ring_(target.textures.size()) {
   initSharedDevice();
 }
 
@@ -432,26 +421,24 @@ auto VulkanTextureBackend::matches_borrowed_target(
   const mln_vulkan_borrowed_texture_descriptor& descriptor
 ) const -> bool {
   // Nothing is built yet, so there is no render pass to be incompatible with.
-  if (!resource) {
+  if (!borrowed_pass_built_) {
     return true;
   }
-  return getResource<VulkanTextureRenderableResource>().matches_borrowed(
-    descriptor
-  );
+  // Each slot's pass was built around these, and mbgl keys its pipelines on
+  // the pass, so a replacement keeps them to keep those pipelines usable.
+  return descriptor.format == borrowed_descriptor_.format &&
+         descriptor.initial_layout == borrowed_descriptor_.initial_layout &&
+         descriptor.final_layout == borrowed_descriptor_.final_layout;
 }
 
 void VulkanTextureBackend::set_borrowed_target(
-  const mln_vulkan_borrowed_texture_descriptor& descriptor
+  const VulkanBorrowedTarget& target
 ) {
-  const auto new_size =
-    mln::Size{descriptor.physical_width, descriptor.physical_height};
-  if (!resource) {
-    borrowed_descriptor_ = descriptor;
-    setSize(new_size);
-    return;
-  }
-  // Once this wait returns, the session is done with the outgoing image, and
-  // the host may destroy it when set_target completes. With one frame in
+  const auto new_size = mln::Size{
+    target.descriptor.physical_width, target.descriptor.physical_height
+  };
+  // Once this wait returns, the session is done with the outgoing images, and
+  // the host may destroy them when set_target completes. With one frame in
   // flight, the frame fence covers the session's last frame, and every other
   // submission waits on its own fence before returning. swap() already waits
   // on the frame fence, so this wait only keeps the guarantee local. A device
@@ -463,11 +450,32 @@ void VulkanTextureBackend::set_borrowed_target(
       throw std::runtime_error("Vulkan frame fence wait failed");
     }
   }
-  getResource<VulkanTextureRenderableResource>().set_borrowed(
-    descriptor, new_size.width, new_size.height
-  );
-  borrowed_descriptor_ = descriptor;
+  borrowed_descriptor_ = target.descriptor;
+  borrowed_images_ = target.textures;
   setRenderableSize(new_size);
+  // A slot builds its resource once, when it is first selected, and keeps it
+  // from frame to frame. A replacement rebuilds each built slot's framebuffer
+  // and depth attachment around its new image but keeps its render pass:
+  // mbgl keys its pipeline cache on the pass, so a new pass would compile
+  // every pipeline again on each replacement, which a host makes on every
+  // resize.
+  ring_.rebuild_each(
+    new_size, resource,
+    [this, new_size](std::size_t slot, mln::gfx::RenderableResource& built) {
+      // Every resource of this backend is one of these.
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
+      static_cast<VulkanTextureRenderableResource&>(built).set_borrowed(
+        borrowed_descriptor_, borrowed_images_.at(slot), new_size.width,
+        new_size.height
+      );
+    }
+  );
+}
+
+auto VulkanTextureBackend::frame_layout() const -> VkImageLayout {
+  return uses_borrowed_texture_
+           ? static_cast<VkImageLayout>(borrowed_descriptor_.final_layout)
+           : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 }
 
 void VulkanTextureBackend::set_ring_size(mln::Size new_size) {
@@ -663,8 +671,10 @@ void VulkanTextureBackend::initSwapchain() {
   maxFrames = 1;
   if (uses_borrowed_texture_) {
     renderable_resource.init_borrowed(
-      borrowed_descriptor_, size.width, size.height
+      borrowed_descriptor_, borrowed_images_.at(ring_.selected()), size.width,
+      size.height
     );
+    borrowed_pass_built_ = true;
   } else {
     renderable_resource.init_sampled(vk::Extent2D{size.width, size.height});
   }

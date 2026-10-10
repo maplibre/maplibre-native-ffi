@@ -65,6 +65,31 @@ enum class RenderSessionMaintenance : uint8_t {
 // session rendering into the target it already had.
 auto unsupported_retarget(const char* message) -> mln_status;
 
+// A borrowed-texture descriptor with its textures array copied out, for work
+// that outlives the call that passed it. The caller may free its array as soon
+// as that call returns, so `descriptor.textures` is null here and every reader
+// takes the entries from `textures`, one per ring slot in slot order.
+template <typename Descriptor, typename Texture>
+struct BorrowedTarget {
+  explicit BorrowedTarget(const Descriptor& source)
+      : descriptor(source),
+        textures(source.textures, source.textures + source.texture_count) {
+    descriptor.textures = nullptr;
+  }
+
+  Descriptor descriptor;
+  std::vector<Texture> textures;
+};
+
+using MetalBorrowedTarget = BorrowedTarget<
+  mln_metal_borrowed_texture_descriptor, mln_metal_borrowed_texture>;
+using VulkanBorrowedTarget = BorrowedTarget<
+  mln_vulkan_borrowed_texture_descriptor, mln_vulkan_borrowed_texture>;
+using OpenGLBorrowedTarget = BorrowedTarget<
+  mln_opengl_borrowed_texture_descriptor, mln_opengl_borrowed_texture>;
+using WebGPUBorrowedTarget = BorrowedTarget<
+  mln_webgpu_borrowed_texture_descriptor, mln_webgpu_borrowed_texture>;
+
 class SurfaceSessionBackend {
  public:
   SurfaceSessionBackend() = default;
@@ -151,6 +176,7 @@ class SurfaceSessionBackend {
 struct RenderFrameMetadata {
   uint64_t generation = 0;
   uint64_t frame_id = 0;
+  uint32_t slot = 0;
   uint32_t physical_width = 0;
   uint32_t physical_height = 0;
   double scale_factor = 1.0;
@@ -198,37 +224,36 @@ class TextureSessionBackend {
   // the host may reuse those handles.
   virtual void quarantine() noexcept {}
 
-  // Renders into a new caller-owned texture, keeping the graphics context and
-  // every resource the renderer holds against it. The descriptor must name the
-  // context this session attached with; a backend rejects anything else.
-  virtual auto set_metal_borrowed_target(
-    const mln_metal_borrowed_texture_descriptor& descriptor
-  ) -> mln_status {
-    (void)descriptor;
+  // Renders into a new ring of caller-owned textures, keeping the graphics
+  // context and every resource the renderer holds against it. The target names
+  // one texture per slot and the context this session attached with; a backend
+  // rejects any other context. On success the backend renders each slot into
+  // the texture at the slot's index, and no longer touches the textures it
+  // replaced.
+  virtual auto set_metal_borrowed_target(const MetalBorrowedTarget& target)
+    -> mln_status {
+    (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned Metal texture"
     );
   }
-  virtual auto set_vulkan_borrowed_target(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor
-  ) -> mln_status {
-    (void)descriptor;
+  virtual auto set_vulkan_borrowed_target(const VulkanBorrowedTarget& target)
+    -> mln_status {
+    (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned Vulkan image"
     );
   }
-  virtual auto set_opengl_borrowed_target(
-    const mln_opengl_borrowed_texture_descriptor& descriptor
-  ) -> mln_status {
-    (void)descriptor;
+  virtual auto set_opengl_borrowed_target(const OpenGLBorrowedTarget& target)
+    -> mln_status {
+    (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned OpenGL texture"
     );
   }
-  virtual auto set_webgpu_borrowed_target(
-    const mln_webgpu_borrowed_texture_descriptor& descriptor
-  ) -> mln_status {
-    (void)descriptor;
+  virtual auto set_webgpu_borrowed_target(const WebGPUBorrowedTarget& target)
+    -> mln_status {
+    (void)target;
     return unsupported_retarget(
       "session does not render into a caller-owned WebGPU texture"
     );
@@ -386,19 +411,24 @@ struct RenderTextureSlot {
   bool rendering = false;
   // Set by a frame disposed without consumer synchronization, or by a release
   // whose wait failed. The host's GPU may still read the slot's texture, so the
-  // ring never renders into it again and detach never destroys it.
+  // ring never renders into it again, and detach never destroys a texture that
+  // the session owns. A borrowed ring's replacement gives the slot a new
+  // texture, which lifts this.
   bool quarantined = false;
 };
 
-// The renderable resources a session-owned texture backend cycles through. The
-// selected slot's resource lives in the backend's own `resource` member, which
-// mbgl reads every frame; this parks the others and drops any whose recorded
-// size no longer matches the backend's. A borrowed target has no ring, so an
-// empty one accepts size records and refuses every selection.
+// The renderable resources a texture backend cycles through, one per slot. A
+// session-owned ring allocates each slot's texture in its resource; a borrowed
+// ring builds each slot's resource over the caller's texture at the slot's
+// index. The selected slot's resource lives in the backend's own `resource`
+// member, which mbgl reads every frame; this parks the others and drops any
+// whose recorded size no longer matches the backend's.
 class RenderableSlotRing {
  public:
   explicit RenderableSlotRing(std::size_t depth)
       : resources_(depth), sizes_(depth) {}
+
+  [[nodiscard]] auto selected() const -> std::size_t { return selected_; }
 
   [[nodiscard]] auto selected_size() const -> mln::Size {
     return sizes_.empty() ? mln::Size{} : sizes_[selected_];
@@ -426,11 +456,34 @@ class RenderableSlotRing {
     return true;
   }
 
-  auto clear() -> void {
+  // Calls `rebuild(slot, resource)` for every slot that has a resource, the
+  // selected one in the backend's `selected_resource` included, and records
+  // `size` for each. A backend that keeps GPU state keyed on a resource
+  // retargets it in place through this rather than dropping it.
+  template <typename Rebuild>
+  auto rebuild_each(
+    mln::Size size,
+    std::unique_ptr<mln::gfx::RenderableResource>& selected_resource,
+    Rebuild&& rebuild
+  ) -> void {
+    for (auto slot = std::size_t{}; slot < resources_.size(); ++slot) {
+      auto& resource = slot == selected_ ? selected_resource : resources_[slot];
+      if (resource == nullptr) continue;
+      rebuild(slot, *resource);
+      sizes_[slot] = size;
+    }
+  }
+
+  // Drops every parked resource and starts over with `depth` empty slots. The
+  // caller drops the selected resource, which it holds.
+  auto reset(std::size_t depth) -> void {
     resources_.clear();
-    sizes_.clear();
+    resources_.resize(depth);
+    sizes_.assign(depth, mln::Size{});
     selected_ = 0;
   }
+
+  auto clear() -> void { reset(0); }
 
  private:
   std::vector<std::unique_ptr<mln::gfx::RenderableResource>> resources_;
@@ -608,6 +661,10 @@ struct RenderTextureState {
   std::unique_ptr<TextureSessionBackend> backend = nullptr;
   TextureSessionMode mode = TextureSessionMode::Owned;
   std::vector<RenderTextureSlot> slots;
+  // Borrowed-ring replacements accepted but not yet run. Acquisition waits for
+  // them, because every frame published before one runs names a texture that
+  // it replaces.
+  std::uint32_t pending_retargets = 0;
 };
 
 struct RenderDriverWork {
@@ -977,6 +1034,20 @@ auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
   const mln_render_target_extent& extent, uint32_t physical_width,
   uint32_t physical_height, const RenderTargetReplacer& replace
+) -> mln_status;
+
+// Queues the replacement of a borrowed ring for render_session_set_target().
+// In the section that queues it, this checks that the session is attached,
+// that no frame is acquired, and that the replacement names one texture per
+// slot, and it retires every published frame. Acquisition then waits until the
+// replacement has run, because a frame published before it names a texture
+// that it replaces. The per-backend entry point validates its own descriptor
+// first, and `replace` owns a copy of it.
+auto enqueue_borrowed_texture_retarget(
+  mln_render_session session, std::size_t texture_count,
+  const mln_render_target_extent& extent, uint32_t physical_width,
+  uint32_t physical_height, RenderTargetReplacer replace,
+  const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status;
 
 // render_session_set_target() for a surface, whose physical size follows from

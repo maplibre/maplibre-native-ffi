@@ -453,6 +453,36 @@ static void borrowed_texture_destroy(
   *texture = 0;
 }
 
+/// The textures of a borrowed ring, one per slot.
+typedef struct opengl_ring {
+  GLuint textures[BORROWED_RING_DEPTH];
+} opengl_ring;
+
+static void opengl_ring_destroy(
+  const opengl_context* context, const gl_procs* procs, opengl_ring* ring
+) {
+  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+    borrowed_texture_destroy(context, procs, &ring->textures[index]);
+  }
+}
+
+static app_error opengl_ring_create(
+  const opengl_context* context, const gl_procs* procs,
+  viewport current_viewport, opengl_ring* out_ring
+) {
+  *out_ring = (opengl_ring){};
+  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+    const app_error error = borrowed_texture_create(
+      context, procs, current_viewport, &out_ring->textures[index]
+    );
+    if (error != APP_OK) {
+      opengl_ring_destroy(context, procs, out_ring);
+      return error;
+    }
+  }
+  return APP_OK;
+}
+
 struct render_target {
   render_target_mode mode;
   render_session session;
@@ -464,8 +494,10 @@ struct render_target {
     } owned;
     struct {
       opengl_compositor compositor;
-      /// The texture the compositor samples.
-      GLuint texture;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
+      /// The ring the session renders into.
+      opengl_ring ring;
       texture_replacements replacements;
     } borrowed;
     struct {
@@ -526,10 +558,10 @@ app_error render_target_init(
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
       error = opengl_compositor_init(&target->as.borrowed.compositor, window);
       if (error == APP_OK) {
-        error = borrowed_texture_create(
+        error = opengl_ring_create(
           &target->as.borrowed.compositor.context,
           &target->as.borrowed.compositor.procs, current_viewport,
-          &target->as.borrowed.texture
+          &target->as.borrowed.ring
         );
         if (error != APP_OK) {
           opengl_compositor_deinit(&target->as.borrowed.compositor);
@@ -548,9 +580,15 @@ app_error render_target_init(
   return APP_OK;
 }
 
-static mln_opengl_borrowed_texture_descriptor borrowed_texture_descriptor(
-  render_target* target, GLuint texture, viewport current_viewport
+/// Describes ring, whose entries the caller provides storage for.
+static mln_opengl_borrowed_texture_descriptor borrowed_ring_descriptor(
+  render_target* target, const opengl_ring* ring, viewport current_viewport,
+  mln_opengl_borrowed_texture entries[BORROWED_RING_DEPTH]
 ) {
+  for (size_t index = 0; index < BORROWED_RING_DEPTH; ++index) {
+    entries[index] =
+      (mln_opengl_borrowed_texture){.texture = ring->textures[index]};
+  }
   mln_opengl_borrowed_texture_descriptor descriptor =
     mln_opengl_borrowed_texture_descriptor_default();
   descriptor.extent = render_target_extent(current_viewport);
@@ -558,7 +596,8 @@ static mln_opengl_borrowed_texture_descriptor borrowed_texture_descriptor(
   descriptor.physical_height = current_viewport.physical_height;
   descriptor.context =
     opengl_context_descriptor(&target->as.borrowed.compositor.context);
-  descriptor.texture = texture;
+  descriptor.textures = entries;
+  descriptor.texture_count = BORROWED_RING_DEPTH;
   descriptor.target = gl_texture_target;
   return descriptor;
 }
@@ -602,9 +641,10 @@ app_error render_target_attach(
       break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
+      mln_opengl_borrowed_texture entries[BORROWED_RING_DEPTH];
       const mln_opengl_borrowed_texture_descriptor descriptor =
-        borrowed_texture_descriptor(
-          target, target->as.borrowed.texture, current_viewport
+        borrowed_ring_descriptor(
+          target, &target->as.borrowed.ring, current_viewport, entries
         );
       status = mln_opengl_borrowed_texture_attach(
         map, &descriptor, &options, &session, &completion, &diagnostic
@@ -632,6 +672,8 @@ void render_target_deinit(render_target* target) {
   }
   if (target->mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
     render_session_release_frame(&target->as.owned.held);
+  } else if (target->mode == RENDER_TARGET_MODE_BORROWED_TEXTURE) {
+    render_session_release_frame(&target->as.borrowed.held);
   }
   render_session_close(&target->session);
   switch (target->mode) {
@@ -640,18 +682,17 @@ void render_target_deinit(render_target* target) {
       break;
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
       opengl_compositor* compositor = &target->as.borrowed.compositor;
-      void* replacement = nullptr;
-      do {
-        GLuint texture = (GLuint)(uintptr_t)replacement;
-        borrowed_texture_destroy(
-          &compositor->context, &compositor->procs, &texture
-        );
+      while (true) {
+        opengl_ring* retired = nullptr;
         texture_replacements_take_any(
-          &target->as.borrowed.replacements, &replacement
+          &target->as.borrowed.replacements, (void**)&retired
         );
-      } while (replacement != nullptr);
-      borrowed_texture_destroy(
-        &compositor->context, &compositor->procs, &target->as.borrowed.texture
+        if (retired == nullptr) break;
+        opengl_ring_destroy(&compositor->context, &compositor->procs, retired);
+        free(retired);
+      }
+      opengl_ring_destroy(
+        &compositor->context, &compositor->procs, &target->as.borrowed.ring
       );
       opengl_compositor_deinit(compositor);
       break;
@@ -663,24 +704,34 @@ void render_target_deinit(render_target* target) {
   free(target);
 }
 
-/// Follows a resized window in borrowed-texture mode: allocates a texture at
-/// the new size and hands it to the live session, which stays attached.
+/// Follows a resized window in borrowed-texture mode: allocates a ring at the
+/// new size and hands it to the live session, which stays attached. The
+/// replacement waits until the host holds no frame, so the held one goes
+/// first; the window keeps showing what it last presented.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
   opengl_compositor* compositor = &target->as.borrowed.compositor;
-  GLuint replacement = 0;
-  MAP_TRY(borrowed_texture_create(
+  render_session_release_frame(&target->as.borrowed.held);
+  opengl_ring* retired = malloc(sizeof(opengl_ring));
+  if (retired == nullptr) return APP_ERROR_RESIZE_FAILED;
+  opengl_ring replacement;
+  const app_error error = opengl_ring_create(
     &compositor->context, &compositor->procs, current_viewport, &replacement
-  ));
+  );
+  if (error != APP_OK) {
+    free(retired);
+    return error;
+  }
+  *retired = target->as.borrowed.ring;
   mln_completion completion;
-  texture_replacement* entry =
-    texture_replacement_begin((void*)(uintptr_t)replacement, &completion);
+  texture_replacement* entry = texture_replacement_begin(retired, &completion);
   mln_status status = MLN_STATUS_INVALID_STATE;
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   if (entry != nullptr) {
+    mln_opengl_borrowed_texture entries[BORROWED_RING_DEPTH];
     const mln_opengl_borrowed_texture_descriptor descriptor =
-      borrowed_texture_descriptor(target, replacement, current_viewport);
+      borrowed_ring_descriptor(target, &replacement, current_viewport, entries);
     status = mln_opengl_borrowed_texture_set_target(
       target->session.handle, &descriptor, &completion, &diagnostic
     );
@@ -689,14 +740,14 @@ static app_error resize_borrowed(
     );
   }
   if (status != MLN_STATUS_OK) {
-    borrowed_texture_destroy(
-      &compositor->context, &compositor->procs, &replacement
-    );
+    opengl_ring_destroy(&compositor->context, &compositor->procs, &replacement);
+    free(retired);
     diagnostics_log_status(
       "OpenGL borrowed texture set target failed", status, &diagnostic
     );
     return APP_ERROR_RESIZE_FAILED;
   }
+  target->as.borrowed.ring = replacement;
   return render_session_resize_map(&target->session, current_viewport);
 }
 
@@ -749,27 +800,26 @@ app_error render_target_resize(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-/// Switches the compositor to each replacement a rendered frame has drawn
-/// into, destroying the texture it retires.
-app_error render_target_show_replacements(render_target* target) {
+app_error render_target_retire_replaced(render_target* target) {
+  if (target->mode != RENDER_TARGET_MODE_BORROWED_TEXTURE) return APP_OK;
   opengl_compositor* compositor = &target->as.borrowed.compositor;
   while (true) {
-    void* replacement = nullptr;
-    MAP_TRY(texture_replacements_take_shown(
-      &target->as.borrowed.replacements, &target->session, &replacement
+    opengl_ring* retired = nullptr;
+    MAP_TRY(texture_replacements_take_completed(
+      &target->as.borrowed.replacements, &target->session, (void**)&retired
     ));
-    if (replacement == nullptr) return APP_OK;
-    borrowed_texture_destroy(
-      &compositor->context, &compositor->procs, &target->as.borrowed.texture
-    );
-    target->as.borrowed.texture = (GLuint)(uintptr_t)replacement;
+    if (retired == nullptr) return APP_OK;
+    opengl_ring_destroy(&compositor->context, &compositor->procs, retired);
+    free(retired);
   }
 }
 
-static app_error present_owned(
-  render_target* target, viewport current_viewport
+/// Acquires the newest frame into *held and samples its texture into the
+/// window. Both texture modes hand their frames over this way.
+static app_error present_acquired(
+  render_target* target, opengl_compositor* compositor,
+  mln_acquired_frame* held, viewport current_viewport
 ) {
-  mln_acquired_frame* held = &target->as.owned.held;
   bool acquired = false;
   MAP_TRY(render_session_acquire_newest(&target->session, held, &acquired));
   // Without a new frame, the window keeps the one it already shows.
@@ -777,7 +827,7 @@ static app_error present_owned(
   MAP_TRY(render_session_require_cpu_complete_producer(
     *held, "OpenGL texture acquire failed"
   ));
-  mln_opengl_owned_texture_frame frame = {.size = sizeof(frame)};
+  mln_opengl_texture_frame frame = {.size = sizeof(frame)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_acquired_frame_get_opengl_texture(*held, &frame, &diagnostic);
@@ -786,7 +836,7 @@ static app_error present_owned(
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
   return opengl_compositor_draw_texture(
-    &target->as.owned.compositor, frame.texture, current_viewport
+    compositor, frame.texture, current_viewport
   );
 }
 
@@ -796,11 +846,13 @@ app_error render_target_present(
   *out_presented = true;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      return present_owned(target, current_viewport);
+      return present_acquired(
+        target, &target->as.owned.compositor, &target->as.owned.held,
+        current_viewport
+      );
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      MAP_TRY(render_target_show_replacements(target));
-      return opengl_compositor_draw_texture(
-        &target->as.borrowed.compositor, target->as.borrowed.texture,
+      return present_acquired(
+        target, &target->as.borrowed.compositor, &target->as.borrowed.held,
         current_viewport
       );
     case RENDER_TARGET_MODE_NATIVE_SURFACE:

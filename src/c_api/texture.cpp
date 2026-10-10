@@ -235,7 +235,7 @@ auto mln_texture_read_premultiplied_rgba8(
 }
 
 auto mln_acquired_frame_get_metal_texture(
-  mln_acquired_frame frame, mln_metal_owned_texture_frame* out_frame,
+  mln_acquired_frame frame, mln_metal_texture_frame* out_frame,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -244,7 +244,7 @@ auto mln_acquired_frame_get_metal_texture(
 }
 
 auto mln_acquired_frame_get_vulkan_texture(
-  mln_acquired_frame frame, mln_vulkan_owned_texture_frame* out_frame,
+  mln_acquired_frame frame, mln_vulkan_texture_frame* out_frame,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -253,7 +253,7 @@ auto mln_acquired_frame_get_vulkan_texture(
 }
 
 auto mln_acquired_frame_get_opengl_texture(
-  mln_acquired_frame frame, mln_opengl_owned_texture_frame* out_frame,
+  mln_acquired_frame frame, mln_opengl_texture_frame* out_frame,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -262,7 +262,7 @@ auto mln_acquired_frame_get_opengl_texture(
 }
 
 auto mln_acquired_frame_get_webgpu_texture(
-  mln_acquired_frame frame, mln_webgpu_owned_texture_frame* out_frame,
+  mln_acquired_frame frame, mln_webgpu_texture_frame* out_frame,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {

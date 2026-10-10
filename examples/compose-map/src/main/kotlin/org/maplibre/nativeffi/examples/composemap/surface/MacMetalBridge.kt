@@ -2,9 +2,14 @@ package org.maplibre.nativeffi.examples.composemap.surface
 
 import androidx.compose.ui.graphics.drawscope.DrawScope
 
+/**
+ * Lends the session a ring of [RING_DEPTH] Metal textures. The renderer holds the frame the
+ * consumer draws until a newer one arrives, so the session renders into the other texture
+ * meanwhile.
+ */
 internal class MacMetalBridge : NativeSurfaceBridge {
   private val rendererDispatcher = NativeSurfaceRendererDispatcher("compose-map-mac-metal-renderer")
-  private var texture = NativeHandle(0)
+  private var textures: List<NativeHandle> = emptyList()
   private var metalDevice = NativeHandle(0)
   private var pixelFormat = 0L
   private var currentExtent = SurfaceExtent.Empty
@@ -13,10 +18,10 @@ internal class MacMetalBridge : NativeSurfaceBridge {
   @Volatile private var generation = 0L
   @Volatile private var renderedGeneration = 0L
 
-  // The texture a frame last landed in, kept alive until one lands in its replacement. Skiko
-  // allocates a new texture for every resize and the map needs a frame or two to fill it, so this
-  // is what the consumer draws in between.
-  private var retiredTexture = NativeHandle(0)
+  // The ring a frame last landed in, kept alive until one lands in its replacement. The bridge
+  // allocates a new ring for every resize and the map needs a frame or two to fill it, so this is
+  // what the consumer draws in between.
+  private var retiredTextures: List<NativeHandle> = emptyList()
   @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.METAL
@@ -37,7 +42,7 @@ internal class MacMetalBridge : NativeSurfaceBridge {
   }
 
   private fun resizeOnRendererThread(extent: SurfaceExtent, skikoDevice: SkikoMetalDevice?) {
-    if (extent == currentExtent && texture.address != 0L) {
+    if (extent == currentExtent && textures.isNotEmpty()) {
       return
     }
     recreateTexture(extent, skikoDevice)
@@ -50,7 +55,7 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
-    if (texture.address == 0L || extent != currentExtent) {
+    if (textures.isEmpty() || extent != currentExtent) {
       resize(extent)
     }
     return NativeSurfaceFrameLease(
@@ -61,16 +66,19 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     )
   }
 
-  private fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
-    MetalTextureTarget(
-      texture =
-        texture.takeIf { it.address != 0L }
-          ?: throw NativeSurfaceBridgeException("Skiko Metal texture allocation returned null"),
+  private fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget {
+    if (textures.isEmpty()) {
+      throw NativeSurfaceBridgeException("Skiko Metal texture allocation returned null")
+    }
+    return MetalTextureTarget(
+      texture = textures.first(),
       device = metalDevice,
       pixelFormat = pixelFormat,
       extent = extent,
       generation = generation,
+      ring = textures,
     )
+  }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
     renderedGeneration = frame.target.generation
@@ -83,11 +91,11 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     // Only a texture this bridge still holds is safe to draw.
     val held =
       when (target.generation) {
-        generation -> texture
-        retiredGeneration -> retiredTexture
-        else -> NativeHandle(0)
+        generation -> textures
+        retiredGeneration -> retiredTextures
+        else -> emptyList()
       }
-    if (held.address == 0L || held.address != target.texture.address) {
+    if (target.texture.address == 0L || target.texture !in held) {
       return false
     }
     return SkikoHost.drawMetalTexture(scope, target)
@@ -114,70 +122,74 @@ internal class MacMetalBridge : NativeSurfaceBridge {
       disposeTexture()
       return
     }
-    val oldTexture = texture
+    val oldTextures = textures
     // Resolved by the caller: asking Skiko from the renderer thread waits on the event dispatch
     // thread, which is already waiting on this one.
     val requiredMetalDevice =
       checkNotNull(skikoDevice) { "The Skiko Metal device is resolved before this hop" }
     // Only the device that allocated a texture can take it back, so a Skiko device change
     // allocates rather than reusing.
-    val reusableTexture =
-      if (metalDevice.address == requiredMetalDevice.ptr) oldTexture.address else 0L
-    val textureAddress =
-      MacMetalBridgeNative.createMetalTexture(
-        metalDevice = requiredMetalDevice.ptr,
-        oldTexture = reusableTexture,
-        width = extent.physicalWidth,
-        height = extent.physicalHeight,
-      )
-    if (textureAddress != oldTexture.address) {
-      retire(oldTexture, deviceChanged = metalDevice.address != requiredMetalDevice.ptr)
+    val sameDevice = metalDevice.address == requiredMetalDevice.ptr
+    val replacement =
+      List(RING_DEPTH) { slot ->
+        val reusable = if (sameDevice) oldTextures.getOrNull(slot)?.address ?: 0L else 0L
+        NativeHandle(
+          MacMetalBridgeNative.createMetalTexture(
+            metalDevice = requiredMetalDevice.ptr,
+            oldTexture = reusable,
+            width = extent.physicalWidth,
+            height = extent.physicalHeight,
+          )
+        )
+      }
+    if (replacement != oldTextures) {
+      retire(oldTextures, deviceChanged = !sameDevice)
     }
-    texture = NativeHandle(textureAddress)
+    textures = replacement
     metalDevice = NativeHandle(requiredMetalDevice.ptr)
-    pixelFormat = MacMetalBridgeNative.texturePixelFormat(textureAddress)
+    pixelFormat = MacMetalBridgeNative.texturePixelFormat(replacement.first().address)
   }
 
-  // Holds the outgoing texture for the consumer to draw while the replacement is still empty. A
+  // Holds the outgoing ring for the consumer to draw while the replacement is still empty. A
   // texture from a device Skiko has replaced cannot be drawn on the new one.
-  private fun retire(outgoing: NativeHandle, deviceChanged: Boolean) {
-    if (outgoing.address == 0L) {
+  private fun retire(outgoing: List<NativeHandle>, deviceChanged: Boolean) {
+    if (outgoing.isEmpty()) {
       return
     }
     if (deviceChanged) {
       // Both belong to the device Skiko replaced.
-      releaseMetalTexture(outgoing)
-      releaseMetalTexture(retiredTexture)
-      retiredTexture = NativeHandle(0)
+      outgoing.forEach(::releaseMetalTexture)
+      retiredTextures.forEach(::releaseMetalTexture)
+      retiredTextures = emptyList()
       retiredGeneration = 0
       return
     }
     if (renderedGeneration != generation) {
       // This one never held a frame, so whatever is already retired stays.
-      releaseMetalTexture(outgoing)
+      outgoing.forEach(::releaseMetalTexture)
       return
     }
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = outgoing
+    retiredTextures.forEach(::releaseMetalTexture)
+    retiredTextures = outgoing
     retiredGeneration = generation
   }
 
   // Released a frame after the replacement rendered, so the consumer's last recorded frame from
   // the retired texture has been flushed.
   private fun releaseRetiredOnceReplaced() {
-    if (retiredTexture.address == 0L || renderedGeneration != generation) {
+    if (retiredTextures.isEmpty() || renderedGeneration != generation) {
       return
     }
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = NativeHandle(0)
+    retiredTextures.forEach(::releaseMetalTexture)
+    retiredTextures = emptyList()
     retiredGeneration = 0
   }
 
   private fun disposeTexture() {
-    releaseMetalTexture(texture)
-    texture = NativeHandle(0)
-    releaseMetalTexture(retiredTexture)
-    retiredTexture = NativeHandle(0)
+    textures.forEach(::releaseMetalTexture)
+    textures = emptyList()
+    retiredTextures.forEach(::releaseMetalTexture)
+    retiredTextures = emptyList()
     retiredGeneration = 0
     metalDevice = NativeHandle(0)
     pixelFormat = 0
@@ -189,5 +201,9 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     }
     SkikoHost.forgetMetalTexture(texture)
     MacMetalBridgeNative.disposeMetalTexture(texture.address)
+  }
+
+  private companion object {
+    const val RING_DEPTH = 2
   }
 }

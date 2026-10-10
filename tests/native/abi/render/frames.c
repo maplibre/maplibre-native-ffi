@@ -96,10 +96,10 @@ enum frame_backend { METAL, VULKAN, OPENGL, WEBGPU };
 // Every backend's frame record, so one call site can take any getter.
 typedef union frame_record {
   uint32_t size;
-  mln_metal_owned_texture_frame metal;
-  mln_vulkan_owned_texture_frame vulkan;
-  mln_opengl_owned_texture_frame opengl;
-  mln_webgpu_owned_texture_frame webgpu;
+  mln_metal_texture_frame metal;
+  mln_vulkan_texture_frame vulkan;
+  mln_opengl_texture_frame opengl;
+  mln_webgpu_texture_frame webgpu;
   mln_render_frame_result result;
   mln_gpu_sync sync;
 } frame_record;
@@ -157,13 +157,13 @@ typedef struct accessor_entry {
 
 // The texture getters come first, indexed by frame_backend.
 static const accessor_entry accessors[] = {
-  {"metal texture", get_metal, sizeof(mln_metal_owned_texture_frame),
+  {"metal texture", get_metal, sizeof(mln_metal_texture_frame),
    PRESET_FRAME_BACKEND == METAL},
-  {"vulkan texture", get_vulkan, sizeof(mln_vulkan_owned_texture_frame),
+  {"vulkan texture", get_vulkan, sizeof(mln_vulkan_texture_frame),
    PRESET_FRAME_BACKEND == VULKAN},
-  {"opengl texture", get_opengl, sizeof(mln_opengl_owned_texture_frame),
+  {"opengl texture", get_opengl, sizeof(mln_opengl_texture_frame),
    PRESET_FRAME_BACKEND == OPENGL},
-  {"webgpu texture", get_webgpu, sizeof(mln_webgpu_owned_texture_frame),
+  {"webgpu texture", get_webgpu, sizeof(mln_webgpu_texture_frame),
    PRESET_FRAME_BACKEND == WEBGPU},
   {"result", get_result, sizeof(mln_render_frame_result), true},
   {"producer sync", get_producer_sync, sizeof(mln_gpu_sync), true},
@@ -185,24 +185,24 @@ static uint64_t expect_preset_texture(
   const frame_record* record, uint64_t generation
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const mln_metal_owned_texture_frame* frame = &record->metal;
+  const mln_metal_texture_frame* frame = &record->metal;
   TEST_ASSERT_NOT_NULL(frame->texture);
   TEST_ASSERT_NOT_NULL(frame->device);
   TEST_ASSERT_NOT_EQUAL_UINT64(0, frame->pixel_format);
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  const mln_vulkan_owned_texture_frame* frame = &record->vulkan;
+  const mln_vulkan_texture_frame* frame = &record->vulkan;
   TEST_ASSERT_NOT_EQUAL_UINT64(0, frame->image);
   TEST_ASSERT_NOT_EQUAL_UINT64(0, frame->image_view);
   TEST_ASSERT_NOT_NULL(frame->device);
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->format);
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  const mln_opengl_owned_texture_frame* frame = &record->opengl;
+  const mln_opengl_texture_frame* frame = &record->opengl;
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->texture);
   // GL_TEXTURE_2D.
   TEST_ASSERT_EQUAL_HEX32(0x0DE1, frame->target);
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->internal_format);
 #else
-  const mln_webgpu_owned_texture_frame* frame = &record->webgpu;
+  const mln_webgpu_texture_frame* frame = &record->webgpu;
   TEST_ASSERT_NOT_NULL(frame->texture);
   TEST_ASSERT_NOT_NULL(frame->texture_view);
   TEST_ASSERT_NOT_NULL(frame->device);

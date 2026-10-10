@@ -28,5 +28,5 @@ func attachOwnedTexture(
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {
-	return frame.WithVulkanTexture(func(view VulkanOwnedTextureFrameView) error { return use(view) })
+	return frame.WithVulkanTexture(func(view VulkanTextureFrameView) error { return use(view) })
 }

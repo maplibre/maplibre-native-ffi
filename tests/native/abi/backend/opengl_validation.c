@@ -79,6 +79,7 @@ MLN_TEST_OVERFLOW_EDIT(opengl_owned)
 MLN_TEST_DESCRIPTOR_EDITS(
   opengl_borrowed, mln_opengl_borrowed_texture_descriptor
 )
+MLN_TEST_BORROWED_EDITS(opengl_borrowed, opengl)
 
 static mln_opengl_surface_descriptor* surface_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_surface;
@@ -151,8 +152,19 @@ static void borrowed_with_undersized_context(void* call) {
   borrowed_of(call)->context.size = sizeof(mln_opengl_context_descriptor) - 1;
 }
 static void borrowed_without_texture(void* call) {
-  borrowed_of(call)->texture = 0;
+  mln_test_target_call* edited = call;
+  edited->textures.opengl[0].texture = 0;
+  borrowed_of(call)->textures = edited->textures.opengl;
 }
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
+// A replacement that names two textures for a session's ring of one.
+static void borrowed_with_another_depth(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.opengl[1].texture = 2;
+  borrowed_of(call)->textures = edited->textures.opengl;
+  borrowed_of(call)->texture_count = 2;
+}
+#endif
 static void borrowed_without_physical_width(void* call) {
   borrowed_of(call)->physical_width = 0;
 }
@@ -190,17 +202,20 @@ static mln_opengl_owned_texture_descriptor owned_descriptor(uint32_t platform) {
   return descriptor;
 }
 
-static mln_opengl_borrowed_texture_descriptor borrowed_descriptor(void) {
-  mln_opengl_borrowed_texture_descriptor descriptor =
-    mln_opengl_borrowed_texture_descriptor_default();
-  descriptor.extent = mln_test_target_extent();
-  descriptor.context = fake_context(PRESET_PLATFORM);
-  descriptor.texture = 1;
+// A ring of one texture, whose entry is in the call's storage.
+static void describe_borrowed(mln_test_target_call* call) {
+  call->textures.opengl[0] = (mln_opengl_borrowed_texture){.texture = 1};
+  mln_opengl_borrowed_texture_descriptor* descriptor =
+    &call->descriptor.opengl_borrowed;
+  *descriptor = mln_opengl_borrowed_texture_descriptor_default();
+  descriptor->extent = mln_test_target_extent();
+  descriptor->context = fake_context(PRESET_PLATFORM);
+  descriptor->textures = call->textures.opengl;
+  descriptor->texture_count = 1;
   // GL_TEXTURE_2D.
-  descriptor.target = UINT32_C(0x0de1);
-  descriptor.physical_width = 64;
-  descriptor.physical_height = 64;
-  return descriptor;
+  descriptor->target = UINT32_C(0x0de1);
+  descriptor->physical_width = 64;
+  descriptor->physical_height = 64;
 }
 
 static void opengl_attach_rejects_malformed_calls(void) {
@@ -267,9 +282,10 @@ static void opengl_attach_rejects_malformed_calls(void) {
     sizeof(owned_rows) / sizeof(owned_rows[0])
   );
 
-  call.descriptor.opengl_borrowed = borrowed_descriptor();
+  describe_borrowed(&call);
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed),
+    MLN_TEST_BORROWED_CASES(opengl_borrowed),
     {"undersized context", borrowed_with_undersized_context,
      MLN_STATUS_INVALID_ARGUMENT, "mln_opengl_context_descriptor.size"},
     {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -370,15 +386,19 @@ static void opengl_set_target_rejects_malformed_descriptors(void) {
   );
   call.session = fixture.session;
 #endif
-  call.descriptor.opengl_borrowed = borrowed_descriptor();
+  describe_borrowed(&call);
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed),
+    MLN_TEST_BORROWED_CASES(opengl_borrowed),
     {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
-#if !defined(MLN_FFI_TEST_BACKEND_OPENGL)
+#if defined(MLN_FFI_TEST_BACKEND_OPENGL)
+    {"more textures than the session's ring has slots",
+     borrowed_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
+#else
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
 #endif

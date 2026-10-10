@@ -298,7 +298,8 @@ MLN_API void mln_render_frame_batch_release(
  *
  * Returns:
  * - MLN_STATUS_OK when a frame is published in *out_frame.
- * - MLN_STATUS_NOT_READY when no rendered frame is available. This is not an
+ * - MLN_STATUS_NOT_READY when no rendered frame is available, which includes
+ *   while a replacement of a borrowed texture ring is pending. This is not an
  *   error: *out_frame is left unchanged, and the caller retries after the next
  *   demand reports MLN_RENDER_RESULT_RENDERED. Bindings return their
  *   language's empty form instead of an error.
@@ -562,13 +563,15 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * leave the session attached. Once accepted, earlier mailbox operations reach
  * a terminal result before graphics resources are destroyed.
  *
- * When a disposed frame or a failed release quarantined a slot of the texture
- * ring, the host's GPU may still read that slot's texture. Detach then keeps
- * the ring and its graphics context until the process exits, and destroys the
- * rest. It waits for the map's in-flight tile work in that case, and once
- * detach completes the host may destroy its graphics objects. The one
- * exception is a kept Vulkan ring: it is a child of the host's VkDevice, so
- * the host keeps the device until the process exits.
+ * When a disposed frame or a failed release quarantined a slot of a
+ * session-owned texture ring, the host's GPU may still read that slot's
+ * texture. Detach then keeps the ring and its graphics context until the
+ * process exits, and destroys the rest. A borrowed ring's textures belong to
+ * the host, so its quarantined slots keep nothing. It waits for the map's
+ * in-flight tile work in that case, and once detach completes the host may
+ * destroy its graphics objects. The one exception is a kept Vulkan ring: it is
+ * a child of the host's VkDevice, so the host keeps the device until the
+ * process exits.
  *
  * Returns:
  * - MLN_STATUS_OK when the detach is accepted.
@@ -692,12 +695,14 @@ MLN_API mln_status mln_render_session_dispose(
  *
  * This cleanup path supplies no consumer GPU synchronization, so the host's
  * GPU may still read the frame's texture. The session keeps that texture and
- * never renders into its slot again. Rendering continues on the other slots,
- * and a view already open on the frame stays valid until it ends. Once every
- * slot is quarantined, frame requests return MLN_STATUS_INVALID_STATE. Detach
- * of a session with a quarantined slot keeps the ring allocated until the
- * process exits; see mln_render_session_detach(). An explicit release with
- * consumer synchronization returns the slot to the ring instead.
+ * never renders into its slot again, unless a replacement of a borrowed ring
+ * gives the slot a new texture. Rendering continues on the other slots, and a
+ * view already open on the frame stays valid until it ends. Once every slot
+ * is quarantined, frame requests return MLN_STATUS_INVALID_STATE. Detach of a
+ * session with a quarantined slot of a session-owned ring keeps the ring
+ * allocated until the process exits; see mln_render_session_detach(). An
+ * explicit release with consumer synchronization returns the slot to the ring
+ * instead.
  *
  * The call is CPU-only and may run on any native thread. It starts no thread.
  * It allocates only when it quarantines the last slot while a frame demand

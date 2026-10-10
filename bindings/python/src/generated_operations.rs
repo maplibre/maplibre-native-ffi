@@ -900,6 +900,15 @@ fn generated_copy_mln_map_viewport_options(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_metal_borrowed_texture(
+    py: Python<'_>,
+    value: &sys::mln_metal_borrowed_texture,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_metal_borrowed_texture_descriptor(
     py: Python<'_>,
     value: &sys::mln_metal_borrowed_texture_descriptor,
@@ -914,7 +923,14 @@ fn generated_copy_mln_metal_borrowed_texture_descriptor(
         "physical_height",
         generated_value(py, value.physical_height)?,
     )?;
-    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
+    dict.set_item(
+        "textures",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.textures, value.texture_count)? },
+            |element| generated_copy_mln_metal_borrowed_texture(py, element),
+        )?,
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -943,22 +959,6 @@ fn generated_copy_mln_metal_owned_texture_descriptor(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_metal_owned_texture_frame(
-    py: Python<'_>,
-    value: &sys::mln_metal_owned_texture_frame,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item("width", generated_value(py, value.width)?)?;
-    dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
-    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
-    dict.set_item("device", generated_value(py, value.device as usize)?)?;
-    dict.set_item("pixel_format", generated_value(py, value.pixel_format)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_metal_surface_descriptor(
     py: Python<'_>,
     value: &sys::mln_metal_surface_descriptor,
@@ -973,6 +973,23 @@ fn generated_copy_mln_metal_surface_descriptor(
         generated_copy_mln_metal_context_descriptor(py, &value.context)?,
     )?;
     dict.set_item("layer", generated_value(py, value.layer as usize)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_metal_texture_frame(
+    py: Python<'_>,
+    value: &sys::mln_metal_texture_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
+    dict.set_item("device", generated_value(py, value.device as usize)?)?;
+    dict.set_item("pixel_format", generated_value(py, value.pixel_format)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -1101,6 +1118,15 @@ fn generated_copy_mln_offline_tile_pyramid_region_definition(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_opengl_borrowed_texture(
+    py: Python<'_>,
+    value: &sys::mln_opengl_borrowed_texture,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("texture", generated_value(py, value.texture)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_opengl_borrowed_texture_descriptor(
     py: Python<'_>,
     value: &sys::mln_opengl_borrowed_texture_descriptor,
@@ -1119,7 +1145,14 @@ fn generated_copy_mln_opengl_borrowed_texture_descriptor(
         "context",
         generated_copy_mln_opengl_context_descriptor(py, &value.context)?,
     )?;
-    dict.set_item("texture", generated_value(py, value.texture)?)?;
+    dict.set_item(
+        "textures",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.textures, value.texture_count)? },
+            |element| generated_copy_mln_opengl_borrowed_texture(py, element),
+        )?,
+    )?;
     dict.set_item("target", generated_value(py, value.target)?)?;
     Ok(dict.into_any().unbind())
 }
@@ -1170,27 +1203,6 @@ fn generated_copy_mln_opengl_owned_texture_descriptor(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_opengl_owned_texture_frame(
-    py: Python<'_>,
-    value: &sys::mln_opengl_owned_texture_frame,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item("width", generated_value(py, value.width)?)?;
-    dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
-    dict.set_item("texture", generated_value(py, value.texture)?)?;
-    dict.set_item("target", generated_value(py, value.target)?)?;
-    dict.set_item(
-        "internal_format",
-        generated_value(py, value.internal_format)?,
-    )?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    dict.set_item("type", generated_value(py, value.type_)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_opengl_surface_descriptor(
     py: Python<'_>,
     value: &sys::mln_opengl_surface_descriptor,
@@ -1205,6 +1217,28 @@ fn generated_copy_mln_opengl_surface_descriptor(
         generated_copy_mln_opengl_context_descriptor(py, &value.context)?,
     )?;
     dict.set_item("surface", generated_value(py, value.surface as usize)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_opengl_texture_frame(
+    py: Python<'_>,
+    value: &sys::mln_opengl_texture_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("texture", generated_value(py, value.texture)?)?;
+    dict.set_item("target", generated_value(py, value.target)?)?;
+    dict.set_item(
+        "internal_format",
+        generated_value(py, value.internal_format)?,
+    )?;
+    dict.set_item("format", generated_value(py, value.format)?)?;
+    dict.set_item("type", generated_value(py, value.type_)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2459,6 +2493,16 @@ fn generated_copy_mln_vec3(py: Python<'_>, value: &sys::mln_vec3) -> PyResult<Py
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_vulkan_borrowed_texture(
+    py: Python<'_>,
+    value: &sys::mln_vulkan_borrowed_texture,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("image", generated_value(py, value.image)?)?;
+    dict.set_item("image_view", generated_value(py, value.image_view)?)?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_vulkan_borrowed_texture_descriptor(
     py: Python<'_>,
     value: &sys::mln_vulkan_borrowed_texture_descriptor,
@@ -2477,8 +2521,14 @@ fn generated_copy_mln_vulkan_borrowed_texture_descriptor(
         "context",
         generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
     )?;
-    dict.set_item("image", generated_value(py, value.image)?)?;
-    dict.set_item("image_view", generated_value(py, value.image_view)?)?;
+    dict.set_item(
+        "textures",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.textures, value.texture_count)? },
+            |element| generated_copy_mln_vulkan_borrowed_texture(py, element),
+        )?,
+    )?;
     dict.set_item("format", generated_value(py, value.format)?)?;
     dict.set_item("initial_layout", generated_value(py, value.initial_layout)?)?;
     dict.set_item("final_layout", generated_value(py, value.final_layout)?)?;
@@ -2531,24 +2581,6 @@ fn generated_copy_mln_vulkan_owned_texture_descriptor(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_vulkan_owned_texture_frame(
-    py: Python<'_>,
-    value: &sys::mln_vulkan_owned_texture_frame,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item("width", generated_value(py, value.width)?)?;
-    dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
-    dict.set_item("image", generated_value(py, value.image)?)?;
-    dict.set_item("image_view", generated_value(py, value.image_view)?)?;
-    dict.set_item("device", generated_value(py, value.device as usize)?)?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    dict.set_item("layout", generated_value(py, value.layout)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_vulkan_surface_descriptor(
     py: Python<'_>,
     value: &sys::mln_vulkan_surface_descriptor,
@@ -2563,6 +2595,25 @@ fn generated_copy_mln_vulkan_surface_descriptor(
         generated_copy_mln_vulkan_context_descriptor(py, &value.context)?,
     )?;
     dict.set_item("surface", generated_value(py, value.surface)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_vulkan_texture_frame(
+    py: Python<'_>,
+    value: &sys::mln_vulkan_texture_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("image", generated_value(py, value.image)?)?;
+    dict.set_item("image_view", generated_value(py, value.image_view)?)?;
+    dict.set_item("device", generated_value(py, value.device as usize)?)?;
+    dict.set_item("format", generated_value(py, value.format)?)?;
+    dict.set_item("layout", generated_value(py, value.layout)?)?;
     Ok(dict.into_any().unbind())
 }
 
@@ -2593,6 +2644,19 @@ fn generated_copy_mln_webgl_context_descriptor(
     Ok(dict.into_any().unbind())
 }
 
+fn generated_copy_mln_webgpu_borrowed_texture(
+    py: Python<'_>,
+    value: &sys::mln_webgpu_borrowed_texture,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
+    dict.set_item(
+        "texture_view",
+        generated_value(py, value.texture_view as usize)?,
+    )?;
+    Ok(dict.into_any().unbind())
+}
+
 fn generated_copy_mln_webgpu_borrowed_texture_descriptor(
     py: Python<'_>,
     value: &sys::mln_webgpu_borrowed_texture_descriptor,
@@ -2611,10 +2675,13 @@ fn generated_copy_mln_webgpu_borrowed_texture_descriptor(
         "context",
         generated_copy_mln_webgpu_context_descriptor(py, &value.context)?,
     )?;
-    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
     dict.set_item(
-        "texture_view",
-        generated_value(py, value.texture_view as usize)?,
+        "textures",
+        generated_list(
+            py,
+            unsafe { generated_slice(value.textures, value.texture_count)? },
+            |element| generated_copy_mln_webgpu_borrowed_texture(py, element),
+        )?,
     )?;
     dict.set_item("format", generated_value(py, value.format)?)?;
     Ok(dict.into_any().unbind())
@@ -2647,26 +2714,6 @@ fn generated_copy_mln_webgpu_owned_texture_descriptor(
     Ok(dict.into_any().unbind())
 }
 
-fn generated_copy_mln_webgpu_owned_texture_frame(
-    py: Python<'_>,
-    value: &sys::mln_webgpu_owned_texture_frame,
-) -> PyResult<Py<PyAny>> {
-    let dict = PyDict::new(py);
-    dict.set_item("generation", generated_value(py, value.generation)?)?;
-    dict.set_item("width", generated_value(py, value.width)?)?;
-    dict.set_item("height", generated_value(py, value.height)?)?;
-    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
-    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
-    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
-    dict.set_item(
-        "texture_view",
-        generated_value(py, value.texture_view as usize)?,
-    )?;
-    dict.set_item("device", generated_value(py, value.device as usize)?)?;
-    dict.set_item("format", generated_value(py, value.format)?)?;
-    Ok(dict.into_any().unbind())
-}
-
 fn generated_copy_mln_webgpu_surface_descriptor(
     py: Python<'_>,
     value: &sys::mln_webgpu_surface_descriptor,
@@ -2681,6 +2728,27 @@ fn generated_copy_mln_webgpu_surface_descriptor(
         generated_copy_mln_webgpu_context_descriptor(py, &value.context)?,
     )?;
     dict.set_item("surface", generated_value(py, value.surface as usize)?)?;
+    dict.set_item("format", generated_value(py, value.format)?)?;
+    Ok(dict.into_any().unbind())
+}
+
+fn generated_copy_mln_webgpu_texture_frame(
+    py: Python<'_>,
+    value: &sys::mln_webgpu_texture_frame,
+) -> PyResult<Py<PyAny>> {
+    let dict = PyDict::new(py);
+    dict.set_item("generation", generated_value(py, value.generation)?)?;
+    dict.set_item("width", generated_value(py, value.width)?)?;
+    dict.set_item("height", generated_value(py, value.height)?)?;
+    dict.set_item("scale_factor", generated_value(py, value.scale_factor)?)?;
+    dict.set_item("frame_id", generated_value(py, value.frame_id)?)?;
+    dict.set_item("slot", generated_value(py, value.slot)?)?;
+    dict.set_item("texture", generated_value(py, value.texture as usize)?)?;
+    dict.set_item(
+        "texture_view",
+        generated_value(py, value.texture_view as usize)?,
+    )?;
+    dict.set_item("device", generated_value(py, value.device as usize)?)?;
     dict.set_item("format", generated_value(py, value.format)?)?;
     Ok(dict.into_any().unbind())
 }
@@ -3342,6 +3410,16 @@ fn generated_input_mln_map_viewport_options<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_metal_borrowed_texture<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_metal_borrowed_texture> {
+    let _ = storage;
+    let mut raw: sys::mln_metal_borrowed_texture = unsafe { std::mem::zeroed() };
+    raw.texture = value.getattr("texture")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
 fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3355,7 +3433,13 @@ fn generated_input_mln_metal_borrowed_texture_descriptor<'py>(
     raw.extent = generated_input_mln_render_target_extent(&value.getattr("extent")?, storage)?;
     raw.physical_width = value.getattr("physical_width")?.extract::<u32>()?;
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
-    raw.texture = value.getattr("texture")?.extract::<usize>()? as _;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_metal_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     Ok(raw)
 }
 
@@ -3460,6 +3544,16 @@ fn generated_input_mln_offline_tile_pyramid_region_definition<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_opengl_borrowed_texture<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_opengl_borrowed_texture> {
+    let _ = storage;
+    let mut raw: sys::mln_opengl_borrowed_texture = unsafe { std::mem::zeroed() };
+    raw.texture = value.getattr("texture")?.extract::<u32>()?;
+    Ok(raw)
+}
+
 fn generated_input_mln_opengl_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -3475,7 +3569,13 @@ fn generated_input_mln_opengl_borrowed_texture_descriptor<'py>(
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
         generated_input_mln_opengl_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.texture = value.getattr("texture")?.extract::<u32>()?;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_opengl_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     raw.target = value.getattr("target")?.extract::<u32>()?;
     Ok(raw)
 }
@@ -4069,6 +4169,17 @@ fn generated_input_mln_vec3<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_vulkan_borrowed_texture<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_vulkan_borrowed_texture> {
+    let _ = storage;
+    let mut raw: sys::mln_vulkan_borrowed_texture = unsafe { std::mem::zeroed() };
+    raw.image = value.getattr("image")?.extract::<u64>()?;
+    raw.image_view = value.getattr("image_view")?.extract::<u64>()?;
+    Ok(raw)
+}
+
 fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -4084,8 +4195,13 @@ fn generated_input_mln_vulkan_borrowed_texture_descriptor<'py>(
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
         generated_input_mln_vulkan_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.image = value.getattr("image")?.extract::<u64>()?;
-    raw.image_view = value.getattr("image_view")?.extract::<u64>()?;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_vulkan_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     raw.format = value.getattr("format")?.extract::<u32>()?;
     raw.initial_layout = value.getattr("initial_layout")?.extract::<u32>()?;
     raw.final_layout = value.getattr("final_layout")?.extract::<u32>()?;
@@ -4180,6 +4296,17 @@ fn generated_input_mln_webgl_context_descriptor<'py>(
     Ok(raw)
 }
 
+fn generated_input_mln_webgpu_borrowed_texture<'py>(
+    value: &Bound<'py, PyAny>,
+    storage: &mut GeneratedInputStorage<'py>,
+) -> PyResult<sys::mln_webgpu_borrowed_texture> {
+    let _ = storage;
+    let mut raw: sys::mln_webgpu_borrowed_texture = unsafe { std::mem::zeroed() };
+    raw.texture = value.getattr("texture")?.extract::<usize>()? as _;
+    raw.texture_view = value.getattr("texture_view")?.extract::<usize>()? as _;
+    Ok(raw)
+}
+
 fn generated_input_mln_webgpu_borrowed_texture_descriptor<'py>(
     value: &Bound<'py, PyAny>,
     storage: &mut GeneratedInputStorage<'py>,
@@ -4195,8 +4322,13 @@ fn generated_input_mln_webgpu_borrowed_texture_descriptor<'py>(
     raw.physical_height = value.getattr("physical_height")?.extract::<u32>()?;
     raw.context =
         generated_input_mln_webgpu_context_descriptor(&value.getattr("context")?, storage)?;
-    raw.texture = value.getattr("texture")?.extract::<usize>()? as _;
-    raw.texture_view = value.getattr("texture_view")?.extract::<usize>()? as _;
+    raw.textures = {
+        let items = generated_items(&value.getattr("textures")?, |item| {
+            generated_input_mln_webgpu_borrowed_texture(&item, storage)
+        })?;
+        raw.texture_count = generated_length(items.len())?;
+        storage.keep_array(items)
+    };
     raw.format = value.getattr("format")?.extract::<u32>()?;
     Ok(raw)
 }
@@ -4585,14 +4717,14 @@ impl AcquiredFrameHandle {
         let mut call =
             GeneratedCall::new(py, "mln_acquired_frame_get_metal_texture", self.admission())?;
         let handle = self.live()?;
-        let mut out_frame: sys::mln_metal_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_metal_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_metal_texture_frame>() as _;
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_acquired_frame_get_metal_texture(handle, &mut out_frame, diagnostic)
             })
         }?;
-        generated_copy_mln_metal_owned_texture_frame(py, &out_frame)
+        generated_copy_mln_metal_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
     fn with_opengl_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -4602,14 +4734,14 @@ impl AcquiredFrameHandle {
             self.admission(),
         )?;
         let handle = self.live()?;
-        let mut out_frame: sys::mln_opengl_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_opengl_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_opengl_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_opengl_texture_frame>() as _;
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_acquired_frame_get_opengl_texture(handle, &mut out_frame, diagnostic)
             })
         }?;
-        generated_copy_mln_opengl_owned_texture_frame(py, &out_frame)
+        generated_copy_mln_opengl_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
     fn with_producer_sync(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -4646,14 +4778,14 @@ impl AcquiredFrameHandle {
             self.admission(),
         )?;
         let handle = self.live()?;
-        let mut out_frame: sys::mln_vulkan_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_vulkan_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_vulkan_texture_frame>() as _;
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_acquired_frame_get_vulkan_texture(handle, &mut out_frame, diagnostic)
             })
         }?;
-        generated_copy_mln_vulkan_owned_texture_frame(py, &out_frame)
+        generated_copy_mln_vulkan_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = ())]
     fn with_webgpu_texture(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -4663,14 +4795,14 @@ impl AcquiredFrameHandle {
             self.admission(),
         )?;
         let handle = self.live()?;
-        let mut out_frame: sys::mln_webgpu_owned_texture_frame = unsafe { std::mem::zeroed() };
-        out_frame.size = std::mem::size_of::<sys::mln_webgpu_owned_texture_frame>() as _;
+        let mut out_frame: sys::mln_webgpu_texture_frame = unsafe { std::mem::zeroed() };
+        out_frame.size = std::mem::size_of::<sys::mln_webgpu_texture_frame>() as _;
         unsafe {
             call.status(|diagnostic| {
                 sys::mln_acquired_frame_get_webgpu_texture(handle, &mut out_frame, diagnostic)
             })
         }?;
-        generated_copy_mln_webgpu_owned_texture_frame(py, &out_frame)
+        generated_copy_mln_webgpu_texture_frame(py, &out_frame)
     }
     #[pyo3(signature = (consumer_completion=None))]
     fn close(

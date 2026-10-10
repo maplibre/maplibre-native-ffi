@@ -29,7 +29,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
 
     public void Resize(Viewport viewport) => context.SetDrawableSize(viewport);
 
-    public bool Draw(MetalOwnedTextureFrameView frame)
+    public bool Draw(MetalTextureFrameView frame)
     {
         if (frame.Width == 0 || frame.Height == 0 || frame.Texture.IsNull)
         {
@@ -45,7 +45,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
     /// Samples the texture into the layer's next drawable. Returns false without presenting while
     /// the layer has no drawable, as a minimized or occluded window does.
     /// </summary>
-    public bool DrawTexture(nint texture)
+    private bool DrawTexture(nint texture)
     {
         nint passDescriptor = 0;
         try

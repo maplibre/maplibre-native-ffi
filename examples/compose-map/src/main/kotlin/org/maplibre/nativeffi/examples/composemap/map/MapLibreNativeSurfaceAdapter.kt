@@ -12,10 +12,13 @@ import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.examples.composemap.surface.VulkanContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.VulkanImageTarget
 import org.maplibre.nativeffi.examples.composemap.surface.WglContextHandles
+import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GeneratedApi
 import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.MetalBorrowedTexture
 import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
+import org.maplibre.nativeffi.generated.OpenglBorrowedTexture
 import org.maplibre.nativeffi.generated.OpenglBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
 import org.maplibre.nativeffi.generated.RenderBackendFlag
@@ -24,6 +27,7 @@ import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
+import org.maplibre.nativeffi.generated.VulkanBorrowedTexture
 import org.maplibre.nativeffi.generated.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.VulkanContextDescriptor
 import org.maplibre.nativeffi.generated.WglContextDescriptor
@@ -59,16 +63,25 @@ internal object MapLibreNativeSurfaceAdapter {
       is OpenGlTextureTarget -> openGlTarget(target, extent)
     }
 
+  /** The ring slot that holds an acquired frame of the active backend. */
+  fun frameSlot(frame: AcquiredFrameHandle): Int =
+    when (backend) {
+      ProducerBackend.METAL -> frame.withMetalTexture { it.slot }
+      ProducerBackend.VULKAN -> frame.withVulkanTexture { it.slot }
+      ProducerBackend.OPENGL -> frame.withOpenglTexture { it.slot }
+    }.toInt()
+
   private fun metalTarget(target: MetalTextureTarget, extent: SurfaceExtent): BorrowedTarget {
     val descriptor =
       MetalBorrowedTextureDescriptor(
         extent.toRenderTargetExtent(),
         extent.physicalWidth.toUInt(),
         extent.physicalHeight.toUInt(),
-        target.texture.toPointer(),
+        target.ring.map { MetalBorrowedTexture(it.toPointer()) },
       )
     return BorrowedTarget(
-      sessionKey = SessionKey.Metal(target.device, target.pixelFormat, extent.scaleFactor),
+      sessionKey =
+        SessionKey.Metal(target.device, target.pixelFormat, target.ringDepth, extent.scaleFactor),
       targetKey = TargetKey(target.generation, extent),
       attach = { map, options -> map.metalBorrowedTextureAttach(descriptor, options) },
       setTarget = { session -> session.metalBorrowedTextureSetTarget(descriptor) },
@@ -82,8 +95,9 @@ internal object MapLibreNativeSurfaceAdapter {
         extent.physicalWidth.toUInt(),
         extent.physicalHeight.toUInt(),
         target.context.toDescriptor(),
-        target.image.toVulkanHandle(),
-        target.imageView.toVulkanHandle(),
+        target.ring.map {
+          VulkanBorrowedTexture(it.image.toVulkanHandle(), it.imageView.toVulkanHandle())
+        },
         target.format.toUInt(),
         target.initialLayout.toUInt(),
         target.finalLayout.toUInt(),
@@ -95,6 +109,7 @@ internal object MapLibreNativeSurfaceAdapter {
           format = target.format,
           initialLayout = target.initialLayout,
           finalLayout = target.finalLayout,
+          ringDepth = target.ringDepth,
           scaleFactor = extent.scaleFactor,
         ),
       targetKey = TargetKey(target.generation, extent),
@@ -110,11 +125,11 @@ internal object MapLibreNativeSurfaceAdapter {
         extent.physicalWidth.toUInt(),
         extent.physicalHeight.toUInt(),
         target.context.toDescriptor(),
-        target.textureName.toUInt(),
+        target.ring.map { OpenglBorrowedTexture(it.toUInt()) },
         target.textureTarget.toUInt(),
       )
     return BorrowedTarget(
-      sessionKey = SessionKey.OpenGl(target.context, extent.scaleFactor),
+      sessionKey = SessionKey.OpenGl(target.context, target.ringDepth, extent.scaleFactor),
       targetKey = TargetKey(target.generation, extent),
       attach = { map, options -> map.openglBorrowedTextureAttach(descriptor, options) },
       setTarget = { session -> session.openglBorrowedTextureSetTarget(descriptor) },
@@ -123,17 +138,21 @@ internal object MapLibreNativeSurfaceAdapter {
 
   /**
    * The part of a target a live render session cannot be moved across. A session takes a
-   * replacement texture only for the graphics context and the scale factor it attached with, so a
-   * target whose key still matches is handed over and one whose key changed closes the session and
-   * attaches again.
+   * replacement ring only for the graphics context, ring depth, and scale factor it attached with,
+   * so a target whose key still matches is handed over and one whose key changed closes the session
+   * and attaches again.
    */
   sealed interface SessionKey {
     /**
      * A Metal texture carries its device and pixel format, which is what a session compares against
      * its own. Attach admits only single-sample textures, so sample count needs no entry.
      */
-    data class Metal(val device: NativeHandle, val pixelFormat: Long, val scaleFactor: Double) :
-      SessionKey
+    data class Metal(
+      val device: NativeHandle,
+      val pixelFormat: Long,
+      val ringDepth: Int,
+      val scaleFactor: Double,
+    ) : SessionKey
 
     /** A Vulkan session built its render pass around the format and both layouts. */
     data class Vulkan(
@@ -141,16 +160,21 @@ internal object MapLibreNativeSurfaceAdapter {
       val format: Int,
       val initialLayout: Int,
       val finalLayout: Int,
+      val ringDepth: Int,
       val scaleFactor: Double,
     ) : SessionKey
 
     /** An OpenGL session names its context provider data. */
-    data class OpenGl(val context: OpenGlContextHandles, val scaleFactor: Double) : SessionKey
+    data class OpenGl(
+      val context: OpenGlContextHandles,
+      val ringDepth: Int,
+      val scaleFactor: Double,
+    ) : SessionKey
   }
 
   /**
-   * The texture a session is rendering into right now. A bridge counts the generation up every time
-   * it allocates, so a matching key means nothing has to be handed over.
+   * The ring a session is rendering into right now. A bridge counts the generation up every time it
+   * allocates, so a matching key means nothing has to be handed over.
    */
   data class TargetKey(val generation: Long, val extent: SurfaceExtent)
 

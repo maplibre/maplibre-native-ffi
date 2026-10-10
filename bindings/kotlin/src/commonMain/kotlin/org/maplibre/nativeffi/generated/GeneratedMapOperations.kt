@@ -2152,7 +2152,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Starts attachment of a caller-owned Metal texture target.
+   * Starts attachment of a ring of caller-owned Metal textures.
    *
    * See `mln_metal_borrowed_texture_attach` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2242,7 +2242,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Starts attachment of a caller-owned OpenGL texture target.
+   * Starts attachment of a ring of caller-owned OpenGL textures.
    *
    * See `mln_opengl_borrowed_texture_attach` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2332,7 +2332,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Starts attachment of a caller-owned Vulkan texture target.
+   * Starts attachment of a ring of caller-owned Vulkan images.
    *
    * See `mln_vulkan_borrowed_texture_attach` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -2422,7 +2422,7 @@ public abstract class GeneratedMapOperations internal constructor() {
     }
 
   /**
-   * Starts attachment of a caller-owned WebGPU texture target.
+   * Starts attachment of a ring of caller-owned WebGPU textures.
    *
    * See `mln_webgpu_borrowed_texture_attach` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

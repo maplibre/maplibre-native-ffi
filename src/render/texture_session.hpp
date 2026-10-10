@@ -127,16 +127,16 @@ auto texture_read_premultiplied_rgba8_start(
   mln_render_session texture, const mln_completion* completion
 ) -> mln_status;
 auto acquired_frame_get_metal_texture(
-  mln_acquired_frame frame, mln_metal_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_metal_texture_frame* out_frame
 ) -> mln_status;
 auto acquired_frame_get_vulkan_texture(
-  mln_acquired_frame frame, mln_vulkan_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_vulkan_texture_frame* out_frame
 ) -> mln_status;
 auto acquired_frame_get_opengl_texture(
-  mln_acquired_frame frame, mln_opengl_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_opengl_texture_frame* out_frame
 ) -> mln_status;
 auto acquired_frame_get_webgpu_texture(
-  mln_acquired_frame frame, mln_webgpu_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_webgpu_texture_frame* out_frame
 ) -> mln_status;
 
 }  // namespace mln::core

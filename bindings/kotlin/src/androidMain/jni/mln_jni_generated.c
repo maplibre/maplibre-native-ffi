@@ -19,7 +19,7 @@ static jint mln_acquired_frame_get_metal_texture_jni(
 ) {
   return (jint)mln_acquired_frame_get_metal_texture(
     (mln_acquired_frame)frame,
-    MLN_JNI_POINTER(mln_metal_owned_texture_frame*, out_frame),
+    MLN_JNI_POINTER(mln_metal_texture_frame*, out_frame),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -29,7 +29,7 @@ static jint mln_acquired_frame_get_opengl_texture_jni(
 ) {
   return (jint)mln_acquired_frame_get_opengl_texture(
     (mln_acquired_frame)frame,
-    MLN_JNI_POINTER(mln_opengl_owned_texture_frame*, out_frame),
+    MLN_JNI_POINTER(mln_opengl_texture_frame*, out_frame),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -58,7 +58,7 @@ static jint mln_acquired_frame_get_vulkan_texture_jni(
 ) {
   return (jint)mln_acquired_frame_get_vulkan_texture(
     (mln_acquired_frame)frame,
-    MLN_JNI_POINTER(mln_vulkan_owned_texture_frame*, out_frame),
+    MLN_JNI_POINTER(mln_vulkan_texture_frame*, out_frame),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }
@@ -68,7 +68,7 @@ static jint mln_acquired_frame_get_webgpu_texture_jni(
 ) {
   return (jint)mln_acquired_frame_get_webgpu_texture(
     (mln_acquired_frame)frame,
-    MLN_JNI_POINTER(mln_webgpu_owned_texture_frame*, out_frame),
+    MLN_JNI_POINTER(mln_webgpu_texture_frame*, out_frame),
     MLN_JNI_POINTER(mln_diagnostic*, out_diagnostic)
   );
 }

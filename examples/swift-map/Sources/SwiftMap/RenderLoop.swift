@@ -153,7 +153,6 @@ final class RenderLoop {
       } else if results.needsRepaint {
         requestFrame()
       }
-      if results.any { try target.compositorDone() }
     } catch {
       fail(error)
     }

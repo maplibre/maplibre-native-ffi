@@ -1,7 +1,7 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    MapHandle, OpenglBorrowedTextureDescriptor, OpenglContextDescriptor,
+    MapHandle, OpenglBorrowedTexture, OpenglBorrowedTextureDescriptor, OpenglContextDescriptor,
     OpenglOwnedTextureDescriptor, OpenglSurfaceDescriptor, RenderDriverKind,
 };
 
@@ -9,11 +9,14 @@ use crate::graphics::GraphicsContext;
 use crate::map_state::MapState;
 use crate::opengl::{OpenGLBorrowedTexture, OpenGLContext, OpenGLTextureCompositor};
 use crate::render_target::{
-    Mode, Replacements, Session, attach_options, compositor_error, extent,
+    BORROWED_RING_DEPTH, Mode, Replacements, Session, attach_options, compositor_error, extent,
     require_cpu_complete_producer,
 };
 use crate::shell::Wakes;
 use crate::viewport::Viewport;
+
+/// The textures of a borrowed ring, one per slot.
+type OpenGLRing = [OpenGLBorrowedTexture; BORROWED_RING_DEPTH];
 
 pub enum RenderTarget {
     OwnedTexture {
@@ -23,9 +26,9 @@ pub enum RenderTarget {
     BorrowedTexture {
         session: Session,
         compositor: Box<OpenGLTextureCompositor>,
-        /// The texture the compositor samples.
-        texture: Box<OpenGLBorrowedTexture>,
-        replacements: Replacements<OpenGLBorrowedTexture>,
+        /// The ring the session renders into.
+        ring: Box<OpenGLRing>,
+        replacements: Replacements<Box<OpenGLRing>>,
     },
     Surface {
         session: Session,
@@ -65,10 +68,8 @@ impl RenderTarget {
                 })
             }
             Mode::BorrowedTexture => {
-                let texture = OpenGLBorrowedTexture::new(gl, viewport).map_err(|error| {
-                    compositor_error(format!("OpenGL texture creation failed: {error}"))
-                })?;
-                let descriptor = borrowed_descriptor(context, &texture, viewport);
+                let ring = ring(gl, viewport)?;
+                let descriptor = borrowed_descriptor(context, &ring, viewport);
                 let session = Session::new(
                     unsafe { map.opengl_borrowed_texture_attach(&descriptor, &options) }?,
                     &options,
@@ -78,7 +79,7 @@ impl RenderTarget {
                 Ok(Self::BorrowedTexture {
                     session,
                     compositor: Box::new(compositor(gl, viewport)?),
-                    texture: Box::new(texture),
+                    ring,
                     replacements: Replacements::default(),
                 })
             }
@@ -132,23 +133,31 @@ impl RenderTarget {
             Self::BorrowedTexture {
                 session,
                 compositor,
+                ring: current,
                 replacements,
-                ..
             } => {
                 let gl = graphics.opengl();
-                let replacement = OpenGLBorrowedTexture::new(gl, viewport).map_err(|error| {
-                    compositor_error(format!("OpenGL texture creation failed: {error}"))
-                })?;
+                // The replacement waits until the host holds no frame, and
+                // the window keeps showing what it last presented.
+                session.release_held()?;
+                let replacement = ring(gl, viewport)?;
                 let context = gl
                     .descriptor()
                     .map_err(|error| compositor_error(error.to_string()))?;
                 let descriptor = borrowed_descriptor(context, &replacement, viewport);
-                let completion = unsafe {
+                let completion = match unsafe {
                     session
                         .handle()
                         .opengl_borrowed_texture_set_target(&descriptor)
-                }?;
-                replacements.push(completion, replacement, wakes);
+                } {
+                    Ok(completion) => completion,
+                    Err(error) => {
+                        close_ring(replacement, Some(gl));
+                        return Err(error.into());
+                    }
+                };
+                let retired = std::mem::replace(current, replacement);
+                replacements.push(completion, retired, wakes);
                 compositor.resize(viewport);
                 // Target replacement changes only the graphics resource, so
                 // the map takes the new extent directly.
@@ -161,22 +170,20 @@ impl RenderTarget {
         }
     }
 
-    /// Switches the compositor to each replacement a rendered frame has drawn
-    /// into, closing the texture it retires.
-    pub fn show_replacements(
+    /// Closes each ring that a completed replacement retired.
+    pub fn retire_replaced(
         &mut self,
         graphics: &GraphicsContext,
         wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
             session,
-            texture,
             replacements,
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_shown(session, wakes)? {
-                std::mem::replace(&mut **texture, replacement).close(Some(graphics.opengl()));
+            while let Some(retired) = replacements.take_completed(session, wakes)? {
+                close_ring(retired, Some(graphics.opengl()));
             }
         }
         Ok(())
@@ -187,13 +194,17 @@ impl RenderTarget {
     pub fn present(
         &mut self,
         graphics: &GraphicsContext,
-        wakes: &Wakes,
+        _wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<bool> {
-        self.show_replacements(graphics, wakes)?;
         match self {
             Self::OwnedTexture {
                 session,
                 compositor,
+            }
+            | Self::BorrowedTexture {
+                session,
+                compositor,
+                ..
             } => {
                 // Without a new frame, the window keeps the one it already
                 // shows.
@@ -203,11 +214,6 @@ impl RenderTarget {
                 require_cpu_complete_producer(frame)?;
                 compositor.draw_frame(graphics.opengl(), frame)?;
             }
-            Self::BorrowedTexture {
-                compositor,
-                texture,
-                ..
-            } => compositor.draw_texture(graphics.opengl(), texture.texture())?,
             // The driver already presented the frame.
             Self::Surface { .. } => {}
         }
@@ -228,15 +234,15 @@ impl RenderTarget {
             Self::BorrowedTexture {
                 session,
                 compositor,
-                texture,
+                ring,
                 mut replacements,
             } => {
                 session.close()?;
-                for replacement in replacements.take_all() {
-                    replacement.close(gl);
+                for retired in replacements.take_all() {
+                    close_ring(retired, gl);
                 }
                 compositor.close(gl);
-                texture.close(gl);
+                close_ring(ring, gl);
                 Ok(())
             }
             Self::Surface { session } => session.close(),
@@ -252,9 +258,30 @@ fn compositor(
         .map_err(|error| compositor_error(format!("OpenGL compositor creation failed: {error}")))
 }
 
+fn ring(gl: &OpenGLContext, viewport: Viewport) -> maplibre_native_ffi::Result<Box<OpenGLRing>> {
+    let texture = || {
+        OpenGLBorrowedTexture::new(gl, viewport)
+            .map_err(|error| compositor_error(format!("OpenGL texture creation failed: {error}")))
+    };
+    let first = texture()?;
+    match texture() {
+        Ok(second) => Ok(Box::new([first, second])),
+        Err(error) => {
+            first.close(Some(gl));
+            Err(error)
+        }
+    }
+}
+
+fn close_ring(ring: Box<OpenGLRing>, gl: Option<&OpenGLContext>) {
+    for texture in *ring {
+        texture.close(gl);
+    }
+}
+
 fn borrowed_descriptor(
     context: OpenglContextDescriptor,
-    texture: &OpenGLBorrowedTexture,
+    ring: &OpenGLRing,
     viewport: Viewport,
 ) -> OpenglBorrowedTextureDescriptor {
     OpenglBorrowedTextureDescriptor {
@@ -262,7 +289,10 @@ fn borrowed_descriptor(
         physical_width: viewport.physical_width,
         physical_height: viewport.physical_height,
         context,
-        texture: texture.texture(),
-        target: texture.target(),
+        textures: ring
+            .iter()
+            .map(|texture| OpenglBorrowedTexture::new(texture.texture()))
+            .collect(),
+        target: ring[0].target(),
     }
 }

@@ -84,7 +84,8 @@ public interface NativeSurfaceFrame {
 }
 
 public sealed interface NativeSurfaceRenderResult {
-  public data object Rendered : NativeSurfaceRenderResult
+  /** A frame reached [target], the ring slot of the frame's target that the consumer draws. */
+  public data class Rendered(public val target: NativeSurfaceTarget) : NativeSurfaceRenderResult
 
   public data object Skipped : NativeSurfaceRenderResult
 }
@@ -194,17 +195,28 @@ private fun physicalDimension(logicalSize: Int, scaleFactor: Double): Int =
 
 @JvmInline public value class NativeHandle(public val address: Long)
 
+/**
+ * The ring of textures a bridge lends the producer for one frame. The producer renders into one
+ * slot at a time, and [slot] names the texture of a slot for the consumer to draw.
+ */
 public sealed interface NativeSurfaceTarget {
   public val backend: ProducerBackend
 
   public val extent: SurfaceExtent
 
   public val generation: Long
+
+  /** The number of textures in the ring. */
+  public val ringDepth: Int
+
+  /** This target with the texture of ring slot [index] in front. */
+  public fun slot(index: Int): NativeSurfaceTarget
 }
 
 /**
- * A Metal texture and the Skiko device it was allocated on. Skiko allocates a new texture on every
- * resize, so a producer keeping per-device state compares [device] rather than the texture.
+ * A ring of Metal textures and the Skiko device they were allocated on. A bridge allocates a new
+ * ring on every resize, so a producer keeping per-device state compares [device] rather than the
+ * textures. [texture] is the texture in front, the first of [ring] unless [slot] chose another.
  */
 public data class MetalTextureTarget(
   public val texture: NativeHandle,
@@ -213,8 +225,14 @@ public data class MetalTextureTarget(
   public val origin: TextureOrigin = TextureOrigin.TOP_LEFT,
   override val extent: SurfaceExtent,
   override val generation: Long,
+  public val ring: List<NativeHandle> = listOf(texture),
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.METAL
+
+  override val ringDepth: Int
+    get() = ring.size
+
+  override fun slot(index: Int): MetalTextureTarget = copy(texture = ring[index])
 }
 
 public enum class TextureOrigin {
@@ -222,6 +240,16 @@ public enum class TextureOrigin {
   BOTTOM_LEFT,
 }
 
+/** One Vulkan image of a ring and its view. */
+public data class VulkanImageSlot(
+  public val image: NativeHandle,
+  public val imageView: NativeHandle,
+)
+
+/**
+ * A ring of Vulkan images. [image] and [imageView] are the image in front, the first of [ring]
+ * unless [slot] chose another.
+ */
 public data class VulkanImageTarget(
   public val context: VulkanContextHandles,
   public val image: NativeHandle,
@@ -232,8 +260,15 @@ public data class VulkanImageTarget(
   public val queueFamilyIndex: Int,
   override val extent: SurfaceExtent,
   override val generation: Long,
+  public val ring: List<VulkanImageSlot> = listOf(VulkanImageSlot(image, imageView)),
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.VULKAN
+
+  override val ringDepth: Int
+    get() = ring.size
+
+  override fun slot(index: Int): VulkanImageTarget =
+    copy(image = ring[index].image, imageView = ring[index].imageView)
 }
 
 public data class VulkanContextHandles(
@@ -265,6 +300,10 @@ public data class WglContextHandles(
   public val getProcAddress: NativeHandle,
 ) : OpenGlContextHandles
 
+/**
+ * A ring of OpenGL textures. [textureName] is the texture in front, the first of [ring] unless
+ * [slot] chose another.
+ */
 public data class OpenGlTextureTarget(
   public val context: OpenGlContextHandles,
   public val textureName: Int,
@@ -274,6 +313,12 @@ public data class OpenGlTextureTarget(
   public val contextProvider: OpenGlContextProvider,
   override val extent: SurfaceExtent,
   override val generation: Long,
+  public val ring: List<Int> = listOf(textureName),
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.OPENGL
+
+  override val ringDepth: Int
+    get() = ring.size
+
+  override fun slot(index: Int): OpenGlTextureTarget = copy(textureName = ring[index])
 }

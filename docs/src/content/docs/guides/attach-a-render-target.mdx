@@ -18,7 +18,7 @@ session detaches.
 
 A native surface draws and presents each frame to a window or view. A
 session-owned texture draws into a ring that the session allocates. A borrowed
-texture draws into a host allocation. [Render a static
+texture draws into a ring of textures that the host allocates. [Render a static
 image](/maplibre-native-ffi/guides/render-a-static-image/) covers texture
 readback.
 
@@ -63,9 +63,14 @@ consumer synchronization, and presentation are available.
 
 <Code code={region(renderTarget, "owned")} lang="c" title="render-target.c" />
 
-A borrowed texture descriptor also states its physical device-pixel size. The
-values must match the host allocation, including on graphics APIs that cannot
-query them.
+A borrowed texture descriptor also states its physical device-pixel size, which
+must match the host's textures, including on graphics APIs that cannot query
+them. It names one texture per ring slot, and the attach call copies that array.
+Both texture kinds hand frames over the same way: the host acquires a rendered
+frame before it samples the frame's texture and releases it afterward, and the
+session never renders into a texture whose frame is acquired. With two textures,
+the host holds the newest frame while the session renders the next one into the
+other.
 
 <Code code={region(renderTarget, "borrowed")} lang="c" title="render-target.c" />
 
@@ -79,8 +84,10 @@ demands capture that generation.
 <Code code={region(renderTarget, "resize")} lang="c" title="render-target.c" />
 
 A borrowed texture gets its size from the host allocation, so resizing it
-reports an unsupported status. Allocate a texture at the new size and replace
-the target with a new descriptor. A host can replace a native surface the same
+reports an unsupported status. Release every acquired frame, allocate a ring of
+as many textures at the new size, and replace the target with a new descriptor.
+A frame rendered before the replacement can no longer be acquired, and the host
+keeps the outgoing textures until the replacement completes. A host can replace a native surface the same
 way after recreating a window or view allocation; Android rotation and Flutter
 surface lifecycle changes use this path. Both paths preserve the session's
 rendering resources, including loaded tiles, and leave map-owned feature state

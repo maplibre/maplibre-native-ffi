@@ -126,9 +126,9 @@ protocol OwnedTextureFrameView: AnyObject {
   var height: UInt32 { get throws }
 }
 
-extension MetalOwnedTextureFrameView: OwnedTextureFrameView {}
-extension VulkanOwnedTextureFrameView: OwnedTextureFrameView {}
-extension OpenglOwnedTextureFrameView: OwnedTextureFrameView {}
+extension MetalTextureFrameView: OwnedTextureFrameView {}
+extension VulkanTextureFrameView: OwnedTextureFrameView {}
+extension OpenglTextureFrameView: OwnedTextureFrameView {}
 
 struct FixtureError: Error, CustomStringConvertible {
   let description: String

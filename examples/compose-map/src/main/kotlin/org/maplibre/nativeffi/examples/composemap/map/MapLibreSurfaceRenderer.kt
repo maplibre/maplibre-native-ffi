@@ -11,8 +11,10 @@ import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceSession
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.examples.composemap.surface.VulkanDeviceRetention
+import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
+import org.maplibre.nativeffi.generated.GpuSyncKind
 import org.maplibre.nativeffi.generated.MapHandle
 import org.maplibre.nativeffi.generated.RenderDriverKind
 import org.maplibre.nativeffi.generated.RenderFrameResult
@@ -25,10 +27,16 @@ import org.maplibre.nativeffi.generated.Wake
 /**
  * The native-surface renderer.
  *
- * [render] runs inside the bridge's producer access, the only window in which Skiko lends its
- * texture. There it demands a frame and waits for that demand's result. A Metal or Vulkan session
- * renders on its core worker meanwhile; an OpenGL session's caller driver runs on the producer
- * thread, which services it while it waits.
+ * [render] runs inside the bridge's producer access, the only window in which the bridge lends its
+ * texture ring. There it demands a frame and waits for that demand's result. A Metal or Vulkan
+ * session renders on its core worker meanwhile; an OpenGL session's caller driver runs on the
+ * producer thread, which services it while it waits.
+ *
+ * Each rendered frame is acquired and handed to the bridge, which draws it after [render] returns.
+ * The renderer holds that frame until the bridge is done with it, so the session never renders into
+ * the texture the bridge draws. In a ring of two, the frame stays held until a newer one is
+ * acquired, and the session renders into the other texture meanwhile. A ring of one has no other
+ * texture, so its frame is released at the next demand, after the bridge has drawn it.
  *
  * Input becomes map commands on the Compose thread. The runtime's event wake asks Compose for a
  * draw when a map update is ready to render.
@@ -83,6 +91,9 @@ internal class MapLibreSurfaceRenderer(
   @Volatile private var currentExtent = SurfaceExtent.Empty
   private var nextToken = 0uL
 
+  /** The frame the bridge draws, held until it is replaced or its ring is. */
+  private var held: AcquiredFrameHandle? = null
+
   override fun onSurfaceAvailable(session: NativeSurfaceSession) {
     surfaceSession = session
     ownerSession = session
@@ -127,6 +138,9 @@ internal class MapLibreSurfaceRenderer(
     if (callerDriver) session.serviceDriverWork(0uL)
     val forced = frameForced.getAndSet(false)
     if (!frameWanted.getAndSet(false) && !forced) return NativeSurfaceRenderResult.Skipped
+    // A ring of one has no texture to render into while its frame is held. The bridge drew that
+    // frame before this call, so it goes first.
+    if (frame.target.ringDepth == 1) releaseHeld()
     val token = ++nextToken
     session.requestFrame(
       FrameDemand(
@@ -140,8 +154,15 @@ internal class MapLibreSurfaceRenderer(
     if (result.needsRepaint) requestRender()
     return when (result.disposition) {
       RenderResult.RENDERED -> {
+        val slot = acquireNewest(session)
+        if (slot == null) {
+          // A frame rendered before a replacement can no longer be acquired; the next Compose
+          // frame renders into the new ring.
+          requestRender(force = true)
+          return NativeSurfaceRenderResult.Skipped
+        }
         onRendered()
-        NativeSurfaceRenderResult.Rendered
+        NativeSurfaceRenderResult.Rendered(frame.target.slot(slot))
       }
       RenderResult.TARGET_NOT_READY -> {
         // A target that was not ready does not cause a map-update event, so the next Compose frame
@@ -151,6 +172,39 @@ internal class MapLibreSurfaceRenderer(
       }
       else -> NativeSurfaceRenderResult.Skipped
     }
+  }
+
+  /**
+   * Holds the newest rendered frame, releasing every older one, and returns its ring slot, or null
+   * when no frame is ready. The bridge finished with the frame this replaces before this call.
+   */
+  private fun acquireNewest(session: RenderSessionHandle): Int? {
+    var newest: AcquiredFrameHandle? = null
+    while (true) {
+      val frame = session.acquireFrame() ?: break
+      // Nothing read an older frame, so it releases CPU-complete.
+      newest?.release()
+      newest = frame
+    }
+    val frame = newest ?: return null
+    frame.withProducerSync { sync ->
+      check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
+        "The bridges draw only frames whose producer work is complete"
+      }
+    }
+    releaseHeld()
+    held = frame
+    return MapLibreNativeSurfaceAdapter.frameSlot(frame)
+  }
+
+  /**
+   * Releases the held frame. CPU-complete release states that the bridge is done with it, which
+   * holds from the next render on.
+   */
+  private fun releaseHeld() {
+    val releasing = held ?: return
+    held = null
+    releasing.release()
   }
 
   /**
@@ -274,9 +328,9 @@ internal class MapLibreSurfaceRenderer(
   }
 
   /**
-   * Renders through a session attached to the texture this frame carries. Skiko reallocates its
-   * texture on every resize; handing the replacement to the live session keeps its renderer warm,
-   * so a session is closed and reattached only when the graphics context or scale changes.
+   * Renders through a session attached to the ring this frame carries. The bridge reallocates its
+   * ring on every resize; handing the replacement to the live session keeps its renderer warm, so a
+   * session is closed and reattached only when the graphics context, ring depth, or scale changes.
    */
   private fun ensureAttachedRenderSession(
     map: MapHandle,
@@ -289,6 +343,8 @@ internal class MapLibreSurfaceRenderer(
           return existing
         }
         try {
+          // A replacement waits until the host holds no frame of the ring.
+          releaseHeld()
           await(existing.session, borrowed.setTarget(existing.session))
         } catch (error: RuntimeException) {
           // A failed replacement leaves it unknown which texture the session holds, and Skiko
@@ -338,6 +394,7 @@ internal class MapLibreSurfaceRenderer(
     renderSession = null
     val session = closing.session
     try {
+      releaseHeld()
       await(session, session.detach())
     } catch (error: RuntimeException) {
       System.err.println("render session detach failed, abandoning: ${error.message}")
@@ -350,6 +407,7 @@ internal class MapLibreSurfaceRenderer(
   private fun abandonRenderSession() {
     val closing = renderSession
     renderSession = null
+    runCatching { releaseHeld() }
     closing?.session?.let { session ->
       abandon(session)
       session.close()

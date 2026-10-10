@@ -1880,6 +1880,21 @@ class MapViewportOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class MetalBorrowedTexture:
+    """One caller-owned Metal texture of a borrowed texture ring.
+
+    See `mln_metal_borrowed_texture` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    texture: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(texture=raw["texture"])
+
+
+@dataclass(frozen=True, slots=True)
 class MetalBorrowedTextureDescriptor:
     """Metal attachment options for a borrowed texture target.
 
@@ -1890,7 +1905,7 @@ class MetalBorrowedTextureDescriptor:
     extent: RenderTargetExtent
     physical_width: int
     physical_height: int
-    texture: int
+    textures: tuple[MetalBorrowedTexture, ...]
 
     @classmethod
     def _from_native(cls, raw):
@@ -1898,7 +1913,9 @@ class MetalBorrowedTextureDescriptor:
             extent=RenderTargetExtent._from_native(raw["extent"]),
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
-            texture=raw["texture"],
+            textures=tuple(
+                MetalBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
         )
 
     @classmethod
@@ -1949,37 +1966,6 @@ class MetalOwnedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class MetalOwnedTextureFrame:
-    """Metal frame acquired from a session-owned texture target.
-
-    See `mln_metal_owned_texture_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    generation: int
-    width: int
-    height: int
-    scale_factor: float
-    frame_id: int
-    texture: int
-    device: int
-    pixel_format: int
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            generation=raw["generation"],
-            width=raw["width"],
-            height=raw["height"],
-            scale_factor=raw["scale_factor"],
-            frame_id=raw["frame_id"],
-            texture=raw["texture"],
-            device=raw["device"],
-            pixel_format=raw["pixel_format"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class MetalSurfaceDescriptor:
     """Metal attachment options for a native surface.
 
@@ -2004,6 +1990,39 @@ class MetalSurfaceDescriptor:
         from . import _native
 
         return cls._from_native(_native._default_metal_surface_descriptor())
+
+
+@dataclass(frozen=True, slots=True)
+class MetalTextureFrame:
+    """Metal frame acquired from a texture ring.
+
+    See `mln_metal_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    generation: int
+    width: int
+    height: int
+    scale_factor: float
+    frame_id: int
+    slot: int
+    texture: int
+    device: int
+    pixel_format: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            generation=raw["generation"],
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            frame_id=raw["frame_id"],
+            slot=raw["slot"],
+            texture=raw["texture"],
+            device=raw["device"],
+            pixel_format=raw["pixel_format"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2145,6 +2164,21 @@ class OfflineTilePyramidRegionDefinition:
 
 
 @dataclass(frozen=True, slots=True)
+class OpenglBorrowedTexture:
+    """One caller-owned OpenGL texture of a borrowed texture ring.
+
+    See `mln_opengl_borrowed_texture` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    texture: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(texture=raw["texture"])
+
+
+@dataclass(frozen=True, slots=True)
 class OpenglBorrowedTextureDescriptor:
     """OpenGL attachment options for a borrowed texture target.
 
@@ -2156,7 +2190,7 @@ class OpenglBorrowedTextureDescriptor:
     physical_width: int
     physical_height: int
     context: OpenglContextDescriptor
-    texture: int
+    textures: tuple[OpenglBorrowedTexture, ...]
     target: int
 
     @classmethod
@@ -2166,7 +2200,9 @@ class OpenglBorrowedTextureDescriptor:
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=OpenglContextDescriptor._from_native(raw["context"]),
-            texture=raw["texture"],
+            textures=tuple(
+                OpenglBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
             target=raw["target"],
         )
 
@@ -2235,41 +2271,6 @@ class OpenglOwnedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class OpenglOwnedTextureFrame:
-    """OpenGL frame acquired from a session-owned texture target.
-
-    See `mln_opengl_owned_texture_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    generation: int
-    width: int
-    height: int
-    scale_factor: float
-    frame_id: int
-    texture: int
-    target: int
-    internal_format: int
-    format: int
-    type: int
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            generation=raw["generation"],
-            width=raw["width"],
-            height=raw["height"],
-            scale_factor=raw["scale_factor"],
-            frame_id=raw["frame_id"],
-            texture=raw["texture"],
-            target=raw["target"],
-            internal_format=raw["internal_format"],
-            format=raw["format"],
-            type=raw["type"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class OpenglSurfaceDescriptor:
     """OpenGL attachment options for a native surface.
 
@@ -2294,6 +2295,43 @@ class OpenglSurfaceDescriptor:
         from . import _native
 
         return cls._from_native(_native._default_opengl_surface_descriptor())
+
+
+@dataclass(frozen=True, slots=True)
+class OpenglTextureFrame:
+    """OpenGL frame acquired from a texture ring.
+
+    See `mln_opengl_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    generation: int
+    width: int
+    height: int
+    scale_factor: float
+    frame_id: int
+    slot: int
+    texture: int
+    target: int
+    internal_format: int
+    format: int
+    type: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            generation=raw["generation"],
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            frame_id=raw["frame_id"],
+            slot=raw["slot"],
+            texture=raw["texture"],
+            target=raw["target"],
+            internal_format=raw["internal_format"],
+            format=raw["format"],
+            type=raw["type"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -3538,6 +3576,22 @@ class Vec3:
 
 
 @dataclass(frozen=True, slots=True)
+class VulkanBorrowedTexture:
+    """One caller-owned Vulkan image of a borrowed texture ring.
+
+    See `mln_vulkan_borrowed_texture` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    image: int
+    image_view: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(image=raw["image"], image_view=raw["image_view"])
+
+
+@dataclass(frozen=True, slots=True)
 class VulkanBorrowedTextureDescriptor:
     """Vulkan attachment options for a borrowed texture target.
 
@@ -3549,8 +3603,7 @@ class VulkanBorrowedTextureDescriptor:
     physical_width: int
     physical_height: int
     context: VulkanContextDescriptor
-    image: int
-    image_view: int
+    textures: tuple[VulkanBorrowedTexture, ...]
     format: int
     initial_layout: int
     final_layout: int
@@ -3562,8 +3615,9 @@ class VulkanBorrowedTextureDescriptor:
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=VulkanContextDescriptor._from_native(raw["context"]),
-            image=raw["image"],
-            image_view=raw["image_view"],
+            textures=tuple(
+                VulkanBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
             format=raw["format"],
             initial_layout=raw["initial_layout"],
             final_layout=raw["final_layout"],
@@ -3631,41 +3685,6 @@ class VulkanOwnedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class VulkanOwnedTextureFrame:
-    """Vulkan frame acquired from a session-owned texture target.
-
-    See `mln_vulkan_owned_texture_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    generation: int
-    width: int
-    height: int
-    scale_factor: float
-    frame_id: int
-    image: int
-    image_view: int
-    device: int
-    format: int
-    layout: int
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            generation=raw["generation"],
-            width=raw["width"],
-            height=raw["height"],
-            scale_factor=raw["scale_factor"],
-            frame_id=raw["frame_id"],
-            image=raw["image"],
-            image_view=raw["image_view"],
-            device=raw["device"],
-            format=raw["format"],
-            layout=raw["layout"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class VulkanSurfaceDescriptor:
     """Vulkan attachment options for a native surface.
 
@@ -3690,6 +3709,43 @@ class VulkanSurfaceDescriptor:
         from . import _native
 
         return cls._from_native(_native._default_vulkan_surface_descriptor())
+
+
+@dataclass(frozen=True, slots=True)
+class VulkanTextureFrame:
+    """Vulkan frame acquired from a texture ring.
+
+    See `mln_vulkan_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    generation: int
+    width: int
+    height: int
+    scale_factor: float
+    frame_id: int
+    slot: int
+    image: int
+    image_view: int
+    device: int
+    format: int
+    layout: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            generation=raw["generation"],
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            frame_id=raw["frame_id"],
+            slot=raw["slot"],
+            image=raw["image"],
+            image_view=raw["image_view"],
+            device=raw["device"],
+            format=raw["format"],
+            layout=raw["layout"],
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -3730,6 +3786,22 @@ class WebglContextDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class WebgpuBorrowedTexture:
+    """One caller-owned WebGPU texture of a borrowed texture ring.
+
+    See `mln_webgpu_borrowed_texture` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    texture: int
+    texture_view: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(texture=raw["texture"], texture_view=raw["texture_view"])
+
+
+@dataclass(frozen=True, slots=True)
 class WebgpuBorrowedTextureDescriptor:
     """WebGPU attachment options for a borrowed texture target.
 
@@ -3741,8 +3813,7 @@ class WebgpuBorrowedTextureDescriptor:
     physical_width: int
     physical_height: int
     context: WebgpuContextDescriptor
-    texture: int
-    texture_view: int
+    textures: tuple[WebgpuBorrowedTexture, ...]
     format: int
 
     @classmethod
@@ -3752,8 +3823,9 @@ class WebgpuBorrowedTextureDescriptor:
             physical_width=raw["physical_width"],
             physical_height=raw["physical_height"],
             context=WebgpuContextDescriptor._from_native(raw["context"]),
-            texture=raw["texture"],
-            texture_view=raw["texture_view"],
+            textures=tuple(
+                WebgpuBorrowedTexture._from_native(item) for item in raw["textures"]
+            ),
             format=raw["format"],
         )
 
@@ -3807,39 +3879,6 @@ class WebgpuOwnedTextureDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
-class WebgpuOwnedTextureFrame:
-    """WebGPU frame acquired from a session-owned texture target.
-
-    See `mln_webgpu_owned_texture_frame` in the
-    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-    """
-
-    generation: int
-    width: int
-    height: int
-    scale_factor: float
-    frame_id: int
-    texture: int
-    texture_view: int
-    device: int
-    format: int
-
-    @classmethod
-    def _from_native(cls, raw):
-        return cls(
-            generation=raw["generation"],
-            width=raw["width"],
-            height=raw["height"],
-            scale_factor=raw["scale_factor"],
-            frame_id=raw["frame_id"],
-            texture=raw["texture"],
-            texture_view=raw["texture_view"],
-            device=raw["device"],
-            format=raw["format"],
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class WebgpuSurfaceDescriptor:
     """WebGPU attachment options for a native surface.
 
@@ -3866,6 +3905,41 @@ class WebgpuSurfaceDescriptor:
         from . import _native
 
         return cls._from_native(_native._default_webgpu_surface_descriptor())
+
+
+@dataclass(frozen=True, slots=True)
+class WebgpuTextureFrame:
+    """WebGPU frame acquired from a texture ring.
+
+    See `mln_webgpu_texture_frame` in the
+    [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+    """
+
+    generation: int
+    width: int
+    height: int
+    scale_factor: float
+    frame_id: int
+    slot: int
+    texture: int
+    texture_view: int
+    device: int
+    format: int
+
+    @classmethod
+    def _from_native(cls, raw):
+        return cls(
+            generation=raw["generation"],
+            width=raw["width"],
+            height=raw["height"],
+            scale_factor=raw["scale_factor"],
+            frame_id=raw["frame_id"],
+            slot=raw["slot"],
+            texture=raw["texture"],
+            texture_view=raw["texture_view"],
+            device=raw["device"],
+            format=raw["format"],
+        )
 
 
 @dataclass(frozen=True, slots=True)

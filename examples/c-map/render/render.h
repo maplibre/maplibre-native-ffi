@@ -59,14 +59,13 @@ render_session* render_target_session(render_target* target);
   render_target* target, viewport current_viewport
 );
 
-/// Follows a completed borrowed-texture replacement: demands the frame that
-/// draws into it, and shows any replacement a rendered frame has drawn into.
-[[nodiscard]] app_error render_target_show_replacements(render_target* target);
+/// Follows completed borrowed-ring replacements: releases each ring they
+/// retired, and demands the frame that draws into the new ring.
+[[nodiscard]] app_error render_target_retire_replaced(render_target* target);
 
-/// Shows the newest rendered frame: the texture modes sample it into the
-/// window, switching to a replacement texture once a frame has rendered into
-/// it, and a surface target already presented it. Reports false when no
-/// frame reached the window.
+/// Shows the newest rendered frame: the texture modes acquire it and sample it
+/// into the window, holding it until a newer one arrives, and a surface target
+/// already presented it. Reports false when no frame reached the window.
 [[nodiscard]] app_error render_target_present(
   render_target* target, viewport current_viewport, bool* out_presented
 );

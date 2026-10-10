@@ -29,5 +29,5 @@ func attachOwnedTexture(
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {
-	return frame.WithOpenglTexture(func(view OpenglOwnedTextureFrameView) error { return use(view) })
+	return frame.WithOpenglTexture(func(view OpenglTextureFrameView) error { return use(view) })
 }

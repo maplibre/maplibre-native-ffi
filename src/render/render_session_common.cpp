@@ -167,7 +167,8 @@ auto opengl_borrowed_texture_descriptor_default() noexcept
     .physical_width = 256,
     .physical_height = 256,
     .context = opengl_context_descriptor_default(),
-    .texture = 0,
+    .textures = nullptr,
+    .texture_count = 0,
     .target = 0,
   };
 }
@@ -1062,8 +1063,8 @@ auto finish_driver_work(
   }
 }
 
-// Whether a session-owned ring has no slot left to render into. A session
-// without a ring renders into its target directly.
+// Whether a texture ring has no slot left to render into. A surface has no
+// ring and renders into its target directly.
 auto every_slot_quarantined_locked(const mln_render_session_object& session)
   -> bool {
   const auto& slots = session.texture.slots;
@@ -1079,6 +1080,20 @@ auto any_slot_quarantined_locked(const mln_render_session_object& session)
   return std::any_of(slots.begin(), slots.end(), [](const auto& slot) {
     return slot.quarantined;
   });
+}
+
+// Retires every published frame that no host holds, so none can be acquired
+// after the target it was rendered into changes.
+void invalidate_unacquired_texture_frames_locked(
+  mln_render_session_object& session
+) {
+  if (session.kind != RenderSessionKind::Texture) return;
+  for (auto& slot : session.texture.slots) {
+    if (!slot.acquired) {
+      slot.available = false;
+      slot.backend_metadata.reset();
+    }
+  }
 }
 
 // The host wakes that a section holding control_mutex owes. A wake callback may
@@ -1266,13 +1281,24 @@ using RenderDriverWorkFactory = std::function<RenderDriverWork(
   const std::shared_ptr<OperationObject>&
 )>;
 
+// What a submission requires of the session beyond attachment, checked in
+// the section that queues it, and what queueing it changes.
+struct RenderDriverAdmission {
+  // Checks the session without changing it.
+  std::function<mln_status(const mln_render_session_object&)> check;
+  // Records the submission once its work is queued.
+  std::function<void(mln_render_session_object&)> commit;
+};
+
 // Shared body of the driver submissions: check the session, register the
 // completion, and hand one work item to the selected driver. An empty
-// `deliver` takes the plain committed completion.
+// `deliver` takes the plain committed completion, and an empty `admit` admits
+// every submission to an attached session.
 auto submit_driver_work(
   mln_render_session session, const mln_completion* completion,
   CompletionOperation::Delivery deliver,
-  const RenderDriverWorkFactory& make_work
+  const RenderDriverWorkFactory& make_work,
+  const RenderDriverAdmission& admit = {}
 ) -> mln_status {
   const auto completion_status = validate_completion(completion);
   if (completion_status != MLN_STATUS_OK) return completion_status;
@@ -1297,12 +1323,52 @@ auto submit_driver_work(
       set_thread_error("render session is not attached");
       return MLN_STATUS_INVALID_STATE;
     }
+    if (admit.check) {
+      const auto admitted = admit.check(*live);
+      if (admitted != MLN_STATUS_OK) {
+        async.completion->reject();
+        return admitted;
+      }
+    }
     // Accepted before the driver can take the work, so the driver, rather
     // than this thread, delivers a completion that finishes early.
     async.completion->accept();
     push_driver_work_locked(*live, make_work(live, async.operation), wakes);
+    if (admit.commit) admit.commit(*live);
   }
   return MLN_STATUS_OK;
+}
+
+// The delivery and work of a driver submission that completes without a
+// value.
+auto valueless_driver_work(
+  RenderDriverCallable work, const ValuelessCompletion& valueless
+) {
+  return std::pair{
+    CompletionOperation::Delivery{
+      [valueless](
+        const std::shared_ptr<Completion>& state, mln_status status,
+        std::string diagnostic, std::any
+      ) { valueless.complete(state, status, std::move(diagnostic)); }
+    },
+    RenderDriverWorkFactory{
+      [work = std::move(work)](
+        const std::shared_ptr<mln_render_session_object>& live,
+        const std::shared_ptr<OperationObject>& operation
+      ) {
+        return RenderDriverWork{
+          [live, operation, work]() {
+            finish_driver_work(operation, work, live);
+          },
+          [operation]() {
+            operation->complete(
+              MLN_STATUS_TARGET_LOST, "render target was abandoned", {}
+            );
+          }
+        };
+      }
+    }
+  };
 }
 
 }  // namespace
@@ -1323,28 +1389,8 @@ auto enqueue_driver_operation(
   mln_render_session session, RenderDriverCallable work,
   const mln_completion* completion, ValuelessCompletion valueless
 ) -> mln_status {
-  return submit_driver_work(
-    session, completion,
-    [valueless](
-      const std::shared_ptr<Completion>& state, mln_status status,
-      std::string diagnostic, std::any
-    ) { valueless.complete(state, status, std::move(diagnostic)); },
-    [work = std::move(work)](
-      const std::shared_ptr<mln_render_session_object>& live,
-      const std::shared_ptr<OperationObject>& operation
-    ) {
-      return RenderDriverWork{
-        [live, operation, work]() {
-          finish_driver_work(operation, work, live);
-        },
-        [operation]() {
-          operation->complete(
-            MLN_STATUS_TARGET_LOST, "render target was abandoned", {}
-          );
-        }
-      };
-    }
-  );
+  auto [deliver, make_work] = valueless_driver_work(std::move(work), valueless);
+  return submit_driver_work(session, completion, std::move(deliver), make_work);
 }
 
 auto enqueue_driver_result_operation(
@@ -1465,11 +1511,11 @@ auto start_attach_render_session(
   }
   session->kind = kind;
   session->capabilities = capabilities;
-  if (
-    kind == RenderSessionKind::Texture &&
-    session->texture.mode == TextureSessionMode::Owned
-  ) {
-    const auto depth = std::clamp(capabilities.texture_ring_depth, 1u, 3u);
+  if (kind == RenderSessionKind::Texture) {
+    // A borrowed ring's depth is the texture count its descriptor validated.
+    const auto depth = session->texture.mode == TextureSessionMode::Owned
+                         ? std::clamp(capabilities.texture_ring_depth, 1u, 3u)
+                         : capabilities.texture_ring_depth;
     session->capabilities.texture_ring_depth = depth;
     session->texture.slots.resize(depth);
   }
@@ -1800,12 +1846,79 @@ auto render_session_set_target(
     live->physical_height = physical_height;
     live->scale_factor = extent.scale_factor;
     ++live->generation;
+    // No frame is acquired, which the check above and the submission's hold
+    // on acquisition ensure. Each slot starts over with its new texture, which
+    // also lifts a quarantine: the texture that the host's GPU may still read
+    // is no longer the slot's.
+    if (kind == RetargetTargetKind::BorrowedTexture) {
+      for (auto& slot : live->texture.slots) slot = RenderTextureSlot{};
+    }
   }
 
   // Target replacement changes only the graphics resource. Map creation and
   // explicit resize commands remain the sole extent authorities.
   warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
   return MLN_STATUS_OK;
+}
+
+auto enqueue_borrowed_texture_retarget(
+  mln_render_session session, std::size_t texture_count,
+  const mln_render_target_extent& extent, uint32_t physical_width,
+  uint32_t physical_height, RenderTargetReplacer replace,
+  const mln_completion* completion, ValuelessCompletion valueless
+) -> mln_status {
+  auto [deliver, make_work] = valueless_driver_work(
+    [extent, physical_width, physical_height,
+     replace = std::move(replace)](mln_render_session_object& target) {
+      // Acquisition resumes once the replacement has run, whatever it
+      // reported: the slots then hold no frame of the replaced textures.
+      struct Settle {
+        mln_render_session_object& session;
+        explicit Settle(mln_render_session_object& live) : session(live) {}
+        Settle(const Settle&) = delete;
+        Settle(Settle&&) = delete;
+        auto operator=(const Settle&) -> Settle& = delete;
+        auto operator=(Settle&&) -> Settle& = delete;
+        ~Settle() {
+          const auto lock = std::scoped_lock{session.control_mutex};
+          --session.texture.pending_retargets;
+        }
+      } settle{target};
+      return render_session_set_target(
+        target.self, RetargetTargetKind::BorrowedTexture, extent,
+        physical_width, physical_height, replace
+      );
+    },
+    valueless
+  );
+  return submit_driver_work(
+    session, completion, std::move(deliver), make_work,
+    RenderDriverAdmission{
+      .check =
+        [texture_count](const mln_render_session_object& live) {
+          if (live.acquired_frame_count != 0) {
+            set_thread_error(
+              "cannot replace the render target while a texture frame is "
+              "acquired"
+            );
+            return MLN_STATUS_INVALID_STATE;
+          }
+          if (texture_count != live.texture.slots.size()) {
+            set_thread_error(
+              "texture_count must equal the ring depth the session attached "
+              "with"
+            );
+            return MLN_STATUS_INVALID_ARGUMENT;
+          }
+          return MLN_STATUS_OK;
+        },
+      .commit =
+        [](mln_render_session_object& live) {
+          invalidate_unacquired_texture_frames_locked(live);
+          ++live.texture.pending_retargets;
+        },
+    }
+  );
 }
 
 auto surface_session_set_target(
@@ -2008,12 +2121,14 @@ auto render_session_detach(mln_render_session_object& session) -> mln_status {
 
   live->scheduler.set_work_available_callback({});
   // A quarantined slot's texture may still be in use by the host's GPU, and
-  // nothing tells native when that use ends. The backend that owns the ring
-  // is released and never destroyed, as abandon does.
+  // nothing tells native when that use ends. A backend that owns such a
+  // texture is released and never destroyed, as abandon does. A borrowed
+  // ring's textures belong to the host, so its backend is destroyed.
   auto quarantine = false;
   {
     const auto lock = std::scoped_lock{live->control_mutex};
-    quarantine = any_slot_quarantined_locked(*live);
+    quarantine = live->texture.mode == TextureSessionMode::Owned &&
+                 any_slot_quarantined_locked(*live);
   }
   TextureSessionBackend* quarantined_texture = nullptr;
 
@@ -2666,6 +2781,7 @@ auto run_frame_demand(
       metadata_request = RenderFrameMetadata{
         .generation = session->generation,
         .frame_id = result.frame_generation,
+        .slot = static_cast<uint32_t>(selected_slot.value_or(0)),
         .physical_width = session->physical_width,
         .physical_height = session->physical_height,
         .scale_factor = session->scale_factor,
@@ -2996,6 +3112,9 @@ auto render_session_acquire_frame(
       );
       return MLN_STATUS_UNSUPPORTED;
     }
+    // Every frame published before a queued replacement names a texture that
+    // it replaces, which the host may destroy once the replacement completes.
+    if (live->texture.pending_retargets != 0) return MLN_STATUS_NOT_READY;
     const auto slot = std::min_element(
       live->texture.slots.begin(), live->texture.slots.end(),
       [](const RenderTextureSlot& left, const RenderTextureSlot& right) {
@@ -3257,18 +3376,6 @@ auto acquired_frame_release(
 }
 
 namespace {
-void invalidate_unacquired_texture_frames_locked(
-  mln_render_session_object& session
-) {
-  if (session.kind != RenderSessionKind::Texture) return;
-  for (auto& slot : session.texture.slots) {
-    if (!slot.acquired) {
-      slot.available = false;
-      slot.backend_metadata.reset();
-    }
-  }
-}
-
 auto make_ordered_resize_work(
   const std::shared_ptr<mln_render_session_object>& session,
   const std::shared_ptr<OperationObject>& operation,

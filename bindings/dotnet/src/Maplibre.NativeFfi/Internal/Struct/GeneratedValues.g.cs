@@ -975,18 +975,39 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static MetalBorrowedTexture CopyMetalBorrowedTexture(
+        mln_metal_borrowed_texture value
+    ) => new(NativePointer.FromNativeAddress((nint)value.texture));
+
+    internal static mln_metal_borrowed_texture NativeMetalBorrowedTexture(
+        MetalBorrowedTexture value
+    )
+    {
+        var native = new mln_metal_borrowed_texture();
+        native.texture = (void*)value.Texture.Address;
+        return native;
+    }
+
     internal static MetalBorrowedTextureDescriptor CopyMetalBorrowedTextureDescriptor(
         mln_metal_borrowed_texture_descriptor value
     ) =>
-        new(
-            CopyRenderTargetExtent(value.extent),
-            value.physical_width,
-            value.physical_height,
-            NativePointer.FromNativeAddress((nint)value.texture)
-        );
+        new()
+        {
+            Extent = CopyRenderTargetExtent(value.extent),
+            PhysicalWidth = value.physical_width,
+            PhysicalHeight = value.physical_height,
+            TexturesStorage = new(
+                NativeCallScope.CopyArray<mln_metal_borrowed_texture, MetalBorrowedTexture>(
+                    value.textures,
+                    (nuint)(value.texture_count),
+                    static item => CopyMetalBorrowedTexture(item)
+                )
+            ),
+        };
 
     internal static mln_metal_borrowed_texture_descriptor NativeMetalBorrowedTextureDescriptor(
-        MetalBorrowedTextureDescriptor value
+        MetalBorrowedTextureDescriptor value,
+        NativeCallScope scope
     )
     {
         var native = NativeMethods.mln_metal_borrowed_texture_descriptor_default();
@@ -994,7 +1015,11 @@ internal static unsafe class GeneratedValues
         native.extent = NativeRenderTargetExtent(value.Extent);
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
-        native.texture = (void*)value.Texture.Address;
+        native.textures = scope.Array<mln_metal_borrowed_texture, MetalBorrowedTexture>(
+            value.TexturesStorage.Items,
+            item => NativeMetalBorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         return native;
     }
 
@@ -1027,37 +1052,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static MetalOwnedTextureFrame CopyMetalOwnedTextureFrame(
-        mln_metal_owned_texture_frame value
-    ) =>
-        new(
-            value.generation,
-            value.width,
-            value.height,
-            value.scale_factor,
-            value.frame_id,
-            NativePointer.FromNativeAddress((nint)value.texture),
-            NativePointer.FromNativeAddress((nint)value.device),
-            value.pixel_format
-        );
-
-    internal static mln_metal_owned_texture_frame NativeMetalOwnedTextureFrame(
-        MetalOwnedTextureFrame value
-    )
-    {
-        var native = new mln_metal_owned_texture_frame();
-        native.size = (uint)sizeof(mln_metal_owned_texture_frame);
-        native.generation = value.Generation;
-        native.width = value.Width;
-        native.height = value.Height;
-        native.scale_factor = value.ScaleFactor;
-        native.frame_id = value.FrameId;
-        native.texture = (void*)value.Texture.Address;
-        native.device = (void*)value.Device.Address;
-        native.pixel_format = value.PixelFormat;
-        return native;
-    }
-
     internal static MetalSurfaceDescriptor CopyMetalSurfaceDescriptor(
         mln_metal_surface_descriptor value
     ) =>
@@ -1076,6 +1070,35 @@ internal static unsafe class GeneratedValues
         native.extent = NativeRenderTargetExtent(value.Extent);
         native.context = NativeMetalContextDescriptor(value.Context);
         native.layer = (void*)value.Layer.Address;
+        return native;
+    }
+
+    internal static MetalTextureFrame CopyMetalTextureFrame(mln_metal_texture_frame value) =>
+        new(
+            value.generation,
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.frame_id,
+            value.slot,
+            NativePointer.FromNativeAddress((nint)value.texture),
+            NativePointer.FromNativeAddress((nint)value.device),
+            value.pixel_format
+        );
+
+    internal static mln_metal_texture_frame NativeMetalTextureFrame(MetalTextureFrame value)
+    {
+        var native = new mln_metal_texture_frame();
+        native.size = (uint)sizeof(mln_metal_texture_frame);
+        native.generation = value.Generation;
+        native.width = value.Width;
+        native.height = value.Height;
+        native.scale_factor = value.ScaleFactor;
+        native.frame_id = value.FrameId;
+        native.slot = value.Slot;
+        native.texture = (void*)value.Texture.Address;
+        native.device = (void*)value.Device.Address;
+        native.pixel_format = value.PixelFormat;
         return native;
     }
 
@@ -1242,17 +1265,37 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static OpenglBorrowedTexture CopyOpenglBorrowedTexture(
+        mln_opengl_borrowed_texture value
+    ) => new(value.texture);
+
+    internal static mln_opengl_borrowed_texture NativeOpenglBorrowedTexture(
+        OpenglBorrowedTexture value
+    )
+    {
+        var native = new mln_opengl_borrowed_texture();
+        native.texture = value.Texture;
+        return native;
+    }
+
     internal static OpenglBorrowedTextureDescriptor CopyOpenglBorrowedTextureDescriptor(
         mln_opengl_borrowed_texture_descriptor value
     ) =>
-        new(
-            CopyRenderTargetExtent(value.extent),
-            value.physical_width,
-            value.physical_height,
-            CopyOpenglContextDescriptor(value.context),
-            value.texture,
-            value.target
-        );
+        new()
+        {
+            Extent = CopyRenderTargetExtent(value.extent),
+            PhysicalWidth = value.physical_width,
+            PhysicalHeight = value.physical_height,
+            Context = CopyOpenglContextDescriptor(value.context),
+            TexturesStorage = new(
+                NativeCallScope.CopyArray<mln_opengl_borrowed_texture, OpenglBorrowedTexture>(
+                    value.textures,
+                    (nuint)(value.texture_count),
+                    static item => CopyOpenglBorrowedTexture(item)
+                )
+            ),
+            Target = value.target,
+        };
 
     internal static mln_opengl_borrowed_texture_descriptor NativeOpenglBorrowedTextureDescriptor(
         OpenglBorrowedTextureDescriptor value,
@@ -1265,7 +1308,11 @@ internal static unsafe class GeneratedValues
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
-        native.texture = value.Texture;
+        native.textures = scope.Array<mln_opengl_borrowed_texture, OpenglBorrowedTexture>(
+            value.TexturesStorage.Items,
+            item => NativeOpenglBorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.target = value.Target;
         return native;
     }
@@ -1341,41 +1388,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static OpenglOwnedTextureFrame CopyOpenglOwnedTextureFrame(
-        mln_opengl_owned_texture_frame value
-    ) =>
-        new(
-            value.generation,
-            value.width,
-            value.height,
-            value.scale_factor,
-            value.frame_id,
-            value.texture,
-            value.target,
-            value.internal_format,
-            value.format,
-            value.type
-        );
-
-    internal static mln_opengl_owned_texture_frame NativeOpenglOwnedTextureFrame(
-        OpenglOwnedTextureFrame value
-    )
-    {
-        var native = new mln_opengl_owned_texture_frame();
-        native.size = (uint)sizeof(mln_opengl_owned_texture_frame);
-        native.generation = value.Generation;
-        native.width = value.Width;
-        native.height = value.Height;
-        native.scale_factor = value.ScaleFactor;
-        native.frame_id = value.FrameId;
-        native.texture = value.Texture;
-        native.target = value.Target;
-        native.internal_format = value.InternalFormat;
-        native.format = value.Format;
-        native.type = value.Type;
-        return native;
-    }
-
     internal static OpenglSurfaceDescriptor CopyOpenglSurfaceDescriptor(
         mln_opengl_surface_descriptor value
     ) =>
@@ -1395,6 +1407,39 @@ internal static unsafe class GeneratedValues
         native.extent = NativeRenderTargetExtent(value.Extent);
         native.context = NativeOpenglContextDescriptor(value.Context, scope);
         native.surface = (void*)value.Surface.Address;
+        return native;
+    }
+
+    internal static OpenglTextureFrame CopyOpenglTextureFrame(mln_opengl_texture_frame value) =>
+        new(
+            value.generation,
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.frame_id,
+            value.slot,
+            value.texture,
+            value.target,
+            value.internal_format,
+            value.format,
+            value.type
+        );
+
+    internal static mln_opengl_texture_frame NativeOpenglTextureFrame(OpenglTextureFrame value)
+    {
+        var native = new mln_opengl_texture_frame();
+        native.size = (uint)sizeof(mln_opengl_texture_frame);
+        native.generation = value.Generation;
+        native.width = value.Width;
+        native.height = value.Height;
+        native.scale_factor = value.ScaleFactor;
+        native.frame_id = value.FrameId;
+        native.slot = value.Slot;
+        native.texture = value.Texture;
+        native.target = value.Target;
+        native.internal_format = value.InternalFormat;
+        native.format = value.Format;
+        native.type = value.Type;
         return native;
     }
 
@@ -3074,23 +3119,44 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static VulkanBorrowedTexture CopyVulkanBorrowedTexture(
+        mln_vulkan_borrowed_texture value
+    ) => new(value.image, value.image_view);
+
+    internal static mln_vulkan_borrowed_texture NativeVulkanBorrowedTexture(
+        VulkanBorrowedTexture value
+    )
+    {
+        var native = new mln_vulkan_borrowed_texture();
+        native.image = value.Image;
+        native.image_view = value.ImageView;
+        return native;
+    }
+
     internal static VulkanBorrowedTextureDescriptor CopyVulkanBorrowedTextureDescriptor(
         mln_vulkan_borrowed_texture_descriptor value
     ) =>
-        new(
-            CopyRenderTargetExtent(value.extent),
-            value.physical_width,
-            value.physical_height,
-            CopyVulkanContextDescriptor(value.context),
-            value.image,
-            value.image_view,
-            value.format,
-            value.initial_layout,
-            value.final_layout
-        );
+        new()
+        {
+            Extent = CopyRenderTargetExtent(value.extent),
+            PhysicalWidth = value.physical_width,
+            PhysicalHeight = value.physical_height,
+            Context = CopyVulkanContextDescriptor(value.context),
+            TexturesStorage = new(
+                NativeCallScope.CopyArray<mln_vulkan_borrowed_texture, VulkanBorrowedTexture>(
+                    value.textures,
+                    (nuint)(value.texture_count),
+                    static item => CopyVulkanBorrowedTexture(item)
+                )
+            ),
+            Format = value.format,
+            InitialLayout = value.initial_layout,
+            FinalLayout = value.final_layout,
+        };
 
     internal static mln_vulkan_borrowed_texture_descriptor NativeVulkanBorrowedTextureDescriptor(
-        VulkanBorrowedTextureDescriptor value
+        VulkanBorrowedTextureDescriptor value,
+        NativeCallScope scope
     )
     {
         var native = NativeMethods.mln_vulkan_borrowed_texture_descriptor_default();
@@ -3099,8 +3165,11 @@ internal static unsafe class GeneratedValues
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeVulkanContextDescriptor(value.Context);
-        native.image = value.Image;
-        native.image_view = value.ImageView;
+        native.textures = scope.Array<mln_vulkan_borrowed_texture, VulkanBorrowedTexture>(
+            value.TexturesStorage.Items,
+            item => NativeVulkanBorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.format = value.Format;
         native.initial_layout = value.InitialLayout;
         native.final_layout = value.FinalLayout;
@@ -3151,41 +3220,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static VulkanOwnedTextureFrame CopyVulkanOwnedTextureFrame(
-        mln_vulkan_owned_texture_frame value
-    ) =>
-        new(
-            value.generation,
-            value.width,
-            value.height,
-            value.scale_factor,
-            value.frame_id,
-            value.image,
-            value.image_view,
-            NativePointer.FromNativeAddress((nint)value.device),
-            value.format,
-            value.layout
-        );
-
-    internal static mln_vulkan_owned_texture_frame NativeVulkanOwnedTextureFrame(
-        VulkanOwnedTextureFrame value
-    )
-    {
-        var native = new mln_vulkan_owned_texture_frame();
-        native.size = (uint)sizeof(mln_vulkan_owned_texture_frame);
-        native.generation = value.Generation;
-        native.width = value.Width;
-        native.height = value.Height;
-        native.scale_factor = value.ScaleFactor;
-        native.frame_id = value.FrameId;
-        native.image = value.Image;
-        native.image_view = value.ImageView;
-        native.device = (void*)value.Device.Address;
-        native.format = value.Format;
-        native.layout = value.Layout;
-        return native;
-    }
-
     internal static VulkanSurfaceDescriptor CopyVulkanSurfaceDescriptor(
         mln_vulkan_surface_descriptor value
     ) =>
@@ -3204,6 +3238,39 @@ internal static unsafe class GeneratedValues
         native.extent = NativeRenderTargetExtent(value.Extent);
         native.context = NativeVulkanContextDescriptor(value.Context);
         native.surface = value.Surface;
+        return native;
+    }
+
+    internal static VulkanTextureFrame CopyVulkanTextureFrame(mln_vulkan_texture_frame value) =>
+        new(
+            value.generation,
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.frame_id,
+            value.slot,
+            value.image,
+            value.image_view,
+            NativePointer.FromNativeAddress((nint)value.device),
+            value.format,
+            value.layout
+        );
+
+    internal static mln_vulkan_texture_frame NativeVulkanTextureFrame(VulkanTextureFrame value)
+    {
+        var native = new mln_vulkan_texture_frame();
+        native.size = (uint)sizeof(mln_vulkan_texture_frame);
+        native.generation = value.Generation;
+        native.width = value.Width;
+        native.height = value.Height;
+        native.scale_factor = value.ScaleFactor;
+        native.frame_id = value.FrameId;
+        native.slot = value.Slot;
+        native.image = value.Image;
+        native.image_view = value.ImageView;
+        native.device = (void*)value.Device.Address;
+        native.format = value.Format;
+        native.layout = value.Layout;
         return native;
     }
 
@@ -3256,21 +3323,46 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
+    internal static WebgpuBorrowedTexture CopyWebgpuBorrowedTexture(
+        mln_webgpu_borrowed_texture value
+    ) =>
+        new(
+            NativePointer.FromNativeAddress((nint)value.texture),
+            NativePointer.FromNativeAddress((nint)value.texture_view)
+        );
+
+    internal static mln_webgpu_borrowed_texture NativeWebgpuBorrowedTexture(
+        WebgpuBorrowedTexture value
+    )
+    {
+        var native = new mln_webgpu_borrowed_texture();
+        native.texture = (void*)value.Texture.Address;
+        native.texture_view = (void*)value.TextureView.Address;
+        return native;
+    }
+
     internal static WebgpuBorrowedTextureDescriptor CopyWebgpuBorrowedTextureDescriptor(
         mln_webgpu_borrowed_texture_descriptor value
     ) =>
-        new(
-            CopyRenderTargetExtent(value.extent),
-            value.physical_width,
-            value.physical_height,
-            CopyWebgpuContextDescriptor(value.context),
-            NativePointer.FromNativeAddress((nint)value.texture),
-            NativePointer.FromNativeAddress((nint)value.texture_view),
-            value.format
-        );
+        new()
+        {
+            Extent = CopyRenderTargetExtent(value.extent),
+            PhysicalWidth = value.physical_width,
+            PhysicalHeight = value.physical_height,
+            Context = CopyWebgpuContextDescriptor(value.context),
+            TexturesStorage = new(
+                NativeCallScope.CopyArray<mln_webgpu_borrowed_texture, WebgpuBorrowedTexture>(
+                    value.textures,
+                    (nuint)(value.texture_count),
+                    static item => CopyWebgpuBorrowedTexture(item)
+                )
+            ),
+            Format = value.format,
+        };
 
     internal static mln_webgpu_borrowed_texture_descriptor NativeWebgpuBorrowedTextureDescriptor(
-        WebgpuBorrowedTextureDescriptor value
+        WebgpuBorrowedTextureDescriptor value,
+        NativeCallScope scope
     )
     {
         var native = NativeMethods.mln_webgpu_borrowed_texture_descriptor_default();
@@ -3279,8 +3371,11 @@ internal static unsafe class GeneratedValues
         native.physical_width = value.PhysicalWidth;
         native.physical_height = value.PhysicalHeight;
         native.context = NativeWebgpuContextDescriptor(value.Context);
-        native.texture = (void*)value.Texture.Address;
-        native.texture_view = (void*)value.TextureView.Address;
+        native.textures = scope.Array<mln_webgpu_borrowed_texture, WebgpuBorrowedTexture>(
+            value.TexturesStorage.Items,
+            item => NativeWebgpuBorrowedTexture(item)
+        );
+        native.texture_count = checked((nuint)value.TexturesStorage.Items.Length);
         native.format = value.Format;
         return native;
     }
@@ -3321,39 +3416,6 @@ internal static unsafe class GeneratedValues
         return native;
     }
 
-    internal static WebgpuOwnedTextureFrame CopyWebgpuOwnedTextureFrame(
-        mln_webgpu_owned_texture_frame value
-    ) =>
-        new(
-            value.generation,
-            value.width,
-            value.height,
-            value.scale_factor,
-            value.frame_id,
-            NativePointer.FromNativeAddress((nint)value.texture),
-            NativePointer.FromNativeAddress((nint)value.texture_view),
-            NativePointer.FromNativeAddress((nint)value.device),
-            value.format
-        );
-
-    internal static mln_webgpu_owned_texture_frame NativeWebgpuOwnedTextureFrame(
-        WebgpuOwnedTextureFrame value
-    )
-    {
-        var native = new mln_webgpu_owned_texture_frame();
-        native.size = (uint)sizeof(mln_webgpu_owned_texture_frame);
-        native.generation = value.Generation;
-        native.width = value.Width;
-        native.height = value.Height;
-        native.scale_factor = value.ScaleFactor;
-        native.frame_id = value.FrameId;
-        native.texture = (void*)value.Texture.Address;
-        native.texture_view = (void*)value.TextureView.Address;
-        native.device = (void*)value.Device.Address;
-        native.format = value.Format;
-        return native;
-    }
-
     internal static WebgpuSurfaceDescriptor CopyWebgpuSurfaceDescriptor(
         mln_webgpu_surface_descriptor value
     ) =>
@@ -3373,6 +3435,37 @@ internal static unsafe class GeneratedValues
         native.extent = NativeRenderTargetExtent(value.Extent);
         native.context = NativeWebgpuContextDescriptor(value.Context);
         native.surface = (void*)value.Surface.Address;
+        native.format = value.Format;
+        return native;
+    }
+
+    internal static WebgpuTextureFrame CopyWebgpuTextureFrame(mln_webgpu_texture_frame value) =>
+        new(
+            value.generation,
+            value.width,
+            value.height,
+            value.scale_factor,
+            value.frame_id,
+            value.slot,
+            NativePointer.FromNativeAddress((nint)value.texture),
+            NativePointer.FromNativeAddress((nint)value.texture_view),
+            NativePointer.FromNativeAddress((nint)value.device),
+            value.format
+        );
+
+    internal static mln_webgpu_texture_frame NativeWebgpuTextureFrame(WebgpuTextureFrame value)
+    {
+        var native = new mln_webgpu_texture_frame();
+        native.size = (uint)sizeof(mln_webgpu_texture_frame);
+        native.generation = value.Generation;
+        native.width = value.Width;
+        native.height = value.Height;
+        native.scale_factor = value.ScaleFactor;
+        native.frame_id = value.FrameId;
+        native.slot = value.Slot;
+        native.texture = (void*)value.Texture.Address;
+        native.texture_view = (void*)value.TextureView.Address;
+        native.device = (void*)value.Device.Address;
         native.format = value.Format;
         return native;
     }

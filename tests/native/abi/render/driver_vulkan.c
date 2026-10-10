@@ -6,6 +6,8 @@
 // queue with it gives it a lock that it takes around each call on the queue.
 // Abandon destroys every object that the session created on the device that
 // it can, after it drains the session's queue, and reports how many it keeps.
+// A borrowed ring builds each slot's objects once, and detach destroys them
+// even when a slot is quarantined, since the slot's image is the host's.
 
 #include <vulkan/vulkan_core.h>
 
@@ -274,7 +276,7 @@ static void a_session_drains_its_own_queue_and_never_waits_on_the_device(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      map, &fixture, first_observer_wrap, NULL, NULL
+      map, &fixture, 1, first_observer_wrap, NULL, NULL
     ),
     mln_test_graphics_last_error()
   );
@@ -304,14 +306,14 @@ static void sessions_sharing_a_queue_call_their_own_device_functions(void) {
   mln_test_render_fixture first = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      first_map, &first, first_observer_wrap, NULL, NULL
+      first_map, &first, 1, first_observer_wrap, NULL, NULL
     ),
     mln_test_graphics_last_error()
   );
   mln_test_render_fixture second = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      second_map, &second, second_observer_wrap, &first, NULL
+      second_map, &second, 1, second_observer_wrap, &first, NULL
     ),
     mln_test_graphics_last_error()
   );
@@ -435,7 +437,7 @@ static void a_session_takes_the_host_queue_lock_around_its_queue_calls(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      map, &fixture, first_observer_wrap, NULL, &queue_lock
+      map, &fixture, 1, first_observer_wrap, NULL, &queue_lock
     ),
     mln_test_graphics_last_error()
   );
@@ -535,6 +537,7 @@ static const char* const counted_kind_names[COUNTED_KIND_COUNT] = {
 };
 
 static atomic_int live_objects[COUNTED_KIND_COUNT];
+static atomic_int created_objects[COUNTED_KIND_COUNT];
 static PFN_vkGetDeviceProcAddr counting_real_get_device_proc_addr;
 
 // How teardown orders its drain, its waits, and its destroys. The counters are
@@ -557,6 +560,9 @@ static void count_objects(counted_kind kind, int change) {
     atomic_fetch_add(&destroys_before_drain, 1);
   }
   atomic_fetch_add(&live_objects[kind], change);
+  if (change > 0) {
+    atomic_fetch_add(&created_objects[kind], change);
+  }
 }
 
 // Defines a counting create and destroy for one kind of object, whose real
@@ -794,6 +800,7 @@ counting_get_device_proc_addr(VkDevice device, const char* name) {
 static void counter_reset(void) {
   for (size_t kind = 0; kind < COUNTED_KIND_COUNT; kind += 1) {
     atomic_store(&live_objects[kind], 0);
+    atomic_store(&created_objects[kind], 0);
   }
   atomic_store(&watching_teardown, false);
   atomic_store(&pending_drain_fence, VK_NULL_HANDLE);
@@ -854,7 +861,7 @@ static void abandon_drains_under_the_host_queue_lock_and_releases_it(void) {
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_render_fixture_create_vulkan_borrowed_texture(
-      map, &fixture, counting_wrap, NULL, &queue_lock
+      map, &fixture, 1, counting_wrap, NULL, &queue_lock
     ),
     mln_test_graphics_last_error()
   );
@@ -934,6 +941,59 @@ static void abandon_destroys_a_surface_swapchain(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A borrowed ring builds each slot's framebuffer once, over the slot's image,
+// and renders every later frame of the slot through it.
+static void a_borrowed_ring_builds_each_slot_once(void) {
+  counter_reset();
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_vulkan_borrowed_texture(
+      map, &fixture, 2, counting_wrap, NULL, NULL
+    ),
+    mln_test_graphics_last_error()
+  );
+  // A slot that holds no frame takes the next one, so three frames fill both
+  // slots and then reuse the first.
+  for (uint64_t token = 1; token <= 3; token += 1) {
+    render_one_frame(&fixture, token);
+  }
+  TEST_ASSERT_EQUAL_INT(2, atomic_load(&created_objects[COUNTED_FRAMEBUFFER]));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A frame disposed without consumer synchronization quarantines its slot. The
+// slot's image belongs to the host, so detach still destroys every object the
+// session created, and the host may then destroy its device.
+static void detach_destroys_a_borrowed_ring_with_a_disposed_frame(void) {
+  counter_reset();
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_prepare_map(runtime, map);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_render_fixture_create_vulkan_borrowed_texture(
+      map, &fixture, 2, counting_wrap, NULL, NULL
+    ),
+    mln_test_graphics_last_error()
+  );
+  mln_acquired_frame frame = mln_test_render_and_acquire(&fixture, 1);
+  TEST_ASSERT_GREATER_THAN_INT(0, live_object_total());
+  MLN_TEST_OK(mln_acquired_frame_dispose(frame, NULL));
+
+  detach(&fixture);
+  assert_no_live_objects();
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_failed_attach_still_owns_the_session_it_published);
   RUN_TEST(a_session_drains_its_own_queue_and_never_waits_on_the_device);
@@ -942,4 +1002,6 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_drains_under_the_host_queue_lock_and_releases_it);
   RUN_TEST(abandon_destroys_an_owned_texture_ring);
   RUN_TEST(abandon_destroys_a_surface_swapchain);
+  RUN_TEST(a_borrowed_ring_builds_each_slot_once);
+  RUN_TEST(detach_destroys_a_borrowed_ring_with_a_disposed_frame);
 }

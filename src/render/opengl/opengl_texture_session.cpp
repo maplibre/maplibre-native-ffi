@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <mln/gfx/backend_scope.hpp>
 #include <mln/gfx/headless_backend.hpp>
@@ -51,6 +52,8 @@ constexpr auto opengl_texture_target = uint32_t{GL_TEXTURE_2D};
 constexpr auto opengl_internal_format = uint32_t{GL_RGBA8};
 constexpr auto opengl_pixel_format = uint32_t{GL_RGBA};
 constexpr auto opengl_pixel_type = uint32_t{GL_UNSIGNED_BYTE};
+
+using mln::core::OpenGLBorrowedTarget;
 
 [[noreturn]] void throw_opengl_framebuffer_error() {
   switch (mln::platform::glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
@@ -102,14 +105,10 @@ class OpenGLTextureRenderableResource final
     }
   }
 
-  // A caller-owned texture returns to its owner as soon as the render update
-  // returns, so it completes every frame. A session-owned texture is handed
-  // over at acquire-frame, which completes the rendering itself.
-  void swap() override {
-    if (borrowed_texture_ != 0) {
-      context.finish();
-    }
-  }
+  // Every texture, the caller's or the session's, reaches the host through an
+  // acquired frame, and recording the frame's metadata completes the rendering
+  // first.
+  void swap() override {}
 
   auto readStillImage() -> mln::PremultipliedImage {
     bind();
@@ -205,14 +204,13 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
         context_(descriptor.context),
         ring_(ring_depth) {}
 
-  OpenGLTextureBackend(
-    const mln_opengl_borrowed_texture_descriptor& descriptor, mln::Size size
-  )
+  // Renders slot i into the target's textures[i].
+  OpenGLTextureBackend(const OpenGLBorrowedTarget& target, mln::Size size)
       : mln::gl::RendererBackend(mln::core::opengl::session_context_mode),
         mln::gfx::HeadlessBackend(size),
-        context_(descriptor.context),
-        borrowed_texture_(descriptor.texture),
-        ring_(0) {}
+        context_(target.descriptor.context),
+        borrowed_textures_(borrowed_texture_names(target)),
+        ring_(target.textures.size()) {}
 
   OpenGLTextureBackend(const OpenGLTextureBackend&) = delete;
   auto operator=(const OpenGLTextureBackend&) -> OpenGLTextureBackend& = delete;
@@ -249,7 +247,8 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
     const auto current_size = getSize();
     if (!resource || resource_size_ != current_size) {
       resource = std::make_unique<OpenGLTextureRenderableResource>(
-        getContext<mln::gl::Context>(), current_size, borrowed_texture_
+        getContext<mln::gl::Context>(), current_size,
+        borrowed_textures_.empty() ? 0U : borrowed_textures_[ring_.selected()]
       );
       resource_size_ = current_size;
       // Recorded with the resource it describes, so a slot that keeps an older
@@ -291,20 +290,31 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
 
   void finish_rendering() { getContext<mln::gl::Context>().finish(); }
 
-  // Renders into a different caller-owned texture from here on, keeping the
+  // Renders slot i into the target's textures[i] from here on, keeping the
   // session's context and everything the renderer built in it.
-  void set_borrowed_texture(uint32_t texture, mln::Size new_size) {
-    borrowed_texture_ = texture;
-    // setSize() drops the renderable unconditionally, rebuilding the
-    // framebuffer against the new texture even when the size is unchanged. No
-    // context is made current: the framebuffer and renderbuffer names go to the
-    // context's abandoned lists and are deleted on the next render.
-    setSize(new_size);
+  void set_borrowed_textures(const OpenGLBorrowedTarget& target) {
+    borrowed_textures_ = borrowed_texture_names(target);
+    // setSize() drops the selected renderable unconditionally, and the reset
+    // drops the parked ones, so every slot rebuilds its framebuffer against
+    // its new texture even when the size is unchanged. No context is made
+    // current: the framebuffer and renderbuffer names go to the context's
+    // abandoned lists and are deleted on the next render.
+    setSize(
+      mln::Size{
+        target.descriptor.physical_width, target.descriptor.physical_height
+      }
+    );
+    ring_.reset(borrowed_textures_.size());
+    resource_size_ = {};
   }
 
   [[nodiscard]] auto context_descriptor() const
     -> const mln_opengl_context_descriptor& {
     return context_;
+  }
+
+  [[nodiscard]] auto renders_borrowed_textures() const -> bool {
+    return !borrowed_textures_.empty();
   }
 
  private:
@@ -461,8 +471,17 @@ class OpenGLTextureBackend final : public mln::gl::RendererBackend,
   void destroy_native_context() {}
 #endif
 
+  static auto borrowed_texture_names(const OpenGLBorrowedTarget& target)
+    -> std::vector<uint32_t> {
+    auto names = std::vector<uint32_t>{};
+    names.reserve(target.textures.size());
+    for (const auto& entry : target.textures) names.push_back(entry.texture);
+    return names;
+  }
+
   mln_opengl_context_descriptor context_{};
-  uint32_t borrowed_texture_ = 0;
+  // The caller's texture for each slot, or empty for a session-owned ring.
+  std::vector<uint32_t> borrowed_textures_;
   mln::Size resource_size_{};
   mln::core::RenderableSlotRing ring_;
 
@@ -487,20 +506,19 @@ class OpenGLTextureSessionBackend final
       : backend_(descriptor, size, ring_depth) {}
 
   OpenGLTextureSessionBackend(
-    const mln_opengl_borrowed_texture_descriptor& descriptor, mln::Size size
+    const OpenGLBorrowedTarget& target, mln::Size size
   )
-      : backend_(descriptor, size) {}
+      : backend_(target, size) {}
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
-  auto set_opengl_borrowed_target(
-    const mln_opengl_borrowed_texture_descriptor& descriptor
-  ) -> mln_status override {
+  auto set_opengl_borrowed_target(const OpenGLBorrowedTarget& target)
+    -> mln_status override {
     if (!mln::core::opengl_context_matches(
-          backend_.context_descriptor(), descriptor.context,
+          backend_.context_descriptor(), target.descriptor.context,
           mln::core::OpenGLContextMatch::Exact
         )) {
       mln::core::set_thread_error(
@@ -508,10 +526,7 @@ class OpenGLTextureSessionBackend final
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    backend_.set_borrowed_texture(
-      descriptor.texture,
-      mln::Size{descriptor.physical_width, descriptor.physical_height}
-    );
+    backend_.set_borrowed_textures(target);
     return MLN_STATUS_OK;
   }
 
@@ -533,18 +548,22 @@ class OpenGLTextureSessionBackend final
       return MLN_STATUS_NOT_READY;
     }
     backend_.finish_rendering();
-    out_metadata = mln_opengl_owned_texture_frame{
-      .size = sizeof(mln_opengl_owned_texture_frame),
+    // The host chose a borrowed texture's format, which the session cannot
+    // query before OpenGL ES 3.1.
+    const auto owned = !backend_.renders_borrowed_textures();
+    out_metadata = mln_opengl_texture_frame{
+      .size = sizeof(mln_opengl_texture_frame),
       .generation = frame.generation,
       .width = frame.physical_width,
       .height = frame.physical_height,
       .scale_factor = frame.scale_factor,
       .frame_id = frame.frame_id,
+      .slot = frame.slot,
       .texture = texture,
       .target = opengl_texture_target,
-      .internal_format = opengl_internal_format,
-      .format = opengl_pixel_format,
-      .type = opengl_pixel_type,
+      .internal_format = owned ? opengl_internal_format : 0U,
+      .format = owned ? opengl_pixel_format : 0U,
+      .type = owned ? opengl_pixel_type : 0U,
     };
     return MLN_STATUS_OK;
   }
@@ -679,18 +698,20 @@ auto opengl_borrowed_texture_attach_start(
     descriptor->physical_height
   );
   session->texture.mode = TextureSessionMode::Borrowed;
-  const auto copied = *descriptor;
-  session->initialize_backend = [copied](mln_render_session_object& target) {
-    target.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
-      copied, mln::Size{target.physical_width, target.physical_height}
+  session->initialize_backend = [target = OpenGLBorrowedTarget{*descriptor}](
+                                  mln_render_session_object& live
+                                ) {
+    live.texture.backend = std::make_unique<OpenGLTextureSessionBackend>(
+      target, mln::Size{live.physical_width, live.physical_height}
     );
     return MLN_STATUS_OK;
   };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
     .driver = 0,
-    .texture_ring_depth = 0,
-    .flags = 0
+    .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -725,17 +746,12 @@ auto opengl_borrowed_texture_set_target_start(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  const auto copied = *descriptor;
-  return enqueue_driver_operation(
-    session,
-    [copied](mln_render_session_object& target) {
-      return render_session_set_target(
-        target.self, RetargetTargetKind::BorrowedTexture, copied.extent,
-        copied.physical_width, copied.physical_height,
-        [&copied](mln_render_session_object& live) {
-          return live.texture.backend->set_opengl_borrowed_target(copied);
-        }
-      );
+  return enqueue_borrowed_texture_retarget(
+    session, descriptor->texture_count, descriptor->extent,
+    descriptor->physical_width, descriptor->physical_height,
+    [target =
+       OpenGLBorrowedTarget{*descriptor}](mln_render_session_object& live) {
+      return live.texture.backend->set_opengl_borrowed_target(target);
     },
     completion, valueless_completion<&mln_opengl_borrowed_texture_set_target>()
   );

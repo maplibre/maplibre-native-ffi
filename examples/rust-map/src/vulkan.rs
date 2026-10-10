@@ -345,10 +345,6 @@ impl BorrowedImage {
         })
     }
 
-    pub fn view(&self) -> vk::ImageView {
-        self.view
-    }
-
     pub fn image_handle(&self) -> u64 {
         self.image.as_raw()
     }

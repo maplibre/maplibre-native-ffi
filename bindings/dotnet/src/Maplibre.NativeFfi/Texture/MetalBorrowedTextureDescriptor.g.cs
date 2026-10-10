@@ -9,29 +9,33 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_metal_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical texture extent. The map viewport uses width and height and the
-/// renderer uses scale_factor; the physical size is stated separately below.
-/// </param>
-/// <param name="PhysicalWidth">
-/// Physical texture width in device pixels. Must be positive. Defaults to 256.
-/// </param>
-/// <param name="PhysicalHeight">
-/// Physical texture height in device pixels. Must be positive. Defaults to 256.
-/// </param>
-/// <param name="Texture">
-/// Borrowed <c>id&lt;MTLTexture&gt;</c> / <c>MTL::Texture*</c>. Required.
-/// </param>
-public readonly partial record struct MetalBorrowedTextureDescriptor(
-    RenderTargetExtent Extent,
-    uint PhysicalWidth,
-    uint PhysicalHeight,
-    NativePointer Texture
-)
+public readonly record struct MetalBorrowedTextureDescriptor
 {
     public MetalBorrowedTextureDescriptor()
-        : this(new RenderTargetExtent(), 256, 256, default) { }
+        : this(new RenderTargetExtent(), 256, 256, default!) { }
 
+    public MetalBorrowedTextureDescriptor(
+        RenderTargetExtent Extent,
+        uint PhysicalWidth,
+        uint PhysicalHeight,
+        MetalBorrowedTexture[] Textures
+    )
+    {
+        this.Extent = Extent;
+        this.PhysicalWidth = PhysicalWidth;
+        this.PhysicalHeight = PhysicalHeight;
+        this.Textures = Textures;
+    }
+
+    public RenderTargetExtent Extent { get; init; }
+    public uint PhysicalWidth { get; init; }
+    public uint PhysicalHeight { get; init; }
+    public MetalBorrowedTexture[] Textures
+    {
+        get => TexturesStorage.ToArray();
+        init => TexturesStorage = ValueArray.Copy(value);
+    }
+    internal ValueArray<MetalBorrowedTexture> TexturesStorage { get; init; }
     public static MetalBorrowedTextureDescriptor Default
     {
         get

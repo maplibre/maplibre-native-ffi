@@ -115,17 +115,17 @@ impl VulkanTextureCompositor {
     pub fn draw(&mut self, frame: &AcquiredFrameHandle) -> maplibre_native_ffi::Result<bool> {
         frame.get_vulkan_texture(|metadata| {
             if metadata.width == 0 || metadata.height == 0 {
-                return Err(compositor_error("owned Vulkan frame has an empty extent"));
+                return Err(compositor_error("Vulkan frame has an empty extent"));
             }
             if metadata.layout != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32 {
                 return Err(compositor_error(format!(
-                    "owned Vulkan frame has layout {}, expected SHADER_READ_ONLY_OPTIMAL",
+                    "Vulkan frame has layout {}, expected SHADER_READ_ONLY_OPTIMAL",
                     metadata.layout
                 )));
             }
             let image_view = vk::ImageView::from_raw(metadata.image_view);
             if image_view == vk::ImageView::null() {
-                return Err(compositor_error("owned Vulkan frame has a null image view"));
+                return Err(compositor_error("Vulkan frame has a null image view"));
             }
             self.draw_image_view(image_view).map_err(|error| {
                 compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
@@ -196,10 +196,7 @@ impl VulkanTextureCompositor {
     /// Samples the image view into the swapchain, reporting whether the frame
     /// reached the screen. A swapchain the surface has outgrown presents
     /// nothing, so the caller keeps its redraw pending.
-    pub(crate) fn draw_image_view(
-        &mut self,
-        image_view: vk::ImageView,
-    ) -> Result<bool, vk::Result> {
+    fn draw_image_view(&mut self, image_view: vk::ImageView) -> Result<bool, vk::Result> {
         // SAFETY: the fence belongs to this live device.
         unsafe {
             self.device

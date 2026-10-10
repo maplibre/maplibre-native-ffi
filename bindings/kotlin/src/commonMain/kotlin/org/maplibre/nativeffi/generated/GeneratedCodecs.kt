@@ -586,12 +586,16 @@ internal fun NativeArena.putMetalBorrowedTextureDescriptor(
   putRenderTargetExtent(target + 8, value.extent)
   writeU32(target + 32, value.physicalWidth)
   writeU32(target + 36, value.physicalHeight)
-  writeAddress(target + 40, value.texture.address)
+  writeAddress(
+    target + 40,
+    array(value.textures, w(4, 8), w(4, 8)) { at, item -> putMetalBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(44, 48), value.textures.size.toULong())
 }
 
 internal fun NativeArena.writeMetalBorrowedTextureDescriptor(
   value: MetalBorrowedTextureDescriptor
-): Long = allocate(48, 8).also { putMetalBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(48, 56), 8).also { putMetalBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeCall.putRenderSessionAttachOptions(
   target: Long,
@@ -640,13 +644,17 @@ internal fun NativeArena.putOpenglBorrowedTextureDescriptor(
   writeU32(target + 32, value.physicalWidth)
   writeU32(target + 36, value.physicalHeight)
   putOpenglContextDescriptor(target + 40, value.context)
-  writeU32(target + w(76, 104), value.texture)
-  writeU32(target + w(80, 108), value.target)
+  writeAddress(
+    target + w(76, 104),
+    array(value.textures, 4, 4) { at, item -> putOpenglBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(80, 112), value.textures.size.toULong())
+  writeU32(target + w(84, 120), value.target)
 }
 
 internal fun NativeArena.writeOpenglBorrowedTextureDescriptor(
   value: OpenglBorrowedTextureDescriptor
-): Long = allocate(w(88, 112), 8).also { putOpenglBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(88, 128), 8).also { putOpenglBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putOpenglOwnedTextureDescriptor(
   target: Long,
@@ -680,16 +688,19 @@ internal fun NativeArena.putVulkanBorrowedTextureDescriptor(
   writeU32(target + 32, value.physicalWidth)
   writeU32(target + 36, value.physicalHeight)
   putVulkanContextDescriptor(target + 40, value.context)
-  writeU64(target + w(72, 104), value.image)
-  writeU64(target + w(80, 112), value.imageView)
-  writeU32(target + w(88, 120), value.format)
-  writeU32(target + w(92, 124), value.initialLayout)
-  writeU32(target + w(96, 128), value.finalLayout)
+  writeAddress(
+    target + w(72, 104),
+    array(value.textures, 16, 8) { at, item -> putVulkanBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(76, 112), value.textures.size.toULong())
+  writeU32(target + w(80, 120), value.format)
+  writeU32(target + w(84, 124), value.initialLayout)
+  writeU32(target + w(88, 128), value.finalLayout)
 }
 
 internal fun NativeArena.writeVulkanBorrowedTextureDescriptor(
   value: VulkanBorrowedTextureDescriptor
-): Long = allocate(w(104, 136), 8).also { putVulkanBorrowedTextureDescriptor(it, value) }
+): Long = allocate(w(96, 136), 8).also { putVulkanBorrowedTextureDescriptor(it, value) }
 
 internal fun NativeArena.putVulkanOwnedTextureDescriptor(
   target: Long,
@@ -723,8 +734,11 @@ internal fun NativeArena.putWebgpuBorrowedTextureDescriptor(
   writeU32(target + 32, value.physicalWidth)
   writeU32(target + 36, value.physicalHeight)
   putWebgpuContextDescriptor(target + 40, value.context)
-  writeAddress(target + w(56, 72), value.texture.address)
-  writeAddress(target + w(60, 80), value.textureView.address)
+  writeAddress(
+    target + w(56, 72),
+    array(value.textures, w(8, 16), w(4, 8)) { at, item -> putWebgpuBorrowedTexture(at, item) },
+  )
+  writeSize(target + w(60, 80), value.textures.size.toULong())
   writeU32(target + w(64, 88), value.format)
 }
 
@@ -931,43 +945,39 @@ internal fun NativeArena.putResourceResponse(target: Long, value: ResourceRespon
 internal fun NativeArena.writeResourceResponse(value: ResourceResponse): Long =
   allocate(w(72, 96), 8).also { putResourceResponse(it, value) }
 
-internal fun readMetalOwnedTextureFrame(
-  source: Long,
-  scope: ViewScope? = null,
-): MetalOwnedTextureFrame =
-  MetalOwnedTextureFrame(
+internal fun readMetalTextureFrame(source: Long, scope: ViewScope? = null): MetalTextureFrame =
+  MetalTextureFrame(
       generation = readU64(source + 8),
       width = readU32(source + 16),
       height = readU32(source + 20),
       scaleFactor = readF64(source + 24),
       frameId = readU64(source + 32),
+      slot = readU32(source + 40),
       texture =
-        readAddress(source + 40).let {
-          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
-        },
-      device =
         readAddress(source + w(44, 48)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
-      pixelFormat = readU64(source + w(48, 56)),
+      device =
+        readAddress(source + w(48, 56)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      pixelFormat = readU64(source + w(56, 64)),
     )
     .also { it.bindingScope = scope }
 
-internal fun readOpenglOwnedTextureFrame(
-  source: Long,
-  scope: ViewScope? = null,
-): OpenglOwnedTextureFrame =
-  OpenglOwnedTextureFrame(
+internal fun readOpenglTextureFrame(source: Long, scope: ViewScope? = null): OpenglTextureFrame =
+  OpenglTextureFrame(
       generation = readU64(source + 8),
       width = readU32(source + 16),
       height = readU32(source + 20),
       scaleFactor = readF64(source + 24),
       frameId = readU64(source + 32),
-      texture = readU32(source + 40),
-      target = readU32(source + 44),
-      internalFormat = readU32(source + 48),
-      format = readU32(source + 52),
-      type = readU32(source + 56),
+      slot = readU32(source + 40),
+      texture = readU32(source + 44),
+      target = readU32(source + 48),
+      internalFormat = readU32(source + 52),
+      format = readU32(source + 56),
+      type = readU32(source + 60),
     )
     .also { it.bindingScope = scope }
 
@@ -989,50 +999,46 @@ internal fun readRenderFrameResult(source: Long): RenderFrameResult =
     needsRepaint = readBool(source + 40),
   )
 
-internal fun readVulkanOwnedTextureFrame(
-  source: Long,
-  scope: ViewScope? = null,
-): VulkanOwnedTextureFrame =
-  VulkanOwnedTextureFrame(
+internal fun readVulkanTextureFrame(source: Long, scope: ViewScope? = null): VulkanTextureFrame =
+  VulkanTextureFrame(
       generation = readU64(source + 8),
       width = readU32(source + 16),
       height = readU32(source + 20),
       scaleFactor = readF64(source + 24),
       frameId = readU64(source + 32),
-      image = readU64(source + 40),
-      imageView = readU64(source + 48),
+      slot = readU32(source + 40),
+      image = readU64(source + 48),
+      imageView = readU64(source + 56),
       device =
-        readAddress(source + 56).let {
+        readAddress(source + 64).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
-      format = readU32(source + w(60, 64)),
-      layout = readU32(source + w(64, 68)),
+      format = readU32(source + w(68, 72)),
+      layout = readU32(source + w(72, 76)),
     )
     .also { it.bindingScope = scope }
 
-internal fun readWebgpuOwnedTextureFrame(
-  source: Long,
-  scope: ViewScope? = null,
-): WebgpuOwnedTextureFrame =
-  WebgpuOwnedTextureFrame(
+internal fun readWebgpuTextureFrame(source: Long, scope: ViewScope? = null): WebgpuTextureFrame =
+  WebgpuTextureFrame(
       generation = readU64(source + 8),
       width = readU32(source + 16),
       height = readU32(source + 20),
       scaleFactor = readF64(source + 24),
       frameId = readU64(source + 32),
+      slot = readU32(source + 40),
       texture =
-        readAddress(source + 40).let {
-          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
-        },
-      textureView =
         readAddress(source + w(44, 48)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
-      device =
+      textureView =
         readAddress(source + w(48, 56)).let {
           if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
         },
-      format = readU32(source + w(52, 64)),
+      device =
+        readAddress(source + w(52, 64)).let {
+          if (scope != null) NativePointer.scoped(it, scope) else NativePointer.ofAddress(it)
+        },
+      format = readU32(source + w(56, 72)),
     )
     .also { it.bindingScope = scope }
 
@@ -1185,7 +1191,10 @@ internal fun readMetalBorrowedTextureDescriptor(source: Long): MetalBorrowedText
     extent = readRenderTargetExtent(source + 8),
     physicalWidth = readU32(source + 32),
     physicalHeight = readU32(source + 36),
-    texture = NativePointer.ofAddress(readAddress(source + 40)),
+    textures =
+      readArray(readAddress(source + 40), readSize(source + w(44, 48)), w(4, 8).toLong()) { item ->
+        readMetalBorrowedTexture(item)
+      },
   )
 
 internal fun readMetalOwnedTextureDescriptor(source: Long): MetalOwnedTextureDescriptor =
@@ -1207,8 +1216,12 @@ internal fun readOpenglBorrowedTextureDescriptor(source: Long): OpenglBorrowedTe
     physicalWidth = readU32(source + 32),
     physicalHeight = readU32(source + 36),
     context = readOpenglContextDescriptor(source + 40),
-    texture = readU32(source + w(76, 104)),
-    target = readU32(source + w(80, 108)),
+    textures =
+      readArray(readAddress(source + w(76, 104)), readSize(source + w(80, 112)), 4.toLong()) { item
+        ->
+        readOpenglBorrowedTexture(item)
+      },
+    target = readU32(source + w(84, 120)),
   )
 
 internal fun readOpenglOwnedTextureDescriptor(source: Long): OpenglOwnedTextureDescriptor =
@@ -1388,11 +1401,14 @@ internal fun readVulkanBorrowedTextureDescriptor(source: Long): VulkanBorrowedTe
     physicalWidth = readU32(source + 32),
     physicalHeight = readU32(source + 36),
     context = readVulkanContextDescriptor(source + 40),
-    image = readU64(source + w(72, 104)),
-    imageView = readU64(source + w(80, 112)),
-    format = readU32(source + w(88, 120)),
-    initialLayout = readU32(source + w(92, 124)),
-    finalLayout = readU32(source + w(96, 128)),
+    textures =
+      readArray(readAddress(source + w(72, 104)), readSize(source + w(76, 112)), 16.toLong()) { item
+        ->
+        readVulkanBorrowedTexture(item)
+      },
+    format = readU32(source + w(80, 120)),
+    initialLayout = readU32(source + w(84, 124)),
+    finalLayout = readU32(source + w(88, 128)),
   )
 
 internal fun readVulkanOwnedTextureDescriptor(source: Long): VulkanOwnedTextureDescriptor =
@@ -1414,8 +1430,11 @@ internal fun readWebgpuBorrowedTextureDescriptor(source: Long): WebgpuBorrowedTe
     physicalWidth = readU32(source + 32),
     physicalHeight = readU32(source + 36),
     context = readWebgpuContextDescriptor(source + 40),
-    texture = NativePointer.ofAddress(readAddress(source + w(56, 72))),
-    textureView = NativePointer.ofAddress(readAddress(source + w(60, 80))),
+    textures =
+      readArray(readAddress(source + w(56, 72)), readSize(source + w(60, 80)), w(8, 16).toLong()) {
+        item ->
+        readWebgpuBorrowedTexture(item)
+      },
     format = readU32(source + w(64, 88)),
   )
 
@@ -1696,6 +1715,13 @@ internal fun NativeArena.putImageContent(target: Long, value: ImageContent) {
 internal fun NativeArena.writeImageContent(value: ImageContent): Long =
   allocate(16, 4).also { putImageContent(it, value) }
 
+internal fun NativeArena.putMetalBorrowedTexture(target: Long, value: MetalBorrowedTexture) {
+  writeAddress(target, value.texture.address)
+}
+
+internal fun NativeArena.writeMetalBorrowedTexture(value: MetalBorrowedTexture): Long =
+  allocate(w(4, 8), w(4, 8)).also { putMetalBorrowedTexture(it, value) }
+
 internal fun NativeCall.putQueueLock(target: Long, value: QueueLock) {
   writeU32(target, w(20, 40).toUInt())
   if (value.lock == null && value.unlock == null) return
@@ -1740,6 +1766,13 @@ internal fun NativeArena.putOpenglContextDescriptor(target: Long, value: OpenglC
 internal fun NativeArena.writeOpenglContextDescriptor(value: OpenglContextDescriptor): Long =
   allocate(w(36, 64), w(4, 8)).also { putOpenglContextDescriptor(it, value) }
 
+internal fun NativeArena.putOpenglBorrowedTexture(target: Long, value: OpenglBorrowedTexture) {
+  writeU32(target, value.texture)
+}
+
+internal fun NativeArena.writeOpenglBorrowedTexture(value: OpenglBorrowedTexture): Long =
+  allocate(4, 4).also { putOpenglBorrowedTexture(it, value) }
+
 internal fun NativeArena.putVulkanContextDescriptor(target: Long, value: VulkanContextDescriptor) {
   writeU32(target, w(32, 64).toUInt())
   writeAddress(target + w(4, 8), value.instance.address)
@@ -1754,6 +1787,14 @@ internal fun NativeArena.putVulkanContextDescriptor(target: Long, value: VulkanC
 internal fun NativeArena.writeVulkanContextDescriptor(value: VulkanContextDescriptor): Long =
   allocate(w(32, 64), w(4, 8)).also { putVulkanContextDescriptor(it, value) }
 
+internal fun NativeArena.putVulkanBorrowedTexture(target: Long, value: VulkanBorrowedTexture) {
+  writeU64(target, value.image)
+  writeU64(target + 8, value.imageView)
+}
+
+internal fun NativeArena.writeVulkanBorrowedTexture(value: VulkanBorrowedTexture): Long =
+  allocate(16, 8).also { putVulkanBorrowedTexture(it, value) }
+
 internal fun NativeArena.putWebgpuContextDescriptor(target: Long, value: WebgpuContextDescriptor) {
   writeU32(target, w(16, 32).toUInt())
   writeAddress(target + w(4, 8), value.instance.address)
@@ -1763,6 +1804,14 @@ internal fun NativeArena.putWebgpuContextDescriptor(target: Long, value: WebgpuC
 
 internal fun NativeArena.writeWebgpuContextDescriptor(value: WebgpuContextDescriptor): Long =
   allocate(w(16, 32), w(4, 8)).also { putWebgpuContextDescriptor(it, value) }
+
+internal fun NativeArena.putWebgpuBorrowedTexture(target: Long, value: WebgpuBorrowedTexture) {
+  writeAddress(target, value.texture.address)
+  writeAddress(target + w(4, 8), value.textureView.address)
+}
+
+internal fun NativeArena.writeWebgpuBorrowedTexture(value: WebgpuBorrowedTexture): Long =
+  allocate(w(8, 16), w(4, 8)).also { putWebgpuBorrowedTexture(it, value) }
 
 internal fun NativeArena.putOfflineTilePyramidRegionDefinition(
   target: Long,
@@ -1872,6 +1921,9 @@ internal fun readRenderTargetExtent(source: Long): RenderTargetExtent =
     scaleFactor = readF64(source + 16),
   )
 
+internal fun readMetalBorrowedTexture(source: Long): MetalBorrowedTexture =
+  MetalBorrowedTexture(texture = NativePointer.ofAddress(readAddress(source)))
+
 internal fun readMetalContextDescriptor(source: Long): MetalContextDescriptor =
   MetalContextDescriptor(device = NativePointer.ofAddress(readAddress(source + w(4, 8))))
 
@@ -1892,6 +1944,9 @@ internal fun readOpenglContextDescriptor(source: Long): OpenglContextDescriptor 
         }
       },
   )
+
+internal fun readOpenglBorrowedTexture(source: Long): OpenglBorrowedTexture =
+  OpenglBorrowedTexture(texture = readU32(source))
 
 internal fun readScreenBox(source: Long): ScreenBox =
   ScreenBox(min = readScreenPoint(source), max = readScreenPoint(source + 16))
@@ -1926,11 +1981,20 @@ internal fun readVulkanContextDescriptor(source: Long): VulkanContextDescriptor 
     getDeviceProcAddr = NativePointer.ofAddress(readAddress(source + w(28, 56))),
   )
 
+internal fun readVulkanBorrowedTexture(source: Long): VulkanBorrowedTexture =
+  VulkanBorrowedTexture(image = readU64(source), imageView = readU64(source + 8))
+
 internal fun readWebgpuContextDescriptor(source: Long): WebgpuContextDescriptor =
   WebgpuContextDescriptor(
     instance = NativePointer.ofAddress(readAddress(source + w(4, 8))),
     device = NativePointer.ofAddress(readAddress(source + w(8, 16))),
     queue = NativePointer.ofAddress(readAddress(source + w(12, 24))),
+  )
+
+internal fun readWebgpuBorrowedTexture(source: Long): WebgpuBorrowedTexture =
+  WebgpuBorrowedTexture(
+    texture = NativePointer.ofAddress(readAddress(source)),
+    textureView = NativePointer.ofAddress(readAddress(source + w(4, 8))),
   )
 
 internal fun readRuntimeEvent(source: Long, message: String = ""): RuntimeEvent =

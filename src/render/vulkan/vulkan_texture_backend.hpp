@@ -38,8 +38,9 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
     const mln_vulkan_owned_texture_descriptor& descriptor, mln::Size size,
     std::size_t ring_depth, std::shared_ptr<const QueueLock> queue_lock
   );
+  // Renders slot i into the target's textures[i].
   VulkanTextureBackend(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor, mln::Size size,
+    const VulkanBorrowedTarget& target, mln::Size size,
     std::shared_ptr<const QueueLock> queue_lock
   );
   VulkanTextureBackend(const VulkanTextureBackend&) = delete;
@@ -55,15 +56,15 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   // Follows a new physical size. Each ring slot keeps its resource until the
   // slot is selected again, which rebuilds it at the new size.
   void set_ring_size(mln::Size new_size);
-  // Whether a replacement image can use the render pass already in hand.
+  // Whether replacement images can use the render passes already built.
   [[nodiscard]] auto matches_borrowed_target(
     const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) const -> bool;
-  // Renders into a different caller-owned image from here on. The caller has
-  // already established that it matches the live render pass.
-  void set_borrowed_target(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor
-  );
+  // Renders slot i into the target's textures[i] from here on. The caller has
+  // already established that the images match the live render passes.
+  void set_borrowed_target(const VulkanBorrowedTarget& target);
+  // The layout a rendered image is left in, which an acquired frame reports.
+  [[nodiscard]] auto frame_layout() const -> VkImageLayout;
   [[nodiscard]] auto context_descriptor() const
     -> const mln_vulkan_context_descriptor& {
     return descriptor_.context;
@@ -89,8 +90,15 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
  private:
   void initSharedDevice();
   mln_vulkan_owned_texture_descriptor descriptor_;
+  // The borrowed format and layouts. Its textures array is null; the images
+  // are in borrowed_images_.
   mln_vulkan_borrowed_texture_descriptor borrowed_descriptor_{};
+  // The caller's image for each slot, or empty for a session-owned ring.
+  std::vector<mln_vulkan_borrowed_texture> borrowed_images_;
   bool uses_borrowed_texture_ = false;
+  // Set once a slot builds its render pass, which fixes the format and the
+  // layouts every later image must match.
+  bool borrowed_pass_built_ = false;
   RenderableSlotRing ring_;
 };
 

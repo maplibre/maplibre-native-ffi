@@ -122,7 +122,7 @@ const App = struct {
         if (self.smoke) events.pushAfter(.smoke_timeout, smoke_timeout_ms);
         // Updates the map published before attachment have no event left to
         // demand their frame.
-        _ = try self.target.session().requestFrame(false);
+        try self.target.session().requestFrame(false);
         while (self.running) {
             var event: c.SDL_Event = undefined;
             if (!c.SDL_WaitEventTimeout(&event, signal_check_ms)) continue;
@@ -158,12 +158,12 @@ const App = struct {
         const session = self.target.session();
         switch (code) {
             .runtime_events => if (try self.map.drainEvents()) {
-                _ = try session.requestFrame(false);
+                try session.requestFrame(false);
             },
             .driver_work => try session.service(),
-            .target_replaced => try self.target.showReplacements(),
+            .target_replaced => try self.target.retireReplaced(),
             .frame_results => try self.showFrameResults(),
-            .retry_frame => _ = try session.requestFrame(true),
+            .retry_frame => try session.requestFrame(true),
             .smoke_timeout => {
                 std.debug.print("smoke: no frame rendered within 60 s\n", .{});
                 return types.AppError.SmokeFrameTimedOut;
@@ -187,9 +187,8 @@ const App = struct {
             // missed the window consumed its update.
             events.pushAfter(.retry_frame, frame_retry_ms);
         } else if (results.needs_repaint) {
-            _ = try session.requestFrame(false);
+            try session.requestFrame(false);
         }
-        if (results.any) try session.compositorDone();
     }
 };
 

@@ -8,11 +8,11 @@ public extension AcquiredFrameHandle {
   ///
   /// See `mln_acquired_frame_get_metal_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withMetalTexture<Result>(_ body: (MetalOwnedTextureFrameView) throws
+  func withMetalTexture<Result>(_ body: (MetalTextureFrameView) throws
     -> Result) throws -> Result
   {
-    var raw = mln_metal_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
+    var raw = mln_metal_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_metal_texture_frame>.size)
     return try nativeView(
       "mln_acquired_frame_get_metal_texture",
       reading: raw,
@@ -27,8 +27,8 @@ public extension AcquiredFrameHandle {
         value,
         diagnostic
       ) }
-    ) { raw, scope in try body(MetalOwnedTextureFrameView(
-      MetalOwnedTextureFrame(raw: raw),
+    ) { raw, scope in try body(MetalTextureFrameView(
+      MetalTextureFrame(raw: raw),
       scope: scope
     )) }
   }
@@ -37,11 +37,11 @@ public extension AcquiredFrameHandle {
   ///
   /// See `mln_acquired_frame_get_opengl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withOpenglTexture<Result>(_ body: (OpenglOwnedTextureFrameView) throws
+  func withOpenglTexture<Result>(_ body: (OpenglTextureFrameView) throws
     -> Result) throws -> Result
   {
-    var raw = mln_opengl_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
+    var raw = mln_opengl_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_opengl_texture_frame>.size)
     return try nativeView(
       "mln_acquired_frame_get_opengl_texture",
       reading: raw,
@@ -56,8 +56,8 @@ public extension AcquiredFrameHandle {
         value,
         diagnostic
       ) }
-    ) { raw, scope in try body(OpenglOwnedTextureFrameView(
-      OpenglOwnedTextureFrame(raw: raw),
+    ) { raw, scope in try body(OpenglTextureFrameView(
+      OpenglTextureFrame(raw: raw),
       scope: scope
     )) }
   }
@@ -66,11 +66,11 @@ public extension AcquiredFrameHandle {
   ///
   /// See `mln_acquired_frame_get_vulkan_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withVulkanTexture<Result>(_ body: (VulkanOwnedTextureFrameView) throws
+  func withVulkanTexture<Result>(_ body: (VulkanTextureFrameView) throws
     -> Result) throws -> Result
   {
-    var raw = mln_vulkan_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
+    var raw = mln_vulkan_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_vulkan_texture_frame>.size)
     return try nativeView(
       "mln_acquired_frame_get_vulkan_texture",
       reading: raw,
@@ -85,8 +85,8 @@ public extension AcquiredFrameHandle {
         value,
         diagnostic
       ) }
-    ) { raw, scope in try body(VulkanOwnedTextureFrameView(
-      VulkanOwnedTextureFrame(raw: raw),
+    ) { raw, scope in try body(VulkanTextureFrameView(
+      VulkanTextureFrame(raw: raw),
       scope: scope
     )) }
   }
@@ -95,11 +95,11 @@ public extension AcquiredFrameHandle {
   ///
   /// See `mln_acquired_frame_get_webgpu_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  func withWebgpuTexture<Result>(_ body: (WebgpuOwnedTextureFrameView) throws
+  func withWebgpuTexture<Result>(_ body: (WebgpuTextureFrameView) throws
     -> Result) throws -> Result
   {
-    var raw = mln_webgpu_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_webgpu_owned_texture_frame>.size)
+    var raw = mln_webgpu_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_webgpu_texture_frame>.size)
     return try nativeView(
       "mln_acquired_frame_get_webgpu_texture",
       reading: raw,
@@ -114,8 +114,8 @@ public extension AcquiredFrameHandle {
         value,
         diagnostic
       ) }
-    ) { raw, scope in try body(WebgpuOwnedTextureFrameView(
-      WebgpuOwnedTextureFrame(raw: raw),
+    ) { raw, scope in try body(WebgpuTextureFrameView(
+      WebgpuTextureFrame(raw: raw),
       scope: scope
     )) }
   }

@@ -42,8 +42,6 @@ final class MetalGraphicsContext {
 
 /// What one drain of the frame-result queue found.
 struct FrameResults {
-  /// The drain found at least one result.
-  var any = false
   /// A demand rendered a frame.
   var rendered = false
   /// The map asked for another frame while it rendered one.
@@ -63,35 +61,28 @@ final class MetalRenderTarget {
     case nativeSurface
   }
 
+  /// The depth of a borrowed ring. The host holds the newest frame until a
+  /// newer one arrives, and the session renders into the other texture
+  /// meanwhile.
+  static let borrowedRingDepth = 2
+
   let session: RenderSessionHandle
   let driver = RenderDriverKind.coreWorker
   private let kind: Kind
-  /// The caller-owned texture the compositor samples.
-  private var borrowedTexture: MetalBorrowedTexture?
-  /// A completed replacement, which the compositor samples once the frame
-  /// demanded with `token` has rendered into it.
-  private var replacement: (texture: MetalBorrowedTexture, token: UInt64)?
-  /// The newest owned-texture frame, held until a newer one replaces it.
+  /// The caller-owned ring the session renders into.
+  private var borrowedRing: [MetalBorrowedTexture]
+  /// The newest texture frame, held until a newer one replaces it.
   private var heldFrame: AcquiredFrameHandle?
-  /// Whether a borrowed-texture demand is outstanding. The texture belongs to
-  /// the session from a demand until its result, and to the host until the
-  /// compositor's reads finish, so at most one demand is outstanding.
-  private var demandOutstanding = false
-  /// A demand that arrived while one was outstanding, sent once the
-  /// compositor is done. A forced one renders without a newer map update.
-  private var wantedDemand: Bool?
   private var nextToken: UInt64 = 0
-  /// The newest demand token with a rendered result.
-  private var renderedToken: UInt64 = 0
 
   private init(
     session: RenderSessionHandle,
     kind: Kind,
-    borrowedTexture: MetalBorrowedTexture? = nil
+    borrowedRing: [MetalBorrowedTexture] = []
   ) {
     self.session = session
     self.kind = kind
-    self.borrowedTexture = borrowedTexture
+    self.borrowedRing = borrowedRing
   }
 
   /// Attaches a session against the map. `frameWake` reports frame results.
@@ -122,13 +113,13 @@ final class MetalRenderTarget {
         MetalRenderTarget(session: session, kind: .ownedTexture($0))
       }
     case .borrowedTexture:
-      let texture = try MetalBorrowedTexture(
+      let ring = try MetalBorrowedTexture.ring(
         graphics: graphics,
         viewport: viewport
       )
       let session = try await finishAttachment(
         map.metalBorrowedTextureAttach(
-          descriptor: texture.descriptor(viewport),
+          descriptor: MetalBorrowedTexture.descriptor(ring, viewport),
           options: options
         )
       )
@@ -136,7 +127,7 @@ final class MetalRenderTarget {
         MetalRenderTarget(
           session: session,
           kind: .borrowedTexture($0),
-          borrowedTexture: texture
+          borrowedRing: ring
         )
       }
     case .nativeSurface:
@@ -154,16 +145,9 @@ final class MetalRenderTarget {
     }
   }
 
-  /// Demands a frame and returns the token whose result shows it. A forced
-  /// demand renders even without a newer map update, which a retry after a
-  /// frame that missed the layer needs. While a borrowed-texture demand is
-  /// outstanding, the demand waits for ``compositorDone()``.
-  @discardableResult
-  func requestFrame(force: Bool = false) throws -> UInt64 {
-    if demandOutstanding {
-      wantedDemand = force || (wantedDemand ?? false)
-      return nextToken + 1
-    }
+  /// Demands a frame. A forced demand renders even without a newer map
+  /// update, which a retry after a frame that missed the layer needs.
+  func requestFrame(force: Bool = false) throws {
     nextToken += 1
     var flags: FrameDemandFlag = force ? [] : [.ifNeeded]
     if case .nativeSurface = kind {
@@ -173,18 +157,6 @@ final class MetalRenderTarget {
       flags: flags,
       token: nextToken
     ))
-    if case .borrowedTexture = kind { demandOutstanding = true }
-    return nextToken
-  }
-
-  /// Ends the host's turn with the borrowed texture after a drain that found
-  /// results, sending any demand that waited for it.
-  func compositorDone() throws {
-    demandOutstanding = false
-    if let force = wantedDemand {
-      wantedDemand = nil
-      try requestFrame(force: force)
-    }
   }
 
   /// Drains every queued frame result.
@@ -194,7 +166,7 @@ final class MetalRenderTarget {
     }
     defer { try? batch.close() }
     let count = try batch.count()
-    var results = FrameResults(any: count > 0)
+    var results = FrameResults()
     // No update and size pending wait for the map's next update, superseded
     // demands have a newer one behind them, and no demand carries a timeout.
     for index in 0 ..< count {
@@ -202,7 +174,6 @@ final class MetalRenderTarget {
       if result.disposition == .rendered {
         results.rendered = true
         results.needsRepaint = result.needsRepaint
-        renderedToken = max(renderedToken, result.token)
       } else if result.disposition == .targetNotReady {
         results.targetNotReady = true
       }
@@ -214,16 +185,10 @@ final class MetalRenderTarget {
   /// the layer.
   func present() throws -> Bool {
     switch kind {
-    case let .ownedTexture(compositor):
+    case let .ownedTexture(compositor), let .borrowedTexture(compositor):
       // Without a new frame, the layer keeps the one it already shows.
       guard let frame = try acquireNewestFrame() else { return true }
       return try compositor.draw(frame: frame)
-    case let .borrowedTexture(compositor):
-      if let replacement, renderedToken >= replacement.token {
-        borrowedTexture = replacement.texture
-        self.replacement = nil
-      }
-      return try compositor.draw(texture: borrowedTexture!.texture)
     case .nativeSurface:
       // The driver already presented the frame.
       return true
@@ -248,18 +213,22 @@ final class MetalRenderTarget {
       try await session.resize(extent: viewport.extent)
       return
     }
-    // The session renders into the outgoing texture until the replacement
-    // completes, and this call keeps the replacement alive until then.
-    let texture = try MetalBorrowedTexture(
+    // The replacement waits until the host holds no frame, so the held one
+    // goes first, and the layer keeps what it last presented. The session
+    // renders into the outgoing ring until the replacement completes, and
+    // this call keeps that ring alive until then.
+    try releaseHeldFrame()
+    let ring = try MetalBorrowedTexture.ring(
       graphics: graphics,
       viewport: viewport
     )
     try await session.metalBorrowedTextureSetTarget(
-      descriptor: texture.descriptor(viewport)
+      descriptor: MetalBorrowedTexture.descriptor(ring, viewport)
     )
-    // Nothing has rendered into the replacement yet, so the compositor keeps
-    // sampling the outgoing texture until this demand's frame renders.
-    replacement = try (texture, requestFrame(force: true))
+    borrowedRing = ring
+    // A replacement publishes no map update, and a frame rendered before it
+    // can no longer be acquired, so the new ring needs a forced frame.
+    try requestFrame(force: true)
     try await map.resize(extent: LogicalExtent(
       width: viewport.logicalWidth,
       height: viewport.logicalHeight,
@@ -359,7 +328,7 @@ final class MetalTextureCompositor {
   /// Samples the texture into the layer's next drawable, reporting whether the
   /// frame was presented. An occluded window or an empty drawable pool yields
   /// no drawable, which is reported as false rather than failing the frame.
-  func draw(
+  private func draw(
     texture: any MTLTexture,
     producerSynchronization: GpuSyncView? = nil
   ) throws -> Bool {
@@ -456,12 +425,29 @@ final class MetalBorrowedTexture {
     self.texture = texture
   }
 
-  func descriptor(_ viewport: Viewport) -> MetalBorrowedTextureDescriptor {
+  /// Allocates a ring of ``MetalRenderTarget/borrowedRingDepth`` textures.
+  static func ring(
+    graphics: MetalGraphicsContext,
+    viewport: Viewport
+  ) throws -> [MetalBorrowedTexture] {
+    try (0 ..< MetalRenderTarget.borrowedRingDepth).map { _ in
+      try MetalBorrowedTexture(graphics: graphics, viewport: viewport)
+    }
+  }
+
+  static func descriptor(
+    _ ring: [MetalBorrowedTexture],
+    _ viewport: Viewport
+  ) -> MetalBorrowedTextureDescriptor {
     MetalBorrowedTextureDescriptor(
       extent: viewport.extent,
       physicalWidth: viewport.physicalWidth,
       physicalHeight: viewport.physicalHeight,
-      texture: nativePointer(texture as AnyObject)
+      textures: ring.map {
+        MaplibreNativeFFI.MetalBorrowedTexture(
+          texture: nativePointer($0.texture as AnyObject)
+        )
+      }
     )
   }
 }

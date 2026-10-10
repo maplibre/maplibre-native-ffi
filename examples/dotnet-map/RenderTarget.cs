@@ -96,10 +96,10 @@ internal sealed class SessionDriver(
 internal abstract class RenderTarget : IDisposable
 {
     /// <summary>
-    /// A session-owned texture ring deep enough to keep compositing while the map renders the next
-    /// frame.
+    /// The depth of a texture ring, session-owned or borrowed: the target holds the newest frame
+    /// until a newer one arrives, and the session renders into the other slot meanwhile.
     /// </summary>
-    protected const uint OwnedTextureRingDepth = 2;
+    protected const uint TextureRingDepth = 2;
 
     /// <summary>How long a frame that did not reach the window waits to retry, about one refresh.</summary>
     private const long RetryDelayMilliseconds = 16;
@@ -108,8 +108,6 @@ internal abstract class RenderTarget : IDisposable
 
     private readonly GlfwWake frames;
     private ulong nextToken;
-    private bool demandOutstanding;
-    private bool? wanted;
     private bool disposed;
 
     /// <summary>Starts an attachment with <paramref name="attach" /> and awaits it.</summary>
@@ -162,13 +160,6 @@ internal abstract class RenderTarget : IDisposable
     public long? RetryAt { get; private set; }
 
     /// <summary>
-    /// Set by a target whose texture the session and the compositor take turns on. Such a target
-    /// keeps at most one demand outstanding, and holds a wanted frame until the outstanding result
-    /// arrives.
-    /// </summary>
-    protected virtual bool ExclusiveTexture => false;
-
-    /// <summary>
     /// Set by a native surface, the only target whose demands ask the session to present.
     /// </summary>
     protected virtual bool Presents => false;
@@ -212,12 +203,6 @@ internal abstract class RenderTarget : IDisposable
     /// <summary>Demands a frame. A forced frame renders even when the map has no newer update.</summary>
     public void RequestFrame(bool force = false)
     {
-        if (ExclusiveTexture && demandOutstanding)
-        {
-            wanted = force || wanted == true;
-            return;
-        }
-        demandOutstanding = true;
         FrameDemandFlag flags = force ? 0 : FrameDemandFlag.IfNeeded;
         if (Presents)
         {
@@ -312,7 +297,6 @@ internal abstract class RenderTarget : IDisposable
             for (ulong index = 0; index < count; index++)
             {
                 var result = results.Get(index);
-                demandOutstanding = false;
                 switch (result.Disposition)
                 {
                     case RenderResult.Rendered:
@@ -337,11 +321,6 @@ internal abstract class RenderTarget : IDisposable
         {
             RequestFrame();
         }
-        if (wanted is { } force && !demandOutstanding)
-        {
-            wanted = null;
-            RequestFrame(force);
-        }
         return shown;
     }
 
@@ -358,25 +337,114 @@ internal abstract class RenderTarget : IDisposable
 }
 
 /// <summary>
-/// A session-owned texture ring. After a rendered result, the target acquires every ready frame,
-/// keeps the newest, and composes it. It holds that frame until a newer one replaces it, so the
-/// session renders into the ring's other slots meanwhile.
+/// A texture ring whose frames the target acquires and composes into the window. After a rendered
+/// result, the target acquires every ready frame, keeps the newest, and composes it. It holds that
+/// frame until a newer one replaces it, so the session renders into the ring's other slot
+/// meanwhile.
 /// </summary>
-internal sealed class OwnedTextureRenderTarget : RenderTarget
+internal abstract class TextureRenderTarget : RenderTarget
 {
-    private readonly ITextureCompositor compositor;
     private AcquiredFrameHandle? held;
 
+    protected TextureRenderTarget(
+        IGraphicsContext graphics,
+        SessionDriver driver,
+        ITextureCompositor compositor,
+        Func<RenderSessionAttachOptions, RenderSessionHandle> attach
+    )
+        : base(graphics, driver, TextureRingDepth, attach)
+    {
+        Compositor = compositor;
+    }
+
+    protected ITextureCompositor Compositor { get; }
+
+    protected static ITextureCompositor CreateCompositor(
+        IGraphicsContext graphics,
+        Viewport viewport
+    ) =>
+        graphics switch
+        {
+            MetalContext metal => new MetalTextureCompositor(metal, viewport),
+            VulkanContext vulkan => new VulkanTextureCompositor(vulkan, viewport),
+            OpenGLContext openGl => new OpenGLTextureCompositor(openGl, viewport),
+            _ => throw new InvalidOperationException(
+                $"Texture targets are not implemented for {graphics.Backend}."
+            ),
+        };
+
+    protected override bool Present()
+    {
+        AcquiredFrameHandle? newest = null;
+        while (Session.AcquireFrame() is { } frame)
+        {
+            // Nothing read an older frame, so it releases CPU-complete.
+            Release(newest);
+            newest = frame;
+        }
+        if (newest is null)
+        {
+            return held is not null;
+        }
+
+        // The compositors finish their reads before they return, so a frame releases CPU-complete.
+        var presented = false;
+        switch (Graphics)
+        {
+            case MetalContext:
+                newest.WithMetalTexture(view => presented = Compositor.Draw(view));
+                break;
+            case VulkanContext:
+                newest.WithVulkanTexture(view => presented = Compositor.Draw(view));
+                break;
+            case OpenGLContext openGl:
+                newest.WithOpenglTexture(view =>
+                {
+                    presented = Compositor.Draw(view);
+                    openGl.FinishGpuWork();
+                });
+                break;
+        }
+        if (presented)
+        {
+            Graphics.FinishFrame();
+        }
+        Release(held);
+        held = newest;
+        return presented;
+    }
+
+    protected override void ReleaseFrames()
+    {
+        Release(held);
+        held = null;
+    }
+
+    protected override void DisposeHost() => Compositor.Dispose();
+
+    private static void Release(AcquiredFrameHandle? frame)
+    {
+        if (frame is null)
+        {
+            return;
+        }
+        using (frame)
+        {
+            frame.Release(GpuSync.Default);
+        }
+    }
+}
+
+/// <summary>A session-owned texture ring, which the session sizes and allocates.</summary>
+internal sealed class OwnedTextureRenderTarget : TextureRenderTarget
+{
     private OwnedTextureRenderTarget(
         IGraphicsContext graphics,
         SessionDriver driver,
         ITextureCompositor compositor,
         Func<RenderSessionAttachOptions, RenderSessionHandle> attach
     )
-        : base(graphics, driver, OwnedTextureRingDepth, attach)
-    {
-        this.compositor = compositor;
-    }
+        : base(graphics, driver, compositor, attach) { }
 
     public static OwnedTextureRenderTarget Attach(
         IGraphicsContext graphics,
@@ -385,15 +453,7 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
         SessionDriver driver
     )
     {
-        ITextureCompositor compositor = graphics switch
-        {
-            MetalContext metal => new MetalTextureCompositor(metal, viewport),
-            VulkanContext vulkan => new VulkanTextureCompositor(vulkan, viewport),
-            OpenGLContext openGl => new OpenGLTextureCompositor(openGl, viewport),
-            _ => throw new InvalidOperationException(
-                $"Owned textures are not implemented for {graphics.Backend}."
-            ),
-        };
+        var compositor = CreateCompositor(graphics, viewport);
         try
         {
             return new(
@@ -440,103 +500,37 @@ internal sealed class OwnedTextureRenderTarget : RenderTarget
         }
     }
 
-    protected override bool Present()
-    {
-        AcquiredFrameHandle? newest = null;
-        while (Session.AcquireFrame() is { } frame)
-        {
-            // Nothing read an older frame, so it releases CPU-complete.
-            Release(newest);
-            newest = frame;
-        }
-        if (newest is null)
-        {
-            return held is not null;
-        }
-
-        // The compositors finish their reads before they return, so a frame releases CPU-complete.
-        var presented = false;
-        switch (Graphics)
-        {
-            case MetalContext:
-                newest.WithMetalTexture(view => presented = compositor.Draw(view));
-                break;
-            case VulkanContext:
-                newest.WithVulkanTexture(view => presented = compositor.Draw(view));
-                break;
-            case OpenGLContext openGl:
-                newest.WithOpenglTexture(view =>
-                {
-                    presented = compositor.Draw(view);
-                    openGl.FinishGpuWork();
-                });
-                break;
-        }
-        if (presented)
-        {
-            Graphics.FinishFrame();
-        }
-        Release(held);
-        held = newest;
-        return presented;
-    }
-
     /// <summary>A session resize needs every frame released, so the held frame goes first.</summary>
     public override void Resize(Viewport viewport)
     {
         ReleaseFrames();
-        compositor.Resize(viewport);
+        Compositor.Resize(viewport);
         base.Resize(viewport);
-    }
-
-    protected override void ReleaseFrames()
-    {
-        Release(held);
-        held = null;
-    }
-
-    protected override void DisposeHost() => compositor.Dispose();
-
-    private static void Release(AcquiredFrameHandle? frame)
-    {
-        if (frame is null)
-        {
-            return;
-        }
-        using (frame)
-        {
-            frame.Release(GpuSync.Default);
-        }
     }
 }
 
 /// <summary>
-/// A caller-owned texture that the session renders into and the compositor samples. The texture
-/// belongs to the session from a demand until its result, and to the compositor from a rendered
-/// result until the draw returns, so the target keeps one demand outstanding.
+/// A ring of caller-owned textures that the session renders into. The host allocates the ring and
+/// sizes it, so a resize hands the session a new ring.
 /// </summary>
-internal sealed class BorrowedTextureRenderTarget : RenderTarget
+internal sealed class BorrowedTextureRenderTarget : TextureRenderTarget
 {
-    private readonly ITextureCompositor compositor;
     private readonly MapHandle map;
-    private IDisposable texture;
+    private IDisposable[] ring;
 
     private BorrowedTextureRenderTarget(
         IGraphicsContext graphics,
         SessionDriver driver,
         ITextureCompositor compositor,
-        IDisposable texture,
+        IDisposable[] ring,
         MapHandle map,
         Func<RenderSessionAttachOptions, RenderSessionHandle> attach
     )
-        : base(graphics, driver, 0, attach)
+        : base(graphics, driver, compositor, attach)
     {
-        this.compositor = compositor;
-        this.texture = texture;
+        this.ring = ring;
         this.map = map;
     }
-
-    protected override bool ExclusiveTexture => true;
 
     public static BorrowedTextureRenderTarget Attach(
         IGraphicsContext graphics,
@@ -545,39 +539,31 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
         SessionDriver driver
     )
     {
-        var texture = Allocate(graphics, viewport);
+        var ring = Allocate(graphics, viewport);
         try
         {
-            ITextureCompositor compositor = graphics switch
-            {
-                MetalContext metal => new MetalTextureCompositor(metal, viewport),
-                VulkanContext vulkan => new VulkanTextureCompositor(vulkan, viewport),
-                OpenGLContext openGl => new OpenGLTextureCompositor(openGl, viewport),
-                _ => throw new InvalidOperationException(
-                    $"Borrowed textures are not implemented for {graphics.Backend}."
-                ),
-            };
+            var compositor = CreateCompositor(graphics, viewport);
             try
             {
                 return new(
                     graphics,
                     driver,
                     compositor,
-                    texture,
+                    ring,
                     map,
                     options =>
-                        texture switch
+                        graphics switch
                         {
-                            MetalBorrowedTexture metal => map.MetalBorrowedTextureAttach(
-                                Describe(metal, viewport),
+                            MetalContext => map.MetalBorrowedTextureAttach(
+                                DescribeMetal(ring, viewport),
                                 options
                             ),
-                            VulkanBorrowedImage vulkan => map.VulkanBorrowedTextureAttach(
-                                Describe((VulkanContext)graphics, driver, vulkan, viewport),
+                            VulkanContext vulkan => map.VulkanBorrowedTextureAttach(
+                                DescribeVulkan(vulkan, ring, viewport),
                                 options
                             ),
-                            OpenGLBorrowedTexture openGl => map.OpenglBorrowedTextureAttach(
-                                Describe((OpenGLContext)graphics, openGl, viewport),
+                            OpenGLContext openGl => map.OpenglBorrowedTextureAttach(
+                                DescribeOpenGL(openGl, ring, viewport),
                                 options
                             ),
                             _ => throw new InvalidOperationException(
@@ -594,58 +580,36 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
         }
         catch
         {
-            texture.Dispose();
+            Dispose(ring);
             throw;
         }
     }
 
-    protected override bool Present()
-    {
-        var presented = texture switch
-        {
-            MetalBorrowedTexture metalTexture
-                when compositor is MetalTextureCompositor metalCompositor =>
-                metalCompositor.DrawTexture(metalTexture.Texture),
-            VulkanBorrowedImage vulkanImage
-                when compositor is VulkanTextureCompositor vulkanCompositor =>
-                vulkanCompositor.DrawImageView(vulkanImage.View),
-            OpenGLBorrowedTexture openGlTexture
-                when compositor is OpenGLTextureCompositor openGlCompositor => DrawOpenGL(
-                openGlCompositor,
-                openGlTexture
-            ),
-            _ => throw new InvalidOperationException("Unsupported borrowed texture compositor."),
-        };
-        if (presented)
-        {
-            Graphics.FinishFrame();
-        }
-        return presented;
-    }
-
     /// <summary>
-    /// Replaces the texture, because its owner sets its size. The outgoing texture stays current
-    /// until the replacement completes, and the frames rendered before it are drawn from it. A
-    /// replacement that fails once started leaves it unknown which texture the session holds, so
-    /// the session detaches before either texture is released.
+    /// Replaces the ring, because its owner sets its size. The replacement waits until the host
+    /// holds no frame, so the held one goes first, and the window keeps what it last presented.
+    /// The outgoing ring stays alive until the replacement completes. A replacement that fails once
+    /// started leaves it unknown which ring the session holds, so the session detaches before
+    /// either ring is released.
     /// </summary>
     public override void Resize(Viewport viewport)
     {
-        compositor.Resize(viewport);
+        ReleaseFrames();
+        Compositor.Resize(viewport);
         var replacement = Allocate(Graphics, viewport);
         Task handover;
         try
         {
-            handover = replacement switch
+            handover = Graphics switch
             {
-                MetalBorrowedTexture metal => Session.MetalBorrowedTextureSetTargetAsync(
-                    Describe(metal, viewport)
+                MetalContext => Session.MetalBorrowedTextureSetTargetAsync(
+                    DescribeMetal(replacement, viewport)
                 ),
-                VulkanBorrowedImage vulkan => Session.VulkanBorrowedTextureSetTargetAsync(
-                    Describe((VulkanContext)Graphics, Driver, vulkan, viewport)
+                VulkanContext vulkan => Session.VulkanBorrowedTextureSetTargetAsync(
+                    DescribeVulkan(vulkan, replacement, viewport)
                 ),
-                OpenGLBorrowedTexture openGl => Session.OpenglBorrowedTextureSetTargetAsync(
-                    Describe((OpenGLContext)Graphics, openGl, viewport)
+                OpenGLContext openGl => Session.OpenglBorrowedTextureSetTargetAsync(
+                    DescribeOpenGL(openGl, replacement, viewport)
                 ),
                 _ => throw new InvalidOperationException(
                     $"Borrowed textures are not implemented for {Graphics.Backend}."
@@ -654,7 +618,7 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
         }
         catch
         {
-            replacement.Dispose();
+            Dispose(replacement);
             throw;
         }
         // A target replacement leaves the map's extent unchanged.
@@ -673,12 +637,13 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
         catch
         {
             Dispose();
-            replacement.Dispose();
+            Dispose(replacement);
             throw;
         }
-        DrainFrameResults();
-        texture.Dispose();
-        texture = replacement;
+        Dispose(ring);
+        ring = replacement;
+        // A replacement publishes no map update, and a frame rendered before it can no longer be
+        // acquired, so the new ring needs a forced frame.
         RequestFrame(force: true);
     }
 
@@ -686,36 +651,50 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
     {
         try
         {
-            compositor.Dispose();
+            base.DisposeHost();
         }
         finally
         {
-            texture.Dispose();
+            Dispose(ring);
         }
     }
 
-    private static IDisposable Allocate(IGraphicsContext graphics, Viewport viewport) =>
-        graphics switch
-        {
-            MetalContext metal => new MetalBorrowedTexture(metal, viewport),
-            VulkanContext vulkan => new VulkanBorrowedImage(vulkan, viewport),
-            OpenGLContext openGl => new OpenGLBorrowedTexture(openGl, viewport),
-            _ => throw new InvalidOperationException(
-                $"Borrowed textures are not implemented for {graphics.Backend}."
-            ),
-        };
-
-    private static bool DrawOpenGL(
-        OpenGLTextureCompositor compositor,
-        OpenGLBorrowedTexture texture
-    )
+    private static IDisposable[] Allocate(IGraphicsContext graphics, Viewport viewport)
     {
-        compositor.DrawTexture(texture.Texture);
-        return true;
+        var ring = new IDisposable[TextureRingDepth];
+        try
+        {
+            for (var slot = 0; slot < ring.Length; slot++)
+            {
+                ring[slot] = graphics switch
+                {
+                    MetalContext metal => new MetalBorrowedTexture(metal, viewport),
+                    VulkanContext vulkan => new VulkanBorrowedImage(vulkan, viewport),
+                    OpenGLContext openGl => new OpenGLBorrowedTexture(openGl, viewport),
+                    _ => throw new InvalidOperationException(
+                        $"Borrowed textures are not implemented for {graphics.Backend}."
+                    ),
+                };
+            }
+        }
+        catch
+        {
+            Dispose(ring);
+            throw;
+        }
+        return ring;
     }
 
-    private static MetalBorrowedTextureDescriptor Describe(
-        MetalBorrowedTexture texture,
+    private static void Dispose(IDisposable?[] ring)
+    {
+        foreach (var texture in ring)
+        {
+            texture?.Dispose();
+        }
+    }
+
+    private static MetalBorrowedTextureDescriptor DescribeMetal(
+        IDisposable[] ring,
         Viewport viewport
     ) =>
         new()
@@ -723,13 +702,18 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
             Extent = viewport.RenderTargetExtent,
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
-            Texture = texture.Pointer,
+            Textures =
+            [
+                .. ring.Cast<MetalBorrowedTexture>()
+                    .Select(texture => new global::Maplibre.NativeFfi.MetalBorrowedTexture(
+                        texture.Pointer
+                    )),
+            ],
         };
 
-    private static VulkanBorrowedTextureDescriptor Describe(
+    private static VulkanBorrowedTextureDescriptor DescribeVulkan(
         VulkanContext context,
-        SessionDriver driver,
-        VulkanBorrowedImage image,
+        IDisposable[] ring,
         Viewport viewport
     ) =>
         new()
@@ -738,16 +722,22 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
             Context = context.Descriptor(),
-            Image = image.ImageHandle,
-            ImageView = image.ViewHandle,
+            Textures =
+            [
+                .. ring.Cast<VulkanBorrowedImage>()
+                    .Select(image => new VulkanBorrowedTexture(
+                        image.ImageHandle,
+                        image.ViewHandle
+                    )),
+            ],
             Format = (uint)VulkanBorrowedImage.ImageFormat,
             InitialLayout = (uint)VulkanBorrowedImage.InitialLayout,
             FinalLayout = (uint)VulkanBorrowedImage.FinalLayout,
         };
 
-    private static OpenglBorrowedTextureDescriptor Describe(
+    private static OpenglBorrowedTextureDescriptor DescribeOpenGL(
         OpenGLContext context,
-        OpenGLBorrowedTexture texture,
+        IDisposable[] ring,
         Viewport viewport
     ) =>
         new()
@@ -756,8 +746,12 @@ internal sealed class BorrowedTextureRenderTarget : RenderTarget
             PhysicalWidth = viewport.PhysicalWidth,
             PhysicalHeight = viewport.PhysicalHeight,
             Context = context.Descriptor(requirePbufferConfig: true),
-            Texture = texture.Texture,
-            Target = texture.Target,
+            Textures =
+            [
+                .. ring.Cast<OpenGLBorrowedTexture>()
+                    .Select(texture => new OpenglBorrowedTexture(texture.Texture)),
+            ],
+            Target = OpenGLBorrowedTexture.Texture2D,
         };
 }
 

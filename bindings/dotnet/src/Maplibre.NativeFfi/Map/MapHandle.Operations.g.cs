@@ -2899,7 +2899,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts attachment of a caller-owned Metal texture target.
+    /// Starts attachment of a ring of caller-owned Metal textures.
     /// </summary>
     /// <remarks>
     /// See <c>mln_metal_borrowed_texture_attach</c> in the <see
@@ -2915,7 +2915,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             (output, completion, diagnostic) =>
                 NativeMethods.mln_metal_borrowed_texture_attach(
                     Handle,
-                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor, scope)),
                     scope.Value(NativeRenderSessionAttachOptions(options, scope)),
                     output,
                     completion,
@@ -2980,7 +2980,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts attachment of a caller-owned OpenGL texture target.
+    /// Starts attachment of a ring of caller-owned OpenGL textures.
     /// </summary>
     /// <remarks>
     /// See <c>mln_opengl_borrowed_texture_attach</c> in the <see
@@ -3061,7 +3061,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts attachment of a caller-owned Vulkan texture target.
+    /// Starts attachment of a ring of caller-owned Vulkan images.
     /// </summary>
     /// <remarks>
     /// See <c>mln_vulkan_borrowed_texture_attach</c> in the <see
@@ -3077,7 +3077,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             (output, completion, diagnostic) =>
                 NativeMethods.mln_vulkan_borrowed_texture_attach(
                     Handle,
-                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor, scope)),
                     scope.Value(NativeRenderSessionAttachOptions(options, scope)),
                     output,
                     completion,
@@ -3142,7 +3142,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
     }
 
     /// <summary>
-    /// Starts attachment of a caller-owned WebGPU texture target.
+    /// Starts attachment of a ring of caller-owned WebGPU textures.
     /// </summary>
     /// <remarks>
     /// See <c>mln_webgpu_borrowed_texture_attach</c> in the <see
@@ -3158,7 +3158,7 @@ public sealed unsafe partial class MapHandle : IDisposable, IAsyncDisposable, IN
             (output, completion, diagnostic) =>
                 NativeMethods.mln_webgpu_borrowed_texture_attach(
                     Handle,
-                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor, scope)),
                     scope.Value(NativeRenderSessionAttachOptions(options, scope)),
                     output,
                     completion,

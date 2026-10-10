@@ -2,12 +2,12 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
-public sealed class MetalOwnedTextureFrameView
+public sealed class VulkanTextureFrameView
 {
-    private readonly MetalOwnedTextureFrame value;
+    private readonly VulkanTextureFrame value;
     private readonly NativeViewScope scope;
 
-    internal MetalOwnedTextureFrameView(MetalOwnedTextureFrame value, NativeViewScope scope)
+    internal VulkanTextureFrameView(VulkanTextureFrame value, NativeViewScope scope)
     {
         this.value = value;
         this.scope = scope;
@@ -18,7 +18,10 @@ public sealed class MetalOwnedTextureFrameView
     public uint Height => scope.Active(value).Height;
     public double ScaleFactor => scope.Active(value).ScaleFactor;
     public ulong FrameId => scope.Active(value).FrameId;
-    public NativePointer Texture => scope.Active(value).Texture;
+    public uint Slot => scope.Active(value).Slot;
+    public ulong Image => scope.Active(value).Image;
+    public ulong ImageView => scope.Active(value).ImageView;
     public NativePointer Device => scope.Active(value).Device;
-    public ulong PixelFormat => scope.Active(value).PixelFormat;
+    public uint Format => scope.Active(value).Format;
+    public uint Layout => scope.Active(value).Layout;
 }

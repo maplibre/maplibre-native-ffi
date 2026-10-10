@@ -324,7 +324,11 @@ mln_metal_borrowed_texture_descriptor_default_holds_its_annotated_values(void) {
     "mln_metal_borrowed_texture_descriptor.physical_height"
   );
   TEST_ASSERT_TRUE_MESSAGE(
-    value.texture == NULL, "mln_metal_borrowed_texture_descriptor.texture"
+    value.textures == NULL, "mln_metal_borrowed_texture_descriptor.textures"
+  );
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.texture_count,
+    "mln_metal_borrowed_texture_descriptor.texture_count"
   );
 }
 
@@ -443,9 +447,12 @@ mln_opengl_borrowed_texture_descriptor_default_holds_its_annotated_values(
     (uint64_t)0, (uint64_t)value.context.ownership,
     "mln_opengl_borrowed_texture_descriptor.context.ownership"
   );
+  TEST_ASSERT_TRUE_MESSAGE(
+    value.textures == NULL, "mln_opengl_borrowed_texture_descriptor.textures"
+  );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.texture,
-    "mln_opengl_borrowed_texture_descriptor.texture"
+    (uint64_t)0, (uint64_t)value.texture_count,
+    "mln_opengl_borrowed_texture_descriptor.texture_count"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.target,
@@ -897,13 +904,12 @@ mln_vulkan_borrowed_texture_descriptor_default_holds_its_annotated_values(
     value.context.get_device_proc_addr == NULL,
     "mln_vulkan_borrowed_texture_descriptor.context.get_device_proc_addr"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.image,
-    "mln_vulkan_borrowed_texture_descriptor.image"
+  TEST_ASSERT_TRUE_MESSAGE(
+    value.textures == NULL, "mln_vulkan_borrowed_texture_descriptor.textures"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.image_view,
-    "mln_vulkan_borrowed_texture_descriptor.image_view"
+    (uint64_t)0, (uint64_t)value.texture_count,
+    "mln_vulkan_borrowed_texture_descriptor.texture_count"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.format,
@@ -1092,11 +1098,11 @@ mln_webgpu_borrowed_texture_descriptor_default_holds_its_annotated_values(
     "mln_webgpu_borrowed_texture_descriptor.context.queue"
   );
   TEST_ASSERT_TRUE_MESSAGE(
-    value.texture == NULL, "mln_webgpu_borrowed_texture_descriptor.texture"
+    value.textures == NULL, "mln_webgpu_borrowed_texture_descriptor.textures"
   );
-  TEST_ASSERT_TRUE_MESSAGE(
-    value.texture_view == NULL,
-    "mln_webgpu_borrowed_texture_descriptor.texture_view"
+  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+    (uint64_t)0, (uint64_t)value.texture_count,
+    "mln_webgpu_borrowed_texture_descriptor.texture_count"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.format,

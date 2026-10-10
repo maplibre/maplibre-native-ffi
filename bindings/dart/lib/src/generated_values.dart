@@ -1120,17 +1120,18 @@ final class WebglContextKind extends _Enum {
   static const transferredCanvas = WebglContextKind.fromRawValue(1);
 }
 
-/// Metal frame acquired from a session-owned texture target.
+/// Metal frame acquired from a texture ring.
 ///
-/// See `mln_metal_owned_texture_frame` in the
+/// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalOwnedTextureFrame extends _Value {
-  const MetalOwnedTextureFrame({
+final class MetalTextureFrame extends _Value {
+  const MetalTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     this.texture = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
     required this.pixelFormat,
@@ -1151,6 +1152,10 @@ final class MetalOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
   final NativePointer texture;
 
@@ -1167,23 +1172,25 @@ final class MetalOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     texture,
     device,
     pixelFormat,
   ];
 }
 
-/// OpenGL frame acquired from a session-owned texture target.
+/// OpenGL frame acquired from a texture ring.
 ///
-/// See `mln_opengl_owned_texture_frame` in the
+/// See `mln_opengl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenglOwnedTextureFrame extends _Value {
-  const OpenglOwnedTextureFrame({
+final class OpenglTextureFrame extends _Value {
+  const OpenglTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     this.texture = 0,
     this.target = 0,
     this.internalFormat = 0,
@@ -1206,19 +1213,24 @@ final class OpenglOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed OpenGL texture object name. Valid until frame release.
   final int texture;
 
   /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
   final int target;
 
-  /// OpenGL internal format, such as GL_RGBA8.
+  /// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
+  /// whose format the host chose.
   final int internalFormat;
 
-  /// OpenGL pixel format, such as GL_RGBA.
+  /// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
   final int format;
 
-  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
+  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
   final int type;
 
   @override
@@ -1228,6 +1240,7 @@ final class OpenglOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     texture,
     target,
     internalFormat,
@@ -1305,17 +1318,18 @@ final class RenderFrameResult extends _Value {
   ];
 }
 
-/// Vulkan frame acquired from a session-owned texture target.
+/// Vulkan frame acquired from a texture ring.
 ///
-/// See `mln_vulkan_owned_texture_frame` in the
+/// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class VulkanOwnedTextureFrame extends _Value {
-  const VulkanOwnedTextureFrame({
+final class VulkanTextureFrame extends _Value {
+  const VulkanTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     required this.image,
     required this.imageView,
     this.device = NativePointer.nullPointer,
@@ -1338,6 +1352,10 @@ final class VulkanOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// image in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed VkImage bit pattern. Valid until frame release.
   final BigInt image;
 
@@ -1350,7 +1368,9 @@ final class VulkanOwnedTextureFrame extends _Value {
   /// Backend-native VkFormat value.
   final int format;
 
-  /// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
+  /// Backend-native VkImageLayout value that the image is in:
+  /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
+  /// descriptor's final_layout for a borrowed one.
   final int layout;
 
   @override
@@ -1360,6 +1380,7 @@ final class VulkanOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     image,
     imageView,
     device,
@@ -1368,17 +1389,18 @@ final class VulkanOwnedTextureFrame extends _Value {
   ];
 }
 
-/// WebGPU frame acquired from a session-owned texture target.
+/// WebGPU frame acquired from a texture ring.
 ///
-/// See `mln_webgpu_owned_texture_frame` in the
+/// See `mln_webgpu_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class WebgpuOwnedTextureFrame extends _Value {
-  const WebgpuOwnedTextureFrame({
+final class WebgpuTextureFrame extends _Value {
+  const WebgpuTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     this.texture = NativePointer.nullPointer,
     this.textureView = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
@@ -1400,6 +1422,10 @@ final class WebgpuOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed WGPUTexture. Valid until frame release.
   final NativePointer texture;
 
@@ -1419,6 +1445,7 @@ final class WebgpuOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     texture,
     textureView,
     device,
@@ -2999,17 +3026,31 @@ final class RenderTargetExtent extends _Value {
   List<Object?> get _members => [width, height, scaleFactor];
 }
 
+/// One caller-owned Metal texture of a borrowed texture ring.
+///
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTexture extends _Value {
+  const MetalBorrowedTexture({this.texture = NativePointer.nullPointer});
+
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+  final NativePointer texture;
+
+  @override
+  List<Object?> get _members => [texture];
+}
+
 /// Metal attachment options for a borrowed texture target.
 ///
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalBorrowedTextureDescriptor extends _Value {
-  const MetalBorrowedTextureDescriptor({
+  MetalBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
-    this.texture = NativePointer.nullPointer,
-  });
+    required List<MetalBorrowedTexture> textures,
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -3023,15 +3064,15 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   /// 256.
   final int physicalHeight;
 
-  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
-  final NativePointer texture;
+  /// The ring's textures, one per slot, in slot order. Required.
+  final List<MetalBorrowedTexture> textures;
 
   @override
   List<Object?> get _members => [
     extent,
     physicalWidth,
     physicalHeight,
-    texture,
+    textures,
   ];
 }
 
@@ -3066,9 +3107,10 @@ final class RenderSessionAttachOptions extends _Value {
   /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
   final RenderDriverKind driver;
 
-  /// Requested host-acquirable owned-texture slot count. Private targets grant
-  /// one slot regardless of this value. Ignored by other targets. Defaults to
-  /// 1.
+  /// Requested slot count of a session-owned texture ring, from one to three.
+  /// Private targets grant one slot regardless of this value. A borrowed
+  /// texture ring's depth is its texture count, so borrowed and other targets
+  /// ignore this value. Defaults to 1.
   final int requestedTextureRingDepth;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.
@@ -3281,19 +3323,33 @@ final class OpenglContextDescriptorDataUnknown
   final Uint8List rawRecord;
 }
 
+/// One caller-owned OpenGL texture of a borrowed texture ring.
+///
+/// See `mln_opengl_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class OpenglBorrowedTexture extends _Value {
+  const OpenglBorrowedTexture({this.texture = 0});
+
+  /// Borrowed OpenGL texture object name. Required.
+  final int texture;
+
+  @override
+  List<Object?> get _members => [texture];
+}
+
 /// OpenGL attachment options for a borrowed texture target.
 ///
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglBorrowedTextureDescriptor extends _Value {
-  const OpenglBorrowedTextureDescriptor({
+  OpenglBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     required this.context,
-    this.texture = 0,
+    required List<OpenglBorrowedTexture> textures,
     this.target = 0,
-  });
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -3307,14 +3363,14 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
   /// 256.
   final int physicalHeight;
 
-  /// Borrowed OpenGL context provider data. The texture must belong to this
+  /// Borrowed OpenGL context provider data. The textures must belong to this
   /// context or a context in the same share group.
   final OpenglContextDescriptor context;
 
-  /// Borrowed OpenGL texture object name. Required.
-  final int texture;
+  /// The ring's textures, one per slot, in slot order. Required.
+  final List<OpenglBorrowedTexture> textures;
 
-  /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
+  /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
   final int target;
 
   @override
@@ -3323,7 +3379,7 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
     physicalWidth,
     physicalHeight,
     context,
-    texture,
+    textures,
     target,
   ];
 }
@@ -3406,7 +3462,8 @@ final class RenderSessionCapabilities extends _Value {
   /// One `mln_render_driver_kind` value.
   final RenderDriverKind driver;
 
-  /// Granted owned-texture slot count, or zero for a target without a ring.
+  /// Granted texture ring depth: the slot count of a session-owned ring, or the
+  /// texture count of a borrowed one. Zero for a surface.
   final int textureRingDepth;
 
   /// A bitwise OR of `mln_render_session_capability_flag` values.
@@ -4182,22 +4239,39 @@ final class VulkanContextDescriptor extends _Value {
   ];
 }
 
+/// One caller-owned Vulkan image of a borrowed texture ring.
+///
+/// See `mln_vulkan_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class VulkanBorrowedTexture extends _Value {
+  const VulkanBorrowedTexture({required this.image, required this.imageView});
+
+  /// Borrowed VkImage. Required.
+  final BigInt image;
+
+  /// Borrowed VkImageView for image. Required. The view must be a 2D color view
+  /// that matches image and the descriptor's format.
+  final BigInt imageView;
+
+  @override
+  List<Object?> get _members => [image, imageView];
+}
+
 /// Vulkan attachment options for a borrowed texture target.
 ///
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTextureDescriptor extends _Value {
-  const VulkanBorrowedTextureDescriptor({
+  VulkanBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     this.context = const VulkanContextDescriptor(),
-    required this.image,
-    required this.imageView,
+    required List<VulkanBorrowedTexture> textures,
     this.format = 0,
     this.initialLayout = 0,
     this.finalLayout = 5,
-  });
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -4212,13 +4286,11 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// Borrowed Vulkan context. All handles are required.
   final VulkanContextDescriptor context;
 
-  /// Borrowed VkImage. Required.
-  final BigInt image;
+  /// The ring's images, one per slot, in slot order. Required.
+  final List<VulkanBorrowedTexture> textures;
 
-  /// Borrowed VkImageView for image. Required.
-  final BigInt imageView;
-
-  /// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
+  /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
+  /// invalid.
   final int format;
 
   /// Backend-native VkImageLayout value expected at render-pass begin.
@@ -4234,8 +4306,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     physicalWidth,
     physicalHeight,
     context,
-    image,
-    imageView,
+    textures,
     format,
     initialLayout,
     finalLayout,
@@ -4313,20 +4384,40 @@ final class WebgpuContextDescriptor extends _Value {
   List<Object?> get _members => [instance, device, queue];
 }
 
+/// One caller-owned WebGPU texture of a borrowed texture ring.
+///
+/// See `mln_webgpu_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class WebgpuBorrowedTexture extends _Value {
+  const WebgpuBorrowedTexture({
+    this.texture = NativePointer.nullPointer,
+    this.textureView = NativePointer.nullPointer,
+  });
+
+  /// Borrowed WGPUTexture. Required.
+  final NativePointer texture;
+
+  /// Borrowed WGPUTextureView for texture. Required. The view must be a 2D
+  /// color view compatible with texture and the descriptor's format.
+  final NativePointer textureView;
+
+  @override
+  List<Object?> get _members => [texture, textureView];
+}
+
 /// WebGPU attachment options for a borrowed texture target.
 ///
 /// See `mln_webgpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class WebgpuBorrowedTextureDescriptor extends _Value {
-  const WebgpuBorrowedTextureDescriptor({
+  WebgpuBorrowedTextureDescriptor({
     this.extent = const RenderTargetExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     this.context = const WebgpuContextDescriptor(),
-    this.texture = NativePointer.nullPointer,
-    this.textureView = NativePointer.nullPointer,
+    required List<WebgpuBorrowedTexture> textures,
     this.format = 0,
-  });
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent.
   final RenderTargetExtent extent;
@@ -4337,16 +4428,15 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
   /// Physical texture height in device pixels. Defaults to 256.
   final int physicalHeight;
 
-  /// Borrowed WebGPU context. device is required.
+  /// Borrowed WebGPU context. device is required. Rendering is submitted
+  /// through context.queue or that device's default queue.
   final WebgpuContextDescriptor context;
 
-  /// Borrowed WGPUTexture. Required.
-  final NativePointer texture;
+  /// The ring's textures, one per slot, in slot order. Required.
+  final List<WebgpuBorrowedTexture> textures;
 
-  /// Borrowed WGPUTextureView for texture. Required.
-  final NativePointer textureView;
-
-  /// Backend-native WGPUTextureFormat value. Undefined is invalid.
+  /// Backend-native WGPUTextureFormat value of every texture. Undefined is
+  /// invalid.
   final int format;
 
   @override
@@ -4355,8 +4445,7 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
     physicalWidth,
     physicalHeight,
     context,
-    texture,
-    textureView,
+    textures,
     format,
   ];
 }

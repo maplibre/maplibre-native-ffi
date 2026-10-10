@@ -4,7 +4,7 @@ internal interface ITextureCompositor : IDisposable
 {
     void Resize(Viewport viewport);
 
-    bool Draw(MetalOwnedTextureFrameView frame)
+    bool Draw(MetalTextureFrameView frame)
     {
         _ = frame;
         throw new NotSupportedException(
@@ -12,7 +12,7 @@ internal interface ITextureCompositor : IDisposable
         );
     }
 
-    bool Draw(VulkanOwnedTextureFrameView frame)
+    bool Draw(VulkanTextureFrameView frame)
     {
         _ = frame;
         throw new NotSupportedException(
@@ -20,7 +20,7 @@ internal interface ITextureCompositor : IDisposable
         );
     }
 
-    bool Draw(OpenglOwnedTextureFrameView frame)
+    bool Draw(OpenglTextureFrameView frame)
     {
         _ = frame;
         throw new NotSupportedException(

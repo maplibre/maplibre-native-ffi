@@ -743,12 +743,18 @@ pub struct mln_map_viewport_options {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_metal_borrowed_texture {
+    pub texture: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_metal_borrowed_texture_descriptor {
     pub size: u32,
     pub extent: mln_render_target_extent,
     pub physical_width: u32,
     pub physical_height: u32,
-    pub texture: *mut std::ffi::c_void,
+    pub textures: *const mln_metal_borrowed_texture,
+    pub texture_count: usize,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -765,24 +771,25 @@ pub struct mln_metal_owned_texture_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_metal_owned_texture_frame {
+pub struct mln_metal_surface_descriptor {
+    pub size: u32,
+    pub extent: mln_render_target_extent,
+    pub context: mln_metal_context_descriptor,
+    pub layer: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_metal_texture_frame {
     pub size: u32,
     pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
     pub frame_id: u64,
+    pub slot: u32,
     pub texture: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
     pub pixel_format: u64,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_metal_surface_descriptor {
-    pub size: u32,
-    pub extent: mln_render_target_extent,
-    pub context: mln_metal_context_descriptor,
-    pub layer: *mut std::ffi::c_void,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -843,6 +850,11 @@ pub struct mln_offline_tile_pyramid_region_definition {
     pub include_ideographs: bool,
 }
 #[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_opengl_borrowed_texture {
+    pub texture: u32,
+}
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_opengl_borrowed_texture_descriptor {
     pub size: u32,
@@ -850,7 +862,8 @@ pub struct mln_opengl_borrowed_texture_descriptor {
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_opengl_context_descriptor,
-    pub texture: u32,
+    pub textures: *const mln_opengl_borrowed_texture,
+    pub texture_count: usize,
     pub target: u32,
 }
 #[repr(C)]
@@ -876,27 +889,28 @@ pub struct mln_opengl_owned_texture_descriptor {
     pub context: mln_opengl_context_descriptor,
 }
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_opengl_owned_texture_frame {
-    pub size: u32,
-    pub generation: u64,
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub frame_id: u64,
-    pub texture: u32,
-    pub target: u32,
-    pub internal_format: u32,
-    pub format: u32,
-    pub type_: u32,
-}
-#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_opengl_surface_descriptor {
     pub size: u32,
     pub extent: mln_render_target_extent,
     pub context: mln_opengl_context_descriptor,
     pub surface: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_opengl_texture_frame {
+    pub size: u32,
+    pub generation: u64,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub frame_id: u64,
+    pub slot: u32,
+    pub texture: u32,
+    pub target: u32,
+    pub internal_format: u32,
+    pub format: u32,
+    pub type_: u32,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1419,14 +1433,20 @@ pub struct mln_vec3 {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_borrowed_texture {
+    pub image: mln_vulkan_non_dispatchable_handle,
+    pub image_view: mln_vulkan_non_dispatchable_handle,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_borrowed_texture_descriptor {
     pub size: u32,
     pub extent: mln_render_target_extent,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_vulkan_context_descriptor,
-    pub image: mln_vulkan_non_dispatchable_handle,
-    pub image_view: mln_vulkan_non_dispatchable_handle,
+    pub textures: *const mln_vulkan_borrowed_texture,
+    pub texture_count: usize,
     pub format: u32,
     pub initial_layout: u32,
     pub final_layout: u32,
@@ -1452,26 +1472,27 @@ pub struct mln_vulkan_owned_texture_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_owned_texture_frame {
+pub struct mln_vulkan_surface_descriptor {
+    pub size: u32,
+    pub extent: mln_render_target_extent,
+    pub context: mln_vulkan_context_descriptor,
+    pub surface: mln_vulkan_non_dispatchable_handle,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_vulkan_texture_frame {
     pub size: u32,
     pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
     pub frame_id: u64,
+    pub slot: u32,
     pub image: mln_vulkan_non_dispatchable_handle,
     pub image_view: mln_vulkan_non_dispatchable_handle,
     pub device: *mut std::ffi::c_void,
     pub format: u32,
     pub layout: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_vulkan_surface_descriptor {
-    pub size: u32,
-    pub extent: mln_render_target_extent,
-    pub context: mln_vulkan_context_descriptor,
-    pub surface: mln_vulkan_non_dispatchable_handle,
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -1491,14 +1512,20 @@ pub struct mln_webgl_context_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub struct mln_webgpu_borrowed_texture {
+    pub texture: *mut std::ffi::c_void,
+    pub texture_view: *mut std::ffi::c_void,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub struct mln_webgpu_borrowed_texture_descriptor {
     pub size: u32,
     pub extent: mln_render_target_extent,
     pub physical_width: u32,
     pub physical_height: u32,
     pub context: mln_webgpu_context_descriptor,
-    pub texture: *mut std::ffi::c_void,
-    pub texture_view: *mut std::ffi::c_void,
+    pub textures: *const mln_webgpu_borrowed_texture,
+    pub texture_count: usize,
     pub format: u32,
 }
 #[repr(C)]
@@ -1518,25 +1545,26 @@ pub struct mln_webgpu_owned_texture_descriptor {
 }
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_owned_texture_frame {
+pub struct mln_webgpu_surface_descriptor {
+    pub size: u32,
+    pub extent: mln_render_target_extent,
+    pub context: mln_webgpu_context_descriptor,
+    pub surface: *mut std::ffi::c_void,
+    pub format: u32,
+}
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct mln_webgpu_texture_frame {
     pub size: u32,
     pub generation: u64,
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
     pub frame_id: u64,
+    pub slot: u32,
     pub texture: *mut std::ffi::c_void,
     pub texture_view: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
-    pub format: u32,
-}
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-pub struct mln_webgpu_surface_descriptor {
-    pub size: u32,
-    pub extent: mln_render_target_extent,
-    pub context: mln_webgpu_context_descriptor,
-    pub surface: *mut std::ffi::c_void,
     pub format: u32,
 }
 #[repr(C)]
@@ -1652,12 +1680,12 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_acquired_frame_get_metal_texture(
         frame: mln_acquired_frame,
-        out_frame: *mut mln_metal_owned_texture_frame,
+        out_frame: *mut mln_metal_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_get_opengl_texture(
         frame: mln_acquired_frame,
-        out_frame: *mut mln_opengl_owned_texture_frame,
+        out_frame: *mut mln_opengl_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_get_producer_sync(
@@ -1672,12 +1700,12 @@ unsafe extern "C" {
     ) -> mln_status;
     pub fn mln_acquired_frame_get_vulkan_texture(
         frame: mln_acquired_frame,
-        out_frame: *mut mln_vulkan_owned_texture_frame,
+        out_frame: *mut mln_vulkan_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_get_webgpu_texture(
         frame: mln_acquired_frame,
-        out_frame: *mut mln_webgpu_owned_texture_frame,
+        out_frame: *mut mln_webgpu_texture_frame,
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_acquired_frame_release(

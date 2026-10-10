@@ -26,6 +26,12 @@ typedef struct mln_metal_owned_texture_descriptor {
   mln_metal_context_descriptor context;
 } mln_metal_owned_texture_descriptor;
 
+/** One caller-owned Metal texture of a borrowed texture ring. */
+typedef struct mln_metal_borrowed_texture {
+  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
+  void* texture;
+} mln_metal_borrowed_texture;
+
 /** Metal attachment options for a borrowed texture target. */
 typedef struct mln_metal_borrowed_texture_descriptor {
   uint32_t size;
@@ -41,20 +47,28 @@ typedef struct mln_metal_borrowed_texture_descriptor {
    * 256. */
   uint32_t physical_height MLN_BINDING("default=256");
   /**
-   * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+   * The ring's textures, one per slot, in slot order. Required.
    *
-   * The texture's pixel dimensions must equal physical_width and
-   * physical_height, the texture must allow render-target usage, and it must be
+   * The call copies the array before it returns. Only the textures it names
+   * must stay valid: until set_target replaces them, until detach completes,
+   * or until abandon returns. The textures are distinct and share one device
+   * and one pixel format. Each texture's pixel dimensions equal physical_width
+   * and physical_height, and each allows render-target usage and is
    * single-sample, because the session builds single-sample depth and stencil
-   * attachments to match. The session reads all three from the texture and
-   * rejects a mismatch. The caller owns the texture and must keep it valid
-   * until detach or destroy.
+   * attachments to match. The session reads all of this from the textures and
+   * rejects a mismatch.
    */
-  void* texture;
+  const mln_metal_borrowed_texture* textures
+    MLN_BINDING("length=texture_count");
+  /**
+   * Number of textures, which is the ring depth. Must be positive. A
+   * replacement keeps the count the session attached with.
+   */
+  size_t texture_count;
 } mln_metal_borrowed_texture_descriptor;
 
-/** Metal frame acquired from a session-owned texture target. */
-typedef struct mln_metal_owned_texture_frame {
+/** Metal frame acquired from a texture ring. */
+typedef struct mln_metal_texture_frame {
   uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
@@ -66,13 +80,20 @@ typedef struct mln_metal_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
-  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release. */
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its
+   * texture in the descriptor's textures array.
+   */
+  uint32_t slot;
+  /**
+   * Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
+   */
   void* texture;
   /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
   void* device;
   /** Backend-native pixel format value. Metal uses MTLPixelFormat. */
   uint64_t pixel_format;
-} mln_metal_owned_texture_frame;
+} mln_metal_texture_frame;
 
 /** Vulkan attachment options for an owned texture target. */
 typedef struct mln_vulkan_owned_texture_descriptor {
@@ -82,6 +103,23 @@ typedef struct mln_vulkan_owned_texture_descriptor {
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
 } mln_vulkan_owned_texture_descriptor;
+
+/** One caller-owned Vulkan image of a borrowed texture ring. */
+typedef struct mln_vulkan_borrowed_texture {
+  /**
+   * Borrowed VkImage. Required.
+   *
+   * The image must be a 2D, single-sample color image with
+   * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT. Include VK_IMAGE_USAGE_SAMPLED_BIT
+   * when the host will sample from the image after rendering.
+   */
+  mln_vulkan_non_dispatchable_handle image;
+  /**
+   * Borrowed VkImageView for image. Required. The view must be a 2D color view
+   * that matches image and the descriptor's format.
+   */
+  mln_vulkan_non_dispatchable_handle image_view;
+} mln_vulkan_borrowed_texture;
 
 /** Vulkan attachment options for a borrowed texture target. */
 typedef struct mln_vulkan_borrowed_texture_descriptor {
@@ -100,32 +138,38 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
   /**
-   * Borrowed VkImage. Required.
+   * The ring's images, one per slot, in slot order. Required.
    *
-   * The image must be a 2D, single-sample color image with
-   * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT. Its dimensions must equal
-   * physical_width and physical_height. Include VK_IMAGE_USAGE_SAMPLED_BIT when
-   * the host will sample from the image after rendering.
+   * The call copies the array before it returns. Only the images it names
+   * must stay valid: until set_target replaces them, until detach completes,
+   * or until abandon returns. The images are distinct, and each image must be
+   * usable on context.graphics_queue's family without an ownership transfer
+   * (VK_SHARING_MODE_EXCLUSIVE on that family, or CONCURRENT).
    *
-   * A VkImage exposes no queryable extent, so the caller guarantees the stated
-   * physical size: the session builds a framebuffer at that size, and Vulkan
-   * leaves a framebuffer larger than its attachment undefined.
+   * A VkImage exposes no queryable extent, so the caller guarantees that each
+   * image's dimensions equal physical_width and physical_height: the session
+   * builds a framebuffer at that size, and Vulkan leaves a framebuffer larger
+   * than its attachment undefined.
    */
-  mln_vulkan_non_dispatchable_handle image;
+  const mln_vulkan_borrowed_texture* textures
+    MLN_BINDING("length=texture_count");
   /**
-   * Borrowed VkImageView for image. Required.
-   *
-   * The view must be a 2D color view that matches image and format.
+   * Number of images, which is the ring depth. Must be positive. A replacement
+   * keeps the count the session attached with.
    */
-  mln_vulkan_non_dispatchable_handle image_view;
-  /** Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
+  size_t texture_count;
+  /**
+   * Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
+   * invalid.
    */
   uint32_t format;
   /**
    * Backend-native VkImageLayout value expected at render-pass begin.
    *
    * Use VK_IMAGE_LAYOUT_UNDEFINED when the previous image contents may be
-   * discarded.
+   * discarded. Setting it equal to final_layout, or to
+   * VK_IMAGE_LAYOUT_UNDEFINED, lets the host release a frame without a layout
+   * transition.
    */
   uint32_t initial_layout;
   /**
@@ -135,8 +179,8 @@ typedef struct mln_vulkan_borrowed_texture_descriptor {
   uint32_t final_layout MLN_BINDING("default=5");
 } mln_vulkan_borrowed_texture_descriptor;
 
-/** Vulkan frame acquired from a session-owned texture target. */
-typedef struct mln_vulkan_owned_texture_frame {
+/** Vulkan frame acquired from a texture ring. */
+typedef struct mln_vulkan_texture_frame {
   uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
@@ -148,6 +192,11 @@ typedef struct mln_vulkan_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its
+   * image in the descriptor's textures array.
+   */
+  uint32_t slot;
   /** Borrowed VkImage bit pattern. Valid until frame release. */
   mln_vulkan_non_dispatchable_handle image;
   /** Borrowed VkImageView bit pattern. Valid until frame release. */
@@ -156,9 +205,13 @@ typedef struct mln_vulkan_owned_texture_frame {
   void* device;
   /** Backend-native VkFormat value. */
   uint32_t format;
-  /** Backend-native VkImageLayout value; Vulkan frames are host-sampleable. */
+  /**
+   * Backend-native VkImageLayout value that the image is in:
+   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
+   * descriptor's final_layout for a borrowed one.
+   */
   uint32_t layout;
-} mln_vulkan_owned_texture_frame;
+} mln_vulkan_texture_frame;
 
 /** OpenGL attachment options for an owned texture target. */
 typedef struct mln_opengl_owned_texture_descriptor {
@@ -172,6 +225,12 @@ typedef struct mln_opengl_owned_texture_descriptor {
    */
   mln_opengl_context_descriptor context;
 } mln_opengl_owned_texture_descriptor;
+
+/** One caller-owned OpenGL texture of a borrowed texture ring. */
+typedef struct mln_opengl_borrowed_texture {
+  /** Borrowed OpenGL texture object name. Required. */
+  uint32_t texture;
+} mln_opengl_borrowed_texture;
 
 /** OpenGL attachment options for a borrowed texture target. */
 typedef struct mln_opengl_borrowed_texture_descriptor {
@@ -188,23 +247,31 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
    * 256. */
   uint32_t physical_height MLN_BINDING("default=256");
   /**
-   * Borrowed OpenGL context provider data. The texture must belong to this
+   * Borrowed OpenGL context provider data. The textures must belong to this
    * context or a context in the same share group.
    */
   mln_opengl_context_descriptor context;
   /**
-   * Borrowed OpenGL texture object name. Required.
+   * The ring's textures, one per slot, in slot order. Required.
    *
-   * The texture's level-0 dimensions must equal physical_width and
-   * physical_height.
+   * The call copies the array before it returns. Only the textures it names
+   * must stay valid: until set_target replaces them, until detach completes,
+   * or until abandon returns. The textures are distinct.
    *
    * Querying texture dimensions needs glGetTexLevelParameteriv, absent before
-   * OpenGL ES 3.1, so the caller guarantees the stated physical size: the
-   * session renders through a framebuffer at that size, and a smaller texture
-   * clips or garbles output.
+   * OpenGL ES 3.1, so the caller guarantees that each texture's level-0
+   * dimensions equal physical_width and physical_height: the session renders
+   * through a framebuffer at that size, and a smaller texture clips or garbles
+   * output.
    */
-  uint32_t texture;
-  /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
+  const mln_opengl_borrowed_texture* textures
+    MLN_BINDING("length=texture_count");
+  /**
+   * Number of textures, which is the ring depth. Must be positive. A
+   * replacement keeps the count the session attached with.
+   */
+  size_t texture_count;
+  /** OpenGL texture target of every texture. Must be GL_TEXTURE_2D. */
   uint32_t target;
 } mln_opengl_borrowed_texture_descriptor;
 
@@ -217,6 +284,24 @@ typedef struct mln_webgpu_owned_texture_descriptor {
   mln_webgpu_context_descriptor context;
 } mln_webgpu_owned_texture_descriptor;
 
+/** One caller-owned WebGPU texture of a borrowed texture ring. */
+typedef struct mln_webgpu_borrowed_texture {
+  /**
+   * Borrowed WGPUTexture. Required.
+   *
+   * The texture must be created by the descriptor's context.device. It must be
+   * 2D, single-sample, and render-attachment capable, and its physical
+   * dimensions and format must match the descriptor. Include TextureBinding
+   * usage when the host will sample from the texture after rendering.
+   */
+  void* texture;
+  /**
+   * Borrowed WGPUTextureView for texture. Required. The view must be a 2D
+   * color view compatible with texture and the descriptor's format.
+   */
+  void* texture_view;
+} mln_webgpu_borrowed_texture;
+
 /** WebGPU attachment options for a borrowed texture target. */
 typedef struct mln_webgpu_borrowed_texture_descriptor {
   uint32_t size;
@@ -226,30 +311,34 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
   uint32_t physical_width MLN_BINDING("default=256");
   /** Physical texture height in device pixels. Defaults to 256. */
   uint32_t physical_height MLN_BINDING("default=256");
-  /** Borrowed WebGPU context. device is required. */
+  /**
+   * Borrowed WebGPU context. device is required. Rendering is submitted
+   * through context.queue or that device's default queue.
+   */
   mln_webgpu_context_descriptor context;
   /**
-   * Borrowed WGPUTexture. Required.
+   * The ring's textures, one per slot, in slot order. Required.
    *
-   * The texture and view must be created by context.device, and rendering is
-   * submitted through context.queue or that device's default queue. The texture
-   * must be 2D, single-sample, and render-attachment capable. Its physical
-   * dimensions and format must match this descriptor. Include TextureBinding
-   * usage when the host will sample from the texture after rendering.
+   * The call copies the array before it returns. Only the textures it names
+   * must stay valid: until set_target replaces them, until detach completes,
+   * or until abandon returns. The textures are distinct.
    */
-  void* texture;
+  const mln_webgpu_borrowed_texture* textures
+    MLN_BINDING("length=texture_count");
   /**
-   * Borrowed WGPUTextureView for texture. Required.
-   *
-   * The view must be a 2D color view compatible with texture and format.
+   * Number of textures, which is the ring depth. Must be positive. A
+   * replacement keeps the count the session attached with.
    */
-  void* texture_view;
-  /** Backend-native WGPUTextureFormat value. Undefined is invalid. */
+  size_t texture_count;
+  /**
+   * Backend-native WGPUTextureFormat value of every texture. Undefined is
+   * invalid.
+   */
   uint32_t format;
 } mln_webgpu_borrowed_texture_descriptor;
 
-/** WebGPU frame acquired from a session-owned texture target. */
-typedef struct mln_webgpu_owned_texture_frame {
+/** WebGPU frame acquired from a texture ring. */
+typedef struct mln_webgpu_texture_frame {
   uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
@@ -261,6 +350,11 @@ typedef struct mln_webgpu_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its
+   * texture in the descriptor's textures array.
+   */
+  uint32_t slot;
   /** Borrowed WGPUTexture. Valid until frame release. */
   void* texture;
   /** Borrowed WGPUTextureView. Valid until frame release. */
@@ -269,10 +363,10 @@ typedef struct mln_webgpu_owned_texture_frame {
   void* device;
   /** Backend-native WGPUTextureFormat value. */
   uint32_t format;
-} mln_webgpu_owned_texture_frame;
+} mln_webgpu_texture_frame;
 
-/** OpenGL frame acquired from a session-owned texture target. */
-typedef struct mln_opengl_owned_texture_frame {
+/** OpenGL frame acquired from a texture ring. */
+typedef struct mln_opengl_texture_frame {
   uint32_t size;
   /** Session generation that produced this frame. */
   uint64_t generation;
@@ -284,17 +378,29 @@ typedef struct mln_opengl_owned_texture_frame {
   double scale_factor;
   /** Opaque frame identity used to reject stale releases. */
   uint64_t frame_id;
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its
+   * texture in the descriptor's textures array.
+   */
+  uint32_t slot;
   /** Borrowed OpenGL texture object name. Valid until frame release. */
   uint32_t texture;
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   uint32_t target;
-  /** OpenGL internal format, such as GL_RGBA8. */
+  /**
+   * OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
+   * whose format the host chose.
+   */
   uint32_t internal_format;
-  /** OpenGL pixel format, such as GL_RGBA. */
+  /**
+   * OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
+   */
   uint32_t format;
-  /** OpenGL pixel type, such as GL_UNSIGNED_BYTE. */
+  /**
+   * OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
+   */
   uint32_t type;
-} mln_opengl_owned_texture_frame;
+} mln_opengl_texture_frame;
 
 /** CPU image readback metadata for a texture target frame. */
 typedef struct mln_texture_image_info {
@@ -411,11 +517,16 @@ MLN_API mln_status mln_metal_owned_texture_attach(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts attachment of a caller-owned Metal texture target.
+ * Starts attachment of a ring of caller-owned Metal textures.
  *
- * The session renders into the descriptor's texture and grants neither frame
- * acquisition nor readback. The descriptor and options are copied before
- * return.
+ * The session renders into the descriptor's textures as a ring whose depth is
+ * their count, and grants frame acquisition and consumer synchronization, but
+ * not readback. It never renders into a texture whose frame is acquired.
+ * Without acquisition, the session may render into any slot that no acquired
+ * frame holds whenever it runs a demand. A host that samples a texture across
+ * demands on a core worker acquires its frame first. The common options select
+ * driver placement; their requested ring depth is ignored. The descriptor, its
+ * textures array, and the options are copied before return.
  *
  * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
  * ATTACHING session there and transfers it to the caller. A non-OK return
@@ -427,10 +538,12 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   null; textures is null, texture_count is zero, or two entries name the
+ *   same texture; the textures differ in device or pixel format, or one does
+ *   not match the physical size, render-target usage, or sample count; the
+ *   stated extent or physical size is not positive; out_session is null or
+ *   does not point to the null handle; or the requested driver kind is
+ *   unknown, or options carry a malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or
  *   options enable a queue lock.
@@ -490,11 +603,16 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts attachment of a caller-owned Vulkan texture target.
+ * Starts attachment of a ring of caller-owned Vulkan images.
  *
- * The session renders into the descriptor's image and grants neither frame
- * acquisition nor readback. The descriptor and options are copied before
- * return.
+ * The session renders into the descriptor's images as a ring whose depth is
+ * their count, and grants frame acquisition and consumer synchronization, but
+ * not readback. It never renders into an image whose frame is acquired.
+ * Without acquisition, the session may render into any slot that no acquired
+ * frame holds whenever it runs a demand. A host that samples an image across
+ * demands on a core worker acquires its frame first. The common options select
+ * driver placement; their requested ring depth is ignored. The descriptor, its
+ * textures array, and the options are copied before return.
  *
  * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
  * ATTACHING session there and transfers it to the caller. A non-OK return
@@ -506,10 +624,10 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
+ *   null; textures is null, texture_count is zero, or two entries name the
+ *   same texture; the stated extent or physical size is not positive;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   driver kind is unknown, or options carry a malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -576,11 +694,17 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts attachment of a caller-owned OpenGL texture target.
+ * Starts attachment of a ring of caller-owned OpenGL textures.
  *
- * The session renders into the descriptor's texture, which must be a
- * GL_TEXTURE_2D, and grants neither frame acquisition nor readback. The
- * descriptor and options are copied before return.
+ * The session renders into the descriptor's GL_TEXTURE_2D textures as a ring
+ * whose depth is their count, and grants frame acquisition and consumer
+ * synchronization, but not readback. It never renders into a texture whose
+ * frame is acquired. Without acquisition, the session may render into any
+ * slot that no acquired frame holds whenever it runs a demand. A host that
+ * samples a texture across demands on a core worker acquires its frame first.
+ * The common options select driver placement; their requested ring depth is
+ * ignored. The descriptor, its textures array, and the options are copied
+ * before return.
  *
  * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
  * ATTACHING session there and transfers it to the caller. A non-OK return
@@ -592,9 +716,10 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
- *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
+ *   null; textures is null, texture_count is zero, or two entries name the
+ *   same texture; target is not GL_TEXTURE_2D; the stated extent or physical
+ *   size is not positive; out_session is null or does not point to the null
+ *   handle; or the requested driver kind is unknown, or options carry a
  *   malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, its
@@ -654,12 +779,17 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts attachment of a caller-owned WebGPU texture target.
+ * Starts attachment of a ring of caller-owned WebGPU textures.
  *
- * The session renders into the descriptor's texture and grants neither frame
- * acquisition nor readback. Browser targets require
- * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD. The descriptor and options are
- * copied before return.
+ * The session renders into the descriptor's textures as a ring whose depth is
+ * their count, and grants frame acquisition and consumer synchronization, but
+ * not readback. It never renders into a texture whose frame is acquired.
+ * Without acquisition, the session may render into any slot that no acquired
+ * frame holds whenever it runs a demand. A host that samples a texture across
+ * demands on a core worker acquires its frame first. Browser targets require
+ * MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, and the requested ring depth of the
+ * common options is ignored. The descriptor, its textures array, and the
+ * options are copied before return.
  *
  * *out_session must be MLN_HANDLE_NULL on entry. MLN_STATUS_OK publishes an
  * ATTACHING session there and transfers it to the caller. A non-OK return
@@ -671,10 +801,10 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
  * - MLN_STATUS_OK when the attachment is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when map is an invalid handle; descriptor,
  *   options, or completion is null or undersized; a required backend handle is
- *   null; the stated extent is not positive or scales past uint32_t;
+ *   null; textures is null, texture_count is zero, or two entries name the
+ *   same texture; the stated extent or physical size is not positive;
  *   out_session is null or does not point to the null handle; or the requested
- *   driver kind is unknown, or options carry a
- *   malformed wake or queue lock.
+ *   driver kind is unknown, or options carry a malformed wake or queue lock.
  * - MLN_STATUS_INVALID_STATE when map has been released.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   requested driver is not MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD, or
@@ -695,24 +825,34 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered caller-owned Metal texture replacement.
+ * Starts an ordered replacement of every texture of a caller-owned Metal ring.
  *
- * The descriptor is copied before return. The replacement must belong to the
- * device this session attached with.
+ * The descriptor and its textures array are copied before return. The
+ * replacement names as many textures as the session attached with, each
+ * belonging to the device this session attached with.
+ *
+ * The replacement runs in order with the session's other driver work. Frames
+ * published before the replacement can no longer be acquired: acquisition
+ * reports MLN_STATUS_NOT_READY from this call's return until the replacement
+ * has run. The replacement also returns to service every slot whose frame was
+ * disposed. The completion means that the session no longer renders into or
+ * reads the replaced textures.
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   textures is null, texture_count is zero or differs from the session's ring
+ *   depth, or two entries name the same texture; or the stated physical size
+ *   is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
+ *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Metal backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_OK once the driver renders into the new texture.
+ * - MLN_STATUS_OK once the driver renders into the new textures.
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement belongs to another device.
  * - MLN_STATUS_UNSUPPORTED when the replacement does not have the pixel format
  *   this session compiled its pipeline states for.
@@ -726,24 +866,34 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered caller-owned Vulkan texture replacement.
+ * Starts an ordered replacement of every image of a caller-owned Vulkan ring.
  *
- * The descriptor is copied before return. The replacement must name the context
- * this session attached with.
+ * The descriptor and its textures array are copied before return. The
+ * replacement names as many images as the session attached with, and the
+ * context this session attached with.
+ *
+ * The replacement runs in order with the session's other driver work. Frames
+ * published before the replacement can no longer be acquired: acquisition
+ * reports MLN_STATUS_NOT_READY from this call's return until the replacement
+ * has run. The replacement also returns to service every slot whose frame was
+ * disposed. The completion means that the session no longer renders into or
+ * reads the replaced textures.
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   textures is null, texture_count is zero or differs from the session's ring
+ *   depth, or two entries name the same texture; or the stated physical size
+ *   is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
+ *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no Vulkan backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_OK once the driver renders into the new texture.
+ * - MLN_STATUS_OK once the driver renders into the new textures.
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context.
  * - MLN_STATUS_UNSUPPORTED when the replacement does not have the format and
  *   layouts this session built its render pass for.
@@ -757,24 +907,35 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered caller-owned OpenGL texture replacement.
+ * Starts an ordered replacement of every texture of a caller-owned OpenGL
+ * ring.
  *
- * The descriptor is copied before return. The replacement must be a
- * GL_TEXTURE_2D in the context this session attached with.
+ * The descriptor and its textures array are copied before return. The
+ * replacement names as many GL_TEXTURE_2D textures as the session attached
+ * with, in the context this session attached with.
+ *
+ * The replacement runs in order with the session's other driver work. Frames
+ * published before the replacement can no longer be acquired: acquisition
+ * reports MLN_STATUS_NOT_READY from this call's return until the replacement
+ * has run. The replacement also returns to service every slot whose frame was
+ * disposed. The completion means that the session no longer renders into or
+ * reads the replaced textures.
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   textures is null, texture_count is zero or differs from the session's ring
+ *   depth, or two entries name the same texture; or the stated physical size
+ *   is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
+ *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no OpenGL backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_OK once the driver renders into the new texture.
+ * - MLN_STATUS_OK once the driver renders into the new textures.
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another context.
  * - MLN_STATUS_TARGET_LOST when the session is abandoned first.
  */
@@ -786,24 +947,35 @@ MLN_API mln_status mln_opengl_borrowed_texture_set_target(
 ) MLN_NOEXCEPT;
 
 /**
- * Starts an ordered caller-owned WebGPU texture replacement.
+ * Starts an ordered replacement of every texture of a caller-owned WebGPU
+ * ring.
  *
- * The descriptor is copied before return. The replacement must name the device
- * and queue this session attached with.
+ * The descriptor and its textures array are copied before return. The
+ * replacement names as many textures as the session attached with, and the
+ * device and queue this session attached with.
+ *
+ * The replacement runs in order with the session's other driver work. Frames
+ * published before the replacement can no longer be acquired: acquisition
+ * reports MLN_STATUS_NOT_READY from this call's return until the replacement
+ * has run. The replacement also returns to service every slot whose frame was
+ * disposed. The completion means that the session no longer renders into or
+ * reads the replaced textures.
  *
  * Returns:
  * - MLN_STATUS_OK when the replacement is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle; descriptor
- *   or completion is null or undersized; a required backend handle is null; or
- *   the stated physical size is not positive.
+ *   or completion is null or undersized; a required backend handle is null;
+ *   textures is null, texture_count is zero or differs from the session's ring
+ *   depth, or two entries name the same texture; or the stated physical size
+ *   is not positive.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
- *   or a texture frame is still acquired.
+ *   or while a frame of the ring is acquired.
  * - MLN_STATUS_UNSUPPORTED when this build carries no WebGPU backend, or the
  *   session does not render into a caller-owned texture.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  *
  * Completes with:
- * - MLN_STATUS_OK once the driver renders into the new texture.
+ * - MLN_STATUS_OK once the driver renders into the new textures.
  * - MLN_STATUS_INVALID_ARGUMENT when the replacement names another device or
  *   queue.
  * - MLN_STATUS_UNSUPPORTED when the replacement does not have the format this
@@ -867,7 +1039,7 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
 MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_metal_texture(
   mln_acquired_frame frame,
-  mln_metal_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_metal_texture_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -892,7 +1064,7 @@ MLN_API mln_status mln_acquired_frame_get_metal_texture(
 MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
   mln_acquired_frame frame,
-  mln_vulkan_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_vulkan_texture_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -917,7 +1089,7 @@ MLN_API mln_status mln_acquired_frame_get_vulkan_texture(
 MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_opengl_texture(
   mln_acquired_frame frame,
-  mln_opengl_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_opengl_texture_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 
@@ -942,7 +1114,7 @@ MLN_API mln_status mln_acquired_frame_get_opengl_texture(
 MLN_BINDING("view_owner=frame")
 MLN_API mln_status mln_acquired_frame_get_webgpu_texture(
   mln_acquired_frame frame,
-  mln_webgpu_owned_texture_frame* out_frame MLN_BINDING("direction=out"),
+  mln_webgpu_texture_frame* out_frame MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

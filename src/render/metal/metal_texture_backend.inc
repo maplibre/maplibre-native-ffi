@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include <mln/gfx/headless_backend.hpp>
 #include <mln/mtl/headless_backend.hpp>
 
@@ -19,7 +21,11 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   MetalTextureBackend(
     MTL::Device* host_device, mln::Size size, std::size_t ring_depth
   );
-  MetalTextureBackend(MTL::Texture* borrowed_texture, mln::Size size);
+  // Renders slot i into borrowed_textures[i], which share one device and one
+  // pixel format.
+  MetalTextureBackend(
+    std::vector<MTL::Texture*> borrowed_textures, mln::Size size
+  );
   MetalTextureBackend(const MetalTextureBackend&) = delete;
   auto operator=(const MetalTextureBackend&) -> MetalTextureBackend& = delete;
   MetalTextureBackend(MetalTextureBackend&&) = delete;
@@ -42,13 +48,16 @@ class MetalTextureBackend final : public mln::mtl::RendererBackend,
   // render pipeline states were built against.
   [[nodiscard]] auto has_borrowed_pixel_format(MTL::PixelFormat format) const
     -> bool;
-  // Renders into a different caller-owned texture from here on. The caller has
-  // already established that the format matches.
-  void set_borrowed_texture(MTL::Texture* texture, mln::Size new_size);
+  // Renders slot i into textures[i] from here on, one texture per slot. The
+  // caller has already established that the device and format match.
+  void set_borrowed_textures(
+    std::vector<MTL::Texture*> textures, mln::Size new_size
+  );
 
  private:
-  MTL::Texture* borrowed_texture_ = nullptr;
-  // Recorded when this session took borrowed_texture_, which it does not
+  // The caller's texture for each slot, or empty for a session-owned ring.
+  std::vector<MTL::Texture*> borrowed_textures_;
+  // Recorded when this session took borrowed_textures_, which it does not
   // retain and the host may already have released.
   MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
   RenderableSlotRing ring_;

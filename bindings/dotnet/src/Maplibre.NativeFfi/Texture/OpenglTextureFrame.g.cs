@@ -3,10 +3,10 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// OpenGL frame acquired from a session-owned texture target.
+/// OpenGL frame acquired from a texture ring.
 /// </summary>
 /// <remarks>
-/// See <c>mln_opengl_owned_texture_frame</c> in the <see
+/// See <c>mln_opengl_texture_frame</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
 /// <param name="Generation">
@@ -24,6 +24,10 @@ namespace Maplibre.NativeFfi;
 /// <param name="FrameId">
 /// Opaque frame identity used to reject stale releases.
 /// </param>
+/// <param name="Slot">
+/// Ring slot that holds this frame. For a borrowed target, the index of its
+/// texture in the descriptor's textures array.
+/// </param>
 /// <param name="Texture">
 /// Borrowed OpenGL texture object name. Valid until frame release.
 /// </param>
@@ -31,20 +35,22 @@ namespace Maplibre.NativeFfi;
 /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
 /// </param>
 /// <param name="InternalFormat">
-/// OpenGL internal format, such as GL_RGBA8.
+/// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture, whose
+/// format the host chose.
 /// </param>
 /// <param name="Format">
-/// OpenGL pixel format, such as GL_RGBA.
+/// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
 /// </param>
 /// <param name="Type">
-/// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
+/// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
 /// </param>
-public readonly partial record struct OpenglOwnedTextureFrame(
+public readonly partial record struct OpenglTextureFrame(
     ulong Generation,
     uint Width,
     uint Height,
     double ScaleFactor,
     ulong FrameId,
+    uint Slot,
     uint Texture,
     uint Target,
     uint InternalFormat,
