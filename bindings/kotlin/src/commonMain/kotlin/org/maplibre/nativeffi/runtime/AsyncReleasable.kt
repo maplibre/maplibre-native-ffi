@@ -6,7 +6,11 @@ import kotlinx.coroutines.withContext
 
 /** An owner whose native release completes asynchronously. */
 public interface AsyncReleasable {
-  /** Starts the native release; the result completes once native teardown has finished. */
+  /**
+   * Starts the native release; the result completes once native teardown has finished. Throws the
+   * mapped MaplibreException when native refuses the release, such as while a child is live, and
+   * leaves the owner live for a retry. A repeated or concurrent call returns the same Deferred.
+   */
   public fun release(): Deferred<Unit>
 }
 

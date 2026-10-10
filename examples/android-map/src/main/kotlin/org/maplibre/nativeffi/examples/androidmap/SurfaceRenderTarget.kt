@@ -2,8 +2,11 @@ package org.maplibre.nativeffi.examples.androidmap
 
 import android.util.Log
 import java.util.concurrent.Semaphore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
+import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.LogicalExtent
@@ -15,6 +18,7 @@ import org.maplibre.nativeffi.generated.RenderSessionAttachOptions
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.generated.Wake
+import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * A native-surface render session. A Vulkan session renders and presents on its core worker. An EGL
@@ -86,8 +90,10 @@ private constructor(
   /**
    * Points the session at the surface the graphics context presents through now, and at the
    * viewport. A session resize carries the map's extent itself. An EGL surface replacement changes
-   * only the graphics resource, so that path submits the map resize alongside it. A caller whose
-   * outgoing surface is about to go passes the returned completion to [await], and a failure
+   * only the graphics resource, so that path submits the map resize alongside it.
+   *
+   * The returned handover fails when native rejects a submission or the session's command fails. A
+   * caller whose outgoing surface is about to go passes the handover to [await], and a failure
    * otherwise reaches [onFailure].
    */
   fun follow(
@@ -95,29 +101,44 @@ private constructor(
     graphics: GraphicsContext,
     viewport: Viewport,
     onFailure: (Throwable) -> Unit,
-  ): Deferred<*> {
+  ): Deferred<Unit> {
     this.viewport = viewport
-    val completion =
+    val handover = CompletableDeferred<Unit>()
+    handover.invokeOnCompletion { error -> if (error != null) onFailure(error) }
+    try {
       when (graphics) {
         is EglGraphicsContext -> {
-          val replacement =
-            session.openglSurfaceSetTarget(
+          session
+            .openglSurfaceSetTarget(
               OpenglSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
             )
-          map.resize(
-            LogicalExtent(
-              viewport.logicalWidth.toUInt(),
-              viewport.logicalHeight.toUInt(),
-              viewport.scaleFactor,
+            .invokeOnCompletion(handover::settle)
+          val resize =
+            map.resize(
+              LogicalExtent(
+                viewport.logicalWidth.toUInt(),
+                viewport.logicalHeight.toUInt(),
+                viewport.scaleFactor,
+              )
             )
-          )
-          replacement
+          resize.invokeOnCompletion { error ->
+            (error ?: resize.terminalFailure("map resize"))?.let { failure ->
+              Log.w(TAG, "resizing the map failed", failure)
+            }
+          }
         }
-        is VulkanGraphicsContext -> session.resize(viewport.extent)
+        is VulkanGraphicsContext -> {
+          val resize = session.resize(viewport.extent)
+          resize.invokeOnCompletion { error ->
+            handover.settle(error ?: resize.terminalFailure("render session resize"))
+          }
+        }
         else -> error("Unsupported graphics context: ${graphics::class.java.name}")
       }
-    completion.invokeOnCompletion { error -> if (error != null) onFailure(error) }
-    return completion
+    } catch (error: RuntimeException) {
+      handover.completeExceptionally(error)
+    }
+    return handover
   }
 
   /**
@@ -232,3 +253,14 @@ private constructor(
     }
   }
 }
+
+private fun CompletableDeferred<Unit>.settle(error: Throwable?) {
+  if (error == null) complete(Unit) else completeExceptionally(error)
+}
+
+/** The failure that a completed command reports as its terminal disposition, or null. */
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun Deferred<CommandCompletion>.terminalFailure(operation: String): Throwable? =
+  getCompleted()
+    .takeIf { it.disposition == CommandDisposition.FAILED }
+    ?.let { IllegalStateException("$operation failed: ${it.status}: ${it.diagnostic}") }

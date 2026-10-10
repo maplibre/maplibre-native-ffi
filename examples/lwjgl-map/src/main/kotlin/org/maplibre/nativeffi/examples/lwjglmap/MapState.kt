@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.runBlocking
+import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.generated.AnimationOptions
 import org.maplibre.nativeffi.generated.CameraDelta
 import org.maplibre.nativeffi.generated.CameraDeltaKind
@@ -17,21 +19,22 @@ import org.maplibre.nativeffi.generated.RuntimeEventType
 import org.maplibre.nativeffi.generated.RuntimeHandle
 import org.maplibre.nativeffi.generated.ScreenPoint
 import org.maplibre.nativeffi.generated.Wake
+import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /** The runtime and its map. Commands go straight to the runtime's own thread. */
 internal class MapState
 private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
   fun cancelTransitions() {
-    map.cancelTransitions().reportFailure("camera transition cancel")
+    submit("camera transition cancel") { map.cancelTransitions() }
   }
 
   fun setGestureInProgress(inProgress: Boolean) {
-    map
-      .updateCamera(
+    submit("gesture update") {
+      map.updateCamera(
         CameraUpdate(gesturePhase = if (inProgress) GesturePhase.BEGIN else GesturePhase.END)
       )
-      .reportFailure("gesture update")
+    }
   }
 
   fun moveBy(dx: Double, dy: Double, durationMs: Double? = null) {
@@ -66,19 +69,31 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   }
 
   private fun update(camera: CameraOptions, durationMs: Double? = null) {
-    map
-      .updateCamera(
+    submit("camera update") {
+      map.updateCamera(
         CameraUpdate(
           mode = if (durationMs == null) CameraUpdateMode.JUMP else CameraUpdateMode.EASE,
           camera = camera,
           animation = animation(durationMs),
         )
       )
-      .reportFailure("camera update")
+    }
   }
 
   private fun delta(delta: CameraDelta) {
-    map.applyCameraDelta(delta).reportFailure("camera delta")
+    submit("camera delta") { map.applyCameraDelta(delta) }
+  }
+
+  /**
+   * Submits a command from input without waiting on it. A rejection or a terminal failure is
+   * printed, so that one bad input does not escape the GLFW callback.
+   */
+  private inline fun submit(operation: String, command: () -> Deferred<CommandCompletion>) {
+    try {
+      command().reportFailure(operation)
+    } catch (error: MaplibreException) {
+      System.err.println("$operation rejected: $error")
+    }
   }
 
   private fun animation(durationMs: Double?): AnimationOptions =

@@ -214,8 +214,7 @@ internal fun nativeUnit(
 
 /**
  * Submits an ordered command. A rejected submission throws; a terminal failure arrives as data in
- * its completion. A handler attached to the returned Deferred may run on the native thread that
- * completes it, so it must return promptly and must not block, as a C completion callback must not.
+ * its completion.
  */
 internal fun nativeCommand(
   owner: Any?,

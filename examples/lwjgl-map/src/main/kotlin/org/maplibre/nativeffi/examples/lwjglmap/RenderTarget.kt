@@ -1,10 +1,12 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.runBlocking
 import org.lwjgl.glfw.GLFW.glfwPostEmptyEvent
 import org.lwjgl.glfw.GLFW.glfwWaitEvents
 import org.maplibre.nativeffi.generated.AcquiredFrameHandle
+import org.maplibre.nativeffi.generated.CommandDisposition
 import org.maplibre.nativeffi.generated.FrameDemand
 import org.maplibre.nativeffi.generated.FrameDemandFlag
 import org.maplibre.nativeffi.generated.LogicalExtent
@@ -17,6 +19,7 @@ import org.maplibre.nativeffi.generated.RenderSessionAttachment
 import org.maplibre.nativeffi.generated.RenderSessionHandle
 import org.maplibre.nativeffi.generated.RenderTargetExtent
 import org.maplibre.nativeffi.generated.Wake
+import org.maplibre.nativeffi.runtime.CommandCompletion
 
 /**
  * Where a session's graphics work runs. A core worker runs it on its own thread. A caller driver
@@ -393,6 +396,17 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
   }
 }
 
-internal fun Deferred<*>.reportFailure(operation: String) {
-  invokeOnCompletion { error -> if (error != null) System.err.println("$operation failed: $error") }
+/** Prints the command's failure once it completes: an error, or a FAILED terminal disposition. */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun Deferred<CommandCompletion>.reportFailure(operation: String) {
+  invokeOnCompletion { error ->
+    if (error != null) {
+      System.err.println("$operation failed: $error")
+      return@invokeOnCompletion
+    }
+    val completion = getCompleted()
+    if (completion.disposition == CommandDisposition.FAILED) {
+      System.err.println("$operation failed: ${completion.status}: ${completion.diagnostic}")
+    }
+  }
 }
