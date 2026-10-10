@@ -271,12 +271,15 @@ pub(crate) fn copy_slice<T: Copy>(result: &sys::mln_completion_result) -> Result
             "native completion returned a null slice",
         ));
     }
-    // SAFETY: the submitting API defines value_count T elements for this callback.
-    Ok(
-        unsafe {
-            std::slice::from_raw_parts(result.value.cast::<T>(), result.value_count).to_vec()
-        },
-    )
+    // SAFETY: the submitting API defines value_count T elements for this
+    // callback, value_size bytes apart.
+    unsafe {
+        crate::convert::strided_items(
+            result.value.cast::<T>(),
+            result.value_count,
+            result.value_size,
+        )
+    }
 }
 
 #[allow(

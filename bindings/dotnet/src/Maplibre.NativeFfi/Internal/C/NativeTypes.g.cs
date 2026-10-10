@@ -23,7 +23,6 @@ internal readonly record struct MlnRuntime(ulong Value) : IMlnHandle;
 
 internal unsafe struct mln_animation_options
 {
-    public uint size;
     public mln_animation_option_field fields;
     public double duration_ms;
     public double velocity;
@@ -86,8 +85,6 @@ internal unsafe struct mln_camera_options
 
 internal unsafe struct mln_camera_query_result
 {
-    public uint size;
-    public uint reserved;
     public ulong generation;
     public mln_camera_options camera;
 }
@@ -122,7 +119,7 @@ internal unsafe struct mln_completion_result
     public uint size;
     public int status;
     public uint disposition;
-    public uint reserved;
+    public uint value_size;
     public ulong generation;
     public mln_buffer_view diagnostic;
     public void* value;
@@ -180,7 +177,6 @@ internal unsafe struct mln_edge_insets
 
 internal unsafe struct mln_egl_context_descriptor
 {
-    public uint size;
     public void* display;
     public void* config;
     public void* share_context;
@@ -373,7 +369,6 @@ internal unsafe struct mln_metal_borrowed_texture_descriptor
 
 internal unsafe struct mln_metal_context_descriptor
 {
-    public uint size;
     public void* device;
 }
 
@@ -407,7 +402,6 @@ internal unsafe struct mln_metal_surface_descriptor
 
 internal unsafe struct mln_offline_geometry_region_definition
 {
-    public uint size;
     public sbyte* style_url;
     public mln_buffer_view geometry;
     public double min_zoom;
@@ -435,7 +429,6 @@ internal unsafe struct mln_offline_region_definition_data
 
 internal unsafe struct mln_offline_region_info
 {
-    public uint size;
     public long id;
     public mln_offline_region_definition definition;
     public byte* metadata;
@@ -444,7 +437,6 @@ internal unsafe struct mln_offline_region_info
 
 internal unsafe struct mln_offline_region_status
 {
-    public uint size;
     public uint download_state;
     public ulong completed_resource_count;
     public ulong completed_resource_size;
@@ -458,7 +450,6 @@ internal unsafe struct mln_offline_region_status
 
 internal unsafe struct mln_offline_tile_pyramid_region_definition
 {
-    public uint size;
     public sbyte* style_url;
     public mln_lat_lng_bounds bounds;
     public double min_zoom;
@@ -480,7 +471,6 @@ internal unsafe struct mln_opengl_borrowed_texture_descriptor
 
 internal unsafe struct mln_opengl_context_descriptor
 {
-    public uint size;
     public uint platform;
     public uint ownership;
     public mln_opengl_context_descriptor_data data;
@@ -564,7 +554,6 @@ internal unsafe struct mln_quaternion
 
 internal unsafe struct mln_queried_feature
 {
-    public uint size;
     public mln_queried_feature_field fields;
     public mln_buffer_view feature;
     public mln_buffer_view source_id;
@@ -574,7 +563,6 @@ internal unsafe struct mln_queried_feature
 
 internal unsafe struct mln_queue_lock
 {
-    public uint size;
     public delegate* unmanaged[Cdecl]<void*, void> @lock;
     public delegate* unmanaged[Cdecl]<void*, void> unlock;
     public void* user_data;
@@ -855,7 +843,6 @@ internal unsafe struct mln_runtime_event_tile_action
 internal unsafe struct mln_runtime_options
 {
     public uint size;
-    public uint flags;
     public sbyte* asset_path;
     public sbyte* cache_path;
     public ulong event_mask;
@@ -891,7 +878,6 @@ internal unsafe struct mln_source_feature_query_options
 
 internal unsafe struct mln_style_image_info
 {
-    public uint size;
     public mln_style_image_info_field fields;
     public uint width;
     public uint height;
@@ -923,8 +909,6 @@ internal unsafe struct mln_style_image_options
 
 internal unsafe struct mln_style_image_result
 {
-    public uint size;
-    public uint reserved;
     public mln_style_image_info info;
     public mln_buffer_view pixels;
     public mln_image_stretch* stretch_x;
@@ -935,8 +919,6 @@ internal unsafe struct mln_style_image_result
 
 internal unsafe struct mln_style_image_stretches_result
 {
-    public uint size;
-    public uint reserved;
     public mln_image_stretch* stretch_x;
     public nuint stretch_x_count;
     public mln_image_stretch* stretch_y;
@@ -945,7 +927,6 @@ internal unsafe struct mln_style_image_stretches_result
 
 internal unsafe struct mln_style_layer_entry
 {
-    public uint size;
     public mln_buffer_view id;
     public mln_buffer_view type;
     public mln_buffer_view source_id;
@@ -954,8 +935,6 @@ internal unsafe struct mln_style_layer_entry
 
 internal unsafe struct mln_style_layer_info
 {
-    public uint size;
-    public uint reserved;
     public mln_buffer_view type;
     public double min_zoom;
     public double max_zoom;
@@ -964,8 +943,6 @@ internal unsafe struct mln_style_layer_info
 
 internal unsafe struct mln_style_layer_result
 {
-    public uint size;
-    public uint reserved;
     public mln_style_layer_info info;
     public mln_buffer_view source_id;
     public mln_buffer_view source_layer;
@@ -973,7 +950,6 @@ internal unsafe struct mln_style_layer_result
 
 internal unsafe struct mln_style_source_info
 {
-    public uint size;
     public uint type;
     public mln_style_source_info_field fields;
     public nuint id_size;
@@ -989,8 +965,6 @@ internal unsafe struct mln_style_source_info
 
 internal unsafe struct mln_style_source_result
 {
-    public uint size;
-    public uint reserved;
     public mln_style_source_info info;
     public mln_buffer_view attribution;
     public mln_buffer_view url;
@@ -1008,8 +982,6 @@ internal unsafe struct mln_style_source_tile_info
 
 internal unsafe struct mln_style_source_tile_urls_result
 {
-    public uint size;
-    public uint reserved;
     public mln_buffer_view* tile_urls;
     public nuint tile_url_count;
 }
@@ -1039,7 +1011,6 @@ internal unsafe struct mln_style_transition_options
 
 internal unsafe struct mln_texture_image_info
 {
-    public uint size;
     public uint width;
     public uint height;
     public uint stride;
@@ -1048,8 +1019,6 @@ internal unsafe struct mln_texture_image_info
 
 internal unsafe struct mln_texture_readback_result
 {
-    public uint size;
-    public uint reserved;
     public mln_buffer_view data;
     public mln_texture_image_info info;
 }
@@ -1094,7 +1063,6 @@ internal unsafe struct mln_vulkan_borrowed_texture_descriptor
 
 internal unsafe struct mln_vulkan_context_descriptor
 {
-    public uint size;
     public void* instance;
     public void* physical_device;
     public void* device;
@@ -1136,7 +1104,6 @@ internal unsafe struct mln_vulkan_surface_descriptor
 
 internal unsafe struct mln_wake
 {
-    public uint size;
     public delegate* unmanaged[Cdecl]<void*, void> callback;
     public void* user_data;
     public delegate* unmanaged[Cdecl]<void*, void> release_user_data;
@@ -1144,7 +1111,6 @@ internal unsafe struct mln_wake
 
 internal unsafe struct mln_webgl_context_descriptor
 {
-    public uint size;
     public uint kind;
     public int context;
     public mln_buffer_view canvas_selector;
@@ -1164,7 +1130,6 @@ internal unsafe struct mln_webgpu_borrowed_texture_descriptor
 
 internal unsafe struct mln_webgpu_context_descriptor
 {
-    public uint size;
     public void* instance;
     public void* device;
     public void* queue;
@@ -1202,7 +1167,6 @@ internal unsafe struct mln_webgpu_surface_descriptor
 
 internal unsafe struct mln_wgl_context_descriptor
 {
-    public uint size;
     public void* device_context;
     public void* share_context;
     public void* get_proc_address;

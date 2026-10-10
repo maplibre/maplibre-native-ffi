@@ -494,7 +494,6 @@ public struct CameraQueryResult: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_camera_query_result {
     var raw = mln_camera_query_result()
-    raw.size = UInt32(MemoryLayout<mln_camera_query_result>.size)
     raw.generation = generation
     raw.camera = camera.nativeValue()
     return raw
@@ -1353,7 +1352,6 @@ public struct OfflineGeometryRegionDefinition: Equatable, Hashable, Sendable {
     -> mln_offline_geometry_region_definition
   {
     var raw = mln_offline_geometry_region_definition()
-    raw.size = UInt32(MemoryLayout<mln_offline_geometry_region_definition>.size)
     raw.style_url = try arena.cString(styleUrl)
     raw.geometry = arena.view(geometry)
     raw.min_zoom = minZoom
@@ -1487,7 +1485,6 @@ public struct OfflineRegionInfo: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_offline_region_info {
     var raw = mln_offline_region_info()
-    raw.size = UInt32(MemoryLayout<mln_offline_region_info>.size)
     raw.id = id
     raw.definition = try definition.nativeValue(arena: arena)
     raw.metadata = arena.view(metadata).data?
@@ -1549,9 +1546,6 @@ public struct OfflineTilePyramidRegionDefinition: Equatable, Hashable,
     -> mln_offline_tile_pyramid_region_definition
   {
     var raw = mln_offline_tile_pyramid_region_definition()
-    raw
-      .size = UInt32(MemoryLayout<mln_offline_tile_pyramid_region_definition>
-        .size)
     raw.style_url = try arena.cString(styleUrl)
     raw.bounds = bounds.nativeValue()
     raw.min_zoom = minZoom

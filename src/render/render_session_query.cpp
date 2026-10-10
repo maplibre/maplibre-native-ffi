@@ -43,7 +43,6 @@ auto queried_feature_view(const QueriedFeatureRecord& record)
     return {.data = string.data(), .size = string.size()};
   };
   auto feature = mln_queried_feature{
-    .size = sizeof(mln_queried_feature),
     .fields = record.fields,
     .feature = view(record.feature),
     .source_id = {},

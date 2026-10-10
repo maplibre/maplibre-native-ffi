@@ -191,8 +191,6 @@ final class mln_adapter_routed_resource_provider extends Struct {
 
 final class mln_animation_options extends Struct {
   @Uint32()
-  external int size;
-  @Uint32()
   external int fields;
   @Double()
   external double duration_ms;
@@ -276,10 +274,6 @@ final class mln_camera_options extends Struct {
 }
 
 final class mln_camera_query_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   @Uint64()
   external int generation;
   external mln_camera_options camera;
@@ -323,7 +317,7 @@ final class mln_completion_result extends Struct {
   @Uint32()
   external int disposition;
   @Uint32()
-  external int reserved;
+  external int value_size;
   @Uint64()
   external int generation;
   external mln_buffer_view diagnostic;
@@ -391,8 +385,6 @@ final class mln_edge_insets extends Struct {
 }
 
 final class mln_egl_context_descriptor extends Struct {
-  @Uint32()
-  external int size;
   external Pointer<Void> display;
   external Pointer<Void> config;
   external Pointer<Void> share_context;
@@ -634,8 +626,6 @@ final class mln_metal_borrowed_texture_descriptor extends Struct {
 }
 
 final class mln_metal_context_descriptor extends Struct {
-  @Uint32()
-  external int size;
   external Pointer<Void> device;
 }
 
@@ -674,8 +664,6 @@ final class mln_metal_surface_descriptor extends Struct {
 }
 
 final class mln_offline_geometry_region_definition extends Struct {
-  @Uint32()
-  external int size;
   external Pointer<Char> style_url;
   external mln_buffer_view geometry;
   @Double()
@@ -702,8 +690,6 @@ final class mln_offline_region_definition_data extends Union {
 }
 
 final class mln_offline_region_info extends Struct {
-  @Uint32()
-  external int size;
   @Int64()
   external int id;
   external mln_offline_region_definition definition;
@@ -713,8 +699,6 @@ final class mln_offline_region_info extends Struct {
 }
 
 final class mln_offline_region_status extends Struct {
-  @Uint32()
-  external int size;
   @Uint32()
   external int download_state;
   @Uint64()
@@ -736,8 +720,6 @@ final class mln_offline_region_status extends Struct {
 }
 
 final class mln_offline_tile_pyramid_region_definition extends Struct {
-  @Uint32()
-  external int size;
   external Pointer<Char> style_url;
   external mln_lat_lng_bounds bounds;
   @Double()
@@ -766,8 +748,6 @@ final class mln_opengl_borrowed_texture_descriptor extends Struct {
 }
 
 final class mln_opengl_context_descriptor extends Struct {
-  @Uint32()
-  external int size;
   @Uint32()
   external int platform;
   @Uint32()
@@ -868,8 +848,6 @@ final class mln_quaternion extends Struct {
 
 final class mln_queried_feature extends Struct {
   @Uint32()
-  external int size;
-  @Uint32()
   external int fields;
   external mln_buffer_view feature;
   external mln_buffer_view source_id;
@@ -878,8 +856,6 @@ final class mln_queried_feature extends Struct {
 }
 
 final class mln_queue_lock extends Struct {
-  @Uint32()
-  external int size;
   external mln_queue_lock_callback lock;
   external mln_queue_lock_callback unlock;
   external Pointer<Void> user_data;
@@ -1200,8 +1176,6 @@ final class mln_runtime_event_tile_action extends Struct {
 final class mln_runtime_options extends Struct {
   @Uint32()
   external int size;
-  @Uint32()
-  external int flags;
   external Pointer<Char> asset_path;
   external Pointer<Char> cache_path;
   @Uint64()
@@ -1239,8 +1213,6 @@ final class mln_source_feature_query_options extends Struct {
 }
 
 final class mln_style_image_info extends Struct {
-  @Uint32()
-  external int size;
   @Uint32()
   external int fields;
   @Uint32()
@@ -1289,10 +1261,6 @@ final class mln_style_image_options extends Struct {
 }
 
 final class mln_style_image_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   external mln_style_image_info info;
   external mln_buffer_view pixels;
   external Pointer<mln_image_stretch> stretch_x;
@@ -1304,10 +1272,6 @@ final class mln_style_image_result extends Struct {
 }
 
 final class mln_style_image_stretches_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   external Pointer<mln_image_stretch> stretch_x;
   @Size()
   external int stretch_x_count;
@@ -1317,8 +1281,6 @@ final class mln_style_image_stretches_result extends Struct {
 }
 
 final class mln_style_layer_entry extends Struct {
-  @Uint32()
-  external int size;
   external mln_buffer_view id;
   external mln_buffer_view type;
   external mln_buffer_view source_id;
@@ -1326,10 +1288,6 @@ final class mln_style_layer_entry extends Struct {
 }
 
 final class mln_style_layer_info extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   external mln_buffer_view type;
   @Double()
   external double min_zoom;
@@ -1340,18 +1298,12 @@ final class mln_style_layer_info extends Struct {
 }
 
 final class mln_style_layer_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   external mln_style_layer_info info;
   external mln_buffer_view source_id;
   external mln_buffer_view source_layer;
 }
 
 final class mln_style_source_info extends Struct {
-  @Uint32()
-  external int size;
   @Uint32()
   external int type;
   @Uint32()
@@ -1375,10 +1327,6 @@ final class mln_style_source_info extends Struct {
 }
 
 final class mln_style_source_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   external mln_style_source_info info;
   external mln_buffer_view attribution;
   external mln_buffer_view url;
@@ -1399,10 +1347,6 @@ final class mln_style_source_tile_info extends Struct {
 }
 
 final class mln_style_source_tile_urls_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   external Pointer<mln_buffer_view> tile_urls;
   @Size()
   external int tile_url_count;
@@ -1444,8 +1388,6 @@ final class mln_style_transition_options extends Struct {
 
 final class mln_texture_image_info extends Struct {
   @Uint32()
-  external int size;
-  @Uint32()
   external int width;
   @Uint32()
   external int height;
@@ -1456,10 +1398,6 @@ final class mln_texture_image_info extends Struct {
 }
 
 final class mln_texture_readback_result extends Struct {
-  @Uint32()
-  external int size;
-  @Uint32()
-  external int reserved;
   external mln_buffer_view data;
   external mln_texture_image_info info;
 }
@@ -1519,8 +1457,6 @@ final class mln_vulkan_borrowed_texture_descriptor extends Struct {
 }
 
 final class mln_vulkan_context_descriptor extends Struct {
-  @Uint32()
-  external int size;
   external Pointer<Void> instance;
   external Pointer<Void> physical_device;
   external Pointer<Void> device;
@@ -1572,16 +1508,12 @@ final class mln_vulkan_surface_descriptor extends Struct {
 }
 
 final class mln_wake extends Struct {
-  @Uint32()
-  external int size;
   external mln_wake_callback callback;
   external Pointer<Void> user_data;
   external mln_user_data_release release_user_data;
 }
 
 final class mln_webgl_context_descriptor extends Struct {
-  @Uint32()
-  external int size;
   @Uint32()
   external int kind;
   @Int32()
@@ -1605,8 +1537,6 @@ final class mln_webgpu_borrowed_texture_descriptor extends Struct {
 }
 
 final class mln_webgpu_context_descriptor extends Struct {
-  @Uint32()
-  external int size;
   external Pointer<Void> instance;
   external Pointer<Void> device;
   external Pointer<Void> queue;
@@ -1650,8 +1580,6 @@ final class mln_webgpu_surface_descriptor extends Struct {
 }
 
 final class mln_wgl_context_descriptor extends Struct {
-  @Uint32()
-  external int size;
   external Pointer<Void> device_context;
   external Pointer<Void> share_context;
   external Pointer<Void> get_proc_address;
@@ -2370,7 +2298,6 @@ external void mln_adapter_arena_destroy(Pointer<Void> arena);
 @Native<
   Int32 Function(
     Uint32,
-    Size,
     mln_adapter_completion_listener,
     Pointer<Void>,
     Pointer<mln_completion>,
@@ -2379,7 +2306,6 @@ external void mln_adapter_arena_destroy(Pointer<Void> arena);
 >()
 external int mln_adapter_completion_create(
   int copy_kind,
-  int element_size,
   mln_adapter_completion_listener listener,
   Pointer<Void> user_data,
   Pointer<mln_completion> out_completion,
@@ -2415,7 +2341,6 @@ external void mln_adapter_custom_source_callbacks_retire(
 @Native<
   Int32 Function(
     Uint32,
-    Size,
     Pointer<Void>,
     Int64,
     Int64,
@@ -2425,7 +2350,6 @@ external void mln_adapter_custom_source_callbacks_retire(
 >()
 external int mln_adapter_dart_completion_create(
   int copy_kind,
-  int element_size,
   Pointer<Void> post_cobject,
   int port,
   int token,
@@ -5526,9 +5450,6 @@ external int mln_runtime_set_resource_transform(
 external mln_source_feature_query_options
 mln_source_feature_query_options_default();
 
-@Native<mln_style_image_info Function()>()
-external mln_style_image_info mln_style_image_info_default();
-
 @Native<mln_style_image_options Function()>()
 external mln_style_image_options mln_style_image_options_default();
 
@@ -5540,9 +5461,6 @@ external mln_style_transition_options mln_style_transition_options_default();
 
 @Native<Uint32 Function()>()
 external int mln_supported_render_backend_mask();
-
-@Native<mln_texture_image_info Function()>()
-external mln_texture_image_info mln_texture_image_info_default();
 
 @Native<
   Int32 Function(

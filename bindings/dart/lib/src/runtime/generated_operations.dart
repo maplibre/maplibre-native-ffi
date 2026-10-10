@@ -1732,7 +1732,6 @@ _NativeRegistration<raw.mln_wake> _prepareWake(
   _NativeCallbackPort? port;
   try {
     final result = arena<raw.mln_wake>();
-    result.ref.size = sizeOf<raw.mln_wake>();
     if (value.callback == null) {
       return _NativeRegistration(result, () {}, arena.releaseAll);
     }
@@ -1797,7 +1796,6 @@ Pointer<raw.mln_metal_context_descriptor> _writeMetalContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_metal_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_metal_context_descriptor>();
   result.ref.device = Pointer<Void>.fromAddress(value.device.address).cast();
   return result;
 }
@@ -1850,7 +1848,6 @@ Pointer<raw.mln_wgl_context_descriptor> _writeWglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_wgl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_wgl_context_descriptor>();
   result.ref.device_context = Pointer<Void>.fromAddress(
     value.deviceContext.address,
   ).cast();
@@ -1876,7 +1873,6 @@ Pointer<raw.mln_egl_context_descriptor> _writeEglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_egl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_egl_context_descriptor>();
   result.ref.display = Pointer<Void>.fromAddress(value.display.address).cast();
   result.ref.config = Pointer<Void>.fromAddress(value.config.address).cast();
   result.ref.share_context = Pointer<Void>.fromAddress(
@@ -1904,7 +1900,6 @@ Pointer<raw.mln_webgl_context_descriptor> _writeWebglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_webgl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_webgl_context_descriptor>();
   result.ref.kind = value.kind.rawValue;
   result.ref.context = _nativeInteger(value.context, -2147483648, 2147483647);
   result.ref.canvas_selector = nativeStringView(
@@ -1927,7 +1922,7 @@ Pointer<raw.mln_opengl_context_descriptor> _writeOpenglContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_opengl_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_opengl_context_descriptor>();
+
   result.ref.ownership = value.ownership.rawValue;
   switch (value.data) {
     case OpenglContextDescriptorDataWgl(:final value):
@@ -2361,7 +2356,6 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 ) {
   final result = arena<raw.mln_runtime_options>();
   result.ref = raw.mln_runtime_options_default();
-  result.ref.flags = _nativeInteger(value.flags, 0, 4294967295);
   result.ref.asset_path = value.assetPath == null
       ? nullptr
       : nativeUtf8CString(value.assetPath!, arena).pointer.cast<Char>();
@@ -2377,7 +2371,6 @@ Pointer<raw.mln_runtime_options> _writeRuntimeOptions(
 
 RuntimeOptions _readRuntimeOptions(raw.mln_runtime_options source) =>
     RuntimeOptions(
-      flags: source.flags,
       assetPath: source.asset_path == nullptr
           ? null
           : source.asset_path.cast<Utf8>().toDartString(),
@@ -2394,7 +2387,6 @@ _writeOfflineTilePyramidRegionDefinition(
   Arena arena,
 ) {
   final result = arena<raw.mln_offline_tile_pyramid_region_definition>();
-  result.ref.size = sizeOf<raw.mln_offline_tile_pyramid_region_definition>();
   result.ref.style_url = nativeUtf8CString(
     value.styleUrl,
     arena,
@@ -2424,7 +2416,6 @@ _writeOfflineGeometryRegionDefinition(
   Arena arena,
 ) {
   final result = arena<raw.mln_offline_geometry_region_definition>();
-  result.ref.size = sizeOf<raw.mln_offline_geometry_region_definition>();
   result.ref.style_url = nativeUtf8CString(
     value.styleUrl,
     arena,
@@ -2906,7 +2897,6 @@ Pointer<raw.mln_vulkan_context_descriptor> _writeVulkanContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_vulkan_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_vulkan_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
     value.instance.address,
   ).cast();
@@ -3041,7 +3031,6 @@ Pointer<raw.mln_webgpu_context_descriptor> _writeWebgpuContextDescriptor(
   Arena arena,
 ) {
   final result = arena<raw.mln_webgpu_context_descriptor>();
-  result.ref.size = sizeOf<raw.mln_webgpu_context_descriptor>();
   result.ref.instance = Pointer<Void>.fromAddress(
     value.instance.address,
   ).cast();
@@ -3804,16 +3793,6 @@ SourceFeatureQueryOptions sourceFeatureQueryOptionsDefault() {
   return _readSourceFeatureQueryOptions(nativeResult);
 }
 
-/// Returns default runtime style image metadata.
-///
-/// See `mln_style_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-StyleImageInfo styleImageInfoDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_style_image_info_default();
-  return _readStyleImageInfo(nativeResult);
-}
-
 /// Returns default runtime style image options.
 ///
 /// See `mln_style_image_options_default` in the
@@ -3852,16 +3831,6 @@ RenderBackendFlag supportedRenderBackendMask() {
   ensureAbiVersion();
   final nativeResult = raw.mln_supported_render_backend_mask();
   return RenderBackendFlag.fromRawValue(nativeResult);
-}
-
-/// Returns texture image info defaults for this C API version.
-///
-/// See `mln_texture_image_info_default` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-TextureImageInfo textureImageInfoDefault() {
-  ensureAbiVersion();
-  final nativeResult = raw.mln_texture_image_info_default();
-  return _readTextureImageInfo(nativeResult);
 }
 
 /// Returns Vulkan borrowed-texture descriptor defaults for this C API

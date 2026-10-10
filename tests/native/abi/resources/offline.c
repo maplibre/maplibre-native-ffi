@@ -27,7 +27,6 @@ static mln_offline_region_definition tile_definition(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data.tile_pyramid = {
-      .size = sizeof(mln_offline_tile_pyramid_region_definition),
       .style_url = offline_style_url,
       .bounds =
         {
@@ -47,7 +46,6 @@ static mln_offline_region_definition geometry_definition(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
     .data.geometry = {
-      .size = sizeof(mln_offline_geometry_region_definition),
       .style_url = offline_style_url,
       .geometry = MLN_BUFFER_LITERAL(line_geometry),
       .min_zoom = 5.0,
@@ -440,7 +438,6 @@ static void an_offline_region_lives_from_creation_to_deletion(void) {
 
   mln_offline_region_status status = {0};
   MLN_TEST_OK(get_region_status(runtime, id, &status));
-  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_offline_region_status), status.size);
   TEST_ASSERT_EQUAL_UINT32(
     MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE, status.download_state
   );

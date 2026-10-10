@@ -87,7 +87,6 @@ public sealed class GeneratedValueTests
     public void ARecordBuiltFromItsParameterlessConstructorEqualsTheNativeDefault()
     {
         Assert.Equal(MapOptions.Default, new MapOptions());
-        Assert.Equal(StyleImageInfo.Default, new StyleImageInfo());
     }
 
     [Fact]

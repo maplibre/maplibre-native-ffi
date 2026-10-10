@@ -115,8 +115,11 @@ def copier(plan, values):
         raise failure(plan.function, "result is both nullable and optional")
     content = replace(result, nullable=False, optional=None)
     if result.kind == "array":
-        if result.stride or result.item_buffer:
-            raise failure(plan.function, "strided array results need a record copy")
+        # call.slice steps by the completion's value_size.
+        if result.item_buffer:
+            raise failure(
+                plan.function, "array results with an item buffer need a record copy"
+            )
         item = result.element
         values.add(item)
         copy = f"call.slice({values.public(item)}, {values.native_type(item)})"

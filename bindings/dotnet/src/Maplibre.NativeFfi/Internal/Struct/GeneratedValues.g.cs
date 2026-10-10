@@ -28,7 +28,6 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_animation_options_default();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_animation_options);
         native.fields |= Put(
             value.DurationMs,
             ref native.duration_ms,
@@ -205,7 +204,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Camera, "CameraQueryResult.Camera must not be null.");
         var native = new mln_camera_query_result();
-        native.size = (uint)sizeof(mln_camera_query_result);
         native.generation = value.Generation;
         native.camera = NativeCameraOptions(value.Camera);
         return native;
@@ -481,7 +479,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_egl_context_descriptor();
-        native.size = (uint)sizeof(mln_egl_context_descriptor);
         native.display = (void*)value.Display.Address;
         native.config = (void*)value.Config.Address;
         native.share_context = (void*)value.ShareContext.Address;
@@ -1080,7 +1077,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_metal_context_descriptor();
-        native.size = (uint)sizeof(mln_metal_context_descriptor);
         native.device = (void*)value.Device.Address;
         return native;
     }
@@ -1172,7 +1168,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.StyleUrl, "OfflineGeometryRegionDefinition.StyleUrl must not be null.");
         var native = new mln_offline_geometry_region_definition();
-        native.size = (uint)sizeof(mln_offline_geometry_region_definition);
         native.style_url = scope.CString(value.StyleUrl);
         native.geometry = scope.Buffer(value.GeometryStorage.Items);
         native.min_zoom = value.MinZoom;
@@ -1246,7 +1241,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Definition, "OfflineRegionInfo.Definition must not be null.");
         var native = new mln_offline_region_info();
-        native.size = (uint)sizeof(mln_offline_region_info);
         native.id = value.Id;
         native.definition = NativeOfflineRegionDefinition(value.Definition, scope);
         var bufferMetadata = scope.Buffer(value.MetadataStorage.Items);
@@ -1271,7 +1265,6 @@ internal static unsafe class GeneratedValues
     internal static mln_offline_region_status NativeOfflineRegionStatus(OfflineRegionStatus value)
     {
         var native = new mln_offline_region_status();
-        native.size = (uint)sizeof(mln_offline_region_status);
         native.download_state = (uint)value.DownloadState;
         native.completed_resource_count = value.CompletedResourceCount;
         native.completed_resource_size = value.CompletedResourceSize;
@@ -1305,7 +1298,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.StyleUrl, "OfflineTilePyramidRegionDefinition.StyleUrl must not be null.");
         var native = new mln_offline_tile_pyramid_region_definition();
-        native.size = (uint)sizeof(mln_offline_tile_pyramid_region_definition);
         native.style_url = scope.CString(value.StyleUrl);
         native.bounds = NativeLatLngBounds(value.Bounds);
         native.min_zoom = value.MinZoom;
@@ -1375,7 +1367,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_opengl_context_descriptor();
-        native.size = (uint)sizeof(mln_opengl_context_descriptor);
         native.ownership = (uint)value.Ownership;
         switch (value.Data)
         {
@@ -1577,7 +1568,6 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_queried_feature();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_queried_feature);
         native.feature = scope.Buffer(value.FeatureStorage.Items);
         native.fields |= Put(
             value.SourceId,
@@ -1631,7 +1621,6 @@ internal static unsafe class GeneratedValues
     internal static mln_queue_lock NativeQueueLock(QueueLock value, NativeCallScope scope)
     {
         var native = new mln_queue_lock();
-        native.size = (uint)sizeof(mln_queue_lock);
         if (value.Lock is not null || value.Unlock is not null)
         {
             native.user_data = scope.Register(value with { });
@@ -2392,7 +2381,6 @@ internal static unsafe class GeneratedValues
 
     internal static RuntimeOptions CopyRuntimeOptions(mln_runtime_options value) =>
         new(
-            value.flags,
             value.asset_path == null ? null : NativeCallScope.CopyCString(value.asset_path),
             value.cache_path == null ? null : NativeCallScope.CopyCString(value.cache_path),
             (RuntimeEventMask)value.event_mask,
@@ -2406,7 +2394,6 @@ internal static unsafe class GeneratedValues
     {
         var native = NativeMethods.mln_runtime_options_default();
         native.size = (uint)sizeof(mln_runtime_options);
-        native.flags = value.Flags;
         native.asset_path = value.AssetPath is null ? null : scope.CString(value.AssetPath);
         native.cache_path = value.CachePath is null ? null : scope.CString(value.CachePath);
         native.event_mask = (ulong)value.EventMask;
@@ -2532,9 +2519,8 @@ internal static unsafe class GeneratedValues
 
     internal static mln_style_image_info NativeStyleImageInfo(StyleImageInfo value)
     {
-        var native = NativeMethods.mln_style_image_info_default();
+        var native = new mln_style_image_info();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_style_image_info);
         native.width = value.Width;
         native.height = value.Height;
         native.stride = value.Stride;
@@ -2686,7 +2672,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Info, "StyleImageResult.Info must not be null.");
         var native = new mln_style_image_result();
-        native.size = (uint)sizeof(mln_style_image_result);
         native.info = NativeStyleImageInfo(value.Info);
         native.pixels = scope.Buffer(value.PixelsStorage.Items);
         native.stretch_x = scope.Array<mln_image_stretch, ImageStretch>(
@@ -2729,7 +2714,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_style_image_stretches_result();
-        native.size = (uint)sizeof(mln_style_image_stretches_result);
         native.stretch_x = scope.Array<mln_image_stretch, ImageStretch>(
             value.StretchXStorage.Items,
             item => NativeImageStretch(item)
@@ -2763,7 +2747,6 @@ internal static unsafe class GeneratedValues
         Required(value.Id, "StyleLayerEntry.Id must not be null.");
         Required(value.Type, "StyleLayerEntry.Type must not be null.");
         var native = new mln_style_layer_entry();
-        native.size = (uint)sizeof(mln_style_layer_entry);
         native.id = scope.Utf8(value.Id);
         native.type = scope.Utf8(value.Type);
         native.source_id = scope.Utf8(value.SourceId ?? "");
@@ -2786,7 +2769,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Type, "StyleLayerInfo.Type must not be null.");
         var native = new mln_style_layer_info();
-        native.size = (uint)sizeof(mln_style_layer_info);
         native.type = scope.Utf8(value.Type);
         native.min_zoom = value.MinZoom;
         native.max_zoom = value.MaxZoom;
@@ -2811,7 +2793,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_style_layer_result();
-        native.size = (uint)sizeof(mln_style_layer_result);
         native.info = NativeStyleLayerInfo(value.Info, scope);
         native.source_id = scope.Utf8(value.SourceId ?? "");
         native.source_layer = scope.Utf8(value.SourceLayer ?? "");
@@ -2851,7 +2832,6 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_style_source_info();
         native.fields = 0;
-        native.size = (uint)sizeof(mln_style_source_info);
         native.type = (uint)value.Type;
         native.id_size = checked((nuint)value.IdSize);
         native.is_volatile = (byte)(value.IsVolatile ? 1 : 0);
@@ -2923,7 +2903,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.Info, "StyleSourceResult.Info must not be null.");
         var native = new mln_style_source_result();
-        native.size = (uint)sizeof(mln_style_source_result);
         native.info = NativeStyleSourceInfo(value.Info);
         native.info.fields &= ~MLN_STYLE_SOURCE_INFO_ATTRIBUTION;
         native.info.fields |= Put(
@@ -2985,7 +2964,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_style_source_tile_urls_result();
-        native.size = (uint)sizeof(mln_style_source_tile_urls_result);
         native.tile_urls = scope.Array<mln_buffer_view, string>(
             value.TileUrlsStorage.Items,
             item => scope.Utf8(item)
@@ -3126,8 +3104,7 @@ internal static unsafe class GeneratedValues
 
     internal static mln_texture_image_info NativeTextureImageInfo(TextureImageInfo value)
     {
-        var native = NativeMethods.mln_texture_image_info_default();
-        native.size = (uint)sizeof(mln_texture_image_info);
+        var native = new mln_texture_image_info();
         native.width = value.Width;
         native.height = value.Height;
         native.stride = value.Stride;
@@ -3150,7 +3127,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_texture_readback_result();
-        native.size = (uint)sizeof(mln_texture_readback_result);
         native.data = scope.Buffer(value.DataStorage.Items);
         native.info = NativeTextureImageInfo(value.Info);
         return native;
@@ -3251,7 +3227,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_vulkan_context_descriptor();
-        native.size = (uint)sizeof(mln_vulkan_context_descriptor);
         native.instance = (void*)value.Instance.Address;
         native.physical_device = (void*)value.PhysicalDevice.Address;
         native.device = (void*)value.Device.Address;
@@ -3349,7 +3324,6 @@ internal static unsafe class GeneratedValues
     internal static mln_wake NativeWake(Wake value, NativeCallScope scope)
     {
         var native = new mln_wake();
-        native.size = (uint)sizeof(mln_wake);
         if (value.Callback is not null)
         {
             native.user_data = scope.Register(value with { });
@@ -3375,7 +3349,6 @@ internal static unsafe class GeneratedValues
     {
         Required(value.CanvasSelector, "WebglContextDescriptor.CanvasSelector must not be null.");
         var native = new mln_webgl_context_descriptor();
-        native.size = (uint)sizeof(mln_webgl_context_descriptor);
         native.kind = (uint)value.Kind;
         native.context = value.Context;
         native.canvas_selector = scope.Utf8(value.CanvasSelector);
@@ -3425,7 +3398,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_webgpu_context_descriptor();
-        native.size = (uint)sizeof(mln_webgpu_context_descriptor);
         native.instance = (void*)value.Instance.Address;
         native.device = (void*)value.Device.Address;
         native.queue = (void*)value.Queue.Address;
@@ -3517,7 +3489,6 @@ internal static unsafe class GeneratedValues
     )
     {
         var native = new mln_wgl_context_descriptor();
-        native.size = (uint)sizeof(mln_wgl_context_descriptor);
         native.device_context = (void*)value.DeviceContext.Address;
         native.share_context = (void*)value.ShareContext.Address;
         native.get_proc_address = (void*)value.GetProcAddress.Address;

@@ -89,7 +89,6 @@ func (event runtimeEventForTest) withOfflineRegionStatus(payload RuntimeEventOff
 	return withPayload(event, C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS, C.mln_runtime_event_offline_region_status{
 		region_id: C.mln_offline_region_id(payload.RegionId),
 		status: C.mln_offline_region_status{
-			size:                 C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{})),
 			download_state:       C.uint32_t(payload.Status.DownloadState),
 			completed_tile_count: C.uint64_t(payload.Status.CompletedTileCount),
 			complete:             C.bool(payload.Status.Complete),

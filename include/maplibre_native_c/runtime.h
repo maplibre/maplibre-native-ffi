@@ -47,7 +47,6 @@ typedef enum mln_offline_region_download_state : uint32_t {
 
 /** Offline region status snapshot. */
 typedef struct mln_offline_region_status {
-  uint32_t size;
   /** One of mln_offline_region_download_state. */
   uint32_t download_state MLN_BINDING("enum=mln_offline_region_download_state");
   uint64_t completed_resource_count;
@@ -378,8 +377,6 @@ MLN_API mln_status mln_network_status_set(
 /** Options used when creating a runtime. */
 typedef struct mln_runtime_options {
   uint32_t size;
-  /** No flags are currently defined. Must be zero. */
-  uint32_t flags;
   /**
    * Directory root for asset:// URLs. Copied during runtime creation.
    * Null or empty selects `/android_asset` on Android and `.` elsewhere.
@@ -480,10 +477,6 @@ typedef struct mln_runtime_event_camera_transition_finished {
 /** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
 typedef struct mln_runtime_event_offline_region_status {
   mln_offline_region_id region_id;
-  /**
-   * Region status. This member keeps its own size field because the same struct
-   * is also returned by mln_runtime_offline_region_get_status().
-   */
   mln_offline_region_status status;
 } mln_runtime_event_offline_region_status;
 
@@ -1009,9 +1002,8 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * Returns:
  * - MLN_STATUS_OK when out_runtime receives an owned runtime.
  * - MLN_STATUS_INVALID_ARGUMENT when options is null, options->size is too
- *   small, options->flags or options->event_mask holds unknown bits, the wake
- *   descriptor is invalid, or out_runtime is null or does not point to the null
- *   handle.
+ *   small, options->event_mask holds unknown bits, the wake descriptor is
+ *   invalid, or out_runtime is null or does not point to the null handle.
  * - MLN_STATUS_WRONG_THREAD when called on the browser main thread.
  * - MLN_STATUS_NATIVE_ERROR when the worker could not be started.
  */

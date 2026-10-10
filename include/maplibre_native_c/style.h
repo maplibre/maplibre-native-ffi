@@ -159,8 +159,6 @@ typedef struct mln_image_stretch {
 
 /** Borrowed image-stretch arrays available during a completion callback. */
 typedef struct mln_style_image_stretches_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
   size_t stretch_x_count;
   const mln_image_stretch* stretch_y MLN_BINDING("length=stretch_y_count");
@@ -170,8 +168,6 @@ typedef struct mln_style_image_stretches_result {
 /** Borrowed inline TileJSON tile URLs available during a completion callback.
  */
 typedef struct mln_style_source_tile_urls_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   const mln_buffer_view* tile_urls MLN_BINDING("length=tile_url_count");
   size_t tile_url_count;
 } mln_style_source_tile_urls_result;
@@ -293,7 +289,6 @@ typedef struct mln_style_source_tile_info {
 
 /** Fixed source metadata included in mln_style_source_result. */
 typedef struct mln_style_source_info {
-  uint32_t size;
   /** One of mln_style_source_type. */
   uint32_t type MLN_BINDING("enum=mln_style_source_type");
   /** Bitwise combination of mln_style_source_info_field values. */
@@ -339,7 +334,6 @@ typedef struct mln_style_source_info {
  * no source, and source_layer is empty when the layer names none.
  */
 typedef struct mln_style_layer_entry {
-  uint32_t size;
   mln_buffer_view id;
   mln_buffer_view type;
   mln_buffer_view source_id MLN_BINDING("optional=empty");
@@ -348,8 +342,6 @@ typedef struct mln_style_layer_entry {
 
 /** Complete source metadata borrowed for a completion callback. */
 typedef struct mln_style_source_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_source_info info;
   mln_buffer_view attribution
     MLN_BINDING("mask=info.fields;bit=MLN_STYLE_SOURCE_INFO_ATTRIBUTION");
@@ -364,8 +356,6 @@ typedef struct mln_style_source_result {
 
 /** Fixed layer metadata included in mln_style_layer_result. */
 typedef struct mln_style_layer_info {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   /** View of a static style-spec layer type string. It stays valid for the
      life of the process. */
   mln_buffer_view type;
@@ -379,8 +369,6 @@ typedef struct mln_style_layer_info {
 
 /** Complete layer metadata borrowed for a completion callback. */
 typedef struct mln_style_layer_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_layer_info info;
   /** Source ID. Empty for a layer type that takes no source. */
   mln_buffer_view source_id MLN_BINDING("optional=empty");
@@ -643,7 +631,6 @@ typedef struct mln_style_image_options {
 
 /** Fixed metadata for one runtime style image. */
 typedef struct mln_style_image_info {
-  uint32_t size;
   /** Bitwise combination of mln_style_image_info_field values. */
   uint32_t fields MLN_BINDING("enum=mln_style_image_info_field");
   uint32_t width;
@@ -675,15 +662,13 @@ typedef struct mln_style_image_info {
     "enum=mln_style_image_text_fit;mask=fields;"
     "bit=MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT"
   );
-  /** Sprite pixel ratio. Defaults to 1.0. */
-  float pixel_ratio MLN_BINDING("default=1.0");
+  /** Sprite pixel ratio. */
+  float pixel_ratio;
   bool sdf;
 } mln_style_image_info;
 
 /** Complete style image borrowed for a completion callback. */
 typedef struct mln_style_image_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   mln_style_image_info info;
   mln_buffer_view pixels MLN_BINDING("encoding=bytes");
   const mln_image_stretch* stretch_x MLN_BINDING("length=stretch_x_count");
@@ -770,9 +755,6 @@ mln_premultiplied_rgba8_image_default(void) MLN_NOEXCEPT;
 /** Returns default runtime style image options. */
 MLN_API mln_style_image_options
 mln_style_image_options_default(void) MLN_NOEXCEPT;
-
-/** Returns default runtime style image metadata. */
-MLN_API mln_style_image_info mln_style_image_info_default(void) MLN_NOEXCEPT;
 
 /** Returns default global style transition options. */
 MLN_API mln_style_transition_options

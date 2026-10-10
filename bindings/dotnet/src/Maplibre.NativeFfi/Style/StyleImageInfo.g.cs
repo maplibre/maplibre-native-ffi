@@ -44,16 +44,8 @@ public sealed record StyleImageInfo
     public StyleImageTextFit? TextFitHeight { get; set; }
 
     /// <summary>
-    /// Sprite pixel ratio. Defaults to 1.0.
+    /// Sprite pixel ratio.
     /// </summary>
-    public float PixelRatio { get; set; } = 1.0f;
+    public float PixelRatio { get; set; }
     public bool Sdf { get; set; }
-    public static StyleImageInfo Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null, "mln_style_image_info_default");
-            return GeneratedValues.CopyStyleImageInfo(NativeMethods.mln_style_image_info_default());
-        }
-    }
 }

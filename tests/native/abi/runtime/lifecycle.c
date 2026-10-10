@@ -20,18 +20,8 @@ static void runtime_options_with_small_size(void* descriptor) {
   ((mln_runtime_options*)descriptor)->size = sizeof(mln_runtime_options) - 1;
 }
 
-static void runtime_options_with_unknown_flag(void* descriptor) {
-  ((mln_runtime_options*)descriptor)->flags = UINT32_C(1) << 31U;
-}
-
 static void runtime_options_with_unknown_event_bit(void* descriptor) {
   ((mln_runtime_options*)descriptor)->event_mask |= UINT64_C(1) << 40U;
-}
-
-static void runtime_options_with_small_wake(void* descriptor) {
-  mln_runtime_options* options = descriptor;
-  options->event_wake.callback = ignore_wake;
-  options->event_wake.size = sizeof(mln_wake) - 1;
 }
 
 static void runtime_options_with_retaining_disabled_wake(void* descriptor) {
@@ -44,12 +34,8 @@ static const mln_test_validation_case runtime_option_cases[] = {
   {"defaults", NULL, MLN_STATUS_OK, NULL},
   {"undersized", runtime_options_with_small_size, MLN_STATUS_INVALID_ARGUMENT,
    "size"},
-  {"unknown flag", runtime_options_with_unknown_flag,
-   MLN_STATUS_INVALID_ARGUMENT, "flags"},
   {"unknown event bit", runtime_options_with_unknown_event_bit,
    MLN_STATUS_INVALID_ARGUMENT, "event_mask"},
-  {"undersized wake", runtime_options_with_small_wake,
-   MLN_STATUS_INVALID_ARGUMENT, "mln_wake.size"},
   {"disabled wake that retains user data",
    runtime_options_with_retaining_disabled_wake, MLN_STATUS_INVALID_ARGUMENT,
    "disabled wake"},

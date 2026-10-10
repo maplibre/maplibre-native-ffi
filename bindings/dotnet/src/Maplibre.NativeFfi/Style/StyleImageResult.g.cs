@@ -11,9 +11,6 @@ namespace Maplibre.NativeFfi;
 /// </remarks>
 public readonly record struct StyleImageResult
 {
-    public StyleImageResult()
-        : this(new StyleImageInfo(), default!, default!, default!) { }
-
     public StyleImageResult(
         StyleImageInfo Info,
         byte[] Pixels,

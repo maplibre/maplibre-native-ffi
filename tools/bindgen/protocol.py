@@ -18,6 +18,10 @@ DIAGNOSTIC = "mln_diagnostic"
 COMPLETION = "mln_completion"
 # The record that a completion callback receives.
 COMPLETION_RESULT = "mln_completion_result"
+# Its members that count an array result's elements and give their byte
+# stride, which is the size of one element in the native build.
+COMPLETION_VALUE_COUNT = "value_count"
+COMPLETION_VALUE_SIZE = "value_size"
 # The record that carries a borrowed byte span.
 BUFFER_VIEW = "mln_buffer_view"
 # The status that a drain returns when nothing is queued.

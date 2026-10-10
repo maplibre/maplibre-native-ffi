@@ -73,7 +73,6 @@ static void runtime_events_wake_the_receiver_directly(void) {
   atomic_uint wakes;
   atomic_init(&wakes, 0);
   const mln_wake event_wake = {
-    .size = sizeof(mln_wake),
     .callback = record_wake,
     .user_data = &wakes,
   };

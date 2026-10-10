@@ -49,7 +49,6 @@ mln_status download_region(
 
   // #region define
   mln_offline_tile_pyramid_region_definition pyramid = {
-    .size = sizeof(pyramid),
     .style_url = "https://tiles.openfreemap.org/styles/bright",
     .bounds = bounds,
     .min_zoom = 10.0,

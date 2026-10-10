@@ -84,7 +84,6 @@ static mln_status attach_owned_texture(still_image_job* job) {
   options.driver = MLN_RENDER_DRIVER_CORE_WORKER;
   options.requested_texture_ring_depth = 1;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = frames_ready,
     .user_data = job,
   };

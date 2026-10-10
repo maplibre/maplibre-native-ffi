@@ -669,11 +669,11 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   /// One of `mln_style_image_text_fit`, meaningful when fields contains
   /// TEXT_FIT_HEIGHT.
   public var textFitHeight: StyleImageTextFit?
-  /// Sprite pixel ratio. Defaults to 1.0.
+  /// Sprite pixel ratio.
   public var pixelRatio: Float
   public var sdf: Bool
   public static var `default`: Self {
-    Self(raw: mln_style_image_info_default())
+    Self(raw: mln_style_image_info())
   }
 
   public init(
@@ -720,7 +720,7 @@ public struct StyleImageInfo: Equatable, Hashable, Sendable {
   }
 
   func nativeValue() -> mln_style_image_info {
-    var raw = mln_style_image_info_default()
+    var raw = mln_style_image_info()
     raw.fields = 0
     raw.width = width
     raw.height = height
@@ -938,7 +938,6 @@ public struct StyleImageResult: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_image_result {
     var raw = mln_style_image_result()
-    raw.size = UInt32(MemoryLayout<mln_style_image_result>.size)
     raw.info = info.nativeValue()
     raw.pixels = arena.view(pixels)
     raw.stretch_x = arena.array(stretchX.map { $0.nativeValue() })
@@ -983,7 +982,6 @@ public struct StyleImageStretchesResult: Equatable, Hashable, Sendable {
     -> mln_style_image_stretches_result
   {
     var raw = mln_style_image_stretches_result()
-    raw.size = UInt32(MemoryLayout<mln_style_image_stretches_result>.size)
     raw.stretch_x = arena.array(stretchX.map { $0.nativeValue() })
     raw.stretch_x_count = try NativeInputArena.count(stretchX.count)
     raw.stretch_y = arena.array(stretchY.map { $0.nativeValue() })
@@ -1052,7 +1050,6 @@ public struct StyleLayerEntry: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_entry {
     var raw = mln_style_layer_entry()
-    raw.size = UInt32(MemoryLayout<mln_style_layer_entry>.size)
     raw.id = arena.view(id)
     raw.type = arena.view(type)
     raw.source_id = sourceId.map { arena.view($0) } ?? mln_buffer_view()
@@ -1103,7 +1100,6 @@ public struct StyleLayerInfo: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_info {
     var raw = mln_style_layer_info()
-    raw.size = UInt32(MemoryLayout<mln_style_layer_info>.size)
     raw.type = arena.view(type)
     raw.min_zoom = minZoom
     raw.max_zoom = maxZoom
@@ -1153,7 +1149,6 @@ public struct StyleLayerResult: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_layer_result {
     var raw = mln_style_layer_result()
-    raw.size = UInt32(MemoryLayout<mln_style_layer_result>.size)
     raw.info = try info.nativeValue(arena: arena)
     raw.source_id = sourceId.map { arena.view($0) } ?? mln_buffer_view()
     raw.source_layer = sourceLayer.map { arena.view($0) } ?? mln_buffer_view()
@@ -1275,7 +1270,6 @@ public struct StyleSourceInfo: Equatable, Hashable, Sendable {
   func nativeValue() -> mln_style_source_info {
     var raw = mln_style_source_info()
     raw.fields = 0
-    raw.size = UInt32(MemoryLayout<mln_style_source_info>.size)
     raw.type = type.rawValue
     raw.id_size = idSize
     raw.is_volatile = isVolatile
@@ -1387,7 +1381,6 @@ public struct StyleSourceResult: Equatable, Hashable, Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_style_source_result {
     var raw = mln_style_source_result()
-    raw.size = UInt32(MemoryLayout<mln_style_source_result>.size)
     raw.info = info.nativeValue()
     if let item = attribution {
       raw.info.fields |= MLN_STYLE_SOURCE_INFO_ATTRIBUTION.rawValue; raw
@@ -1480,7 +1473,6 @@ public struct StyleSourceTileUrlsResult: Equatable, Hashable, Sendable {
     -> mln_style_source_tile_urls_result
   {
     var raw = mln_style_source_tile_urls_result()
-    raw.size = UInt32(MemoryLayout<mln_style_source_tile_urls_result>.size)
     raw.tile_urls = arena.array(tileUrls.map { arena.view($0) })
     raw.tile_url_count = try NativeInputArena.count(tileUrls.count)
     return raw

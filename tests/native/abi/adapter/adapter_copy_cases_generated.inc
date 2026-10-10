@@ -127,7 +127,6 @@ static const void* mln_adapter_copy_case_camera_query_result_value(
   size_t* count
 ) {
   static mln_camera_query_result values[1];
-  values[0].size = sizeof(values[0]);
   values[0].generation = 1;
   values[0].camera.size = sizeof(values[0].camera);
   values[0].camera.fields |= MLN_CAMERA_OPTION_CENTER;
@@ -301,12 +300,9 @@ static const void* mln_adapter_copy_case_offline_region_info_value(
   static const char text_12[] =
     "mln_offline_region_info[1].definition.data.tile_pyramid.style_url";
   static const char text_20[] = "mln_offline_region_info[1].metadata";
-  values[0].size = sizeof(values[0]);
   values[0].id = 1;
   values[0].definition.size = sizeof(values[0].definition);
   values[0].definition.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
-  values[0].definition.data.tile_pyramid.size =
-    sizeof(values[0].definition.data.tile_pyramid);
   values[0].definition.data.tile_pyramid.style_url = text_2;
   values[0].definition.data.tile_pyramid.bounds.southwest.latitude = 3.5;
   values[0].definition.data.tile_pyramid.bounds.southwest.longitude = 4.5;
@@ -318,12 +314,9 @@ static const void* mln_adapter_copy_case_offline_region_info_value(
   values[0].definition.data.tile_pyramid.include_ideographs = true;
   values[0].metadata = (const uint8_t*)text_10;
   values[0].metadata_size = sizeof(text_10) - 1;
-  values[1].size = sizeof(values[1]);
   values[1].id = 11;
   values[1].definition.size = sizeof(values[1].definition);
   values[1].definition.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
-  values[1].definition.data.tile_pyramid.size =
-    sizeof(values[1].definition.data.tile_pyramid);
   values[1].definition.data.tile_pyramid.style_url = text_12;
   values[1].definition.data.tile_pyramid.bounds.southwest.latitude = 13.5;
   values[1].definition.data.tile_pyramid.bounds.southwest.longitude = 14.5;
@@ -413,7 +406,6 @@ static const void* mln_adapter_copy_case_offline_region_status_value(
   size_t* count
 ) {
   static mln_offline_region_status values[1];
-  values[0].size = sizeof(values[0]);
   values[0].download_state = MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE;
   values[0].completed_resource_count = 1;
   values[0].completed_resource_size = 2;
@@ -478,7 +470,6 @@ static const void* mln_adapter_copy_case_queried_feature_value(size_t* count) {
   static const char text_6[] = "mln_queried_feature[1].source_id";
   static const char text_7[] = "mln_queried_feature[1].source_layer_id";
   static const char text_8[] = "mln_queried_feature[1].state";
-  values[0].size = sizeof(values[0]);
   values[0].feature.data = text_1;
   values[0].feature.size = sizeof(text_1) - 1;
   values[0].fields |= MLN_QUERIED_FEATURE_SOURCE_ID;
@@ -490,7 +481,6 @@ static const void* mln_adapter_copy_case_queried_feature_value(size_t* count) {
   values[0].fields |= MLN_QUERIED_FEATURE_STATE;
   values[0].state.data = text_4;
   values[0].state.size = sizeof(text_4) - 1;
-  values[1].size = sizeof(values[1]);
   values[1].feature.data = text_5;
   values[1].feature.size = sizeof(text_5) - 1;
   values[1].fields |= MLN_QUERIED_FEATURE_SOURCE_ID;
@@ -558,8 +548,6 @@ static const void* mln_adapter_copy_case_style_image_result_value(
   static const char text_12[] = "mln_style_image_result[0].pixels";
   static struct mln_image_stretch items_13[2];
   static struct mln_image_stretch items_18[2];
-  values[0].size = sizeof(values[0]);
-  values[0].info.size = sizeof(values[0].info);
   values[0].info.width = 1;
   values[0].info.height = 2;
   values[0].info.stride = 3;
@@ -682,7 +670,6 @@ static const void* mln_adapter_copy_case_style_image_stretches_result_value(
   static mln_style_image_stretches_result values[1];
   static struct mln_image_stretch items_1[2];
   static struct mln_image_stretch items_6[2];
-  values[0].size = sizeof(values[0]);
   items_1[0].from = 2.5;
   items_1[0].to = 3.5;
   items_1[1].from = 4.5;
@@ -765,7 +752,6 @@ static const void* mln_adapter_copy_case_style_layer_entry_value(
   static const char text_6[] = "mln_style_layer_entry[1].type";
   static const char text_7[] = "mln_style_layer_entry[1].source_id";
   static const char text_8[] = "mln_style_layer_entry[1].source_layer";
-  values[0].size = sizeof(values[0]);
   values[0].id.data = text_1;
   values[0].id.size = sizeof(text_1) - 1;
   values[0].type.data = text_2;
@@ -774,7 +760,6 @@ static const void* mln_adapter_copy_case_style_layer_entry_value(
   values[0].source_id.size = sizeof(text_3) - 1;
   values[0].source_layer.data = text_4;
   values[0].source_layer.size = sizeof(text_4) - 1;
-  values[1].size = sizeof(values[1]);
   values[1].id.data = text_5;
   values[1].id.size = sizeof(text_5) - 1;
   values[1].type.data = text_6;
@@ -817,8 +802,6 @@ static const void* mln_adapter_copy_case_style_layer_result_value(
   static const char text_1[] = "mln_style_layer_result[0].info.type";
   static const char text_4[] = "mln_style_layer_result[0].source_id";
   static const char text_5[] = "mln_style_layer_result[0].source_layer";
-  values[0].size = sizeof(values[0]);
-  values[0].info.size = sizeof(values[0].info);
   values[0].info.type.data = text_1;
   values[0].info.type.size = sizeof(text_1) - 1;
   values[0].info.min_zoom = 2.5;
@@ -869,8 +852,6 @@ static const void* mln_adapter_copy_case_style_source_result_value(
   static struct mln_buffer_view items_14[2];
   static const char text_15[] = "mln_style_source_result[0].tile_urls[0]";
   static const char text_16[] = "mln_style_source_result[0].tile_urls[1]";
-  values[0].size = sizeof(values[0]);
-  values[0].info.size = sizeof(values[0].info);
   values[0].info.type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
   values[0].info.id_size = 1;
   values[0].info.is_volatile = true;
@@ -1004,7 +985,6 @@ static const void* mln_adapter_copy_case_style_source_tile_urls_result_value(
     "mln_style_source_tile_urls_result[0].tile_urls[0]";
   static const char text_3[] =
     "mln_style_source_tile_urls_result[0].tile_urls[1]";
-  values[0].size = sizeof(values[0]);
   items_1[0].data = text_2;
   items_1[0].size = sizeof(text_2) - 1;
   items_1[1].data = text_3;
@@ -1082,10 +1062,8 @@ static const void* mln_adapter_copy_case_texture_readback_result_value(
 ) {
   static mln_texture_readback_result values[1];
   static const char text_1[] = "mln_texture_readback_result[0].data";
-  values[0].size = sizeof(values[0]);
   values[0].data.data = text_1;
   values[0].data.size = sizeof(text_1) - 1;
-  values[0].info.size = sizeof(values[0].info);
   values[0].info.width = 2;
   values[0].info.height = 3;
   values[0].info.stride = 4;

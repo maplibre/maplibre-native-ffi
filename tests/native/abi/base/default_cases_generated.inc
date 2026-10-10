@@ -15,10 +15,6 @@
 static void mln_animation_options_default_holds_its_annotated_values(void) {
   const mln_animation_options value = mln_animation_options_default();
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_animation_options), (uint64_t)value.size,
-    "mln_animation_options.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.fields, "mln_animation_options.fields"
   );
 }
@@ -54,10 +50,6 @@ static void mln_camera_delta_default_holds_its_annotated_values(void) {
   );
   TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
     0, (double)value.amount, "mln_camera_delta.amount"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_animation_options), (uint64_t)value.animation.size,
-    "mln_camera_delta.animation.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.animation.fields,
@@ -103,10 +95,6 @@ static void mln_camera_update_default_holds_its_annotated_values(void) {
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.camera.fields,
     "mln_camera_update.camera.fields"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_animation_options), (uint64_t)value.animation.size,
-    "mln_camera_update.animation.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.animation.fields,
@@ -352,11 +340,6 @@ mln_metal_owned_texture_descriptor_default_holds_its_annotated_values(void) {
     1.0, (double)value.extent.scale_factor,
     "mln_metal_owned_texture_descriptor.extent.scale_factor"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_metal_context_descriptor),
-    (uint64_t)value.context.size,
-    "mln_metal_owned_texture_descriptor.context.size"
-  );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.device == NULL,
     "mln_metal_owned_texture_descriptor.context.device"
@@ -387,10 +370,6 @@ static void mln_metal_surface_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
     1.0, (double)value.extent.scale_factor,
     "mln_metal_surface_descriptor.extent.scale_factor"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_metal_context_descriptor),
-    (uint64_t)value.context.size, "mln_metal_surface_descriptor.context.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.device == NULL, "mln_metal_surface_descriptor.context.device"
@@ -435,11 +414,6 @@ mln_opengl_borrowed_texture_descriptor_default_holds_its_annotated_values(
     "mln_opengl_borrowed_texture_descriptor.physical_height"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_opengl_context_descriptor),
-    (uint64_t)value.context.size,
-    "mln_opengl_borrowed_texture_descriptor.context.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.context.ownership,
     "mln_opengl_borrowed_texture_descriptor.context.ownership"
   );
@@ -478,11 +452,6 @@ mln_opengl_owned_texture_descriptor_default_holds_its_annotated_values(void) {
     "mln_opengl_owned_texture_descriptor.extent.scale_factor"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_opengl_context_descriptor),
-    (uint64_t)value.context.size,
-    "mln_opengl_owned_texture_descriptor.context.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.context.ownership,
     "mln_opengl_owned_texture_descriptor.context.ownership"
   );
@@ -512,10 +481,6 @@ static void mln_opengl_surface_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
     1.0, (double)value.extent.scale_factor,
     "mln_opengl_surface_descriptor.extent.scale_factor"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_opengl_context_descriptor),
-    (uint64_t)value.context.size, "mln_opengl_surface_descriptor.context.size"
   );
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.context.ownership,
@@ -584,10 +549,6 @@ mln_render_session_attach_options_default_holds_its_annotated_values(void) {
     (uint64_t)0, (uint64_t)value.reserved,
     "mln_render_session_attach_options.reserved"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_wake), (uint64_t)value.frame_wake.size,
-    "mln_render_session_attach_options.frame_wake.size"
-  );
   TEST_ASSERT_TRUE_MESSAGE(
     value.frame_wake.callback == NULL,
     "mln_render_session_attach_options.frame_wake.callback"
@@ -600,10 +561,6 @@ mln_render_session_attach_options_default_holds_its_annotated_values(void) {
     value.frame_wake.release_user_data == NULL,
     "mln_render_session_attach_options.frame_wake.release_user_data"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_wake), (uint64_t)value.driver_work_wake.size,
-    "mln_render_session_attach_options.driver_work_wake.size"
-  );
   TEST_ASSERT_TRUE_MESSAGE(
     value.driver_work_wake.callback == NULL,
     "mln_render_session_attach_options.driver_work_wake.callback"
@@ -615,10 +572,6 @@ mln_render_session_attach_options_default_holds_its_annotated_values(void) {
   TEST_ASSERT_TRUE_MESSAGE(
     value.driver_work_wake.release_user_data == NULL,
     "mln_render_session_attach_options.driver_work_wake.release_user_data"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_queue_lock), (uint64_t)value.queue_lock.size,
-    "mln_render_session_attach_options.queue_lock.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
     value.queue_lock.lock == NULL,
@@ -662,9 +615,6 @@ static void mln_runtime_options_default_holds_its_annotated_values(void) {
     (uint64_t)sizeof(mln_runtime_options), (uint64_t)value.size,
     "mln_runtime_options.size"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.flags, "mln_runtime_options.flags"
-  );
   TEST_ASSERT_TRUE_MESSAGE(
     value.asset_path == NULL, "mln_runtime_options.asset_path"
   );
@@ -674,10 +624,6 @@ static void mln_runtime_options_default_holds_its_annotated_values(void) {
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)MLN_RUNTIME_EVENT_MASK_ALL, (uint64_t)value.event_mask,
     "mln_runtime_options.event_mask"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_wake), (uint64_t)value.event_wake.size,
-    "mln_runtime_options.event_wake.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
     value.event_wake.callback == NULL, "mln_runtime_options.event_wake.callback"
@@ -708,43 +654,6 @@ static void mln_source_feature_query_options_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)0, (uint64_t)value.source_layer_id_count,
     "mln_source_feature_query_options.source_layer_id_count"
-  );
-}
-
-static void mln_style_image_info_default_holds_its_annotated_values(void) {
-  const mln_style_image_info value = mln_style_image_info_default();
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_style_image_info), (uint64_t)value.size,
-    "mln_style_image_info.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.fields, "mln_style_image_info.fields"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.width, "mln_style_image_info.width"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.height, "mln_style_image_info.height"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.stride, "mln_style_image_info.stride"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.byte_length, "mln_style_image_info.byte_length"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.stretch_x_count,
-    "mln_style_image_info.stretch_x_count"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.stretch_y_count,
-    "mln_style_image_info.stretch_y_count"
-  );
-  TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
-    1.0, (double)value.pixel_ratio, "mln_style_image_info.pixel_ratio"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.sdf, "mln_style_image_info.sdf"
   );
 }
 
@@ -795,27 +704,6 @@ static void mln_style_transition_options_default_holds_its_annotated_values(
   );
 }
 
-static void mln_texture_image_info_default_holds_its_annotated_values(void) {
-  const mln_texture_image_info value = mln_texture_image_info_default();
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_texture_image_info), (uint64_t)value.size,
-    "mln_texture_image_info.size"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.width, "mln_texture_image_info.width"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.height, "mln_texture_image_info.height"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.stride, "mln_texture_image_info.stride"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)0, (uint64_t)value.byte_length,
-    "mln_texture_image_info.byte_length"
-  );
-}
-
 static void
 mln_vulkan_borrowed_texture_descriptor_default_holds_its_annotated_values(
   void
@@ -849,11 +737,6 @@ mln_vulkan_borrowed_texture_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_UINT64_MESSAGE(
     (uint64_t)256, (uint64_t)value.physical_height,
     "mln_vulkan_borrowed_texture_descriptor.physical_height"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_vulkan_context_descriptor),
-    (uint64_t)value.context.size,
-    "mln_vulkan_borrowed_texture_descriptor.context.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.instance == NULL,
@@ -929,11 +812,6 @@ mln_vulkan_owned_texture_descriptor_default_holds_its_annotated_values(void) {
     1.0, (double)value.extent.scale_factor,
     "mln_vulkan_owned_texture_descriptor.extent.scale_factor"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_vulkan_context_descriptor),
-    (uint64_t)value.context.size,
-    "mln_vulkan_owned_texture_descriptor.context.size"
-  );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.instance == NULL,
     "mln_vulkan_owned_texture_descriptor.context.instance"
@@ -988,10 +866,6 @@ static void mln_vulkan_surface_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
     1.0, (double)value.extent.scale_factor,
     "mln_vulkan_surface_descriptor.extent.scale_factor"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_vulkan_context_descriptor),
-    (uint64_t)value.context.size, "mln_vulkan_surface_descriptor.context.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.instance == NULL,
@@ -1060,11 +934,6 @@ mln_webgpu_borrowed_texture_descriptor_default_holds_its_annotated_values(
     (uint64_t)256, (uint64_t)value.physical_height,
     "mln_webgpu_borrowed_texture_descriptor.physical_height"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_webgpu_context_descriptor),
-    (uint64_t)value.context.size,
-    "mln_webgpu_borrowed_texture_descriptor.context.size"
-  );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.instance == NULL,
     "mln_webgpu_borrowed_texture_descriptor.context.instance"
@@ -1114,11 +983,6 @@ mln_webgpu_owned_texture_descriptor_default_holds_its_annotated_values(void) {
     1.0, (double)value.extent.scale_factor,
     "mln_webgpu_owned_texture_descriptor.extent.scale_factor"
   );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_webgpu_context_descriptor),
-    (uint64_t)value.context.size,
-    "mln_webgpu_owned_texture_descriptor.context.size"
-  );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.instance == NULL,
     "mln_webgpu_owned_texture_descriptor.context.instance"
@@ -1157,10 +1021,6 @@ static void mln_webgpu_surface_descriptor_default_holds_its_annotated_values(
   TEST_ASSERT_EQUAL_DOUBLE_MESSAGE(
     1.0, (double)value.extent.scale_factor,
     "mln_webgpu_surface_descriptor.extent.scale_factor"
-  );
-  TEST_ASSERT_EQUAL_UINT64_MESSAGE(
-    (uint64_t)sizeof(mln_webgpu_context_descriptor),
-    (uint64_t)value.context.size, "mln_webgpu_surface_descriptor.context.size"
   );
   TEST_ASSERT_TRUE_MESSAGE(
     value.context.instance == NULL,
@@ -1208,11 +1068,9 @@ static void mln_webgpu_surface_descriptor_default_holds_its_annotated_values(
   X(mln_rendered_feature_query_options_default_holds_its_annotated_values)     \
   X(mln_runtime_options_default_holds_its_annotated_values)                    \
   X(mln_source_feature_query_options_default_holds_its_annotated_values)       \
-  X(mln_style_image_info_default_holds_its_annotated_values)                   \
   X(mln_style_image_options_default_holds_its_annotated_values)                \
   X(mln_style_tile_source_options_default_holds_its_annotated_values)          \
   X(mln_style_transition_options_default_holds_its_annotated_values)           \
-  X(mln_texture_image_info_default_holds_its_annotated_values)                 \
   X(mln_vulkan_borrowed_texture_descriptor_default_holds_its_annotated_values) \
   X(mln_vulkan_owned_texture_descriptor_default_holds_its_annotated_values)    \
   X(mln_vulkan_surface_descriptor_default_holds_its_annotated_values)          \

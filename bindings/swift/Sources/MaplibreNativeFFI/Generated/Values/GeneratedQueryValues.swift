@@ -56,7 +56,6 @@ public struct QueriedFeature: Equatable, Hashable, Sendable {
   func nativeValue(arena: NativeInputArena) throws -> mln_queried_feature {
     var raw = mln_queried_feature()
     raw.fields = 0
-    raw.size = UInt32(MemoryLayout<mln_queried_feature>.size)
     raw.feature = arena.view(feature)
     if let item = sourceId {
       raw.fields |= MLN_QUERIED_FEATURE_SOURCE_ID.rawValue; raw

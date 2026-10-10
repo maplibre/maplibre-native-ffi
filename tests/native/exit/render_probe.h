@@ -93,7 +93,6 @@ static inline uint64_t probe_signal_wait(probe_signal* signal, uint64_t seen) {
 
 static inline mln_wake probe_signal_wake(probe_signal* signal) {
   return (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = probe_signal_notify,
     .user_data = signal,
   };

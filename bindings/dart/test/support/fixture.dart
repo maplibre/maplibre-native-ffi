@@ -130,7 +130,6 @@ Future<RuntimeFixture> openRuntime({
   final events = Signal();
   final runtime = runtimeCreate(
     RuntimeOptions(
-      flags: defaults.flags,
       assetPath: defaults.assetPath,
       cachePath: defaults.cachePath,
       eventMask: defaults.eventMask,

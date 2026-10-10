@@ -19,7 +19,6 @@ public struct Wake: Sendable {
 
   func nativeValue(arena: NativeInputArena) throws -> mln_wake {
     var raw = mln_wake()
-    raw.size = UInt32(MemoryLayout<mln_wake>.size)
     raw.callback = callback == nil ? nil : invokeWakeCallback
     if callback != nil {
       raw.user_data = arena.callback(self)

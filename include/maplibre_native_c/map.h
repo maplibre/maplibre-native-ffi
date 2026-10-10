@@ -265,7 +265,6 @@ typedef struct mln_unit_bezier {
 
 /** Optional animation controls for camera transitions. */
 typedef struct mln_animation_options {
-  uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_animation_option_field");
   /**
    * Duration in milliseconds. Must be finite and non-negative. Values that
@@ -476,7 +475,6 @@ typedef struct mln_bound_options {
 
 /** Tile-pyramid offline region definition. */
 typedef struct mln_offline_tile_pyramid_region_definition {
-  uint32_t size;
   /** Style URL. Copied during region creation. */
   const char* style_url;
   mln_lat_lng_bounds bounds;
@@ -492,7 +490,6 @@ typedef struct mln_offline_tile_pyramid_region_definition {
 
 /** Geometry offline region definition. */
 typedef struct mln_offline_geometry_region_definition {
-  uint32_t size;
   /** Style URL. Copied during region creation. */
   const char* style_url;
   /** UTF-8 GeoJSON Geometry bytes. Borrowed during region creation. */
@@ -531,7 +528,6 @@ typedef struct mln_offline_region_definition {
  * completion callback.
  */
 typedef struct mln_offline_region_info {
-  uint32_t size;
   mln_offline_region_id id;
   mln_offline_region_definition definition;
   /** Metadata bytes. */
@@ -918,8 +914,6 @@ typedef struct mln_map_snapshot {
 
 /** Camera result borrowed for an ordered camera-query completion. */
 typedef struct mln_camera_query_result {
-  uint32_t size;
-  uint32_t reserved MLN_BINDING("kind=reserved");
   uint64_t generation;
   mln_camera_options camera;
 } mln_camera_query_result;

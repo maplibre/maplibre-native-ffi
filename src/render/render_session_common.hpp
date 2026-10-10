@@ -773,13 +773,11 @@ inline auto physical_dimension(uint32_t logical, double scale_factor)
   return static_cast<uint32_t>(std::ceil(logical * scale_factor));
 }
 
+// Validates the members of an extent. A caller that passes the extent by
+// pointer checks its size first; a descriptor that embeds it versions it.
 inline auto validate_render_target_extent(
   const mln_render_target_extent& extent, const char* dimension_message
 ) -> mln_status {
-  if (extent.size < sizeof(mln_render_target_extent)) {
-    set_thread_error("mln_render_target_extent.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (
     extent.width == 0 || extent.height == 0 ||
     !std::isfinite(extent.scale_factor) || extent.scale_factor <= 0.0
@@ -793,10 +791,6 @@ inline auto validate_render_target_extent(
 inline auto validate_metal_context(
   const mln_metal_context_descriptor& context, bool require_device
 ) -> mln_status {
-  if (context.size < sizeof(mln_metal_context_descriptor)) {
-    set_thread_error("mln_metal_context_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (require_device && context.device == nullptr) {
     set_thread_error("Metal device must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -807,10 +801,6 @@ inline auto validate_metal_context(
 inline auto validate_vulkan_context(
   const mln_vulkan_context_descriptor& context, const char* null_handles_message
 ) -> mln_status {
-  if (context.size < sizeof(mln_vulkan_context_descriptor)) {
-    set_thread_error("mln_vulkan_context_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (
     context.instance == nullptr || context.physical_device == nullptr ||
     context.device == nullptr || context.graphics_queue == nullptr

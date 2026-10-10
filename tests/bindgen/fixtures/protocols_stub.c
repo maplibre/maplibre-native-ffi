@@ -106,7 +106,7 @@ mln_probe_hooks mln_probe_hooks_default(void) {
   return (mln_probe_hooks){
     .size = sizeof(mln_probe_hooks),
     .limit = 4,
-    .signal = {.size = sizeof(mln_probe_signal)},
+    .signal = {0},
   };
 }
 
@@ -165,8 +165,8 @@ mln_status mln_probe_ledger_get(
     uint64_t appended;
   } wide_reading;
   static const wide_reading readings[2] = {
-    {.reading = {.size = sizeof(wide_reading), .value = 7}, .appended = 0xa5},
-    {.reading = {.size = sizeof(wide_reading), .value = 9}, .appended = 0xa5},
+    {.reading = {.value = 7}, .appended = 0xa5},
+    {.reading = {.value = 9}, .appended = 0xa5},
   };
   *out_view = (mln_probe_reading_view){
     .size = sizeof(mln_probe_reading_view),

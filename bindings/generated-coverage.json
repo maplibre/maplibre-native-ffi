@@ -323,7 +323,7 @@
     "tests/native/abi/adapter/adapter_copy_cases_generated.inc",
     "tests/native/abi/base/default_cases_generated.inc"
   ],
-  "function_count": 293,
+  "function_count": 291,
   "languages": {
     "dart": {
       "callback_adapters": {
@@ -566,12 +566,10 @@
         "mln_runtime_set_resource_provider",
         "mln_runtime_set_resource_transform",
         "mln_source_feature_query_options_default",
-        "mln_style_image_info_default",
         "mln_style_image_options_default",
         "mln_style_tile_source_options_default",
         "mln_style_transition_options_default",
         "mln_supported_render_backend_mask",
-        "mln_texture_image_info_default",
         "mln_texture_read_premultiplied_rgba8",
         "mln_vulkan_borrowed_texture_attach",
         "mln_vulkan_borrowed_texture_descriptor_default",
@@ -835,12 +833,10 @@
         "mln_runtime_set_resource_provider",
         "mln_runtime_set_resource_transform",
         "mln_source_feature_query_options_default",
-        "mln_style_image_info_default",
         "mln_style_image_options_default",
         "mln_style_tile_source_options_default",
         "mln_style_transition_options_default",
         "mln_supported_render_backend_mask",
-        "mln_texture_image_info_default",
         "mln_texture_read_premultiplied_rgba8",
         "mln_vulkan_borrowed_texture_attach",
         "mln_vulkan_borrowed_texture_descriptor_default",
@@ -1104,12 +1100,10 @@
         "mln_runtime_set_resource_provider",
         "mln_runtime_set_resource_transform",
         "mln_source_feature_query_options_default",
-        "mln_style_image_info_default",
         "mln_style_image_options_default",
         "mln_style_tile_source_options_default",
         "mln_style_transition_options_default",
         "mln_supported_render_backend_mask",
-        "mln_texture_image_info_default",
         "mln_texture_read_premultiplied_rgba8",
         "mln_vulkan_borrowed_texture_attach",
         "mln_vulkan_borrowed_texture_descriptor_default",
@@ -1373,12 +1367,10 @@
         "mln_runtime_set_resource_provider",
         "mln_runtime_set_resource_transform",
         "mln_source_feature_query_options_default",
-        "mln_style_image_info_default",
         "mln_style_image_options_default",
         "mln_style_tile_source_options_default",
         "mln_style_transition_options_default",
         "mln_supported_render_backend_mask",
-        "mln_texture_image_info_default",
         "mln_texture_read_premultiplied_rgba8",
         "mln_vulkan_borrowed_texture_attach",
         "mln_vulkan_borrowed_texture_descriptor_default",
@@ -1690,7 +1682,6 @@
         "mln_source_feature_query_options_default": {
           "default": "mln_source_feature_query_options"
         },
-        "mln_style_image_info_default": { "default": "mln_style_image_info" },
         "mln_style_image_options_default": {
           "default": "mln_style_image_options"
         },
@@ -1699,9 +1690,6 @@
         },
         "mln_style_transition_options_default": {
           "default": "mln_style_transition_options"
-        },
-        "mln_texture_image_info_default": {
-          "default": "mln_texture_image_info"
         },
         "mln_vulkan_borrowed_texture_descriptor_default": {
           "default": "mln_vulkan_borrowed_texture_descriptor"
@@ -1963,12 +1951,10 @@
         "mln_runtime_set_resource_provider",
         "mln_runtime_set_resource_transform",
         "mln_source_feature_query_options_default",
-        "mln_style_image_info_default",
         "mln_style_image_options_default",
         "mln_style_tile_source_options_default",
         "mln_style_transition_options_default",
         "mln_supported_render_backend_mask",
-        "mln_texture_image_info_default",
         "mln_texture_read_premultiplied_rgba8",
         "mln_vulkan_borrowed_texture_attach",
         "mln_vulkan_borrowed_texture_descriptor_default",
@@ -2232,12 +2218,10 @@
         "mln_runtime_set_resource_provider",
         "mln_runtime_set_resource_transform",
         "mln_source_feature_query_options_default",
-        "mln_style_image_info_default",
         "mln_style_image_options_default",
         "mln_style_tile_source_options_default",
         "mln_style_transition_options_default",
         "mln_supported_render_backend_mask",
-        "mln_texture_image_info_default",
         "mln_texture_read_premultiplied_rgba8",
         "mln_vulkan_borrowed_texture_attach",
         "mln_vulkan_borrowed_texture_descriptor_default",
@@ -2501,12 +2485,10 @@
         "mln_runtime_set_resource_provider",
         "mln_runtime_set_resource_transform",
         "mln_source_feature_query_options_default",
-        "mln_style_image_info_default",
         "mln_style_image_options_default",
         "mln_style_tile_source_options_default",
         "mln_style_transition_options_default",
         "mln_supported_render_backend_mask",
-        "mln_texture_image_info_default",
         "mln_texture_read_premultiplied_rgba8",
         "mln_vulkan_borrowed_texture_attach",
         "mln_vulkan_borrowed_texture_descriptor_default",
@@ -2532,7 +2514,7 @@
       "unsupported": {}
     }
   },
-  "public_function_count": 262,
+  "public_function_count": 260,
   "runtime_exports": [
     "mln_adapter_arena_adopt_handle",
     "mln_adapter_arena_adopt_release",
@@ -2569,7 +2551,7 @@
   "schema_version": 1,
   "semantic": {
     "resolved_callbacks": 12,
-    "resolved_operations": 260,
+    "resolved_operations": 258,
     "support_relations": {
       "mln_acquired_frame_dispose": { "dispose": "mln_acquired_frame" },
       "mln_acquired_frame_view_begin": { "view": "mln_acquired_frame" },
@@ -2634,7 +2616,6 @@
       "mln_source_feature_query_options_default": {
         "default": "mln_source_feature_query_options"
       },
-      "mln_style_image_info_default": { "default": "mln_style_image_info" },
       "mln_style_image_options_default": {
         "default": "mln_style_image_options"
       },
@@ -2644,7 +2625,6 @@
       "mln_style_transition_options_default": {
         "default": "mln_style_transition_options"
       },
-      "mln_texture_image_info_default": { "default": "mln_texture_image_info" },
       "mln_vulkan_borrowed_texture_descriptor_default": {
         "default": "mln_vulkan_borrowed_texture_descriptor"
       },

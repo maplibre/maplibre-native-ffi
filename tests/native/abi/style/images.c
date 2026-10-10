@@ -155,10 +155,9 @@ static void style_images_copy_their_metadata_pixels_and_stretches(void) {
   // Replacing an image replaces its metadata too, back to the defaults.
   set_image(map, "marker", &image, NULL);
   info = read_image_info(map, "marker");
-  const mln_style_image_info defaults = mln_style_image_info_default();
-  TEST_ASSERT_EQUAL_FLOAT(defaults.pixel_ratio, info.pixel_ratio);
-  TEST_ASSERT_EQUAL(defaults.sdf, info.sdf);
-  TEST_ASSERT_EQUAL_UINT32(defaults.fields, info.fields);
+  TEST_ASSERT_EQUAL_FLOAT(1.0f, info.pixel_ratio);
+  TEST_ASSERT_FALSE(info.sdf);
+  TEST_ASSERT_EQUAL_UINT32(0, info.fields);
 
   options = mln_style_image_options_default();
   options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;

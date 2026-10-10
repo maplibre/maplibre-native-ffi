@@ -1482,8 +1482,6 @@ internal actual object C {
     )
   private val mln_source_feature_query_options_default =
     Ffm.downcall("mln_source_feature_query_options_default", mln_source_feature_query_options)
-  private val mln_style_image_info_default =
-    Ffm.downcall("mln_style_image_info_default", mln_style_image_info)
   private val mln_style_image_options_default =
     Ffm.downcall("mln_style_image_options_default", mln_style_image_options)
   private val mln_style_tile_source_options_default =
@@ -1492,8 +1490,6 @@ internal actual object C {
     Ffm.downcall("mln_style_transition_options_default", mln_style_transition_options)
   private val mln_supported_render_backend_mask =
     Ffm.downcall("mln_supported_render_backend_mask", JAVA_INT)
-  private val mln_texture_image_info_default =
-    Ffm.downcall("mln_texture_image_info_default", mln_texture_image_info)
   private val mln_texture_read_premultiplied_rgba8 =
     Ffm.downcall("mln_texture_read_premultiplied_rgba8", JAVA_INT, JAVA_LONG, JAVA_LONG, JAVA_LONG)
   private val mln_vulkan_borrowed_texture_attach =
@@ -3895,11 +3891,6 @@ internal actual object C {
     ) as MemorySegment
   }
 
-  actual fun mln_style_image_info_default(returned: Long) {
-    mln_style_image_info_default.invokeExact(Ffm.into(returned, mln_style_image_info))
-      as MemorySegment
-  }
-
   actual fun mln_style_image_options_default(returned: Long) {
     mln_style_image_options_default.invokeExact(Ffm.into(returned, mln_style_image_options))
       as MemorySegment
@@ -3919,11 +3910,6 @@ internal actual object C {
 
   actual fun mln_supported_render_backend_mask(): Int =
     mln_supported_render_backend_mask.invokeExact() as Int
-
-  actual fun mln_texture_image_info_default(returned: Long) {
-    mln_texture_image_info_default.invokeExact(Ffm.into(returned, mln_texture_image_info))
-      as MemorySegment
-  }
 
   actual fun mln_texture_read_premultiplied_rgba8(
     session: Long,
@@ -4123,8 +4109,8 @@ internal val mln_unit_bezier: GroupLayout =
   )
 internal val mln_animation_options: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
     JAVA_INT.withName("fields"),
+    Ffm.pad(4),
     JAVA_DOUBLE.withName("duration_ms"),
     JAVA_DOUBLE.withName("velocity"),
     JAVA_DOUBLE.withName("min_zoom"),
@@ -4335,8 +4321,7 @@ internal val mln_metal_borrowed_texture_descriptor: GroupLayout =
     JAVA_INT.withName("physical_height"),
     ADDRESS.withName("texture"),
   )
-internal val mln_metal_context_descriptor: GroupLayout =
-  Ffm.struct(JAVA_INT.withName("size"), Ffm.pad(4), ADDRESS.withName("device"))
+internal val mln_metal_context_descriptor: GroupLayout = Ffm.struct(ADDRESS.withName("device"))
 internal val mln_metal_owned_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
@@ -4354,16 +4339,12 @@ internal val mln_metal_surface_descriptor: GroupLayout =
   )
 internal val mln_wgl_context_descriptor: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
     ADDRESS.withName("device_context"),
     ADDRESS.withName("share_context"),
     ADDRESS.withName("get_proc_address"),
   )
 internal val mln_egl_context_descriptor: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
     ADDRESS.withName("display"),
     ADDRESS.withName("config"),
     ADDRESS.withName("share_context"),
@@ -4373,10 +4354,8 @@ internal val mln_egl_context_descriptor: GroupLayout =
   )
 internal val mln_webgl_context_descriptor: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
     JAVA_INT.withName("kind"),
     JAVA_INT.withName("context"),
-    Ffm.pad(4),
     mln_buffer_view.withName("canvas_selector"),
   )
 internal val mln_opengl_context_descriptor_data: GroupLayout =
@@ -4387,10 +4366,8 @@ internal val mln_opengl_context_descriptor_data: GroupLayout =
   )
 internal val mln_opengl_context_descriptor: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
     JAVA_INT.withName("platform"),
     JAVA_INT.withName("ownership"),
-    Ffm.pad(4),
     mln_opengl_context_descriptor_data.withName("data"),
   )
 internal val mln_opengl_borrowed_texture_descriptor: GroupLayout =
@@ -4439,16 +4416,12 @@ internal val mln_projection_mode: GroupLayout =
   )
 internal val mln_wake: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
     ADDRESS.withName("callback"),
     ADDRESS.withName("user_data"),
     ADDRESS.withName("release_user_data"),
   )
 internal val mln_queue_lock: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
     ADDRESS.withName("lock"),
     ADDRESS.withName("unlock"),
     ADDRESS.withName("user_data"),
@@ -4491,7 +4464,7 @@ internal val mln_rendered_query_geometry: GroupLayout =
 internal val mln_runtime_options: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),
-    JAVA_INT.withName("flags"),
+    Ffm.pad(4),
     ADDRESS.withName("asset_path"),
     ADDRESS.withName("cache_path"),
     JAVA_LONG.withName("event_mask"),
@@ -4511,24 +4484,6 @@ internal val mln_image_content: GroupLayout =
     JAVA_FLOAT.withName("top"),
     JAVA_FLOAT.withName("right"),
     JAVA_FLOAT.withName("bottom"),
-  )
-internal val mln_style_image_info: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("fields"),
-    JAVA_INT.withName("width"),
-    JAVA_INT.withName("height"),
-    JAVA_INT.withName("stride"),
-    Ffm.pad(4),
-    JAVA_LONG.withName("byte_length"),
-    JAVA_LONG.withName("stretch_x_count"),
-    JAVA_LONG.withName("stretch_y_count"),
-    mln_image_content.withName("content"),
-    JAVA_INT.withName("text_fit_width"),
-    JAVA_INT.withName("text_fit_height"),
-    JAVA_FLOAT.withName("pixel_ratio"),
-    JAVA_BOOLEAN.withName("sdf"),
-    Ffm.pad(3),
   )
 internal val mln_style_image_options: GroupLayout =
   Ffm.struct(
@@ -4569,18 +4524,8 @@ internal val mln_style_transition_options: GroupLayout =
     JAVA_BOOLEAN.withName("enable_placement_transitions"),
     Ffm.pad(7),
   )
-internal val mln_texture_image_info: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    JAVA_INT.withName("width"),
-    JAVA_INT.withName("height"),
-    JAVA_INT.withName("stride"),
-    JAVA_LONG.withName("byte_length"),
-  )
 internal val mln_vulkan_context_descriptor: GroupLayout =
   Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
     ADDRESS.withName("instance"),
     ADDRESS.withName("physical_device"),
     ADDRESS.withName("device"),
@@ -4621,13 +4566,7 @@ internal val mln_vulkan_surface_descriptor: GroupLayout =
     JAVA_LONG.withName("surface"),
   )
 internal val mln_webgpu_context_descriptor: GroupLayout =
-  Ffm.struct(
-    JAVA_INT.withName("size"),
-    Ffm.pad(4),
-    ADDRESS.withName("instance"),
-    ADDRESS.withName("device"),
-    ADDRESS.withName("queue"),
-  )
+  Ffm.struct(ADDRESS.withName("instance"), ADDRESS.withName("device"), ADDRESS.withName("queue"))
 internal val mln_webgpu_borrowed_texture_descriptor: GroupLayout =
   Ffm.struct(
     JAVA_INT.withName("size"),

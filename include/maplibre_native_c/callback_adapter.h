@@ -70,8 +70,9 @@ typedef void (*mln_adapter_completion_listener)(
  * Creates a completion descriptor that copies its borrowed result before
  * notifying an asynchronous host listener.
  *
- * out_completion must point to a zeroed descriptor. element_size is used only
- * with MLN_ADAPTER_COMPLETION_COPY_FLAT and may be zero for resultless calls.
+ * out_completion must point to a zeroed descriptor.
+ * MLN_ADAPTER_COMPLETION_COPY_FLAT copies value_count elements of
+ * mln_completion_result.value_size bytes each, and the copy keeps that stride.
  * The caller passes the descriptor to exactly one asynchronous C API call. If
  * that call rejects the submission, the caller must pass the descriptor to
  * mln_adapter_completion_reject().
@@ -88,8 +89,7 @@ typedef void (*mln_adapter_completion_listener)(
  * - MLN_STATUS_NATIVE_ERROR when adapter state could not be allocated.
  */
 MLN_API mln_status mln_adapter_completion_create(
-  uint32_t copy_kind, size_t element_size,
-  mln_adapter_completion_listener listener,
+  uint32_t copy_kind, mln_adapter_completion_listener listener,
   void* user_data MLN_BINDING("kind=context"),
   mln_completion* out_completion MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
@@ -107,7 +107,7 @@ MLN_API void mln_adapter_completion_reject(
  * A borrowed result requires no adoption; adopting its record has no effect.
  */
 MLN_API void mln_adapter_completion_record_adopt(
-  mln_adapter_completion_record* record
+  mln_adapter_completion_record* record MLN_BINDING("kind=native_pointer")
 ) MLN_NOEXCEPT;
 
 /**
@@ -117,7 +117,7 @@ MLN_API void mln_adapter_completion_record_adopt(
  * this directly. Native handle disposal requires no completion allocation.
  */
 MLN_API void mln_adapter_completion_record_destroy(
-  mln_adapter_completion_record* record
+  mln_adapter_completion_record* record MLN_BINDING("kind=native_pointer")
 ) MLN_NOEXCEPT;
 
 /**
@@ -431,14 +431,16 @@ MLN_API mln_status mln_adapter_dart_wake_create(
 /**
  * Captures a completion and posts its token and copied result to a Dart port.
  *
- * The VM releases an undelivered result through its native-pointer message
- * finalizer. Delivered results transfer to the binding's completion decoder.
- * Rejection uses mln_adapter_completion_reject.
+ * The copy keeps the result's value_size, so the binding's completion decoder
+ * indexes an array with the stride of the native build. The VM releases an
+ * undelivered result through its native-pointer message finalizer. Delivered
+ * results transfer to the binding's completion decoder. Rejection uses
+ * mln_adapter_completion_reject.
  */
 MLN_API mln_status mln_adapter_dart_completion_create(
-  uint32_t copy_kind, size_t element_size,
-  void* post_cobject MLN_BINDING("lifetime=process"), int64_t port,
-  int64_t token, mln_completion* out_completion MLN_BINDING("direction=out"),
+  uint32_t copy_kind, void* post_cobject MLN_BINDING("lifetime=process"),
+  int64_t port, int64_t token,
+  mln_completion* out_completion MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic
 ) MLN_NOEXCEPT;
 

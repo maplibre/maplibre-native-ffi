@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 #include <string>
@@ -32,8 +33,11 @@ class ErasedCompletionValue final {
   friend class CompletionValue;
   friend class ValuelessCompletion;
 
+  // size is the byte stride of one element, which the completion reports as
+  // value_size whenever value is not null.
   static auto deliver(
-    const mln_completion& descriptor, const void* value, std::size_t count
+    const mln_completion& descriptor, const void* value, std::size_t count,
+    std::uint32_t size
   ) noexcept -> void;
 };
 
@@ -50,6 +54,7 @@ class CompletionValue final {
 
  public:
   using Type = typename CompletionResult<Function>::type;
+  static constexpr std::uint32_t size = sizeof(Type);
   static constexpr bool array = CompletionResult<Function>::array;
   static constexpr bool nullable = CompletionResult<Function>::nullable;
 
@@ -58,7 +63,7 @@ class CompletionValue final {
   ) noexcept -> void
     requires(!array)
   {
-    ErasedCompletionValue::deliver(descriptor, &value, 1);
+    ErasedCompletionValue::deliver(descriptor, &value, 1, size);
   }
 
   static auto deliver(
@@ -73,13 +78,13 @@ class CompletionValue final {
       static const Type empty{};
       if (data == nullptr) data = &empty;
     }
-    ErasedCompletionValue::deliver(descriptor, data, values.size());
+    ErasedCompletionValue::deliver(descriptor, data, values.size(), size);
   }
 
   static auto deliver_absent(const mln_completion& descriptor) noexcept -> void
     requires(nullable)
   {
-    ErasedCompletionValue::deliver(descriptor, nullptr, 0);
+    ErasedCompletionValue::deliver(descriptor, nullptr, 0, 0);
   }
 
   // Resolves completion with a value that points into no storage of its own.

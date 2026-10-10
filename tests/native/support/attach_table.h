@@ -155,23 +155,18 @@ static inline void mln_test_run_attach_table(
   );
 }
 
-// Defines the edits every descriptor shares, for the union member `member` of
-// type `type`: undersized, and with an undersized extent.
-// MLN_TEST_DESCRIPTOR_CASES(member) names their rows.
+// Defines the edit every descriptor shares, for the union member `member` of
+// type `type`: undersized. MLN_TEST_DESCRIPTOR_CASES(member) names its row.
+// The descriptor versions its embedded extent and context, so their sizes are
+// not checked.
 #define MLN_TEST_DESCRIPTOR_EDITS(member, type)                               \
   static void member##_undersized(void* call) {                               \
     ((mln_test_target_call*)call)->descriptor.member.size = sizeof(type) - 1; \
-  }                                                                           \
-  static void member##_undersized_extent(void* call) {                        \
-    ((mln_test_target_call*)call)->descriptor.member.extent.size =            \
-      sizeof(mln_render_target_extent) - 1;                                   \
   }
 
 #define MLN_TEST_DESCRIPTOR_CASES(member)                                     \
   {"undersized descriptor", member##_undersized, MLN_STATUS_INVALID_ARGUMENT, \
-   "size is too small"},                                                      \
-    {"undersized extent", member##_undersized_extent,                         \
-     MLN_STATUS_INVALID_ARGUMENT, "mln_render_target_extent.size"}
+   "size is too small"}
 
 // For a target whose physical size follows from its extent: an extent that
 // overflows 32 bits once scaled. MLN_TEST_OVERFLOW_CASE(member) names its row.

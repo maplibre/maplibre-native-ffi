@@ -125,7 +125,6 @@ typedef enum MLN_BINDING("kind=bitmask") mln_queried_feature_field : uint32_t {
  * object.
  */
 typedef struct mln_queried_feature {
-  uint32_t size;
   uint32_t fields MLN_BINDING("enum=mln_queried_feature_field");
   mln_buffer_view feature MLN_BINDING("encoding=json");
   mln_buffer_view source_id

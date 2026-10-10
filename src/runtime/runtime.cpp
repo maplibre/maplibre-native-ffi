@@ -258,12 +258,6 @@ auto valid_coordinate(const mln_lat_lng& coordinate) -> bool {
 auto validate_tile_pyramid_definition(
   const mln_offline_tile_pyramid_region_definition& definition
 ) -> mln_status {
-  if (definition.size < sizeof(mln_offline_tile_pyramid_region_definition)) {
-    mln::core::set_thread_error(
-      "mln_offline_tile_pyramid_region_definition.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (definition.style_url == nullptr) {
     mln::core::set_thread_error("offline region style_url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -296,12 +290,6 @@ auto validate_tile_pyramid_definition(
 auto validate_geometry_definition(
   const mln_offline_geometry_region_definition& definition
 ) -> mln_status {
-  if (definition.size < sizeof(mln_offline_geometry_region_definition)) {
-    mln::core::set_thread_error(
-      "mln_offline_geometry_region_definition.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (definition.style_url == nullptr) {
     mln::core::set_thread_error("offline region style_url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -413,7 +401,6 @@ auto to_c_download_state(mln::OfflineRegionDownloadState state) -> uint32_t {
 auto to_c_status(const mln::OfflineRegionStatus& status)
   -> mln_offline_region_status {
   return mln_offline_region_status{
-    .size = sizeof(mln_offline_region_status),
     .download_state = to_c_download_state(status.downloadState),
     .completed_resource_count = status.completedResourceCount,
     .completed_resource_size = status.completedResourceSize,
@@ -517,10 +504,8 @@ auto to_c_region_data(const mln::OfflineRegion& region)
 auto fill_region_info(
   const OfflineRegionData& data, mln_offline_region_info* out_info
 ) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_offline_region_info)) {
-    mln::core::set_thread_error(
-      "out_info must not be null and must have a valid size"
-    );
+  if (out_info == nullptr) {
+    mln::core::set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -532,7 +517,6 @@ auto fill_region_info(
   switch (data.definition_type) {
     case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID:
       definition.data.tile_pyramid = mln_offline_tile_pyramid_region_definition{
-        .size = sizeof(mln_offline_tile_pyramid_region_definition),
         .style_url = data.style_url.c_str(),
         .bounds = data.bounds,
         .min_zoom = data.min_zoom,
@@ -547,7 +531,6 @@ auto fill_region_info(
         return MLN_STATUS_NATIVE_ERROR;
       }
       definition.data.geometry = mln_offline_geometry_region_definition{
-        .size = sizeof(mln_offline_geometry_region_definition),
         .style_url = data.style_url.c_str(),
         .geometry =
           {.data = data.geometry.data(), .size = data.geometry.size()},
@@ -563,7 +546,6 @@ auto fill_region_info(
   }
 
   *out_info = mln_offline_region_info{
-    .size = sizeof(mln_offline_region_info),
     .id = data.id,
     .definition = definition,
     .metadata = data.metadata.empty() ? nullptr : data.metadata.data(),
@@ -781,12 +763,6 @@ auto validate_runtime_options(const mln_runtime_options* options)
 
   if (options->size < sizeof(mln_runtime_options)) {
     mln::core::set_thread_error("mln_runtime_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (options->flags != 0U) {
-    mln::core::set_thread_error(
-      "mln_runtime_options.flags contains unknown bits"
-    );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   // Validated here as well as in the setter, so a mask this library cannot
@@ -1599,7 +1575,6 @@ auto present_regions(
                            std::move(value)](const mln_completion& descriptor) {
       auto info = std::vector<mln_offline_region_info>(value.size());
       for (size_t index = 0; index < value.size(); ++index) {
-        info[index].size = sizeof(mln_offline_region_info);
         if (fill_region_info(value[index], &info[index]) != MLN_STATUS_OK) {
           deliver_failure(
             descriptor, MLN_STATUS_NATIVE_ERROR, thread_last_error_message()
@@ -1626,7 +1601,6 @@ auto present_regions(
     completion->resolve(
       [value = std::move(*value)](const mln_completion& descriptor) {
         auto info = mln_offline_region_info{};
-        info.size = sizeof(mln_offline_region_info);
         if (fill_region_info(value, &info) != MLN_STATUS_OK) {
           deliver_failure(
             descriptor, MLN_STATUS_NATIVE_ERROR, thread_last_error_message()

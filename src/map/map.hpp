@@ -111,9 +111,7 @@ auto deliver_style_result(
   } else if constexpr (std::is_same_v<Type, mln_style_source_result>) {
     const auto tile_urls = views(result.strings);
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_source_result),
-                   .reserved = 0,
-                   .info = result.source_info,
+      descriptor, {.info = result.source_info,
                    .attribution = view(result.attribution),
                    .url = view(result.url),
                    .tile_urls = tile_urls.data(),
@@ -124,18 +122,15 @@ auto deliver_style_result(
   ) {
     const auto tile_urls = views(result.strings);
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_source_tile_urls_result),
-                   .reserved = 0,
-                   .tile_urls = tile_urls.data(),
-                   .tile_url_count = tile_urls.size()}
+      descriptor,
+      {.tile_urls = tile_urls.data(), .tile_url_count = tile_urls.size()}
     );
   } else if constexpr (std::is_same_v<Type, mln_style_layer_entry>) {
     auto layers = std::vector<mln_style_layer_entry>{};
     layers.reserve(result.layers.size());
     for (const auto& entry : result.layers) {
       layers.push_back(
-        {.size = sizeof(mln_style_layer_entry),
-         .id = view(entry.id),
+        {.id = view(entry.id),
          .type = view(entry.type),
          .source_id = view(entry.source_id),
          .source_layer = view(entry.source_layer)}
@@ -144,17 +139,13 @@ auto deliver_style_result(
     Value::deliver(descriptor, layers);
   } else if constexpr (std::is_same_v<Type, mln_style_layer_result>) {
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_layer_result),
-                   .reserved = 0,
-                   .info = result.layer_info,
+      descriptor, {.info = result.layer_info,
                    .source_id = view(result.source_id),
                    .source_layer = view(result.source_layer)}
     );
   } else if constexpr (std::is_same_v<Type, mln_style_image_result>) {
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_image_result),
-                   .reserved = 0,
-                   .info = result.image_info,
+      descriptor, {.info = result.image_info,
                    .pixels = view(result.bytes),
                    .stretch_x = result.stretch_x.data(),
                    .stretch_x_count = result.stretch_x.size(),
@@ -163,9 +154,7 @@ auto deliver_style_result(
     );
   } else if constexpr (std::is_same_v<Type, mln_style_image_stretches_result>) {
     Value::deliver(
-      descriptor, {.size = sizeof(mln_style_image_stretches_result),
-                   .reserved = 0,
-                   .stretch_x = result.stretch_x.data(),
+      descriptor, {.stretch_x = result.stretch_x.data(),
                    .stretch_x_count = result.stretch_x.size(),
                    .stretch_y = result.stretch_y.data(),
                    .stretch_y_count = result.stretch_y.size()}

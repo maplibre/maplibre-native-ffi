@@ -150,6 +150,7 @@ internal inline fun <T> readStrided(
   size: Int,
   read: (Long) -> T,
 ): List<T> {
+  if (count == 0uL) return emptyList()
   require(stride.toLong() >= size) { "native stride $stride is below the element size $size" }
   return readArray(pointer, count, stride.toLong(), read)
 }

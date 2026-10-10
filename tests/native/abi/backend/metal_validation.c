@@ -15,16 +15,8 @@ MLN_TEST_DESCRIPTOR_EDITS(metal_borrowed, mln_metal_borrowed_texture_descriptor)
 static void surface_without_layer(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_surface.layer = NULL;
 }
-static void surface_with_undersized_context(void* call) {
-  ((mln_test_target_call*)call)->descriptor.metal_surface.context.size =
-    sizeof(mln_metal_context_descriptor) - 1;
-}
 static void owned_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_owned.context.device = NULL;
-}
-static void owned_with_undersized_context(void* call) {
-  ((mln_test_target_call*)call)->descriptor.metal_owned.context.size =
-    sizeof(mln_metal_context_descriptor) - 1;
 }
 static void borrowed_without_texture(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_borrowed.texture = NULL;
@@ -95,8 +87,6 @@ static void metal_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case surface_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(metal_surface),
     MLN_TEST_OVERFLOW_CASE(metal_surface),
-    {"undersized context", surface_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_metal_context_descriptor.size"},
     {"null layer", surface_without_layer, MLN_STATUS_INVALID_ARGUMENT, NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
@@ -114,8 +104,6 @@ static void metal_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case owned_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(metal_owned),
     MLN_TEST_OVERFLOW_CASE(metal_owned),
-    {"undersized context", owned_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_metal_context_descriptor.size"},
     {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT, NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_METAL)
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,

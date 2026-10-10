@@ -29,11 +29,9 @@ auto mln_render_session_attach_options_default() noexcept
     .driver = MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD,
     .requested_texture_ring_depth = 1,
     .reserved = 0,
-    .frame_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
-    .driver_work_wake = mln_wake{sizeof(mln_wake), nullptr, nullptr, nullptr},
-    .queue_lock = mln_queue_lock{
-      sizeof(mln_queue_lock), nullptr, nullptr, nullptr, nullptr
-    },
+    .frame_wake = mln_wake{},
+    .driver_work_wake = mln_wake{},
+    .queue_lock = mln_queue_lock{},
   };
 }
 

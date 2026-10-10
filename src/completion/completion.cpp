@@ -13,13 +13,14 @@ namespace {
 auto invoke_completion(
   const mln_completion& descriptor, mln_status status,
   std::uint32_t disposition, std::uint64_t generation,
-  const std::string& diagnostic, const void* value, std::size_t value_count
+  const std::string& diagnostic, const void* value, std::size_t value_count,
+  std::uint32_t value_size
 ) noexcept -> void {
   const auto result = mln_completion_result{
     .size = sizeof(mln_completion_result),
     .status = status,
     .disposition = disposition,
-    .reserved = 0,
+    .value_size = value == nullptr ? 0 : value_size,
     .generation = generation,
     .diagnostic =
       mln_buffer_view{.data = diagnostic.data(), .size = diagnostic.size()},
@@ -37,11 +38,12 @@ auto invoke_completion(
 }  // namespace
 
 auto ErasedCompletionValue::deliver(
-  const mln_completion& descriptor, const void* value, std::size_t count
+  const mln_completion& descriptor, const void* value, std::size_t count,
+  std::uint32_t size
 ) noexcept -> void {
   invoke_completion(
     descriptor, MLN_STATUS_OK, MLN_COMMAND_DISPOSITION_COMMITTED, 0, {}, value,
-    count
+    count, size
   );
 }
 
@@ -53,13 +55,13 @@ auto deliver_failure(
     assert(false && "a failure delivery reported success");
     invoke_completion(
       descriptor, MLN_STATUS_NATIVE_ERROR, MLN_COMMAND_DISPOSITION_COMMITTED, 0,
-      "native completion reported success without its result", nullptr, 0
+      "native completion reported success without its result", nullptr, 0, 0
     );
     return;
   }
   invoke_completion(
     descriptor, status, MLN_COMMAND_DISPOSITION_COMMITTED, 0, diagnostic,
-    nullptr, 0
+    nullptr, 0, 0
   );
 }
 
@@ -68,7 +70,7 @@ auto ValuelessCompletion::deliver(
   const std::string& diagnostic
 ) const noexcept -> void {
   if (status == MLN_STATUS_OK) {
-    ErasedCompletionValue::deliver(descriptor, nullptr, 0);
+    ErasedCompletionValue::deliver(descriptor, nullptr, 0, 0);
   } else {
     deliver_failure(descriptor, status, diagnostic);
   }
@@ -99,7 +101,7 @@ Completion::~Completion() {
             ) {
       invoke_completion(
         descriptor, MLN_STATUS_CANCELLED, MLN_COMMAND_DISPOSITION_CANCELLED, 0,
-        diagnostic, nullptr, 0
+        diagnostic, nullptr, 0, 0
       );
     });
   }
@@ -212,7 +214,7 @@ auto complete_command(
     [disposition, status, generation,
      diagnostic = std::move(diagnostic)](const mln_completion& descriptor) {
       invoke_completion(
-        descriptor, status, disposition, generation, diagnostic, nullptr, 0
+        descriptor, status, disposition, generation, diagnostic, nullptr, 0, 0
       );
     }
   );

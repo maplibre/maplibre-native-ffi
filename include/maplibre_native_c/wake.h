@@ -28,13 +28,12 @@ typedef void (*mln_wake_callback)(void* user_data);
  * not destroy the object that owns the wake. Native code calls
  * release_user_data after all callback invocations have returned.
  *
- * A descriptor whose callback is null disables waking; size must still be
- * sizeof(mln_wake), and a disabled wake must not carry release_user_data.
+ * A descriptor whose callback is null disables waking, and a disabled wake
+ * must not carry release_user_data.
  * When the owning API permits an omitted wake, the receiver services its queue
  * or driver on its own schedule instead.
  */
 typedef struct mln_wake {
-  uint32_t size;
   mln_wake_callback callback MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
   /**

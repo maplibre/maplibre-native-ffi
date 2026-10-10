@@ -2667,8 +2667,6 @@ public data class RenderedQueryGeometry(public val data: RenderedQueryGeometryDa
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
  */
 public data class RuntimeOptions(
-  /** No flags are currently defined. Must be zero. */
-  public val flags: UInt = 0u,
   /**
    * Directory root for asset:// URLs. Copied during runtime creation. Null or empty selects
    * `/android_asset` on Android and `.` elsewhere.
@@ -2699,6 +2697,14 @@ public data class SourceFeatureQueryOptions(
 )
 
 /**
+ * One stretchable interval along an image axis, in image pixels.
+ *
+ * See `mln_image_stretch` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class ImageStretch(public val from: Float = 0f, public val to: Float = 0f)
+
+/**
  * Content-box insets in image pixels, measured from the image's top-left.
  *
  * See `mln_image_content` in the
@@ -2710,40 +2716,6 @@ public data class ImageContent(
   public val right: Float = 0f,
   public val bottom: Float = 0f,
 )
-
-/**
- * Fixed metadata for one runtime style image.
- *
- * See `mln_style_image_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class StyleImageInfo(
-  public val width: UInt = 0u,
-  public val height: UInt = 0u,
-  /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
-  public val stride: UInt = 0u,
-  public val byteLength: ULong = 0uL,
-  /** Interval counts for the stretchable axes. */
-  public val stretchXCount: ULong = 0uL,
-  public val stretchYCount: ULong = 0uL,
-  /** Content box, meaningful when fields contains CONTENT. */
-  public val content: ImageContent? = null,
-  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_WIDTH. */
-  public val textFitWidth: StyleImageTextFit? = null,
-  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_HEIGHT. */
-  public val textFitHeight: StyleImageTextFit? = null,
-  /** Sprite pixel ratio. Defaults to 1.0. */
-  public val pixelRatio: Float = 1.0f,
-  public val sdf: Boolean = false,
-)
-
-/**
- * One stretchable interval along an image axis, in image pixels.
- *
- * See `mln_image_stretch` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
- */
-public data class ImageStretch(public val from: Float = 0f, public val to: Float = 0f)
 
 /**
  * Options for runtime style images.
@@ -2814,23 +2786,6 @@ public data class StyleTransitionOptions(
   public val delayMs: Double? = null,
   /** Whether symbol placement changes cross-fade. */
   public val enablePlacementTransitions: Boolean? = null,
-)
-
-/**
- * CPU image readback metadata for a texture target frame.
- *
- * See `mln_texture_image_info` in the
- * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
- */
-public data class TextureImageInfo(
-  /** Physical image width in device pixels. */
-  public val width: UInt = 0u,
-  /** Physical image height in device pixels. */
-  public val height: UInt = 0u,
-  /** Bytes per image row. */
-  public val stride: UInt = 0u,
-  /** Required output buffer byte length. */
-  public val byteLength: ULong = 0uL,
 )
 
 /**
@@ -3100,10 +3055,6 @@ public data class OfflineRegionStatus(
  */
 public data class RuntimeEventOfflineRegionStatus(
   public val regionId: Long = 0L,
-  /**
-   * Region status. This member keeps its own size field because the same struct is also returned by
-   * `mln_runtime_offline_region_get_status()`.
-   */
   public val status: OfflineRegionStatus = OfflineRegionStatus(),
 )
 
@@ -3251,6 +3202,32 @@ public data class FeatureStateSelector(
   public val featureId: String? = null,
   /** Optional state key. Used only by remove and requires feature_id. */
   public val stateKey: String? = null,
+)
+
+/**
+ * Fixed metadata for one runtime style image.
+ *
+ * See `mln_style_image_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
+ */
+public data class StyleImageInfo(
+  public val width: UInt = 0u,
+  public val height: UInt = 0u,
+  /** Native copied images are exposed as tightly packed premultiplied RGBA8. */
+  public val stride: UInt = 0u,
+  public val byteLength: ULong = 0uL,
+  /** Interval counts for the stretchable axes. */
+  public val stretchXCount: ULong = 0uL,
+  public val stretchYCount: ULong = 0uL,
+  /** Content box, meaningful when fields contains CONTENT. */
+  public val content: ImageContent? = null,
+  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_WIDTH. */
+  public val textFitWidth: StyleImageTextFit? = null,
+  /** One of `mln_style_image_text_fit`, meaningful when fields contains TEXT_FIT_HEIGHT. */
+  public val textFitHeight: StyleImageTextFit? = null,
+  /** Sprite pixel ratio. */
+  public val pixelRatio: Float = 0f,
+  public val sdf: Boolean = false,
 )
 
 /**
@@ -3578,6 +3555,23 @@ public data class QueriedFeature(
   public val sourceId: String? = null,
   public val sourceLayerId: String? = null,
   public val state: ByteArray? = null,
+)
+
+/**
+ * CPU image readback metadata for a texture target frame.
+ *
+ * See `mln_texture_image_info` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class TextureImageInfo(
+  /** Physical image width in device pixels. */
+  public val width: UInt = 0u,
+  /** Physical image height in device pixels. */
+  public val height: UInt = 0u,
+  /** Bytes per image row. */
+  public val stride: UInt = 0u,
+  /** Required output buffer byte length. */
+  public val byteLength: ULong = 0uL,
 )
 
 /**

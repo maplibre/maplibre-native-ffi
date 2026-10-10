@@ -782,9 +782,12 @@ class Values:
             f"result.ref = raw.{value.default}();"
             if value.default
             else f"result.ref.size = sizeOf<raw.{value.native}>();"
+            if any(f.role == "size" for f in value.fields)
+            else ""
         )
+        initialize = f"    {initialize}\n" if initialize else ""
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots{', bool Function() receiverClosed' if value.registration.receiver_owned else ''}) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n    {initialize}\n    {disabled_code}\n    port = roots.register({{\n"
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots{', bool Function() receiverClosed' if value.registration.receiver_owned else ''}) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n{initialize}    {disabled_code}\n    port = roots.register({{\n"
             + "\n".join(handlers)
             + "\n    });\n"
             + "\n".join(writes)
@@ -832,9 +835,12 @@ class Values:
             f"result.ref = raw.{value.default}();"
             if value.default
             else f"result.ref.size = sizeOf<raw.{value.native}>();"
+            if any(f.role == "size" for f in value.fields)
+            else ""
         )
+        initialize = f"    {initialize}\n" if initialize else ""
         conversion = (
-            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n    {initialize}\n"
+            f"_NativeRegistration<raw.{value.native}> _prepare{public}({public} value, _NativeCallbackPorts roots) {{\n  final arena = Arena();\n  _NativeCallbackPort? port;\n  try {{\n    final result = arena<raw.{value.native}>();\n{initialize}"
             + "".join(line + "\n" for line in writes)
             + f"    port = roots.registerDeferred({key}, (message) => _deliver{public_name(callback.native)}(value.{name}, message));\n"
             + f"    result.ref.{deferred.name} = raw.mln_adapter_deferred_callback_function({key}).cast();\n"
@@ -846,6 +852,11 @@ class Values:
 
     def render_registration(self, value):
         public = public_name(value.native)
+        sized = (
+            f"      descriptor.ref.size = sizeOf<raw.{value.native}>();\n"
+            if any(f.role == "size" for f in value.fields)
+            else ""
+        )
         declarations = [
             f"sealed class {public} {{",
             f"  const {public}._();",
@@ -856,7 +867,7 @@ class Values:
                 f"final class {public}Empty extends {public} {{ const {public}Empty() : super._(); }}"
             ],
             [
-                f"    case {public}Empty():\n      final descriptor = arena<raw.{value.native}>();\n      descriptor.ref.size = sizeOf<raw.{value.native}>();\n      return _NativeRegistration(descriptor, arena.releaseAll, arena.releaseAll);"
+                f"    case {public}Empty():\n      final descriptor = arena<raw.{value.native}>();\n{sized}      return _NativeRegistration(descriptor, arena.releaseAll, arena.releaseAll);"
             ],
         )
         for adapter in self.registration_adapters(value):
@@ -878,7 +889,7 @@ class Values:
                 else ""
             )
             cases.append(
-                f"    case {variant}():\n      final context = _write{context}(value.value, arena{ports});\n      final descriptor = arena<raw.{value.native}>();\n      descriptor.ref.size = sizeOf<raw.{value.native}>();\n      descriptor.ref.{callback_field} = Native.addressOf<NativeFunction<raw.{adapter.callback}Function>>(raw.{adapter.function});\n      descriptor.ref.{value.registration.user_data} = context.cast();\n      descriptor.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(raw.mln_adapter_dart_release);\n      transferred = true;\n      roots.register(context.cast(), arena.releaseAll, arena: arena);\n      return _NativeRegistration(descriptor, () => roots.reject(context.cast()));"
+                f"    case {variant}():\n      final context = _write{context}(value.value, arena{ports});\n      final descriptor = arena<raw.{value.native}>();\n{sized}      descriptor.ref.{callback_field} = Native.addressOf<NativeFunction<raw.{adapter.callback}Function>>(raw.{adapter.function});\n      descriptor.ref.{value.registration.user_data} = context.cast();\n      descriptor.ref.{value.registration.release} = Native.addressOf<NativeFunction<raw.mln_user_data_releaseFunction>>(raw.mln_adapter_dart_release);\n      transferred = true;\n      roots.register(context.cast(), arena.releaseAll, arena: arena);\n      return _NativeRegistration(descriptor, () => roots.reject(context.cast()));"
             )
         declarations.append("}")
         declarations.extend(children)

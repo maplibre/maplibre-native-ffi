@@ -285,10 +285,6 @@ auto mln_style_image_options_default(void) noexcept -> mln_style_image_options {
   return mln::core::style_image_options_default();
 }
 
-auto mln_style_image_info_default(void) noexcept -> mln_style_image_info {
-  return mln::core::style_image_info_default();
-}
-
 auto mln_style_transition_options_default(void) noexcept
   -> mln_style_transition_options {
   return mln::core::style_transition_options_default();
@@ -408,7 +404,6 @@ auto mln_map_get_style_source_info(
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
         result.source_info = {};
-        result.source_info.size = sizeof(mln_style_source_info);
         auto status = mln::core::map_get_style_source_info(
           live, id.view(), &result.source_info, &result.found
         );
@@ -1503,7 +1498,6 @@ auto mln_map_get_style_layer_info(
         mln::core::MapObject& live, mln::core::StyleOperationResult& result
       ) -> mln_status {
         result.layer_info = {};
-        result.layer_info.size = sizeof(mln_style_layer_info);
         auto status = mln::core::map_get_style_layer_info(
           live, id.view(), &result.layer_info, &result.found
         );

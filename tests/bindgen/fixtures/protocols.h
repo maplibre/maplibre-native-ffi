@@ -19,7 +19,7 @@
   defined(MLN_PROTOCOL_COMPLETION_RUNTIME) ||                            \
   defined(MLN_PROTOCOL_ABI_VERSION) || defined(MLN_PROTOCOL_DEFAULTS) || \
   defined(MLN_PROTOCOL_DEFAULT_REGISTRATION) ||                          \
-  defined(MLN_PROTOCOL_STRIDED_RECORDS)
+  defined(MLN_PROTOCOL_STRIDED_RECORDS) || defined(MLN_PROTOCOL_VERSIONING)
 #define MLN_PROTOCOL_STANDARD_TYPES
 #endif
 #if defined(MLN_PROTOCOL_DECISION)
@@ -80,10 +80,10 @@ typedef struct mln_completion_result {
   uint32_t size;
   int status BIND("enum=mln_status");
   uint32_t disposition BIND("enum=mln_command_disposition");
-  uint32_t reserved BIND("kind=reserved");
+  uint32_t value_size;
   uint64_t generation;
   mln_buffer_view diagnostic;
-  const void* value BIND("kind=erased");
+  const void* value BIND("kind=erased;length=value_count;stride=value_size");
   size_t value_count;
 } mln_completion_result;
 typedef void (*mln_completion_callback)(
@@ -200,7 +200,6 @@ mln_status mln_probe_settings_check(
 typedef void (*mln_probe_notify)(void* user_data, uint32_t count);
 typedef void (*mln_probe_notify_release)(void* user_data);
 typedef struct mln_probe_signal {
-  uint32_t size;
   mln_probe_notify callback BIND("nullable=true");
   void* user_data BIND("kind=context");
   mln_probe_notify_release release_user_data;
@@ -230,8 +229,9 @@ mln_status mln_keyword_combine(
 
 #ifdef MLN_PROTOCOL_PRESENCE_MASK
 // A bitmask presence mask whose bit guards an embedded record, in a record with
-// a default constructor. A snapshot nests it beside a borrowed array, and a
-// borrowed route reuses the nested bit through the mask path camera.fields.
+// a default constructor that a caller passes by pointer. A snapshot nests it
+// beside a borrowed array, and a borrowed route reuses the nested bit through
+// the mask path camera.fields.
 typedef enum BIND("kind=bitmask") mln_camera_field : uint64_t {
   MLN_CAMERA_CENTER = 1ULL << 40,
   MLN_CAMERA_ZOOM = 2
@@ -259,6 +259,9 @@ typedef struct mln_camera_route {
   size_t stop_count;
 } mln_camera_route;
 mln_camera mln_camera_default(void);
+mln_status mln_map_jump(
+  mln_map map, const mln_camera* camera, mln_diagnostic* out_diagnostic
+);
 BIND("execution=query;result=mln_snapshot")
 mln_status mln_map_snapshot(
   mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
@@ -574,10 +577,10 @@ mln_status mln_probe_read_level(
 #endif
 
 // Plain records that native steps through by a stride it reports, which may
-// exceed the record a binding compiled.
+// exceed the record a binding compiled. The stride versions each record, so a
+// record carries no size of its own.
 #ifdef MLN_PROTOCOL_STRIDED_RECORDS
 typedef struct mln_probe_reading {
-  uint32_t size;
   uint64_t value;
 } mln_probe_reading;
 typedef struct mln_probe_reading_view {
@@ -600,6 +603,32 @@ mln_status mln_probe_ledger_get(
   mln_probe_ledger ledger,
   mln_probe_reading_view* out_view BIND("direction=out"),
   mln_diagnostic* out_diagnostic
+);
+#endif
+
+// Each struct is versioned by one thing. A window that a caller passes by
+// pointer begins with its size and keeps it where a survey embeds it. The span
+// that only a window embeds, and the survey that only a completion delivers,
+// carry none.
+#ifdef MLN_PROTOCOL_VERSIONING
+typedef struct mln_probe_span {
+  double low;
+  double high;
+} mln_probe_span;
+typedef struct mln_probe_window {
+  uint32_t size;
+  mln_probe_span span;
+} mln_probe_window;
+typedef struct mln_probe_survey {
+  mln_probe_window window;
+  uint64_t samples;
+} mln_probe_survey;
+mln_status mln_map_set_window(
+  mln_map map, const mln_probe_window* window, mln_diagnostic* out_diagnostic
+);
+BIND("execution=query;result=mln_probe_survey")
+mln_status mln_map_survey(
+  mln_map map, const mln_completion* completion, mln_diagnostic* out_diagnostic
 );
 #endif
 

@@ -2733,12 +2733,6 @@ internal actual object C {
       .place(returned.toCPointer()!!)
   }
 
-  actual fun mln_style_image_info_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_style_image_info_default()
-      .place(returned.toCPointer()!!)
-  }
-
   actual fun mln_style_image_options_default(returned: Long) {
     org.maplibre.nativeffi.internal.cinterop
       .mln_style_image_options_default()
@@ -2759,12 +2753,6 @@ internal actual object C {
 
   actual fun mln_supported_render_backend_mask(): Int =
     org.maplibre.nativeffi.internal.cinterop.mln_supported_render_backend_mask().toInt()
-
-  actual fun mln_texture_image_info_default(returned: Long) {
-    org.maplibre.nativeffi.internal.cinterop
-      .mln_texture_image_info_default()
-      .place(returned.toCPointer()!!)
-  }
 
   actual fun mln_texture_read_premultiplied_rgba8(
     session: Long,

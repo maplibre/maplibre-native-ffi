@@ -11,11 +11,10 @@
 // Passes one result through an adapter completion and returns the record it
 // delivered, or null for the failure channel.
 static mln_adapter_completion_record* copy_result(
-  uint32_t copy_kind, size_t element_size, const mln_completion_result* result,
+  uint32_t copy_kind, const mln_completion_result* result,
   mln_test_adapter_delivery* delivery
 ) {
-  mln_completion completion =
-    mln_test_adapter_completion(copy_kind, element_size, delivery);
+  mln_completion completion = mln_test_adapter_completion(copy_kind, delivery);
   completion.callback(completion.user_data, result);
   completion.release_user_data(completion.user_data);
   TEST_ASSERT_EQUAL_size_t(1, atomic_load(&delivery->deliveries));
@@ -35,12 +34,13 @@ static void every_copy_kind_copies_its_result_into_storage_of_its_own(void) {
       .status = MLN_STATUS_OK,
       .generation = 5,
       .diagnostic = MLN_BUFFER_LITERAL(diagnostic),
+      .value_size = (uint32_t)entry->element_size,
       .value = source,
       .value_count = count,
     };
     mln_test_adapter_delivery delivery = {0};
     mln_adapter_completion_record* record =
-      copy_result(entry->kind, entry->element_size, &result, &delivery);
+      copy_result(entry->kind, &result, &delivery);
 
     TEST_ASSERT_NOT_NULL_MESSAGE(record, entry->type);
     MLN_TEST_OK_MESSAGE(record->result.status, entry->type);
@@ -63,35 +63,37 @@ static void every_copy_kind_copies_its_result_into_storage_of_its_own(void) {
   }
 }
 
-// A flat copy takes element_size bytes per value, and cannot copy values of
-// unknown size.
-static void flat_copies_take_element_size_bytes_per_value(void) {
+// A flat copy takes the result's value_size bytes per value and keeps that
+// stride, and cannot copy values of unknown size.
+static void flat_copies_take_value_size_bytes_per_value(void) {
   typedef struct triple {
     uint32_t first;
     uint32_t second;
     uint32_t third;
   } triple;
   const triple values[] = {{1, 2, 3}, {4, 5, 6}};
-  const mln_completion_result result = {
+  mln_completion_result result = {
     .size = sizeof(mln_completion_result),
     .status = MLN_STATUS_OK,
+    .value_size = sizeof(triple),
     .value = values,
     .value_count = 2,
   };
 
   mln_test_adapter_delivery delivery = {0};
-  mln_adapter_completion_record* record = copy_result(
-    MLN_ADAPTER_COMPLETION_COPY_FLAT, sizeof(triple), &result, &delivery
-  );
+  mln_adapter_completion_record* record =
+    copy_result(MLN_ADAPTER_COMPLETION_COPY_FLAT, &result, &delivery);
   TEST_ASSERT_NOT_NULL(record);
   TEST_ASSERT_EQUAL_size_t(2, record->result.value_count);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(triple), record->result.value_size);
   TEST_ASSERT_TRUE(record->result.value != (const void*)values);
   TEST_ASSERT_EQUAL_MEMORY(values, record->result.value, sizeof(values));
   mln_adapter_completion_record_destroy(record);
 
+  result.value_size = 0;
   mln_test_adapter_delivery unsized = {0};
   TEST_ASSERT_NULL(
-    copy_result(MLN_ADAPTER_COMPLETION_COPY_FLAT, 0, &result, &unsized)
+    copy_result(MLN_ADAPTER_COMPLETION_COPY_FLAT, &result, &unsized)
   );
 }
 
@@ -108,9 +110,8 @@ static void a_failed_result_copies_its_diagnostic_and_no_value(void) {
     .value_count = 1,
   };
   mln_test_adapter_delivery delivery = {0};
-  mln_adapter_completion_record* record = copy_result(
-    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), &result, &delivery
-  );
+  mln_adapter_completion_record* record =
+    copy_result(MLN_ADAPTER_COMPLETION_COPY_MAP, &result, &delivery);
   TEST_ASSERT_NOT_NULL(record);
   MLN_TEST_STATUS(MLN_STATUS_NATIVE_ERROR, record->result.status);
   TEST_ASSERT_TRUE(
@@ -130,11 +131,12 @@ static mln_adapter_completion_record* copy_one(
   const mln_completion_result result = {
     .size = sizeof(mln_completion_result),
     .status = MLN_STATUS_OK,
+    .value_size = (uint32_t)size,
     .value = value,
     .value_count = 1,
   };
   mln_adapter_completion_record* record =
-    copy_result(copy_kind, size, &result, delivery);
+    copy_result(copy_kind, &result, delivery);
   TEST_ASSERT_NOT_NULL(record);
   return record;
 }
@@ -194,7 +196,6 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
   mln_adapter_completion_record_destroy(record);
 
   const mln_queried_feature feature = {
-    .size = sizeof(mln_queried_feature),
     .feature = MLN_BUFFER_LITERAL("{}"),
     .source_id = stale,
     .source_layer_id = stale,
@@ -212,8 +213,7 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
   TEST_ASSERT_EQUAL_size_t(0, copied_feature->state.size);
   mln_adapter_completion_record_destroy(record);
 
-  mln_style_image_result image = {.size = sizeof(mln_style_image_result)};
-  image.info = mln_style_image_info_default();
+  mln_style_image_result image = {0};
   image.info.content = (mln_image_content){1.0f, 1.0f, 2.0f, 2.0f};
   image.info.text_fit_width = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
   image.info.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
@@ -232,10 +232,8 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
 
   const mln_buffer_view tile_urls[] = {stale};
   const mln_style_source_result source = {
-    .size = sizeof(mln_style_source_result),
     .info =
       {
-        .size = sizeof(mln_style_source_info),
         .attribution_size = 3,
         .url_size = 3,
         .tilejson =
@@ -276,6 +274,6 @@ static void a_copy_clears_the_fields_its_presence_bits_mark_absent(void) {
 MLN_TEST_GROUP {
   RUN_TEST(every_copy_kind_copies_its_result_into_storage_of_its_own);
   RUN_TEST(a_copy_clears_the_fields_its_presence_bits_mark_absent);
-  RUN_TEST(flat_copies_take_element_size_bytes_per_value);
+  RUN_TEST(flat_copies_take_value_size_bytes_per_value);
   RUN_TEST(a_failed_result_copies_its_diagnostic_and_no_value);
 }

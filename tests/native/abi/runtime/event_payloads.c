@@ -218,9 +218,6 @@ static void check_offline_status(
   const mln_runtime_event_offline_region_status* status =
     &record->event.payload.offline_region_status;
   TEST_ASSERT_EQUAL_INT64(context->region_id, status->region_id);
-  TEST_ASSERT_EQUAL_UINT32(
-    sizeof(mln_offline_region_status), status->status.size
-  );
   TEST_ASSERT_LESS_OR_EQUAL_UINT32(
     MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, status->status.download_state
   );
@@ -859,7 +856,6 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data.tile_pyramid = {
-      .size = sizeof(mln_offline_tile_pyramid_region_definition),
       .style_url = offline_style_url,
       .bounds =
         {
@@ -876,7 +872,7 @@ static void an_observed_offline_download_reports_status_and_errors(void) {
   MLN_TEST_OK(mln_runtime_offline_region_create(
     runtime, &definition, NULL, 0, &create.descriptor, NULL
   ));
-  mln_offline_region_info info = {.size = sizeof(info)};
+  mln_offline_region_info info = {0};
   MLN_TEST_OK(mln_test_completion_finish_value(&create, &info, sizeof(info)));
   scenario_context context = {.runtime = runtime, .region_id = info.id};
   mln_test_drain_all(runtime);

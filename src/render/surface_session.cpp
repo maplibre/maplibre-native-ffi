@@ -19,7 +19,6 @@ auto metal_surface_descriptor_default() noexcept
       },
     .context =
       mln_metal_context_descriptor{
-        .size = sizeof(mln_metal_context_descriptor),
         .device = nullptr,
       },
     .layer = nullptr,
@@ -39,7 +38,6 @@ auto vulkan_surface_descriptor_default() noexcept
       },
     .context =
       mln_vulkan_context_descriptor{
-        .size = sizeof(mln_vulkan_context_descriptor),
         .instance = nullptr,
         .physical_device = nullptr,
         .device = nullptr,

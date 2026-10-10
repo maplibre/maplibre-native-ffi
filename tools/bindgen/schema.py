@@ -12,6 +12,9 @@ from dataclasses import replace
 from .model import Api, CType, Function, ModelError
 from .protocol import (
     BUFFER_VIEW,
+    COMPLETION_RESULT,
+    COMPLETION_VALUE_COUNT,
+    COMPLETION_VALUE_SIZE,
     NOT_READY,
     STATUS,
     is_buffer_view,
@@ -1256,8 +1259,147 @@ def validate(api: Api) -> None:
         )
     errors.extend(reference_errors(api))
     errors.extend(field_default_errors(api))
+    errors.extend(versioning_errors(api))
     if errors:
         raise ModelError(errors)
+
+
+# How the public interface reaches a record. A record that a caller passes by
+# pointer, that native passes to a callback by pointer, or that a function takes
+# or returns by value versions itself. An embedded record is versioned by its
+# container, and a completion value or a strided element by its stride.
+BY_POINTER = "pointer"
+EMBEDDED = "embedded"
+DELIVERED = "delivered"
+
+
+def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
+    """How the public interface reaches each record, and which it takes in.
+
+    The first map gives each record the ways the public functions and callbacks
+    reach it. A record default function is not a reach, since it only
+    initializes a record that something else takes. The set holds the records
+    that native reads from the host: an input parameter, an output that a
+    callback fills for native, and every record that one of those holds.
+    """
+    conventions = Conventions(api)
+    reaches: dict[str, set[str]] = {}
+    inputs: set[str] = set()
+    internal = set(api.runtime_types)
+    defaults = {
+        typedef.metadata["default"]
+        for typedef in api.typedefs
+        if "default" in typedef.metadata
+    }
+
+    def record_of(type_: CType) -> str | None:
+        name = conventions.resolve(type_).declaration
+        return name if name in api.records_by_name else None
+
+    def reach(type_: CType, how: str, metadata: dict[str, str], incoming: bool):
+        resolved = conventions.resolve(type_)
+        if resolved.kind == "pointer" and resolved.pointee is not None:
+            if metadata.get("kind") in OPAQUE_POINTER_KINDS:
+                return
+            how = DELIVERED if "stride" in metadata else BY_POINTER
+            resolved = conventions.resolve(resolved.pointee)
+        name = record_of(resolved)
+        if name is None:
+            return
+        reaches.setdefault(name, set()).add(how)
+        if incoming:
+            take(name)
+
+    def take(name: str):
+        if name in inputs:
+            return
+        inputs.add(name)
+        for field in api.records_by_name[name].fields:
+            reach(field.type, EMBEDDED, field.metadata, True)
+
+    for function in api.public_functions:
+        for parameter in function.parameters:
+            if is_completion(parameter.type):
+                continue
+            reach(
+                parameter.type,
+                BY_POINTER,
+                parameter.metadata,
+                parameter.metadata.get("direction", "in") != "out",
+            )
+        if function.name not in defaults and function.return_type.kind != "void":
+            reach(function.return_type, BY_POINTER, {}, False)
+        result = function.metadata.get("result")
+        if result and result != "void" and result in api.records_by_name:
+            reaches.setdefault(result, set()).add(DELIVERED)
+    for typedef in api.typedefs:
+        if typedef.name in internal:
+            continue
+        for parameter in typedef.parameters:
+            reach(
+                parameter.type,
+                BY_POINTER,
+                parameter.metadata,
+                parameter.metadata.get("direction", "in") == "out",
+            )
+    for record in api.records:
+        if record.name in internal:
+            continue
+        for field in record.fields:
+            resolved = conventions.resolve(field.type)
+            if resolved.kind == "pointer":
+                reach(field.type, BY_POINTER, field.metadata, False)
+            else:
+                reach(field.type, EMBEDDED, field.metadata, False)
+    return reaches, inputs
+
+
+def versioning_errors(api: Api) -> list[str]:
+    """Check that each struct is versioned by exactly one thing.
+
+    A struct that a caller passes by pointer, or that native passes to a
+    callback by pointer, carries its own size. A struct that the interface only
+    embeds by value is versioned by its container, and a completion value or a
+    strided element by the stride that native delivers with it, so neither
+    carries a size. A record default initializes a record that native reads, so
+    an output-only record has none. Every binding steps through an array result
+    by the stride that the completion result reports beside its count.
+    """
+    reaches, inputs = record_reaches(api)
+    errors = []
+    completion = api.records_by_name.get(COMPLETION_RESULT)
+    for field in completion.fields if completion else ():
+        if field.metadata.get("kind") == "erased" and (
+            field.metadata.get("length"),
+            field.metadata.get("stride"),
+        ) != (COMPLETION_VALUE_COUNT, COMPLETION_VALUE_SIZE):
+            errors.append(
+                f"{field.location}: {COMPLETION_RESULT}.{field.name}: requires "
+                f"length={COMPLETION_VALUE_COUNT};stride={COMPLETION_VALUE_SIZE}"
+            )
+    for record in api.records:
+        how = reaches.get(record.name)
+        if (
+            how
+            and BY_POINTER not in how
+            and any(field.metadata.get("kind") == "size" for field in record.fields)
+        ):
+            errors.append(
+                f"{record.location}: {record.name}: struct versioned by its "
+                "container or stride must not carry size"
+            )
+    for typedef in api.typedefs:
+        if (
+            "default" in typedef.metadata
+            and typedef.name in api.records_by_name
+            and typedef.name in reaches
+            and typedef.name not in inputs
+        ):
+            errors.append(
+                f"{typedef.location}: {typedef.name}: default requires a record "
+                "that native reads"
+            )
+    return errors
 
 
 def defaulted_records(api: Api) -> set[str]:

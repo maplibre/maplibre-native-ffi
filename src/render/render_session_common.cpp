@@ -59,8 +59,8 @@ auto render_target_extent_physical_size(
   const mln_render_target_extent* extent, uint32_t* out_width,
   uint32_t* out_height
 ) -> mln_status {
-  if (extent == nullptr) {
-    set_thread_error("extent must not be null");
+  if (extent == nullptr || extent->size < sizeof(mln_render_target_extent)) {
+    set_thread_error("extent must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_width == nullptr || out_height == nullptr) {
@@ -101,7 +101,6 @@ auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 auto opengl_context_descriptor_default() noexcept
   -> mln_opengl_context_descriptor {
   auto result = mln_opengl_context_descriptor{
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
     .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
     .data = {},
@@ -109,7 +108,6 @@ auto opengl_context_descriptor_default() noexcept
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
   result.data.wgl = mln_wgl_context_descriptor{
-    .size = sizeof(mln_wgl_context_descriptor),
     .device_context = nullptr,
     .share_context = nullptr,
     .get_proc_address = nullptr,
@@ -117,7 +115,6 @@ auto opengl_context_descriptor_default() noexcept
 #elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   result.data.egl = mln_egl_context_descriptor{
-    .size = sizeof(mln_egl_context_descriptor),
     .display = nullptr,
     .config = nullptr,
     .share_context = nullptr,
@@ -127,7 +124,6 @@ auto opengl_context_descriptor_default() noexcept
 #elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
   result.data.webgl = mln_webgl_context_descriptor{
-    .size = sizeof(mln_webgl_context_descriptor),
     .kind = MLN_WEBGL_CONTEXT_EXISTING,
     .context = 0,
     .canvas_selector = {},
@@ -183,7 +179,6 @@ auto webgpu_surface_descriptor_default() noexcept
       },
     .context =
       mln_webgpu_context_descriptor{
-        .size = sizeof(mln_webgpu_context_descriptor),
         .instance = nullptr,
         .device = nullptr,
         .queue = nullptr,
@@ -213,10 +208,6 @@ auto opengl_surface_descriptor_default() noexcept
 // a null queue means the device's default queue.
 auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
   -> mln_status {
-  if (context.size < sizeof(mln_webgpu_context_descriptor)) {
-    set_thread_error("mln_webgpu_context_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (context.device == nullptr) {
     set_thread_error("WebGPU device must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -227,10 +218,6 @@ auto validate_webgpu_context(const mln_webgpu_context_descriptor& context)
 auto validate_opengl_context(
   const mln_opengl_context_descriptor& context, bool require_supported_provider
 ) -> mln_status {
-  if (context.size < sizeof(mln_opengl_context_descriptor)) {
-    set_thread_error("mln_opengl_context_descriptor.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (
     context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED &&
     context.ownership != MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
@@ -248,10 +235,6 @@ auto validate_opengl_context(
     ) {
       set_thread_error("OpenGL WGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
-    }
-    if (context.data.wgl.size < sizeof(mln_wgl_context_descriptor)) {
-      set_thread_error("mln_wgl_context_descriptor.size is too small");
-      return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (context.data.wgl.device_context == nullptr) {
       set_thread_error("WGL device_context must not be null");
@@ -282,10 +265,6 @@ auto validate_opengl_context(
     ) {
       set_thread_error("OpenGL EGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
-    }
-    if (context.data.egl.size < sizeof(mln_egl_context_descriptor)) {
-      set_thread_error("mln_egl_context_descriptor.size is too small");
-      return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (
       context.data.egl.display == nullptr || context.data.egl.config == nullptr
@@ -330,10 +309,6 @@ auto validate_opengl_context(
     ) {
       set_thread_error("OpenGL WebGL context provider is not supported");
       return MLN_STATUS_UNSUPPORTED;
-    }
-    if (context.data.webgl.size < sizeof(mln_webgl_context_descriptor)) {
-      set_thread_error("mln_webgl_context_descriptor.size is too small");
-      return MLN_STATUS_INVALID_ARGUMENT;
     }
     if (context.data.webgl.kind == MLN_WEBGL_CONTEXT_EXISTING) {
       if (dedicated) {
@@ -3316,8 +3291,8 @@ auto render_session_resize_start(
   mln_render_session session, const mln_render_target_extent* extent,
   const mln_completion* completion
 ) -> mln_status {
-  if (extent == nullptr) {
-    set_thread_error("extent must not be null");
+  if (extent == nullptr || extent->size < sizeof(mln_render_target_extent)) {
+    set_thread_error("extent must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   const auto valid = validate_render_target_extent(

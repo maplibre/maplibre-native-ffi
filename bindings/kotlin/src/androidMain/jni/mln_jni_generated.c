@@ -2477,13 +2477,6 @@ static void mln_source_feature_query_options_default_jni(
     mln_source_feature_query_options_default();
 }
 
-static void mln_style_image_info_default_jni(
-  JNIEnv* env, jclass type, jlong returned
-) {
-  *MLN_JNI_POINTER(mln_style_image_info*, returned) =
-    mln_style_image_info_default();
-}
-
 static void mln_style_image_options_default_jni(
   JNIEnv* env, jclass type, jlong returned
 ) {
@@ -2507,13 +2500,6 @@ static void mln_style_transition_options_default_jni(
 
 static jint mln_supported_render_backend_mask_jni(JNIEnv* env, jclass type) {
   return (jint)mln_supported_render_backend_mask();
-}
-
-static void mln_texture_image_info_default_jni(
-  JNIEnv* env, jclass type, jlong returned
-) {
-  *MLN_JNI_POINTER(mln_texture_image_info*, returned) =
-    mln_texture_image_info_default();
 }
 
 static jint mln_texture_read_premultiplied_rgba8_jni(
@@ -3135,8 +3121,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_runtime_set_resource_transform_jni},
   {"mln_source_feature_query_options_default", "(J)V",
    (void*)mln_source_feature_query_options_default_jni},
-  {"mln_style_image_info_default", "(J)V",
-   (void*)mln_style_image_info_default_jni},
   {"mln_style_image_options_default", "(J)V",
    (void*)mln_style_image_options_default_jni},
   {"mln_style_tile_source_options_default", "(J)V",
@@ -3145,8 +3129,6 @@ const JNINativeMethod mln_jni_methods[] = {
    (void*)mln_style_transition_options_default_jni},
   {"mln_supported_render_backend_mask", "()I",
    (void*)mln_supported_render_backend_mask_jni},
-  {"mln_texture_image_info_default", "(J)V",
-   (void*)mln_texture_image_info_default_jni},
   {"mln_texture_read_premultiplied_rgba8", "(JJJ)I",
    (void*)mln_texture_read_premultiplied_rgba8_jni},
   {"mln_vulkan_borrowed_texture_attach", "(JJJJJJ)I",

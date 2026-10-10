@@ -2000,9 +2000,6 @@ final class RuntimeEventOfflineRegionStatus extends _Value {
     required this.status,
   });
   final int regionId;
-
-  /// Region status. This member keeps its own size field because the same
-  /// struct is also returned by `mln_runtime_offline_region_get_status()`.
   final OfflineRegionStatus status;
 
   @override
@@ -2576,7 +2573,7 @@ final class StyleImageInfo extends _Value {
     this.content,
     this.textFitWidth,
     this.textFitHeight,
-    this.pixelRatio = 1.0,
+    this.pixelRatio = 0,
     this.sdf = false,
   });
   final int width;
@@ -2601,7 +2598,7 @@ final class StyleImageInfo extends _Value {
   /// TEXT_FIT_HEIGHT.
   final StyleImageTextFit? textFitHeight;
 
-  /// Sprite pixel ratio. Defaults to 1.0.
+  /// Sprite pixel ratio.
   final double pixelRatio;
   final bool sdf;
 
@@ -3793,15 +3790,11 @@ final class ResourceRequestCancelHandler {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 final class RuntimeOptions extends _Value {
   const RuntimeOptions({
-    this.flags = 0,
     this.assetPath,
     this.cachePath,
     this.eventMask = RuntimeEventMask.all,
     this.eventWake = const Wake(),
   });
-
-  /// No flags are currently defined. Must be zero.
-  final int flags;
 
   /// Directory root for asset:// URLs. Copied during runtime creation. Null or
   /// empty selects `/android_asset` on Android and `.` elsewhere.
@@ -3818,13 +3811,7 @@ final class RuntimeOptions extends _Value {
   final Wake eventWake;
 
   @override
-  List<Object?> get _members => [
-    flags,
-    assetPath,
-    cachePath,
-    eventMask,
-    eventWake,
-  ];
+  List<Object?> get _members => [assetPath, cachePath, eventMask, eventWake];
 }
 
 /// Tile-pyramid offline region definition.

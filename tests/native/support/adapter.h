@@ -38,12 +38,11 @@ static inline void mln_test_adapter_keep_record(
 
 // Creates an adapter completion whose listener keeps its record in delivery.
 static inline mln_completion mln_test_adapter_completion(
-  uint32_t copy_kind, size_t element_size, mln_test_adapter_delivery* delivery
+  uint32_t copy_kind, mln_test_adapter_delivery* delivery
 ) {
   mln_completion completion = {0};
   MLN_TEST_OK(mln_adapter_completion_create(
-    copy_kind, element_size, mln_test_adapter_keep_record, delivery,
-    &completion, NULL
+    copy_kind, mln_test_adapter_keep_record, delivery, &completion, NULL
   ));
   return completion;
 }

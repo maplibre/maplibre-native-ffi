@@ -82,9 +82,8 @@ typedef void (*mln_queue_lock_callback)(void* user_data);
  * wait. The host takes the same lock around its own calls on the queue.
  *
  * Both callbacks are null to disable the lock, or both are set. A disabled
- * lock must not carry release_user_data, and size must still be
- * sizeof(mln_queue_lock). A session without a lock assumes that the host
- * leaves the queue alone while the session is attached.
+ * lock must not carry release_user_data. A session without a lock assumes that
+ * the host leaves the queue alone while the session is attached.
  *
  * The callbacks must not call the C API. The host must not hold the lock while
  * it calls the C API, because the driver may need the lock to finish the call:
@@ -97,7 +96,6 @@ typedef void (*mln_queue_lock_callback)(void* user_data);
  * invoke the callbacks.
  */
 typedef struct mln_queue_lock {
-  uint32_t size;
   mln_queue_lock_callback lock MLN_BINDING("nullable=true");
   mln_queue_lock_callback unlock MLN_BINDING("nullable=true");
   void* user_data MLN_BINDING("kind=context");
@@ -199,14 +197,12 @@ MLN_API mln_gpu_sync mln_gpu_sync_default(void) MLN_NOEXCEPT;
 
 /** Metal backend context fields shared by Metal render targets. */
 typedef struct mln_metal_context_descriptor {
-  uint32_t size;
   /** `id<MTLDevice>` / `MTL::Device*`. Retained when the target requires it. */
   void* device;
 } mln_metal_context_descriptor;
 
 /** Vulkan backend context fields shared by Vulkan render targets. */
 typedef struct mln_vulkan_context_descriptor {
-  uint32_t size;
   /** Borrowed VkInstance. Required. */
   void* instance;
   /** Borrowed VkPhysicalDevice. Required. */
@@ -230,7 +226,6 @@ typedef struct mln_vulkan_context_descriptor {
 
 /** WebGPU backend context fields shared by WebGPU render targets. */
 typedef struct mln_webgpu_context_descriptor {
-  uint32_t size;
   /** Borrowed WGPUInstance. Optional for texture targets. */
   void* instance;
   /** Borrowed WGPUDevice. Required. */
@@ -295,7 +290,6 @@ typedef enum mln_opengl_client_api : uint32_t {
 
 /** WGL context fields shared by OpenGL render targets on Windows. */
 typedef struct mln_wgl_context_descriptor {
-  uint32_t size;
   /** Borrowed HDC used to create the session context. Required. */
   void* device_context;
   /**
@@ -310,7 +304,6 @@ typedef struct mln_wgl_context_descriptor {
 
 /** EGL context fields shared by OpenGL render targets. */
 typedef struct mln_egl_context_descriptor {
-  uint32_t size;
   /** Borrowed EGLDisplay. Required and kept initialized through teardown. */
   void* display;
   /**
@@ -349,7 +342,6 @@ typedef enum mln_webgl_context_kind : uint32_t {
 
 /** WebGL context fields shared by OpenGL render targets in the browser. */
 typedef struct mln_webgl_context_descriptor {
-  uint32_t size;
   /** One mln_webgl_context_kind value. */
   uint32_t kind MLN_BINDING("enum=mln_webgl_context_kind");
   /** Borrowed EMSCRIPTEN_WEBGL_CONTEXT_HANDLE for EXISTING. Must be positive.
@@ -374,7 +366,6 @@ typedef union mln_opengl_context_descriptor_data {
 
 /** OpenGL backend context fields shared by OpenGL render targets. */
 typedef struct mln_opengl_context_descriptor {
-  uint32_t size;
   /** WGL, EGL, or WebGL context provider. */
   uint32_t platform MLN_BINDING("enum=mln_opengl_context_platform");
   /**

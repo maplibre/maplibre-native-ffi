@@ -448,7 +448,6 @@ pub const MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS: mln_webgl_context_kind = 1;
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_animation_options {
-    pub size: u32,
     pub fields: u32,
     pub duration_ms: f64,
     pub velocity: f64,
@@ -511,8 +510,6 @@ pub struct mln_camera_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_camera_query_result {
-    pub size: u32,
-    pub reserved: u32,
     pub generation: u64,
     pub camera: mln_camera_options,
 }
@@ -547,7 +544,7 @@ pub struct mln_completion_result {
     pub size: u32,
     pub status: i32,
     pub disposition: u32,
-    pub reserved: u32,
+    pub value_size: u32,
     pub generation: u64,
     pub diagnostic: mln_buffer_view,
     pub value: *const std::ffi::c_void,
@@ -599,7 +596,6 @@ pub struct mln_edge_insets {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_egl_context_descriptor {
-    pub size: u32,
     pub display: *mut std::ffi::c_void,
     pub config: *mut std::ffi::c_void,
     pub share_context: *mut std::ffi::c_void,
@@ -787,7 +783,6 @@ pub struct mln_metal_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_metal_context_descriptor {
-    pub size: u32,
     pub device: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -821,7 +816,6 @@ pub struct mln_metal_surface_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_geometry_region_definition {
-    pub size: u32,
     pub style_url: *const std::ffi::c_char,
     pub geometry: mln_buffer_view,
     pub min_zoom: f64,
@@ -845,7 +839,6 @@ pub union mln_offline_region_definition_data {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_offline_region_info {
-    pub size: u32,
     pub id: mln_offline_region_id,
     pub definition: mln_offline_region_definition,
     pub metadata: *const u8,
@@ -854,7 +847,6 @@ pub struct mln_offline_region_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_region_status {
-    pub size: u32,
     pub download_state: u32,
     pub completed_resource_count: u64,
     pub completed_resource_size: u64,
@@ -868,7 +860,6 @@ pub struct mln_offline_region_status {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_offline_tile_pyramid_region_definition {
-    pub size: u32,
     pub style_url: *const std::ffi::c_char,
     pub bounds: mln_lat_lng_bounds,
     pub min_zoom: f64,
@@ -890,7 +881,6 @@ pub struct mln_opengl_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct mln_opengl_context_descriptor {
-    pub size: u32,
     pub platform: u32,
     pub ownership: u32,
     pub data: mln_opengl_context_descriptor_data,
@@ -968,7 +958,6 @@ pub struct mln_quaternion {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_queried_feature {
-    pub size: u32,
     pub fields: u32,
     pub feature: mln_buffer_view,
     pub source_id: mln_buffer_view,
@@ -978,7 +967,6 @@ pub struct mln_queried_feature {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_queue_lock {
-    pub size: u32,
     pub lock: mln_queue_lock_callback,
     pub unlock: mln_queue_lock_callback,
     pub user_data: *mut std::ffi::c_void,
@@ -1230,7 +1218,6 @@ pub struct mln_runtime_event_tile_action {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_runtime_options {
     pub size: u32,
-    pub flags: u32,
     pub asset_path: *const std::ffi::c_char,
     pub cache_path: *const std::ffi::c_char,
     pub event_mask: u64,
@@ -1266,7 +1253,6 @@ pub struct mln_source_feature_query_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_info {
-    pub size: u32,
     pub fields: u32,
     pub width: u32,
     pub height: u32,
@@ -1298,8 +1284,6 @@ pub struct mln_style_image_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_result {
-    pub size: u32,
-    pub reserved: u32,
     pub info: mln_style_image_info,
     pub pixels: mln_buffer_view,
     pub stretch_x: *const mln_image_stretch,
@@ -1310,8 +1294,6 @@ pub struct mln_style_image_result {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_image_stretches_result {
-    pub size: u32,
-    pub reserved: u32,
     pub stretch_x: *const mln_image_stretch,
     pub stretch_x_count: usize,
     pub stretch_y: *const mln_image_stretch,
@@ -1320,7 +1302,6 @@ pub struct mln_style_image_stretches_result {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_entry {
-    pub size: u32,
     pub id: mln_buffer_view,
     pub type_: mln_buffer_view,
     pub source_id: mln_buffer_view,
@@ -1329,8 +1310,6 @@ pub struct mln_style_layer_entry {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_info {
-    pub size: u32,
-    pub reserved: u32,
     pub type_: mln_buffer_view,
     pub min_zoom: f64,
     pub max_zoom: f64,
@@ -1339,8 +1318,6 @@ pub struct mln_style_layer_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_layer_result {
-    pub size: u32,
-    pub reserved: u32,
     pub info: mln_style_layer_info,
     pub source_id: mln_buffer_view,
     pub source_layer: mln_buffer_view,
@@ -1348,7 +1325,6 @@ pub struct mln_style_layer_result {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_info {
-    pub size: u32,
     pub type_: u32,
     pub fields: u32,
     pub id_size: usize,
@@ -1364,8 +1340,6 @@ pub struct mln_style_source_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_result {
-    pub size: u32,
-    pub reserved: u32,
     pub info: mln_style_source_info,
     pub attribution: mln_buffer_view,
     pub url: mln_buffer_view,
@@ -1383,8 +1357,6 @@ pub struct mln_style_source_tile_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_style_source_tile_urls_result {
-    pub size: u32,
-    pub reserved: u32,
     pub tile_urls: *const mln_buffer_view,
     pub tile_url_count: usize,
 }
@@ -1414,7 +1386,6 @@ pub struct mln_style_transition_options {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_texture_image_info {
-    pub size: u32,
     pub width: u32,
     pub height: u32,
     pub stride: u32,
@@ -1423,8 +1394,6 @@ pub struct mln_texture_image_info {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_texture_readback_result {
-    pub size: u32,
-    pub reserved: u32,
     pub data: mln_buffer_view,
     pub info: mln_texture_image_info,
 }
@@ -1469,7 +1438,6 @@ pub struct mln_vulkan_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_vulkan_context_descriptor {
-    pub size: u32,
     pub instance: *mut std::ffi::c_void,
     pub physical_device: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
@@ -1511,7 +1479,6 @@ pub struct mln_vulkan_surface_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_wake {
-    pub size: u32,
     pub callback: mln_wake_callback,
     pub user_data: *mut std::ffi::c_void,
     pub release_user_data: mln_user_data_release,
@@ -1519,7 +1486,6 @@ pub struct mln_wake {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_webgl_context_descriptor {
-    pub size: u32,
     pub kind: u32,
     pub context: i32,
     pub canvas_selector: mln_buffer_view,
@@ -1539,7 +1505,6 @@ pub struct mln_webgpu_borrowed_texture_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_webgpu_context_descriptor {
-    pub size: u32,
     pub instance: *mut std::ffi::c_void,
     pub device: *mut std::ffi::c_void,
     pub queue: *mut std::ffi::c_void,
@@ -1577,7 +1542,6 @@ pub struct mln_webgpu_surface_descriptor {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct mln_wgl_context_descriptor {
-    pub size: u32,
     pub device_context: *mut std::ffi::c_void,
     pub share_context: *mut std::ffi::c_void,
     pub get_proc_address: *mut std::ffi::c_void,
@@ -2934,12 +2898,10 @@ unsafe extern "C" {
         out_diagnostic: *mut mln_diagnostic,
     ) -> mln_status;
     pub fn mln_source_feature_query_options_default() -> mln_source_feature_query_options;
-    pub fn mln_style_image_info_default() -> mln_style_image_info;
     pub fn mln_style_image_options_default() -> mln_style_image_options;
     pub fn mln_style_tile_source_options_default() -> mln_style_tile_source_options;
     pub fn mln_style_transition_options_default() -> mln_style_transition_options;
     pub fn mln_supported_render_backend_mask() -> u32;
-    pub fn mln_texture_image_info_default() -> mln_texture_image_info;
     pub fn mln_texture_read_premultiplied_rgba8(
         session: mln_render_session,
         completion: *const mln_completion,

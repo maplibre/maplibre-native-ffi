@@ -744,10 +744,11 @@ public abstract class GeneratedMapOperations internal constructor() {
       { result ->
         if (CompletionBridge.valuePointer(result) == 0L) null
         else
-          readArray(
+          readStrided(
             CompletionBridge.valuePointer(result),
             CompletionBridge.valueCount(result),
-            16.toLong(),
+            CompletionBridge.valueSize(result),
+            16,
           ) {
             readLatLng(it)
           }
@@ -1095,10 +1096,11 @@ public abstract class GeneratedMapOperations internal constructor() {
       binding,
       "mln_map_lat_lngs_for_pixels",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          16.toLong(),
+          CompletionBridge.valueSize(result),
+          16,
         ) {
           readLatLng(it)
         }
@@ -1127,10 +1129,11 @@ public abstract class GeneratedMapOperations internal constructor() {
       binding,
       "mln_map_lat_lngs_for_pixels_unwrapped",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          16.toLong(),
+          CompletionBridge.valueSize(result),
+          16,
         ) {
           readLatLng(it)
         }
@@ -1159,10 +1162,11 @@ public abstract class GeneratedMapOperations internal constructor() {
       binding,
       "mln_map_list_style_layer_ids",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          2 * NativeMemory.addressSize.toLong(),
+          CompletionBridge.valueSize(result),
+          2 * NativeMemory.addressSize,
         ) {
           readViewString(it)
         }
@@ -1183,10 +1187,11 @@ public abstract class GeneratedMapOperations internal constructor() {
       binding,
       "mln_map_list_style_layers",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(36, 72).toLong(),
+          CompletionBridge.valueSize(result),
+          w(32, 64),
         ) {
           readStyleLayerEntry(it)
         }
@@ -1207,10 +1212,11 @@ public abstract class GeneratedMapOperations internal constructor() {
       binding,
       "mln_map_list_style_source_ids",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          2 * NativeMemory.addressSize.toLong(),
+          CompletionBridge.valueSize(result),
+          2 * NativeMemory.addressSize,
         ) {
           readViewString(it)
         }
@@ -1302,10 +1308,11 @@ public abstract class GeneratedMapOperations internal constructor() {
       binding,
       "mln_map_pixels_for_lat_lngs",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          16.toLong(),
+          CompletionBridge.valueSize(result),
+          16,
         ) {
           readScreenPoint(it)
         }

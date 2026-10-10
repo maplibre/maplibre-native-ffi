@@ -319,8 +319,8 @@ def completion_decode(value, values):
         element = value.element
         item = values.decode_item(element, "it", None, None)
         expression = (
-            "readArray(CompletionBridge.valuePointer(result), CompletionBridge.valueCount(result), "
-            f"{values.element_size(element)}.toLong()) {{ {item} }}"
+            "readStrided(CompletionBridge.valuePointer(result), CompletionBridge.valueCount(result), "
+            f"CompletionBridge.valueSize(result), {values.element_size(element)}) {{ {item} }}"
         )
     elif value.kind in {"buffer", "record", "scalar", "enum"}:
         expression = values.decode(

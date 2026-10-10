@@ -338,13 +338,15 @@ func completionNullable[T any](convert func(*C.mln_completion_result) (T, error)
 // completionListOf converts each item of the completion's native array.
 func completionListOf[N, T any](copy func(N) T) func(*C.mln_completion_result) ([]T, error) {
 	return func(result *C.mln_completion_result) ([]T, error) {
-		items, err := completionSlice[N](result)
-		if err != nil {
-			return nil, err
+		if result.value_count == 0 {
+			return []T{}, nil
 		}
-		copied := make([]T, len(items))
-		for i, item := range items {
-			copied[i] = copy(item)
+		if result.value == nil {
+			return nil, newBindingError(ErrInvalidState, "native completion returned a null slice")
+		}
+		copied := make([]T, bindingLength(uint64(result.value_count)))
+		for i := range copied {
+			copied[i] = copy(*completionItem[N](result, i))
 		}
 		return copied, nil
 	}

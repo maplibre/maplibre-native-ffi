@@ -97,9 +97,12 @@ static void setters_apply_before_return_and_conversions_round_trip(void) {
   mln_map map = mln_test_create_map(runtime);
   mln_map_projection projection = create_projection(map);
 
+  // A camera passed by pointer versions itself, unlike one embedded in an
+  // update.
   mln_camera_options too_small = {.size = sizeof(mln_camera_options) - 1};
   MLN_TEST_INVALID(mln_map_projection_get_camera(projection, &too_small, NULL));
   MLN_TEST_INVALID(mln_map_projection_get_camera(projection, NULL, NULL));
+  MLN_TEST_INVALID(mln_map_projection_set_camera(projection, &too_small, NULL));
 
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;

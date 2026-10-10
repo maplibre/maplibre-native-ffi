@@ -229,6 +229,7 @@ BIND("execution=command") mln_status session_flush(
 typedef struct options { double zoom; } options;
 options make_options(void);
 options other_options(void);
+void use_options(const options *value);
 """
         bound = compile_api(parse(source))
         self.assertIsNone(bound.values["options"].default)

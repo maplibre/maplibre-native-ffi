@@ -25,20 +25,8 @@ static void surface_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_surface.surface =
     MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
 }
-static void surface_with_undersized_context(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_surface.context.size =
-    sizeof(mln_vulkan_context_descriptor) - 1;
-}
 static void owned_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_owned.context.device = NULL;
-}
-static void owned_with_undersized_context(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_owned.context.size =
-    sizeof(mln_vulkan_context_descriptor) - 1;
-}
-static void borrowed_with_undersized_context(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.context.size =
-    sizeof(mln_vulkan_context_descriptor) - 1;
 }
 static void borrowed_without_image(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.image =
@@ -66,7 +54,6 @@ MLN_TEST_SET_TARGET_SUBMITTER(
 
 static mln_vulkan_context_descriptor fake_context(void) {
   return (mln_vulkan_context_descriptor){
-    .size = sizeof(mln_vulkan_context_descriptor),
     .instance = MLN_TEST_FAKE_HANDLE,
     .physical_device = MLN_TEST_FAKE_HANDLE,
     .device = MLN_TEST_FAKE_HANDLE,
@@ -112,8 +99,6 @@ static void vulkan_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case surface_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(vulkan_surface),
     MLN_TEST_OVERFLOW_CASE(vulkan_surface),
-    {"undersized context", surface_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_vulkan_context_descriptor.size"},
     {"null surface", surface_without_surface, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
 #if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -132,8 +117,6 @@ static void vulkan_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case owned_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(vulkan_owned),
     MLN_TEST_OVERFLOW_CASE(vulkan_owned),
-    {"undersized context", owned_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_vulkan_context_descriptor.size"},
     {"null device", owned_without_device, MLN_STATUS_INVALID_ARGUMENT,
      "must not be null"},
 #if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
@@ -151,8 +134,6 @@ static void vulkan_attach_rejects_malformed_calls(void) {
   call.descriptor.vulkan_borrowed = borrowed_descriptor();
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed),
-    {"undersized context", borrowed_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_vulkan_context_descriptor.size"},
     {"null image", borrowed_without_image, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null image view", borrowed_without_image_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},

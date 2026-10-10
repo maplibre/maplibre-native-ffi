@@ -18,7 +18,6 @@ auto vulkan_owned_texture_descriptor_default() noexcept
   -> mln_vulkan_owned_texture_descriptor;
 auto vulkan_borrowed_texture_descriptor_default() noexcept
   -> mln_vulkan_borrowed_texture_descriptor;
-auto texture_image_info_default() noexcept -> mln_texture_image_info;
 auto validate_texture(
   mln_render_session texture, mln_render_session_object*& out_texture
 ) -> mln_status;

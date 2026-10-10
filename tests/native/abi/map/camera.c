@@ -41,7 +41,7 @@ static mln_camera_query_result query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
   MLN_TEST_OK(mln_map_camera_query(map, &query.descriptor, NULL));
-  mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
+  mln_camera_query_result result = {0};
   MLN_TEST_OK(
     mln_test_completion_finish_value(&query, &result, sizeof(result))
   );
@@ -89,8 +89,10 @@ static void update_bad_gesture(void* descriptor) {
   ((mln_camera_update*)descriptor)->gesture_phase =
     MLN_GESTURE_PHASE_CANCEL + 1;
 }
-static void camera_undersized(void* descriptor) {
-  ((mln_camera_update*)descriptor)->camera.size -= 1;
+// The update versions its embedded camera, so native ignores the camera's own
+// size.
+static void camera_without_size(void* descriptor) {
+  ((mln_camera_update*)descriptor)->camera.size = 0;
 }
 static void camera_unknown_field(void* descriptor) {
   ((mln_camera_update*)descriptor)->camera.fields = UINT32_C(1) << 31;
@@ -119,9 +121,6 @@ static void camera_nan_anchor(void* descriptor) {
   mln_camera_options* camera = &((mln_camera_update*)descriptor)->camera;
   camera->fields = MLN_CAMERA_OPTION_ANCHOR;
   camera->anchor.y = NAN;
-}
-static void animation_undersized(void* descriptor) {
-  ((mln_camera_update*)descriptor)->animation.size -= 1;
 }
 static void animation_unknown_field(void* descriptor) {
   ((mln_camera_update*)descriptor)->animation.fields = UINT32_C(1) << 31;
@@ -158,8 +157,7 @@ static const mln_test_validation_case update_cases[] = {
    "mode or gesture phase"},
   {"gesture phase out of range", update_bad_gesture,
    MLN_STATUS_INVALID_ARGUMENT, "mode or gesture phase"},
-  {"undersized camera", camera_undersized, MLN_STATUS_INVALID_ARGUMENT,
-   "size is too small"},
+  {"camera without size", camera_without_size, MLN_STATUS_OK, NULL},
   {"unknown camera field", camera_unknown_field, MLN_STATUS_INVALID_ARGUMENT,
    "unknown bits"},
   {"latitude past the pole", camera_latitude_past_the_pole,
@@ -171,8 +169,6 @@ static const mln_test_validation_case update_cases[] = {
    "greater than or equal to 0"},
   {"NaN anchor", camera_nan_anchor, MLN_STATUS_INVALID_ARGUMENT,
    "screen point values must be finite"},
-  {"undersized animation", animation_undersized, MLN_STATUS_INVALID_ARGUMENT,
-   "size is too small"},
   {"unknown animation field", animation_unknown_field,
    MLN_STATUS_INVALID_ARGUMENT, "unknown bits"},
   {"negative duration", animation_negative_duration,
@@ -612,9 +608,6 @@ static void delta_nan_anchor(void* descriptor) {
   delta->fields = MLN_CAMERA_DELTA_FIELD_ANCHOR;
   delta->anchor.x = NAN;
 }
-static void delta_undersized_animation(void* descriptor) {
-  ((mln_camera_delta*)descriptor)->animation.size -= 1;
-}
 
 static const mln_test_validation_case delta_cases[] = {
   {"undersized", delta_undersized, MLN_STATUS_INVALID_ARGUMENT, "valid size"},
@@ -640,8 +633,6 @@ static const mln_test_validation_case delta_cases[] = {
    "only scale and bearing"},
   {"NaN anchor", delta_nan_anchor, MLN_STATUS_INVALID_ARGUMENT,
    "must be finite"},
-  {"undersized animation", delta_undersized_animation,
-   MLN_STATUS_INVALID_ARGUMENT, "size is too small"},
 };
 
 static mln_camera_options finish_camera_query(mln_test_completion* query) {

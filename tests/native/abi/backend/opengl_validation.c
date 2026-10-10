@@ -25,24 +25,20 @@
 // A shared context of `platform` whose handles only validation reads.
 static mln_opengl_context_descriptor fake_context(uint32_t platform) {
   mln_opengl_context_descriptor context = {
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = platform,
     .ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
   };
   if (platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL) {
     context.data.wgl = (mln_wgl_context_descriptor){
-      .size = sizeof(mln_wgl_context_descriptor),
       .device_context = MLN_TEST_FAKE_HANDLE,
       .share_context = MLN_TEST_FAKE_HANDLE,
     };
   } else if (platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL) {
     context.data.webgl = (mln_webgl_context_descriptor){
-      .size = sizeof(mln_webgl_context_descriptor),
       .context = 1,
     };
   } else {
     context.data.egl = (mln_egl_context_descriptor){
-      .size = sizeof(mln_egl_context_descriptor),
       .display = MLN_TEST_FAKE_HANDLE,
       .config = MLN_TEST_FAKE_HANDLE,
       .share_context = MLN_TEST_FAKE_HANDLE,
@@ -51,17 +47,7 @@ static mln_opengl_context_descriptor fake_context(uint32_t platform) {
   return context;
 }
 
-// The provider data's own size, and the one handle a shared context needs
-// beyond the display or device.
-static void shrink_provider(mln_opengl_context_descriptor* context) {
-#if defined(MLN_FFI_TEST_OPENGL_WGL)
-  context->data.wgl.size = sizeof(mln_wgl_context_descriptor) - 1;
-#elif defined(MLN_FFI_TEST_OPENGL_WEBGL)
-  context->data.webgl.size = sizeof(mln_webgl_context_descriptor) - 1;
-#else
-  context->data.egl.size = sizeof(mln_egl_context_descriptor) - 1;
-#endif
-}
+// The one handle a shared context needs beyond the display or device.
 static void clear_shared_context(mln_opengl_context_descriptor* context) {
 #if defined(MLN_FFI_TEST_OPENGL_WGL)
   context->data.wgl.share_context = NULL;
@@ -90,12 +76,6 @@ static mln_opengl_borrowed_texture_descriptor* borrowed_of(void* call) {
   return &((mln_test_target_call*)call)->descriptor.opengl_borrowed;
 }
 
-static void surface_with_undersized_context(void* call) {
-  surface_of(call)->context.size = sizeof(mln_opengl_context_descriptor) - 1;
-}
-static void surface_with_undersized_provider(void* call) {
-  shrink_provider(&surface_of(call)->context);
-}
 // WGL and EGL present to a surface alongside the context. A WebGL context
 // names its canvas itself and takes no surface, so there the context is the
 // required handle.
@@ -127,9 +107,6 @@ static void webgl_surface_with_surface_handle(void* call) {
   surface_of(call)->surface = MLN_TEST_FAKE_HANDLE;
 }
 #endif
-static void owned_with_undersized_provider(void* call) {
-  shrink_provider(&owned_of(call)->context);
-}
 static void owned_without_shared_context(void* call) {
   clear_shared_context(&owned_of(call)->context);
 }
@@ -147,9 +124,6 @@ static void dedicated_wgl_owned_texture(void* call) {
   descriptor->context.data.wgl.share_context = NULL;
 }
 #endif
-static void borrowed_with_undersized_context(void* call) {
-  borrowed_of(call)->context.size = sizeof(mln_opengl_context_descriptor) - 1;
-}
 static void borrowed_without_texture(void* call) {
   borrowed_of(call)->texture = 0;
 }
@@ -213,10 +187,6 @@ static void opengl_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case surface_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(opengl_surface),
     MLN_TEST_OVERFLOW_CASE(opengl_surface),
-    {"undersized context", surface_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_opengl_context_descriptor.size"},
-    {"undersized provider data", surface_with_undersized_provider,
-     MLN_STATUS_INVALID_ARGUMENT, "size is too small"},
     {"no drawable", surface_without_its_drawable, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
     {"unknown ownership", surface_with_unknown_ownership,
@@ -245,8 +215,6 @@ static void opengl_attach_rejects_malformed_calls(void) {
   static const mln_test_validation_case owned_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(opengl_owned),
     MLN_TEST_OVERFLOW_CASE(opengl_owned),
-    {"undersized provider data", owned_with_undersized_provider,
-     MLN_STATUS_INVALID_ARGUMENT, "size is too small"},
     {"no shared context", owned_without_shared_context,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
 #if !defined(MLN_FFI_TEST_OPENGL_WGL) && !defined(MLN_FFI_TEST_OPENGL_WEBGL)
@@ -270,8 +238,6 @@ static void opengl_attach_rejects_malformed_calls(void) {
   call.descriptor.opengl_borrowed = borrowed_descriptor();
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(opengl_borrowed),
-    {"undersized context", borrowed_with_undersized_context,
-     MLN_STATUS_INVALID_ARGUMENT, "mln_opengl_context_descriptor.size"},
     {"no texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},

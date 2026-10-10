@@ -48,10 +48,6 @@ auto mln_webgpu_borrowed_texture_descriptor_default(void) noexcept
   return mln::core::webgpu_borrowed_texture_descriptor_default();
 }
 
-auto mln_texture_image_info_default(void) noexcept -> mln_texture_image_info {
-  return mln::core::texture_image_info_default();
-}
-
 auto mln_supported_render_backend_mask(void) noexcept -> uint32_t {
   return mln::core::supported_render_backend_mask();
 }

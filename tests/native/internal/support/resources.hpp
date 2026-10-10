@@ -82,7 +82,6 @@ inline auto start_offline_download(mln_runtime runtime, const char* style_url)
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data = {
       .tile_pyramid = {
-        .size = sizeof(mln_offline_tile_pyramid_region_definition),
         .style_url = style_url,
         .bounds =
           {
@@ -108,7 +107,7 @@ inline auto start_offline_download(mln_runtime runtime, const char* style_url)
     mln_test_completion_destroy(&creation);
     return false;
   }
-  auto info = mln_offline_region_info{.size = sizeof(mln_offline_region_info)};
+  auto info = mln_offline_region_info{};
   if (
     mln_test_completion_finish_value(&creation, &info, sizeof(info)) !=
     MLN_STATUS_OK

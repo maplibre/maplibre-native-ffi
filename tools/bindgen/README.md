@@ -61,19 +61,35 @@ Each declaration follows these rules, which every binding relies on:
   value has that integer type and `MLN_BINDING("enum=<enum>")`, because native
   can write a value that an older binding does not know. An enum of flags that
   combine is `kind=bitmask`.
-- A struct that can grow begins with `uint32_t size`, and new members go at the
-  end. Native sets the size of each struct that it passes to a callback. For an
-  input struct, and for an output struct that the caller allocates, native
-  rejects a size below its own `sizeof` with `MLN_STATUS_INVALID_ARGUMENT` and
-  accepts a larger one. `mln_diagnostic` is the exception: native accepts any
-  size, writes no more than size bytes, and truncates the message to fit.
+- A struct is versioned by exactly one thing, and new members go at the end:
+  - A struct that a caller passes through a pointer, as an input or as an output
+    that the caller allocates, or that native passes by pointer as a callback
+    argument, begins with `uint32_t size`. Native sets the size of each struct
+    that it passes to a callback. For an input struct, and for an output struct
+    that the caller allocates, native rejects a size below its own `sizeof` with
+    `MLN_STATUS_INVALID_ARGUMENT` and accepts a larger one. `mln_diagnostic` is
+    the exception: native accepts any size, writes no more than size bytes, and
+    truncates the message to fit.
+  - A record that native delivers in borrowed storage carries no size. The
+    stride of that storage versions it: `mln_completion_result.value_size` for a
+    completion value, and `event_size` or `result_size` for an element of a
+    strided view. A binding steps through an array by that stride.
+  - A struct that the public headers only embed by value carries no size. Its
+    container versions it, and it cannot grow within an epoch, because growing
+    it moves every later member of its parent.
+  - When a sized struct is embedded by value, native ignores its size on input
+    and sets it on output, as with the `camera` member of `mln_camera_update`
+    and of `mln_map_snapshot`.
+  - Small value types, such as coordinates, points, IDs, and `mln_buffer_view`,
+    are frozen and carry no size. Changing one means adding a new type.
+
+  The schema rejects a size on a struct that the public headers reach only by
+  value inside records, or only as a completion value or a strided element.
 - An input struct whose defaults are not all zero has a `mln_<struct>_default()`
   function. It returns the struct with size set and every member at its default.
   A binding starts each record from that function, or from zero with size set
-  when the struct has none.
-- A versioned struct embedded by value cannot grow within an epoch, because
-  growing it moves every later member of its parent. Native validates the size
-  of both, as it does for the `camera` member of `mln_camera_update`.
+  when the struct has none. The schema rejects a default function for a record
+  that native never reads, directly or embedded in an input.
 - An optional scalar or aggregate member of a struct names its bit in the
   struct's `fields` mask, a `uint32_t` whose `enum=` names a `kind=bitmask`
   enum: `MLN_BINDING("mask=fields;bit=<constant>")`. Each optional member has
@@ -94,8 +110,9 @@ While `API_EPOCH` is `0`, a change may break the ABI, and growing a struct
 breaks every caller built against the older header; see
 [Versioning](../../docs/src/content/docs/development/versioning.md). A stable
 epoch must accept every earlier published size of a struct and fill the missing
-members from their defaults. The size member and the default function make that
-possible, so new structs follow the size and default rules now.
+members from their defaults, and every binding must index an array by the stride
+that native reports. The size member, the delivery stride, and the default
+function make that possible, so new structs follow these rules now.
 
 ## Annotate only what convention leaves open
 

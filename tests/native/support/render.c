@@ -157,14 +157,10 @@ bool mln_test_render_fixture_create_with(
   options.requested_texture_ring_depth = 2;
   options.driver = fixture->driver;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
-    .callback = mln_test_render_count_wake,
-    .user_data = &fixture->frame_wakes
+    .callback = mln_test_render_count_wake, .user_data = &fixture->frame_wakes
   };
   options.driver_work_wake = (mln_wake){
-    .size = sizeof(mln_wake),
-    .callback = mln_test_render_count_wake,
-    .user_data = &fixture->driver_wakes
+    .callback = mln_test_render_count_wake, .user_data = &fixture->driver_wakes
   };
   mln_test_completion completion = mln_test_completion_default(0);
   mln_status status = MLN_STATUS_INVALID_STATE;

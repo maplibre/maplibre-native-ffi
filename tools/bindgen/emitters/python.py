@@ -117,11 +117,11 @@ def result_converter(
     public = values.type(result)
     if result.kind == "array" and result.element:
         element = result.element
-        copied = values.copy(element, "*value")
+        copied = values.copy(element, "value")
         converter = f"""|py, result| {{
             {"if result.value.is_null() { return Ok(py.None()); }" if result.nullable else ""}
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::{element.native}>(result)? {{
+            for value in generated_completion_values::<sys::{element.native}>(result)? {{
                 list.append({copied})?;
             }}
             Ok(list.into_any().unbind())

@@ -249,7 +249,6 @@ public struct OfflineRegionStatus: Equatable, Hashable, Sendable {
 
   func nativeValue() -> mln_offline_region_status {
     var raw = mln_offline_region_status()
-    raw.size = UInt32(MemoryLayout<mln_offline_region_status>.size)
     raw.download_state = downloadState.rawValue
     raw.completed_resource_count = completedResourceCount
     raw.completed_resource_size = completedResourceSize
@@ -1152,8 +1151,6 @@ public struct RuntimeEventOfflineRegionResponseError: Equatable, Hashable,
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeEventOfflineRegionStatus: Equatable, Hashable, Sendable {
   public var regionId: Int64
-  /// Region status. This member keeps its own size field because the same
-  /// struct is also returned by `mln_runtime_offline_region_get_status()`.
   public var status: OfflineRegionStatus
   public static var `default`: Self {
     Self(raw: mln_runtime_event_offline_region_status())
@@ -1428,8 +1425,6 @@ public struct RuntimeEventType: RawRepresentable, NativeOpenValue, Equatable,
 /// See `mln_runtime_options` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 public struct RuntimeOptions: Sendable {
-  /// No flags are currently defined. Must be zero.
-  public var flags: UInt32
   /// Directory root for asset:// URLs. Copied during runtime creation. Null or
   /// empty selects `/android_asset` on Android and `.` elsewhere.
   public var assetPath: String?
@@ -1445,13 +1440,11 @@ public struct RuntimeOptions: Sendable {
   }
 
   public init(
-    flags: UInt32 = RuntimeOptions.default.flags,
     assetPath: String? = RuntimeOptions.default.assetPath,
     cachePath: String? = RuntimeOptions.default.cachePath,
     eventMask: RuntimeEventMask = RuntimeOptions.default.eventMask,
     eventWake: Wake = RuntimeOptions.default.eventWake
   ) {
-    self.flags = flags
     self.assetPath = assetPath
     self.cachePath = cachePath
     self.eventMask = eventMask
@@ -1462,7 +1455,6 @@ public struct RuntimeOptions: Sendable {
     raw: mln_runtime_options,
     recordBytes _: UnsafeRawBufferPointer? = nil
   ) throws {
-    flags = raw.flags
     assetPath = raw.asset_path == nil ? nil : try NativeString
       .copyCString(raw.asset_path)
     cachePath = raw.cache_path == nil ? nil : try NativeString
@@ -1474,7 +1466,6 @@ public struct RuntimeOptions: Sendable {
   func nativeValue(arena: NativeInputArena) throws -> mln_runtime_options {
     var raw = mln_runtime_options_default()
     raw.size = UInt32(MemoryLayout<mln_runtime_options>.size)
-    raw.flags = flags
     raw.asset_path = try assetPath.map { try arena.cString($0) }
     raw.cache_path = try cachePath.map { try arena.cString($0) }
     raw.event_mask = eventMask.rawValue

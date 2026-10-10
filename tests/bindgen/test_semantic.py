@@ -3,7 +3,7 @@
 import re
 import unittest
 
-from support import parse
+from support import parse, parse_sources, protocol_header
 
 from tools.bindgen import default_cases, native_ports
 from tools.bindgen.emitters import dart
@@ -279,6 +279,39 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
             .initial,
             FieldInitial("256", 256),
         )
+
+    def test_each_struct_is_versioned_by_one_thing(self):
+        header = protocol_header(groups=("versioning", "strided_records"))
+        bind(parse_sources({"api.h": header}), require_complete=True)
+        message = "struct versioned by its container or stride must not carry size"
+        for name in ("mln_probe_span", "mln_probe_survey", "mln_probe_reading"):
+            with (
+                self.subTest(record=name),
+                self.assertRaisesRegex(ModelError, rf"{name}: {message}"),
+            ):
+                bind(
+                    parse_sources(
+                        {
+                            "api.h": header.replace(
+                                f"typedef struct {name} {{\n",
+                                f"typedef struct {name} {{\n  uint32_t size;\n",
+                            )
+                        }
+                    )
+                )
+        # A default initializes a record that native reads, so a record that
+        # only a completion delivers has none.
+        with self.assertRaisesRegex(
+            ModelError, "mln_probe_survey: default requires a record that native reads"
+        ):
+            bind(
+                parse_sources(
+                    {
+                        "api.h": header
+                        + "mln_probe_survey mln_probe_survey_default(void);\n"
+                    }
+                )
+            )
 
     def test_a_presence_bit_guards_one_member_of_a_record(self):
         source = """
@@ -966,8 +999,8 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
 BIND("synchronous=true") typedef void (*gate)(void *context);
 typedef void (*notify)(void *context);
 typedef void (*release)(void *context);
-typedef struct gates { unsigned size; gate enter BIND("nullable=true"); gate leave BIND("nullable=true"); void *context BIND("kind=context"); release retire; } gates BIND("kind=callback_registration;release=retire");
-typedef struct signals { unsigned size; notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
+typedef struct gates { gate enter BIND("nullable=true"); gate leave BIND("nullable=true"); void *context BIND("kind=context"); release retire; } gates BIND("kind=callback_registration;release=retire");
+typedef struct signals { notify signal BIND("nullable=true"); void *context BIND("kind=context"); release retire; } signals BIND("kind=callback_registration;release=retire");
 typedef struct settings { unsigned size; signals wake; gates guard; } settings;
 settings settings_default(void);
 mln_status attach(const settings *options, mln_diagnostic *out_diagnostic);

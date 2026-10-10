@@ -185,22 +185,23 @@ enum NativeCompletion {
     return value.load(as: Value.self)
   }
 
+  /// Copies each element of the result's array, which native lays out
+  /// value_size bytes apart.
   static func values<Value>(
     _ result: UnsafePointer<mln_completion_result>,
     as _: Value.Type = Value.self
-  ) throws -> UnsafeBufferPointer<Value> {
-    guard result.pointee.value_count > 0 else {
-      return UnsafeBufferPointer(start: nil, count: 0)
-    }
+  ) throws -> [Value] {
+    guard result.pointee.value_count > 0 else { return [] }
     guard let value = result.pointee.value else {
       throw NativeStatusFailure.swiftNativeError(
         "native completion returned a null array"
       )
     }
-    return UnsafeBufferPointer(
-      start: value.assumingMemoryBound(to: Value.self),
-      count: result.pointee.value_count
-    )
+    return try NativeInputArena.copyStrided(
+      value.assumingMemoryBound(to: Value.self),
+      count: result.pointee.value_count,
+      stride: result.pointee.value_size
+    ) { item, _ in item }
   }
 
   static func data(

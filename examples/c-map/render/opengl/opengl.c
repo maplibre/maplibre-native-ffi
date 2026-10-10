@@ -286,10 +286,8 @@ static mln_opengl_context_descriptor opengl_context_descriptor(
   const opengl_context* context
 ) {
   return (mln_opengl_context_descriptor){
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
     .data.egl = {
-      .size = sizeof(mln_egl_context_descriptor),
       .display = context->egl_display,
       .config = context->egl_config,
       .share_context = context->context,

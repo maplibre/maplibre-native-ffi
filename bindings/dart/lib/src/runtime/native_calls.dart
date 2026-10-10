@@ -18,18 +18,30 @@ final class _CompletionValue<T> {
   _CompletionValue(this.copyKind, this.elementSize, this.read);
 
   final int copyKind;
+
+  /// The size of one element in this binding's header, which the native
+  /// stride must cover.
   final int elementSize;
 
   /// Reads the value stored at an element's address.
   final T Function(Pointer<Void> element) read;
 
-  List<T> readList(raw.mln_completion_result result) => List<T>.unmodifiable(
-    List.generate(
-      result.value_count,
-      (index) =>
-          read((result.value.cast<Uint8>() + index * elementSize).cast()),
-    ),
-  );
+  /// Reads each element of the result's array, which native lays out
+  /// value_size bytes apart.
+  List<T> readList(raw.mln_completion_result result) {
+    final count = result.value_count;
+    if (count == 0) return List<T>.unmodifiable(const []);
+    final stride = result.value_size;
+    if (stride < elementSize) {
+      throwInvalidState('native completion stride is too small');
+    }
+    return List<T>.unmodifiable(
+      List.generate(
+        count,
+        (index) => read((result.value.cast<Uint8>() + index * stride).cast()),
+      ),
+    );
+  }
 }
 
 /// Starts an ordered command.
@@ -39,7 +51,6 @@ Future<CommandCompletion> _command(_NativeStart start) =>
 /// Starts an operation that completes without a value.
 Future<void> _run(_NativeStart start) => startNativeCompletion(
   copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-  elementSize: 0,
   start: _withArena(start),
   decode: (_) {},
 );
@@ -48,7 +59,6 @@ Future<void> _run(_NativeStart start) => startNativeCompletion(
 Future<T> _query<T>(_CompletionValue<T> value, _NativeStart start) =>
     startNativeCompletion(
       copyKind: value.copyKind,
-      elementSize: value.elementSize,
       start: _withArena(start),
       decode: (result) => value.read(result.value),
     );
@@ -57,7 +67,6 @@ Future<T> _query<T>(_CompletionValue<T> value, _NativeStart start) =>
 Future<T?> _queryOptional<T>(_CompletionValue<T?> value, _NativeStart start) =>
     startNativeCompletion(
       copyKind: value.copyKind,
-      elementSize: value.elementSize,
       start: _withArena(start),
       decode: (result) =>
           result.value_count == 0 ? null : value.read(result.value),
@@ -67,7 +76,6 @@ Future<T?> _queryOptional<T>(_CompletionValue<T?> value, _NativeStart start) =>
 Future<List<T>> _queryList<T>(_CompletionValue<T> value, _NativeStart start) =>
     startNativeCompletion(
       copyKind: value.copyKind,
-      elementSize: value.elementSize,
       start: _withArena(start),
       decode: value.readList,
     );
@@ -78,7 +86,6 @@ Future<List<T>?> _queryOptionalList<T>(
   _NativeStart start,
 ) => startNativeCompletion(
   copyKind: value.copyKind,
-  elementSize: value.elementSize,
   start: _withArena(start),
   decode: (result) => result.value == nullptr ? null : value.readList(result),
 );
@@ -91,7 +98,6 @@ Future<T> _queryOwned<T>(
   T Function(int handle) adopt,
 ) => startNativeCompletion(
   copyKind: copyKind,
-  elementSize: sizeOf<Uint64>(),
   start: _withArena(start),
   decode: (result) => adopt(result.value.cast<Uint64>().value),
   claimBeforeDecode: true,
@@ -116,7 +122,6 @@ A _attach<T extends Object, A>(
   var handle = 0;
   final completed = startNativeCompletion<void>(
     copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-    elementSize: 0,
     start: (completion) => withNativeArena((arena) {
       final output = arena<Uint64>();
       final status = start(arena, completion, output);

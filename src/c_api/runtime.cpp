@@ -12,12 +12,10 @@
 auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
   return mln_runtime_options{
     .size = sizeof(mln_runtime_options),
-    .flags = 0,
     .asset_path = nullptr,
     .cache_path = nullptr,
     .event_mask = MLN_RUNTIME_EVENT_MASK_ALL,
     .event_wake = mln_wake{
-      .size = sizeof(mln_wake),
       .callback = nullptr,
       .user_data = nullptr,
       .release_user_data = nullptr,

@@ -1010,17 +1010,9 @@ auto validate_lat_lng(mln_lat_lng coordinate) -> mln_status;
 auto validate_edge_insets(mln_edge_insets padding) -> mln_status;
 auto validate_screen_point(mln_screen_point point) -> mln_status;
 
-auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
-  if (camera == nullptr) {
-    mln::core::set_thread_error("camera must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (camera->size < sizeof(mln_camera_options)) {
-    mln::core::set_thread_error("mln_camera_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+// Validates the members of a camera, whose size its container versions when it
+// is embedded.
+auto validate_camera_fields(const mln_camera_options* camera) -> mln_status {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_CAMERA_OPTION_CENTER) | MLN_CAMERA_OPTION_ZOOM |
     MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH |
@@ -1072,6 +1064,19 @@ auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+// Validates a camera that a caller passes by pointer.
+auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
+  if (camera == nullptr) {
+    mln::core::set_thread_error("camera must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (camera->size < sizeof(mln_camera_options)) {
+    mln::core::set_thread_error("mln_camera_options.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return validate_camera_fields(camera);
+}
+
 using DoubleMilliseconds = std::chrono::duration<double, std::milli>;
 
 auto max_native_duration_ms() -> double {
@@ -1104,11 +1109,6 @@ auto validate_animation_options(const mln_animation_options* animation)
   if (animation == nullptr) {
     return MLN_STATUS_OK;
   }
-  if (animation->size < sizeof(mln_animation_options)) {
-    mln::core::set_thread_error("mln_animation_options.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_ANIMATION_OPTION_DURATION) |
     MLN_ANIMATION_OPTION_VELOCITY | MLN_ANIMATION_OPTION_MIN_ZOOM |
@@ -2315,7 +2315,6 @@ auto camera_options_default() noexcept -> mln_camera_options {
 
 auto animation_options_default() noexcept -> mln_animation_options {
   return mln_animation_options{
-    .size = sizeof(mln_animation_options),
     .fields = 0,
     .duration_ms = 0,
     .velocity = 0,
@@ -3762,7 +3761,7 @@ auto map_update_camera(
     set_thread_error("camera update mode or gesture phase is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto camera_status = validate_camera_options(&update->camera);
+  const auto camera_status = validate_camera_fields(&update->camera);
   if (camera_status != MLN_STATUS_OK) {
     return camera_status;
   }
@@ -3956,8 +3955,6 @@ auto map_camera_query_start(mln_map map, const mln_completion* completion)
         state->complete(
           MLN_STATUS_OK, {},
           std::any{mln_camera_query_result{
-            .size = sizeof(mln_camera_query_result),
-            .reserved = 0,
             .generation = generation,
             .camera = from_native_camera(live->map->getCameraOptions())
           }}

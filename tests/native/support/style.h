@@ -162,6 +162,8 @@ typedef struct mln_test_style_entry {
 typedef struct mln_test_style_list {
   mln_status status;
   size_t count;
+  // The completion's value_size, the stride that the entries were read by.
+  uint32_t value_size;
   mln_test_style_entry entries[MLN_TEST_STYLE_LIST_CAPACITY];
 } mln_test_style_list;
 

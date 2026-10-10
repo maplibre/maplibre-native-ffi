@@ -163,7 +163,6 @@ struct AdapterOwnerToken {
 
 struct AdapterCompletionState {
   std::uint32_t copy_kind = MLN_ADAPTER_COMPLETION_COPY_FLAT;
-  std::size_t element_size = 0;
   mln_adapter_completion_listener listener = nullptr;
   void* user_data = nullptr;
   std::optional<DartWake> dart_port;
@@ -249,7 +248,7 @@ auto adapter_completion_callback(
     return;
   AdapterCompletionRecord* record = nullptr;
   try {
-    record = mln::capture::copy(*result, state->copy_kind, state->element_size);
+    record = mln::capture::copy(*result, state->copy_kind);
   } catch (...) {
     mln::capture::discard(state->copy_kind, *result);
     deliver_completion(*state, nullptr);
@@ -506,9 +505,9 @@ extern "C" MLN_API void mln_adapter_deferred_call_record_destroy(
 }
 
 extern "C" MLN_API auto mln_adapter_completion_create(
-  std::uint32_t copy_kind, std::size_t element_size,
-  mln_adapter_completion_listener listener, void* user_data,
-  mln_completion* out_completion, mln_diagnostic* out_diagnostic
+  std::uint32_t copy_kind, mln_adapter_completion_listener listener,
+  void* user_data, mln_completion* out_completion,
+  mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
     if (
@@ -523,7 +522,6 @@ extern "C" MLN_API auto mln_adapter_completion_create(
     }
     auto state = std::make_unique<AdapterCompletionState>();
     state->copy_kind = copy_kind;
-    state->element_size = element_size;
     state->listener = listener;
     state->user_data = user_data;
     *out_completion = mln_completion{
@@ -538,8 +536,8 @@ extern "C" MLN_API auto mln_adapter_completion_create(
 }
 
 extern "C" MLN_API auto mln_adapter_dart_completion_create(
-  std::uint32_t copy_kind, std::size_t element_size, void* post_cobject,
-  std::int64_t port, std::int64_t token, mln_completion* out_completion,
+  std::uint32_t copy_kind, void* post_cobject, std::int64_t port,
+  std::int64_t token, mln_completion* out_completion,
   mln_diagnostic* out_diagnostic
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary(out_diagnostic, [&]() -> mln_status {
@@ -550,8 +548,8 @@ extern "C" MLN_API auto mln_adapter_dart_completion_create(
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     const auto status = mln_adapter_completion_create(
-      copy_kind, element_size, [](void*, mln_adapter_completion_record*) {},
-      nullptr, out_completion, nullptr
+      copy_kind, [](void*, mln_adapter_completion_record*) {}, nullptr,
+      out_completion, nullptr
     );
     if (status != MLN_STATUS_OK) return status;
     auto* state =
@@ -606,7 +604,6 @@ extern "C" MLN_API auto mln_adapter_dart_wake_create(
       DartWake{reinterpret_cast<DartWake::Post>(post_cobject), port}
     );
     *out_wake = {};
-    out_wake->size = sizeof(mln_wake);
     out_wake->callback = [](void* context) {
       static_cast<DartWake*>(context)->notify(0);
     };

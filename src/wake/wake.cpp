@@ -77,10 +77,6 @@ auto validate_wake(const mln_wake* wake) -> mln_status {
     set_thread_error("wake must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (wake->size < sizeof(mln_wake)) {
-    set_thread_error("mln_wake.size is too small");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (wake->callback == nullptr && wake->release_user_data != nullptr) {
     set_thread_error("a disabled wake must not retain user data");
     return MLN_STATUS_INVALID_ARGUMENT;

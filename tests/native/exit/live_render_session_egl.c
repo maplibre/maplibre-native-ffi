@@ -17,13 +17,11 @@ static mln_status attach(
   // renders in the host's context.
   const bool dedicated = options->driver == MLN_RENDER_DRIVER_CORE_WORKER;
   descriptor.context = (mln_opengl_context_descriptor){
-    .size = sizeof(mln_opengl_context_descriptor),
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
     .ownership = dedicated ? MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED
                            : MLN_OPENGL_CONTEXT_OWNERSHIP_SHARED,
     .data = {
       .egl = {
-        .size = sizeof(mln_egl_context_descriptor),
         .display = context->egl_display,
         .config = context->egl_config,
         .share_context = dedicated ? NULL : context->egl_context,

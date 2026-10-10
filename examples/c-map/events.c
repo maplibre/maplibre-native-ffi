@@ -48,7 +48,6 @@ static void wake_render_loop(void* user_data) {
 
 mln_wake app_event_wake(app_event_code code) {
   return (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = wake_render_loop,
     .user_data = (void*)(intptr_t)code,
   };

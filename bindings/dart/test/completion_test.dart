@@ -24,7 +24,6 @@ void main() {
       var decodes = 0;
       final creation = startNativeCompletion<void>(
         copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_MAP,
-        elementSize: sizeOf<Uint64>(),
         start: (completion) => withNativeArena((arena) {
           final options = arena<raw.mln_map_options>();
           options.ref = raw.mln_map_options_default();
@@ -89,7 +88,6 @@ void main() {
     expect(
       () => startNativeCompletion<void>(
         copyKind: raw.MLN_ADAPTER_COMPLETION_COPY_FLAT,
-        elementSize: 0,
         // The null runtime is never live, so native refuses the barrier.
         start: (completion) =>
             raw.mln_runtime_barrier(0, completion, nativeDiagnostic),

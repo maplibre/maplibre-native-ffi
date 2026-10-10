@@ -31,7 +31,8 @@ internal static unsafe class NativeCompletion
         return *(T*)result->value;
     }
 
-    internal static ReadOnlySpan<T> Values<T>(mln_completion_result* result)
+    /// <summary>Copies each element of the result's array, which native lays out value_size bytes apart.</summary>
+    internal static T[] Values<T>(mln_completion_result* result)
         where T : unmanaged
     {
         if (result->value_count == 0)
@@ -42,7 +43,19 @@ internal static unsafe class NativeCompletion
         {
             throw new InvalidOperationException("Native completion returned a null array.");
         }
-        return new ReadOnlySpan<T>(result->value, checked((int)result->value_count));
+        if (result->value_size < sizeof(T))
+        {
+            throw new InvalidOperationException(
+                "Native completion stride is below the element size."
+            );
+        }
+        var values = new T[checked((int)result->value_count)];
+        var bytes = (byte*)result->value;
+        for (var index = 0; index < values.Length; index++)
+            values[index] = Unsafe.ReadUnaligned<T>(
+                bytes + checked((nuint)index * result->value_size)
+            );
+        return values;
     }
 
     internal static Task<CommandCompletion> SubmitCommand(

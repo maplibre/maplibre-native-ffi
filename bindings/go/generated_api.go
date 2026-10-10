@@ -1424,7 +1424,6 @@ func copyAnimationOptions(raw C.mln_animation_options) AnimationOptions {
 
 func nativeAnimationOptions(input AnimationOptions, arena *bindingArena) C.mln_animation_options {
 	raw := C.mln_animation_options_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.fields = 0
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_DURATION, &raw.duration_ms, input.DurationMs, arena, bindingNumber[float64, C.double])
 	bindingMasked(&raw.fields, C.MLN_ANIMATION_OPTION_VELOCITY, &raw.velocity, input.Velocity, arena, bindingNumber[float64, C.double])
@@ -1851,7 +1850,6 @@ func copyEglContextDescriptor(raw C.mln_egl_context_descriptor) EglContextDescri
 
 func nativeEglContextDescriptor(input EglContextDescriptor, arena *bindingArena) C.mln_egl_context_descriptor {
 	raw := C.mln_egl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.display = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Display)))
 	raw.config = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Config)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
@@ -2513,7 +2511,6 @@ func copyMetalContextDescriptor(raw C.mln_metal_context_descriptor) MetalContext
 
 func nativeMetalContextDescriptor(input MetalContextDescriptor, arena *bindingArena) C.mln_metal_context_descriptor {
 	raw := C.mln_metal_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
 	return raw
 }
@@ -2653,7 +2650,6 @@ func copyOfflineGeometryRegionDefinition(raw C.mln_offline_geometry_region_defin
 
 func nativeOfflineGeometryRegionDefinition(input OfflineGeometryRegionDefinition, arena *bindingArena) C.mln_offline_geometry_region_definition {
 	raw := C.mln_offline_geometry_region_definition{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.style_url = arena.cstring(input.StyleUrl)
 	raw.geometry = C.mln_buffer_view{data: arena.bytes(input.Geometry), size: C.size_t(len(input.Geometry))}
 	raw.min_zoom = C.double(input.MinZoom)
@@ -2785,7 +2781,6 @@ func copyOfflineTilePyramidRegionDefinition(raw C.mln_offline_tile_pyramid_regio
 
 func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefinition, arena *bindingArena) C.mln_offline_tile_pyramid_region_definition {
 	raw := C.mln_offline_tile_pyramid_region_definition{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.style_url = arena.cstring(input.StyleUrl)
 	raw.bounds = nativeLatLngBounds(input.Bounds, arena)
 	raw.min_zoom = C.double(input.MinZoom)
@@ -2877,7 +2872,6 @@ func copyOpenglContextDescriptor(raw C.mln_opengl_context_descriptor) OpenglCont
 
 func nativeOpenglContextDescriptor(input OpenglContextDescriptor, arena *bindingArena) C.mln_opengl_context_descriptor {
 	raw := C.mln_opengl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.ownership = C.uint32_t(input.Ownership)
 	if input.Data == nil {
 		arena.fail("missing union variant")
@@ -3172,7 +3166,6 @@ type QueueLock struct {
 
 func nativeQueueLock(input QueueLock, arena *bindingArena) C.mln_queue_lock {
 	raw := C.mln_queue_lock{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Lock != nil || input.Unlock != nil {
 		raw.user_data = arena.register(input, 0)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -3801,9 +3794,7 @@ func copyRuntimeEventOfflineRegionResponseError(raw C.mln_runtime_event_offline_
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeEventOfflineRegionStatus struct {
 	RegionId int64
-	// Region status. This member keeps its own size field because the same struct
-	// is also returned by mln_runtime_offline_region_get_status().
-	Status OfflineRegionStatus
+	Status   OfflineRegionStatus
 }
 
 func copyRuntimeEventOfflineRegionStatus(raw C.mln_runtime_event_offline_region_status) RuntimeEventOfflineRegionStatus {
@@ -3895,8 +3886,6 @@ func copyRuntimeEventTileAction(raw C.mln_runtime_event_tile_action) RuntimeEven
 // See mln_runtime_options in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html
 type RuntimeOptions struct {
-	// No flags are currently defined. Must be zero.
-	Flags uint32
 	// Directory root for asset:// URLs. Copied during runtime creation. Null or
 	// empty selects /android_asset on Android and . elsewhere.
 	AssetPath *string
@@ -3911,7 +3900,6 @@ type RuntimeOptions struct {
 
 func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 	var result RuntimeOptions
-	result.Flags = uint32(raw.flags)
 	result.AssetPath = func() *string {
 		if raw.asset_path == nil {
 			return nil
@@ -3933,7 +3921,6 @@ func copyRuntimeOptions(raw C.mln_runtime_options) RuntimeOptions {
 func nativeRuntimeOptions(input RuntimeOptions, arena *bindingArena) C.mln_runtime_options {
 	raw := C.mln_runtime_options_default()
 	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.flags = C.uint32_t(input.Flags)
 	if input.AssetPath != nil {
 		raw.asset_path = arena.cstring((*input.AssetPath))
 	}
@@ -4111,7 +4098,7 @@ type StyleImageInfo struct {
 	// One of mln_style_image_text_fit, meaningful when fields contains
 	// TEXT_FIT_HEIGHT.
 	TextFitHeight *StyleImageTextFit
-	// Sprite pixel ratio. Defaults to 1.0.
+	// Sprite pixel ratio.
 	PixelRatio float32
 	Sdf        bool
 }
@@ -4130,28 +4117,6 @@ func copyStyleImageInfo(raw C.mln_style_image_info) StyleImageInfo {
 	result.PixelRatio = float32(raw.pixel_ratio)
 	result.Sdf = bool(raw.sdf)
 	return result
-}
-
-func nativeStyleImageInfo(input StyleImageInfo, arena *bindingArena) C.mln_style_image_info {
-	raw := C.mln_style_image_info_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.fields = 0
-	raw.width = C.uint32_t(input.Width)
-	raw.height = C.uint32_t(input.Height)
-	raw.stride = C.uint32_t(input.Stride)
-	raw.byte_length = C.size_t(input.ByteLength)
-	raw.stretch_x_count = C.size_t(input.StretchXCount)
-	raw.stretch_y_count = C.size_t(input.StretchYCount)
-	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_INFO_CONTENT, &raw.content, input.Content, arena, nativeImageContent)
-	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_WIDTH, &raw.text_fit_width, input.TextFitWidth, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	bindingMasked(&raw.fields, C.MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT, &raw.text_fit_height, input.TextFitHeight, arena, bindingNumber[StyleImageTextFit, C.uint32_t])
-	raw.pixel_ratio = C.float(input.PixelRatio)
-	raw.sdf = C.bool(input.Sdf)
-	return raw
-}
-
-func DefaultStyleImageInfo() StyleImageInfo {
-	return copyStyleImageInfo(C.mln_style_image_info_default())
 }
 
 // StyleImageOptions corresponds to mln_style_image_options. Options for runtime
@@ -4649,20 +4614,6 @@ func copyTextureImageInfo(raw C.mln_texture_image_info) TextureImageInfo {
 	return result
 }
 
-func nativeTextureImageInfo(input TextureImageInfo, arena *bindingArena) C.mln_texture_image_info {
-	raw := C.mln_texture_image_info_default()
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
-	raw.width = C.uint32_t(input.Width)
-	raw.height = C.uint32_t(input.Height)
-	raw.stride = C.uint32_t(input.Stride)
-	raw.byte_length = C.size_t(input.ByteLength)
-	return raw
-}
-
-func DefaultTextureImageInfo() TextureImageInfo {
-	return copyTextureImageInfo(C.mln_texture_image_info_default())
-}
-
 // TextureReadbackResult corresponds to mln_texture_readback_result. Texture
 // readback borrowed for a completion callback.
 //
@@ -4861,7 +4812,6 @@ func copyVulkanContextDescriptor(raw C.mln_vulkan_context_descriptor) VulkanCont
 
 func nativeVulkanContextDescriptor(input VulkanContextDescriptor, arena *bindingArena) C.mln_vulkan_context_descriptor {
 	raw := C.mln_vulkan_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.instance = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Instance)))
 	raw.physical_device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.PhysicalDevice)))
 	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
@@ -4993,7 +4943,6 @@ type Wake struct{ Callback func() }
 
 func nativeWake(input Wake, arena *bindingArena) C.mln_wake {
 	raw := C.mln_wake{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	if input.Callback != nil {
 		raw.user_data = arena.register(input, 0)
 		raw.release_user_data = C.mln_user_data_release(C.binding_release)
@@ -5029,7 +4978,6 @@ func copyWebglContextDescriptor(raw C.mln_webgl_context_descriptor) WebglContext
 
 func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingArena) C.mln_webgl_context_descriptor {
 	raw := C.mln_webgl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.kind = C.uint32_t(input.Kind)
 	raw.context = C.int32_t(input.Context)
 	raw.canvas_selector = C.mln_buffer_view{data: arena.bytes([]byte(input.CanvasSelector)), size: C.size_t(len(input.CanvasSelector))}
@@ -5113,7 +5061,6 @@ func copyWebgpuContextDescriptor(raw C.mln_webgpu_context_descriptor) WebgpuCont
 
 func nativeWebgpuContextDescriptor(input WebgpuContextDescriptor, arena *bindingArena) C.mln_webgpu_context_descriptor {
 	raw := C.mln_webgpu_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.instance = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Instance)))
 	raw.device = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Device)))
 	raw.queue = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Queue)))
@@ -5260,7 +5207,6 @@ func copyWglContextDescriptor(raw C.mln_wgl_context_descriptor) WglContextDescri
 
 func nativeWglContextDescriptor(input WglContextDescriptor, arena *bindingArena) C.mln_wgl_context_descriptor {
 	raw := C.mln_wgl_context_descriptor{}
-	raw.size = bindingCountLike(raw.size, int(unsafe.Sizeof(raw)))
 	raw.device_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.DeviceContext)))
 	raw.share_context = unsafe.Pointer(C.binding_address(C.uintptr_t(input.ShareContext)))
 	raw.get_proc_address = unsafe.Pointer(C.binding_address(C.uintptr_t(input.GetProcAddress)))

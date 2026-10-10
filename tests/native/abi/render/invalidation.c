@@ -95,12 +95,8 @@ static void read_center_pixel(
   TEST_ASSERT_TRUE(
     mln_test_completion_copy_value(&readback, &result, sizeof(result))
   );
-  mln_texture_image_info expected = mln_texture_image_info_default();
-  expected.width = 64;
-  expected.height = 64;
-  TEST_ASSERT_EQUAL_UINT32(expected.size, result.info.size);
-  TEST_ASSERT_EQUAL_UINT32(expected.width, result.info.width);
-  TEST_ASSERT_EQUAL_UINT32(expected.height, result.info.height);
+  TEST_ASSERT_EQUAL_UINT32(64, result.info.width);
+  TEST_ASSERT_EQUAL_UINT32(64, result.info.height);
   TEST_ASSERT_EQUAL_size_t(result.info.byte_length, result.data.size);
   const size_t offset = (size_t)(result.info.height / 2) * result.info.stride +
                         (size_t)(result.info.width / 2) * 4;

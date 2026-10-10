@@ -50,7 +50,6 @@ impl Default for AnimationOptions {
 impl ToNative<sys::mln_animation_options> for AnimationOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_animation_options> {
         let mut raw: sys::mln_animation_options = unsafe { sys::mln_animation_options_default() };
-        raw.size = std::mem::size_of::<sys::mln_animation_options>() as _;
         raw.fields = 0;
         if let Some(item) = &self.duration_ms {
             raw.fields |= sys::MLN_ANIMATION_OPTION_DURATION;
@@ -965,7 +964,6 @@ impl EglContextDescriptor {
 impl ToNative<sys::mln_egl_context_descriptor> for EglContextDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_egl_context_descriptor> {
         let mut raw: sys::mln_egl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_egl_context_descriptor>() as _;
         raw.display = self.display;
         raw.config = self.config;
         raw.share_context = self.share_context;
@@ -2319,7 +2317,6 @@ impl MetalContextDescriptor {
 impl ToNative<sys::mln_metal_context_descriptor> for MetalContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_metal_context_descriptor> {
         let mut raw: sys::mln_metal_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_metal_context_descriptor>() as _;
         raw.device = self.device;
         Ok(raw)
     }
@@ -2526,7 +2523,6 @@ impl ToNative<sys::mln_offline_geometry_region_definition> for OfflineGeometryRe
         arena: &mut InputArena,
     ) -> Result<sys::mln_offline_geometry_region_definition> {
         let mut raw: sys::mln_offline_geometry_region_definition = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as _;
         raw.style_url = to_native(&self.style_url, arena)?;
         raw.geometry = to_native(&self.geometry, arena)?;
         raw.min_zoom = self.min_zoom;
@@ -2745,7 +2741,6 @@ impl ToNative<sys::mln_offline_tile_pyramid_region_definition>
     ) -> Result<sys::mln_offline_tile_pyramid_region_definition> {
         let mut raw: sys::mln_offline_tile_pyramid_region_definition =
             unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as _;
         raw.style_url = to_native(&self.style_url, arena)?;
         raw.bounds = to_native(&self.bounds, arena)?;
         raw.min_zoom = self.min_zoom;
@@ -2859,7 +2854,6 @@ pub struct OpenglContextDescriptor {
 impl ToNative<sys::mln_opengl_context_descriptor> for OpenglContextDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_opengl_context_descriptor> {
         let mut raw: sys::mln_opengl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_opengl_context_descriptor>() as _;
         raw.ownership = to_native(&self.ownership, arena)?;
         match &self.data {
             OpenglContextDescriptorData::Wgl(item) => {
@@ -3394,7 +3388,6 @@ impl QueueLock {
 impl ToNative<sys::mln_queue_lock> for QueueLock {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_queue_lock> {
         let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_queue_lock>() as _;
         raw.lock = self.lock.as_ref().map(|_| Self::lock_trampoline as _);
         raw.unlock = self.unlock.as_ref().map(|_| Self::unlock_trampoline as _);
         if !(raw.lock.is_none() && raw.unlock.is_none()) {
@@ -4738,8 +4731,6 @@ impl FromNative<sys::mln_runtime_event_offline_region_response_error>
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct RuntimeEventOfflineRegionStatus {
     pub region_id: i64,
-    /// Region status. This member keeps its own size field because the same
-    /// struct is also returned by `mln_runtime_offline_region_get_status()`.
     pub status: OfflineRegionStatus,
 }
 impl RuntimeEventOfflineRegionStatus {
@@ -4956,8 +4947,6 @@ pub enum RuntimeEventType: u32 {
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
 #[derive(Debug, Clone)]
 pub struct RuntimeOptions {
-    /// No flags are currently defined. Must be zero.
-    pub flags: u32,
     /// Directory root for asset:// URLs. Copied during runtime creation. Null
     /// or empty selects `/android_asset` on Android and `.` elsewhere.
     pub asset_path: Option<String>,
@@ -4978,7 +4967,6 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_runtime_options> {
         let mut raw: sys::mln_runtime_options = unsafe { sys::mln_runtime_options_default() };
         raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
-        raw.flags = self.flags;
         raw.asset_path = to_native(&self.asset_path, arena)?;
         raw.cache_path = to_native(&self.cache_path, arena)?;
         raw.event_mask = to_native(&self.event_mask, arena)?;
@@ -4989,7 +4977,6 @@ impl ToNative<sys::mln_runtime_options> for RuntimeOptions {
 impl FromNative<sys::mln_runtime_options> for RuntimeOptions {
     unsafe fn from_native(raw: sys::mln_runtime_options) -> Result<Self> {
         Ok(Self {
-            flags: raw.flags,
             asset_path: unsafe { from_native(raw.asset_path) }?,
             cache_path: unsafe { from_native(raw.cache_path) }?,
             event_mask: unsafe { from_native(raw.event_mask) }?,
@@ -5189,7 +5176,7 @@ pub enum Status: i32 {
 ///
 /// See `mln_style_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/style_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct StyleImageInfo {
     pub width: u32,
     pub height: u32,
@@ -5207,14 +5194,9 @@ pub struct StyleImageInfo {
     /// One of `mln_style_image_text_fit`, meaningful when fields contains
     /// TEXT_FIT_HEIGHT.
     pub text_fit_height: Option<StyleImageTextFit>,
-    /// Sprite pixel ratio. Defaults to 1.0.
+    /// Sprite pixel ratio.
     pub pixel_ratio: f32,
     pub sdf: bool,
-}
-impl Default for StyleImageInfo {
-    fn default() -> Self {
-        convert::native_default(unsafe { sys::mln_style_image_info_default() })
-    }
 }
 impl FromNative<sys::mln_style_image_info> for StyleImageInfo {
     unsafe fn from_native(raw: sys::mln_style_image_info) -> Result<Self> {
@@ -5956,7 +5938,7 @@ pub enum StyleVectorTileEncoding: u32 {
 ///
 /// See `mln_texture_image_info` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct TextureImageInfo {
     /// Physical image width in device pixels.
     pub width: u32,
@@ -5966,11 +5948,6 @@ pub struct TextureImageInfo {
     pub stride: u32,
     /// Required output buffer byte length.
     pub byte_length: usize,
-}
-impl Default for TextureImageInfo {
-    fn default() -> Self {
-        convert::native_default(unsafe { sys::mln_texture_image_info_default() })
-    }
 }
 impl TextureImageInfo {
     pub const fn new(width: u32, height: u32, stride: u32, byte_length: usize) -> Self {
@@ -6308,7 +6285,6 @@ impl VulkanContextDescriptor {
 impl ToNative<sys::mln_vulkan_context_descriptor> for VulkanContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_vulkan_context_descriptor> {
         let mut raw: sys::mln_vulkan_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_vulkan_context_descriptor>() as _;
         raw.instance = self.instance;
         raw.physical_device = self.physical_device;
         raw.device = self.device;
@@ -6541,7 +6517,6 @@ impl Wake {
 impl ToNative<sys::mln_wake> for Wake {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_wake> {
         let mut raw: sys::mln_wake = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_wake>() as _;
         raw.callback = self
             .callback
             .as_ref()
@@ -6572,7 +6547,6 @@ pub struct WebglContextDescriptor {
 impl ToNative<sys::mln_webgl_context_descriptor> for WebglContextDescriptor {
     fn to_native(&self, arena: &mut InputArena) -> Result<sys::mln_webgl_context_descriptor> {
         let mut raw: sys::mln_webgl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_webgl_context_descriptor>() as _;
         raw.kind = to_native(&self.kind, arena)?;
         raw.context = self.context;
         raw.canvas_selector = to_native(&self.canvas_selector, arena)?;
@@ -6713,7 +6687,6 @@ impl WebgpuContextDescriptor {
 impl ToNative<sys::mln_webgpu_context_descriptor> for WebgpuContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_webgpu_context_descriptor> {
         let mut raw: sys::mln_webgpu_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_webgpu_context_descriptor>() as _;
         raw.instance = self.instance;
         raw.device = self.device;
         raw.queue = self.queue;
@@ -6931,7 +6904,6 @@ impl WglContextDescriptor {
 impl ToNative<sys::mln_wgl_context_descriptor> for WglContextDescriptor {
     fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_wgl_context_descriptor> {
         let mut raw: sys::mln_wgl_context_descriptor = unsafe { std::mem::zeroed() };
-        raw.size = std::mem::size_of::<sys::mln_wgl_context_descriptor>() as _;
         raw.device_context = self.device_context;
         raw.share_context = self.share_context;
         raw.get_proc_address = self.get_proc_address;

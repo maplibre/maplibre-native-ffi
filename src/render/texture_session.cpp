@@ -31,7 +31,6 @@ auto metal_owned_texture_descriptor_default() noexcept
         .scale_factor = 1.0,
       },
     .context = mln_metal_context_descriptor{
-      .size = sizeof(mln_metal_context_descriptor),
       .device = nullptr,
     },
   };
@@ -66,7 +65,6 @@ auto vulkan_owned_texture_descriptor_default() noexcept
         .scale_factor = 1.0,
       },
     .context = mln_vulkan_context_descriptor{
-      .size = sizeof(mln_vulkan_context_descriptor),
       .instance = nullptr,
       .physical_device = nullptr,
       .device = nullptr,
@@ -93,7 +91,6 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
     .physical_height = 256,
     .context =
       mln_vulkan_context_descriptor{
-        .size = sizeof(mln_vulkan_context_descriptor),
         .instance = nullptr,
         .physical_device = nullptr,
         .device = nullptr,
@@ -122,7 +119,6 @@ auto webgpu_owned_texture_descriptor_default() noexcept
         .scale_factor = 1.0,
       },
     .context = mln_webgpu_context_descriptor{
-      .size = sizeof(mln_webgpu_context_descriptor),
       .instance = nullptr,
       .device = nullptr,
       .queue = nullptr,
@@ -145,7 +141,6 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
     .physical_height = 256,
     .context =
       mln_webgpu_context_descriptor{
-        .size = sizeof(mln_webgpu_context_descriptor),
         .instance = nullptr,
         .device = nullptr,
         .queue = nullptr,
@@ -420,16 +415,6 @@ auto validate_opengl_borrowed_texture_descriptor(
   return MLN_STATUS_OK;
 }
 
-auto texture_image_info_default() noexcept -> mln_texture_image_info {
-  return mln_texture_image_info{
-    .size = sizeof(mln_texture_image_info),
-    .width = 0,
-    .height = 0,
-    .stride = 0,
-    .byte_length = 0
-  };
-}
-
 auto validate_texture(
   mln_render_session texture, mln_render_session_object*& out_texture
 ) -> mln_status {
@@ -469,8 +454,8 @@ auto texture_read_premultiplied_rgba8(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_info == nullptr || out_info->size < sizeof(mln_texture_image_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
+  if (out_info == nullptr) {
+    set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (live->texture.mode != TextureSessionMode::Owned) {
@@ -501,7 +486,6 @@ auto texture_read_premultiplied_rgba8(
   const auto byte_length = static_cast<size_t>(stride) * live->physical_height;
 
   *out_info = mln_texture_image_info{
-    .size = sizeof(mln_texture_image_info),
     .width = live->physical_width,
     .height = live->physical_height,
     .stride = stride,
@@ -558,7 +542,7 @@ auto texture_read_premultiplied_rgba8_start(
     [](mln_render_session_object& target, std::any& result) {
       auto readback = TextureReadbackResult{
         .bytes = {},
-        .info = texture_image_info_default(),
+        .info = {},
       };
       auto status = texture_read_premultiplied_rgba8(
         target.self, nullptr, 0, &readback.info
@@ -583,8 +567,6 @@ auto texture_read_premultiplied_rgba8_start(
                         info =
                           readback->info](const mln_completion& descriptor) {
           const auto value = mln_texture_readback_result{
-            .size = sizeof(mln_texture_readback_result),
-            .reserved = 0,
             .data = {.data = bytes.data(), .size = bytes.size()},
             .info = info,
           };

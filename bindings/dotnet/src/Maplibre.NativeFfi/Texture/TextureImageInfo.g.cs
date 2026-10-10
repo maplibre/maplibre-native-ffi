@@ -26,16 +26,4 @@ public readonly partial record struct TextureImageInfo(
     uint Height,
     uint Stride,
     ulong ByteLength
-)
-{
-    public static TextureImageInfo Default
-    {
-        get
-        {
-            using var call = NativeCall.Enter(null, "mln_texture_image_info_default");
-            return GeneratedValues.CopyTextureImageInfo(
-                NativeMethods.mln_texture_image_info_default()
-            );
-        }
-    }
-}
+);

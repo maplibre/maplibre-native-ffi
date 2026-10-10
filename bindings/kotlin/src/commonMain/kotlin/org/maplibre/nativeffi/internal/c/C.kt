@@ -1224,8 +1224,6 @@ internal expect object C {
 
   fun mln_source_feature_query_options_default(returned: Long): Unit
 
-  fun mln_style_image_info_default(returned: Long): Unit
-
   fun mln_style_image_options_default(returned: Long): Unit
 
   fun mln_style_tile_source_options_default(returned: Long): Unit
@@ -1233,8 +1231,6 @@ internal expect object C {
   fun mln_style_transition_options_default(returned: Long): Unit
 
   fun mln_supported_render_backend_mask(): Int
-
-  fun mln_texture_image_info_default(returned: Long): Unit
 
   fun mln_texture_read_premultiplied_rgba8(
     session: Long,

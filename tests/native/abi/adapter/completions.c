@@ -8,7 +8,6 @@
 // The arguments of one mln_adapter_completion_create() call.
 typedef struct create_arguments {
   uint32_t copy_kind;
-  size_t element_size;
   mln_adapter_completion_listener listener;
   mln_completion output;
   bool null_output;
@@ -37,7 +36,7 @@ static mln_status create_completion(
   mln_test_adapter_delivery* delivery = context;
   create_arguments arguments = *(const create_arguments*)descriptor;
   const mln_status status = mln_adapter_completion_create(
-    arguments.copy_kind, arguments.element_size, arguments.listener, delivery,
+    arguments.copy_kind, arguments.listener, delivery,
     arguments.null_output ? NULL : &arguments.output, diagnostic
   );
   if (status == MLN_STATUS_OK) {
@@ -58,7 +57,6 @@ static void completion_create_rejects_raw_invalid_arguments(void) {
   };
   const create_arguments defaults = {
     .copy_kind = MLN_ADAPTER_COMPLETION_COPY_MAP,
-    .element_size = sizeof(mln_map),
     .listener = mln_test_adapter_keep_record,
   };
   mln_test_adapter_delivery delivery = {0};
@@ -72,7 +70,7 @@ static void completion_create_rejects_raw_invalid_arguments(void) {
 static void completion_copy_failures_use_the_adapter_failure_channel(void) {
   mln_test_adapter_delivery delivery = {0};
   mln_completion completion = mln_test_adapter_completion(
-    MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT, 0, &delivery
+    MLN_ADAPTER_COMPLETION_COPY_TEXTURE_READBACK_RESULT, &delivery
   );
 
   // A texture readback completion must carry exactly one result. The invalid
@@ -95,9 +93,8 @@ static void completion_copy_failures_use_the_adapter_failure_channel(void) {
 static mln_adapter_completion_record* create_map_record(
   mln_runtime runtime, mln_test_adapter_delivery* delivery, mln_map* out_map
 ) {
-  mln_completion completion = mln_test_adapter_completion(
-    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), delivery
-  );
+  mln_completion completion =
+    mln_test_adapter_completion(MLN_ADAPTER_COMPLETION_COPY_MAP, delivery);
   MLN_TEST_OK(mln_map_create(runtime, NULL, &completion, NULL));
   TEST_ASSERT_TRUE(mln_test_wait_for_flag(&delivery->delivered));
   mln_adapter_completion_record* record = atomic_load(&delivery->record);
@@ -143,9 +140,8 @@ static void an_adopted_record_leaves_its_result_to_the_host(void) {
 // synchronous, so the listener count is final when the reject returns.
 static void a_rejected_completion_never_reaches_its_listener(void) {
   mln_test_adapter_delivery delivery = {0};
-  mln_completion completion = mln_test_adapter_completion(
-    MLN_ADAPTER_COMPLETION_COPY_MAP, sizeof(mln_map), &delivery
-  );
+  mln_completion completion =
+    mln_test_adapter_completion(MLN_ADAPTER_COMPLETION_COPY_MAP, &delivery);
   MLN_TEST_INVALID(mln_map_create(MLN_HANDLE_NULL, NULL, &completion, NULL));
   mln_adapter_completion_reject(&completion);
   TEST_ASSERT_EQUAL_size_t(0, atomic_load(&delivery.deliveries));

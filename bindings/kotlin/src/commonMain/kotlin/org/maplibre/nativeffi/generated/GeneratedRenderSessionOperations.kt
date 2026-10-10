@@ -295,10 +295,11 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       binding,
       "mln_render_session_query_rendered_features",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(40, 72).toLong(),
+          CompletionBridge.valueSize(result),
+          w(36, 72),
         ) {
           readQueriedFeature(it)
         }
@@ -331,10 +332,11 @@ public abstract class GeneratedRenderSessionOperations internal constructor() {
       binding,
       "mln_render_session_query_source_features",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(40, 72).toLong(),
+          CompletionBridge.valueSize(result),
+          w(36, 72),
         ) {
           readQueriedFeature(it)
         }

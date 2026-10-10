@@ -580,7 +580,6 @@ static void a_session_disposed_while_attaching_frees_the_map(void) {
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = count_nothing,
     .user_data = &released,
     .release_user_data = flag_release,
@@ -630,7 +629,6 @@ static void a_disposed_attached_session_releases_its_wakes_before_the_device(
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = count_nothing,
     .user_data = &released,
     .release_user_data = flag_release,
@@ -826,12 +824,10 @@ static void wakes_may_call_back_into_the_session(void) {
     mln_render_session_attach_options_default();
   options.requested_texture_ring_depth = 2;
   options.frame_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = drain_inside_frame_wake,
     .user_data = &reentrant,
   };
   options.driver_work_wake = (mln_wake){
-    .size = sizeof(mln_wake),
     .callback = service_inside_driver_wake,
     .user_data = &reentrant,
   };

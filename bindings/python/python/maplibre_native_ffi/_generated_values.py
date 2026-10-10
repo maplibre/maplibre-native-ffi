@@ -3066,7 +3066,6 @@ class RuntimeOptions:
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/runtime_8h.html).
     """
 
-    flags: int
     event_mask: RuntimeEventMask
     event_wake: Wake
     asset_path: str | None = None
@@ -3075,7 +3074,6 @@ class RuntimeOptions:
     @classmethod
     def _from_native(cls, raw):
         return cls(
-            flags=raw["flags"],
             asset_path=raw["asset_path"],
             cache_path=raw["cache_path"],
             event_mask=RuntimeEventMask(raw["event_mask"]),
@@ -3203,12 +3201,6 @@ class StyleImageInfo:
             pixel_ratio=raw["pixel_ratio"],
             sdf=raw["sdf"],
         )
-
-    @classmethod
-    def default(cls):
-        from . import _native
-
-        return cls._from_native(_native._default_style_image_info())
 
 
 @dataclass(frozen=True, slots=True)
@@ -3551,12 +3543,6 @@ class TextureImageInfo:
             stride=raw["stride"],
             byte_length=raw["byte_length"],
         )
-
-    @classmethod
-    def default(cls):
-        from . import _native
-
-        return cls._from_native(_native._default_texture_image_info())
 
 
 @dataclass(frozen=True, slots=True)

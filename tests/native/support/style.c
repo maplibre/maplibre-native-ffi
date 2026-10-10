@@ -331,14 +331,18 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
   list_probe* probe = user_data;
   probe->list.status = result->status;
   probe->list.count = result->value_count;
+  probe->list.value_size = result->value_size;
   bool fits = result->value_count <= MLN_TEST_STYLE_LIST_CAPACITY;
   for (size_t index = 0;
        index < result->value_count && index < MLN_TEST_STYLE_LIST_CAPACITY;
        index += 1) {
     mln_test_style_entry* copy = &probe->list.entries[index];
+    // Elements lie value_size bytes apart, as a binding built against an
+    // older header steps through them.
+    const void* element =
+      (const unsigned char*)result->value + index * result->value_size;
     if (probe->entries) {
-      const mln_style_layer_entry* entry =
-        &((const mln_style_layer_entry*)result->value)[index];
+      const mln_style_layer_entry* entry = element;
       fits &= copy_text(entry->id, copy->id, sizeof(copy->id));
       fits &= copy_text(entry->type, copy->type, sizeof(copy->type));
       fits &=
@@ -347,10 +351,8 @@ static void copy_list(void* user_data, const mln_completion_result* result) {
         entry->source_layer, copy->source_layer, sizeof(copy->source_layer)
       );
     } else {
-      fits &= copy_text(
-        ((const mln_buffer_view*)result->value)[index], copy->id,
-        sizeof(copy->id)
-      );
+      fits &=
+        copy_text(*(const mln_buffer_view*)element, copy->id, sizeof(copy->id));
     }
   }
   probe->overflowed = !fits;

@@ -96,7 +96,6 @@ static void attach_and_destroy_here(void* context) {
   descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
   descriptor.context.ownership = MLN_OPENGL_CONTEXT_OWNERSHIP_DEDICATED;
   descriptor.context.data.webgl = (mln_webgl_context_descriptor){
-    .size = sizeof(mln_webgl_context_descriptor),
     .kind = MLN_WEBGL_CONTEXT_TRANSFERRED_CANVAS,
     .canvas_selector = mln_test_buffer_view(selector, strlen(selector)),
   };

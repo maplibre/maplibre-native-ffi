@@ -279,10 +279,11 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
       binding,
       "mln_runtime_offline_regions_list",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(96, 112).toLong(),
+          CompletionBridge.valueSize(result),
+          w(88, 96),
         ) {
           readOfflineRegionInfo(it)
         }
@@ -305,10 +306,11 @@ public abstract class GeneratedRuntimeOperations internal constructor() {
       binding,
       "mln_runtime_offline_regions_merge_database",
       { result ->
-        readArray(
+        readStrided(
           CompletionBridge.valuePointer(result),
           CompletionBridge.valueCount(result),
-          w(96, 112).toLong(),
+          CompletionBridge.valueSize(result),
+          w(88, 96),
         ) {
           readOfflineRegionInfo(it)
         }

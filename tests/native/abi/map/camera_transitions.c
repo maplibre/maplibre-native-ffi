@@ -55,7 +55,7 @@ static mln_camera_options query_camera(mln_map map) {
   mln_test_completion query =
     mln_test_completion_default(sizeof(mln_camera_query_result));
   MLN_TEST_OK(mln_map_camera_query(map, &query.descriptor, NULL));
-  mln_camera_query_result result = {.size = sizeof(mln_camera_query_result)};
+  mln_camera_query_result result = {0};
   MLN_TEST_OK(
     mln_test_completion_finish_value(&query, &result, sizeof(result))
   );

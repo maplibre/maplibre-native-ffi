@@ -1757,9 +1757,6 @@ internal static unsafe partial class NativeMethods
     internal static partial mln_source_feature_query_options mln_source_feature_query_options_default();
 
     [LibraryImport(LibraryName)]
-    internal static partial mln_style_image_info mln_style_image_info_default();
-
-    [LibraryImport(LibraryName)]
     internal static partial mln_style_image_options mln_style_image_options_default();
 
     [LibraryImport(LibraryName)]
@@ -1770,9 +1767,6 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(LibraryName)]
     internal static partial uint mln_supported_render_backend_mask();
-
-    [LibraryImport(LibraryName)]
-    internal static partial mln_texture_image_info mln_texture_image_info_default();
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_texture_read_premultiplied_rgba8(

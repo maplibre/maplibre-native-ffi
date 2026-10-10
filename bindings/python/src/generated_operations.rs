@@ -1886,7 +1886,6 @@ fn generated_copy_mln_runtime_options(
     value: &sys::mln_runtime_options,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("flags", generated_value(py, value.flags)?)?;
     dict.set_item("asset_path", unsafe {
         generated_c_string(py, value.asset_path, true)
     }?)?;
@@ -2748,7 +2747,6 @@ fn generated_input_mln_animation_options<'py>(
         return Ok(unsafe { sys::mln_animation_options_default() });
     }
     let mut raw: sys::mln_animation_options = unsafe { sys::mln_animation_options_default() };
-    raw.size = std::mem::size_of::<sys::mln_animation_options>() as _;
     raw.fields = 0;
     if let Some(field) = generated_present(value, "duration_ms")? {
         raw.duration_ms = field.extract::<f64>()?;
@@ -3061,7 +3059,6 @@ fn generated_input_mln_egl_context_descriptor<'py>(
 ) -> PyResult<sys::mln_egl_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_egl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_egl_context_descriptor>() as _;
     raw.display = value.getattr("display")?.extract::<usize>()? as _;
     raw.config = value.getattr("config")?.extract::<usize>()? as _;
     raw.share_context = value.getattr("share_context")?.extract::<usize>()? as _;
@@ -3419,7 +3416,6 @@ fn generated_input_mln_metal_context_descriptor<'py>(
 ) -> PyResult<sys::mln_metal_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_metal_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_metal_context_descriptor>() as _;
     raw.device = value.getattr("device")?.extract::<usize>()? as _;
     Ok(raw)
 }
@@ -3462,7 +3458,6 @@ fn generated_input_mln_offline_geometry_region_definition<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_offline_geometry_region_definition> {
     let mut raw: sys::mln_offline_geometry_region_definition = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as _;
     raw.style_url = storage.c_string(value.getattr("style_url")?)?;
     raw.geometry = storage.buffer(value.getattr("geometry")?, false)?;
     raw.min_zoom = value.getattr("min_zoom")?.extract::<f64>()?;
@@ -3504,7 +3499,6 @@ fn generated_input_mln_offline_tile_pyramid_region_definition<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_offline_tile_pyramid_region_definition> {
     let mut raw: sys::mln_offline_tile_pyramid_region_definition = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as _;
     raw.style_url = storage.c_string(value.getattr("style_url")?)?;
     raw.bounds = generated_input_mln_lat_lng_bounds(&value.getattr("bounds")?, storage)?;
     raw.min_zoom = value.getattr("min_zoom")?.extract::<f64>()?;
@@ -3539,7 +3533,6 @@ fn generated_input_mln_opengl_context_descriptor<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_opengl_context_descriptor> {
     let mut raw: sys::mln_opengl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_opengl_context_descriptor>() as _;
     raw.ownership = value
         .getattr("ownership")?
         .extract::<sys::mln_opengl_context_ownership>()?;
@@ -3673,7 +3666,6 @@ fn generated_input_mln_queue_lock<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_queue_lock> {
     let mut raw: sys::mln_queue_lock = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_queue_lock>() as _;
     let lock_enabled = !value.getattr("lock")?.is_none();
     let unlock_enabled = !value.getattr("unlock")?.is_none();
     if lock_enabled || unlock_enabled {
@@ -3878,7 +3870,6 @@ fn generated_input_mln_runtime_options<'py>(
     }
     let mut raw: sys::mln_runtime_options = unsafe { sys::mln_runtime_options_default() };
     raw.size = std::mem::size_of::<sys::mln_runtime_options>() as _;
-    raw.flags = value.getattr("flags")?.extract::<u32>()?;
     let field = value.getattr("asset_path")?;
     raw.asset_path = if field.is_none() {
         std::ptr::null()
@@ -4140,7 +4131,6 @@ fn generated_input_mln_vulkan_context_descriptor<'py>(
 ) -> PyResult<sys::mln_vulkan_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_vulkan_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_vulkan_context_descriptor>() as _;
     raw.instance = value.getattr("instance")?.extract::<usize>()? as _;
     raw.physical_device = value.getattr("physical_device")?.extract::<usize>()? as _;
     raw.device = value.getattr("device")?.extract::<usize>()? as _;
@@ -4193,7 +4183,6 @@ fn generated_input_mln_wake<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_wake> {
     let mut raw: sys::mln_wake = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_wake>() as _;
     let callback_enabled = !value.getattr("callback")?.is_none();
     if callback_enabled {
         raw.user_data =
@@ -4213,7 +4202,6 @@ fn generated_input_mln_webgl_context_descriptor<'py>(
     storage: &mut GeneratedInputStorage<'py>,
 ) -> PyResult<sys::mln_webgl_context_descriptor> {
     let mut raw: sys::mln_webgl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_webgl_context_descriptor>() as _;
     raw.kind = value
         .getattr("kind")?
         .extract::<sys::mln_webgl_context_kind>()?;
@@ -4249,7 +4237,6 @@ fn generated_input_mln_webgpu_context_descriptor<'py>(
 ) -> PyResult<sys::mln_webgpu_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_webgpu_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_webgpu_context_descriptor>() as _;
     raw.instance = value.getattr("instance")?.extract::<usize>()? as _;
     raw.device = value.getattr("device")?.extract::<usize>()? as _;
     raw.queue = value.getattr("queue")?.extract::<usize>()? as _;
@@ -4296,7 +4283,6 @@ fn generated_input_mln_wgl_context_descriptor<'py>(
 ) -> PyResult<sys::mln_wgl_context_descriptor> {
     let _ = storage;
     let mut raw: sys::mln_wgl_context_descriptor = unsafe { std::mem::zeroed() };
-    raw.size = std::mem::size_of::<sys::mln_wgl_context_descriptor>() as _;
     raw.device_context = value.getattr("device_context")?.extract::<usize>()? as _;
     raw.share_context = value.getattr("share_context")?.extract::<usize>()? as _;
     raw.get_proc_address = value.getattr("get_proc_address")?.extract::<usize>()? as _;
@@ -4492,13 +4478,6 @@ fn _default_source_feature_query_options(py: Python<'_>) -> PyResult<Py<PyAny>> 
 }
 
 #[pyfunction]
-fn _default_style_image_info(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
-    let value = unsafe { sys::mln_style_image_info_default() };
-    generated_copy_mln_style_image_info(py, &value)
-}
-
-#[pyfunction]
 fn _default_style_image_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_style_image_options_default() };
@@ -4517,13 +4496,6 @@ fn _default_style_transition_options(py: Python<'_>) -> PyResult<Py<PyAny>> {
     generated_check_reentry()?;
     let value = unsafe { sys::mln_style_transition_options_default() };
     generated_copy_mln_style_transition_options(py, &value)
-}
-
-#[pyfunction]
-fn _default_texture_image_info(py: Python<'_>) -> PyResult<Py<PyAny>> {
-    generated_check_reentry()?;
-    let value = unsafe { sys::mln_texture_image_info_default() };
-    generated_copy_mln_texture_image_info(py, &value)
 }
 
 #[pyfunction]
@@ -5735,8 +5707,8 @@ impl MapHandle {
                 return Ok(py.None());
             }
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_lat_lng>(result)? {
-                list.append(generated_copy_mln_lat_lng(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_lat_lng>(result)? {
+                list.append(generated_copy_mln_lat_lng(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6233,8 +6205,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_lat_lng>(result)? {
-                list.append(generated_copy_mln_lat_lng(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_lat_lng>(result)? {
+                list.append(generated_copy_mln_lat_lng(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6271,8 +6243,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_lat_lng>(result)? {
-                list.append(generated_copy_mln_lat_lng(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_lat_lng>(result)? {
+                list.append(generated_copy_mln_lat_lng(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6297,8 +6269,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_buffer_view>(result)? {
-                list.append(generated_text(py, *value)?)?;
+            for value in generated_completion_values::<sys::mln_buffer_view>(result)? {
+                list.append(generated_text(py, value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6317,8 +6289,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_style_layer_entry>(result)? {
-                list.append(generated_copy_mln_style_layer_entry(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_style_layer_entry>(result)? {
+                list.append(generated_copy_mln_style_layer_entry(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6337,8 +6309,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_buffer_view>(result)? {
-                list.append(generated_text(py, *value)?)?;
+            for value in generated_completion_values::<sys::mln_buffer_view>(result)? {
+                list.append(generated_text(py, value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -6450,8 +6422,8 @@ impl MapHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_screen_point>(result)? {
-                list.append(generated_copy_mln_screen_point(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_screen_point>(result)? {
+                list.append(generated_copy_mln_screen_point(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -8618,8 +8590,8 @@ impl RenderSessionHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_queried_feature>(result)? {
-                list.append(generated_copy_mln_queried_feature(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
+                list.append(generated_copy_mln_queried_feature(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -8659,8 +8631,8 @@ impl RenderSessionHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_queried_feature>(result)? {
-                list.append(generated_copy_mln_queried_feature(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_queried_feature>(result)? {
+                list.append(generated_copy_mln_queried_feature(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -9332,8 +9304,8 @@ impl RuntimeHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_offline_region_info>(result)? {
-                list.append(generated_copy_mln_offline_region_info(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_offline_region_info>(result)? {
+                list.append(generated_copy_mln_offline_region_info(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -9362,8 +9334,8 @@ impl RuntimeHandle {
         let handle = self.live()?;
         let convert = |py: Python<'_>, result: &sys::mln_completion_result| {
             let list = PyList::empty(py);
-            for value in generated_completion_slice::<sys::mln_offline_region_info>(result)? {
-                list.append(generated_copy_mln_offline_region_info(py, value)?)?;
+            for value in generated_completion_values::<sys::mln_offline_region_info>(result)? {
+                list.append(generated_copy_mln_offline_region_info(py, &value)?)?;
             }
             Ok(list.into_any().unbind())
         };
@@ -10044,14 +10016,12 @@ fn register_generated_functions(module: &Bound<'_, PyModule>) -> PyResult<()> {
         _default_source_feature_query_options,
         module
     )?)?;
-    module.add_function(wrap_pyfunction!(_default_style_image_info, module)?)?;
     module.add_function(wrap_pyfunction!(_default_style_image_options, module)?)?;
     module.add_function(wrap_pyfunction!(
         _default_style_tile_source_options,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(_default_style_transition_options, module)?)?;
-    module.add_function(wrap_pyfunction!(_default_texture_image_info, module)?)?;
     module.add_function(wrap_pyfunction!(
         _default_vulkan_borrowed_texture_descriptor,
         module

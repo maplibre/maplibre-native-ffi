@@ -1176,7 +1176,6 @@ auto style_image_info_from_native(const mln::style::Image& image)
     fields |= MLN_STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT;
   }
   return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
     .fields = fields,
     .width = pixels.size.width,
     .height = pixels.size.height,
@@ -1475,7 +1474,6 @@ auto style_image_options_default() noexcept -> mln_style_image_options {
 
 auto style_image_info_default() noexcept -> mln_style_image_info {
   return mln_style_image_info{
-    .size = sizeof(mln_style_image_info),
     .fields = 0,
     .width = 0,
     .height = 0,
@@ -1593,8 +1591,8 @@ auto map_get_style_source_info(
   MapObject& live, mln_buffer_view source_id, mln_style_source_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_source_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
+  if (out_info == nullptr) {
+    set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_found == nullptr) {
@@ -1606,7 +1604,6 @@ auto map_get_style_source_info(
     map_native(live).getStyle().getSource(string_from_view(source_id));
   *out_found = source != nullptr;
   *out_info = mln_style_source_info{};
-  out_info->size = sizeof(mln_style_source_info);
   out_info->type = MLN_STYLE_SOURCE_TYPE_UNKNOWN;
   if (source == nullptr) {
     return MLN_STATUS_OK;
@@ -2417,8 +2414,8 @@ auto map_get_style_image_info(
   MapObject& live, mln_buffer_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_image_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
+  if (out_info == nullptr) {
+    set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_found == nullptr) {
@@ -2948,8 +2945,8 @@ auto map_get_style_layer_info(
   MapObject& live, mln_buffer_view layer_id, mln_style_layer_info* out_info,
   bool* out_found
 ) -> mln_status {
-  if (out_info == nullptr || out_info->size < sizeof(mln_style_layer_info)) {
-    set_thread_error("out_info must not be null and must have a valid size");
+  if (out_info == nullptr) {
+    set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_found == nullptr) {
@@ -2961,7 +2958,6 @@ auto map_get_style_layer_info(
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   *out_found = layer != nullptr;
   *out_info = mln_style_layer_info{};
-  out_info->size = sizeof(mln_style_layer_info);
   if (layer == nullptr) {
     return MLN_STATUS_OK;
   }

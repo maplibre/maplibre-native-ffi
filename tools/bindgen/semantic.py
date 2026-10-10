@@ -15,7 +15,14 @@ from typing import TypedDict
 from . import docs
 from .model import Api, CType, Function, ModelError
 from .names import type_name
-from .protocol import BUFFER_VIEW, STATUS, is_completion, is_status
+from .protocol import (
+    BUFFER_VIEW,
+    COMPLETION_VALUE_COUNT,
+    COMPLETION_VALUE_SIZE,
+    STATUS,
+    is_completion,
+    is_status,
+)
 from .schema import validate
 
 
@@ -1089,6 +1096,8 @@ class Binder:
                     ]
                 )
             if metadata.get("shape") == "array":
+                # An array result steps by the stride of the native build
+                # rather than by the binding's own size of the element.
                 result = ValuePlan(
                     "array",
                     result.native,
@@ -1096,7 +1105,8 @@ class Binder:
                     ownership=metadata.get("ownership", "borrowed"),
                     lifetime="completion",
                     nullable=result.nullable,
-                    length="value_count",
+                    length=COMPLETION_VALUE_COUNT,
+                    stride=COMPLETION_VALUE_SIZE,
                     element=replace(result, nullable=False),
                 )
         elif not any(is_completion(p.type) for p in function.parameters):

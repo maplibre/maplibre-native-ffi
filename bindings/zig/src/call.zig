@@ -652,12 +652,15 @@ pub fn orEmpty(comptime Copy: type, comptime Raw: type) type {
 pub fn slice(comptime Item: type, comptime Raw: type) type {
     return struct {
         pub const Value = marshal.OwnedValue([]const Item);
+        /// Copies each element, stepping by the completion's value_size.
         pub fn copy(result: *const c.mln_completion_result, context: marshal.Decode) Error!Value {
-            const items = try marshal.nativeSlice(Raw, @ptrCast(@alignCast(result.value)), result.value_count);
+            const items: ?[*]const Raw = @ptrCast(@alignCast(result.value));
+            const count = result.value_count;
+            if (count != 0) _ = try marshal.stridedAt(Raw, items, count, result.value_size, count - 1);
             var arena = std.heap.ArenaAllocator.init(context.allocator.?);
             errdefer arena.deinit();
-            const copied = try arena.allocator().alloc(Item, items.len);
-            for (items, copied) |item, *target| target.* = try marshal.decode(Item, item, .{ .allocator = arena.allocator() });
+            const copied = try arena.allocator().alloc(Item, count);
+            for (copied, 0..) |*target, index| target.* = try marshal.decode(Item, try marshal.stridedAt(Raw, items, count, result.value_size, index), .{ .allocator = arena.allocator() });
             return .{ .arena = arena, .value = copied };
         }
     };

@@ -42,14 +42,20 @@ typedef struct mln_completion_result {
   int32_t status MLN_BINDING("enum=mln_status");
   /** One of mln_command_disposition. */
   uint32_t disposition MLN_BINDING("enum=mln_command_disposition");
-  uint32_t reserved MLN_BINDING("kind=reserved");
+  /**
+   * Byte stride of one element of value: sizeof the result record in the
+   * native build, at least sizeof in the caller's header. Zero when value is
+   * null. Index array results with this value.
+   */
+  uint32_t value_size;
   /** Map snapshot generation published by a committed command, or zero. */
   uint64_t generation;
   /** Borrowed diagnostic bytes, empty on success. */
   mln_buffer_view diagnostic;
   /** Borrowed function-specific result, or null when the function has none. */
-  const void* value MLN_BINDING("kind=erased");
-  /** Function-specific element or byte count for value. */
+  const void* value
+    MLN_BINDING("kind=erased;length=value_count;stride=value_size");
+  /** Function-specific element count for value. */
   size_t value_count;
 } mln_completion_result;
 

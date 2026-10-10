@@ -348,9 +348,12 @@ static void layers_list_in_style_order_after_moves(void) {
   // Moving a layer before itself leaves the order alone.
   move_layer(map, "dots", "dots");
 
+  // The listings read their entries by the completion's value_size, which
+  // is the element size of this build.
   const mln_test_style_list ids = mln_test_style_list_layer_ids(map);
   MLN_TEST_OK(ids.status);
   TEST_ASSERT_EQUAL_size_t(3, ids.count);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_buffer_view), ids.value_size);
   TEST_ASSERT_EQUAL_STRING("roads", ids.entries[0].id);
   TEST_ASSERT_EQUAL_STRING("dots", ids.entries[1].id);
   TEST_ASSERT_EQUAL_STRING("paper", ids.entries[2].id);
@@ -358,6 +361,7 @@ static void layers_list_in_style_order_after_moves(void) {
   const mln_test_style_list layers = mln_test_style_list_layers(map);
   MLN_TEST_OK(layers.status);
   TEST_ASSERT_EQUAL_size_t(3, layers.count);
+  TEST_ASSERT_EQUAL_UINT32(sizeof(mln_style_layer_entry), layers.value_size);
   TEST_ASSERT_EQUAL_STRING("roads", layers.entries[0].id);
   TEST_ASSERT_EQUAL_STRING("line", layers.entries[0].type);
   TEST_ASSERT_EQUAL_STRING("tiles", layers.entries[0].source_id);

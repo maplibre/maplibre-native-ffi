@@ -256,7 +256,8 @@ def operation(plan, values):
                 parent = parent_of(plan.completion.result_owner)
                 convert = f"completionOf(func(raw C.{result.native}) {completion_type} {{ return adopt{values.owner(result.native)}(uint64(raw), {parent}) }})"
             elif result.kind == "array":
-                if result.stride or result.item_buffer:
+                # completionListOf steps by the completion's value_size.
+                if result.item_buffer:
                     values.fail(result, "array result needs a copy adapter")
                 helper = (
                     "completionNullableListOf"

@@ -99,8 +99,9 @@ operation covers the whole database.
 
 <Code code={region(offlineStorage, "list")} lang="c" title="offline-storage.c" />
 
-The list completion borrows a contiguous array of region records. Copy the
-records and nested definition or metadata values that the host keeps.
+The list completion borrows an array of region records, spaced by the stride
+that the completion reports. Copy the records and nested definition or metadata
+values that the host keeps.
 
 <Code code={region(offlineStorage, "result")} lang="c" title="offline-storage.c" />
 
