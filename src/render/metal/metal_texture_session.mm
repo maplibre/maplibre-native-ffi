@@ -70,6 +70,13 @@ class MetalTextureSessionBackend final
   }
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
+  // Command buffers retain the objects they use, so their GPU work keeps
+  // those objects alive and destruction needs no wait.
+  [[nodiscard]] auto allows_off_thread_teardown() const noexcept
+    -> bool override {
+    return true;
+  }
+
   auto set_metal_borrowed_target(
     const mln_metal_borrowed_texture_descriptor& descriptor
   ) -> mln_status override {

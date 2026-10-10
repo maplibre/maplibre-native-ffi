@@ -2,7 +2,7 @@
 namespace Maplibre.NativeFfi;
 
 /// <summary>
-/// Result of irreversible CPU-side target abandonment.
+/// What abandon did with a session's graphics resources.
 /// </summary>
 /// <remarks>
 /// See <c>mln_render_abandon_disposition</c> in the <see
@@ -11,12 +11,12 @@ namespace Maplibre.NativeFfi;
 public enum RenderAbandonDisposition : uint
 {
     /// <summary>
-    /// No graphics resources remained when control was abandoned.
+    /// Abandon destroyed every graphics resource, or none remained.
     /// </summary>
     Clean = 0,
 
     /// <summary>
-    /// Graphics resources could not be destroyed and were quarantined.
+    /// Abandon kept graphics resources that it could not safely destroy.
     /// </summary>
     Quarantined = 1,
 }

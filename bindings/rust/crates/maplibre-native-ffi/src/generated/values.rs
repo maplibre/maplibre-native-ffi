@@ -3313,14 +3313,14 @@ impl ToNative<sys::mln_queue_lock> for QueueLock {
 }
 
 native_enum! {
-/// Result of irreversible CPU-side target abandonment.
+/// What abandon did with a session's graphics resources.
 ///
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub enum RenderAbandonDisposition: u32 {
-    /// No graphics resources remained when control was abandoned.
+    /// Abandon destroyed every graphics resource, or none remained.
     Clean = 0,
-    /// Graphics resources could not be destroyed and were quarantined.
+    /// Abandon kept graphics resources that it could not safely destroy.
     Quarantined = 1,
 } Unknown
 }

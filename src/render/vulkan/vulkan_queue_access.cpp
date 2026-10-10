@@ -39,6 +39,10 @@ struct Slot {
   // The host's lock on the queue, taken inside submit_mutex. Null when the
   // host has none.
   std::shared_ptr<const mln::core::QueueLock> host_lock;
+  // Set once the backend's teardown starts on a thread other than its
+  // driver's. A failed device or queue wait then reports device loss, the
+  // one failure that mbgl's destructors catch.
+  bool teardown = false;
 };
 
 // More Vulkan sessions than any process keeps attached at once.
@@ -108,6 +112,12 @@ auto drain_queue(const Slot& slot) -> VkResult {
 // handle means a broken invariant rather than a call to pass through.
 constexpr auto unregistered_result = VK_ERROR_INITIALIZATION_FAILED;
 
+// Drains the slot's queue for a device or queue wait.
+auto wait_idle(const Slot& slot) -> VkResult {
+  const auto result = drain_queue(slot);
+  return slot.teardown && result != VK_SUCCESS ? VK_ERROR_DEVICE_LOST : result;
+}
+
 auto slot_queue_submit(
   std::size_t index, VkQueue queue, uint32_t submit_count,
   const VkSubmitInfo* submits, VkFence fence
@@ -142,7 +152,7 @@ auto slot_queue_wait_idle(std::size_t index, VkQueue queue) -> VkResult {
   if (!slot || slot->queue != queue) {
     return unregistered_result;
   }
-  return drain_queue(*slot);
+  return wait_idle(*slot);
 }
 
 auto slot_device_wait_idle(std::size_t index, VkDevice device) -> VkResult {
@@ -150,7 +160,7 @@ auto slot_device_wait_idle(std::size_t index, VkDevice device) -> VkResult {
   if (!slot || slot->device != device) {
     return unregistered_result;
   }
-  return drain_queue(*slot);
+  return wait_idle(*slot);
 }
 
 template <std::size_t Index>
@@ -265,6 +275,32 @@ void VulkanQueueAccess::install_queue_access(
 }
 
 VulkanQueueAccess::~VulkanQueueAccess() { release_queue_access(); }
+
+auto VulkanQueueAccess::drain_for_teardown() noexcept -> bool {
+  // Without a registration, nothing routes mbgl's own waits, which wait on
+  // the device as mbgl's teardown always has.
+  if (slot_ == no_slot) {
+    return true;
+  }
+  auto slot = std::optional<Slot>{};
+  {
+    auto& state = registry();
+    const auto lock = std::scoped_lock{state.mutex};
+    // install_queue_access() took the slot, so the index is in bounds, and
+    // this function must not throw.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-*)
+    auto& registered = state.slots[slot_];
+    if (!registered) {
+      return true;
+    }
+    registered->teardown = true;
+    slot = registered;
+  }
+  const auto result = drain_queue(*slot);
+  // Exit refuses the host's lock with the same result, and the caller checks
+  // for exit itself.
+  return result == VK_SUCCESS || result == VK_ERROR_DEVICE_LOST;
+}
 
 void VulkanQueueAccess::release_queue_access() noexcept {
   const auto index = std::exchange(slot_, no_slot);

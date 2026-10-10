@@ -254,9 +254,9 @@ impl<T: maplibre_core::handle::NativeHandle> ExitOwner for Mutex<NativeHandleSta
 /// Disposal alone would detach an attached session on its worker while the
 /// process exits, and graphics drivers tear down their own state in exit
 /// handlers that can run first. Abandonment returns once the in-flight driver
-/// call has ended and makes no graphics call, so the disposal that follows
-/// only quarantines. A session that refuses abandonment, such as one inside a
-/// caller-driven call, is disposed as it is.
+/// call has ended and the session's graphics objects are destroyed or kept, so
+/// the disposal that follows makes no graphics call. A session that refuses
+/// abandonment, such as one inside a caller-driven call, is disposed as it is.
 fn end_graphics_at_exit<T: 'static>(raw: u64) {
     if std::any::TypeId::of::<T>() != std::any::TypeId::of::<sys::mln_render_session>() {
         return;

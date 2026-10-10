@@ -1823,7 +1823,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
         return self._native.opengl_surface_set_target(descriptor)
 
     def abandon(self) -> RenderAbandonResult:
-        """Irreversibly closes control and mailboxes without graphics calls.
+        """Irreversibly closes control and mailboxes and disposes of the
+        session's graphics objects.
 
         See `mln_render_session_abandon` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

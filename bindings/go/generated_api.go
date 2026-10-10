@@ -598,17 +598,17 @@ const (
 
 func (value QueriedFeatureField) Has(flags QueriedFeatureField) bool { return value&flags == flags }
 
-// RenderAbandonDisposition corresponds to mln_render_abandon_disposition.
-// Result of irreversible CPU-side target abandonment.
+// RenderAbandonDisposition corresponds to mln_render_abandon_disposition. What
+// abandon did with a session's graphics resources.
 //
 // See mln_render_abandon_disposition in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderAbandonDisposition uint32
 
 const (
-	// No graphics resources remained when control was abandoned.
+	// Abandon destroyed every graphics resource, or none remained.
 	RenderAbandonDispositionClean RenderAbandonDisposition = RenderAbandonDisposition(C.MLN_RENDER_ABANDON_DISPOSITION_CLEAN)
-	// Graphics resources could not be destroyed and were quarantined.
+	// Abandon kept graphics resources that it could not safely destroy.
 	RenderAbandonDispositionQuarantined RenderAbandonDisposition = RenderAbandonDisposition(C.MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED)
 )
 
@@ -7532,7 +7532,8 @@ func (receiver *RenderFrameBatchHandle) Close() error {
 	return err
 }
 
-// Abandon irreversibly closes control and mailboxes without graphics calls.
+// Abandon irreversibly closes control and mailboxes and disposes of the
+// session's graphics objects.
 //
 // See mln_render_session_abandon in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html

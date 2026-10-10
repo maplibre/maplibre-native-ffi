@@ -70,10 +70,21 @@ class VulkanQueueAccess {
     VkQueue queue
   );
 
-  // Leaves the registry ahead of destruction, for a backend that abandon
-  // quarantines: it is never destroyed and never calls Vulkan again, and the
-  // host may destroy the device and reuse its handles for another session.
-  // This also lets go of the host's queue lock.
+  // Prepares a backend for destruction on a thread other than its driver's,
+  // as abandon destroys it. First, from here on, a device or queue wait that
+  // fails reports VK_ERROR_DEVICE_LOST. mbgl's destructors catch only that
+  // failure, so another one, such as a fence that cannot be created, would
+  // otherwise terminate the process. Then it waits for the work the session
+  // submitted to its queue, taking the host's queue lock only to submit the
+  // wait. Returns whether the backend may now be destroyed: the queue drained
+  // or the device is lost. Any other failure leaves work that may still use
+  // the backend's objects.
+  [[nodiscard]] auto drain_for_teardown() noexcept -> bool;
+
+  // Leaves the registry ahead of destruction, for a backend that detach or
+  // abandon keeps: it is never destroyed and never calls Vulkan again, and the
+  // host may reuse its handles for another session. This also lets go of the
+  // host's queue lock.
   void release_queue_access() noexcept;
 
  private:

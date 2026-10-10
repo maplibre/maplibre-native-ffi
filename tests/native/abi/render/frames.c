@@ -372,8 +372,10 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
 }
 
 // Abandon right after the host acquires a frame succeeds even though a core
-// worker may still be inside the call that rendered it. The frame then
-// reports target loss, and releasing it is CPU-only.
+// worker may still be inside the call that rendered it. The host's GPU may
+// still read the frame's texture, so abandon keeps the ring's backend and the
+// renderer that draws through it. The frame then reports target loss, and
+// releasing it is CPU-only.
 static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_runtime runtime;
   mln_map map;
@@ -388,7 +390,7 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
   );
-  TEST_ASSERT_GREATER_THAN_UINT32(0, abandoned.quarantined_resource_count);
+  TEST_ASSERT_EQUAL_UINT32(2, abandoned.quarantined_resource_count);
   mln_render_frame_result invalid = {.size = sizeof(mln_render_frame_result)};
   MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(frame, &invalid, NULL)

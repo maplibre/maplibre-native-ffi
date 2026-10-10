@@ -154,11 +154,11 @@ typedef struct mln_render_session_snapshot {
   bool pending_changes;
 } mln_render_session_snapshot;
 
-/** Result of irreversible CPU-side target abandonment. */
+/** What abandon did with a session's graphics resources. */
 typedef enum mln_render_abandon_disposition : uint32_t {
-  /** No graphics resources remained when control was abandoned. */
+  /** Abandon destroyed every graphics resource, or none remained. */
   MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0U,
-  /** Graphics resources could not be destroyed and were quarantined. */
+  /** Abandon kept graphics resources that it could not safely destroy. */
   MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1U,
 } mln_render_abandon_disposition;
 
@@ -589,7 +589,8 @@ MLN_API mln_status mln_render_session_detach(
 ) MLN_NOEXCEPT;
 
 /**
- * Irreversibly closes control and mailboxes without graphics calls.
+ * Irreversibly closes control and mailboxes and disposes of the session's
+ * graphics objects.
  *
  * A core worker can still be inside the driver call that published a frame
  * result or completion the host already observed. The call waits for that
@@ -598,15 +599,30 @@ MLN_API mln_status mln_render_session_detach(
  * MLN_STATUS_BUSY instead, as does abandon from inside any of the session's
  * driver calls, such as from a completion that the core worker delivers.
  *
- * Before returning, the call also waits for the map's in-flight tile work,
- * which can still reference quarantined renderer resources and through them
- * the host's graphics objects. After it returns, no library thread touches the
- * session's target or device, so the host may destroy them immediately. Do
- * not call from a MapLibre worker callback.
+ * Before returning, the call waits for the map's in-flight tile work and then
+ * disposes of the session's graphics objects. It destroys Vulkan and Metal
+ * objects on the calling thread. For a Vulkan session it first waits for the
+ * work the session submitted to its queue, taking the host's queue lock only
+ * to submit that wait, never across it. It keeps an object, until the process
+ * exits, when destroying it is not safe: the texture ring of a session-owned
+ * target while a frame of it is acquired or a slot is quarantined; every
+ * object when the process has begun to exit; and OpenGL and WebGPU objects,
+ * which only their graphics thread may destroy. *out_result reports what was
+ * kept. Release acquired frames before abandon to let it destroy a
+ * session-owned ring.
+ *
+ * The host keeps the target's graphics objects valid until the call returns,
+ * and must not hold the queue lock while it waits on the abandoning thread.
+ * After the call returns, no library thread touches them and the host may
+ * destroy them. The one exception is a kept Vulkan object: it is a child of
+ * the host's VkDevice, and a kept swapchain is also a child of its
+ * VkSurfaceKHR, so the host keeps those parents until the process exits. A
+ * Vulkan GPU that hangs without reporting device loss blocks the call. Do not
+ * call from a MapLibre worker callback.
  *
  * Returns:
  * - MLN_STATUS_OK when control is abandoned and *out_result describes what was
- *   quarantined.
+ *   kept.
  * - MLN_STATUS_BUSY when a scope from mln_acquired_frame_view_begin() is
  *   active, a caller-driver call is in flight, or the caller is inside one of
  *   the session's driver calls. Nothing changes.
@@ -650,8 +666,9 @@ MLN_API mln_status mln_render_session_destroy(
  * session that is attached and has no acquired frame detaches on its worker
  * after the in-flight call, which frees its graphics resources. Every other
  * session is abandoned on the cleanup worker once its in-flight driver work and
- * its scopes from mln_acquired_frame_view_begin() end, which quarantines its
- * graphics resources. A session that waits for those does not delay other
+ * its scopes from mln_acquired_frame_view_begin() end, which disposes of its
+ * graphics resources as mln_render_session_abandon() does. A session that
+ * waits for those does not delay other
  * sessions' retirement. Either way, retirement releases the
  * map attachment. The host keeps its graphics objects alive until the session's
  * wake release callbacks run. Acquired frame accessors report target loss after

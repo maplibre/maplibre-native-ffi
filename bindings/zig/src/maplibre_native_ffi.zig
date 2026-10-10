@@ -2492,14 +2492,14 @@ pub const QueueLock = struct {
     }
 };
 
-/// Result of irreversible CPU-side target abandonment.
+/// What abandon did with a session's graphics resources.
 ///
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub const RenderAbandonDisposition = enum(u32) {
-    /// Graphics resources could not be destroyed and were quarantined.
+    /// Abandon kept graphics resources that it could not safely destroy.
     quarantined = 1,
-    /// No graphics resources remained when control was abandoned.
+    /// Abandon destroyed every graphics resource, or none remained.
     clean = 0,
     _,
     pub const fromNative = marshal.EnumMethods(@This()).fromNative;
@@ -6803,7 +6803,8 @@ pub fn renderFrameBatchRelease(batch: RenderFrameBatch) status.Error!void {
     return call.direct("mln_render_frame_batch_release", .close, batch, void, null, .{});
 }
 
-/// Irreversibly closes control and mailboxes without graphics calls.
+/// Irreversibly closes control and mailboxes and disposes of the session's
+/// graphics objects.
 ///
 /// See `mln_render_session_abandon` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

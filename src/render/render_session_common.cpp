@@ -42,6 +42,7 @@
 #include "bytes/buffer.hpp"
 #include "c_api/autorelease_pool.hpp"
 #include "diagnostics/diagnostics.hpp"
+#include "execution/process_exit.hpp"
 #include "geojson/geojson.hpp"
 #include "handles/handle_table.hpp"
 #include "map/map.hpp"
@@ -934,9 +935,18 @@ auto resubmit_parked_retirements(RetirementTask* task) noexcept -> void {
     task = next;
   }
 }
+// What abandon does with the graphics objects it takes from a session.
+enum class AbandonedGraphics : std::uint8_t {
+  // Destroys each one whose destruction is safe on the abandoning thread.
+  DestroyWhenSafe,
+  // Keeps every one until the process exits, making no graphics call.
+  Keep,
+};
+
 auto abandon_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
-  mln_render_abandon_result* out_result
+  mln_render_abandon_result* out_result,
+  AbandonedGraphics graphics = AbandonedGraphics::DestroyWhenSafe
 ) -> mln_status;
 auto destroy_render_session(
   const std::shared_ptr<mln_render_session_object>& live
@@ -3659,9 +3669,83 @@ auto render_session_abandon(
 }
 
 namespace {
+// The graphics objects that abandon takes from a session, which nothing else
+// can reach once it has taken them. Whatever retirement leaves behind, such as
+// when an exception skips it, is kept rather than destroyed unprepared.
+struct AbandonedObjects {
+  AbandonedObjects() = default;
+  AbandonedObjects(const AbandonedObjects&) = delete;
+  AbandonedObjects(AbandonedObjects&&) = delete;
+  auto operator=(const AbandonedObjects&) -> AbandonedObjects& = delete;
+  auto operator=(AbandonedObjects&&) -> AbandonedObjects& = delete;
+  ~AbandonedObjects() { static_cast<void>(keep()); }
+
+  // Keeps every object until the process exits, and returns how many it kept.
+  auto keep() noexcept -> uint32_t {
+    auto kept = uint32_t{0};
+    if (renderer.release() != nullptr) ++kept;
+    if (auto* backend = surface.release(); backend != nullptr) {
+      backend->quarantine();
+      ++kept;
+    }
+    if (auto* backend = texture.release(); backend != nullptr) {
+      backend->quarantine();
+      ++kept;
+    }
+    return kept;
+  }
+
+  std::unique_ptr<mln::Renderer> renderer;
+  std::unique_ptr<SurfaceSessionBackend> surface;
+  std::unique_ptr<TextureSessionBackend> texture;
+};
+
+// Destroys what abandon took from a session when that is safe on this thread,
+// keeps the rest until the process exits, and returns how many it kept.
+// `keep_ring` says the host's GPU may still read a texture of the session's
+// ring, which lives in the texture backend.
+auto retire_abandoned_objects(
+  mln_render_session_object& session, AbandonedObjects& objects, bool keep_ring
+) -> uint32_t {
+  const auto teardown_allowed = [&] {
+    if (objects.surface != nullptr)
+      return objects.surface->allows_off_thread_teardown();
+    if (objects.texture != nullptr)
+      return objects.texture->allows_off_thread_teardown();
+    return true;
+  };
+  // Once exit begins, the host's runtime and its graphics driver may already
+  // be gone.
+  if (keep_ring || process_exiting() || !teardown_allowed())
+    return objects.keep();
+  const auto prepared = (objects.surface == nullptr ||
+                         objects.surface->prepare_off_thread_teardown()) &&
+                        (objects.texture == nullptr ||
+                         objects.texture->prepare_off_thread_teardown());
+  // A Vulkan drain that exit refused waited for nothing.
+  if (!prepared || process_exiting()) return objects.keep();
+  // The driver thread created these objects, and this thread destroys them.
+  // Vulkan and Metal objects have no thread affinity. mbgl's vulkan::Context
+  // checks its creating thread with MBGL_VERIFY_THREAD, which only builds
+  // with assertions enabled; every preset is a Release build, so a debug
+  // preset would need this teardown on the driver thread instead.
+  auto destroy = [&]() -> mln_status {
+    // Destruction can schedule mailbox work, which nothing runs afterwards.
+    const auto current = ScopedCurrentScheduler{session.scheduler};
+    // The renderer draws through the backend, so it goes first.
+    objects.renderer.reset();
+    objects.surface.reset();
+    objects.texture.reset();
+    session.scheduler.discard();
+    return MLN_STATUS_OK;
+  };
+  static_cast<void>(mln::c_api::with_autorelease_pool(destroy));
+  return 0;
+}
+
 auto abandon_render_session(
   const std::shared_ptr<mln_render_session_object>& live,
-  mln_render_abandon_result* out_result
+  mln_render_abandon_result* out_result, AbandonedGraphics graphics
 ) -> mln_status {
   auto discarded = std::deque<RenderDriverWork>{};
   auto waiting = std::deque<RenderDriverWork>{};
@@ -3670,9 +3754,8 @@ auto abandon_render_session(
   auto frame_wake = std::shared_ptr<Wake>{};
   auto driver_wake = std::shared_ptr<Wake>{};
   auto queue_lock = std::shared_ptr<QueueLock>{};
-  auto quarantined = uint32_t{0};
-  SurfaceSessionBackend* quarantined_surface = nullptr;
-  TextureSessionBackend* quarantined_texture = nullptr;
+  auto objects = AbandonedObjects{};
+  auto keep_ring = false;
   {
     // Declared before the lock, so the wakes owed by the results published
     // below run after it is released and before the wakes are dropped.
@@ -3758,16 +3841,19 @@ auto abandon_render_session(
       wakes.frame(live->frame_wake);
     }
     // The publish and release paths read the wakes and the graphics objects
-    // under this lock. Nothing may destroy the graphics objects: the host owns
-    // the device behind them and may already have torn it down, so they are
-    // released from the session and never freed. The wakes are moved out and
-    // dropped after the lock, since releasing host user data can run arbitrary
-    // host code.
-    if (live->renderer.release() != nullptr) ++quarantined;
-    quarantined_surface = live->surface.backend.release();
-    quarantined_texture = live->texture.backend.release();
-    quarantined += static_cast<uint32_t>(quarantined_surface != nullptr) +
-                   static_cast<uint32_t>(quarantined_texture != nullptr);
+    // under this lock, so both move out here. The graphics objects are
+    // retired, and the wakes dropped, after the lock: destruction makes
+    // graphics calls, and releasing host user data can run arbitrary host
+    // code. The host's GPU may still read the texture of a session-owned slot
+    // that a frame holds or that a disposed frame quarantined, and nothing
+    // tells native when that read ends, so such a ring is kept.
+    keep_ring = live->texture.mode == TextureSessionMode::Owned &&
+                std::ranges::any_of(live->texture.slots, [](const auto& slot) {
+                  return slot.acquired || slot.quarantined;
+                });
+    objects.renderer = std::move(live->renderer);
+    objects.surface = std::move(live->surface.backend);
+    objects.texture = std::move(live->texture.backend);
     frame_wake = std::move(live->frame_wake);
     driver_wake = std::move(live->driver_wake);
     queue_lock = std::move(live->queue_lock);
@@ -3786,13 +3872,15 @@ auto abandon_render_session(
   }
   live->scheduler.set_work_available_callback({});
   live->scheduler.discard();
-  // Tile workers can still hold the quarantined renderer's atlas, which holds
-  // the host's graphics device. Drain them before returning so the documented
-  // contract — no graphics calls after abandon — covers worker threads and
-  // the host may destroy its device immediately.
+  // Tile workers can still hold the renderer's atlas, which holds the host's
+  // graphics device. Drain them before the renderer is retired, so that no
+  // library thread touches the host's graphics objects once abandon returns.
   map_quiesce_render_workers(live->map);
-  if (quarantined_surface != nullptr) quarantined_surface->quarantine();
-  if (quarantined_texture != nullptr) quarantined_texture->quarantine();
+  // Retired before the map's slot is released, because the renderer holds
+  // the map's forwarding observer, as detach explains.
+  const auto kept = graphics == AbandonedGraphics::Keep
+                      ? objects.keep()
+                      : retire_abandoned_objects(*live, objects, keep_ring);
   static_cast<void>(map_detach_render_target_session(live->map, live.get()));
   {
     const auto lock = std::scoped_lock{live->control_mutex};
@@ -3802,14 +3890,15 @@ auto abandon_render_session(
   }
   frame_wake.reset();
   driver_wake.reset();
-  // The quarantine above took the lock out of the backend's queue
-  // registration, so this drops the last reference and runs its release.
+  // Retirement took the lock out of the backend's queue registration, by
+  // destroying or keeping the backend, so this drops the last reference and
+  // runs its release.
   queue_lock.reset();
   *out_result = mln_render_abandon_result{
     sizeof(*out_result),
-    quarantined == 0 ? MLN_RENDER_ABANDON_DISPOSITION_CLEAN
-                     : MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED,
-    quarantined, 0
+    kept == 0 ? MLN_RENDER_ABANDON_DISPOSITION_CLEAN
+              : MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED,
+    kept, 0
   };
   return MLN_STATUS_OK;
 }
@@ -3825,8 +3914,8 @@ auto abandon_driver_work(std::deque<RenderDriverWork>& queue) noexcept -> void {
 // keeps its graphics objects alive until the session's wakes are released,
 // which happens only after this returns, so the worker can still detach and
 // free the renderer and backends. Anything that keeps the detach from
-// finishing falls back to the teardown lane's abandon, which quarantines
-// whatever the session still holds.
+// finishing falls back to the teardown lane's abandon, which retires whatever
+// the session still holds.
 auto detach_disposed_session(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void {
@@ -3886,8 +3975,9 @@ auto detach_disposed_session(
   session_teardown_lane().submit(session->disposal_task);
 }
 
-// Whether disposal may detach an eligible session, which frees its graphics
-// resources, or quarantines every session, which makes no graphics call.
+// Whether disposal may detach an eligible session and destroy the graphics
+// objects of the others as abandon does, or keeps the graphics objects of
+// every session, which makes no graphics call.
 enum class DisposalTeardown : std::uint8_t { DetachOnWorker, Quarantine };
 
 // Admission owns an embedded node and a self-reference and allocates nothing.
@@ -3905,6 +3995,7 @@ auto dispose_render_session(
   {
     const auto lock = std::scoped_lock{live->control_mutex};
     if (live->disposal_requested.exchange(true)) return;
+    live->disposal_keeps_graphics = teardown == DisposalTeardown::Quarantine;
     detach_on_worker =
       teardown == DisposalTeardown::DetachOnWorker &&
       live->capabilities.driver == MLN_RENDER_DRIVER_CORE_WORKER &&
@@ -3926,7 +4017,11 @@ auto dispose_render_session(
       auto result =
         mln_render_abandon_result{sizeof(mln_render_abandon_result), 0, 0, 0};
       try {
-        static_cast<void>(abandon_render_session(owned, &result));
+        static_cast<void>(abandon_render_session(
+          owned, &result,
+          session.disposal_keeps_graphics ? AbandonedGraphics::Keep
+                                          : AbandonedGraphics::DestroyWhenSafe
+        ));
         static_cast<void>(destroy_render_session(owned));
         session.disposal_owner.reset();
       } catch (...) {

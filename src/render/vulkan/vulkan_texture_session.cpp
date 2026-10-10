@@ -130,6 +130,15 @@ class VulkanTextureSessionBackend final
 
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
+  [[nodiscard]] auto allows_off_thread_teardown() const noexcept
+    -> bool override {
+    return true;
+  }
+
+  auto prepare_off_thread_teardown() noexcept -> bool override {
+    return backend_.drain_for_teardown();
+  }
+
   void quarantine() noexcept override { backend_.release_queue_access(); }
 
   auto set_vulkan_borrowed_target(

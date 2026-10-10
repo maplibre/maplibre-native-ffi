@@ -311,9 +311,20 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
     mln_test_thread_join(thread);
     TEST_ASSERT_TRUE(release.abandon_waited);
     MLN_TEST_OK(release.abandon_status);
+    // The session rendered, so it holds a renderer and a backend. Abandon
+    // destroys both on Vulkan and Metal, and keeps both on OpenGL and WebGPU,
+    // whose objects only their graphics thread may destroy.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_ABANDON_DISPOSITION_CLEAN, result.disposition
+    );
+    TEST_ASSERT_EQUAL_UINT32(0, result.quarantined_resource_count);
+#else
     TEST_ASSERT_EQUAL_UINT32(
       MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
     );
+    TEST_ASSERT_EQUAL_UINT32(2, result.quarantined_resource_count);
+#endif
   } else {
     // Servicing the attach already passed the exit point, so the held call is
     // the next exit.

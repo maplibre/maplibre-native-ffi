@@ -170,7 +170,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Irreversibly closes control and mailboxes without graphics calls.
+    /// Irreversibly closes control and mailboxes and disposes of the session's
+    /// graphics objects.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_abandon</c> in the <see

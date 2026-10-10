@@ -81,18 +81,21 @@ typedef void (*mln_queue_lock_release)(void* user_data);
  * thread, so a host that also uses that queue passes a lock here. Native code
  * calls lock and then unlock on the driver thread around each submission and
  * presentation on the queue, including the empty submission that waits for
- * the queue to drain. It holds the lock only for that call, never across a
- * wait. The host takes the same lock around its own calls on the queue.
+ * the queue to drain. Abandon also takes it on the calling thread, around the
+ * drains that its teardown submits. Native code holds the lock only for that
+ * call, never across a wait. The host takes the same lock around its own calls
+ * on the queue.
  *
  * Both callbacks are null to disable the lock, or both are set. A disabled
  * lock must not carry release_user_data, and size must still be
  * sizeof(mln_queue_lock). A session without a lock assumes that the host
  * leaves the queue alone while the session is attached.
  *
- * The callbacks must not call the C API. The host must not hold the lock while
- * it calls the C API, because the driver may need the lock to finish the call:
- * a caller-graphics-thread driver takes it inside driver service, and abandon
- * and teardown wait for a core worker that may be waiting for it. Sessions
+ * The callbacks must not call the C API. The host never holds the lock while
+ * it calls the C API, or while it waits on a thread that does, because the
+ * call may need the lock to finish: a caller-graphics-thread driver takes it
+ * inside driver service, abandon takes it to drain the queue, and abandon and
+ * teardown wait for a core worker that may be waiting for it. Sessions
  * that share a queue each take their own lock, so give them all a lock on the
  * same host mutex.
  *

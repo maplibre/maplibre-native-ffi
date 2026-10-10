@@ -78,10 +78,27 @@ class SurfaceSessionBackend {
   virtual auto renderer_backend() -> mln::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
 
-  // Abandon calls this on a backend it quarantines, once nothing can reach the
-  // backend again. A quarantined backend is never destroyed, so one that
-  // registered the host's graphics handles process-wide releases them here: the
-  // host may destroy its device and reuse those handles.
+  // Whether abandon may destroy this backend, and the renderer that draws
+  // through it, on the abandoning thread instead of the driver thread. A
+  // backend whose graphics objects only their graphics thread may destroy says
+  // no, and abandon keeps it until the process exits.
+  [[nodiscard]] virtual auto allows_off_thread_teardown() const noexcept
+    -> bool {
+    return false;
+  }
+
+  // Abandon calls this on the abandoning thread before it destroys the backend
+  // there. A backend whose GPU work can outlive the driver call that submitted
+  // it waits for that work here. False keeps the backend, because work that
+  // may still use its objects did not finish.
+  [[nodiscard]] virtual auto prepare_off_thread_teardown() noexcept -> bool {
+    return true;
+  }
+
+  // Abandon calls this on a backend it keeps, once nothing can reach the
+  // backend again. A kept backend is never destroyed, so one that registered
+  // the host's graphics handles process-wide releases them here: the host may
+  // reuse those handles.
   virtual void quarantine() noexcept {}
 
   // Whether the surface can take a frame right now. Not ready skips the frame
@@ -158,10 +175,27 @@ class TextureSessionBackend {
   // resource overrides this to rebuild only what the size changed.
   virtual void resize(mln::Size size) { headless_backend().setSize(size); }
 
-  // Abandon calls this on a backend it quarantines, once nothing can reach the
-  // backend again. A quarantined backend is never destroyed, so one that
-  // registered the host's graphics handles process-wide releases them here: the
-  // host may destroy its device and reuse those handles.
+  // Whether abandon may destroy this backend, and the renderer that draws
+  // through it, on the abandoning thread instead of the driver thread. A
+  // backend whose graphics objects only their graphics thread may destroy says
+  // no, and abandon keeps it until the process exits.
+  [[nodiscard]] virtual auto allows_off_thread_teardown() const noexcept
+    -> bool {
+    return false;
+  }
+
+  // Abandon calls this on the abandoning thread before it destroys the backend
+  // there. A backend whose GPU work can outlive the driver call that submitted
+  // it waits for that work here. False keeps the backend, because work that
+  // may still use its objects did not finish.
+  [[nodiscard]] virtual auto prepare_off_thread_teardown() noexcept -> bool {
+    return true;
+  }
+
+  // Detach and abandon call this on a backend they keep, once nothing can
+  // reach the backend again. A kept backend is never destroyed, so one that
+  // registered the host's graphics handles process-wide releases them here:
+  // the host may reuse those handles.
   virtual void quarantine() noexcept {}
 
   // Renders into a new caller-owned texture, keeping the graphics context and
@@ -647,6 +681,9 @@ struct mln_render_session_object
   // the worker detaches it and frees its graphics objects instead of
   // quarantining them.
   bool disposal_detach = false;
+  // Disposal came from a finalizer that can run while the process exits, so
+  // the abandon that retires the session keeps every graphics object.
+  bool disposal_keeps_graphics = false;
   bool destruction_started = false;
   bool attached = false;
   // Ticket of the newest accepted resize. An older ticket reaching the driver

@@ -231,8 +231,8 @@ pub const Session = struct {
     }
 };
 
-/// Ends a session's graphics work without graphics calls, which completes any
-/// pending lifecycle submission with target loss.
+/// Ends a session's graphics work at once, which completes any pending
+/// lifecycle submission with target loss.
 fn abandon(handle: maplibre.RenderSession) void {
     var diagnostic: maplibre.Diagnostic = .{};
     const result = maplibre.renderSessionAbandon(handle, &diagnostic) catch |err| {

@@ -284,8 +284,8 @@ impl Session {
             .map_err(|error| Box::new(error) as Box<dyn StdError>)
     }
 
-    /// Ends the session's graphics work without graphics calls, which
-    /// completes any pending lifecycle submission with target loss.
+    /// Ends the session's graphics work at once, which completes any pending
+    /// lifecycle submission with target loss.
     pub fn abandon(&self) {
         match self.session.abandon() {
             Ok(result) if result.quarantined_resource_count > 0 => eprintln!(

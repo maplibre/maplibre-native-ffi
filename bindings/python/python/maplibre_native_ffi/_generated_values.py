@@ -647,7 +647,7 @@ class QueriedFeatureField(IntFlag):
 
 
 class RenderAbandonDisposition(UnknownIntEnum):
-    """Result of irreversible CPU-side target abandonment.
+    """What abandon did with a session's graphics resources.
 
     See `mln_render_abandon_disposition` in the
     [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).

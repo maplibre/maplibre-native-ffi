@@ -49,8 +49,8 @@ app_error render_session_service(render_session* session) {
   return APP_OK;
 }
 
-/// Ends the session's graphics work without graphics calls, which completes
-/// any pending lifecycle submission with target loss.
+/// Ends the session's graphics work at once, which completes any pending
+/// lifecycle submission with target loss.
 static void abandon(render_session* session) {
   mln_render_abandon_result result = {.size = sizeof(result)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};

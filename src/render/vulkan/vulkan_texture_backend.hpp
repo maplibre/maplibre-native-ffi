@@ -48,6 +48,7 @@ class VulkanTextureBackend final : private VulkanQueueAccess,
   auto operator=(VulkanTextureBackend&&) -> VulkanTextureBackend& = delete;
   ~VulkanTextureBackend() override;
 
+  using VulkanQueueAccess::drain_for_teardown;
   using VulkanQueueAccess::release_queue_access;
 
   auto getDefaultRenderable() -> mln::gfx::Renderable& override;

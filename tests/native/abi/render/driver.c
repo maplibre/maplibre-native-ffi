@@ -353,7 +353,10 @@ static void maintenance_commands_run_in_order_with_frames(void) {
 }
 
 // A session abandoned right after attach has nothing in flight to wait for,
-// and a caller driver's queued command completes as target lost.
+// and a caller driver's queued command completes as target lost. It has
+// rendered nothing, so it holds a backend and no renderer: abandon destroys a
+// Vulkan or Metal backend, and keeps an OpenGL or WebGPU one, which only its
+// graphics thread may destroy.
 static void abandon_completes_pending_work_and_invalidates_accessors(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
@@ -371,10 +374,17 @@ static void abandon_completes_pending_work_and_invalidates_accessors(void) {
     .size = sizeof(mln_render_abandon_result)
   };
   MLN_TEST_OK(mln_render_session_abandon(fixture.session, &abandoned, NULL));
-  TEST_ASSERT_TRUE(
-    abandoned.disposition == MLN_RENDER_ABANDON_DISPOSITION_CLEAN ||
-    abandoned.disposition == MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_CLEAN, abandoned.disposition
   );
+  TEST_ASSERT_EQUAL_UINT32(0, abandoned.quarantined_resource_count);
+#else
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(1, abandoned.quarantined_resource_count);
+#endif
   // Abandon settles every accepted command before it returns.
   TEST_ASSERT_TRUE(mln_test_completion_poll(&pending));
   if (fixture.driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {

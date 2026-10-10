@@ -71,7 +71,7 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   public static let present: FrameDemandFlag = .init(rawValue: 2)
 }
 
-/// Result of irreversible CPU-side target abandonment.
+/// What abandon did with a session's graphics resources.
 ///
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -83,9 +83,9 @@ public struct RenderAbandonDisposition: RawRepresentable, NativeOpenValue,
     self.rawValue = rawValue
   }
 
-  /// No graphics resources remained when control was abandoned.
+  /// Abandon destroyed every graphics resource, or none remained.
   public static let clean: RenderAbandonDisposition = .init(rawValue: 0)
-  /// Graphics resources could not be destroyed and were quarantined.
+  /// Abandon kept graphics resources that it could not safely destroy.
   public static let quarantined: RenderAbandonDisposition = .init(rawValue: 1)
 }
 

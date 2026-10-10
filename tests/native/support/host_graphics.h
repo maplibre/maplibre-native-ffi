@@ -48,11 +48,19 @@ bool mln_test_render_fixture_create_vulkan_borrowed_texture(
   const mln_test_render_fixture* share, const mln_queue_lock* queue_lock
 );
 
-// mln_test_render_fixture_create() for a session with the host queue lock
-// `queue_lock`.
+// mln_test_render_fixture_create() for a session whose context names
+// `wrap`'s vkGetDeviceProcAddr, when `wrap` is non-null, and with the host
+// queue lock `queue_lock`, when that is non-null.
 bool mln_test_render_fixture_create_vulkan_owned_texture(
   mln_map map, mln_test_render_fixture* fixture,
-  const mln_queue_lock* queue_lock
+  mln_test_vulkan_device_proc_addr_wrap wrap, const mln_queue_lock* queue_lock
+);
+
+// mln_test_render_fixture_create_surface() for a session whose context names
+// `wrap`'s vkGetDeviceProcAddr.
+bool mln_test_render_fixture_create_vulkan_surface(
+  mln_map map, mln_test_render_fixture* fixture,
+  mln_test_vulkan_device_proc_addr_wrap wrap
 );
 #endif
 
