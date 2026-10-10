@@ -850,6 +850,12 @@ mln_status await_retirement(request value BIND("handle_access=issued"), mln_diag
             ),
             ("absent_on=MLN_STATUS_MISSING", one, "failure enumerator"),
             ("absent_on=MLN_STATUS_OK", one, "failure enumerator"),
+            # A drain is absent on MLN_STATUS_NOT_READY by convention.
+            (
+                "execution=event_batch;absent_on=MLN_STATUS_NOT_READY",
+                one,
+                "absent_on=MLN_STATUS_NOT_READY restates the default",
+            ),
         ):
             source = f'BIND("{annotation}") mln_status read({parameters});'
             with self.subTest(source=source), self.assertRaisesRegex(ModelError, error):

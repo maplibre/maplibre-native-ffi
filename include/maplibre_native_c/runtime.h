@@ -1473,7 +1473,7 @@ MLN_API mln_status mln_runtime_dispose(
  * - MLN_STATUS_INVALID_STATE when runtime has been released or is closing.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=event_batch;absent_on=MLN_STATUS_NOT_READY")
+MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_runtime_drain_events(
   mln_runtime runtime, mln_event_batch* out_batch MLN_BINDING("direction=out"),
   mln_diagnostic* out_diagnostic

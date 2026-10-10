@@ -248,7 +248,6 @@ def lower_function(plan: OperationPlan, values: Values) -> tuple[str, str]:
         "immediate",
         "snapshot",
         "lifecycle",
-        "drain",
         "event_batch",
         "render_driver",
     }:

@@ -12,6 +12,7 @@ from dataclasses import replace
 from .model import Api, CType, Function, ModelError
 from .protocol import (
     BUFFER_VIEW,
+    NOT_READY,
     STATUS,
     is_buffer_view,
     is_completion,
@@ -326,10 +327,11 @@ class Conventions:
         return {**self.value(field.type, {**defaults, **explicit}), **defaults}
 
     def function(self, function: Function) -> dict[str, str]:
-        """A function without a completion runs immediately; a completion
-        without a result delivers none, and a result is one borrowed value
-        unless it is a handle, which the completion transfers. A callback
-        registration passes its context parameter as the user data."""
+        """A function without a completion runs immediately, and a drain
+        reports nothing queued as an absent output; a completion without a
+        result delivers none, and a result is one borrowed value unless it is a
+        handle, which the completion transfers. A callback registration passes
+        its context parameter as the user data."""
         explicit = function.metadata
         defaults = {}
         if "registration" in explicit:
@@ -342,6 +344,8 @@ class Conventions:
                 defaults["user_data"] = contexts[0]
         if not has_completion(function):
             defaults["execution"] = "immediate"
+            if explicit.get("execution") == "event_batch":
+                defaults["absent_on"] = NOT_READY
             if not is_status(function.return_type) and (
                 function.return_type.kind != "void"
             ):

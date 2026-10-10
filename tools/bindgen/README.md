@@ -109,6 +109,7 @@ the rest: `lifetime=completion` for an array completion result, and
 | Declaration                         | Default                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------ |
 | Function without a completion       | `execution=immediate`                                                                      |
+| `execution=event_batch`             | `absent_on=MLN_STATUS_NOT_READY`                                                           |
 | Completion function                 | `result=void`; a value result has `shape=value` and is `borrowed`, or `owned` for a handle |
 | Parameter                           | `direction=in`; an output pointer to a handle is `owned`                                   |
 | Pointer                             | `ownership=borrowed`, except a callback                                                    |
@@ -129,7 +130,8 @@ the rest: `lifetime=completion` for an array completion result, and
 begin with an unrelated `uint32_t` member. A struct whose size member has
 another name annotates it `kind=size`. `protocol.py` names the protocol types
 that every handwritten runtime is written against: the status enum, the
-diagnostic, the completion and its result, and the buffer view. No other rule
+diagnostic, the completion and its result, and the buffer view. It also names
+`MLN_STATUS_NOT_READY`, which reports a drain with nothing queued. No other rule
 reads a declaration's name.
 
 Five keys state what a C shape cannot:
@@ -148,15 +150,16 @@ Five keys state what a C shape cannot:
   with a native default keeps such a registration at its disabled default.
 - `absent_on=` on a function names a failure status of `mln_status` that reports
   its one output as absent rather than failed, as `MLN_STATUS_NOT_READY` does
-  for an event or frame-result drain with nothing queued and for a frame
-  acquisition with no rendered frame. A binding returns its language's empty
-  form for that status, such as `None`, `nil`, or `null`, and reads or adopts
-  the output only on success. The schema accepts the key only on a function that
-  returns a status, takes no completion, and has exactly one output. The
-  semantic plan also rejects it on a borrowed view, a consuming operation, and a
-  call that passes a callback registration, because an absent call publishes
-  nothing. Dart, Go, Rust, Swift, and Zig return any output as absent; .NET,
-  Kotlin, and Python return only an owned handle as absent.
+  for `mln_render_session_acquire_frame` when no frame has rendered. A drain is
+  absent on `MLN_STATUS_NOT_READY` by convention, so only another kind of
+  function writes the key. A binding returns its language's empty form for that
+  status, such as `None`, `nil`, or `null`, and reads or adopts the output only
+  on success. The schema accepts the key only on a function that returns a
+  status, takes no completion, and has exactly one output. The semantic plan
+  also rejects it on a borrowed view, a consuming operation, and a call that
+  passes a callback registration, because an absent call publishes nothing.
+  Dart, Go, Rust, Swift, and Zig return any output as absent; .NET, Kotlin, and
+  Python return only an owned handle as absent.
 - `default=` on a field states the nonzero value that the field holds in its
   record's native default: a decimal integer, a decimal with a point, `true`, or
   a constant of the field's enum. Dart, Kotlin, and Zig build a record from

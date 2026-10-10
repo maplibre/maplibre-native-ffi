@@ -279,7 +279,7 @@ MLN_API mln_status mln_render_session_request_frame(
  * - MLN_STATUS_INVALID_STATE when session has been released.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_BINDING("execution=event_batch;absent_on=MLN_STATUS_NOT_READY")
+MLN_BINDING("execution=event_batch")
 MLN_API mln_status mln_render_session_drain_frame_results(
   mln_render_session session,
   mln_render_frame_batch* out_batch MLN_BINDING("direction=out"),

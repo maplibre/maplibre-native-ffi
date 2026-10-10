@@ -20,6 +20,8 @@ COMPLETION = "mln_completion"
 COMPLETION_RESULT = "mln_completion_result"
 # The record that carries a borrowed byte span.
 BUFFER_VIEW = "mln_buffer_view"
+# The status that a drain returns when nothing is queued.
+NOT_READY = "MLN_STATUS_NOT_READY"
 
 
 def declared_name(type_: CType) -> str:

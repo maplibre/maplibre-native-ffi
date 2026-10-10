@@ -20,7 +20,6 @@ EXECUTIONS = {
     "immediate",
     "operation",
     "render_driver",
-    "drain",
     "lifecycle",
     "event_batch",
 }
