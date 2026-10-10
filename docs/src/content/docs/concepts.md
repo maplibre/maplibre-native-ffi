@@ -84,9 +84,12 @@ acceptance and later invokes one completion with its terminal disposition. Every
 binding reports a submission that native rejects from the call itself, and a
 command's terminal failure as data in its completion. A host that does not wait
 on a command still observes its completion, through a handler or a task, to see
-a terminal failure. Ordered queries and lifecycle transitions use typed
-completions. Bindings expose one-shot work through their normal future, promise,
-task, suspension, or explicit async idiom.
+a terminal failure. Superseded and cancelled are terminal dispositions, not
+failures: a later command replaced a superseded command, and native abandoned a
+cancelled command, such as when its owner closed before the command ran. Ordered
+queries and lifecycle transitions use typed completions. Bindings expose
+one-shot work through their normal future, promise, task, suspension, or
+explicit async idiom.
 
 Cancelling or timing out a binding's wait ends only that wait. The native work
 continues to its terminal disposition, and its completion still runs. When the
