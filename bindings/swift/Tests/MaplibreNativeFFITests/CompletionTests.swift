@@ -74,6 +74,34 @@ private struct ConversionFailure: Error {}
   }
 }
 
+/// An array result is read at the completion's value_size, which a native
+/// build whose element grew reports wider than this binding's element. A
+/// stride narrower than the element cannot hold one, so the read throws.
+@Test func anArrayResultIsReadAtItsValueSize() throws {
+  // Two coordinates, each followed by a member this binding does not know.
+  let wide: [Double] = [1, 2, -1, 3, 4, -1]
+  try wide.withUnsafeBytes { bytes in
+    var result = mln_completion_result()
+    result.size = UInt32(MemoryLayout<mln_completion_result>.size)
+    result.status = MLN_STATUS_OK.rawValue
+    result.value = bytes.baseAddress
+    result.value_count = 2
+    result.value_size = UInt32(3 * MemoryLayout<Double>.size)
+    let points = try withUnsafePointer(to: result) {
+      try NativeCompletion.values($0, as: mln_lat_lng.self)
+    }
+    #expect(points.map(\.latitude) == [1, 3])
+    #expect(points.map(\.longitude) == [2, 4])
+
+    result.value_size = UInt32(MemoryLayout<mln_lat_lng>.size - 1)
+    #expect(throws: (any Error).self) {
+      try withUnsafePointer(to: result) {
+        try NativeCompletion.values($0, as: mln_lat_lng.self)
+      }
+    }
+  }
+}
+
 /// A submission native rejects throws its status, and the bridge state it
 /// never handed over, with the converter's captures, is freed before the
 /// throw reaches the caller.

@@ -608,8 +608,8 @@ mln_status mln_probe_ledger_get(
 
 // Each struct is versioned by one thing. A window that a caller passes by
 // pointer begins with its size and keeps it where a survey embeds it. The span
-// that only a window embeds, and the survey that only a completion delivers,
-// carry none.
+// that only a window embeds, the survey that only a completion delivers, and
+// the tallies that the survey borrows without a stride carry none.
 #ifdef MLN_PROTOCOL_VERSIONING
 typedef struct mln_probe_span {
   double low;
@@ -619,9 +619,14 @@ typedef struct mln_probe_window {
   uint32_t size;
   mln_probe_span span;
 } mln_probe_window;
+typedef struct mln_probe_tally {
+  uint64_t hits;
+} mln_probe_tally;
 typedef struct mln_probe_survey {
   mln_probe_window window;
   uint64_t samples;
+  const mln_probe_tally* tallies BIND("length=tally_count");
+  size_t tally_count;
 } mln_probe_survey;
 mln_status mln_map_set_window(
   mln_map map, const mln_probe_window* window, mln_diagnostic* out_diagnostic

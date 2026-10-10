@@ -529,22 +529,8 @@ unsafe fn generated_strided_values<T: Copy>(
     stride: impl TryInto<usize>,
 ) -> PyResult<impl Iterator<Item = T>> {
     let (count, stride) = (generated_count(count)?, generated_count(stride)?);
-    if count != 0
-        && (data.is_null()
-            || stride < std::mem::size_of::<T>()
-            || count > isize::MAX as usize / stride)
-    {
-        return Err(native_error("invalid native record stride"));
-    }
-    Ok((0..count).map(move |index| {
-        // SAFETY: the array contract supplies count records of the given stride.
-        unsafe {
-            data.cast::<u8>()
-                .add(index * stride)
-                .cast::<T>()
-                .read_unaligned()
-        }
-    }))
+    // SAFETY: the array contract supplies count records of the given stride.
+    unsafe { maplibre_core::ptr::strided_records(data, count, stride) }.map_err(map_error)
 }
 
 unsafe fn generated_arena_string<P>(

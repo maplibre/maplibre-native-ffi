@@ -70,10 +70,12 @@ Each declaration follows these rules, which every binding relies on:
     `MLN_STATUS_INVALID_ARGUMENT` and accepts a larger one. `mln_diagnostic` is
     the exception: native accepts any size, writes no more than size bytes, and
     truncates the message to fit.
-  - A record that native delivers in borrowed storage carries no size. The
+  - A record that native only delivers in borrowed storage carries no size. The
     stride of that storage versions it: `mln_completion_result.value_size` for a
     completion value, and `event_size` or `result_size` for an element of a
-    strided view. A binding steps through an array by that stride.
+    strided view. A binding steps through an array by that stride. A record that
+    is also passed by pointer keeps its size, and native sets it when delivering
+    the record, as with `mln_camera_options`.
   - A struct that the public headers only embed by value carries no size. Its
     container versions it, and it cannot grow within an epoch, because growing
     it moves every later member of its parent.
@@ -84,7 +86,10 @@ Each declaration follows these rules, which every binding relies on:
     are frozen and carry no size. Changing one means adding a new type.
 
   The schema rejects a size on a struct that the public headers reach only by
-  value inside records, or only as a completion value or a strided element.
+  value inside records, or only as a completion value or a strided element. An
+  array that one of those records borrows reaches its elements the same way: a
+  binding indexes an array without a stride by its own size, so those elements
+  are frozen like an embedded struct.
 - An input struct whose defaults are not all zero has a `mln_<struct>_default()`
   function. It returns the struct with size set and every member at its default.
   A binding starts each record from that function, or from zero with size set

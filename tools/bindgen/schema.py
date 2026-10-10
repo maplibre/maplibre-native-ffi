@@ -1281,6 +1281,13 @@ def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
     initializes a record that something else takes. The set holds the records
     that native reads from the host: an input parameter, an output that a
     callback fills for native, and every record that one of those holds.
+
+    A borrowed array inside a record takes its reach from that record. Inside
+    a record that versions itself or that native reads, the array's elements
+    version themselves too. Inside a record that native only delivers or
+    embeds, the elements are delivered when the array carries a stride, and
+    are otherwise indexed by the binding's own size, which freezes them as an
+    embedded record is frozen.
     """
     conventions = Conventions(api)
     reaches: dict[str, set[str]] = {}
@@ -1296,12 +1303,18 @@ def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
         name = conventions.resolve(type_).declaration
         return name if name in api.records_by_name else None
 
-    def reach(type_: CType, how: str, metadata: dict[str, str], incoming: bool):
+    def reach(
+        type_: CType,
+        how: str,
+        metadata: dict[str, str],
+        incoming: bool,
+        unstrided: str = BY_POINTER,
+    ):
         resolved = conventions.resolve(type_)
         if resolved.kind == "pointer" and resolved.pointee is not None:
             if metadata.get("kind") in OPAQUE_POINTER_KINDS:
                 return
-            how = DELIVERED if "stride" in metadata else BY_POINTER
+            how = DELIVERED if "stride" in metadata else unstrided
             resolved = conventions.resolve(resolved.pointee)
         name = record_of(resolved)
         if name is None:
@@ -1342,16 +1355,28 @@ def record_reaches(api: Api) -> tuple[dict[str, set[str]], set[str]]:
                 parameter.metadata,
                 parameter.metadata.get("direction", "in") == "out",
             )
-    for record in api.records:
-        if record.name in internal:
-            continue
-        for field in record.fields:
-            resolved = conventions.resolve(field.type)
-            if resolved.kind == "pointer":
-                reach(field.type, BY_POINTER, field.metadata, False)
-            else:
-                reach(field.type, EMBEDDED, field.metadata, False)
-    return reaches, inputs
+    # A record's members reach further records only as the record itself is
+    # reached, so this repeats until a pass adds nothing. Reaches only grow,
+    # and a record that a later pass finds versioning itself also passes that
+    # to its arrays.
+    while True:
+        before = sum(len(how) for how in reaches.values())
+        for record in api.records:
+            if record.name in internal or record.name not in reaches:
+                continue
+            versions_itself = (
+                BY_POINTER in reaches[record.name] or record.name in inputs
+            )
+            for field in record.fields:
+                reach(
+                    field.type,
+                    EMBEDDED,
+                    field.metadata,
+                    False,
+                    BY_POINTER if versions_itself else EMBEDDED,
+                )
+        if sum(len(how) for how in reaches.values()) == before:
+            return reaches, inputs
 
 
 def versioning_errors(api: Api) -> list[str]:

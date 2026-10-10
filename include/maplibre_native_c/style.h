@@ -2058,8 +2058,9 @@ MLN_API mln_status mln_map_list_style_layer_ids(
 /**
  * Starts an ordered query of every style layer in style order.
  *
- * The completion borrows mln_style_layer_entry[value_count]. Copy retained
- * entries and their string views before the callback returns.
+ * The completion borrows value_count mln_style_layer_entry values, value_size
+ * bytes apart. Copy retained entries and their string views before the
+ * callback returns.
  *
  * Returns:
  * - MLN_STATUS_OK when the query was accepted.

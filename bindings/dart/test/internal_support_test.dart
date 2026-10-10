@@ -98,6 +98,44 @@ void main() {
     });
   });
 
+  // A native build whose element grew reports a value_size wider than this
+  // binding's element, so the reader steps by it. A stride narrower than the
+  // element cannot hold one.
+  test('an array completion is read at its value_size', () {
+    // Two coordinates, each followed by a member this binding does not know.
+    final stride = sizeOf<raw.mln_lat_lng>() + 8;
+    final points = calloc<Uint8>(2 * stride);
+    final result = calloc<raw.mln_completion_result>();
+    try {
+      for (final (index, (latitude, longitude)) in [
+        (1.0, 2.0),
+        (3.0, 4.0),
+      ].indexed) {
+        final point = (points + index * stride).cast<raw.mln_lat_lng>().ref;
+        point.latitude = latitude;
+        point.longitude = longitude;
+      }
+      result.ref.size = sizeOf<raw.mln_completion_result>();
+      result.ref.status = nativeStatusOk;
+      result.ref.value = points.cast();
+      result.ref.value_count = 2;
+      result.ref.value_size = stride;
+
+      expect(decodeLatLngListForTesting(result.ref), const [
+        LatLng(1, 2),
+        LatLng(3, 4),
+      ]);
+      result.ref.value_size = sizeOf<raw.mln_lat_lng>() - 1;
+      expect(
+        () => decodeLatLngListForTesting(result.ref),
+        throwsA(isA<InvalidStateException>()),
+      );
+    } finally {
+      calloc.free(result);
+      calloc.free(points);
+    }
+  });
+
   test(
     'a drained batch is indexed by its stride and copied field by field',
     () async {

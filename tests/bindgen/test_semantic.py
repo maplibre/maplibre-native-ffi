@@ -284,7 +284,12 @@ mln_status write_loose(const loose *value, mln_diagnostic *out_diagnostic);
         header = protocol_header(groups=("versioning", "strided_records"))
         bind(parse_sources({"api.h": header}), require_complete=True)
         message = "struct versioned by its container or stride must not carry size"
-        for name in ("mln_probe_span", "mln_probe_survey", "mln_probe_reading"):
+        for name in (
+            "mln_probe_span",
+            "mln_probe_survey",
+            "mln_probe_tally",
+            "mln_probe_reading",
+        ):
             with (
                 self.subTest(record=name),
                 self.assertRaisesRegex(ModelError, rf"{name}: {message}"),

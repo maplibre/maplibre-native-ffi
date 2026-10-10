@@ -665,3 +665,31 @@ pub fn slice(comptime Item: type, comptime Raw: type) type {
         }
     };
 }
+
+// A native build whose element grew reports a value_size wider than this
+// binding's element, so the copy steps by it. A stride narrower than the
+// element cannot hold one, so the copy fails.
+test "an array completion is read at its value_size" {
+    // Two coordinates, each followed by a member this binding does not know.
+    const Wide = extern struct { point: c.mln_lat_lng, newer: f64 };
+    const wide = [_]Wide{
+        .{ .point = .{ .latitude = 1, .longitude = 2 }, .newer = -1 },
+        .{ .point = .{ .latitude = 3, .longitude = 4 }, .newer = -1 },
+    };
+    var result = std.mem.zeroInit(c.mln_completion_result, .{
+        .size = @sizeOf(c.mln_completion_result),
+        .status = c.MLN_STATUS_OK,
+        .value = @as(?*const anyopaque, &wide),
+        .value_count = wide.len,
+        .value_size = @sizeOf(Wide),
+    });
+    const Copy = slice(c.mln_lat_lng, c.mln_lat_lng);
+    var points = try Copy.copy(&result, .{ .allocator = std.testing.allocator });
+    defer points.deinit();
+    try std.testing.expectEqual(@as(usize, 2), points.value.len);
+    try std.testing.expectEqual(@as(f64, 3), points.value[1].latitude);
+    try std.testing.expectEqual(@as(f64, 4), points.value[1].longitude);
+
+    result.value_size = @sizeOf(c.mln_lat_lng) - 1;
+    try std.testing.expectError(error.NativeError, Copy.copy(&result, .{ .allocator = std.testing.allocator }));
+}

@@ -266,6 +266,12 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
     mln_render_session_resize(fixture.session, &extent, &rejected_scale, NULL)
   );
   extent.scale_factor = 1.0;
+  mln_render_target_extent undersized = extent;
+  undersized.size = sizeof(mln_render_target_extent) - 1;
+  mln_completion rejected_size = mln_test_discard_completion();
+  MLN_TEST_INVALID(mln_render_session_resize(
+    fixture.session, &undersized, &rejected_size, NULL
+  ));
   mln_test_render_request_forced(&fixture, 302);
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, &fixture,
@@ -292,17 +298,29 @@ static void resizes_order_extent_generations_and_supersede_each_other(void) {
     new_frame.extent_generation, snapshot.extent_generation
   );
 
-  mln_render_target_extent second = extent;
-  second.width = 128;
-  second.height = 72;
+  // The second caller was built against a newer header and passes a larger
+  // extent. The snapshot embeds the extent, so it reports this build's size
+  // whether or not the driver has applied the resize yet.
+  struct {
+    mln_render_target_extent extent;
+    uint8_t newer_members[16];
+  } second = {.extent = extent};
+  second.extent.size = sizeof(second);
+  second.extent.width = 128;
+  second.extent.height = 72;
   mln_test_completion first_resize = mln_test_completion_default(0);
   mln_test_completion second_resize = mln_test_completion_default(0);
   MLN_TEST_OK(mln_render_session_resize(
     fixture.session, &extent, &first_resize.descriptor, NULL
   ));
   MLN_TEST_OK(mln_render_session_resize(
-    fixture.session, &second, &second_resize.descriptor, NULL
+    fixture.session, &second.extent, &second_resize.descriptor, NULL
   ));
+  snapshot = read_snapshot(fixture.session);
+  TEST_ASSERT_EQUAL_UINT32(
+    sizeof(mln_render_target_extent), snapshot.extent.size
+  );
+  TEST_ASSERT_EQUAL_UINT32(128, snapshot.extent.width);
   MLN_TEST_OK(
     mln_test_render_fixture_finish_operation(&fixture, &first_resize)
   );

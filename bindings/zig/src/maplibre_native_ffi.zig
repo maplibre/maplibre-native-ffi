@@ -7061,8 +7061,8 @@ pub fn renderSessionQueryRenderedFeatures(allocator: std.mem.Allocator, session:
 }
 
 /// Starts a source-feature query against the session's latest driver state. The
-/// completion borrows an array of `mln_queried_feature` values (value_count
-/// entries), valid only for the callback.
+/// completion borrows value_count `mln_queried_feature` values, value_size
+/// bytes apart, valid only for the callback.
 ///
 /// See `mln_render_session_query_source_features` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/query_8h.html).

@@ -5,6 +5,7 @@ package maplibre
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 )
 
@@ -45,6 +46,21 @@ func TestCompletionDeliversExactlyOnce(t *testing.T) {
 		t.Fatalf("a conversion that failed after adopting its map: %v, want ErrNative", err)
 	}
 	closeOnceCollected(t, f.runtime, "the disposal of the map the failed conversion adopted")
+}
+
+// An array result is read at the completion's value_size, which a native
+// build whose element grew reports wider than this binding's element. A stride
+// narrower than the element cannot hold it, so the decode fails instead.
+func TestArrayCompletionIsReadAtItsValueSize(t *testing.T) {
+	points := []LatLng{{Latitude: 1, Longitude: 2}, {Latitude: 3, Longitude: 4}}
+	wide := latLngArrayCompletionForTest(8, points)
+	if got := await(t, wide); !slices.Equal(got, points) {
+		t.Fatalf("Await() = %v, want %v", got, points)
+	}
+	narrow := latLngArrayCompletionForTest(-8, points)
+	if _, err := narrow.Await(context.Background()); !errors.Is(err, ErrNative) {
+		t.Fatalf("a stride below the element size: %v, want ErrNative", err)
+	}
 }
 
 // A submission native refuses returns its error at once, and the binding

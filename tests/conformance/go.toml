@@ -44,6 +44,7 @@
 "VAL-04" = "bindings/go/binding_runtime_test.go::TestIntegerCarriersKeepTheirValues"
 "VAL-05" = "bindings/go/values_test.go::TestArrayInputsAreCopiedAtSubmission"
 "VAL-06" = { na = "A Go struct has no constructor: its zero value is zero in every field, and DefaultMapOptions returns a copy of the native default" }
+"VAL-07" = "bindings/go/completion_test.go::TestArrayCompletionIsReadAtItsValueSize"
 "VIEW-01" = "bindings/go/render_test.go::TestFrameViewIsScopedToItsCallback"
 "REND-01" = "bindings/go/render_test.go::TestOwnedTextureFrameReadsBackAsPixels"
 "REND-02" = "bindings/go/render_test.go::TestCallerDriverIsServicedFromAGoroutine"

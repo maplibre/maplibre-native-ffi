@@ -41,6 +41,7 @@
 "VAL-04" = "bindings/dart/test/values_test.dart::integer narrowing is checked and 64-bit carriers round-trip"
 "VAL-05" = "bindings/dart/test/values_test.dart::an array input is copied when the call submits it"
 "VAL-06" = "bindings/dart/test/values_test.dart::a record built from its constructor defaults equals the native default"
+"VAL-07" = "bindings/dart/test/internal_support_test.dart::an array completion is read at its value_size"
 # An OpenGL session exposes frames only from a context that it shares with the
 # host, which only a caller-driven session can drive, so the test skips on EGL
 # and WGL builds; Metal and Vulkan builds cover it.

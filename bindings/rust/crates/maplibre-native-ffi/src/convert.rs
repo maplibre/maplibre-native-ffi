@@ -561,25 +561,8 @@ unsafe fn strided_values<T: Copy>(
     count: usize,
     stride: usize,
 ) -> Result<Vec<T>> {
-    if count == 0 {
-        return Ok(Vec::new());
-    }
-    if pointer.is_null()
-        || stride < std::mem::size_of::<T>()
-        || count > isize::MAX as usize / stride
-    {
-        return Err(Error::invalid_argument("invalid native stride"));
-    }
-    Ok((0..count)
-        // SAFETY: the caller guarantees each strided entry.
-        .map(|index| unsafe {
-            pointer
-                .cast::<u8>()
-                .add(index * stride)
-                .cast::<T>()
-                .read_unaligned()
-        })
-        .collect())
+    // SAFETY: the caller guarantees each strided entry.
+    Ok(unsafe { maplibre_core::ptr::strided_records(pointer, count, stride) }?.collect())
 }
 
 /// Copies a UTF-8 range from a native batch's shared message storage.

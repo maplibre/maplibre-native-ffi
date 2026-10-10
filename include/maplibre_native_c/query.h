@@ -162,9 +162,9 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  *
  * All inputs are copied before return. Core-worker sessions execute on their
  * worker. Caller-driver sessions publish driver work and complete only after
- * the host services it on the graphics thread. The completion borrows an array
- * of mln_queried_feature values (value_count entries), valid only for the
- * callback.
+ * the host services it on the graphics thread. The completion borrows
+ * value_count mln_queried_feature values, value_size bytes apart, valid only
+ * for the callback.
  *
  * Box geometry is normalized and clipped to the viewport, so a box that
  * over-covers the viewport queries everything visible. A box that lies entirely
@@ -194,8 +194,8 @@ MLN_API mln_status mln_render_session_query_rendered_features(
 
 /**
  * Starts a source-feature query against the session's latest driver state.
- * The completion borrows an array of mln_queried_feature values (value_count
- * entries), valid only for the callback.
+ * The completion borrows value_count mln_queried_feature values, value_size
+ * bytes apart, valid only for the callback.
  *
  * Returns:
  * - MLN_STATUS_OK when the query is accepted.

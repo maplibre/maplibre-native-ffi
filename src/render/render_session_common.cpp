@@ -3351,7 +3351,10 @@ auto render_session_resize_start(
     async
   );
   if (registered != MLN_STATUS_OK) return registered;
-  const auto copied = *extent;
+  // The snapshot reports this extent as an embedded member, so it carries the
+  // size of this build's struct rather than the caller's.
+  auto copied = *extent;
+  copied.size = sizeof(mln_render_target_extent);
   auto ticket = uint64_t{0};
   {
     const auto lock = std::scoped_lock{live->control_mutex};

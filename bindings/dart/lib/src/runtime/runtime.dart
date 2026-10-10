@@ -203,6 +203,11 @@ List<RuntimeEvent> decodeRuntimeEventBatchForTesting(
   raw.mln_event_batch_view batch,
 ) => _readEventBatchView(batch).events;
 
+/// Decodes a synthetic array completion of coordinates through the production
+/// element reader.
+List<LatLng> decodeLatLngListForTesting(raw.mln_completion_result result) =>
+    _resultLatLng.readList(result);
+
 /// Starts a command and decodes its receipt, including failed dispositions.
 Future<CommandCompletion> _startCommand(
   NativeCompletionStart start, {

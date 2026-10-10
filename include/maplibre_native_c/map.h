@@ -593,7 +593,7 @@ MLN_API mln_status mln_runtime_offline_region_get(
  * Starts listing the offline regions in the runtime database.
  *
  * A successful completion borrows value_count mln_offline_region_info values,
- * valid only for the duration of the callback.
+ * value_size bytes apart, valid only for the duration of the callback.
  *
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.
@@ -632,7 +632,8 @@ MLN_API mln_status mln_runtime_offline_regions_list(
  * diagnostic.
  *
  * A successful completion borrows value_count mln_offline_region_info values,
- * one per merged region, valid only for the duration of the callback.
+ * value_size bytes apart and one per merged region, valid only for the
+ * duration of the callback.
  *
  * Returns:
  * - MLN_STATUS_OK when the operation is accepted.

@@ -181,6 +181,31 @@ func int32CompletionForTest(convert func(int32) (int32, error)) (*Future[int32],
 	return &Future[int32]{state: state}, deliver
 }
 
+// latLngArrayCompletionForTest delivers points to the decoder of an array
+// result as native lays them out, with value_size widen bytes wider than this
+// binding's mln_lat_lng, and returns the future that the decoded copy
+// completes. A negative widen narrows the stride.
+func latLngArrayCompletionForTest(widen int, points []LatLng) *Future[[]LatLng] {
+	stride := uintptr(int(unsafe.Sizeof(C.mln_lat_lng{})) + widen)
+	state := &futureState[[]LatLng]{ready: make(chan struct{})}
+	bridge := &completionBridge[[]LatLng]{state: state, convert: completionListOf(copyLatLng)}
+	elements := C.calloc(C.size_t(len(points)), C.size_t(max(stride, unsafe.Sizeof(C.mln_lat_lng{}))))
+	defer C.free(elements)
+	for i, point := range points {
+		*(*C.mln_lat_lng)(unsafe.Add(elements, uintptr(i)*stride)) = C.mln_lat_lng{
+			latitude:  C.double(point.Latitude),
+			longitude: C.double(point.Longitude),
+		}
+	}
+	bridge.complete(&C.mln_completion_result{
+		status:      C.MLN_STATUS_OK,
+		value:       elements,
+		value_count: C.size_t(len(points)),
+		value_size:  C.uint32_t(stride),
+	})
+	return &Future[[]LatLng]{state: state}
+}
+
 // rejectedSubmissionForTest starts a completion that native refuses, and
 // returns the handle the binding passed as the completion's user data.
 func rejectedSubmissionForTest() (cgo.Handle, error) {
