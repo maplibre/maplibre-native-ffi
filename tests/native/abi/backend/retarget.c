@@ -330,9 +330,9 @@ static void release(mln_acquired_frame* frame) {
   MLN_TEST_OK(mln_acquired_frame_release(frame, &sync, NULL));
 }
 
-// A replacement waits until the host holds no frame of the ring, because an
-// acquired frame names a texture that the replacement retires.
-static void a_borrowed_retarget_waits_for_acquired_frames(void) {
+// A replacement is refused while the host holds a frame of the ring, because
+// an acquired frame names a texture that the replacement retires.
+static void a_borrowed_retarget_is_refused_while_a_frame_is_acquired(void) {
   retarget_map map = {0};
   open_borrowed_ring(&map, MLN_TEST_PRESET_DRIVER);
   const mln_test_render_fixture* fixture = &map.fixture;
@@ -371,6 +371,62 @@ static void a_borrowed_retarget_waits_for_acquired_frames(void) {
     mln_test_last_error()
   );
   finish(fixture, &completion, MLN_STATUS_OK, "the ring replacement");
+  close_map(&map);
+}
+
+// A frame disposed without consumer synchronization quarantines its slot, since
+// the host's GPU may still read the slot's texture. A replacement retires those
+// textures, so it returns every slot to service, even in a ring that refused
+// frames because each of its slots was quarantined.
+static void a_borrowed_retarget_returns_quarantined_slots_to_service(void) {
+  retarget_map map = {0};
+  open_borrowed_ring(&map, MLN_TEST_PRESET_DRIVER);
+  const mln_test_render_fixture* fixture = &map.fixture;
+  mln_test_graphics_texture* replacements[2] = {
+    mln_test_render_fixture_new_texture(fixture),
+    mln_test_render_fixture_new_texture(fixture),
+  };
+  TEST_ASSERT_NOT_NULL_MESSAGE(replacements[0], mln_test_graphics_last_error());
+  TEST_ASSERT_NOT_NULL_MESSAGE(replacements[1], mln_test_graphics_last_error());
+  restore_fixture_context(fixture);
+  for (int index = 0; index < 2; index += 1) {
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
+    );
+    mln_acquired_frame frame = MLN_HANDLE_NULL;
+    MLN_TEST_OK(acquire(fixture, &frame));
+    MLN_TEST_OK(mln_acquired_frame_dispose(frame, NULL));
+  }
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = 0;
+  demand.token = 2000;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_STATE,
+    mln_render_session_request_frame(fixture->session, &demand, NULL)
+  );
+
+  mln_test_completion completion = mln_test_completion_default(0);
+  MLN_TEST_OK_MESSAGE(
+    mln_test_render_fixture_set_textures(
+      fixture, mln_test_render_fixture_graphics(fixture), replacements, 2,
+      &completion.descriptor
+    ),
+    mln_test_last_error()
+  );
+  finish(fixture, &completion, MLN_STATUS_OK, "the ring replacement");
+
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_RENDERED, render_frame(fixture, 0)
+  );
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  MLN_TEST_OK(acquire(fixture, &frame));
+  uint32_t slot = UINT32_MAX;
+  const uint64_t texture = mln_test_frame_texture_handle(frame, &slot);
+  TEST_ASSERT_LESS_THAN_UINT32(2, slot);
+  TEST_ASSERT_EQUAL_UINT64(
+    mln_test_texture_handle(replacements[slot]), texture
+  );
+  release(&frame);
   close_map(&map);
 }
 
@@ -715,7 +771,8 @@ static void refused_retargets_leave_the_old_target_rendering(void) {
 MLN_TEST_GROUP {
 #if !defined(__EMSCRIPTEN__)
   RUN_TEST(a_borrowed_texture_retarget_renders_into_the_new_texture);
-  RUN_TEST(a_borrowed_retarget_waits_for_acquired_frames);
+  RUN_TEST(a_borrowed_retarget_is_refused_while_a_frame_is_acquired);
+  RUN_TEST(a_borrowed_retarget_returns_quarantined_slots_to_service);
   RUN_TEST(frames_published_before_a_retarget_cannot_be_acquired);
   RUN_TEST(a_surface_retarget_presents_through_the_new_surface);
   RUN_TEST(refused_retargets_leave_the_old_target_rendering);
