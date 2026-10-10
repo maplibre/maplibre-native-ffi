@@ -204,6 +204,18 @@ also loses its destructor; glslang compiles shaders in pools that `TShader` and
 `TProgram` own, so a thread leaks only what it allocated from the default pool
 outside them. Upstream: not applicable; it serves this build's compile options.
 
+`0041-cancel-camera-transitions-by-id.patch` adds an optional
+`AnimationOptions::transitionId` and a `cancelTransitions(uint64_t)` overload on
+`Transform` and `Map`. The overload cancels the commands that carry that
+identity and leaves the others animating, so a host can end one camera command
+without ending every other. It builds on the per-command transitions of
+`0015-independent-camera-animations.patch`, and each cancelled command finishes
+once, as the unfiltered cancellation finishes it. An identity in the options
+lets the caller match a command without RTTI, which `std::function::target()`
+needs and this build turns off. The patch includes a Transform regression for a
+matching cancellation, a cancellation that matches nothing, and the command that
+keeps running. Upstream: not yet proposed; it depends on 0015.
+
 Each patch is a squashed diff applied on top of the patches before it. Patch
 context and test placement follow the pinned source and earlier patches. The
 publication patch includes the transition setters for our bearing-accuracy

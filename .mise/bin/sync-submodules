@@ -80,6 +80,7 @@ mln_patches=(
   "$repo_root/patches/maplibre-native/0038-apple-locale-expressions.patch"
   "$repo_root/patches/maplibre-native/0039-color-ramp-global-state.patch"
   "$repo_root/patches/maplibre-native/0040-destroy-thread-local-run-loop.patch"
+  "$repo_root/patches/maplibre-native/0041-cancel-camera-transitions-by-id.patch"
 )
 
 # The patches overlap, so no single patch reverses cleanly on its own once the
