@@ -273,9 +273,10 @@ internal abstract class RenderTarget : IDisposable
 
     /// <summary>
     /// Drains every frame result and shows the newest rendered frame. A rendered frame that asks
-    /// for another, as during a paint transition, demands it. A target that was not ready, or a
-    /// frame that missed the window, consumed its map update, so a forced retry follows after about
-    /// one refresh.
+    /// for another, as during a paint transition, demands it. Neither a target that was not ready
+    /// nor a frame that missed the window causes a map-update event, so a retry follows after about
+    /// one refresh. The retry is forced, because a frame that missed the window consumed its
+    /// update.
     /// </summary>
     /// <returns>Whether a frame reached the window.</returns>
     protected bool DrainFrameResults()

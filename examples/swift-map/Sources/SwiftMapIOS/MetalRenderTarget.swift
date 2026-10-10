@@ -94,7 +94,7 @@ final class MetalRenderTarget {
   }
 
   /// Demands a presented frame. A forced demand renders even without a newer
-  /// map update, which a retry after an undrawn frame needs.
+  /// map update.
   func requestFrame(force: Bool = false) throws {
     nextToken += 1
     try session.requestFrame(demand: FrameDemand(

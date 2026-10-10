@@ -33,7 +33,7 @@ typedef custom_unsigned nested_unsigned;
 typedef int64_t custom_signed;
 typedef size_t custom_count;
 typedef enum flags : uint64_t {{ FLAG_HIGH = 0x100000000ULL }} flags;
-typedef struct values {{ nested_unsigned id; custom_signed offset; custom_count count; flags mask; }} values;
+typedef struct values {{ nested_unsigned id; custom_signed offset; custom_count count; uint64_t mask BIND("enum=flags"); }} values;
 mln_status read_values(values *out BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """),
                     require_complete=True,
@@ -82,7 +82,7 @@ void release_owner(owner value);
 mln_status begin_view(owner value, void **scope BIND("direction=out;kind=context"), mln_diagnostic *out_diagnostic);
 void end_view(void *scope BIND("kind=context"));
 typedef enum event_tag : int { NONE = 0, NUMBER = -1 } event_tag;
-typedef struct event { event_tag tag; union { double number BIND("variant=NUMBER"); } payload BIND("tag=tag;empty_variant=NONE"); } event;
+typedef struct event { int tag BIND("enum=event_tag"); union { double number BIND("variant=NUMBER"); } payload BIND("tag=tag;empty_variant=NONE"); } event;
 mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_diagnostic);
 """
         model = bind(self.parse(source), require_complete=True)
@@ -111,7 +111,7 @@ mln_status read_event(event *value BIND("direction=out"), mln_diagnostic *out_di
 typedef enum choice : unsigned { TEXT = 1, NUMBER = 2 } choice;
 typedef struct text { const char *data BIND("length=count"); unsigned count; } text;
 typedef struct value {
-  choice tag;
+  unsigned tag BIND("enum=choice");
   union {
     text text BIND("variant=TEXT");
     double number BIND("variant=NUMBER");

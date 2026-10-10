@@ -27,13 +27,13 @@ private final class NativeCompletionState<Value: Sendable>:
     let converted: Result<Value, Error>
     do {
       let raw = native.pointee
-      guard raw.status == MLN_STATUS_OK || acceptErrorStatus else {
+      guard raw.status == MLN_STATUS_OK.rawValue || acceptErrorStatus else {
         let diagnostic = try NativeString.copyUTF8(
           data: raw.diagnostic.data,
           size: raw.diagnostic.size
         )
         throw NativeStatusFailure(
-          rawStatus: raw.status.rawValue,
+          rawStatus: raw.status,
           diagnostic: diagnostic
         )
       }
@@ -162,7 +162,7 @@ enum NativeCompletion {
       try CommandCompletion(
         disposition: CommandDisposition(rawValue: result.pointee.disposition),
         generation: result.pointee.generation,
-        rawStatus: result.pointee.status.rawValue,
+        rawStatus: result.pointee.status,
         diagnostic: NativeString.copyUTF8(
           data: result.pointee.diagnostic.data,
           size: result.pointee.diagnostic.size

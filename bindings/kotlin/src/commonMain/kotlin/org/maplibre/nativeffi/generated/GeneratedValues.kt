@@ -812,11 +812,21 @@ public data class RenderResult(public val rawValue: UInt) {
   public companion object {
     /** A frame was rendered for acquisition, presentation, or ordered readback. */
     public val RENDERED: RenderResult = RenderResult(0u)
-    /** No newer map update was available. */
+    /**
+     * No newer map update was available, or the map had no complete frame to draw yet. The map
+     * publishes another update when it has one.
+     */
     public val NO_UPDATE: RenderResult = RenderResult(1u)
-    /** An ordered extent change had not reached the driver. */
+    /**
+     * An ordered extent change had not reached the map. The map publishes an update at the new
+     * extent.
+     */
     public val SIZE_PENDING: RenderResult = RenderResult(2u)
-    /** The target could not produce a frame. */
+    /**
+     * The target could not produce a frame. The attempt consumes nothing, so a later demand with
+     * the same flags renders what this one would have. This result does not cause a map update, so
+     * the host demands again when the target can be ready, such as after a paced delay.
+     */
     public val TARGET_NOT_READY: RenderResult = RenderResult(3u)
     /** A newer demand in the same coalescing boundary replaced this demand. */
     public val SUPERSEDED: RenderResult = RenderResult(4u)

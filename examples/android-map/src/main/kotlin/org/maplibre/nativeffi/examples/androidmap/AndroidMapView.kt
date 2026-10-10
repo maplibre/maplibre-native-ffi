@@ -137,8 +137,8 @@ internal class AndroidMapView(
       finishPendingDrawing()
       onRendered()
     }
-    // A target that was not ready consumed the map update, so the next Choreographer frame forces
-    // a retry. The result otherwise carries the map's own follow-up demand, so an ongoing
+    // A target that was not ready does not cause a map-update event, so the next Choreographer
+    // frame retries. The result otherwise carries the map's own follow-up demand, so an ongoing
     // transition needs no runtime event round trip.
     if (drained.targetNotReady) requestRedraw() else if (drained.needsRepaint) scheduleFrame()
   }
@@ -173,7 +173,7 @@ internal class AndroidMapView(
   }
 
   /**
-   * Parks a live session off the outgoing surface before this callback returns, since the surface
+   * Moves a live session off the outgoing surface before this callback returns, since the surface
    * is gone after that. A session still attaching against it closes instead.
    */
   private fun surfaceLost() {
@@ -182,7 +182,8 @@ internal class AndroidMapView(
       target?.attached != false &&
         try {
           graphics?.releaseSurface {
-            // The context outlived the surface, so the session parks on it until a surface returns.
+            // The context outlived the surface, so the session parks on the context's own surface
+            // until a surface returns.
             followSurface("surface released")?.let { target?.await(it) }
           } == true
         } catch (error: RuntimeException) {

@@ -482,7 +482,7 @@ internal static unsafe class GeneratedValues
         native.display = (void*)value.Display.Address;
         native.config = (void*)value.Config.Address;
         native.share_context = (void*)value.ShareContext.Address;
-        native.client_api = (mln_opengl_client_api)value.ClientApi;
+        native.client_api = (uint)value.ClientApi;
         native.get_proc_address = (void*)value.GetProcAddress.Address;
         return native;
     }
@@ -1277,18 +1277,15 @@ internal static unsafe class GeneratedValues
             (OpenglContextOwnership)value.ownership,
             value.platform switch
             {
-                (mln_opengl_context_platform)
-                    mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL =>
+                (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL =>
                     new OpenglContextDescriptor.DataValue.Wgl(
                         CopyWglContextDescriptor(value.data.wgl)
                     ),
-                (mln_opengl_context_platform)
-                    mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL =>
+                (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL =>
                     new OpenglContextDescriptor.DataValue.Egl(
                         CopyEglContextDescriptor(value.data.egl)
                     ),
-                (mln_opengl_context_platform)
-                    mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL =>
+                (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL =>
                     new OpenglContextDescriptor.DataValue.Webgl(
                         CopyWebglContextDescriptor(value.data.webgl)
                     ),
@@ -1306,21 +1303,19 @@ internal static unsafe class GeneratedValues
     {
         var native = new mln_opengl_context_descriptor();
         native.size = (uint)sizeof(mln_opengl_context_descriptor);
-        native.ownership = (mln_opengl_context_ownership)value.Ownership;
+        native.ownership = (uint)value.Ownership;
         switch (value.Data)
         {
             case OpenglContextDescriptor.DataValue.Wgl selected:
-                native.platform = (mln_opengl_context_platform)
-                    mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+                native.platform = (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
                 native.data.wgl = NativeWglContextDescriptor(selected.Value);
                 break;
             case OpenglContextDescriptor.DataValue.Egl selected:
-                native.platform = (mln_opengl_context_platform)
-                    mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+                native.platform = (uint)mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
                 native.data.egl = NativeEglContextDescriptor(selected.Value);
                 break;
             case OpenglContextDescriptor.DataValue.Webgl selected:
-                native.platform = (mln_opengl_context_platform)
+                native.platform = (uint)
                     mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
                 native.data.webgl = NativeWebglContextDescriptor(selected.Value, scope);
                 break;

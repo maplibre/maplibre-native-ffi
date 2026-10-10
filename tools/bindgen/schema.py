@@ -848,6 +848,12 @@ def validate(api: Api) -> None:
                 metadata_errors(field.metadata, FIELD_KEYS, fcontext, KINDS["field"])
             )
             errors.extend(value_metadata_errors(field.type, field.metadata, fcontext))
+            # Native can write a value that an older binding's enum lacks.
+            enum_name = field.type.canonical.removeprefix("enum ")
+            if enum_name != field.type.canonical and enum_name.isidentifier():
+                errors.append(
+                    f"{fcontext}: an enum member requires an integer type and enum=<enum>"
+                )
             if "stride" in field.metadata:
                 stride = field_path(record.name, field.metadata["stride"])
                 if (

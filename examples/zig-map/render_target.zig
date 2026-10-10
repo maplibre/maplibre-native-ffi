@@ -111,9 +111,9 @@ pub const Session = struct {
     }
 
     /// Demands a frame and returns the token whose result shows it. A forced
-    /// demand renders even without a newer map update, which a retry after an
-    /// undrawn frame needs. While a turn-taking session has a demand
-    /// outstanding, the demand waits for `compositorDone`.
+    /// demand renders even without a newer map update, which a retry after a
+    /// frame that missed the window needs. While a turn-taking session has a
+    /// demand outstanding, the demand waits for `compositorDone`.
     pub fn requestFrame(self: *Session, force: bool) !u64 {
         if (self.demand_outstanding) {
             self.wanted = force or (self.wanted orelse false);

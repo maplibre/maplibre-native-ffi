@@ -16,8 +16,9 @@ const glTexture2D = 0x0DE1
 // next one.
 const ownedTextureRingDepth = 2
 
-// retryDelay is how long a frame that did not reach the window waits to
-// retry, about one display refresh.
+// retryDelay is how long the loop waits before it retries a frame that did not
+// reach the window, about one display refresh. No map-update event prompts
+// that retry.
 const retryDelay = 16 * time.Millisecond
 
 // renderTarget is a render session and the frames it shows. OpenGL on an EGL
@@ -146,9 +147,10 @@ func (driver *callerDriver) HandleWakes() (bool, error) {
 
 // drainFrameResults drains every frame result and shows the newest rendered
 // frame. A rendered frame that asks for another, as during a paint
-// transition, demands it. A target that was not ready, or a frame that missed
-// the window, consumed its map update, so a forced retry follows after about
-// one refresh.
+// transition, demands it. Neither a target that was not ready nor a frame that
+// missed the window causes a map-update event, so a retry follows after about
+// one refresh. The retry is forced, because a frame that missed the window
+// consumed its update.
 func (driver *callerDriver) drainFrameResults() (bool, error) {
 	batch, err := driver.session.DrainFrameResults()
 	if err != nil || batch == nil {

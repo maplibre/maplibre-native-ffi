@@ -171,7 +171,7 @@ func int32CompletionForTest(convert func(int32) (int32, error)) (*Future[int32],
 		return convert(int32(value))
 	}}
 	deliver := func(status int32, value *int32) {
-		result := C.mln_completion_result{status: C.mln_status(status)}
+		result := C.mln_completion_result{status: C.int32_t(status)}
 		if value != nil {
 			native := C.int32_t(*value)
 			result.value = unsafe.Pointer(&native)

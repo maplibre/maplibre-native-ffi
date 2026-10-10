@@ -529,7 +529,7 @@ pub struct mln_completion {
 #[derive(Debug, Clone, Copy)]
 pub struct mln_completion_result {
     pub size: u32,
-    pub status: mln_status,
+    pub status: i32,
     pub disposition: u32,
     pub reserved: u32,
     pub generation: u64,
@@ -587,7 +587,7 @@ pub struct mln_egl_context_descriptor {
     pub display: *mut std::ffi::c_void,
     pub config: *mut std::ffi::c_void,
     pub share_context: *mut std::ffi::c_void,
-    pub client_api: mln_opengl_client_api,
+    pub client_api: u32,
     pub get_proc_address: *mut std::ffi::c_void,
 }
 #[repr(C)]
@@ -857,8 +857,8 @@ pub struct mln_opengl_borrowed_texture_descriptor {
 #[derive(Clone, Copy)]
 pub struct mln_opengl_context_descriptor {
     pub size: u32,
-    pub platform: mln_opengl_context_platform,
-    pub ownership: mln_opengl_context_ownership,
+    pub platform: u32,
+    pub ownership: u32,
     pub data: mln_opengl_context_descriptor_data,
 }
 #[repr(C)]

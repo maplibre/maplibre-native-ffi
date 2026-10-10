@@ -52,7 +52,7 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
       raw.share_context,
       to: UInt.self
     ))
-    clientApi = OpenglClientApi(rawValue: raw.client_api.rawValue)
+    clientApi = OpenglClientApi(rawValue: raw.client_api)
     getProcAddress = NativePointer(bitPattern: unsafeBitCast(
       raw.get_proc_address,
       to: UInt.self
@@ -65,7 +65,7 @@ public struct EglContextDescriptor: Equatable, Hashable, Sendable {
     raw.display = display.unsafeMutableRawPointer
     raw.config = config.unsafeMutableRawPointer
     raw.share_context = shareContext.unsafeMutableRawPointer
-    raw.client_api = mln_opengl_client_api(rawValue: clientApi.rawValue)
+    raw.client_api = clientApi.rawValue
     raw.get_proc_address = getProcAddress.unsafeMutableRawPointer
     return raw
   }
@@ -209,10 +209,10 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
     raw: mln_opengl_context_descriptor,
     recordBytes: UnsafeRawBufferPointer? = nil
   ) throws {
-    ownership = OpenglContextOwnership(rawValue: raw.ownership.rawValue)
+    ownership = OpenglContextOwnership(rawValue: raw.ownership)
     data = try { () throws -> OpenglContextDescriptorData in
-      switch raw.platform
-        .rawValue
+      switch raw
+        .platform
       {
       case MLN_OPENGL_CONTEXT_PLATFORM_WGL
         .rawValue: return .wgl(WglContextDescriptor(raw: raw.data
@@ -222,7 +222,7 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
                   .rawValue: return try .webgl(WebglContextDescriptor(raw: raw
             .data
             .webgl)) default: return .unknown(
-          raw.platform.rawValue,
+          raw.platform,
           recordBytes
             .map {
               Data($0
@@ -239,14 +239,14 @@ public struct OpenglContextDescriptor: Equatable, Hashable, Sendable {
   {
     var raw = mln_opengl_context_descriptor()
     raw.size = UInt32(MemoryLayout<mln_opengl_context_descriptor>.size)
-    raw.ownership = mln_opengl_context_ownership(rawValue: ownership.rawValue)
+    raw.ownership = ownership.rawValue
     switch data {
-    case let .wgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL; raw
-      .data.wgl = item.nativeValue()
-    case let .egl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL; raw
-      .data.egl = item.nativeValue()
-    case let .webgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL; raw
-      .data.webgl = try item.nativeValue(arena: arena)
+    case let .wgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL
+      .rawValue; raw.data.wgl = item.nativeValue()
+    case let .egl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL
+      .rawValue; raw.data.egl = item.nativeValue()
+    case let .webgl(item): raw.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL
+      .rawValue; raw.data.webgl = try item.nativeValue(arena: arena)
     case .unknown: throw NativeStringError(
         "unknown union variant cannot be submitted"
       )

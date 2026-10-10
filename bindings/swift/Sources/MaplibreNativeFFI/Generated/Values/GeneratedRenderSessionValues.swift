@@ -200,11 +200,16 @@ public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
 
   /// A frame was rendered for acquisition, presentation, or ordered readback.
   public static let rendered: RenderResult = .init(rawValue: 0)
-  /// No newer map update was available.
+  /// No newer map update was available, or the map had no complete frame to
+  /// draw yet. The map publishes another update when it has one.
   public static let noUpdate: RenderResult = .init(rawValue: 1)
-  /// An ordered extent change had not reached the driver.
+  /// An ordered extent change had not reached the map. The map publishes an
+  /// update at the new extent.
   public static let sizePending: RenderResult = .init(rawValue: 2)
-  /// The target could not produce a frame.
+  /// The target could not produce a frame. The attempt consumes nothing, so a
+  /// later demand with the same flags renders what this one would have. This
+  /// result does not cause a map update, so the host demands again when the
+  /// target can be ready, such as after a paced delay.
   public static let targetNotReady: RenderResult = .init(rawValue: 3)
   /// A newer demand in the same coalescing boundary replaced this demand.
   public static let superseded: RenderResult = .init(rawValue: 4)

@@ -612,13 +612,18 @@ final class RenderResult extends _Enum {
   /// A frame was rendered for acquisition, presentation, or ordered readback.
   static const rendered = RenderResult.fromRawValue(0);
 
-  /// No newer map update was available.
+  /// No newer map update was available, or the map had no complete frame to
+  /// draw yet. The map publishes another update when it has one.
   static const noUpdate = RenderResult.fromRawValue(1);
 
-  /// An ordered extent change had not reached the driver.
+  /// An ordered extent change had not reached the map. The map publishes an
+  /// update at the new extent.
   static const sizePending = RenderResult.fromRawValue(2);
 
-  /// The target could not produce a frame.
+  /// The target could not produce a frame. The attempt consumes nothing, so a
+  /// later demand with the same flags renders what this one would have. This
+  /// result does not cause a map update, so the host demands again when the
+  /// target can be ready, such as after a paced delay.
   static const targetNotReady = RenderResult.fromRawValue(3);
 
   /// A newer demand in the same coalescing boundary replaced this demand.

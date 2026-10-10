@@ -77,7 +77,7 @@ typedef enum mln_command_disposition : uint32_t {
 } mln_command_disposition;
 typedef struct mln_completion_result {
   uint32_t size;
-  mln_status status;
+  int status BIND("enum=mln_status");
   uint32_t disposition BIND("enum=mln_command_disposition");
   uint32_t reserved BIND("kind=reserved");
   uint64_t generation;

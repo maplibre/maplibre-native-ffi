@@ -29,8 +29,8 @@ fn isSmokeRun(init_args: std.process.Init) bool {
 /// How long a smoke run waits for its first rendered frame.
 const smoke_timeout_ms = 60_000;
 
-/// How long a frame that did not reach the window waits before it retries,
-/// about one display refresh.
+/// How long the loop waits before it retries a frame that did not reach the
+/// window, about one display refresh. No map-update event prompts that retry.
 const frame_retry_ms = 16;
 
 /// How long the render loop waits before SDL checks for a quit signal. SDL
@@ -181,8 +181,10 @@ const App = struct {
             return;
         }
         if (results.target_not_ready or (results.rendered and !presented)) {
-            // The map update was consumed without reaching the window, so the
-            // retry forces a frame rather than waiting for another update.
+            // Neither a target that was not ready nor a frame that missed the
+            // window causes a map-update event, so the retry waits about one
+            // display refresh. It forces the frame, because a frame that
+            // missed the window consumed its update.
             events.pushAfter(.retry_frame, frame_retry_ms);
         } else if (results.needs_repaint) {
             _ = try session.requestFrame(false);

@@ -16,17 +16,22 @@ public enum RenderResult : uint
     Rendered = 0,
 
     /// <summary>
-    /// No newer map update was available.
+    /// No newer map update was available, or the map had no complete frame to
+    /// draw yet. The map publishes another update when it has one.
     /// </summary>
     NoUpdate = 1,
 
     /// <summary>
-    /// An ordered extent change had not reached the driver.
+    /// An ordered extent change had not reached the map. The map publishes an
+    /// update at the new extent.
     /// </summary>
     SizePending = 2,
 
     /// <summary>
-    /// The target could not produce a frame.
+    /// The target could not produce a frame. The attempt consumes nothing, so a
+    /// later demand with the same flags renders what this one would have. This
+    /// result does not cause a map update, so the host demands again when the
+    /// target can be ready, such as after a paced delay.
     /// </summary>
     TargetNotReady = 3,
 
