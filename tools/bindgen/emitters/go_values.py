@@ -11,10 +11,6 @@ def public(native):
     return name(native.removeprefix("mln_"))
 
 
-def field(value):
-    return ".".join(native_identifier(part) for part in value.split("."))
-
-
 def scalar(ctype, carrier=None):
     portable = {
         "size_t": "uint",
@@ -196,7 +192,7 @@ class Values:
                 size = (
                     value.length
                     if value.length.isdigit()
-                    else f"{scope}.{field(value.length)}"
+                    else f"{scope}.{native_identifier(value.length)}"
                 )
                 pointer = f"unsafe.Pointer({expr})"
             else:
@@ -216,14 +212,14 @@ class Values:
             count = (
                 value.length
                 if value.length.isdigit()
-                else f"{scope}.{field(value.length)}"
+                else f"{scope}.{native_identifier(value.length)}"
             )
             output = self.type(value)
             elem = value.element
             ctype = elem.native
             source = f"&{expr}[0]" if value.ctype.kind == "array" else expr
             stride = (
-                f"{scope}.{field(value.stride)}"
+                f"{scope}.{native_identifier(value.stride)}"
                 if value.stride
                 else f"unsafe.Sizeof(C.{ctype}{{}})"
                 if elem.kind == "record"
@@ -233,10 +229,10 @@ class Values:
             enrichment = ""
             if value.item_buffer:
                 arena = value.item_buffer
-                enrichment = f"result[i].{name(arena.field)} = bindingArenaString(unsafe.Pointer({scope}.{field(arena.data)}), uint64({scope}.{field(arena.size)}), uint64(item.{field(arena.offset)}), uint64(item.{field(arena.length)}));"
+                enrichment = f"result[i].{name(arena.field)} = bindingArenaString(unsafe.Pointer({scope}.{native_identifier(arena.data)}), uint64({scope}.{native_identifier(arena.size)}), uint64(item.{native_identifier(arena.offset)}), uint64(item.{native_identifier(arena.length)}));"
             return f"func() {output} {{ {f'if {source} == nil {{ return nil }}; ' if value.nullable else ''}length := bindingLength(uint64({count})); result := make({output}, length); for i := range result {{ item := *(*C.{ctype})(bindingElement(unsafe.Pointer({source}), i, uint64({stride}), unsafe.Sizeof(*{source}), unsafe.Alignof(*{source}))); result[i] = {copy}; {enrichment} }}; return result }}()"
         if value.kind == "union":
-            tag = f"{scope}.{field(value.tag)}"
+            tag = f"{scope}.{native_identifier(value.tag)}"
             arms = []
             for f in value.fields:
                 read = f"*(*C.{f.value.native})(unsafe.Pointer(&{expr}))"
@@ -291,7 +287,7 @@ class Values:
                 inner = f"({self.c_type(value)})({inner})"
             code = f"{dest} = {inner}"
             if value.length and value.length != "nul" and not value.length.isdigit():
-                code += f"; {scope}.{field(value.length)} = bindingCountLike({scope}.{field(value.length)}, len({expr}))"
+                code += f"; {scope}.{native_identifier(value.length)} = bindingCountLike({scope}.{native_identifier(value.length)}, len({expr}))"
             return code
         if value.kind == "array":
             ctype = value.element.native
@@ -307,7 +303,7 @@ class Values:
                 setup += f"; items := unsafe.Slice({dest}, len({expr}))"
                 slot = "items[i]"
                 if value.length and not value.length.isdigit():
-                    setup += f"; {scope}.{field(value.length)} = bindingCountLike({scope}.{field(value.length)}, len({expr}))"
+                    setup += f"; {scope}.{native_identifier(value.length)} = bindingCountLike({scope}.{native_identifier(value.length)}, len({expr}))"
             return (
                 "{ "
                 + setup
@@ -425,14 +421,12 @@ class Values:
                         continue
                     if v is None:
                         lines.append(
-                            f"result.{member} = raw.{field(f.mask)} & C.{f.name} != 0"
+                            f"result.{member} = raw.{native_identifier(f.mask)} & C.{f.name} != 0"
                         )
                         continue
-                    convert = self.copy(f.value, "raw." + field(f.name))
+                    convert = self.copy(f.value, "raw." + native_identifier(f.name))
                     if f.presence and f.presence.mask:
-                        condition = (
-                            f"raw.{field(f.presence.mask)} & C.{f.presence.bit} != 0"
-                        )
+                        condition = f"raw.{native_identifier(f.presence.mask)} & C.{f.presence.bit} != 0"
                         if v.kind == "array":
                             lines.append(
                                 f"if {condition} {{ result.{member} = {convert} }}"
@@ -453,31 +447,31 @@ class Values:
                 for f in visible.fields:
                     if f.role == "size":
                         lines.append(
-                            f"raw.{field(f.name)} = bindingCountLike(raw.{field(f.name)}, int(unsafe.Sizeof(raw)))"
+                            f"raw.{native_identifier(f.name)} = bindingCountLike(raw.{native_identifier(f.name)}, int(unsafe.Sizeof(raw)))"
                         )
                     elif f.role == "presence_mask":
-                        lines.append(f"raw.{field(f.name)} = 0")
+                        lines.append(f"raw.{native_identifier(f.name)} = 0")
                 for member, v, f in members:
                     expr = "input." + member
                     if v is None:
                         lines.append(
-                            f"if {expr} {{ raw.{field(f.mask)} |= C.{f.name} }}"
+                            f"if {expr} {{ raw.{native_identifier(f.mask)} |= C.{f.name} }}"
                         )
                         continue
                     if v.kind == "union":
                         arms = []
                         for variant in v.fields:
-                            write = f"*(*C.{variant.value.native})(unsafe.Pointer(&raw.{field(f.name)}))"
+                            write = f"*(*C.{variant.value.native})(unsafe.Pointer(&raw.{native_identifier(f.name)}))"
                             arms.append(
                                 f"case {self.union_name(v)}{name(variant.name)}Variant: {self.native(variant.value, 'variant.Value', write)}"
                             )
                         tag_type = next(
                             f.value for f in value.fields if f.name == v.tag
                         )
-                        tag = f"raw.{field(v.tag)} = {self.c_type(tag_type)}({expr}.bindingTag())"
+                        tag = f"raw.{native_identifier(v.tag)} = {self.c_type(tag_type)}({expr}.bindingTag())"
                         body = f'if {expr} == nil {{ arena.fail("missing union variant") }}; {tag}; switch variant := {expr}.(type) {{ {"; ".join(arms)}; default: arena.fail("unknown input union variant") }}'
                         if v.empty_variant:
-                            body = f"if {expr} == nil {{ raw.{field(v.tag)} = C.{v.empty_variant[0]} }} else {{ {body} }}"
+                            body = f"if {expr} == nil {{ raw.{native_identifier(v.tag)} = C.{v.empty_variant[0]} }} else {{ {body} }}"
                         lines.append(body)
                         continue
                     body = self.native(
@@ -485,14 +479,14 @@ class Values:
                         "(*" + expr + ")"
                         if f.presence and f.presence.mask and v.kind != "array"
                         else expr,
-                        "raw." + field(f.name),
+                        "raw." + native_identifier(f.name),
                     )
                     if f.presence and f.presence.mask:
-                        mask = f"raw.{field(f.presence.mask)} |= C.{f.presence.bit}"
+                        mask = f"raw.{native_identifier(f.presence.mask)} |= C.{f.presence.bit}"
                         convert = self.converter(f.value)
                         if convert:
                             lines.append(
-                                f"bindingMasked(&raw.{field(f.presence.mask)}, C.{f.presence.bit}, &raw.{field(f.name)}, {expr}, arena, {convert})"
+                                f"bindingMasked(&raw.{native_identifier(f.presence.mask)}, C.{f.presence.bit}, &raw.{native_identifier(f.name)}, {expr}, arena, {convert})"
                             )
                         else:
                             lines.append(f"if {expr} != nil {{ {body}; {mask} }}")

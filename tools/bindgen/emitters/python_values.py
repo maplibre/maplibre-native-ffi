@@ -69,9 +69,7 @@ def public_name(native: str) -> str:
 def rust_field(name: str) -> str:
     from .rust import BINDGEN_RESERVED
 
-    return ".".join(
-        part + "_" if part in BINDGEN_RESERVED else part for part in name.split(".")
-    )
+    return name + "_" if name in BINDGEN_RESERVED else name
 
 
 def optional(plan: ValuePlan) -> bool:

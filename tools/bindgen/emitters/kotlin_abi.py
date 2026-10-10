@@ -196,18 +196,12 @@ class Abi:
         assert isinstance(kind, Record)
         return self.record(kind, width)
 
-    def offset(self, record: str, path: str) -> tuple[int, int]:
-        """The byte offset of a dotted field path per data model (ILP32, LP64)."""
-        result = []
-        for width in (32, 64):
-            kind = self.classify(CType("record", record, "struct " + record, record))
-            total = 0
-            for part in path.split("."):
-                assert isinstance(kind, Record), path
-                total += self.record(kind, width).offsets[part]
-                kind = dict(kind.fields)[part]
-            result.append(total)
-        return result[0], result[1]
+    def offset(self, record: str, field: str) -> tuple[int, int]:
+        """The byte offset of a field per data model (ILP32, LP64)."""
+        return (
+            self.record_named(record, 32).offsets[field],
+            self.record_named(record, 64).offsets[field],
+        )
 
     def size(self, ctype: CType) -> tuple[int, int]:
         kind = self.classify(ctype)

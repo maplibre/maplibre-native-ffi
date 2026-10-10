@@ -50,9 +50,7 @@ class Unsupported(ValueError):
 
 def member(name: str) -> str:
     """A C field or parameter name, escaped only where it is a C# keyword."""
-    return ".".join(
-        "@" + part if part in KEYWORDS["dotnet"] else part for part in name.split(".")
-    )
+    return "@" + name if name in KEYWORDS["dotnet"] else name
 
 
 def width(ctype) -> str | None:

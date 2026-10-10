@@ -495,16 +495,12 @@ class Values:
             return "NativeMemory.addressSize"
         return self.align(element.native)
 
-    def at(self, base, record, path):
-        offset = width_expression(self.abi.offset(record.native, path))
+    def at(self, base, record, field):
+        offset = width_expression(self.abi.offset(record.native, field))
         return base if offset == "0" else f"{base} + {offset}"
 
-    def field_plan(self, record, path):
-        value = record
-        for part in path.split("."):
-            field = next(f for f in value.fields if f.name == part)
-            value = field.value
-        return field
+    def field_plan(self, record, field):
+        return next(f for f in record.fields if f.name == field)
 
     def accessor(self, value):
         """The accessor suffix and public type of a scalar or enum's storage."""

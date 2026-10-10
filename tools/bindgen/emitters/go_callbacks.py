@@ -3,7 +3,8 @@
 from dataclasses import replace
 
 from ..model import ModelError
-from .go_values import field, name, public
+from .go import native_identifier
+from .go_values import name, public
 
 
 def plain(plan):
@@ -103,7 +104,7 @@ def sources(values, plan):
         c.append(f"{ret} {symbol}({params}) {{ {guard} {body} }}")
         parameters = [p for p in callback.parameters if p.name != callback.context]
         go_params = ", ".join(
-            "native_" + field(p.name) + " " + values.c_type(p.value)
+            "native_" + native_identifier(p.name) + " " + values.c_type(p.value)
             for p in callback.parameters
         )
         go_ret = (
@@ -147,7 +148,9 @@ def sources(values, plan):
                     f"&{public(value.native)}Scope{{native: native_{p.name}, scope: scope}}"
                 )
             else:
-                copied.append(values.copy(p.value, "native_" + field(p.name)))
+                copied.append(
+                    values.copy(p.value, "native_" + native_identifier(p.name))
+                )
         setup.append(
             f"callbacks, ok := bindingCallbackValue[{public(plan.native)}](native_{callback.context}); if !ok || callbacks.{name(member)} == nil {{ return }}"
         )
@@ -181,13 +184,13 @@ def registration_input(values, plan):
     identity = "arena.identity" if descriptor.receiver_owned else "0"
     lines = [
         f"if {enabled} {{",
-        f"raw.{field(descriptor.user_data)} = arena.register(input, {identity})",
-        f"raw.{field(descriptor.release)} = (C.{release_type})(C.{release})",
+        f"raw.{native_identifier(descriptor.user_data)} = arena.register(input, {identity})",
+        f"raw.{native_identifier(descriptor.release)} = (C.{release_type})(C.{release})",
     ]
     for member in descriptor.callbacks:
         ctype = next(f.value.native for f in plan.fields if f.name == member)
         lines.append(
-            f"if input.{name(member)} != nil {{ raw.{field(member)} = (C.{ctype})(C.binding_{plan.native}_{member}) }}"
+            f"if input.{name(member)} != nil {{ raw.{native_identifier(member)} = (C.{ctype})(C.binding_{plan.native}_{member}) }}"
         )
     lines.append("}")
     return "; ".join(lines)
