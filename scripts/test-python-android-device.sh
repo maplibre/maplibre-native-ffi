@@ -37,7 +37,6 @@ if [[ ! -d "$native_install_dir" ]]; then
 fi
 
 mise run //:android-sdk-packages
-serial=${ANDROID_SERIAL:-emulator-5554}
 if [[ -z "${ANDROID_SERIAL:-}" && "$preset" == android-x64-egl ]]; then
   # CPython 3.14's x86_64 Android runtime uses the legacy open syscall during
   # mimalloc initialization. API 26 rejects that syscall before Python can
@@ -48,6 +47,8 @@ fi
 if [[ -z "${ANDROID_SERIAL:-}" ]]; then
   mise run //:android-emulator:boot "$abi"
 fi
+serial=$("$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh")
+export ANDROID_SERIAL="$serial"
 
 # cibuildwheel pins its own NDK and removes other NDK versions from the SDK it
 # manages. Give it an isolated SDK view so later repository tasks retain the

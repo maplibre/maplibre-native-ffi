@@ -20,17 +20,17 @@ rendered="smoke: rendered a frame"
 timeout_seconds=120
 
 adb="$ANDROID_HOME/platform-tools/adb"
-# An explicit serial selects a connected device. Otherwise a booted emulator of
-# the preset's ABI at the serial boot-android-emulator.sh gives it runs the
-# smoke, whatever its API level: the app supports every level the suites boot,
-# and the x64 EGL target's suites leave API 26 or the default level running.
-# Without one, the default emulator boots.
-if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-  export ANDROID_SERIAL=emulator-5554
-  if ! "$adb" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' | grep -qx 1; then
-    mise run //:android-emulator:boot "$abi"
-  fi
+# An explicit serial selects a connected device. Otherwise this checkout's
+# booted emulator runs the smoke, whatever its API level: the app supports
+# every level the suites boot, and the x64 EGL target's suites leave API 26 or
+# the default level running. Without one, the default emulator boots. adb and
+# Gradle both read the exported serial.
+serial_script="$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh"
+if ! ANDROID_SERIAL=$("$serial_script"); then
+  mise run //:android-emulator:boot "$abi"
+  ANDROID_SERIAL=$("$serial_script")
 fi
+export ANDROID_SERIAL
 device_abi=$("$adb" shell getprop ro.product.cpu.abi | tr -d '\r')
 if [[ "$device_abi" != "$abi" ]]; then
   echo "Android device $ANDROID_SERIAL has ABI $device_abi; preset $preset needs $abi." >&2

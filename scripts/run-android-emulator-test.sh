@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Runs native test executables on ANDROID_SERIAL or boots the default emulator.
+# Runs native test executables on ANDROID_SERIAL or on the emulator that
+# boot-android-emulator.sh starts.
 # Every executable runs and reports its own exit status; the first failure
 # stops the batch.
 set -euo pipefail
@@ -44,7 +45,6 @@ if (($# == 0)); then
 fi
 test_executables=("$@")
 
-serial=${ANDROID_SERIAL:-emulator-5554}
 timeout_scale=${MLN_TEST_TIMEOUT_SCALE:-3}
 remote_dir=/data/local/tmp/maplibre-native-ffi
 fixture_dir=${MLN_FFI_TEST_FIXTURE_DIR:-}
@@ -69,8 +69,10 @@ if [[ -n "$fixture_dir" && ! -d "$fixture_dir" ]]; then
   exit 2
 fi
 
-# An explicit serial selects a connected device; only the default emulator can
-# be booted automatically.
+# An explicit serial selects a connected device; only this checkout's emulator
+# can be booted automatically.
+serial_script="$MISE_MONOREPO_ROOT/scripts/android-device-serial.sh"
+serial=$("$serial_script") || serial=
 if [[ -n "${ANDROID_SERIAL:-}" ]]; then
   device_abi=$("$adb" -s "$serial" shell getprop ro.product.cpu.abi | tr -d '\r')
   device_api=$("$adb" -s "$serial" shell getprop ro.build.version.sdk | tr -d '\r')
@@ -79,9 +81,7 @@ if [[ -n "${ANDROID_SERIAL:-}" ]]; then
     echo "Android device $serial has ABI $device_abi and API $device_api; expected $abi ${emulator_api:+at API $emulator_api}." >&2
     exit 2
   fi
-elif [[ -n "$emulator_api" ]] || [[ ! -x "$adb" ]] ||
-  ! "$adb" -s "$serial" shell getprop sys.boot_completed 2>/dev/null |
-  tr -d '\r' | grep -qx 1 ||
+elif [[ -n "$emulator_api" || -z "$serial" ]] ||
   ! "$adb" -s "$serial" shell getprop ro.product.cpu.abi 2>/dev/null |
   tr -d '\r' | grep -qx "$abi"; then
   emulator_args=("$abi")
@@ -89,6 +89,7 @@ elif [[ -n "$emulator_api" ]] || [[ ! -x "$adb" ]] ||
     emulator_args+=(--api "$emulator_api")
   fi
   mise run //:android-emulator:boot "${emulator_args[@]}"
+  serial=$("$serial_script")
 fi
 
 # The shell user may execute what it owns under /data/local/tmp. The Android

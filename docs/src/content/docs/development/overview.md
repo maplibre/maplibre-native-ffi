@@ -107,6 +107,11 @@ mise run test android-x64-egl
 mise run //:android-emulator:stop
 ```
 
+The Android emulator takes the first free console port from 5554 and runs beside
+emulators that other checkouts or projects started. The stop task stops only the
+emulator that this checkout booted. To run the Android tasks on another device,
+set `ANDROID_SERIAL` to its adb serial.
+
 Both emulators use KVM on Linux when the user can read and write `/dev/kvm`, and
 boot in a few minutes. On every other host the guest runs in software, and a
 boot takes an hour or more.
