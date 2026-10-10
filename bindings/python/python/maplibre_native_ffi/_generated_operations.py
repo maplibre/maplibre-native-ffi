@@ -45,8 +45,8 @@ from ._generated_values import (
     MapViewportOptions,
     MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor,
-    MetalOwnedTextureFrame,
     MetalSurfaceDescriptor,
+    MetalTextureFrame,
     NetworkStatus,
     OfflineRegionDefinition,
     OfflineRegionDownloadState,
@@ -55,8 +55,8 @@ from ._generated_values import (
     OpenglBorrowedTextureDescriptor,
     OpenglContextProviderFlag,
     OpenglOwnedTextureDescriptor,
-    OpenglOwnedTextureFrame,
     OpenglSurfaceDescriptor,
+    OpenglTextureFrame,
     PremultipliedRgba8Image,
     ProjectedMeters,
     ProjectionMode,
@@ -89,12 +89,12 @@ from ._generated_values import (
     TextureReadbackResult,
     VulkanBorrowedTextureDescriptor,
     VulkanOwnedTextureDescriptor,
-    VulkanOwnedTextureFrame,
     VulkanSurfaceDescriptor,
+    VulkanTextureFrame,
     WebgpuBorrowedTextureDescriptor,
     WebgpuOwnedTextureDescriptor,
-    WebgpuOwnedTextureFrame,
     WebgpuSurfaceDescriptor,
+    WebgpuTextureFrame,
 )
 
 if TYPE_CHECKING:
@@ -178,7 +178,7 @@ class MapAttachWebgpuSurfaceResult(NamedTuple):
 class _AcquiredFrameHandleOperations(GeneratedOperations):
     _native: _native._AcquiredFrameHandle
 
-    def with_metal_texture(self, callback: Callable[[MetalOwnedTextureFrame], R]) -> R:
+    def with_metal_texture(self, callback: Callable[[MetalTextureFrame], R]) -> R:
         """Copies Metal-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_metal_texture` in the
@@ -189,13 +189,11 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return _with_view(
             self,
             lambda: self._native.with_metal_texture(),
-            lambda raw: MetalOwnedTextureFrame._from_native(raw),
+            lambda raw: MetalTextureFrame._from_native(raw),
             callback,
         )
 
-    def with_opengl_texture(
-        self, callback: Callable[[OpenglOwnedTextureFrame], R]
-    ) -> R:
+    def with_opengl_texture(self, callback: Callable[[OpenglTextureFrame], R]) -> R:
         """Copies OpenGL-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_opengl_texture` in the
@@ -206,7 +204,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return _with_view(
             self,
             lambda: self._native.with_opengl_texture(),
-            lambda raw: OpenglOwnedTextureFrame._from_native(raw),
+            lambda raw: OpenglTextureFrame._from_native(raw),
             callback,
         )
 
@@ -233,9 +231,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         """
         return RenderFrameResult._from_native(self._native.get_result())
 
-    def with_vulkan_texture(
-        self, callback: Callable[[VulkanOwnedTextureFrame], R]
-    ) -> R:
+    def with_vulkan_texture(self, callback: Callable[[VulkanTextureFrame], R]) -> R:
         """Copies Vulkan-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_vulkan_texture` in the
@@ -246,13 +242,11 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return _with_view(
             self,
             lambda: self._native.with_vulkan_texture(),
-            lambda raw: VulkanOwnedTextureFrame._from_native(raw),
+            lambda raw: VulkanTextureFrame._from_native(raw),
             callback,
         )
 
-    def with_webgpu_texture(
-        self, callback: Callable[[WebgpuOwnedTextureFrame], R]
-    ) -> R:
+    def with_webgpu_texture(self, callback: Callable[[WebgpuTextureFrame], R]) -> R:
         """Copies WebGPU-native metadata from an acquired frame.
 
         See `mln_acquired_frame_get_webgpu_texture` in the
@@ -263,7 +257,7 @@ class _AcquiredFrameHandleOperations(GeneratedOperations):
         return _with_view(
             self,
             lambda: self._native.with_webgpu_texture(),
-            lambda raw: WebgpuOwnedTextureFrame._from_native(raw),
+            lambda raw: WebgpuTextureFrame._from_native(raw),
             callback,
         )
 
@@ -521,7 +515,7 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: MetalBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachMetalBorrowedTextureResult:
-        """Starts attachment of a caller-owned Metal texture target.
+        """Starts attachment of a ring of caller-owned Metal textures.
 
         See `mln_map_attach_metal_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -569,7 +563,7 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: OpenglBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachOpenglBorrowedTextureResult:
-        """Starts attachment of a caller-owned OpenGL texture target.
+        """Starts attachment of a ring of caller-owned OpenGL textures.
 
         See `mln_map_attach_opengl_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -617,7 +611,7 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: VulkanBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachVulkanBorrowedTextureResult:
-        """Starts attachment of a caller-owned Vulkan texture target.
+        """Starts attachment of a ring of caller-owned Vulkan images.
 
         See `mln_map_attach_vulkan_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -665,7 +659,7 @@ class _MapHandleOperations(GeneratedOperations):
         descriptor: WebgpuBorrowedTextureDescriptor | None = None,
         options: RenderSessionAttachOptions | None = None,
     ) -> MapAttachWebgpuBorrowedTextureResult:
-        """Starts attachment of a caller-owned WebGPU texture target.
+        """Starts attachment of a ring of caller-owned WebGPU textures.
 
         See `mln_map_attach_webgpu_borrowed_texture` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1669,7 +1663,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     _native: _native._RenderSessionHandle
 
     def abandon(self) -> RenderAbandonResult:
-        """Irreversibly closes control and mailboxes without graphics calls.
+        """Irreversibly closes control and mailboxes and disposes of the
+        session's graphics objects.
 
         See `mln_render_session_abandon` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1691,6 +1686,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def barrier(self) -> Future[None]:
         """Starts a barrier that completes after all render work accepted before
         it has a terminal result. A barrier does not request a frame.
+        Accepting a barrier ends the wait of every earlier demand that waits
+        for a map update.
 
         See `mln_render_session_barrier` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -1882,7 +1879,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_metal_borrowed_texture_target(
         self, descriptor: MetalBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
-        """Starts an ordered caller-owned Metal texture replacement.
+        """Starts an ordered replacement of every texture of a caller-owned
+        Metal ring.
 
         See `mln_render_session_set_metal_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1902,7 +1900,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_opengl_borrowed_texture_target(
         self, descriptor: OpenglBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
-        """Starts an ordered caller-owned OpenGL texture replacement.
+        """Starts an ordered replacement of every texture of a caller-owned
+        OpenGL ring.
 
         See `mln_render_session_set_opengl_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1922,7 +1921,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_vulkan_borrowed_texture_target(
         self, descriptor: VulkanBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
-        """Starts an ordered caller-owned Vulkan texture replacement.
+        """Starts an ordered replacement of every image of a caller-owned Vulkan
+        ring.
 
         See `mln_render_session_set_vulkan_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -1942,7 +1942,8 @@ class _RenderSessionHandleOperations(GeneratedOperations):
     def set_webgpu_borrowed_texture_target(
         self, descriptor: WebgpuBorrowedTextureDescriptor | None = None
     ) -> Future[None]:
-        """Starts an ordered caller-owned WebGPU texture replacement.
+        """Starts an ordered replacement of every texture of a caller-owned
+        WebGPU ring.
 
         See `mln_render_session_set_webgpu_borrowed_texture_target` in the
         [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

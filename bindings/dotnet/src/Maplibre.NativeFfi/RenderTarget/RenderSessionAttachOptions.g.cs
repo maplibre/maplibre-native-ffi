@@ -14,8 +14,10 @@ namespace Maplibre.NativeFfi;
 /// <c>MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD</c>.
 /// </param>
 /// <param name="RequestedTextureRingDepth">
-/// Requested host-acquirable owned-texture slot count. Private targets grant
-/// one slot regardless of this value. Ignored by other targets. Defaults to 1.
+/// Requested slot count of a session-owned texture ring, from one to three.
+/// Private targets grant one slot regardless of this value. A borrowed texture
+/// ring's depth is its texture count, so borrowed and other targets ignore this
+/// value. Defaults to 1.
 /// </param>
 /// <param name="FrameWake">
 /// Wakes the receiver when the frame-result queue becomes nonempty.

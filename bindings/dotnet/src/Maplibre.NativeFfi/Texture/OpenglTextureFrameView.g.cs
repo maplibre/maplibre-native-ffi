@@ -2,12 +2,12 @@
 #nullable enable
 namespace Maplibre.NativeFfi;
 
-public sealed class WebgpuOwnedTextureFrameView
+public sealed class OpenglTextureFrameView
 {
-    private readonly WebgpuOwnedTextureFrame value;
+    private readonly OpenglTextureFrame value;
     private readonly NativeViewScope scope;
 
-    internal WebgpuOwnedTextureFrameView(WebgpuOwnedTextureFrame value, NativeViewScope scope)
+    internal OpenglTextureFrameView(OpenglTextureFrame value, NativeViewScope scope)
     {
         this.value = value;
         this.scope = scope;
@@ -18,8 +18,10 @@ public sealed class WebgpuOwnedTextureFrameView
     public uint Height => scope.Active(value).Height;
     public double ScaleFactor => scope.Active(value).ScaleFactor;
     public ulong FrameId => scope.Active(value).FrameId;
-    public NativePointer Texture => scope.Active(value).Texture;
-    public NativePointer TextureView => scope.Active(value).TextureView;
-    public NativePointer Device => scope.Active(value).Device;
+    public uint Slot => scope.Active(value).Slot;
+    public uint Texture => scope.Active(value).Texture;
+    public uint Target => scope.Active(value).Target;
+    public uint InternalFormat => scope.Active(value).InternalFormat;
     public uint Format => scope.Active(value).Format;
+    public uint Type => scope.Active(value).Type;
 }

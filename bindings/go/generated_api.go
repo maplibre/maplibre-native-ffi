@@ -244,6 +244,17 @@ const (
 	// presenting target whose demand clears this bit still renders and keeps
 	// whatever it presented last. Ignored by targets without presentation.
 	FrameDemandFlagPresent FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_PRESENT)
+	// With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
+	// MLN_RENDER_RESULT_NO_UPDATE or MLN_RENDER_RESULT_SIZE_PENDING waits instead,
+	// and runs again after the map's next update, a target replacement, or an
+	// applied resize. A waiting demand holds no ring slot. A later demand with the
+	// same flags and coalescing boundary supersedes it, a barrier ends its wait
+	// with MLN_RENDER_RESULT_NO_UPDATE, and detach, abandon, or the quarantine of
+	// the ring's last usable slot end it with MLN_RENDER_RESULT_TARGET_NOT_READY. A
+	// waiting demand's result can follow the results of demands accepted after it.
+	// The flag does not pace: a host that re-arms a waiting demand as each result
+	// arrives renders every update the map publishes.
+	FrameDemandFlagWaitForUpdate FrameDemandFlag = FrameDemandFlag(C.MLN_FRAME_DEMAND_WAIT_FOR_UPDATE)
 )
 
 func (value FrameDemandFlag) Has(flags FrameDemandFlag) bool { return value&flags == flags }
@@ -318,7 +329,9 @@ const (
 type GpuSyncKind uint32
 
 const (
-	// The producer or consumer has completed before the API call returns.
+	// The host needs no synchronization object. The work completed, or on WebGPU
+	// was submitted to the device's queue, before the frame became acquirable or
+	// before the release call.
 	GpuSyncKindCpuComplete GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_CPU_COMPLETE)
 	// id<MTLSharedEvent> plus a monotonically increasing signal value.
 	GpuSyncKindMetalSharedEvent GpuSyncKind = GpuSyncKind(C.MLN_GPU_SYNC_METAL_SHARED_EVENT)
@@ -601,17 +614,17 @@ const (
 
 func (value QueriedFeatureField) Has(flags QueriedFeatureField) bool { return value&flags == flags }
 
-// RenderAbandonDisposition corresponds to mln_render_abandon_disposition.
-// Result of irreversible CPU-side target abandonment.
+// RenderAbandonDisposition corresponds to mln_render_abandon_disposition. What
+// abandon did with a session's graphics resources.
 //
 // See mln_render_abandon_disposition in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderAbandonDisposition uint32
 
 const (
-	// No graphics resources remained when control was abandoned.
+	// Abandon destroyed every graphics resource, or none remained.
 	RenderAbandonDispositionClean RenderAbandonDisposition = RenderAbandonDisposition(C.MLN_RENDER_ABANDON_DISPOSITION_CLEAN)
-	// Graphics resources could not be destroyed and were quarantined.
+	// Abandon kept graphics resources that it could not safely destroy.
 	RenderAbandonDispositionQuarantined RenderAbandonDisposition = RenderAbandonDisposition(C.MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED)
 )
 
@@ -670,10 +683,13 @@ const (
 	// A frame was rendered for acquisition, presentation, or ordered readback.
 	RenderResultRendered RenderResult = RenderResult(C.MLN_RENDER_RESULT_RENDERED)
 	// No newer map update was available, or the map had no complete frame to draw
-	// yet. The map publishes another update when it has one.
+	// yet. The map publishes another update when it has one. A demand with
+	// MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for that update instead, and finishes
+	// with this result only when a barrier ends its wait.
 	RenderResultNoUpdate RenderResult = RenderResult(C.MLN_RENDER_RESULT_NO_UPDATE)
 	// An ordered extent change had not reached the map. The map publishes an update
-	// at the new extent.
+	// at the new extent, which a demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits
+	// for instead of finishing with this result.
 	RenderResultSizePending RenderResult = RenderResult(C.MLN_RENDER_RESULT_SIZE_PENDING)
 	// The target could not produce a frame. The attempt consumes nothing, so a
 	// later demand with the same flags renders what this one would have. This
@@ -1935,7 +1951,9 @@ type FrameDemand struct {
 	// Demands coalesce only when this value and their flags match.
 	CoalescingBoundary uint64
 	// Positive time allowed before driver work begins, in nanoseconds; zero has no
-	// limit.
+	// limit. A demand that waits, for a free texture slot or for a map update, is
+	// checked against its timeout when it runs again; a wait has no timer of its
+	// own.
 	TimeoutNs uint64
 }
 
@@ -2340,8 +2358,11 @@ type MapSnapshot struct {
 	RenderingStatsViewEnabled bool
 	RepaintDemand             bool
 	// True while the map is inside a gesture.
-	GestureInProgress            bool
-	EventMask                    RuntimeEventMask
+	GestureInProgress bool
+	EventMask         RuntimeEventMask
+	// Generation of the latest render update the map published. A rendered frame at
+	// or past it draws map state that includes every command this snapshot
+	// observes, though animations and resource loads finish in later frames.
 	LatestRenderUpdateGeneration uint64
 	Tile                         MapTileOptions
 	Bounds                       BoundOptions
@@ -2451,6 +2472,28 @@ func DefaultMapViewportOptions() MapViewportOptions {
 	return copyMapViewportOptions(C.mln_map_viewport_options_default())
 }
 
+// MetalBorrowedTexture corresponds to mln_metal_borrowed_texture. One
+// caller-owned Metal texture of a borrowed texture ring.
+//
+// See mln_metal_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type MetalBorrowedTexture struct {
+	// Borrowed id<MTLTexture> / MTL::Texture*. Required.
+	Texture uintptr
+}
+
+func copyMetalBorrowedTexture(raw C.mln_metal_borrowed_texture) MetalBorrowedTexture {
+	var result MetalBorrowedTexture
+	result.Texture = uintptr(unsafe.Pointer(raw.texture))
+	return result
+}
+
+func nativeMetalBorrowedTexture(input MetalBorrowedTexture, arena *bindingArena) C.mln_metal_borrowed_texture {
+	raw := C.mln_metal_borrowed_texture{}
+	raw.texture = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Texture)))
+	return raw
+}
+
 // MetalBorrowedTextureDescriptor corresponds to
 // mln_metal_borrowed_texture_descriptor. Metal attachment options for a
 // borrowed texture target.
@@ -2466,8 +2509,8 @@ type MetalBorrowedTextureDescriptor struct {
 	PhysicalWidth uint32
 	// Physical texture height in device pixels. Must be positive. Defaults to 256.
 	PhysicalHeight uint32
-	// Borrowed id<MTLTexture> / MTL::Texture*. Required.
-	Texture uintptr
+	// The ring's textures, one per slot, in slot order. Required.
+	Textures []MetalBorrowedTexture
 }
 
 func copyMetalBorrowedTextureDescriptor(raw C.mln_metal_borrowed_texture_descriptor) MetalBorrowedTextureDescriptor {
@@ -2475,7 +2518,15 @@ func copyMetalBorrowedTextureDescriptor(raw C.mln_metal_borrowed_texture_descrip
 	result.Extent = copyLogicalExtent(raw.extent)
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
-	result.Texture = uintptr(unsafe.Pointer(raw.texture))
+	result.Textures = func() []MetalBorrowedTexture {
+		length := bindingLength(uint64(raw.texture_count))
+		result := make([]MetalBorrowedTexture, length)
+		for i := range result {
+			item := *(*C.mln_metal_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_metal_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
+			result[i] = copyMetalBorrowedTexture(item)
+		}
+		return result
+	}()
 	return result
 }
 
@@ -2485,7 +2536,14 @@ func nativeMetalBorrowedTextureDescriptor(input MetalBorrowedTextureDescriptor, 
 	raw.extent = nativeLogicalExtent(input.Extent, arena)
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
-	raw.texture = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Texture)))
+	{
+		raw.textures = (*C.mln_metal_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
+		items := unsafe.Slice(raw.textures, len(input.Textures))
+		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
+		for i, item := range input.Textures {
+			items[i] = nativeMetalBorrowedTexture(item, arena)
+		}
+	}
 	return raw
 }
 
@@ -2548,43 +2606,6 @@ func DefaultMetalOwnedTextureDescriptor() MetalOwnedTextureDescriptor {
 	return copyMetalOwnedTextureDescriptor(C.mln_metal_owned_texture_descriptor_default())
 }
 
-// MetalOwnedTextureFrame corresponds to mln_metal_owned_texture_frame. Metal
-// frame acquired from a session-owned texture target.
-//
-// See mln_metal_owned_texture_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type MetalOwnedTextureFrame struct {
-	// Session generation that produced this frame.
-	Generation uint64
-	// Physical Metal texture width in device pixels.
-	Width uint32
-	// Physical Metal texture height in device pixels.
-	Height uint32
-	// UI-to-device pixel scale used for this frame.
-	ScaleFactor float64
-	// Opaque frame identity used to reject stale releases.
-	FrameId uint64
-	// Borrowed id<MTLTexture> / MTL::Texture*. Valid until frame release.
-	Texture uintptr
-	// Borrowed id<MTLDevice> / MTL::Device*. Valid until frame release.
-	Device uintptr
-	// Backend-native pixel format value. Metal uses MTLPixelFormat.
-	PixelFormat uint64
-}
-
-func copyMetalOwnedTextureFrame(raw C.mln_metal_owned_texture_frame) MetalOwnedTextureFrame {
-	var result MetalOwnedTextureFrame
-	result.Generation = uint64(raw.generation)
-	result.Width = uint32(raw.width)
-	result.Height = uint32(raw.height)
-	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
-	result.Texture = uintptr(unsafe.Pointer(raw.texture))
-	result.Device = uintptr(unsafe.Pointer(raw.device))
-	result.PixelFormat = uint64(raw.pixel_format)
-	return result
-}
-
 // MetalSurfaceDescriptor corresponds to mln_metal_surface_descriptor. Metal
 // attachment options for a native surface.
 //
@@ -2619,6 +2640,47 @@ func nativeMetalSurfaceDescriptor(input MetalSurfaceDescriptor, arena *bindingAr
 
 func DefaultMetalSurfaceDescriptor() MetalSurfaceDescriptor {
 	return copyMetalSurfaceDescriptor(C.mln_metal_surface_descriptor_default())
+}
+
+// MetalTextureFrame corresponds to mln_metal_texture_frame. Metal frame
+// acquired from a texture ring.
+//
+// See mln_metal_texture_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type MetalTextureFrame struct {
+	// Session generation that produced this frame.
+	Generation uint64
+	// Physical Metal texture width in device pixels.
+	Width uint32
+	// Physical Metal texture height in device pixels.
+	Height uint32
+	// UI-to-device pixel scale used for this frame.
+	ScaleFactor float64
+	// Opaque frame identity used to reject stale releases.
+	FrameId uint64
+	// Ring slot that holds this frame. For a borrowed target, the index of its
+	// texture in the descriptor's textures array.
+	Slot uint32
+	// Borrowed id<MTLTexture> / MTL::Texture*. Valid until frame release.
+	Texture uintptr
+	// Borrowed id<MTLDevice> / MTL::Device*. Valid until frame release.
+	Device uintptr
+	// Backend-native pixel format value. Metal uses MTLPixelFormat.
+	PixelFormat uint64
+}
+
+func copyMetalTextureFrame(raw C.mln_metal_texture_frame) MetalTextureFrame {
+	var result MetalTextureFrame
+	result.Generation = uint64(raw.generation)
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.FrameId = uint64(raw.frame_id)
+	result.Slot = uint32(raw.slot)
+	result.Texture = uintptr(unsafe.Pointer(raw.texture))
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.PixelFormat = uint64(raw.pixel_format)
+	return result
 }
 
 // OfflineGeometryRegionDefinition corresponds to
@@ -2792,6 +2854,28 @@ func nativeOfflineTilePyramidRegionDefinition(input OfflineTilePyramidRegionDefi
 	return raw
 }
 
+// OpenglBorrowedTexture corresponds to mln_opengl_borrowed_texture. One
+// caller-owned OpenGL texture of a borrowed texture ring.
+//
+// See mln_opengl_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type OpenglBorrowedTexture struct {
+	// Borrowed OpenGL texture object name. Required.
+	Texture uint32
+}
+
+func copyOpenglBorrowedTexture(raw C.mln_opengl_borrowed_texture) OpenglBorrowedTexture {
+	var result OpenglBorrowedTexture
+	result.Texture = uint32(raw.texture)
+	return result
+}
+
+func nativeOpenglBorrowedTexture(input OpenglBorrowedTexture, arena *bindingArena) C.mln_opengl_borrowed_texture {
+	raw := C.mln_opengl_borrowed_texture{}
+	raw.texture = C.uint32_t(input.Texture)
+	return raw
+}
+
 // OpenglBorrowedTextureDescriptor corresponds to
 // mln_opengl_borrowed_texture_descriptor. OpenGL attachment options for a
 // borrowed texture target.
@@ -2807,12 +2891,12 @@ type OpenglBorrowedTextureDescriptor struct {
 	PhysicalWidth uint32
 	// Physical texture height in device pixels. Must be positive. Defaults to 256.
 	PhysicalHeight uint32
-	// Borrowed OpenGL context provider data. The texture must belong to this
+	// Borrowed OpenGL context provider data. The textures must belong to this
 	// context or a context in the same share group.
 	Context OpenglContextDescriptor
-	// Borrowed OpenGL texture object name. Required.
-	Texture uint32
-	// OpenGL texture target. GL_TEXTURE_2D is the expected target.
+	// The ring's textures, one per slot, in slot order. Required.
+	Textures []OpenglBorrowedTexture
+	// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
 	Target uint32
 }
 
@@ -2822,7 +2906,15 @@ func copyOpenglBorrowedTextureDescriptor(raw C.mln_opengl_borrowed_texture_descr
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
 	result.Context = copyOpenglContextDescriptor(raw.context)
-	result.Texture = uint32(raw.texture)
+	result.Textures = func() []OpenglBorrowedTexture {
+		length := bindingLength(uint64(raw.texture_count))
+		result := make([]OpenglBorrowedTexture, length)
+		for i := range result {
+			item := *(*C.mln_opengl_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_opengl_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
+			result[i] = copyOpenglBorrowedTexture(item)
+		}
+		return result
+	}()
 	result.Target = uint32(raw.target)
 	return result
 }
@@ -2834,7 +2926,14 @@ func nativeOpenglBorrowedTextureDescriptor(input OpenglBorrowedTextureDescriptor
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	raw.context = nativeOpenglContextDescriptor(input.Context, arena)
-	raw.texture = C.uint32_t(input.Texture)
+	{
+		raw.textures = (*C.mln_opengl_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
+		items := unsafe.Slice(raw.textures, len(input.Textures))
+		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
+		for i, item := range input.Textures {
+			items[i] = nativeOpenglBorrowedTexture(item, arena)
+		}
+	}
 	raw.target = C.uint32_t(input.Target)
 	return raw
 }
@@ -2928,49 +3027,6 @@ func DefaultOpenglOwnedTextureDescriptor() OpenglOwnedTextureDescriptor {
 	return copyOpenglOwnedTextureDescriptor(C.mln_opengl_owned_texture_descriptor_default())
 }
 
-// OpenglOwnedTextureFrame corresponds to mln_opengl_owned_texture_frame. OpenGL
-// frame acquired from a session-owned texture target.
-//
-// See mln_opengl_owned_texture_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type OpenglOwnedTextureFrame struct {
-	// Session generation that produced this frame.
-	Generation uint64
-	// Physical OpenGL texture width in device pixels.
-	Width uint32
-	// Physical OpenGL texture height in device pixels.
-	Height uint32
-	// UI-to-device pixel scale used for this frame.
-	ScaleFactor float64
-	// Opaque frame identity used to reject stale releases.
-	FrameId uint64
-	// Borrowed OpenGL texture object name. Valid until frame release.
-	Texture uint32
-	// OpenGL texture target. GL_TEXTURE_2D is the expected target.
-	Target uint32
-	// OpenGL internal format, such as GL_RGBA8.
-	InternalFormat uint32
-	// OpenGL pixel format, such as GL_RGBA.
-	Format uint32
-	// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
-	Type uint32
-}
-
-func copyOpenglOwnedTextureFrame(raw C.mln_opengl_owned_texture_frame) OpenglOwnedTextureFrame {
-	var result OpenglOwnedTextureFrame
-	result.Generation = uint64(raw.generation)
-	result.Width = uint32(raw.width)
-	result.Height = uint32(raw.height)
-	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
-	result.Texture = uint32(raw.texture)
-	result.Target = uint32(raw.target)
-	result.InternalFormat = uint32(raw.internal_format)
-	result.Format = uint32(raw.format)
-	result.Type = uint32(raw._type)
-	return result
-}
-
 // OpenglSurfaceDescriptor corresponds to mln_opengl_surface_descriptor. OpenGL
 // attachment options for a native surface.
 //
@@ -3006,6 +3062,54 @@ func nativeOpenglSurfaceDescriptor(input OpenglSurfaceDescriptor, arena *binding
 
 func DefaultOpenglSurfaceDescriptor() OpenglSurfaceDescriptor {
 	return copyOpenglSurfaceDescriptor(C.mln_opengl_surface_descriptor_default())
+}
+
+// OpenglTextureFrame corresponds to mln_opengl_texture_frame. OpenGL frame
+// acquired from a texture ring.
+//
+// See mln_opengl_texture_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type OpenglTextureFrame struct {
+	// Session generation that produced this frame.
+	Generation uint64
+	// Physical OpenGL texture width in device pixels.
+	Width uint32
+	// Physical OpenGL texture height in device pixels.
+	Height uint32
+	// UI-to-device pixel scale used for this frame.
+	ScaleFactor float64
+	// Opaque frame identity used to reject stale releases.
+	FrameId uint64
+	// Ring slot that holds this frame. For a borrowed target, the index of its
+	// texture in the descriptor's textures array.
+	Slot uint32
+	// Borrowed OpenGL texture object name. Valid until frame release.
+	Texture uint32
+	// OpenGL texture target. GL_TEXTURE_2D is the expected target.
+	Target uint32
+	// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture, whose
+	// format the host chose.
+	InternalFormat uint32
+	// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
+	Format uint32
+	// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
+	Type uint32
+}
+
+func copyOpenglTextureFrame(raw C.mln_opengl_texture_frame) OpenglTextureFrame {
+	var result OpenglTextureFrame
+	result.Generation = uint64(raw.generation)
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.FrameId = uint64(raw.frame_id)
+	result.Slot = uint32(raw.slot)
+	result.Texture = uint32(raw.texture)
+	result.Target = uint32(raw.target)
+	result.InternalFormat = uint32(raw.internal_format)
+	result.Format = uint32(raw.format)
+	result.Type = uint32(raw._type)
+	return result
 }
 
 // PremultipliedRgba8Image corresponds to mln_premultiplied_rgba8_image.
@@ -3230,8 +3334,12 @@ func copyRenderFrameBatchView(raw C.mln_render_frame_batch_view) RenderFrameBatc
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
 type RenderFrameResult struct {
 	// One mln_render_result value.
-	Disposition         RenderResult
-	Token               uint64
+	Disposition RenderResult
+	Token       uint64
+	// Generation of the map render update the demand evaluated. When disposition is
+	// MLN_RENDER_RESULT_RENDERED, the frame drew that update; compare it with
+	// mln_map_snapshot.latest_render_update_generation to find the first frame that
+	// includes a command.
 	MapUpdateGeneration uint64
 	ExtentGeneration    uint64
 	// Zero unless disposition is MLN_RENDER_RESULT_RENDERED.
@@ -3243,7 +3351,10 @@ type RenderFrameResult struct {
 	// needs_repaint field, delivered with the frame result so a host can re-arm its
 	// frame loop without the runtime event round trip. A camera transition does not
 	// set it by itself: the map publishes a new update after each of the
-	// transition's frames instead, which a render-if-needed demand renders.
+	// transition's frames instead, which a render-if-needed demand renders. A
+	// demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE renders each transition update
+	// without a runtime-event round trip; the host re-arms the demand as each
+	// result arrives.
 	NeedsRepaint bool
 }
 
@@ -3267,8 +3378,10 @@ type RenderSessionAttachOptions struct {
 	// One mln_render_driver_kind value. Defaults to
 	// MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD.
 	Driver RenderDriverKind
-	// Requested host-acquirable owned-texture slot count. Private targets grant one
-	// slot regardless of this value. Ignored by other targets. Defaults to 1.
+	// Requested slot count of a session-owned texture ring, from one to three.
+	// Private targets grant one slot regardless of this value. A borrowed texture
+	// ring's depth is its texture count, so borrowed and other targets ignore this
+	// value. Defaults to 1.
 	RequestedTextureRingDepth uint32
 	// Wakes the receiver when the frame-result queue becomes nonempty.
 	FrameWake Wake
@@ -3310,7 +3423,8 @@ func DefaultRenderSessionAttachOptions() RenderSessionAttachOptions {
 type RenderSessionCapabilities struct {
 	// One mln_render_driver_kind value.
 	Driver RenderDriverKind
-	// Granted owned-texture slot count, or zero for a target without a ring.
+	// Granted texture ring depth: the slot count of a session-owned ring, or the
+	// texture count of a borrowed one. Zero for a surface.
 	TextureRingDepth uint32
 	// A bitwise OR of mln_render_session_capability_flag values.
 	Flags RenderSessionCapabilityFlag
@@ -4547,6 +4661,33 @@ func nativeVec3(input Vec3, arena *bindingArena) C.mln_vec3 {
 	return raw
 }
 
+// VulkanBorrowedTexture corresponds to mln_vulkan_borrowed_texture. One
+// caller-owned Vulkan image of a borrowed texture ring.
+//
+// See mln_vulkan_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type VulkanBorrowedTexture struct {
+	// Borrowed VkImage. Required.
+	Image uint64
+	// Borrowed VkImageView for image. Required. The view must be a 2D color view
+	// that matches image and the descriptor's format.
+	ImageView uint64
+}
+
+func copyVulkanBorrowedTexture(raw C.mln_vulkan_borrowed_texture) VulkanBorrowedTexture {
+	var result VulkanBorrowedTexture
+	result.Image = uint64(raw.image)
+	result.ImageView = uint64(raw.image_view)
+	return result
+}
+
+func nativeVulkanBorrowedTexture(input VulkanBorrowedTexture, arena *bindingArena) C.mln_vulkan_borrowed_texture {
+	raw := C.mln_vulkan_borrowed_texture{}
+	raw.image = C.mln_vulkan_non_dispatchable_handle(input.Image)
+	raw.image_view = C.mln_vulkan_non_dispatchable_handle(input.ImageView)
+	return raw
+}
+
 // VulkanBorrowedTextureDescriptor corresponds to
 // mln_vulkan_borrowed_texture_descriptor. Vulkan attachment options for a
 // borrowed texture target.
@@ -4564,11 +4705,9 @@ type VulkanBorrowedTextureDescriptor struct {
 	PhysicalHeight uint32
 	// Borrowed Vulkan context. All handles are required.
 	Context VulkanContextDescriptor
-	// Borrowed VkImage. Required.
-	Image uint64
-	// Borrowed VkImageView for image. Required.
-	ImageView uint64
-	// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
+	// The ring's images, one per slot, in slot order. Required.
+	Textures []VulkanBorrowedTexture
+	// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is invalid.
 	Format uint32
 	// Backend-native VkImageLayout value expected at render-pass begin.
 	InitialLayout uint32
@@ -4583,8 +4722,15 @@ func copyVulkanBorrowedTextureDescriptor(raw C.mln_vulkan_borrowed_texture_descr
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
 	result.Context = copyVulkanContextDescriptor(raw.context)
-	result.Image = uint64(raw.image)
-	result.ImageView = uint64(raw.image_view)
+	result.Textures = func() []VulkanBorrowedTexture {
+		length := bindingLength(uint64(raw.texture_count))
+		result := make([]VulkanBorrowedTexture, length)
+		for i := range result {
+			item := *(*C.mln_vulkan_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_vulkan_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
+			result[i] = copyVulkanBorrowedTexture(item)
+		}
+		return result
+	}()
 	result.Format = uint32(raw.format)
 	result.InitialLayout = uint32(raw.initial_layout)
 	result.FinalLayout = uint32(raw.final_layout)
@@ -4598,8 +4744,14 @@ func nativeVulkanBorrowedTextureDescriptor(input VulkanBorrowedTextureDescriptor
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	raw.context = nativeVulkanContextDescriptor(input.Context, arena)
-	raw.image = C.mln_vulkan_non_dispatchable_handle(input.Image)
-	raw.image_view = C.mln_vulkan_non_dispatchable_handle(input.ImageView)
+	{
+		raw.textures = (*C.mln_vulkan_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
+		items := unsafe.Slice(raw.textures, len(input.Textures))
+		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
+		for i, item := range input.Textures {
+			items[i] = nativeVulkanBorrowedTexture(item, arena)
+		}
+	}
 	raw.format = C.uint32_t(input.Format)
 	raw.initial_layout = C.uint32_t(input.InitialLayout)
 	raw.final_layout = C.uint32_t(input.FinalLayout)
@@ -4691,49 +4843,6 @@ func DefaultVulkanOwnedTextureDescriptor() VulkanOwnedTextureDescriptor {
 	return copyVulkanOwnedTextureDescriptor(C.mln_vulkan_owned_texture_descriptor_default())
 }
 
-// VulkanOwnedTextureFrame corresponds to mln_vulkan_owned_texture_frame. Vulkan
-// frame acquired from a session-owned texture target.
-//
-// See mln_vulkan_owned_texture_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type VulkanOwnedTextureFrame struct {
-	// Session generation that produced this frame.
-	Generation uint64
-	// Physical Vulkan image width in device pixels.
-	Width uint32
-	// Physical Vulkan image height in device pixels.
-	Height uint32
-	// UI-to-device pixel scale used for this frame.
-	ScaleFactor float64
-	// Opaque frame identity used to reject stale releases.
-	FrameId uint64
-	// Borrowed VkImage bit pattern. Valid until frame release.
-	Image uint64
-	// Borrowed VkImageView bit pattern. Valid until frame release.
-	ImageView uint64
-	// Borrowed VkDevice. Valid until frame release.
-	Device uintptr
-	// Backend-native VkFormat value.
-	Format uint32
-	// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
-	Layout uint32
-}
-
-func copyVulkanOwnedTextureFrame(raw C.mln_vulkan_owned_texture_frame) VulkanOwnedTextureFrame {
-	var result VulkanOwnedTextureFrame
-	result.Generation = uint64(raw.generation)
-	result.Width = uint32(raw.width)
-	result.Height = uint32(raw.height)
-	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
-	result.Image = uint64(raw.image)
-	result.ImageView = uint64(raw.image_view)
-	result.Device = uintptr(unsafe.Pointer(raw.device))
-	result.Format = uint32(raw.format)
-	result.Layout = uint32(raw.layout)
-	return result
-}
-
 // VulkanSurfaceDescriptor corresponds to mln_vulkan_surface_descriptor. Vulkan
 // attachment options for a native surface.
 //
@@ -4770,6 +4879,55 @@ func nativeVulkanSurfaceDescriptor(input VulkanSurfaceDescriptor, arena *binding
 
 func DefaultVulkanSurfaceDescriptor() VulkanSurfaceDescriptor {
 	return copyVulkanSurfaceDescriptor(C.mln_vulkan_surface_descriptor_default())
+}
+
+// VulkanTextureFrame corresponds to mln_vulkan_texture_frame. Vulkan frame
+// acquired from a texture ring.
+//
+// See mln_vulkan_texture_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type VulkanTextureFrame struct {
+	// Session generation that produced this frame.
+	Generation uint64
+	// Physical Vulkan image width in device pixels.
+	Width uint32
+	// Physical Vulkan image height in device pixels.
+	Height uint32
+	// UI-to-device pixel scale used for this frame.
+	ScaleFactor float64
+	// Opaque frame identity used to reject stale releases.
+	FrameId uint64
+	// Ring slot that holds this frame. For a borrowed target, the index of its
+	// image in the descriptor's textures array.
+	Slot uint32
+	// Borrowed VkImage bit pattern. Valid until frame release.
+	Image uint64
+	// Borrowed VkImageView bit pattern. Valid until frame release.
+	ImageView uint64
+	// Borrowed VkDevice. Valid until frame release.
+	Device uintptr
+	// Backend-native VkFormat value.
+	Format uint32
+	// Backend-native VkImageLayout value that the image is in:
+	// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
+	// descriptor's final_layout for a borrowed one.
+	Layout uint32
+}
+
+func copyVulkanTextureFrame(raw C.mln_vulkan_texture_frame) VulkanTextureFrame {
+	var result VulkanTextureFrame
+	result.Generation = uint64(raw.generation)
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.FrameId = uint64(raw.frame_id)
+	result.Slot = uint32(raw.slot)
+	result.Image = uint64(raw.image)
+	result.ImageView = uint64(raw.image_view)
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.Format = uint32(raw.format)
+	result.Layout = uint32(raw.layout)
+	return result
 }
 
 // Wake corresponds to mln_wake. Receiver wake callback copied by a successful
@@ -4822,6 +4980,33 @@ func nativeWebglContextDescriptor(input WebglContextDescriptor, arena *bindingAr
 	return raw
 }
 
+// WebgpuBorrowedTexture corresponds to mln_webgpu_borrowed_texture. One
+// caller-owned WebGPU texture of a borrowed texture ring.
+//
+// See mln_webgpu_borrowed_texture in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type WebgpuBorrowedTexture struct {
+	// Borrowed WGPUTexture. Required.
+	Texture uintptr
+	// Borrowed WGPUTextureView for texture. Required. The view must be a 2D color
+	// view compatible with texture and the descriptor's format.
+	TextureView uintptr
+}
+
+func copyWebgpuBorrowedTexture(raw C.mln_webgpu_borrowed_texture) WebgpuBorrowedTexture {
+	var result WebgpuBorrowedTexture
+	result.Texture = uintptr(unsafe.Pointer(raw.texture))
+	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
+	return result
+}
+
+func nativeWebgpuBorrowedTexture(input WebgpuBorrowedTexture, arena *bindingArena) C.mln_webgpu_borrowed_texture {
+	raw := C.mln_webgpu_borrowed_texture{}
+	raw.texture = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Texture)))
+	raw.texture_view = unsafe.Pointer(C.binding_address(C.uintptr_t(input.TextureView)))
+	return raw
+}
+
 // WebgpuBorrowedTextureDescriptor corresponds to
 // mln_webgpu_borrowed_texture_descriptor. WebGPU attachment options for a
 // borrowed texture target.
@@ -4837,13 +5022,13 @@ type WebgpuBorrowedTextureDescriptor struct {
 	PhysicalWidth uint32
 	// Physical texture height in device pixels. Defaults to 256.
 	PhysicalHeight uint32
-	// Borrowed WebGPU context. device is required.
+	// Borrowed WebGPU context. device is required. Rendering is submitted through
+	// context.queue or that device's default queue.
 	Context WebgpuContextDescriptor
-	// Borrowed WGPUTexture. Required.
-	Texture uintptr
-	// Borrowed WGPUTextureView for texture. Required.
-	TextureView uintptr
-	// Backend-native WGPUTextureFormat value. Undefined is invalid.
+	// The ring's textures, one per slot, in slot order. Required.
+	Textures []WebgpuBorrowedTexture
+	// Backend-native WGPUTextureFormat value of every texture. Undefined is
+	// invalid.
 	Format uint32
 }
 
@@ -4853,8 +5038,15 @@ func copyWebgpuBorrowedTextureDescriptor(raw C.mln_webgpu_borrowed_texture_descr
 	result.PhysicalWidth = uint32(raw.physical_width)
 	result.PhysicalHeight = uint32(raw.physical_height)
 	result.Context = copyWebgpuContextDescriptor(raw.context)
-	result.Texture = uintptr(unsafe.Pointer(raw.texture))
-	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
+	result.Textures = func() []WebgpuBorrowedTexture {
+		length := bindingLength(uint64(raw.texture_count))
+		result := make([]WebgpuBorrowedTexture, length)
+		for i := range result {
+			item := *(*C.mln_webgpu_borrowed_texture)(bindingElement(unsafe.Pointer(raw.textures), i, uint64(unsafe.Sizeof(C.mln_webgpu_borrowed_texture{})), unsafe.Sizeof(*raw.textures), unsafe.Alignof(*raw.textures)))
+			result[i] = copyWebgpuBorrowedTexture(item)
+		}
+		return result
+	}()
 	result.Format = uint32(raw.format)
 	return result
 }
@@ -4866,8 +5058,14 @@ func nativeWebgpuBorrowedTextureDescriptor(input WebgpuBorrowedTextureDescriptor
 	raw.physical_width = C.uint32_t(input.PhysicalWidth)
 	raw.physical_height = C.uint32_t(input.PhysicalHeight)
 	raw.context = nativeWebgpuContextDescriptor(input.Context, arena)
-	raw.texture = unsafe.Pointer(C.binding_address(C.uintptr_t(input.Texture)))
-	raw.texture_view = unsafe.Pointer(C.binding_address(C.uintptr_t(input.TextureView)))
+	{
+		raw.textures = (*C.mln_webgpu_borrowed_texture)(arena.array(len(input.Textures), unsafe.Sizeof(*raw.textures)))
+		items := unsafe.Slice(raw.textures, len(input.Textures))
+		raw.texture_count = bindingCountLike(raw.texture_count, len(input.Textures))
+		for i, item := range input.Textures {
+			items[i] = nativeWebgpuBorrowedTexture(item, arena)
+		}
+	}
 	raw.format = C.uint32_t(input.Format)
 	return raw
 }
@@ -4940,46 +5138,6 @@ func DefaultWebgpuOwnedTextureDescriptor() WebgpuOwnedTextureDescriptor {
 	return copyWebgpuOwnedTextureDescriptor(C.mln_webgpu_owned_texture_descriptor_default())
 }
 
-// WebgpuOwnedTextureFrame corresponds to mln_webgpu_owned_texture_frame. WebGPU
-// frame acquired from a session-owned texture target.
-//
-// See mln_webgpu_owned_texture_frame in the C API reference:
-// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-type WebgpuOwnedTextureFrame struct {
-	// Session generation that produced this frame.
-	Generation uint64
-	// Physical WebGPU texture width in device pixels.
-	Width uint32
-	// Physical WebGPU texture height in device pixels.
-	Height uint32
-	// UI-to-device pixel scale used for this frame.
-	ScaleFactor float64
-	// Opaque frame identity used to reject stale releases.
-	FrameId uint64
-	// Borrowed WGPUTexture. Valid until frame release.
-	Texture uintptr
-	// Borrowed WGPUTextureView. Valid until frame release.
-	TextureView uintptr
-	// Borrowed WGPUDevice. Valid until frame release.
-	Device uintptr
-	// Backend-native WGPUTextureFormat value.
-	Format uint32
-}
-
-func copyWebgpuOwnedTextureFrame(raw C.mln_webgpu_owned_texture_frame) WebgpuOwnedTextureFrame {
-	var result WebgpuOwnedTextureFrame
-	result.Generation = uint64(raw.generation)
-	result.Width = uint32(raw.width)
-	result.Height = uint32(raw.height)
-	result.ScaleFactor = float64(raw.scale_factor)
-	result.FrameId = uint64(raw.frame_id)
-	result.Texture = uintptr(unsafe.Pointer(raw.texture))
-	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
-	result.Device = uintptr(unsafe.Pointer(raw.device))
-	result.Format = uint32(raw.format)
-	return result
-}
-
 // WebgpuSurfaceDescriptor corresponds to mln_webgpu_surface_descriptor. WebGPU
 // attachment options for a native surface.
 //
@@ -5023,6 +5181,50 @@ func DefaultWebgpuSurfaceDescriptor() WebgpuSurfaceDescriptor {
 	return copyWebgpuSurfaceDescriptor(C.mln_webgpu_surface_descriptor_default())
 }
 
+// WebgpuTextureFrame corresponds to mln_webgpu_texture_frame. WebGPU frame
+// acquired from a texture ring.
+//
+// See mln_webgpu_texture_frame in the C API reference:
+// https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
+type WebgpuTextureFrame struct {
+	// Session generation that produced this frame.
+	Generation uint64
+	// Physical WebGPU texture width in device pixels.
+	Width uint32
+	// Physical WebGPU texture height in device pixels.
+	Height uint32
+	// UI-to-device pixel scale used for this frame.
+	ScaleFactor float64
+	// Opaque frame identity used to reject stale releases.
+	FrameId uint64
+	// Ring slot that holds this frame. For a borrowed target, the index of its
+	// texture in the descriptor's textures array.
+	Slot uint32
+	// Borrowed WGPUTexture. Valid until frame release.
+	Texture uintptr
+	// Borrowed WGPUTextureView. Valid until frame release.
+	TextureView uintptr
+	// Borrowed WGPUDevice. Valid until frame release.
+	Device uintptr
+	// Backend-native WGPUTextureFormat value.
+	Format uint32
+}
+
+func copyWebgpuTextureFrame(raw C.mln_webgpu_texture_frame) WebgpuTextureFrame {
+	var result WebgpuTextureFrame
+	result.Generation = uint64(raw.generation)
+	result.Width = uint32(raw.width)
+	result.Height = uint32(raw.height)
+	result.ScaleFactor = float64(raw.scale_factor)
+	result.FrameId = uint64(raw.frame_id)
+	result.Slot = uint32(raw.slot)
+	result.Texture = uintptr(unsafe.Pointer(raw.texture))
+	result.TextureView = uintptr(unsafe.Pointer(raw.texture_view))
+	result.Device = uintptr(unsafe.Pointer(raw.device))
+	result.Format = uint32(raw.format)
+	return result
+}
+
 // WglContextDescriptor corresponds to mln_wgl_context_descriptor. WGL context
 // fields shared by OpenGL render targets on Windows.
 //
@@ -5055,12 +5257,12 @@ func nativeWglContextDescriptor(input WglContextDescriptor, arena *bindingArena)
 	return raw
 }
 
-type MetalOwnedTextureFrameView struct {
-	value MetalOwnedTextureFrame
+type MetalTextureFrameView struct {
+	value MetalTextureFrame
 	scope *bindingScope
 }
 
-func (view MetalOwnedTextureFrameView) Generation() (uint64, error) {
+func (view MetalTextureFrameView) Generation() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5069,7 +5271,7 @@ func (view MetalOwnedTextureFrameView) Generation() (uint64, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) Width() (uint32, error) {
+func (view MetalTextureFrameView) Width() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5078,7 +5280,7 @@ func (view MetalOwnedTextureFrameView) Width() (uint32, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) Height() (uint32, error) {
+func (view MetalTextureFrameView) Height() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5087,7 +5289,7 @@ func (view MetalOwnedTextureFrameView) Height() (uint32, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) ScaleFactor() (float64, error) {
+func (view MetalTextureFrameView) ScaleFactor() (float64, error) {
 	return bindingCall(func() float64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5096,7 +5298,7 @@ func (view MetalOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) FrameId() (uint64, error) {
+func (view MetalTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5105,7 +5307,16 @@ func (view MetalOwnedTextureFrameView) FrameId() (uint64, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) UnsafeTexture() (uintptr, error) {
+func (view MetalTextureFrameView) Slot() (uint32, error) {
+	return bindingCall(func() uint32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Slot
+	})
+}
+
+func (view MetalTextureFrameView) UnsafeTexture() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5114,7 +5325,7 @@ func (view MetalOwnedTextureFrameView) UnsafeTexture() (uintptr, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
+func (view MetalTextureFrameView) UnsafeDevice() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5123,7 +5334,7 @@ func (view MetalOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
 	})
 }
 
-func (view MetalOwnedTextureFrameView) PixelFormat() (uint64, error) {
+func (view MetalTextureFrameView) PixelFormat() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5132,12 +5343,12 @@ func (view MetalOwnedTextureFrameView) PixelFormat() (uint64, error) {
 	})
 }
 
-type OpenglOwnedTextureFrameView struct {
-	value OpenglOwnedTextureFrame
+type OpenglTextureFrameView struct {
+	value OpenglTextureFrame
 	scope *bindingScope
 }
 
-func (view OpenglOwnedTextureFrameView) Generation() (uint64, error) {
+func (view OpenglTextureFrameView) Generation() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5146,7 +5357,7 @@ func (view OpenglOwnedTextureFrameView) Generation() (uint64, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) Width() (uint32, error) {
+func (view OpenglTextureFrameView) Width() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5155,7 +5366,7 @@ func (view OpenglOwnedTextureFrameView) Width() (uint32, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) Height() (uint32, error) {
+func (view OpenglTextureFrameView) Height() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5164,7 +5375,7 @@ func (view OpenglOwnedTextureFrameView) Height() (uint32, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) ScaleFactor() (float64, error) {
+func (view OpenglTextureFrameView) ScaleFactor() (float64, error) {
 	return bindingCall(func() float64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5173,7 +5384,7 @@ func (view OpenglOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) FrameId() (uint64, error) {
+func (view OpenglTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5182,7 +5393,16 @@ func (view OpenglOwnedTextureFrameView) FrameId() (uint64, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) Texture() (uint32, error) {
+func (view OpenglTextureFrameView) Slot() (uint32, error) {
+	return bindingCall(func() uint32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Slot
+	})
+}
+
+func (view OpenglTextureFrameView) Texture() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5191,7 +5411,7 @@ func (view OpenglOwnedTextureFrameView) Texture() (uint32, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) Target() (uint32, error) {
+func (view OpenglTextureFrameView) Target() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5200,7 +5420,7 @@ func (view OpenglOwnedTextureFrameView) Target() (uint32, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) InternalFormat() (uint32, error) {
+func (view OpenglTextureFrameView) InternalFormat() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5209,7 +5429,7 @@ func (view OpenglOwnedTextureFrameView) InternalFormat() (uint32, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) Format() (uint32, error) {
+func (view OpenglTextureFrameView) Format() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5218,7 +5438,7 @@ func (view OpenglOwnedTextureFrameView) Format() (uint32, error) {
 	})
 }
 
-func (view OpenglOwnedTextureFrameView) Type() (uint32, error) {
+func (view OpenglTextureFrameView) Type() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5259,12 +5479,12 @@ func (view GpuSyncView) Value() (uint64, error) {
 	})
 }
 
-type VulkanOwnedTextureFrameView struct {
-	value VulkanOwnedTextureFrame
+type VulkanTextureFrameView struct {
+	value VulkanTextureFrame
 	scope *bindingScope
 }
 
-func (view VulkanOwnedTextureFrameView) Generation() (uint64, error) {
+func (view VulkanTextureFrameView) Generation() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5273,7 +5493,7 @@ func (view VulkanOwnedTextureFrameView) Generation() (uint64, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) Width() (uint32, error) {
+func (view VulkanTextureFrameView) Width() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5282,7 +5502,7 @@ func (view VulkanOwnedTextureFrameView) Width() (uint32, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) Height() (uint32, error) {
+func (view VulkanTextureFrameView) Height() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5291,7 +5511,7 @@ func (view VulkanOwnedTextureFrameView) Height() (uint32, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) ScaleFactor() (float64, error) {
+func (view VulkanTextureFrameView) ScaleFactor() (float64, error) {
 	return bindingCall(func() float64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5300,7 +5520,7 @@ func (view VulkanOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) FrameId() (uint64, error) {
+func (view VulkanTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5309,7 +5529,16 @@ func (view VulkanOwnedTextureFrameView) FrameId() (uint64, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) Image() (uint64, error) {
+func (view VulkanTextureFrameView) Slot() (uint32, error) {
+	return bindingCall(func() uint32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Slot
+	})
+}
+
+func (view VulkanTextureFrameView) Image() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5318,7 +5547,7 @@ func (view VulkanOwnedTextureFrameView) Image() (uint64, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) ImageView() (uint64, error) {
+func (view VulkanTextureFrameView) ImageView() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5327,7 +5556,7 @@ func (view VulkanOwnedTextureFrameView) ImageView() (uint64, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
+func (view VulkanTextureFrameView) UnsafeDevice() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5336,7 +5565,7 @@ func (view VulkanOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) Format() (uint32, error) {
+func (view VulkanTextureFrameView) Format() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5345,7 +5574,7 @@ func (view VulkanOwnedTextureFrameView) Format() (uint32, error) {
 	})
 }
 
-func (view VulkanOwnedTextureFrameView) Layout() (uint32, error) {
+func (view VulkanTextureFrameView) Layout() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5354,12 +5583,12 @@ func (view VulkanOwnedTextureFrameView) Layout() (uint32, error) {
 	})
 }
 
-type WebgpuOwnedTextureFrameView struct {
-	value WebgpuOwnedTextureFrame
+type WebgpuTextureFrameView struct {
+	value WebgpuTextureFrame
 	scope *bindingScope
 }
 
-func (view WebgpuOwnedTextureFrameView) Generation() (uint64, error) {
+func (view WebgpuTextureFrameView) Generation() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5368,7 +5597,7 @@ func (view WebgpuOwnedTextureFrameView) Generation() (uint64, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) Width() (uint32, error) {
+func (view WebgpuTextureFrameView) Width() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5377,7 +5606,7 @@ func (view WebgpuOwnedTextureFrameView) Width() (uint32, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) Height() (uint32, error) {
+func (view WebgpuTextureFrameView) Height() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5386,7 +5615,7 @@ func (view WebgpuOwnedTextureFrameView) Height() (uint32, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) ScaleFactor() (float64, error) {
+func (view WebgpuTextureFrameView) ScaleFactor() (float64, error) {
 	return bindingCall(func() float64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5395,7 +5624,7 @@ func (view WebgpuOwnedTextureFrameView) ScaleFactor() (float64, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) FrameId() (uint64, error) {
+func (view WebgpuTextureFrameView) FrameId() (uint64, error) {
 	return bindingCall(func() uint64 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5404,7 +5633,16 @@ func (view WebgpuOwnedTextureFrameView) FrameId() (uint64, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) UnsafeTexture() (uintptr, error) {
+func (view WebgpuTextureFrameView) Slot() (uint32, error) {
+	return bindingCall(func() uint32 {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		view.scope.check()
+		return view.value.Slot
+	})
+}
+
+func (view WebgpuTextureFrameView) UnsafeTexture() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5413,7 +5651,7 @@ func (view WebgpuOwnedTextureFrameView) UnsafeTexture() (uintptr, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) UnsafeTextureView() (uintptr, error) {
+func (view WebgpuTextureFrameView) UnsafeTextureView() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5422,7 +5660,7 @@ func (view WebgpuOwnedTextureFrameView) UnsafeTextureView() (uintptr, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
+func (view WebgpuTextureFrameView) UnsafeDevice() (uintptr, error) {
 	return bindingCall(func() uintptr {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5431,7 +5669,7 @@ func (view WebgpuOwnedTextureFrameView) UnsafeDevice() (uintptr, error) {
 	})
 }
 
-func (view WebgpuOwnedTextureFrameView) Format() (uint32, error) {
+func (view WebgpuTextureFrameView) Format() (uint32, error) {
 	return bindingCall(func() uint32 {
 		runtime.LockOSThread()
 		defer runtime.UnlockOSThread()
@@ -5619,15 +5857,15 @@ func (handle *RuntimeHandle) owner() *bindingOwner {
 //
 // See mln_acquired_frame_get_metal_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalOwnedTextureFrameView) error) error {
-	var outFrame C.mln_metal_owned_texture_frame
+func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalTextureFrameView) error) error {
+	var outFrame C.mln_metal_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_metal_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_metal_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
-	}, func(scope *bindingScope) MetalOwnedTextureFrameView {
-		return MetalOwnedTextureFrameView{value: copyMetalOwnedTextureFrame(outFrame), scope: scope}
+	}, func(scope *bindingScope) MetalTextureFrameView {
+		return MetalTextureFrameView{value: copyMetalTextureFrame(outFrame), scope: scope}
 	})
 }
 
@@ -5635,15 +5873,15 @@ func (receiver *AcquiredFrameHandle) WithMetalTexture(callback func(MetalOwnedTe
 //
 // See mln_acquired_frame_get_opengl_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglOwnedTextureFrameView) error) error {
-	var outFrame C.mln_opengl_owned_texture_frame
+func (receiver *AcquiredFrameHandle) WithOpenglTexture(callback func(OpenglTextureFrameView) error) error {
+	var outFrame C.mln_opengl_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_opengl_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_opengl_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
-	}, func(scope *bindingScope) OpenglOwnedTextureFrameView {
-		return OpenglOwnedTextureFrameView{value: copyOpenglOwnedTextureFrame(outFrame), scope: scope}
+	}, func(scope *bindingScope) OpenglTextureFrameView {
+		return OpenglTextureFrameView{value: copyOpenglTextureFrame(outFrame), scope: scope}
 	})
 }
 
@@ -5680,15 +5918,15 @@ func (receiver *AcquiredFrameHandle) GetResult() (RenderFrameResult, error) {
 //
 // See mln_acquired_frame_get_vulkan_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanOwnedTextureFrameView) error) error {
-	var outFrame C.mln_vulkan_owned_texture_frame
+func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanTextureFrameView) error) error {
+	var outFrame C.mln_vulkan_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_vulkan_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_vulkan_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
-	}, func(scope *bindingScope) VulkanOwnedTextureFrameView {
-		return VulkanOwnedTextureFrameView{value: copyVulkanOwnedTextureFrame(outFrame), scope: scope}
+	}, func(scope *bindingScope) VulkanTextureFrameView {
+		return VulkanTextureFrameView{value: copyVulkanTextureFrame(outFrame), scope: scope}
 	})
 }
 
@@ -5696,15 +5934,15 @@ func (receiver *AcquiredFrameHandle) WithVulkanTexture(callback func(VulkanOwned
 //
 // See mln_acquired_frame_get_webgpu_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
-func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuOwnedTextureFrameView) error) error {
-	var outFrame C.mln_webgpu_owned_texture_frame
+func (receiver *AcquiredFrameHandle) WithWebgpuTexture(callback func(WebgpuTextureFrameView) error) error {
+	var outFrame C.mln_webgpu_texture_frame
 	outFrame.size = C.uint32_t(unsafe.Sizeof(outFrame))
 	return bindingWithView(bindingRead(receiver.owner(), C.binding_operation_mln_acquired_frame_get_webgpu_texture), callback, func(raw uint64, token *unsafe.Pointer, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_view_begin(C.mln_acquired_frame(raw), token, diagnostic))
 	}, func(token unsafe.Pointer) { C.mln_acquired_frame_view_end(token) }, func(raw uint64, diagnostic *C.mln_diagnostic) int32 {
 		return int32(C.mln_acquired_frame_get_webgpu_texture(C.mln_acquired_frame(raw), &outFrame, diagnostic))
-	}, func(scope *bindingScope) WebgpuOwnedTextureFrameView {
-		return WebgpuOwnedTextureFrameView{value: copyWebgpuOwnedTextureFrame(outFrame), scope: scope}
+	}, func(scope *bindingScope) WebgpuTextureFrameView {
+		return WebgpuTextureFrameView{value: copyWebgpuTextureFrame(outFrame), scope: scope}
 	})
 }
 
@@ -6056,8 +6294,8 @@ type MapAttachMetalBorrowedTextureResult struct {
 	Completion *Future[struct{}]
 }
 
-// AttachMetalBorrowedTexture starts attachment of a caller-owned Metal texture
-// target.
+// AttachMetalBorrowedTexture starts attachment of a ring of caller-owned Metal
+// textures.
 //
 // See mln_map_attach_metal_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -6118,8 +6356,8 @@ type MapAttachOpenglBorrowedTextureResult struct {
 	Completion *Future[struct{}]
 }
 
-// AttachOpenglBorrowedTexture starts attachment of a caller-owned OpenGL
-// texture target.
+// AttachOpenglBorrowedTexture starts attachment of a ring of caller-owned
+// OpenGL textures.
 //
 // See mln_map_attach_opengl_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -6180,8 +6418,8 @@ type MapAttachVulkanBorrowedTextureResult struct {
 	Completion *Future[struct{}]
 }
 
-// AttachVulkanBorrowedTexture starts attachment of a caller-owned Vulkan
-// texture target.
+// AttachVulkanBorrowedTexture starts attachment of a ring of caller-owned
+// Vulkan images.
 //
 // See mln_map_attach_vulkan_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -6242,8 +6480,8 @@ type MapAttachWebgpuBorrowedTextureResult struct {
 	Completion *Future[struct{}]
 }
 
-// AttachWebgpuBorrowedTexture starts attachment of a caller-owned WebGPU
-// texture target.
+// AttachWebgpuBorrowedTexture starts attachment of a ring of caller-owned
+// WebGPU textures.
 //
 // See mln_map_attach_webgpu_borrowed_texture in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -7376,7 +7614,8 @@ func (receiver *RenderFrameBatchHandle) Close() error {
 	return err
 }
 
-// Abandon irreversibly closes control and mailboxes without graphics calls.
+// Abandon irreversibly closes control and mailboxes and disposes of the
+// session's graphics objects.
 //
 // See mln_render_session_abandon in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7406,7 +7645,8 @@ func (receiver *RenderSessionHandle) AcquireFrame() (*AcquiredFrameHandle, error
 }
 
 // Barrier starts a barrier that completes after all render work accepted before
-// it has a terminal result. A barrier does not request a frame.
+// it has a terminal result. A barrier does not request a frame. Accepting a
+// barrier ends the wait of every earlier demand that waits for a map update.
 //
 // See mln_render_session_barrier in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html
@@ -7617,8 +7857,8 @@ func (receiver *RenderSessionHandle) ServiceDriverWork(maxWork uint) (uint, erro
 	})
 }
 
-// SetMetalBorrowedTextureTarget starts an ordered caller-owned Metal texture
-// replacement.
+// SetMetalBorrowedTextureTarget starts an ordered replacement of every texture
+// of a caller-owned Metal ring.
 //
 // See mln_render_session_set_metal_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -7638,8 +7878,8 @@ func (receiver *RenderSessionHandle) SetMetalSurfaceTarget(descriptor MetalSurfa
 	}, completionUnit)
 }
 
-// SetOpenglBorrowedTextureTarget starts an ordered caller-owned OpenGL texture
-// replacement.
+// SetOpenglBorrowedTextureTarget starts an ordered replacement of every texture
+// of a caller-owned OpenGL ring.
 //
 // See mln_render_session_set_opengl_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -7659,8 +7899,8 @@ func (receiver *RenderSessionHandle) SetOpenglSurfaceTarget(descriptor OpenglSur
 	}, completionUnit)
 }
 
-// SetVulkanBorrowedTextureTarget starts an ordered caller-owned Vulkan texture
-// replacement.
+// SetVulkanBorrowedTextureTarget starts an ordered replacement of every image
+// of a caller-owned Vulkan ring.
 //
 // See mln_render_session_set_vulkan_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html
@@ -7680,8 +7920,8 @@ func (receiver *RenderSessionHandle) SetVulkanSurfaceTarget(descriptor VulkanSur
 	}, completionUnit)
 }
 
-// SetWebgpuBorrowedTextureTarget starts an ordered caller-owned WebGPU texture
-// replacement.
+// SetWebgpuBorrowedTextureTarget starts an ordered replacement of every texture
+// of a caller-owned WebGPU ring.
 //
 // See mln_render_session_set_webgpu_borrowed_texture_target in the C API reference:
 // https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html

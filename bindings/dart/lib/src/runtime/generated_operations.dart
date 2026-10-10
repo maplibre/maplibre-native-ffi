@@ -1,27 +1,28 @@
 // Generated from the C headers by tools/bindgen. Do not edit.
 part of 'runtime.dart';
 
-MetalOwnedTextureFrame _readMetalOwnedTextureFrame(
-  raw.mln_metal_owned_texture_frame source,
-) => MetalOwnedTextureFrame(
-  generation: uint64FromNative(source.generation),
-  width: source.width,
-  height: source.height,
-  scaleFactor: source.scale_factor,
-  frameId: uint64FromNative(source.frame_id),
-  texture: NativePointer(source.texture.address),
-  device: NativePointer(source.device.address),
-  pixelFormat: uint64FromNative(source.pixel_format),
-);
+MetalTextureFrame _readMetalTextureFrame(raw.mln_metal_texture_frame source) =>
+    MetalTextureFrame(
+      generation: uint64FromNative(source.generation),
+      width: source.width,
+      height: source.height,
+      scaleFactor: source.scale_factor,
+      frameId: uint64FromNative(source.frame_id),
+      slot: source.slot,
+      texture: NativePointer(source.texture.address),
+      device: NativePointer(source.device.address),
+      pixelFormat: uint64FromNative(source.pixel_format),
+    );
 
-OpenglOwnedTextureFrame _readOpenglOwnedTextureFrame(
-  raw.mln_opengl_owned_texture_frame source,
-) => OpenglOwnedTextureFrame(
+OpenglTextureFrame _readOpenglTextureFrame(
+  raw.mln_opengl_texture_frame source,
+) => OpenglTextureFrame(
   generation: uint64FromNative(source.generation),
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
   frameId: uint64FromNative(source.frame_id),
+  slot: source.slot,
   texture: source.texture,
   target: source.target,
   internalFormat: source.internal_format,
@@ -54,14 +55,15 @@ RenderFrameResult _readRenderFrameResult(raw.mln_render_frame_result source) =>
       needsRepaint: source.needs_repaint,
     );
 
-VulkanOwnedTextureFrame _readVulkanOwnedTextureFrame(
-  raw.mln_vulkan_owned_texture_frame source,
-) => VulkanOwnedTextureFrame(
+VulkanTextureFrame _readVulkanTextureFrame(
+  raw.mln_vulkan_texture_frame source,
+) => VulkanTextureFrame(
   generation: uint64FromNative(source.generation),
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
   frameId: uint64FromNative(source.frame_id),
+  slot: source.slot,
   image: uint64FromNative(source.image),
   imageView: uint64FromNative(source.image_view),
   device: NativePointer(source.device.address),
@@ -69,14 +71,15 @@ VulkanOwnedTextureFrame _readVulkanOwnedTextureFrame(
   layout: source.layout,
 );
 
-WebgpuOwnedTextureFrame _readWebgpuOwnedTextureFrame(
-  raw.mln_webgpu_owned_texture_frame source,
-) => WebgpuOwnedTextureFrame(
+WebgpuTextureFrame _readWebgpuTextureFrame(
+  raw.mln_webgpu_texture_frame source,
+) => WebgpuTextureFrame(
   generation: uint64FromNative(source.generation),
   width: source.width,
   height: source.height,
   scaleFactor: source.scale_factor,
   frameId: uint64FromNative(source.frame_id),
+  slot: source.slot,
   texture: NativePointer(source.texture.address),
   textureView: NativePointer(source.texture_view.address),
   device: NativePointer(source.device.address),
@@ -1160,6 +1163,19 @@ StyleTileSourceOptions _readStyleTileSourceOptions(
       : null,
 );
 
+Pointer<raw.mln_metal_borrowed_texture> _writeMetalBorrowedTexture(
+  MetalBorrowedTexture value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_metal_borrowed_texture>();
+  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  return result;
+}
+
+MetalBorrowedTexture _readMetalBorrowedTexture(
+  raw.mln_metal_borrowed_texture source,
+) => MetalBorrowedTexture(texture: NativePointer(source.texture.address));
+
 Pointer<raw.mln_metal_borrowed_texture_descriptor>
 _writeMetalBorrowedTextureDescriptor(
   MetalBorrowedTextureDescriptor value,
@@ -1178,7 +1194,16 @@ _writeMetalBorrowedTextureDescriptor(
     0,
     4294967295,
   );
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  result.ref.textures = arena<raw.mln_metal_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    result.ref.textures[index] = _writeMetalBorrowedTexture(
+      value.textures[index],
+      arena,
+    ).ref;
+  }
   return result;
 }
 
@@ -1188,7 +1213,12 @@ MetalBorrowedTextureDescriptor _readMetalBorrowedTextureDescriptor(
   extent: _readLogicalExtent(source.extent),
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
-  texture: NativePointer(source.texture.address),
+  textures: List<MetalBorrowedTexture>.unmodifiable(
+    List.generate(
+      source.texture_count,
+      (index) => _readMetalBorrowedTexture(source.textures[index]),
+    ),
+  ),
 );
 
 _NativeRegistration<raw.mln_wake> _prepareWake(
@@ -1438,6 +1468,19 @@ OpenglContextDescriptor _readOpenglContextDescriptor(
   },
 );
 
+Pointer<raw.mln_opengl_borrowed_texture> _writeOpenglBorrowedTexture(
+  OpenglBorrowedTexture value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_opengl_borrowed_texture>();
+  result.ref.texture = _nativeInteger(value.texture, 0, 4294967295);
+  return result;
+}
+
+OpenglBorrowedTexture _readOpenglBorrowedTexture(
+  raw.mln_opengl_borrowed_texture source,
+) => OpenglBorrowedTexture(texture: source.texture);
+
 Pointer<raw.mln_opengl_borrowed_texture_descriptor>
 _writeOpenglBorrowedTextureDescriptor(
   OpenglBorrowedTextureDescriptor value,
@@ -1457,7 +1500,16 @@ _writeOpenglBorrowedTextureDescriptor(
     4294967295,
   );
   result.ref.context = _writeOpenglContextDescriptor(value.context, arena).ref;
-  result.ref.texture = _nativeInteger(value.texture, 0, 4294967295);
+  result.ref.textures = arena<raw.mln_opengl_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    result.ref.textures[index] = _writeOpenglBorrowedTexture(
+      value.textures[index],
+      arena,
+    ).ref;
+  }
   result.ref.target = _nativeInteger(value.target, 0, 4294967295);
   return result;
 }
@@ -1469,7 +1521,12 @@ OpenglBorrowedTextureDescriptor _readOpenglBorrowedTextureDescriptor(
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
   context: _readOpenglContextDescriptor(source.context),
-  texture: source.texture,
+  textures: List<OpenglBorrowedTexture>.unmodifiable(
+    List.generate(
+      source.texture_count,
+      (index) => _readOpenglBorrowedTexture(source.textures[index]),
+    ),
+  ),
   target: source.target,
 );
 
@@ -1553,6 +1610,29 @@ VulkanContextDescriptor _readVulkanContextDescriptor(
   getDeviceProcAddr: NativePointer(source.get_device_proc_addr.address),
 );
 
+Pointer<raw.mln_vulkan_borrowed_texture> _writeVulkanBorrowedTexture(
+  VulkanBorrowedTexture value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_vulkan_borrowed_texture>();
+  result.ref.image = uint64ToNative(
+    value.image,
+    'mln_vulkan_non_dispatchable_handle',
+  );
+  result.ref.image_view = uint64ToNative(
+    value.imageView,
+    'mln_vulkan_non_dispatchable_handle',
+  );
+  return result;
+}
+
+VulkanBorrowedTexture _readVulkanBorrowedTexture(
+  raw.mln_vulkan_borrowed_texture source,
+) => VulkanBorrowedTexture(
+  image: uint64FromNative(source.image),
+  imageView: uint64FromNative(source.image_view),
+);
+
 Pointer<raw.mln_vulkan_borrowed_texture_descriptor>
 _writeVulkanBorrowedTextureDescriptor(
   VulkanBorrowedTextureDescriptor value,
@@ -1572,14 +1652,16 @@ _writeVulkanBorrowedTextureDescriptor(
     4294967295,
   );
   result.ref.context = _writeVulkanContextDescriptor(value.context, arena).ref;
-  result.ref.image = uint64ToNative(
-    value.image,
-    'mln_vulkan_non_dispatchable_handle',
+  result.ref.textures = arena<raw.mln_vulkan_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
   );
-  result.ref.image_view = uint64ToNative(
-    value.imageView,
-    'mln_vulkan_non_dispatchable_handle',
-  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    result.ref.textures[index] = _writeVulkanBorrowedTexture(
+      value.textures[index],
+      arena,
+    ).ref;
+  }
   result.ref.format = _nativeInteger(value.format, 0, 4294967295);
   result.ref.initial_layout = _nativeInteger(
     value.initialLayout,
@@ -1597,8 +1679,12 @@ VulkanBorrowedTextureDescriptor _readVulkanBorrowedTextureDescriptor(
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
   context: _readVulkanContextDescriptor(source.context),
-  image: uint64FromNative(source.image),
-  imageView: uint64FromNative(source.image_view),
+  textures: List<VulkanBorrowedTexture>.unmodifiable(
+    List.generate(
+      source.texture_count,
+      (index) => _readVulkanBorrowedTexture(source.textures[index]),
+    ),
+  ),
   format: source.format,
   initialLayout: source.initial_layout,
   finalLayout: source.final_layout,
@@ -1667,6 +1753,25 @@ WebgpuContextDescriptor _readWebgpuContextDescriptor(
   queue: NativePointer(source.queue.address),
 );
 
+Pointer<raw.mln_webgpu_borrowed_texture> _writeWebgpuBorrowedTexture(
+  WebgpuBorrowedTexture value,
+  Arena arena,
+) {
+  final result = arena<raw.mln_webgpu_borrowed_texture>();
+  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
+  result.ref.texture_view = Pointer<Void>.fromAddress(
+    value.textureView.address,
+  ).cast();
+  return result;
+}
+
+WebgpuBorrowedTexture _readWebgpuBorrowedTexture(
+  raw.mln_webgpu_borrowed_texture source,
+) => WebgpuBorrowedTexture(
+  texture: NativePointer(source.texture.address),
+  textureView: NativePointer(source.texture_view.address),
+);
+
 Pointer<raw.mln_webgpu_borrowed_texture_descriptor>
 _writeWebgpuBorrowedTextureDescriptor(
   WebgpuBorrowedTextureDescriptor value,
@@ -1686,10 +1791,16 @@ _writeWebgpuBorrowedTextureDescriptor(
     4294967295,
   );
   result.ref.context = _writeWebgpuContextDescriptor(value.context, arena).ref;
-  result.ref.texture = Pointer<Void>.fromAddress(value.texture.address).cast();
-  result.ref.texture_view = Pointer<Void>.fromAddress(
-    value.textureView.address,
-  ).cast();
+  result.ref.textures = arena<raw.mln_webgpu_borrowed_texture>(
+    value.textures.isEmpty ? 1 : value.textures.length,
+  );
+  result.ref.texture_count = value.textures.length;
+  for (var index = 0; index < value.textures.length; index++) {
+    result.ref.textures[index] = _writeWebgpuBorrowedTexture(
+      value.textures[index],
+      arena,
+    ).ref;
+  }
   result.ref.format = _nativeInteger(value.format, 0, 4294967295);
   return result;
 }
@@ -1701,8 +1812,12 @@ WebgpuBorrowedTextureDescriptor _readWebgpuBorrowedTextureDescriptor(
   physicalWidth: source.physical_width,
   physicalHeight: source.physical_height,
   context: _readWebgpuContextDescriptor(source.context),
-  texture: NativePointer(source.texture.address),
-  textureView: NativePointer(source.texture_view.address),
+  textures: List<WebgpuBorrowedTexture>.unmodifiable(
+    List.generate(
+      source.texture_count,
+      (index) => _readWebgpuBorrowedTexture(source.textures[index]),
+    ),
+  ),
   format: source.format,
 );
 
@@ -3839,9 +3954,9 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// See `mln_acquired_frame_get_metal_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedMetalOwnedTextureFrame getMetalTexture() => withNativeArena((arena) {
-    final outFrame = arena<raw.mln_metal_owned_texture_frame>();
-    outFrame.ref.size = sizeOf<raw.mln_metal_owned_texture_frame>();
+  ScopedMetalTextureFrame getMetalTexture() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_metal_texture_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_metal_texture_frame>();
     _check(
       raw.mln_acquired_frame_get_metal_texture(
         _handle.raw,
@@ -3849,9 +3964,9 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedMetalOwnedTextureFrame._(
+    return ScopedMetalTextureFrame._(
       this,
-      _readMetalOwnedTextureFrame(outFrame.ref),
+      _readMetalTextureFrame(outFrame.ref),
     );
   });
 
@@ -3859,9 +3974,9 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// See `mln_acquired_frame_get_opengl_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedOpenglOwnedTextureFrame getOpenglTexture() => withNativeArena((arena) {
-    final outFrame = arena<raw.mln_opengl_owned_texture_frame>();
-    outFrame.ref.size = sizeOf<raw.mln_opengl_owned_texture_frame>();
+  ScopedOpenglTextureFrame getOpenglTexture() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_opengl_texture_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_opengl_texture_frame>();
     _check(
       raw.mln_acquired_frame_get_opengl_texture(
         _handle.raw,
@@ -3869,9 +3984,9 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedOpenglOwnedTextureFrame._(
+    return ScopedOpenglTextureFrame._(
       this,
-      _readOpenglOwnedTextureFrame(outFrame.ref),
+      _readOpenglTextureFrame(outFrame.ref),
     );
   });
 
@@ -3913,9 +4028,9 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// See `mln_acquired_frame_get_vulkan_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedVulkanOwnedTextureFrame getVulkanTexture() => withNativeArena((arena) {
-    final outFrame = arena<raw.mln_vulkan_owned_texture_frame>();
-    outFrame.ref.size = sizeOf<raw.mln_vulkan_owned_texture_frame>();
+  ScopedVulkanTextureFrame getVulkanTexture() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_vulkan_texture_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_vulkan_texture_frame>();
     _check(
       raw.mln_acquired_frame_get_vulkan_texture(
         _handle.raw,
@@ -3923,9 +4038,9 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedVulkanOwnedTextureFrame._(
+    return ScopedVulkanTextureFrame._(
       this,
-      _readVulkanOwnedTextureFrame(outFrame.ref),
+      _readVulkanTextureFrame(outFrame.ref),
     );
   });
 
@@ -3933,9 +4048,9 @@ final class AcquiredFrameHandle implements Finalizable {
   ///
   /// See `mln_acquired_frame_get_webgpu_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-  ScopedWebgpuOwnedTextureFrame getWebgpuTexture() => withNativeArena((arena) {
-    final outFrame = arena<raw.mln_webgpu_owned_texture_frame>();
-    outFrame.ref.size = sizeOf<raw.mln_webgpu_owned_texture_frame>();
+  ScopedWebgpuTextureFrame getWebgpuTexture() => withNativeArena((arena) {
+    final outFrame = arena<raw.mln_webgpu_texture_frame>();
+    outFrame.ref.size = sizeOf<raw.mln_webgpu_texture_frame>();
     _check(
       raw.mln_acquired_frame_get_webgpu_texture(
         _handle.raw,
@@ -3943,9 +4058,9 @@ final class AcquiredFrameHandle implements Finalizable {
         nativeDiagnostic,
       ),
     );
-    return ScopedWebgpuOwnedTextureFrame._(
+    return ScopedWebgpuTextureFrame._(
       this,
-      _readWebgpuOwnedTextureFrame(outFrame.ref),
+      _readWebgpuTextureFrame(outFrame.ref),
     );
   });
 
@@ -4429,7 +4544,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     ),
   );
 
-  /// Starts attachment of a caller-owned Metal texture target.
+  /// Starts attachment of a ring of caller-owned Metal textures.
   ///
   /// See `mln_map_attach_metal_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4528,7 +4643,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
-  /// Starts attachment of a caller-owned OpenGL texture target.
+  /// Starts attachment of a ring of caller-owned OpenGL textures.
   ///
   /// See `mln_map_attach_opengl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4627,7 +4742,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
-  /// Starts attachment of a caller-owned Vulkan texture target.
+  /// Starts attachment of a ring of caller-owned Vulkan images.
   ///
   /// See `mln_map_attach_vulkan_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -4726,7 +4841,7 @@ final class MapHandle implements Finalizable, _CallbackPortOwner {
     );
   }
 
-  /// Starts attachment of a caller-owned WebGPU texture target.
+  /// Starts attachment of a ring of caller-owned WebGPU textures.
   ///
   /// See `mln_map_attach_webgpu_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6376,7 +6491,8 @@ final class RenderSessionHandle implements Finalizable {
   /// The issued native handle id.
   BigInt get identity => uint64FromNative(_state.handleId);
 
-  /// Irreversibly closes control and mailboxes without graphics calls.
+  /// Irreversibly closes control and mailboxes and disposes of the session's
+  /// graphics objects.
   ///
   /// See `mln_render_session_abandon` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -6416,7 +6532,8 @@ final class RenderSessionHandle implements Finalizable {
   });
 
   /// Starts a barrier that completes after all render work accepted before it
-  /// has a terminal result. A barrier does not request a frame.
+  /// has a terminal result. A barrier does not request a frame. Accepting a
+  /// barrier ends the wait of every earlier demand that waits for a map update.
   ///
   /// See `mln_render_session_barrier` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -6724,7 +6841,8 @@ final class RenderSessionHandle implements Finalizable {
     return outServiced.value;
   });
 
-  /// Starts an ordered caller-owned Metal texture replacement.
+  /// Starts an ordered replacement of every texture of a caller-owned Metal
+  /// ring.
   ///
   /// See `mln_render_session_set_metal_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6753,7 +6871,8 @@ final class RenderSessionHandle implements Finalizable {
     ),
   );
 
-  /// Starts an ordered caller-owned OpenGL texture replacement.
+  /// Starts an ordered replacement of every texture of a caller-owned OpenGL
+  /// ring.
   ///
   /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6783,7 +6902,8 @@ final class RenderSessionHandle implements Finalizable {
         ),
       );
 
-  /// Starts an ordered caller-owned Vulkan texture replacement.
+  /// Starts an ordered replacement of every image of a caller-owned Vulkan
+  /// ring.
   ///
   /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -6813,7 +6933,8 @@ final class RenderSessionHandle implements Finalizable {
         ),
       );
 
-  /// Starts an ordered caller-owned WebGPU texture replacement.
+  /// Starts an ordered replacement of every texture of a caller-owned WebGPU
+  /// ring.
   ///
   /// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -7356,51 +7477,53 @@ final class RenderSessionAttachment {
   final Future<void> completed;
 }
 
-final class ScopedMetalOwnedTextureFrame {
-  ScopedMetalOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
+final class ScopedMetalTextureFrame {
+  ScopedMetalTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
         raw.mln_acquired_frame_view_begin,
         raw.mln_acquired_frame_view_end,
       );
-  final MetalOwnedTextureFrame _value;
+  final MetalTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedMetalOwnedTextureFrame) use) =>
+  T withView<T>(T Function(ScopedMetalTextureFrame) use) =>
       _scope.use(() => use(this));
   BigInt get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
   BigInt get frameId => _scope.active(_value).frameId;
+  int get slot => _scope.active(_value).slot;
   ScopedNativePointer get texture => ScopedNativePointer(
     _value.texture.address,
     checkValid: _scope.checkActive,
-    debugName: 'MetalOwnedTextureFrame.texture',
+    debugName: 'MetalTextureFrame.texture',
   );
   ScopedNativePointer get device => ScopedNativePointer(
     _value.device.address,
     checkValid: _scope.checkActive,
-    debugName: 'MetalOwnedTextureFrame.device',
+    debugName: 'MetalTextureFrame.device',
   );
   BigInt get pixelFormat => _scope.active(_value).pixelFormat;
 }
 
-final class ScopedOpenglOwnedTextureFrame {
-  ScopedOpenglOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
+final class ScopedOpenglTextureFrame {
+  ScopedOpenglTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
         raw.mln_acquired_frame_view_begin,
         raw.mln_acquired_frame_view_end,
       );
-  final OpenglOwnedTextureFrame _value;
+  final OpenglTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedOpenglOwnedTextureFrame) use) =>
+  T withView<T>(T Function(ScopedOpenglTextureFrame) use) =>
       _scope.use(() => use(this));
   BigInt get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
   BigInt get frameId => _scope.active(_value).frameId;
+  int get slot => _scope.active(_value).slot;
   int get texture => _scope.active(_value).texture;
   int get target => _scope.active(_value).target;
   int get internalFormat => _scope.active(_value).internalFormat;
@@ -7423,63 +7546,65 @@ final class ScopedGpuSync {
   BigInt get value => _scope.active(_value).value;
 }
 
-final class ScopedVulkanOwnedTextureFrame {
-  ScopedVulkanOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
+final class ScopedVulkanTextureFrame {
+  ScopedVulkanTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
         raw.mln_acquired_frame_view_begin,
         raw.mln_acquired_frame_view_end,
       );
-  final VulkanOwnedTextureFrame _value;
+  final VulkanTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedVulkanOwnedTextureFrame) use) =>
+  T withView<T>(T Function(ScopedVulkanTextureFrame) use) =>
       _scope.use(() => use(this));
   BigInt get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
   BigInt get frameId => _scope.active(_value).frameId;
+  int get slot => _scope.active(_value).slot;
   BigInt get image => _scope.active(_value).image;
   BigInt get imageView => _scope.active(_value).imageView;
   ScopedNativePointer get device => ScopedNativePointer(
     _value.device.address,
     checkValid: _scope.checkActive,
-    debugName: 'VulkanOwnedTextureFrame.device',
+    debugName: 'VulkanTextureFrame.device',
   );
   int get format => _scope.active(_value).format;
   int get layout => _scope.active(_value).layout;
 }
 
-final class ScopedWebgpuOwnedTextureFrame {
-  ScopedWebgpuOwnedTextureFrame._(AcquiredFrameHandle owner, this._value)
+final class ScopedWebgpuTextureFrame {
+  ScopedWebgpuTextureFrame._(AcquiredFrameHandle owner, this._value)
     : _scope = _NativeViewScope(
         owner._state,
         raw.mln_acquired_frame_view_begin,
         raw.mln_acquired_frame_view_end,
       );
-  final WebgpuOwnedTextureFrame _value;
+  final WebgpuTextureFrame _value;
   final _NativeViewScope _scope;
-  T withView<T>(T Function(ScopedWebgpuOwnedTextureFrame) use) =>
+  T withView<T>(T Function(ScopedWebgpuTextureFrame) use) =>
       _scope.use(() => use(this));
   BigInt get generation => _scope.active(_value).generation;
   int get width => _scope.active(_value).width;
   int get height => _scope.active(_value).height;
   double get scaleFactor => _scope.active(_value).scaleFactor;
   BigInt get frameId => _scope.active(_value).frameId;
+  int get slot => _scope.active(_value).slot;
   ScopedNativePointer get texture => ScopedNativePointer(
     _value.texture.address,
     checkValid: _scope.checkActive,
-    debugName: 'WebgpuOwnedTextureFrame.texture',
+    debugName: 'WebgpuTextureFrame.texture',
   );
   ScopedNativePointer get textureView => ScopedNativePointer(
     _value.textureView.address,
     checkValid: _scope.checkActive,
-    debugName: 'WebgpuOwnedTextureFrame.textureView',
+    debugName: 'WebgpuTextureFrame.textureView',
   );
   ScopedNativePointer get device => ScopedNativePointer(
     _value.device.address,
     checkValid: _scope.checkActive,
-    debugName: 'WebgpuOwnedTextureFrame.device',
+    debugName: 'WebgpuTextureFrame.device',
   );
   int get format => _scope.active(_value).format;
 }

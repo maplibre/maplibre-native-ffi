@@ -351,6 +351,33 @@ static app_error borrowed_texture_create(
   return APP_OK;
 }
 
+/// The textures of a borrowed ring, one per slot.
+typedef struct metal_ring {
+  id textures[RING_DEPTH];
+} metal_ring;
+
+static void metal_ring_release(metal_ring* ring) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    release_object(&ring->textures[index]);
+  }
+}
+
+static app_error metal_ring_create(
+  id device, viewport current_viewport, metal_ring* out_ring
+) {
+  *out_ring = (metal_ring){};
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    const app_error error = borrowed_texture_create(
+      device, current_viewport, &out_ring->textures[index]
+    );
+    if (error != APP_OK) {
+      metal_ring_release(out_ring);
+      return error;
+    }
+  }
+  return APP_OK;
+}
+
 struct render_target {
   render_target_mode mode;
   render_session session;
@@ -362,8 +389,10 @@ struct render_target {
     } owned;
     struct {
       metal_compositor compositor;
-      /// The texture the compositor samples.
-      id texture;
+      /// The newest frame, held until a newer one replaces it.
+      mln_acquired_frame held;
+      /// The ring the session renders into.
+      metal_ring ring;
       texture_replacements replacements;
     } borrowed;
     struct {
@@ -416,9 +445,9 @@ app_error render_target_init(
         &target->as.borrowed.compositor, window, current_viewport
       );
       if (error == APP_OK) {
-        error = borrowed_texture_create(
+        error = metal_ring_create(
           target->as.borrowed.compositor.view.device, current_viewport,
-          &target->as.borrowed.texture
+          &target->as.borrowed.ring
         );
         if (error != APP_OK) {
           metal_compositor_deinit(&target->as.borrowed.compositor);
@@ -443,15 +472,22 @@ static mln_metal_context_descriptor metal_context_descriptor(id device) {
   };
 }
 
-static mln_metal_borrowed_texture_descriptor borrowed_texture_descriptor(
-  id texture, viewport current_viewport
+/// Describes ring, whose entries the caller provides storage for.
+static mln_metal_borrowed_texture_descriptor borrowed_ring_descriptor(
+  const metal_ring* ring, viewport current_viewport,
+  mln_metal_borrowed_texture entries[RING_DEPTH]
 ) {
+  for (size_t index = 0; index < RING_DEPTH; ++index) {
+    entries[index] =
+      (mln_metal_borrowed_texture){.texture = ring->textures[index]};
+  }
   mln_metal_borrowed_texture_descriptor descriptor =
     mln_metal_borrowed_texture_descriptor_default();
   descriptor.extent = render_target_extent(current_viewport);
   descriptor.physical_width = current_viewport.physical_width;
   descriptor.physical_height = current_viewport.physical_height;
-  descriptor.texture = texture;
+  descriptor.textures = entries;
+  descriptor.texture_count = RING_DEPTH;
   return descriptor;
 }
 
@@ -480,9 +516,10 @@ app_error render_target_attach(
       break;
     }
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
+      mln_metal_borrowed_texture entries[RING_DEPTH];
       const mln_metal_borrowed_texture_descriptor descriptor =
-        borrowed_texture_descriptor(
-          target->as.borrowed.texture, current_viewport
+        borrowed_ring_descriptor(
+          &target->as.borrowed.ring, current_viewport, entries
         );
       status = mln_map_attach_metal_borrowed_texture(
         map, &descriptor, &options, &session, &completion, &diagnostic
@@ -514,6 +551,8 @@ void render_target_deinit(render_target* target) {
   }
   if (target->mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
     render_session_release_frame(&target->as.owned.held);
+  } else if (target->mode == RENDER_TARGET_MODE_BORROWED_TEXTURE) {
+    render_session_release_frame(&target->as.borrowed.held);
   }
   render_session_close(&target->session);
   switch (target->mode) {
@@ -521,14 +560,16 @@ void render_target_deinit(render_target* target) {
       metal_compositor_deinit(&target->as.owned.compositor);
       break;
     case RENDER_TARGET_MODE_BORROWED_TEXTURE: {
-      id replacement = nullptr;
-      do {
-        release_object(&replacement);
+      while (true) {
+        metal_ring* retired = nullptr;
         texture_replacements_take_any(
-          &target->as.borrowed.replacements, (void**)&replacement
+          &target->as.borrowed.replacements, (void**)&retired
         );
-      } while (replacement != nullptr);
-      release_object(&target->as.borrowed.texture);
+        if (retired == nullptr) break;
+        metal_ring_release(retired);
+        free(retired);
+      }
+      metal_ring_release(&target->as.borrowed.ring);
       metal_compositor_deinit(&target->as.borrowed.compositor);
       break;
     }
@@ -539,25 +580,36 @@ void render_target_deinit(render_target* target) {
   free(target);
 }
 
-/// Follows a resized window in borrowed-texture mode: allocates a texture at
-/// the new size and hands it to the live session, which stays attached.
+/// Follows a resized window in borrowed-texture mode: allocates a ring at the
+/// new size and hands it to the live session, which stays attached. A
+/// replacement is refused while the host holds a frame, so the held one goes
+/// first; the window keeps showing what it last presented.
 static app_error resize_borrowed(
   render_target* target, viewport current_viewport
 ) {
   metal_compositor_resize(&target->as.borrowed.compositor, current_viewport);
-  id replacement = nullptr;
-  MAP_TRY(borrowed_texture_create(
+  render_session_release_frame(&target->as.borrowed.held);
+  metal_ring* retired = malloc(sizeof(metal_ring));
+  if (retired == nullptr) return APP_ERROR_RESIZE_FAILED;
+  metal_ring replacement;
+  const app_error error = metal_ring_create(
     target->as.borrowed.compositor.view.device, current_viewport, &replacement
-  ));
+  );
+  if (error != APP_OK) {
+    free(retired);
+    return error;
+  }
+  *retired = target->as.borrowed.ring;
   mln_completion completion;
-  texture_replacement* entry =
-    texture_replacement_begin(replacement, &completion);
+  texture_replacement* entry = texture_replacement_begin(retired, &completion);
   if (entry == nullptr) {
-    release_object(&replacement);
+    metal_ring_release(&replacement);
+    free(retired);
     return APP_ERROR_RESIZE_FAILED;
   }
+  mln_metal_borrowed_texture entries[RING_DEPTH];
   const mln_metal_borrowed_texture_descriptor descriptor =
-    borrowed_texture_descriptor(replacement, current_viewport);
+    borrowed_ring_descriptor(&replacement, current_viewport, entries);
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_render_session_set_metal_borrowed_texture_target(
@@ -565,12 +617,14 @@ static app_error resize_borrowed(
     );
   texture_replacements_queue(&target->as.borrowed.replacements, entry, status);
   if (status != MLN_STATUS_OK) {
-    release_object(&replacement);
+    metal_ring_release(&replacement);
+    free(retired);
     diagnostics_log_status(
       "Metal borrowed texture set target failed", status, &diagnostic
     );
     return APP_ERROR_RESIZE_FAILED;
   }
+  target->as.borrowed.ring = replacement;
   return render_session_resize_map(&target->session, current_viewport);
 }
 
@@ -592,22 +646,25 @@ app_error render_target_resize(
   return APP_ERROR_BACKEND_SETUP_FAILED;
 }
 
-/// Switches the compositor to each replacement a rendered frame has drawn
-/// into, releasing the texture it retires.
-app_error render_target_show_replacements(render_target* target) {
+app_error render_target_retire_replaced(render_target* target) {
+  if (target->mode != RENDER_TARGET_MODE_BORROWED_TEXTURE) return APP_OK;
   while (true) {
-    id replacement = nullptr;
-    MAP_TRY(texture_replacements_take_shown(
-      &target->as.borrowed.replacements, &target->session, (void**)&replacement
+    metal_ring* retired = nullptr;
+    MAP_TRY(texture_replacements_take_completed(
+      &target->as.borrowed.replacements, &target->session, (void**)&retired
     ));
-    if (replacement == nullptr) return APP_OK;
-    release_object(&target->as.borrowed.texture);
-    target->as.borrowed.texture = replacement;
+    if (retired == nullptr) return APP_OK;
+    metal_ring_release(retired);
+    free(retired);
   }
 }
 
-static app_error present_owned(render_target* target, bool* out_presented) {
-  mln_acquired_frame* held = &target->as.owned.held;
+/// Acquires the newest frame into *held and samples its texture into the
+/// window. Both texture modes hand their frames over this way.
+static app_error present_acquired(
+  render_target* target, metal_compositor* compositor, mln_acquired_frame* held,
+  bool* out_presented
+) {
   bool acquired = false;
   MAP_TRY(render_session_acquire_newest(&target->session, held, &acquired));
   if (!acquired) {
@@ -618,7 +675,7 @@ static app_error present_owned(render_target* target, bool* out_presented) {
   MAP_TRY(render_session_require_cpu_complete_producer(
     *held, "Metal texture acquire failed"
   ));
-  mln_metal_owned_texture_frame frame = {.size = sizeof(frame)};
+  mln_metal_texture_frame frame = {.size = sizeof(frame)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
   const mln_status status =
     mln_acquired_frame_get_metal_texture(*held, &frame, &diagnostic);
@@ -627,7 +684,7 @@ static app_error present_owned(render_target* target, bool* out_presented) {
     return APP_ERROR_BACKEND_DRAW_FAILED;
   }
   return metal_compositor_draw_texture(
-    &target->as.owned.compositor, (id)frame.texture, out_presented
+    compositor, (id)frame.texture, out_presented
   );
 }
 
@@ -638,11 +695,13 @@ app_error render_target_present(
   *out_presented = false;
   switch (target->mode) {
     case RENDER_TARGET_MODE_OWNED_TEXTURE:
-      return present_owned(target, out_presented);
+      return present_acquired(
+        target, &target->as.owned.compositor, &target->as.owned.held,
+        out_presented
+      );
     case RENDER_TARGET_MODE_BORROWED_TEXTURE:
-      MAP_TRY(render_target_show_replacements(target));
-      return metal_compositor_draw_texture(
-        &target->as.borrowed.compositor, target->as.borrowed.texture,
+      return present_acquired(
+        target, &target->as.borrowed.compositor, &target->as.borrowed.held,
         out_presented
       );
     case RENDER_TARGET_MODE_NATIVE_SURFACE:

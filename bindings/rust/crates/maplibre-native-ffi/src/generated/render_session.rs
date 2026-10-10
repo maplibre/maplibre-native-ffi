@@ -12,7 +12,8 @@ native_owner! {
 }
 
 impl RenderSessionHandle {
-    /// Irreversibly closes control and mailboxes without graphics calls.
+    /// Irreversibly closes control and mailboxes and disposes of the session's
+    /// graphics objects.
     ///
     /// See `mln_render_session_abandon` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -47,7 +48,9 @@ impl RenderSessionHandle {
     }
 
     /// Starts a barrier that completes after all render work accepted before it
-    /// has a terminal result. A barrier does not request a frame.
+    /// has a terminal result. A barrier does not request a frame. Accepting a
+    /// barrier ends the wait of every earlier demand that waits for a map
+    /// update.
     ///
     /// See `mln_render_session_barrier` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -375,7 +378,8 @@ impl RenderSessionHandle {
         Ok(out_serviced)
     }
 
-    /// Starts an ordered caller-owned Metal texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned Metal
+    /// ring.
     ///
     /// See `mln_render_session_set_metal_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -431,7 +435,8 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Starts an ordered caller-owned OpenGL texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned OpenGL
+    /// ring.
     ///
     /// See `mln_render_session_set_opengl_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -487,7 +492,8 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Starts an ordered caller-owned Vulkan texture replacement.
+    /// Starts an ordered replacement of every image of a caller-owned Vulkan
+    /// ring.
     ///
     /// See `mln_render_session_set_vulkan_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -543,7 +549,8 @@ impl RenderSessionHandle {
         )
     }
 
-    /// Starts an ordered caller-owned WebGPU texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned WebGPU
+    /// ring.
     ///
     /// See `mln_render_session_set_webgpu_borrowed_texture_target` in the
     /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).

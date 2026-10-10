@@ -12,9 +12,10 @@ import (
 
 const glTexture2D = 0x0DE1
 
-// ownedTextureRingDepth keeps a texture to compose while the map renders the
-// next one.
-const ownedTextureRingDepth = 2
+// textureRingDepth is the depth of a texture ring, session-owned or borrowed.
+// The target holds the newest frame until a newer one arrives, and the session
+// renders into the other slot meanwhile.
+const textureRingDepth = 2
 
 // retryDelay is how long the loop waits before it retries a frame that did not
 // reach the window, about one display refresh. No map-update event prompts
@@ -233,7 +234,7 @@ func (driver *callerDriver) Close() error {
 		fmt.Printf("render session detach failed, abandoning: %v\n", detachErr)
 		abandoned, abandonErr := driver.session.Abandon()
 		if abandoned.QuarantinedResourceCount > 0 {
-			fmt.Printf("render session quarantined %d resources\n", abandoned.QuarantinedResourceCount)
+			fmt.Printf("render session abandon kept %d resource groups until exit\n", abandoned.QuarantinedResourceCount)
 		}
 		err = errors.Join(err, abandonErr)
 	}
@@ -276,14 +277,26 @@ func newOpenGLRenderTarget(context *openGLContext, v viewport, mode renderTarget
 	}
 }
 
-// openGLOwnedTextureTarget composes a session-owned texture ring. After a
-// rendered result, it acquires every ready frame, keeps the newest, and
-// composes it. It holds that frame until a newer one replaces it, so the
-// session renders into the ring's other slots meanwhile.
-type openGLOwnedTextureTarget struct {
+// openGLFrameTarget composes a texture ring's frames. After a rendered result,
+// it acquires every ready frame, keeps the newest, and composes it. It holds
+// that frame until a newer one replaces it, so the session renders into the
+// ring's other slot meanwhile.
+type openGLFrameTarget struct {
 	callerDriver
 	compositor *openGLTextureCompositor
 	held       *maplibre.AcquiredFrameHandle
+}
+
+func newOpenGLFrameTarget(compositor *openGLTextureCompositor, driver callerDriver) *openGLFrameTarget {
+	target := &openGLFrameTarget{callerDriver: driver, compositor: compositor}
+	target.present = target.drawFrame
+	target.releaseFrames = target.releaseHeld
+	return target
+}
+
+// openGLOwnedTextureTarget composes a session-owned texture ring.
+type openGLOwnedTextureTarget struct {
+	*openGLFrameTarget
 }
 
 func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLOwnedTextureTarget, error) {
@@ -295,12 +308,10 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLOwnedTextureTarget{callerDriver: driver, compositor: compositor}
-	target.present = target.drawFrame
-	target.releaseFrames = target.releaseHeld
+	target := &openGLOwnedTextureTarget{newOpenGLFrameTarget(compositor, driver)}
 	attachment, err := m.AttachOpenglOwnedTexture(
 		maplibre.OpenglOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor},
-		target.attachOptions(ownedTextureRingDepth),
+		target.attachOptions(textureRingDepth),
 	)
 	if err == nil {
 		err = target.attach(attachment.Session, attachment.Completion)
@@ -324,7 +335,7 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 
 // drawFrame composes the newest ready frame and releases the older ones.
 // DrawTexture finishes its GPU reads, so each frame releases CPU-complete.
-func (target *openGLOwnedTextureTarget) drawFrame() (bool, error) {
+func (target *openGLFrameTarget) drawFrame() (bool, error) {
 	var newest *maplibre.AcquiredFrameHandle
 	for {
 		frame, err := target.session.AcquireFrame()
@@ -344,7 +355,7 @@ func (target *openGLOwnedTextureTarget) drawFrame() (bool, error) {
 	}
 	drawErr := requireCPUCompleteProducer(newest)
 	if drawErr == nil {
-		drawErr = newest.WithOpenglTexture(func(info maplibre.OpenglOwnedTextureFrameView) error {
+		drawErr = newest.WithOpenglTexture(func(info maplibre.OpenglTextureFrameView) error {
 			targetID, err := info.Target()
 			if err != nil {
 				return err
@@ -361,7 +372,7 @@ func (target *openGLOwnedTextureTarget) drawFrame() (bool, error) {
 	return drawErr == nil, errors.Join(drawErr, releaseErr)
 }
 
-func (target *openGLOwnedTextureTarget) releaseHeld() error {
+func (target *openGLFrameTarget) releaseHeld() error {
 	err := releaseFrame(target.held)
 	target.held = nil
 	return err
@@ -387,14 +398,12 @@ func requireCPUCompleteProducer(frame *maplibre.AcquiredFrameHandle) error {
 	})
 }
 
-// openGLBorrowedTextureTarget renders into a texture that the example owns.
-// The caller driver renders and composes on the SDL thread in order, so the
-// texture needs no hand-off between them.
+// openGLBorrowedTextureTarget renders into a ring of textures that the example
+// owns, and composes its frames as a session-owned ring's.
 type openGLBorrowedTextureTarget struct {
-	callerDriver
-	compositor *openGLTextureCompositor
-	mapRef     *maplibre.MapHandle
-	texture    uint32
+	*openGLFrameTarget
+	mapRef *maplibre.MapHandle
+	ring   [textureRingDepth]uint32
 }
 
 func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle, driver callerDriver) (*openGLBorrowedTextureTarget, error) {
@@ -402,84 +411,100 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 	if err != nil {
 		return nil, err
 	}
-	target := &openGLBorrowedTextureTarget{callerDriver: driver, compositor: compositor, mapRef: m}
-	target.present = target.drawTexture
-	descriptor, err := target.describe(v)
+	target := &openGLBorrowedTextureTarget{openGLFrameTarget: newOpenGLFrameTarget(compositor, driver), mapRef: m}
+	ring, descriptor, err := target.describe(v)
 	if err == nil {
-		target.texture = descriptor.Texture
+		target.ring = ring
 		var attachment maplibre.MapAttachOpenglBorrowedTextureResult
-		attachment, err = m.AttachOpenglBorrowedTexture(descriptor, target.attachOptions(0))
+		attachment, err = m.AttachOpenglBorrowedTexture(descriptor, target.attachOptions(textureRingDepth))
 		if err == nil {
 			err = target.attach(attachment.Session, attachment.Completion)
 		}
 	}
 	if err != nil {
-		target.deleteTexture(target.texture)
+		target.deleteRing(target.ring)
 		return nil, errors.Join(fmt.Errorf("OpenGL borrowed texture attach failed: %w", err), compositor.Close())
 	}
 	return target, nil
 }
 
-// describe allocates a texture at the viewport's size and describes it.
-func (target *openGLBorrowedTextureTarget) describe(v viewport) (maplibre.OpenglBorrowedTextureDescriptor, error) {
+// describe allocates a ring at the viewport's size and describes it.
+func (target *openGLBorrowedTextureTarget) describe(v viewport) ([textureRingDepth]uint32, maplibre.OpenglBorrowedTextureDescriptor, error) {
+	var ring [textureRingDepth]uint32
 	context, err := target.compositor.context.descriptor(true)
 	if err != nil {
-		return maplibre.OpenglBorrowedTextureDescriptor{}, err
+		return ring, maplibre.OpenglBorrowedTextureDescriptor{}, err
 	}
-	texture, err := createBorrowedTexture(target.compositor.context, v)
-	if err != nil {
-		return maplibre.OpenglBorrowedTextureDescriptor{}, err
+	textures := make([]maplibre.OpenglBorrowedTexture, 0, textureRingDepth)
+	for slot := range ring {
+		texture, err := createBorrowedTexture(target.compositor.context, v)
+		if err != nil {
+			target.deleteRing(ring)
+			return [textureRingDepth]uint32{}, maplibre.OpenglBorrowedTextureDescriptor{}, err
+		}
+		ring[slot] = texture
+		textures = append(textures, maplibre.OpenglBorrowedTexture{Texture: texture})
 	}
-	return maplibre.OpenglBorrowedTextureDescriptor{
+	return ring, maplibre.OpenglBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
 		Context:        context,
-		Texture:        texture,
+		Textures:       textures,
 		Target:         glTexture2D,
 	}, nil
 }
 
-func (target *openGLBorrowedTextureTarget) deleteTexture(texture uint32) {
-	if texture != 0 && target.compositor.context.MakeCurrent() == nil {
-		glDeleteTexture(texture)
+func (target *openGLBorrowedTextureTarget) deleteRing(ring [textureRingDepth]uint32) {
+	if target.compositor.context.MakeCurrent() != nil {
+		return
+	}
+	for _, texture := range ring {
+		if texture != 0 {
+			glDeleteTexture(texture)
+		}
 	}
 }
 
 func (target *openGLBorrowedTextureTarget) Close() error {
 	err := target.callerDriver.Close()
-	target.deleteTexture(target.texture)
+	target.deleteRing(target.ring)
 	return errors.Join(err, target.compositor.Close())
 }
 
-// Resize replaces the texture, because its owner sets its size. The outgoing
-// texture stays current until the replacement completes.
+// Resize replaces the ring, because its owner sets its size. A replacement is
+// refused while the host holds a frame, so the held one goes first, and the
+// window keeps what it last presented. The outgoing ring stays alive until the
+// replacement completes. A failed replacement leaves it unknown which ring the
+// session holds, so the session detaches before either ring is released.
 func (target *openGLBorrowedTextureTarget) Resize(v viewport) error {
+	if err := target.releaseHeld(); err != nil {
+		return err
+	}
 	if err := target.compositor.Resize(v); err != nil {
 		return err
 	}
-	descriptor, err := target.describe(v)
+	ring, descriptor, err := target.describe(v)
 	if err != nil {
 		return err
 	}
 	future, err := target.session.SetOpenglBorrowedTextureTarget(descriptor)
 	if err != nil {
-		target.deleteTexture(descriptor.Texture)
+		target.deleteRing(ring)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
 	}
 	// A target replacement leaves the map's extent unchanged.
 	resizeMap(target.mapRef, v)
-	if err := target.replaceTarget(future, nil); err != nil {
-		target.deleteTexture(descriptor.Texture)
+	if err := target.await(future); err != nil {
+		err = errors.Join(err, target.callerDriver.Close())
+		target.deleteRing(ring)
 		return fmt.Errorf("OpenGL borrowed texture set target failed: %w", err)
 	}
-	target.deleteTexture(target.texture)
-	target.texture = descriptor.Texture
+	target.deleteRing(target.ring)
+	target.ring = ring
+	// A replacement publishes no map update, and a frame rendered before it
+	// can no longer be acquired, so the new ring needs a forced frame.
 	return target.RequestFrame(true)
-}
-
-func (target *openGLBorrowedTextureTarget) drawTexture() (bool, error) {
-	return true, target.compositor.DrawTexture(glTexture2D, target.texture)
 }
 
 // openGLSurfaceTarget renders into the window's EGL surface, and the session

@@ -3,10 +3,10 @@
 internal import CMaplibreNativeC
 import Foundation
 
-public final class MetalOwnedTextureFrameView {
-  private let snapshot: MetalOwnedTextureFrame
+public final class MetalTextureFrameView {
+  private let snapshot: MetalTextureFrame
   private let scope: NativeViewScope
-  init(_ value: MetalOwnedTextureFrame, scope: NativeViewScope) {
+  init(_ value: MetalTextureFrame, scope: NativeViewScope) {
     snapshot = value; self.scope = scope
   }
 
@@ -28,6 +28,10 @@ public final class MetalOwnedTextureFrameView {
 
   public var frameId: UInt64 {
     get throws { try scope.check(); return snapshot.frameId }
+  }
+
+  public var slot: UInt32 {
+    get throws { try scope.check(); return snapshot.slot }
   }
 
   public var texture: NativePointer {
@@ -43,10 +47,10 @@ public final class MetalOwnedTextureFrameView {
   }
 }
 
-public final class OpenglOwnedTextureFrameView {
-  private let snapshot: OpenglOwnedTextureFrame
+public final class OpenglTextureFrameView {
+  private let snapshot: OpenglTextureFrame
   private let scope: NativeViewScope
-  init(_ value: OpenglOwnedTextureFrame, scope: NativeViewScope) {
+  init(_ value: OpenglTextureFrame, scope: NativeViewScope) {
     snapshot = value; self.scope = scope
   }
 
@@ -68,6 +72,10 @@ public final class OpenglOwnedTextureFrameView {
 
   public var frameId: UInt64 {
     get throws { try scope.check(); return snapshot.frameId }
+  }
+
+  public var slot: UInt32 {
+    get throws { try scope.check(); return snapshot.slot }
   }
 
   public var texture: UInt32 {
@@ -111,10 +119,10 @@ public final class GpuSyncView {
   }
 }
 
-public final class VulkanOwnedTextureFrameView {
-  private let snapshot: VulkanOwnedTextureFrame
+public final class VulkanTextureFrameView {
+  private let snapshot: VulkanTextureFrame
   private let scope: NativeViewScope
-  init(_ value: VulkanOwnedTextureFrame, scope: NativeViewScope) {
+  init(_ value: VulkanTextureFrame, scope: NativeViewScope) {
     snapshot = value; self.scope = scope
   }
 
@@ -136,6 +144,10 @@ public final class VulkanOwnedTextureFrameView {
 
   public var frameId: UInt64 {
     get throws { try scope.check(); return snapshot.frameId }
+  }
+
+  public var slot: UInt32 {
+    get throws { try scope.check(); return snapshot.slot }
   }
 
   public var image: UInt64 {
@@ -159,10 +171,10 @@ public final class VulkanOwnedTextureFrameView {
   }
 }
 
-public final class WebgpuOwnedTextureFrameView {
-  private let snapshot: WebgpuOwnedTextureFrame
+public final class WebgpuTextureFrameView {
+  private let snapshot: WebgpuTextureFrame
   private let scope: NativeViewScope
-  init(_ value: WebgpuOwnedTextureFrame, scope: NativeViewScope) {
+  init(_ value: WebgpuTextureFrame, scope: NativeViewScope) {
     snapshot = value; self.scope = scope
   }
 
@@ -184,6 +196,10 @@ public final class WebgpuOwnedTextureFrameView {
 
   public var frameId: UInt64 {
     get throws { try scope.check(); return snapshot.frameId }
+  }
+
+  public var slot: UInt32 {
+    get throws { try scope.check(); return snapshot.slot }
   }
 
   public var texture: NativePointer {

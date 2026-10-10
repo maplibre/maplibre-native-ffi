@@ -307,6 +307,18 @@ public data class FrameDemandFlag(public val rawValue: UInt) {
      * without presentation.
      */
     public val PRESENT: FrameDemandFlag = FrameDemandFlag(2u)
+    /**
+     * With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+     * `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits instead, and runs
+     * again after the map's next update, a target replacement, or an applied resize. A waiting
+     * demand holds no ring slot. A later demand with the same flags and coalescing boundary
+     * supersedes it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach,
+     * abandon, or the quarantine of the ring's last usable slot end it with
+     * `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow the results of
+     * demands accepted after it. The flag does not pace: a host that re-arms a waiting demand as
+     * each result arrives renders every update the map publishes.
+     */
+    public val WAIT_FOR_UPDATE: FrameDemandFlag = FrameDemandFlag(4u)
   }
 }
 
@@ -396,7 +408,10 @@ public data class GesturePhase(public val rawValue: UInt) {
  */
 public data class GpuSyncKind(public val rawValue: UInt) {
   public companion object {
-    /** The producer or consumer has completed before the API call returns. */
+    /**
+     * The host needs no synchronization object. The work completed, or on WebGPU was submitted to
+     * the device's queue, before the frame became acquirable or before the release call.
+     */
     public val CPU_COMPLETE: GpuSyncKind = GpuSyncKind(0u)
     /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
     public val METAL_SHARED_EVENT: GpuSyncKind = GpuSyncKind(1u)
@@ -740,16 +755,16 @@ public data class QueriedFeatureField(public val rawValue: UInt) {
 }
 
 /**
- * Result of irreversible CPU-side target abandonment.
+ * What abandon did with a session's graphics resources.
  *
  * See `mln_render_abandon_disposition` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
  */
 public data class RenderAbandonDisposition(public val rawValue: UInt) {
   public companion object {
-    /** No graphics resources remained when control was abandoned. */
+    /** Abandon destroyed every graphics resource, or none remained. */
     public val CLEAN: RenderAbandonDisposition = RenderAbandonDisposition(0u)
-    /** Graphics resources could not be destroyed and were quarantined. */
+    /** Abandon kept graphics resources that it could not safely destroy. */
     public val QUARANTINED: RenderAbandonDisposition = RenderAbandonDisposition(1u)
   }
 }
@@ -824,12 +839,15 @@ public data class RenderResult(public val rawValue: UInt) {
     public val RENDERED: RenderResult = RenderResult(0u)
     /**
      * No newer map update was available, or the map had no complete frame to draw yet. The map
-     * publishes another update when it has one.
+     * publishes another update when it has one. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE`
+     * waits for that update instead, and finishes with this result only when a barrier ends its
+     * wait.
      */
     public val NO_UPDATE: RenderResult = RenderResult(1u)
     /**
      * An ordered extent change had not reached the map. The map publishes an update at the new
-     * extent.
+     * extent, which a demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing
+     * with this result.
      */
     public val SIZE_PENDING: RenderResult = RenderResult(2u)
     /**
@@ -1511,12 +1529,12 @@ public data class WebglContextKind(public val rawValue: UInt) {
 }
 
 /**
- * Metal frame acquired from a session-owned texture target.
+ * Metal frame acquired from a texture ring.
  *
- * See `mln_metal_owned_texture_frame` in the
+ * See `mln_metal_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public class MetalOwnedTextureFrame(
+public class MetalTextureFrame(
   /** Session generation that produced this frame. */
   generation: ULong = 0uL,
   /** Physical Metal texture width in device pixels. */
@@ -1527,6 +1545,11 @@ public class MetalOwnedTextureFrame(
   scaleFactor: Double = 0.0,
   /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
+   * descriptor's textures array.
+   */
+  slot: UInt = 0u,
   /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release. */
   texture: NativePointer,
   /** Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release. */
@@ -1570,6 +1593,13 @@ public class MetalOwnedTextureFrame(
       return storedFrameId
     }
 
+  private val storedSlot: UInt = slot
+  public val slot: UInt
+    get() {
+      bindingScope?.ensureActive()
+      return storedSlot
+    }
+
   private val storedTexture: NativePointer = texture
   public val texture: NativePointer
     get() {
@@ -1593,12 +1623,12 @@ public class MetalOwnedTextureFrame(
 }
 
 /**
- * OpenGL frame acquired from a session-owned texture target.
+ * OpenGL frame acquired from a texture ring.
  *
- * See `mln_opengl_owned_texture_frame` in the
+ * See `mln_opengl_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public class OpenglOwnedTextureFrame(
+public class OpenglTextureFrame(
   /** Session generation that produced this frame. */
   generation: ULong = 0uL,
   /** Physical OpenGL texture width in device pixels. */
@@ -1609,15 +1639,23 @@ public class OpenglOwnedTextureFrame(
   scaleFactor: Double = 0.0,
   /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
+   * descriptor's textures array.
+   */
+  slot: UInt = 0u,
   /** Borrowed OpenGL texture object name. Valid until frame release. */
   texture: UInt = 0u,
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   target: UInt = 0u,
-  /** OpenGL internal format, such as GL_RGBA8. */
+  /**
+   * OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture, whose format the host
+   * chose.
+   */
   internalFormat: UInt = 0u,
-  /** OpenGL pixel format, such as GL_RGBA. */
+  /** OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture. */
   format: UInt = 0u,
-  /** OpenGL pixel type, such as GL_UNSIGNED_BYTE. */
+  /** OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture. */
   type: UInt = 0u,
 ) {
   internal var bindingScope: ViewScope? = null
@@ -1654,6 +1692,13 @@ public class OpenglOwnedTextureFrame(
     get() {
       bindingScope?.ensureActive()
       return storedFrameId
+    }
+
+  private val storedSlot: UInt = slot
+  public val slot: UInt
+    get() {
+      bindingScope?.ensureActive()
+      return storedSlot
     }
 
   private val storedTexture: UInt = texture
@@ -1742,6 +1787,12 @@ public data class RenderFrameResult(
   /** One `mln_render_result` value. */
   public val disposition: RenderResult = RenderResult(0u),
   public val token: ULong = 0uL,
+  /**
+   * Generation of the map render update the demand evaluated. When disposition is
+   * `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it with
+   * `mln_map_snapshot.latest_render_update_generation` to find the first frame that includes a
+   * command.
+   */
   public val mapUpdateGeneration: ULong = 0uL,
   public val extentGeneration: ULong = 0uL,
   /** Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`. */
@@ -1753,18 +1804,20 @@ public data class RenderFrameResult(
    * carries in its needs_repaint field, delivered with the frame result so a host can re-arm its
    * frame loop without the runtime event round trip. A camera transition does not set it by itself:
    * the map publishes a new update after each of the transition's frames instead, which a
-   * render-if-needed demand renders.
+   * render-if-needed demand renders. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each
+   * transition update without a runtime-event round trip; the host re-arms the demand as each
+   * result arrives.
    */
   public val needsRepaint: Boolean = false,
 )
 
 /**
- * Vulkan frame acquired from a session-owned texture target.
+ * Vulkan frame acquired from a texture ring.
  *
- * See `mln_vulkan_owned_texture_frame` in the
+ * See `mln_vulkan_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public class VulkanOwnedTextureFrame(
+public class VulkanTextureFrame(
   /** Session generation that produced this frame. */
   generation: ULong = 0uL,
   /** Physical Vulkan image width in device pixels. */
@@ -1775,6 +1828,11 @@ public class VulkanOwnedTextureFrame(
   scaleFactor: Double = 0.0,
   /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its image in the
+   * descriptor's textures array.
+   */
+  slot: UInt = 0u,
   /** Borrowed VkImage bit pattern. Valid until frame release. */
   image: ULong = 0uL,
   /** Borrowed VkImageView bit pattern. Valid until frame release. */
@@ -1783,7 +1841,11 @@ public class VulkanOwnedTextureFrame(
   device: NativePointer,
   /** Backend-native VkFormat value. */
   format: UInt = 0u,
-  /** Backend-native VkImageLayout value; Vulkan frames are host-sampleable. */
+  /**
+   * Backend-native VkImageLayout value that the image is in:
+   * VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the descriptor's
+   * final_layout for a borrowed one.
+   */
   layout: UInt = 0u,
 ) {
   internal var bindingScope: ViewScope? = null
@@ -1820,6 +1882,13 @@ public class VulkanOwnedTextureFrame(
     get() {
       bindingScope?.ensureActive()
       return storedFrameId
+    }
+
+  private val storedSlot: UInt = slot
+  public val slot: UInt
+    get() {
+      bindingScope?.ensureActive()
+      return storedSlot
     }
 
   private val storedImage: ULong = image
@@ -1859,12 +1928,12 @@ public class VulkanOwnedTextureFrame(
 }
 
 /**
- * WebGPU frame acquired from a session-owned texture target.
+ * WebGPU frame acquired from a texture ring.
  *
- * See `mln_webgpu_owned_texture_frame` in the
+ * See `mln_webgpu_texture_frame` in the
  * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
  */
-public class WebgpuOwnedTextureFrame(
+public class WebgpuTextureFrame(
   /** Session generation that produced this frame. */
   generation: ULong = 0uL,
   /** Physical WebGPU texture width in device pixels. */
@@ -1875,6 +1944,11 @@ public class WebgpuOwnedTextureFrame(
   scaleFactor: Double = 0.0,
   /** Opaque frame identity used to reject stale releases. */
   frameId: ULong = 0uL,
+  /**
+   * Ring slot that holds this frame. For a borrowed target, the index of its texture in the
+   * descriptor's textures array.
+   */
+  slot: UInt = 0u,
   /** Borrowed WGPUTexture. Valid until frame release. */
   texture: NativePointer,
   /** Borrowed WGPUTextureView. Valid until frame release. */
@@ -1918,6 +1992,13 @@ public class WebgpuOwnedTextureFrame(
     get() {
       bindingScope?.ensureActive()
       return storedFrameId
+    }
+
+  private val storedSlot: UInt = slot
+  public val slot: UInt
+    get() {
+      bindingScope?.ensureActive()
+      return storedSlot
     }
 
   private val storedTexture: NativePointer = texture
@@ -2143,7 +2224,11 @@ public data class FrameDemand(
   public val token: ULong = 0uL,
   /** Demands coalesce only when this value and their flags match. */
   public val coalescingBoundary: ULong = 0uL,
-  /** Positive time allowed before driver work begins, in nanoseconds; zero has no limit. */
+  /**
+   * Positive time allowed before driver work begins, in nanoseconds; zero has no limit. A demand
+   * that waits, for a free texture slot or for a map update, is checked against its timeout when it
+   * runs again; a wait has no timer of its own.
+   */
   public val timeoutNs: ULong = 0uL,
 )
 
@@ -2306,6 +2391,17 @@ public data class MapViewportOptions(
 )
 
 /**
+ * One caller-owned Metal texture of a borrowed texture ring.
+ *
+ * See `mln_metal_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class MetalBorrowedTexture(
+  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
+  public val texture: NativePointer
+)
+
+/**
  * Metal attachment options for a borrowed texture target.
  *
  * See `mln_metal_borrowed_texture_descriptor` in the
@@ -2322,8 +2418,8 @@ public data class MetalBorrowedTextureDescriptor(
   public val physicalWidth: UInt = 256u,
   /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
-  /** Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required. */
-  public val texture: NativePointer,
+  /** The ring's textures, one per slot, in slot order. Required. */
+  public val textures: List<MetalBorrowedTexture> = emptyList(),
 )
 
 /**
@@ -2469,6 +2565,17 @@ public data class OpenglContextDescriptor(
 )
 
 /**
+ * One caller-owned OpenGL texture of a borrowed texture ring.
+ *
+ * See `mln_opengl_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class OpenglBorrowedTexture(
+  /** Borrowed OpenGL texture object name. Required. */
+  public val texture: UInt = 0u
+)
+
+/**
  * OpenGL attachment options for a borrowed texture target.
  *
  * See `mln_opengl_borrowed_texture_descriptor` in the
@@ -2486,13 +2593,13 @@ public data class OpenglBorrowedTextureDescriptor(
   /** Physical texture height in device pixels. Must be positive. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
   /**
-   * Borrowed OpenGL context provider data. The texture must belong to this context or a context in
+   * Borrowed OpenGL context provider data. The textures must belong to this context or a context in
    * the same share group.
    */
   public val context: OpenglContextDescriptor,
-  /** Borrowed OpenGL texture object name. Required. */
-  public val texture: UInt = 0u,
-  /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
+  /** The ring's textures, one per slot, in slot order. Required. */
+  public val textures: List<OpenglBorrowedTexture> = emptyList(),
+  /** OpenGL texture target of every texture. Must be GL_TEXTURE_2D. */
   public val target: UInt = 0u,
 )
 
@@ -2577,8 +2684,9 @@ public data class RenderSessionAttachOptions(
   /** One `mln_render_driver_kind` value. Defaults to `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`. */
   public val driver: RenderDriverKind = RenderDriverKind.CALLER_GRAPHICS_THREAD,
   /**
-   * Requested host-acquirable owned-texture slot count. Private targets grant one slot regardless
-   * of this value. Ignored by other targets. Defaults to 1.
+   * Requested slot count of a session-owned texture ring, from one to three. Private targets grant
+   * one slot regardless of this value. A borrowed texture ring's depth is its texture count, so
+   * borrowed and other targets ignore this value. Defaults to 1.
    */
   public val requestedTextureRingDepth: UInt = 1u,
   /** Wakes the receiver when the frame-result queue becomes nonempty. */
@@ -2808,6 +2916,22 @@ public data class VulkanContextDescriptor(
 )
 
 /**
+ * One caller-owned Vulkan image of a borrowed texture ring.
+ *
+ * See `mln_vulkan_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class VulkanBorrowedTexture(
+  /** Borrowed VkImage. Required. */
+  public val image: ULong = 0uL,
+  /**
+   * Borrowed VkImageView for image. Required. The view must be a 2D color view that matches image
+   * and the descriptor's format.
+   */
+  public val imageView: ULong = 0uL,
+)
+
+/**
  * Vulkan attachment options for a borrowed texture target.
  *
  * See `mln_vulkan_borrowed_texture_descriptor` in the
@@ -2826,11 +2950,9 @@ public data class VulkanBorrowedTextureDescriptor(
   public val physicalHeight: UInt = 256u,
   /** Borrowed Vulkan context. All handles are required. */
   public val context: VulkanContextDescriptor,
-  /** Borrowed VkImage. Required. */
-  public val image: ULong = 0uL,
-  /** Borrowed VkImageView for image. Required. */
-  public val imageView: ULong = 0uL,
-  /** Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid. */
+  /** The ring's images, one per slot, in slot order. Required. */
+  public val textures: List<VulkanBorrowedTexture> = emptyList(),
+  /** Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is invalid. */
   public val format: UInt = 0u,
   /** Backend-native VkImageLayout value expected at render-pass begin. */
   public val initialLayout: UInt = 0u,
@@ -2897,6 +3019,22 @@ public data class WebgpuContextDescriptor(
 )
 
 /**
+ * One caller-owned WebGPU texture of a borrowed texture ring.
+ *
+ * See `mln_webgpu_borrowed_texture` in the
+ * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+ */
+public data class WebgpuBorrowedTexture(
+  /** Borrowed WGPUTexture. Required. */
+  public val texture: NativePointer,
+  /**
+   * Borrowed WGPUTextureView for texture. Required. The view must be a 2D color view compatible
+   * with texture and the descriptor's format.
+   */
+  public val textureView: NativePointer,
+)
+
+/**
  * WebGPU attachment options for a borrowed texture target.
  *
  * See `mln_webgpu_borrowed_texture_descriptor` in the
@@ -2913,13 +3051,14 @@ public data class WebgpuBorrowedTextureDescriptor(
   public val physicalWidth: UInt = 256u,
   /** Physical texture height in device pixels. Defaults to 256. */
   public val physicalHeight: UInt = 256u,
-  /** Borrowed WebGPU context. device is required. */
+  /**
+   * Borrowed WebGPU context. device is required. Rendering is submitted through context.queue or
+   * that device's default queue.
+   */
   public val context: WebgpuContextDescriptor,
-  /** Borrowed WGPUTexture. Required. */
-  public val texture: NativePointer,
-  /** Borrowed WGPUTextureView for texture. Required. */
-  public val textureView: NativePointer,
-  /** Backend-native WGPUTextureFormat value. Undefined is invalid. */
+  /** The ring's textures, one per slot, in slot order. Required. */
+  public val textures: List<WebgpuBorrowedTexture> = emptyList(),
+  /** Backend-native WGPUTextureFormat value of every texture. Undefined is invalid. */
   public val format: UInt = 0u,
 )
 
@@ -3228,6 +3367,11 @@ public data class MapSnapshot(
   /** True while the map is inside a gesture. */
   public val gestureInProgress: Boolean = false,
   public val eventMask: RuntimeEventMask = RuntimeEventMask(0uL),
+  /**
+   * Generation of the latest render update the map published. A rendered frame at or past it draws
+   * map state that includes every command this snapshot observes, though animations and resource
+   * loads finish in later frames.
+   */
   public val latestRenderUpdateGeneration: ULong = 0uL,
   public val tile: MapTileOptions = MapTileOptions(),
   public val bounds: BoundOptions = BoundOptions(),
@@ -3359,7 +3503,10 @@ public data class RenderAbandonResult(
 public data class RenderSessionCapabilities(
   /** One `mln_render_driver_kind` value. */
   public val driver: RenderDriverKind,
-  /** Granted owned-texture slot count, or zero for a target without a ring. */
+  /**
+   * Granted texture ring depth: the slot count of a session-owned ring, or the texture count of a
+   * borrowed one. Zero for a surface.
+   */
   public val textureRingDepth: UInt = 0u,
   /** A bitwise OR of `mln_render_session_capability_flag` values. */
   public val flags: RenderSessionCapabilityFlag,

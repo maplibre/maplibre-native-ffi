@@ -25,8 +25,9 @@ mln_render_session_attach_options render_session_attach_options(
   mln_render_session_attach_options options =
     mln_render_session_attach_options_default();
   options.driver = driver;
-  options.requested_texture_ring_depth =
-    mode == RENDER_TARGET_MODE_OWNED_TEXTURE ? 2 : 0;
+  if (mode == RENDER_TARGET_MODE_OWNED_TEXTURE) {
+    options.requested_texture_ring_depth = RING_DEPTH;
+  }
   options.frame_wake = app_event_wake(APP_EVENT_FRAME_RESULTS);
   if (driver == MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD) {
     options.driver_work_wake = app_event_wake(APP_EVENT_DRIVER_WORK);
@@ -49,8 +50,12 @@ app_error render_session_service(render_session* session) {
   return APP_OK;
 }
 
-/// Ends the session's graphics work without graphics calls, which completes
-/// any pending lifecycle submission with target loss.
+static bool graphics_kept = false;
+
+bool render_session_graphics_kept(void) { return graphics_kept; }
+
+/// Ends the session's graphics work at once, which completes any pending
+/// lifecycle submission with target loss.
 static void abandon(render_session* session) {
   mln_render_abandon_result result = {.size = sizeof(result)};
   mln_diagnostic diagnostic = {.size = sizeof(diagnostic)};
@@ -62,8 +67,9 @@ static void abandon(render_session* session) {
       "render session abandon failed", status, &diagnostic
     );
   } else if (result.quarantined_resource_count > 0) {
+    graphics_kept = true;
     fprintf(
-      stderr, "render session abandon quarantined %u resource groups\n",
+      stderr, "render session abandon kept %u resource groups until exit\n",
       result.quarantined_resource_count
     );
   }
@@ -105,9 +111,6 @@ app_error render_session_finish_attach(
     .map = map,
     .driver = options->driver,
     .presents = mode == RENDER_TARGET_MODE_NATIVE_SURFACE,
-    // A caller driver renders and composes on one thread, in order.
-    .takes_turns = mode == RENDER_TARGET_MODE_BORROWED_TEXTURE &&
-                   options->driver == MLN_RENDER_DRIVER_CORE_WORKER,
   };
   if (status != MLN_STATUS_OK) {
     awaited_completion_deinit(attached);
@@ -154,15 +157,7 @@ void render_session_close(render_session* session) {
   *session = (render_session){.handle = MLN_HANDLE_NULL};
 }
 
-app_error render_session_request_frame(
-  render_session* session, bool force, uint64_t* out_token
-) {
-  if (session->demand_outstanding) {
-    session->demand_wanted = true;
-    session->wanted_forced = session->wanted_forced || force;
-    if (out_token != nullptr) *out_token = session->next_frame_token + 1;
-    return APP_OK;
-  }
+app_error render_session_request_frame(render_session* session, bool force) {
   mln_frame_demand demand = mln_frame_demand_default();
   demand.flags = (force ? 0 : MLN_FRAME_DEMAND_IF_NEEDED) |
                  (session->presents ? MLN_FRAME_DEMAND_PRESENT : 0);
@@ -175,18 +170,7 @@ app_error render_session_request_frame(
       APP_ERROR_RENDER_FAILED, "frame demand failed", status, &diagnostic
     );
   }
-  session->demand_outstanding = session->takes_turns;
-  if (out_token != nullptr) *out_token = demand.token;
   return APP_OK;
-}
-
-app_error render_session_compositor_done(render_session* session) {
-  session->demand_outstanding = false;
-  if (!session->demand_wanted) return APP_OK;
-  const bool force = session->wanted_forced;
-  session->demand_wanted = false;
-  session->wanted_forced = false;
-  return render_session_request_frame(session, force, nullptr);
 }
 
 app_error render_session_drain_results(
@@ -206,7 +190,6 @@ app_error render_session_drain_results(
   }
   mln_render_frame_batch_view view = {.size = sizeof(view)};
   status = mln_render_frame_batch_get(batch, &view, &diagnostic);
-  out_results->any = view.result_count > 0;
   for (size_t i = 0; status == MLN_STATUS_OK && i < view.result_count; ++i) {
     const mln_render_frame_result* result =
       (const mln_render_frame_result*)((const char*)view.results +
@@ -217,9 +200,6 @@ app_error render_session_drain_results(
       case MLN_RENDER_RESULT_RENDERED:
         out_results->rendered = true;
         out_results->needs_repaint = result->needs_repaint;
-        if (result->token > session->rendered_token) {
-          session->rendered_token = result->token;
-        }
         break;
       case MLN_RENDER_RESULT_TARGET_NOT_READY:
         out_results->target_not_ready = true;
@@ -330,12 +310,9 @@ app_error render_session_require_cpu_complete_producer(
 
 struct texture_replacement {
   texture_replacement* next;
-  void* texture;
+  void* retired;
   atomic_bool completed;
   mln_status status;
-  /// The demand whose rendered frame shows the replacement, once its
-  /// set_target has completed.
-  uint64_t shown_token;
 };
 
 static void complete_replacement(
@@ -348,11 +325,11 @@ static void complete_replacement(
 }
 
 texture_replacement* texture_replacement_begin(
-  void* texture, mln_completion* out_completion
+  void* retired, mln_completion* out_completion
 ) {
   texture_replacement* replacement = calloc(1, sizeof(texture_replacement));
   if (replacement == nullptr) return nullptr;
-  replacement->texture = texture;
+  replacement->retired = retired;
   *out_completion = (mln_completion){
     .size = sizeof(mln_completion),
     .callback = complete_replacement,
@@ -379,18 +356,18 @@ void texture_replacements_queue(
 
 static void* take_oldest(texture_replacements* replacements) {
   texture_replacement* oldest = replacements->oldest;
-  void* texture = oldest->texture;
+  void* retired = oldest->retired;
   replacements->oldest = oldest->next;
   if (replacements->oldest == nullptr) replacements->newest = nullptr;
   free(oldest);
-  return texture;
+  return retired;
 }
 
-app_error texture_replacements_take_shown(
+app_error texture_replacements_take_completed(
   texture_replacements* replacements, render_session* session,
-  void** out_texture
+  void** out_retired
 ) {
-  *out_texture = nullptr;
+  *out_retired = nullptr;
   texture_replacement* oldest = replacements->oldest;
   if (
     oldest == nullptr ||
@@ -399,25 +376,21 @@ app_error texture_replacements_take_shown(
     return APP_OK;
   }
   if (oldest->status != MLN_STATUS_OK) {
-    // The session may still render into the outgoing texture or the
-    // replacement, so neither can be released before it detaches.
+    // The session may still render into the retired ring or the new one, so
+    // neither can be released before it detaches.
     return log_failure(
       APP_ERROR_RESIZE_FAILED, "texture replacement failed", oldest->status,
       NULL
     );
   }
-  if (oldest->shown_token == 0) {
-    MAP_TRY(render_session_request_frame(session, true, &oldest->shown_token));
-  }
-  if (session->rendered_token < oldest->shown_token) return APP_OK;
-  *out_texture = take_oldest(replacements);
-  return APP_OK;
+  *out_retired = take_oldest(replacements);
+  return render_session_request_frame(session, true);
 }
 
 void texture_replacements_take_any(
-  texture_replacements* replacements, void** out_texture
+  texture_replacements* replacements, void** out_retired
 ) {
-  *out_texture =
+  *out_retired =
     replacements->oldest != nullptr ? take_oldest(replacements) : nullptr;
 }
 

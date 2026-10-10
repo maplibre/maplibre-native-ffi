@@ -192,11 +192,11 @@ impl OpenGLTextureCompositor {
     ) -> maplibre_native_ffi::Result<()> {
         frame.get_opengl_texture(|metadata| {
             if metadata.width == 0 || metadata.height == 0 {
-                return Err(compositor_error("owned OpenGL frame has an empty extent"));
+                return Err(compositor_error("OpenGL frame has an empty extent"));
             }
             if metadata.target != TEXTURE_TARGET {
                 return Err(compositor_error(format!(
-                    "owned OpenGL frame has target {}, expected TEXTURE_2D",
+                    "OpenGL frame has target {}, expected TEXTURE_2D",
                     metadata.target
                 )));
             }
@@ -204,7 +204,7 @@ impl OpenGLTextureCompositor {
         })?
     }
 
-    pub fn draw_texture(
+    fn draw_texture(
         &self,
         context: &OpenGLContext,
         texture: u32,

@@ -132,7 +132,11 @@ private constructor(
       runCatching { session.abandon() }
         .onSuccess { result ->
           if (result.quarantinedResourceCount > 0u) {
-            Log.w(TAG, "render session quarantined ${result.quarantinedResourceCount} resources")
+            graphicsKept = true
+            Log.w(
+              TAG,
+              "render session abandon kept ${result.quarantinedResourceCount} resource groups until exit",
+            )
           }
         }
     }
@@ -161,6 +165,15 @@ private constructor(
 
   companion object {
     private const val TAG = "MapLibreAndroidMap"
+
+    /**
+     * Whether an abandon kept graphics objects until the process exits. A kept Vulkan object is a
+     * child of the host's device, and a kept swapchain of its surface, so the Vulkan context then
+     * keeps those until the process exits too.
+     */
+    @Volatile
+    var graphicsKept = false
+      private set
 
     /**
      * Starts attaching a session. The UI thread services a caller driver and closes the session.

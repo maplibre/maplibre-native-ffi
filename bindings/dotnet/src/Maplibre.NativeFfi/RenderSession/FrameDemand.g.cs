@@ -21,7 +21,9 @@ namespace Maplibre.NativeFfi;
 /// </param>
 /// <param name="TimeoutNs">
 /// Positive time allowed before driver work begins, in nanoseconds; zero has no
-/// limit.
+/// limit. A demand that waits, for a free texture slot or for a map update, is
+/// checked against its timeout when it runs again; a wait has no timer of its
+/// own.
 /// </param>
 public readonly partial record struct FrameDemand(
     FrameDemandFlag Flags,

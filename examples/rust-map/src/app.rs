@@ -133,7 +133,7 @@ impl App {
             AppEvent::TargetReplaced => {
                 let target = self.target.as_mut().expect("render target is open");
                 target
-                    .show_replacements(&self.graphics, &self.wakes)
+                    .retire_replaced(&self.graphics, &self.wakes)
                     .map_err(Into::into)
             }
             AppEvent::FrameResults => self.show_frame_results(),
@@ -152,12 +152,7 @@ impl App {
         self.retry_at = None;
         // A frame that missed the window consumed its update, so the retry
         // forces the frame.
-        if let Err(error) = self
-            .target_mut()
-            .session_mut()
-            .request_frame(true)
-            .map(drop)
-        {
+        if let Err(error) = self.target_mut().session_mut().request_frame(true) {
             eprintln!("frame retry failed: {error}");
             self.abort_process(1);
         }
@@ -191,9 +186,6 @@ impl App {
             self.retry_at = Some(Instant::now() + FRAME_RETRY);
         } else if results.needs_repaint {
             target.session_mut().request_frame(false)?;
-        }
-        if results.any {
-            target.session_mut().compositor_done()?;
         }
         Ok(())
     }

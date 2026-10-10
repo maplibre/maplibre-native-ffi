@@ -4,6 +4,7 @@ import kotlinx.coroutines.Deferred
 import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.GpuSyncKind
 import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.MetalBorrowedTexture as MetalRingTexture
 import org.maplibre.nativeffi.generated.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.MetalContextDescriptor
 import org.maplibre.nativeffi.generated.MetalOwnedTextureDescriptor
@@ -46,7 +47,7 @@ internal object MetalRenderTarget {
     val compositor = MetalTextureCompositor(context)
     try {
       val attached =
-        AttachedSession.attach(driver, RenderTarget.OWNED_TEXTURE_RING_DEPTH) { options ->
+        AttachedSession.attach(driver, RenderTarget.TEXTURE_RING_DEPTH.toUInt()) { options ->
           map.attachMetalOwnedTexture(
             MetalOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context)),
             options,
@@ -66,32 +67,46 @@ internal object MetalRenderTarget {
     driver: SessionDriver,
   ): RenderTarget {
     context.resizeDrawable(viewport)
-    val texture = MetalBorrowedTexture(context, viewport)
+    val ring = BorrowedTextureTarget.allocateRing(viewport) { MetalBorrowedTexture(context, it) }
     var compositor: MetalTextureCompositor? = null
     try {
       compositor = MetalTextureCompositor(context)
       val attached =
-        AttachedSession.attach(driver) { options ->
-          map.attachMetalBorrowedTexture(borrowedDescriptor(viewport, texture), options)
+        AttachedSession.attach(driver, RenderTarget.TEXTURE_RING_DEPTH.toUInt()) { options ->
+          map.attachMetalBorrowedTexture(borrowedDescriptor(viewport, ring), options)
         }
-      return BorrowedTexture(attached, map, context, compositor, texture)
+      return BorrowedTexture(attached, map, context, compositor, ring)
     } catch (error: RuntimeException) {
       runCatching { compositor?.close() }.onFailure(error::addSuppressed)
-      texture.close()
+      ring.forEach(AutoCloseable::close)
       throw error
     }
   }
 
   private fun borrowedDescriptor(
     viewport: Viewport,
-    texture: MetalBorrowedTexture,
+    ring: List<MetalBorrowedTexture>,
   ): MetalBorrowedTextureDescriptor =
     MetalBorrowedTextureDescriptor(
       RenderTarget.extent(viewport),
       viewport.framebufferWidth().toUInt(),
       viewport.framebufferHeight().toUInt(),
-      NativePointer.ofAddress(texture.texture()),
+      ring.map { MetalRingTexture(NativePointer.ofAddress(it.texture())) },
     )
+
+  /** Composes a frame of either texture mode, whose producer work is complete. */
+  private fun draw(compositor: MetalTextureCompositor, frame: AcquiredFrameHandle): Boolean =
+    frame.withProducerSync { sync ->
+      check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
+        "Metal compositor requires CPU-complete producer work"
+      }
+      frame.withMetalTexture { view ->
+        check(view.width != 0u && view.height != 0u && !view.texture.isNull) {
+          "Metal frame has an empty extent or null texture"
+        }
+        compositor.drawTexture(view.texture.address)
+      }
+    }
 
   private fun descriptor(context: MetalContext): MetalContextDescriptor =
     MetalContextDescriptor(NativePointer.ofAddress(context.deviceAddress()))
@@ -101,17 +116,7 @@ internal object MetalRenderTarget {
     private val context: MetalContext,
     private val compositor: MetalTextureCompositor,
   ) : OwnedTextureTarget(attached) {
-    override fun draw(frame: AcquiredFrameHandle): Boolean = frame.withProducerSync { sync ->
-      check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
-        "Metal compositor requires CPU-complete producer work"
-      }
-      frame.withMetalTexture { view ->
-        check(view.width != 0u && view.height != 0u && !view.texture.isNull) {
-          "owned Metal frame has an empty extent or null texture"
-        }
-        compositor.drawTexture(view.texture.address)
-      }
-    }
+    override fun draw(frame: AcquiredFrameHandle): Boolean = draw(compositor, frame)
 
     override fun resizeHost(viewport: Viewport) {
       context.resizeDrawable(viewport)
@@ -127,16 +132,18 @@ internal object MetalRenderTarget {
     map: MapHandle,
     private val context: MetalContext,
     private val compositor: MetalTextureCompositor,
-    texture: MetalBorrowedTexture,
-  ) : BorrowedTextureTarget<MetalBorrowedTexture>(attached, map, texture) {
+    ring: List<MetalBorrowedTexture>,
+  ) : BorrowedTextureTarget<MetalBorrowedTexture>(attached, map, ring) {
     override fun allocate(viewport: Viewport): MetalBorrowedTexture =
       MetalBorrowedTexture(context, viewport)
 
-    override fun setTarget(viewport: Viewport, replacement: MetalBorrowedTexture): Deferred<Unit> =
+    override fun setTarget(
+      viewport: Viewport,
+      replacement: List<MetalBorrowedTexture>,
+    ): Deferred<Unit> =
       session.setMetalBorrowedTextureTarget(borrowedDescriptor(viewport, replacement))
 
-    override fun draw(texture: MetalBorrowedTexture): Boolean =
-      compositor.drawTexture(texture.texture())
+    override fun draw(frame: AcquiredFrameHandle): Boolean = draw(compositor, frame)
 
     override fun resizeHost(viewport: Viewport) {
       context.resizeDrawable(viewport)
@@ -144,7 +151,7 @@ internal object MetalRenderTarget {
 
     override fun closeHost() {
       compositor.close()
-      texture.close()
+      super.closeHost()
     }
   }
 }

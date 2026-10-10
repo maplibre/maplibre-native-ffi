@@ -86,16 +86,9 @@ import Testing
     getDeviceProcAddr: NativePointer(bitPattern: 0xA0)
   )
   let extent = LogicalExtent(width: 64, height: 32, scaleFactor: 2)
-  let texture = VulkanBorrowedTextureDescriptor(
-    extent: extent,
-    physicalWidth: 128,
-    physicalHeight: 64,
-    context: context,
+  let texture = VulkanBorrowedTexture(
     image: 0x8000_0000_0000_0001,
-    imageView: 0x0000_0001_0000_0000,
-    format: 44,
-    initialLayout: 1,
-    finalLayout: 2
+    imageView: 0x0000_0001_0000_0000
   ).nativeValue()
   #expect(texture.image == 0x8000_0000_0000_0001)
   #expect(texture.image_view == 0x0000_0001_0000_0000)

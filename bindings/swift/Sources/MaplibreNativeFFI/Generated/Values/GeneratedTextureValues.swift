@@ -3,6 +3,35 @@
 internal import CMaplibreNativeC
 import Foundation
 
+/// One caller-owned Metal texture of a borrowed texture ring.
+///
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct MetalBorrowedTexture: Equatable, Hashable, Sendable {
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+  public var texture: NativePointer
+  public static var `default`: Self {
+    Self(raw: mln_metal_borrowed_texture())
+  }
+
+  public init(texture: NativePointer = MetalBorrowedTexture.default.texture) {
+    self.texture = texture
+  }
+
+  init(raw: mln_metal_borrowed_texture) {
+    texture = NativePointer(bitPattern: unsafeBitCast(
+      raw.texture,
+      to: UInt.self
+    ))
+  }
+
+  func nativeValue() -> mln_metal_borrowed_texture {
+    var raw = mln_metal_borrowed_texture()
+    raw.texture = texture.unsafeMutableRawPointer
+    return raw
+  }
+}
+
 /// Metal attachment options for a borrowed texture target.
 ///
 /// See `mln_metal_borrowed_texture_descriptor` in the
@@ -19,10 +48,10 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Physical texture height in device pixels. Must be positive. Defaults to
   /// 256.
   public var physicalHeight: UInt32
-  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
-  public var texture: NativePointer
+  /// The ring's textures, one per slot, in slot order. Required.
+  public var textures: [MetalBorrowedTexture]
   public static var `default`: Self {
-    Self(raw: mln_metal_borrowed_texture_descriptor_default())
+    try! Self(raw: mln_metal_borrowed_texture_descriptor_default())
   }
 
   public init(
@@ -31,30 +60,38 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
       .physicalWidth,
     physicalHeight: UInt32 = MetalBorrowedTextureDescriptor.default
       .physicalHeight,
-    texture: NativePointer = MetalBorrowedTextureDescriptor.default.texture
+    textures: [MetalBorrowedTexture] = MetalBorrowedTextureDescriptor.default
+      .textures
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
-    self.texture = texture
+    self.textures = textures
   }
 
-  init(raw: mln_metal_borrowed_texture_descriptor) {
+  init(
+    raw: mln_metal_borrowed_texture_descriptor,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
     extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
-    texture = NativePointer(bitPattern: unsafeBitCast(
-      raw.texture,
-      to: UInt.self
-    ))
+    textures = try NativeInputArena.copyArray(
+      raw.textures,
+      count: Int(raw.texture_count)
+    ).map { MetalBorrowedTexture(raw: $0) }
   }
 
-  func nativeValue() -> mln_metal_borrowed_texture_descriptor {
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_metal_borrowed_texture_descriptor
+  {
     var raw = mln_metal_borrowed_texture_descriptor_default()
+    raw.size = UInt32(MemoryLayout<mln_metal_borrowed_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
-    raw.texture = texture.unsafeMutableRawPointer
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
     return raw
   }
 }
@@ -95,11 +132,11 @@ public struct MetalOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Metal frame acquired from a session-owned texture target.
+/// Metal frame acquired from a texture ring.
 ///
-/// See `mln_metal_owned_texture_frame` in the
+/// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
+public struct MetalTextureFrame: Equatable, Hashable, Sendable {
   /// Session generation that produced this frame.
   public var generation: UInt64
   /// Physical Metal texture width in device pixels.
@@ -110,6 +147,9 @@ public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
   public var scaleFactor: Double
   /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  public var slot: UInt32
   /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
   public var texture: NativePointer
   /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
@@ -117,35 +157,38 @@ public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
   /// Backend-native pixel format value. Metal uses MTLPixelFormat.
   public var pixelFormat: UInt64
   public static var `default`: Self {
-    Self(raw: mln_metal_owned_texture_frame())
+    Self(raw: mln_metal_texture_frame())
   }
 
   public init(
-    generation: UInt64 = MetalOwnedTextureFrame.default.generation,
-    width: UInt32 = MetalOwnedTextureFrame.default.width,
-    height: UInt32 = MetalOwnedTextureFrame.default.height,
-    scaleFactor: Double = MetalOwnedTextureFrame.default.scaleFactor,
-    frameId: UInt64 = MetalOwnedTextureFrame.default.frameId,
-    texture: NativePointer = MetalOwnedTextureFrame.default.texture,
-    device: NativePointer = MetalOwnedTextureFrame.default.device,
-    pixelFormat: UInt64 = MetalOwnedTextureFrame.default.pixelFormat
+    generation: UInt64 = MetalTextureFrame.default.generation,
+    width: UInt32 = MetalTextureFrame.default.width,
+    height: UInt32 = MetalTextureFrame.default.height,
+    scaleFactor: Double = MetalTextureFrame.default.scaleFactor,
+    frameId: UInt64 = MetalTextureFrame.default.frameId,
+    slot: UInt32 = MetalTextureFrame.default.slot,
+    texture: NativePointer = MetalTextureFrame.default.texture,
+    device: NativePointer = MetalTextureFrame.default.device,
+    pixelFormat: UInt64 = MetalTextureFrame.default.pixelFormat
   ) {
     self.generation = generation
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
     self.frameId = frameId
+    self.slot = slot
     self.texture = texture
     self.device = device
     self.pixelFormat = pixelFormat
   }
 
-  init(raw: mln_metal_owned_texture_frame) {
+  init(raw: mln_metal_texture_frame) {
     generation = raw.generation
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
     frameId = raw.frame_id
+    slot = raw.slot
     texture = NativePointer(bitPattern: unsafeBitCast(
       raw.texture,
       to: UInt.self
@@ -154,17 +197,44 @@ public struct MetalOwnedTextureFrame: Equatable, Hashable, Sendable {
     pixelFormat = raw.pixel_format
   }
 
-  func nativeValue() -> mln_metal_owned_texture_frame {
-    var raw = mln_metal_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
+  func nativeValue() -> mln_metal_texture_frame {
+    var raw = mln_metal_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_metal_texture_frame>.size)
     raw.generation = generation
     raw.width = width
     raw.height = height
     raw.scale_factor = scaleFactor
     raw.frame_id = frameId
+    raw.slot = slot
     raw.texture = texture.unsafeMutableRawPointer
     raw.device = device.unsafeMutableRawPointer
     raw.pixel_format = pixelFormat
+    return raw
+  }
+}
+
+/// One caller-owned OpenGL texture of a borrowed texture ring.
+///
+/// See `mln_opengl_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct OpenglBorrowedTexture: Equatable, Hashable, Sendable {
+  /// Borrowed OpenGL texture object name. Required.
+  public var texture: UInt32
+  public static var `default`: Self {
+    Self(raw: mln_opengl_borrowed_texture())
+  }
+
+  public init(texture: UInt32 = OpenglBorrowedTexture.default.texture) {
+    self.texture = texture
+  }
+
+  init(raw: mln_opengl_borrowed_texture) {
+    texture = raw.texture
+  }
+
+  func nativeValue() -> mln_opengl_borrowed_texture {
+    var raw = mln_opengl_borrowed_texture()
+    raw.texture = texture
     return raw
   }
 }
@@ -185,12 +255,12 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// Physical texture height in device pixels. Must be positive. Defaults to
   /// 256.
   public var physicalHeight: UInt32
-  /// Borrowed OpenGL context provider data. The texture must belong to this
+  /// Borrowed OpenGL context provider data. The textures must belong to this
   /// context or a context in the same share group.
   public var context: OpenglContextDescriptor
-  /// Borrowed OpenGL texture object name. Required.
-  public var texture: UInt32
-  /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
+  /// The ring's textures, one per slot, in slot order. Required.
+  public var textures: [OpenglBorrowedTexture]
+  /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
   public var target: UInt32
   public static var `default`: Self {
     try! Self(raw: mln_opengl_borrowed_texture_descriptor_default())
@@ -204,14 +274,15 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
       .physicalHeight,
     context: OpenglContextDescriptor = OpenglBorrowedTextureDescriptor.default
       .context,
-    texture: UInt32 = OpenglBorrowedTextureDescriptor.default.texture,
+    textures: [OpenglBorrowedTexture] = OpenglBorrowedTextureDescriptor.default
+      .textures,
     target: UInt32 = OpenglBorrowedTextureDescriptor.default.target
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.context = context
-    self.texture = texture
+    self.textures = textures
     self.target = target
   }
 
@@ -223,7 +294,10 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = try OpenglContextDescriptor(raw: raw.context)
-    texture = raw.texture
+    textures = try NativeInputArena.copyArray(
+      raw.textures,
+      count: Int(raw.texture_count)
+    ).map { OpenglBorrowedTexture(raw: $0) }
     target = raw.target
   }
 
@@ -236,7 +310,8 @@ public struct OpenglBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
     raw.context = try context.nativeValue(arena: arena)
-    raw.texture = texture
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
     raw.target = target
     return raw
   }
@@ -286,11 +361,11 @@ public struct OpenglOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// OpenGL frame acquired from a session-owned texture target.
+/// OpenGL frame acquired from a texture ring.
 ///
-/// See `mln_opengl_owned_texture_frame` in the
+/// See `mln_opengl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct OpenglOwnedTextureFrame: Equatable, Hashable, Sendable {
+public struct OpenglTextureFrame: Equatable, Hashable, Sendable {
   /// Session generation that produced this frame.
   public var generation: UInt64
   /// Physical OpenGL texture width in device pixels.
@@ -301,37 +376,43 @@ public struct OpenglOwnedTextureFrame: Equatable, Hashable, Sendable {
   public var scaleFactor: Double
   /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  public var slot: UInt32
   /// Borrowed OpenGL texture object name. Valid until frame release.
   public var texture: UInt32
   /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
   public var target: UInt32
-  /// OpenGL internal format, such as GL_RGBA8.
+  /// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
+  /// whose format the host chose.
   public var internalFormat: UInt32
-  /// OpenGL pixel format, such as GL_RGBA.
+  /// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
   public var format: UInt32
-  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
+  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
   public var type: UInt32
   public static var `default`: Self {
-    Self(raw: mln_opengl_owned_texture_frame())
+    Self(raw: mln_opengl_texture_frame())
   }
 
   public init(
-    generation: UInt64 = OpenglOwnedTextureFrame.default.generation,
-    width: UInt32 = OpenglOwnedTextureFrame.default.width,
-    height: UInt32 = OpenglOwnedTextureFrame.default.height,
-    scaleFactor: Double = OpenglOwnedTextureFrame.default.scaleFactor,
-    frameId: UInt64 = OpenglOwnedTextureFrame.default.frameId,
-    texture: UInt32 = OpenglOwnedTextureFrame.default.texture,
-    target: UInt32 = OpenglOwnedTextureFrame.default.target,
-    internalFormat: UInt32 = OpenglOwnedTextureFrame.default.internalFormat,
-    format: UInt32 = OpenglOwnedTextureFrame.default.format,
-    type: UInt32 = OpenglOwnedTextureFrame.default.type
+    generation: UInt64 = OpenglTextureFrame.default.generation,
+    width: UInt32 = OpenglTextureFrame.default.width,
+    height: UInt32 = OpenglTextureFrame.default.height,
+    scaleFactor: Double = OpenglTextureFrame.default.scaleFactor,
+    frameId: UInt64 = OpenglTextureFrame.default.frameId,
+    slot: UInt32 = OpenglTextureFrame.default.slot,
+    texture: UInt32 = OpenglTextureFrame.default.texture,
+    target: UInt32 = OpenglTextureFrame.default.target,
+    internalFormat: UInt32 = OpenglTextureFrame.default.internalFormat,
+    format: UInt32 = OpenglTextureFrame.default.format,
+    type: UInt32 = OpenglTextureFrame.default.type
   ) {
     self.generation = generation
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
     self.frameId = frameId
+    self.slot = slot
     self.texture = texture
     self.target = target
     self.internalFormat = internalFormat
@@ -339,12 +420,13 @@ public struct OpenglOwnedTextureFrame: Equatable, Hashable, Sendable {
     self.type = type
   }
 
-  init(raw: mln_opengl_owned_texture_frame) {
+  init(raw: mln_opengl_texture_frame) {
     generation = raw.generation
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
     frameId = raw.frame_id
+    slot = raw.slot
     texture = raw.texture
     target = raw.target
     internalFormat = raw.internal_format
@@ -352,14 +434,15 @@ public struct OpenglOwnedTextureFrame: Equatable, Hashable, Sendable {
     type = raw.type
   }
 
-  func nativeValue() -> mln_opengl_owned_texture_frame {
-    var raw = mln_opengl_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
+  func nativeValue() -> mln_opengl_texture_frame {
+    var raw = mln_opengl_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_opengl_texture_frame>.size)
     raw.generation = generation
     raw.width = width
     raw.height = height
     raw.scale_factor = scaleFactor
     raw.frame_id = frameId
+    raw.slot = slot
     raw.texture = texture
     raw.target = target
     raw.internal_format = internalFormat
@@ -450,6 +533,41 @@ public struct TextureReadbackResult: Equatable, Hashable, Sendable {
   }
 }
 
+/// One caller-owned Vulkan image of a borrowed texture ring.
+///
+/// See `mln_vulkan_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct VulkanBorrowedTexture: Equatable, Hashable, Sendable {
+  /// Borrowed VkImage. Required.
+  public var image: UInt64
+  /// Borrowed VkImageView for image. Required. The view must be a 2D color view
+  /// that matches image and the descriptor's format.
+  public var imageView: UInt64
+  public static var `default`: Self {
+    Self(raw: mln_vulkan_borrowed_texture())
+  }
+
+  public init(
+    image: UInt64 = VulkanBorrowedTexture.default.image,
+    imageView: UInt64 = VulkanBorrowedTexture.default.imageView
+  ) {
+    self.image = image
+    self.imageView = imageView
+  }
+
+  init(raw: mln_vulkan_borrowed_texture) {
+    image = raw.image
+    imageView = raw.image_view
+  }
+
+  func nativeValue() -> mln_vulkan_borrowed_texture {
+    var raw = mln_vulkan_borrowed_texture()
+    raw.image = image
+    raw.image_view = imageView
+    return raw
+  }
+}
+
 /// Vulkan attachment options for a borrowed texture target.
 ///
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
@@ -466,11 +584,10 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var physicalHeight: UInt32
   /// Borrowed Vulkan context. All handles are required.
   public var context: VulkanContextDescriptor
-  /// Borrowed VkImage. Required.
-  public var image: UInt64
-  /// Borrowed VkImageView for image. Required.
-  public var imageView: UInt64
-  /// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
+  /// The ring's images, one per slot, in slot order. Required.
+  public var textures: [VulkanBorrowedTexture]
+  /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
+  /// invalid.
   public var format: UInt32
   /// Backend-native VkImageLayout value expected at render-pass begin.
   public var initialLayout: UInt32
@@ -478,7 +595,7 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   /// to 5, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
   public var finalLayout: UInt32
   public static var `default`: Self {
-    Self(raw: mln_vulkan_borrowed_texture_descriptor_default())
+    try! Self(raw: mln_vulkan_borrowed_texture_descriptor_default())
   }
 
   public init(
@@ -489,8 +606,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
       .physicalHeight,
     context: VulkanContextDescriptor = VulkanBorrowedTextureDescriptor.default
       .context,
-    image: UInt64 = VulkanBorrowedTextureDescriptor.default.image,
-    imageView: UInt64 = VulkanBorrowedTextureDescriptor.default.imageView,
+    textures: [VulkanBorrowedTexture] = VulkanBorrowedTextureDescriptor.default
+      .textures,
     format: UInt32 = VulkanBorrowedTextureDescriptor.default.format,
     initialLayout: UInt32 = VulkanBorrowedTextureDescriptor.default
       .initialLayout,
@@ -500,33 +617,40 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.context = context
-    self.image = image
-    self.imageView = imageView
+    self.textures = textures
     self.format = format
     self.initialLayout = initialLayout
     self.finalLayout = finalLayout
   }
 
-  init(raw: mln_vulkan_borrowed_texture_descriptor) {
+  init(
+    raw: mln_vulkan_borrowed_texture_descriptor,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
     extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = VulkanContextDescriptor(raw: raw.context)
-    image = raw.image
-    imageView = raw.image_view
+    textures = try NativeInputArena.copyArray(
+      raw.textures,
+      count: Int(raw.texture_count)
+    ).map { VulkanBorrowedTexture(raw: $0) }
     format = raw.format
     initialLayout = raw.initial_layout
     finalLayout = raw.final_layout
   }
 
-  func nativeValue() -> mln_vulkan_borrowed_texture_descriptor {
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_vulkan_borrowed_texture_descriptor
+  {
     var raw = mln_vulkan_borrowed_texture_descriptor_default()
+    raw.size = UInt32(MemoryLayout<mln_vulkan_borrowed_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
     raw.context = context.nativeValue()
-    raw.image = image
-    raw.image_view = imageView
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
     raw.format = format
     raw.initial_layout = initialLayout
     raw.final_layout = finalLayout
@@ -570,11 +694,11 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// Vulkan frame acquired from a session-owned texture target.
+/// Vulkan frame acquired from a texture ring.
 ///
-/// See `mln_vulkan_owned_texture_frame` in the
+/// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
+public struct VulkanTextureFrame: Equatable, Hashable, Sendable {
   /// Session generation that produced this frame.
   public var generation: UInt64
   /// Physical Vulkan image width in device pixels.
@@ -585,6 +709,9 @@ public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
   public var scaleFactor: Double
   /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// image in the descriptor's textures array.
+  public var slot: UInt32
   /// Borrowed VkImage bit pattern. Valid until frame release.
   public var image: UInt64
   /// Borrowed VkImageView bit pattern. Valid until frame release.
@@ -593,29 +720,33 @@ public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
   public var device: NativePointer
   /// Backend-native VkFormat value.
   public var format: UInt32
-  /// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
+  /// Backend-native VkImageLayout value that the image is in:
+  /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
+  /// descriptor's final_layout for a borrowed one.
   public var layout: UInt32
   public static var `default`: Self {
-    Self(raw: mln_vulkan_owned_texture_frame())
+    Self(raw: mln_vulkan_texture_frame())
   }
 
   public init(
-    generation: UInt64 = VulkanOwnedTextureFrame.default.generation,
-    width: UInt32 = VulkanOwnedTextureFrame.default.width,
-    height: UInt32 = VulkanOwnedTextureFrame.default.height,
-    scaleFactor: Double = VulkanOwnedTextureFrame.default.scaleFactor,
-    frameId: UInt64 = VulkanOwnedTextureFrame.default.frameId,
-    image: UInt64 = VulkanOwnedTextureFrame.default.image,
-    imageView: UInt64 = VulkanOwnedTextureFrame.default.imageView,
-    device: NativePointer = VulkanOwnedTextureFrame.default.device,
-    format: UInt32 = VulkanOwnedTextureFrame.default.format,
-    layout: UInt32 = VulkanOwnedTextureFrame.default.layout
+    generation: UInt64 = VulkanTextureFrame.default.generation,
+    width: UInt32 = VulkanTextureFrame.default.width,
+    height: UInt32 = VulkanTextureFrame.default.height,
+    scaleFactor: Double = VulkanTextureFrame.default.scaleFactor,
+    frameId: UInt64 = VulkanTextureFrame.default.frameId,
+    slot: UInt32 = VulkanTextureFrame.default.slot,
+    image: UInt64 = VulkanTextureFrame.default.image,
+    imageView: UInt64 = VulkanTextureFrame.default.imageView,
+    device: NativePointer = VulkanTextureFrame.default.device,
+    format: UInt32 = VulkanTextureFrame.default.format,
+    layout: UInt32 = VulkanTextureFrame.default.layout
   ) {
     self.generation = generation
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
     self.frameId = frameId
+    self.slot = slot
     self.image = image
     self.imageView = imageView
     self.device = device
@@ -623,12 +754,13 @@ public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
     self.layout = layout
   }
 
-  init(raw: mln_vulkan_owned_texture_frame) {
+  init(raw: mln_vulkan_texture_frame) {
     generation = raw.generation
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
     frameId = raw.frame_id
+    slot = raw.slot
     image = raw.image
     imageView = raw.image_view
     device = NativePointer(bitPattern: unsafeBitCast(raw.device, to: UInt.self))
@@ -636,19 +768,61 @@ public struct VulkanOwnedTextureFrame: Equatable, Hashable, Sendable {
     layout = raw.layout
   }
 
-  func nativeValue() -> mln_vulkan_owned_texture_frame {
-    var raw = mln_vulkan_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
+  func nativeValue() -> mln_vulkan_texture_frame {
+    var raw = mln_vulkan_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_vulkan_texture_frame>.size)
     raw.generation = generation
     raw.width = width
     raw.height = height
     raw.scale_factor = scaleFactor
     raw.frame_id = frameId
+    raw.slot = slot
     raw.image = image
     raw.image_view = imageView
     raw.device = device.unsafeMutableRawPointer
     raw.format = format
     raw.layout = layout
+    return raw
+  }
+}
+
+/// One caller-owned WebGPU texture of a borrowed texture ring.
+///
+/// See `mln_webgpu_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+public struct WebgpuBorrowedTexture: Equatable, Hashable, Sendable {
+  /// Borrowed WGPUTexture. Required.
+  public var texture: NativePointer
+  /// Borrowed WGPUTextureView for texture. Required. The view must be a 2D
+  /// color view compatible with texture and the descriptor's format.
+  public var textureView: NativePointer
+  public static var `default`: Self {
+    Self(raw: mln_webgpu_borrowed_texture())
+  }
+
+  public init(
+    texture: NativePointer = WebgpuBorrowedTexture.default.texture,
+    textureView: NativePointer = WebgpuBorrowedTexture.default.textureView
+  ) {
+    self.texture = texture
+    self.textureView = textureView
+  }
+
+  init(raw: mln_webgpu_borrowed_texture) {
+    texture = NativePointer(bitPattern: unsafeBitCast(
+      raw.texture,
+      to: UInt.self
+    ))
+    textureView = NativePointer(bitPattern: unsafeBitCast(
+      raw.texture_view,
+      to: UInt.self
+    ))
+  }
+
+  func nativeValue() -> mln_webgpu_borrowed_texture {
+    var raw = mln_webgpu_borrowed_texture()
+    raw.texture = texture.unsafeMutableRawPointer
+    raw.texture_view = textureView.unsafeMutableRawPointer
     return raw
   }
 }
@@ -667,16 +841,16 @@ public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
   public var physicalWidth: UInt32
   /// Physical texture height in device pixels. Defaults to 256.
   public var physicalHeight: UInt32
-  /// Borrowed WebGPU context. device is required.
+  /// Borrowed WebGPU context. device is required. Rendering is submitted
+  /// through context.queue or that device's default queue.
   public var context: WebgpuContextDescriptor
-  /// Borrowed WGPUTexture. Required.
-  public var texture: NativePointer
-  /// Borrowed WGPUTextureView for texture. Required.
-  public var textureView: NativePointer
-  /// Backend-native WGPUTextureFormat value. Undefined is invalid.
+  /// The ring's textures, one per slot, in slot order. Required.
+  public var textures: [WebgpuBorrowedTexture]
+  /// Backend-native WGPUTextureFormat value of every texture. Undefined is
+  /// invalid.
   public var format: UInt32
   public static var `default`: Self {
-    Self(raw: mln_webgpu_borrowed_texture_descriptor_default())
+    try! Self(raw: mln_webgpu_borrowed_texture_descriptor_default())
   }
 
   public init(
@@ -687,44 +861,44 @@ public struct WebgpuBorrowedTextureDescriptor: Equatable, Hashable, Sendable {
       .physicalHeight,
     context: WebgpuContextDescriptor = WebgpuBorrowedTextureDescriptor.default
       .context,
-    texture: NativePointer = WebgpuBorrowedTextureDescriptor.default.texture,
-    textureView: NativePointer = WebgpuBorrowedTextureDescriptor.default
-      .textureView,
+    textures: [WebgpuBorrowedTexture] = WebgpuBorrowedTextureDescriptor.default
+      .textures,
     format: UInt32 = WebgpuBorrowedTextureDescriptor.default.format
   ) {
     self.extent = extent
     self.physicalWidth = physicalWidth
     self.physicalHeight = physicalHeight
     self.context = context
-    self.texture = texture
-    self.textureView = textureView
+    self.textures = textures
     self.format = format
   }
 
-  init(raw: mln_webgpu_borrowed_texture_descriptor) {
+  init(
+    raw: mln_webgpu_borrowed_texture_descriptor,
+    recordBytes _: UnsafeRawBufferPointer? = nil
+  ) throws {
     extent = LogicalExtent(raw: raw.extent)
     physicalWidth = raw.physical_width
     physicalHeight = raw.physical_height
     context = WebgpuContextDescriptor(raw: raw.context)
-    texture = NativePointer(bitPattern: unsafeBitCast(
-      raw.texture,
-      to: UInt.self
-    ))
-    textureView = NativePointer(bitPattern: unsafeBitCast(
-      raw.texture_view,
-      to: UInt.self
-    ))
+    textures = try NativeInputArena.copyArray(
+      raw.textures,
+      count: Int(raw.texture_count)
+    ).map { WebgpuBorrowedTexture(raw: $0) }
     format = raw.format
   }
 
-  func nativeValue() -> mln_webgpu_borrowed_texture_descriptor {
+  func nativeValue(arena: NativeInputArena) throws
+    -> mln_webgpu_borrowed_texture_descriptor
+  {
     var raw = mln_webgpu_borrowed_texture_descriptor_default()
+    raw.size = UInt32(MemoryLayout<mln_webgpu_borrowed_texture_descriptor>.size)
     raw.extent = extent.nativeValue()
     raw.physical_width = physicalWidth
     raw.physical_height = physicalHeight
     raw.context = context.nativeValue()
-    raw.texture = texture.unsafeMutableRawPointer
-    raw.texture_view = textureView.unsafeMutableRawPointer
+    raw.textures = arena.array(textures.map { $0.nativeValue() })
+    raw.texture_count = try NativeInputArena.count(textures.count)
     raw.format = format
     return raw
   }
@@ -766,11 +940,11 @@ public struct WebgpuOwnedTextureDescriptor: Equatable, Hashable, Sendable {
   }
 }
 
-/// WebGPU frame acquired from a session-owned texture target.
+/// WebGPU frame acquired from a texture ring.
 ///
-/// See `mln_webgpu_owned_texture_frame` in the
+/// See `mln_webgpu_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-public struct WebgpuOwnedTextureFrame: Equatable, Hashable, Sendable {
+public struct WebgpuTextureFrame: Equatable, Hashable, Sendable {
   /// Session generation that produced this frame.
   public var generation: UInt64
   /// Physical WebGPU texture width in device pixels.
@@ -781,6 +955,9 @@ public struct WebgpuOwnedTextureFrame: Equatable, Hashable, Sendable {
   public var scaleFactor: Double
   /// Opaque frame identity used to reject stale releases.
   public var frameId: UInt64
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  public var slot: UInt32
   /// Borrowed WGPUTexture. Valid until frame release.
   public var texture: NativePointer
   /// Borrowed WGPUTextureView. Valid until frame release.
@@ -790,37 +967,40 @@ public struct WebgpuOwnedTextureFrame: Equatable, Hashable, Sendable {
   /// Backend-native WGPUTextureFormat value.
   public var format: UInt32
   public static var `default`: Self {
-    Self(raw: mln_webgpu_owned_texture_frame())
+    Self(raw: mln_webgpu_texture_frame())
   }
 
   public init(
-    generation: UInt64 = WebgpuOwnedTextureFrame.default.generation,
-    width: UInt32 = WebgpuOwnedTextureFrame.default.width,
-    height: UInt32 = WebgpuOwnedTextureFrame.default.height,
-    scaleFactor: Double = WebgpuOwnedTextureFrame.default.scaleFactor,
-    frameId: UInt64 = WebgpuOwnedTextureFrame.default.frameId,
-    texture: NativePointer = WebgpuOwnedTextureFrame.default.texture,
-    textureView: NativePointer = WebgpuOwnedTextureFrame.default.textureView,
-    device: NativePointer = WebgpuOwnedTextureFrame.default.device,
-    format: UInt32 = WebgpuOwnedTextureFrame.default.format
+    generation: UInt64 = WebgpuTextureFrame.default.generation,
+    width: UInt32 = WebgpuTextureFrame.default.width,
+    height: UInt32 = WebgpuTextureFrame.default.height,
+    scaleFactor: Double = WebgpuTextureFrame.default.scaleFactor,
+    frameId: UInt64 = WebgpuTextureFrame.default.frameId,
+    slot: UInt32 = WebgpuTextureFrame.default.slot,
+    texture: NativePointer = WebgpuTextureFrame.default.texture,
+    textureView: NativePointer = WebgpuTextureFrame.default.textureView,
+    device: NativePointer = WebgpuTextureFrame.default.device,
+    format: UInt32 = WebgpuTextureFrame.default.format
   ) {
     self.generation = generation
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
     self.frameId = frameId
+    self.slot = slot
     self.texture = texture
     self.textureView = textureView
     self.device = device
     self.format = format
   }
 
-  init(raw: mln_webgpu_owned_texture_frame) {
+  init(raw: mln_webgpu_texture_frame) {
     generation = raw.generation
     width = raw.width
     height = raw.height
     scaleFactor = raw.scale_factor
     frameId = raw.frame_id
+    slot = raw.slot
     texture = NativePointer(bitPattern: unsafeBitCast(
       raw.texture,
       to: UInt.self
@@ -833,14 +1013,15 @@ public struct WebgpuOwnedTextureFrame: Equatable, Hashable, Sendable {
     format = raw.format
   }
 
-  func nativeValue() -> mln_webgpu_owned_texture_frame {
-    var raw = mln_webgpu_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_webgpu_owned_texture_frame>.size)
+  func nativeValue() -> mln_webgpu_texture_frame {
+    var raw = mln_webgpu_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_webgpu_texture_frame>.size)
     raw.generation = generation
     raw.width = width
     raw.height = height
     raw.scale_factor = scaleFactor
     raw.frame_id = frameId
+    raw.slot = slot
     raw.texture = texture.unsafeMutableRawPointer
     raw.texture_view = textureView.unsafeMutableRawPointer
     raw.device = device.unsafeMutableRawPointer

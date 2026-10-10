@@ -37,6 +37,11 @@ that the driver used.
 
 A host that renders on demand derives that demand from runtime events: an
 update-available event, or a frame-finished event whose repaint flag is set.
+Alternatively, keep one demand armed with the if-needed and wait-for-update
+flags, and re-arm it as each result arrives. The driver then renders each map
+update, including each step of a camera transition, without a runtime-event
+round trip. The flag does not pace, so pace the re-arm to the display. A
+waiting demand's result can arrive after the results of later demands.
 
 <Code code={region(frameLoopSnippet, "wants")} lang="c" title="frame-loop.c" />
 
@@ -85,10 +90,13 @@ them in host pacing.
 
 <Code code={region(frameLoopSnippet, "results")} lang="c" title="frame-loop.c" />
 
-Owned texture acquisition is nonblocking and leases the oldest completed slot
-that is not already acquired. Wait for or submit work after its producer sync.
-Release the acquired handle with consumer-completion sync when host GPU work
-reads the texture. CPU-complete sync is valid only when that work completed
+Texture acquisition, from an owned or a borrowed ring, is nonblocking and
+leases the oldest rendered slot that is not already acquired. Read the texture
+after its producer sync. A CPU-complete producer sync needs no wait or fence
+from the host. On OpenGL, a host that samples the texture from another context
+of the share group binds it again after acquisition. Release the acquired handle with consumer-completion sync when
+host GPU work reads the texture. CPU-complete sync is valid only when that work
+completed before release, or on WebGPU was submitted to the device's queue
 before release. The session retires the slot through its selected driver before
 reusing it.
 

@@ -1,4 +1,8 @@
+#include <cstddef>
 #include <memory>
+#include <span>
+#include <utility>
+#include <vector>
 
 #include <mln/util/size.hpp>
 
@@ -13,8 +17,19 @@
 #include "render/texture_session.hpp"
 
 namespace {
+
+auto metal_textures(std::span<const mln_metal_borrowed_texture> entries)
+  -> std::vector<MTL::Texture*> {
+  auto textures = std::vector<MTL::Texture*>{};
+  textures.reserve(entries.size());
+  for (const auto& entry : entries) {
+    textures.push_back(static_cast<MTL::Texture*>(entry.texture));
+  }
+  return textures;
+}
+
 // The shared validator cannot reach MTL::Texture, so the checks that read the
-// texture itself live here, after it.
+// textures themselves live here, after it.
 auto validate_borrowed_texture(
   const mln_metal_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
@@ -23,33 +38,49 @@ auto validate_borrowed_texture(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  // Non-null, because the shared validator rejects a null texture.
-  auto* metal_texture = static_cast<MTL::Texture*>(descriptor->texture);
   const auto physical_status = mln::core::validate_borrowed_physical_size(
     descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  if (
-    metal_texture->width() != descriptor->physical_width ||
-    metal_texture->height() != descriptor->physical_height
-  ) {
-    mln::core::set_thread_error(
-      "Metal texture dimensions must match descriptor physical size"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if ((metal_texture->usage() & MTL::TextureUsageRenderTarget) == 0) {
-    mln::core::set_thread_error("Metal texture must allow render target usage");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  // Metal requires one sample count across a render pass, and both the depth
-  // and stencil attachments the session builds and every pipeline mbgl creates
-  // are single-sample.
-  if (metal_texture->sampleCount() != 1) {
-    mln::core::set_thread_error("Metal texture must be single-sample");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  // Non-null, because the shared validator rejects a null texture.
+  const auto textures =
+    metal_textures({descriptor->textures, descriptor->texture_count});
+  for (auto* metal_texture : textures) {
+    if (
+      metal_texture->width() != descriptor->physical_width ||
+      metal_texture->height() != descriptor->physical_height
+    ) {
+      mln::core::set_thread_error(
+        "Metal texture dimensions must match descriptor physical size"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if ((metal_texture->usage() & MTL::TextureUsageRenderTarget) == 0) {
+      mln::core::set_thread_error(
+        "Metal texture must allow render target usage"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    // Metal requires one sample count across a render pass, and both the
+    // depth and stencil attachments the session builds and every pipeline mbgl
+    // creates are single-sample.
+    if (metal_texture->sampleCount() != 1) {
+      mln::core::set_thread_error("Metal texture must be single-sample");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    // Every slot renders with the same device and the same cached pipeline
+    // states, whose key omits the color format.
+    if (
+      metal_texture->device() != textures.front()->device() ||
+      metal_texture->pixelFormat() != textures.front()->pixelFormat()
+    ) {
+      mln::core::set_thread_error(
+        "Metal textures of one ring must share a device and a pixel format"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
   return MLN_STATUS_OK;
 }
@@ -62,34 +93,46 @@ class MetalTextureSessionBackend final
   )
       : backend_(host_device, size, ring_depth) {}
 
-  MetalTextureSessionBackend(MTL::Texture* borrowed_texture, mln::Size size)
-      : backend_(borrowed_texture, size) {}
+  MetalTextureSessionBackend(
+    std::vector<MTL::Texture*> borrowed_textures, mln::Size size
+  )
+      : backend_(std::move(borrowed_textures), size) {}
 
   auto headless_backend() -> mln::gfx::HeadlessBackend& override {
     return backend_;
   }
   void resize(mln::Size size) override { backend_.set_ring_size(size); }
 
-  auto set_metal_borrowed_target(
-    const mln_metal_borrowed_texture_descriptor& descriptor
-  ) -> mln_status override {
-    auto* texture = static_cast<MTL::Texture*>(descriptor.texture);
-    if (!backend_.has_device(texture->device())) {
+  // Command buffers retain the objects they use, so their GPU work keeps
+  // those objects alive and destruction needs no wait.
+  [[nodiscard]] auto allows_off_thread_teardown() const noexcept
+    -> bool override {
+    return true;
+  }
+
+  auto set_metal_borrowed_target(const mln::core::MetalBorrowedTarget& target)
+    -> mln_status override {
+    // The submission checked that the textures share one device and format.
+    auto textures = metal_textures(target.textures);
+    if (!backend_.has_device(textures.front()->device())) {
       mln::core::set_thread_error(
         "Metal texture target must belong to the device this session attached "
         "with"
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    if (!backend_.has_borrowed_pixel_format(texture->pixelFormat())) {
+    if (!backend_.has_borrowed_pixel_format(textures.front()->pixelFormat())) {
       return mln::core::unsupported_retarget(
         "Metal texture target must have the pixel format this session's render "
         "pipeline states were built for; destroy the session and attach again "
         "to change it"
       );
     }
-    backend_.set_borrowed_texture(
-      texture, mln::Size{descriptor.physical_width, descriptor.physical_height}
+    backend_.set_borrowed_textures(
+      std::move(textures),
+      mln::Size{
+        target.descriptor.physical_width, target.descriptor.physical_height
+      }
     );
     return MLN_STATUS_OK;
   }
@@ -113,13 +156,14 @@ class MetalTextureSessionBackend final
       mln::core::set_thread_error("rendered Metal texture is not available");
       return MLN_STATUS_NOT_READY;
     }
-    out_metadata = mln_metal_owned_texture_frame{
-      .size = sizeof(mln_metal_owned_texture_frame),
+    out_metadata = mln_metal_texture_frame{
+      .size = sizeof(mln_metal_texture_frame),
       .generation = frame.generation,
       .width = static_cast<uint32_t>(metal_texture->width()),
       .height = static_cast<uint32_t>(metal_texture->height()),
       .scale_factor = frame.scale_factor,
       .frame_id = frame.frame_id,
+      .slot = frame.slot,
       .texture = metal_texture,
       .device = metal_texture->device(),
       .pixel_format = static_cast<uint64_t>(metal_texture->pixelFormat())
@@ -222,21 +266,21 @@ auto metal_borrowed_texture_attach_start(
     descriptor->physical_height
   );
   session->texture.mode = TextureSessionMode::Borrowed;
-  auto* const borrowed_texture =
-    static_cast<MTL::Texture*>(descriptor->texture);
-  session->initialize_backend = [borrowed_texture](
-                                  mln_render_session_object& target
-                                ) {
-    target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
-      borrowed_texture, mln::Size{target.physical_width, target.physical_height}
-    );
-    return MLN_STATUS_OK;
-  };
+  session->initialize_backend =
+    [textures = metal_textures(
+       {descriptor->textures, descriptor->texture_count}
+     )](mln_render_session_object& target) {
+      target.texture.backend = std::make_unique<MetalTextureSessionBackend>(
+        textures, mln::Size{target.physical_width, target.physical_height}
+      );
+      return MLN_STATUS_OK;
+    };
   const auto capabilities = mln_render_session_capabilities{
     .size = sizeof(mln_render_session_capabilities),
     .driver = 0,
-    .texture_ring_depth = 0,
-    .flags = 0
+    .texture_ring_depth = static_cast<uint32_t>(descriptor->texture_count),
+    .flags = MLN_RENDER_SESSION_CAPABILITY_FRAME_ACQUISITION |
+             MLN_RENDER_SESSION_CAPABILITY_CONSUMER_SYNC
   };
   return start_attach_render_session(
     std::move(session), RenderSessionKind::Texture, options, capabilities,
@@ -260,17 +304,12 @@ auto metal_borrowed_texture_set_target_start(
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  const auto copied = *descriptor;
-  return enqueue_driver_operation(
-    session,
-    [copied](mln_render_session_object& target) {
-      return render_session_set_target(
-        target.self, RetargetTargetKind::BorrowedTexture, copied.extent,
-        copied.physical_width, copied.physical_height,
-        [&copied](mln_render_session_object& live) {
-          return live.texture.backend->set_metal_borrowed_target(copied);
-        }
-      );
+  return enqueue_borrowed_texture_retarget(
+    session, descriptor->texture_count, descriptor->extent,
+    descriptor->physical_width, descriptor->physical_height,
+    [target =
+       MetalBorrowedTarget{*descriptor}](mln_render_session_object& live) {
+      return live.texture.backend->set_metal_borrowed_target(target);
     },
     completion,
     valueless_completion<

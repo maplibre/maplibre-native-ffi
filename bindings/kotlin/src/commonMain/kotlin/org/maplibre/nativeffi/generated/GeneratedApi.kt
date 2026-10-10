@@ -352,7 +352,7 @@ public object GeneratedApi {
    */
   public fun metalBorrowedTextureDescriptorDefault(): MetalBorrowedTextureDescriptor =
     nativeCall(null, null, "mln_metal_borrowed_texture_descriptor_default") {
-      val out = sized(40, 8)
+      val out = sized(w(40, 48), 8)
       C.mln_metal_borrowed_texture_descriptor_default(out)
       readMetalBorrowedTextureDescriptor(out)
     }
@@ -415,7 +415,7 @@ public object GeneratedApi {
    */
   public fun openglBorrowedTextureDescriptorDefault(): OpenglBorrowedTextureDescriptor =
     nativeCall(null, null, "mln_opengl_borrowed_texture_descriptor_default") {
-      val out = sized(w(72, 88), 8)
+      val out = sized(w(72, 104), 8)
       C.mln_opengl_borrowed_texture_descriptor_default(out)
       readOpenglBorrowedTextureDescriptor(out)
     }
@@ -709,7 +709,7 @@ public object GeneratedApi {
    */
   public fun vulkanBorrowedTextureDescriptorDefault(): VulkanBorrowedTextureDescriptor =
     nativeCall(null, null, "mln_vulkan_borrowed_texture_descriptor_default") {
-      val out = sized(w(96, 120), 8)
+      val out = sized(w(80, 120), 8)
       C.mln_vulkan_borrowed_texture_descriptor_default(out)
       readVulkanBorrowedTextureDescriptor(out)
     }

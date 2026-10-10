@@ -1,4 +1,5 @@
 using Maplibre.NativeFfi.Error;
+using Maplibre.NativeFfi.Internal.Memory;
 using Maplibre.NativeFfi.Internal.Pointer;
 using Maplibre.NativeFfi.Internal.Struct;
 using Xunit;
@@ -141,8 +142,8 @@ public sealed class RenderTests
     public void AFrameViewRejectsOtherThreadsAndExpiresWithItsLease()
     {
         var scope = new NativeViewScope();
-        var frame = new VulkanOwnedTextureFrameView(
-            new VulkanOwnedTextureFrame(
+        var frame = new VulkanTextureFrameView(
+            new VulkanTextureFrame(
                 1,
                 2,
                 3,
@@ -150,13 +151,14 @@ public sealed class RenderTests
                 5,
                 6,
                 7,
-                NativePointer.FromBorrowedAddress(8),
-                9,
-                10
+                8,
+                NativePointer.FromBorrowedAddress(9),
+                10,
+                11
             ),
             scope
         );
-        Assert.Equal(6ul, frame.Image);
+        Assert.Equal(7ul, frame.Image);
 
         Exception? crossThread = null;
         var thread = new Thread(() => crossThread = Record.Exception(() => frame.Image));
@@ -188,21 +190,23 @@ public sealed class RenderTests
                 },
             }
         );
+        using var scope = new NativeCallScope();
         var nativeTexture = GeneratedValues.NativeVulkanBorrowedTextureDescriptor(
             new VulkanBorrowedTextureDescriptor
             {
                 Extent = new LogicalExtent(64, 32, 1),
                 PhysicalWidth = 64,
                 PhysicalHeight = 32,
-                Image = image,
-                ImageView = imageView,
-            }
+                Textures = [new VulkanBorrowedTexture(image, imageView)],
+            },
+            scope
         );
 
         Assert.Equal(surface, nativeSurface.surface);
         Assert.Equal(unchecked((nint)0xF000_0000_0000_0222), (nint)nativeSurface.context.instance);
         Assert.Equal(7u, nativeSurface.context.graphics_queue_family_index);
-        Assert.Equal(image, nativeTexture.image);
-        Assert.Equal(imageView, nativeTexture.image_view);
+        Assert.Equal(1u, (uint)nativeTexture.texture_count);
+        Assert.Equal(image, nativeTexture.textures[0].image);
+        Assert.Equal(imageView, nativeTexture.textures[0].image_view);
     }
 }

@@ -7,81 +7,6 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
-typedef struct idle_probe {
-  mln_runtime runtime;
-  const mln_test_render_fixture* fixture;
-  bool dirty;
-  bool idle;
-  // The statistics of the latest finished frame, if any.
-  bool has_stats;
-  mln_rendering_stats stats;
-} idle_probe;
-
-// An update clears an earlier idle, and an idle after it ends the wait. Each
-// finished frame's statistics replace the ones before.
-static bool record_update_or_idle(
-  const mln_runtime_event* event, const char* messages, void* context
-) {
-  (void)messages;
-  idle_probe* probe = context;
-  if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
-    probe->dirty = true;
-    probe->idle = false;
-  } else if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
-    probe->idle = true;
-  } else if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
-    probe->has_stats = true;
-    probe->stats = event->payload.render_frame.stats;
-  }
-  return false;
-}
-
-static bool update_or_idle_arrived(void* context) {
-  idle_probe* probe = context;
-  (void)mln_test_render_fixture_service(probe->fixture);
-  (void)mln_test_drain_counting_matching(
-    probe->runtime, record_update_or_idle, probe
-  );
-  return probe->dirty || probe->idle;
-}
-
-// Renders the way a host driven by render updates does: one frame per batch
-// of updates, until the map reports idle. The barrier orders every earlier
-// command before the first drain. Returns the probe, which holds the
-// statistics of the latest frame that finished on the way.
-static idle_probe render_to_idle(
-  mln_runtime runtime, const mln_test_render_fixture* fixture
-) {
-  MLN_TEST_OK(mln_test_runtime_barrier(runtime));
-  idle_probe probe = {.runtime = runtime, .fixture = fixture};
-  const mln_test_deadline deadline = mln_test_deadline_default();
-  for (;;) {
-    probe.dirty = false;
-    TEST_ASSERT_TRUE_MESSAGE(
-      mln_test_await(
-        update_or_idle_arrived, &probe, deadline, "a render update or idle"
-      ),
-      "the map never reported idle"
-    );
-    if (probe.idle) {
-      return probe;
-    }
-    mln_frame_demand demand = mln_frame_demand_default();
-    MLN_TEST_OK(
-      mln_render_session_request_frame(fixture->session, &demand, NULL)
-    );
-    MLN_TEST_RENDER_AWAIT(
-      MLN_STATUS_OK, fixture,
-      mln_render_session_barrier(fixture->session, &completion.descriptor, NULL)
-    );
-    mln_render_frame_batch batch = MLN_HANDLE_NULL;
-    MLN_TEST_OK(
-      mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
-    );
-    mln_render_frame_batch_release(batch);
-  }
-}
-
 // The premultiplied RGBA of the pixel at the center of the latest frame.
 static void read_center_pixel(
   const mln_test_render_fixture* fixture, uint8_t out[4]
@@ -178,7 +103,7 @@ static void select_then_clear_renderer_data(
   mln_runtime runtime, mln_map map, const mln_test_render_fixture* fixture
 ) {
   set_selected(map, "{\"selected\":true}");
-  render_to_idle(runtime, fixture);
+  (void)mln_test_render_until_idle(runtime, fixture, NULL);
   expect_center_pixel(fixture, green, "the selected point");
   MLN_TEST_RENDER_AWAIT(
     MLN_STATUS_OK, fixture,
@@ -293,10 +218,10 @@ static void each_mutation_reaches_the_pixels_of_an_update_driven_host(void) {
     if (row->prepare != NULL) {
       row->prepare(map);
     }
-    render_to_idle(runtime, &fixture);
+    (void)mln_test_render_until_idle(runtime, &fixture, NULL);
     expect_center_pixel(&fixture, row->before, row->label);
     row->mutate(runtime, map, &fixture);
-    render_to_idle(runtime, &fixture);
+    (void)mln_test_render_until_idle(runtime, &fixture, NULL);
     expect_center_pixel(&fixture, row->after, row->label);
     mln_test_render_fixture_destroy(&fixture);
     mln_test_destroy_map(map);
@@ -633,11 +558,12 @@ static void frame_results_report_whether_the_map_needs_another_frame(void) {
 static mln_rendering_stats render_stats_to_idle(
   mln_runtime runtime, const mln_test_render_fixture* fixture
 ) {
-  const idle_probe probe = render_to_idle(runtime, fixture);
+  mln_rendering_stats stats = {0};
   TEST_ASSERT_TRUE_MESSAGE(
-    probe.has_stats, "rendering to idle finished no frame"
+    mln_test_render_until_idle(runtime, fixture, &stats),
+    "rendering to idle finished no frame"
   );
-  return probe.stats;
+  return stats;
 }
 
 // Each frame advances the frame count and adds its draws to the total. A frame

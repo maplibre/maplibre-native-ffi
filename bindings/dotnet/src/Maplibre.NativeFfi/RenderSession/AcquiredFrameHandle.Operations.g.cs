@@ -55,13 +55,10 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     /// See <c>mln_acquired_frame_get_metal_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public void WithMetalTexture(Action<MetalOwnedTextureFrameView> callback)
+    public void WithMetalTexture(Action<MetalTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_metal_texture");
-        var outFrame = new mln_metal_owned_texture_frame
-        {
-            size = (uint)sizeof(mln_metal_owned_texture_frame),
-        };
+        var outFrame = new mln_metal_texture_frame { size = (uint)sizeof(mln_metal_texture_frame) };
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
         void* token = null;
@@ -75,9 +72,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
                     Diagnostic
                 )
             );
-            callback(
-                new MetalOwnedTextureFrameView(CopyMetalOwnedTextureFrame(outFrame), viewScope)
-            );
+            callback(new MetalTextureFrameView(CopyMetalTextureFrame(outFrame), viewScope));
         }
         finally
         {
@@ -93,12 +88,12 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     /// See <c>mln_acquired_frame_get_opengl_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public void WithOpenglTexture(Action<OpenglOwnedTextureFrameView> callback)
+    public void WithOpenglTexture(Action<OpenglTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_opengl_texture");
-        var outFrame = new mln_opengl_owned_texture_frame
+        var outFrame = new mln_opengl_texture_frame
         {
-            size = (uint)sizeof(mln_opengl_owned_texture_frame),
+            size = (uint)sizeof(mln_opengl_texture_frame),
         };
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
@@ -113,9 +108,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
                     Diagnostic
                 )
             );
-            callback(
-                new OpenglOwnedTextureFrameView(CopyOpenglOwnedTextureFrame(outFrame), viewScope)
-            );
+            callback(new OpenglTextureFrameView(CopyOpenglTextureFrame(outFrame), viewScope));
         }
         finally
         {
@@ -182,12 +175,12 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     /// See <c>mln_acquired_frame_get_vulkan_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public void WithVulkanTexture(Action<VulkanOwnedTextureFrameView> callback)
+    public void WithVulkanTexture(Action<VulkanTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_vulkan_texture");
-        var outFrame = new mln_vulkan_owned_texture_frame
+        var outFrame = new mln_vulkan_texture_frame
         {
-            size = (uint)sizeof(mln_vulkan_owned_texture_frame),
+            size = (uint)sizeof(mln_vulkan_texture_frame),
         };
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
@@ -202,9 +195,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
                     Diagnostic
                 )
             );
-            callback(
-                new VulkanOwnedTextureFrameView(CopyVulkanOwnedTextureFrame(outFrame), viewScope)
-            );
+            callback(new VulkanTextureFrameView(CopyVulkanTextureFrame(outFrame), viewScope));
         }
         finally
         {
@@ -220,12 +211,12 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
     /// See <c>mln_acquired_frame_get_webgpu_texture</c> in the <see
     /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
     /// </remarks>
-    public void WithWebgpuTexture(Action<WebgpuOwnedTextureFrameView> callback)
+    public void WithWebgpuTexture(Action<WebgpuTextureFrameView> callback)
     {
         using var read = state.Read(this, "mln_acquired_frame_get_webgpu_texture");
-        var outFrame = new mln_webgpu_owned_texture_frame
+        var outFrame = new mln_webgpu_texture_frame
         {
-            size = (uint)sizeof(mln_webgpu_owned_texture_frame),
+            size = (uint)sizeof(mln_webgpu_texture_frame),
         };
         ArgumentNullException.ThrowIfNull(callback);
         var viewScope = new NativeViewScope();
@@ -240,9 +231,7 @@ public sealed unsafe partial class AcquiredFrameHandle : IDisposable, INativeOwn
                     Diagnostic
                 )
             );
-            callback(
-                new WebgpuOwnedTextureFrameView(CopyWebgpuOwnedTextureFrame(outFrame), viewScope)
-            );
+            callback(new WebgpuTextureFrameView(CopyWebgpuTextureFrame(outFrame), viewScope));
         }
         finally
         {

@@ -47,7 +47,8 @@ auto metal_borrowed_texture_descriptor_default() noexcept
       },
     .physical_width = 256,
     .physical_height = 256,
-    .texture = nullptr,
+    .textures = nullptr,
+    .texture_count = 0,
   };
 }
 
@@ -95,8 +96,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
         .get_instance_proc_addr = nullptr,
         .get_device_proc_addr = nullptr,
       },
-    .image = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
-    .image_view = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL,
+    .textures = nullptr,
+    .texture_count = 0,
     .format = 0,
     .initial_layout = 0,
     .final_layout = 5,
@@ -139,11 +140,48 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
         .device = nullptr,
         .queue = nullptr,
       },
-    .texture = nullptr,
-    .texture_view = nullptr,
+    .textures = nullptr,
+    .texture_count = 0,
     .format = 0,
   };
 }
+
+namespace {
+
+// Checks the textures array that every borrowed descriptor carries: present,
+// nonempty, each entry naming a texture, and no texture named twice. Two slots
+// that share a texture would let the session render into a texture whose frame
+// the host holds. `key` maps an entry to the handle that identifies it, which
+// is zero or null for an entry that names nothing.
+template <typename Texture, typename Key>
+auto validate_borrowed_textures(
+  const Texture* textures, size_t count, Key key, const char* null_message
+) -> mln_status {
+  if (textures == nullptr || count == 0) {
+    set_thread_error("textures must name at least one texture");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (count > max_texture_ring_depth) {
+    set_thread_error("texture_count must be at most 3");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  for (size_t index = 0; index < count; ++index) {
+    const auto identity = key(textures[index]);
+    if (identity == decltype(identity){}) {
+      set_thread_error(null_message);
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    for (size_t earlier = 0; earlier < index; ++earlier) {
+      if (key(textures[earlier]) == identity) {
+        set_thread_error("textures must name distinct textures");
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
+}  // namespace
 
 auto validate_webgpu_owned_texture_descriptor(
   const mln_webgpu_owned_texture_descriptor* descriptor
@@ -188,9 +226,19 @@ auto validate_webgpu_borrowed_texture_descriptor(
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
-  if (descriptor->texture == nullptr || descriptor->texture_view == nullptr) {
-    set_thread_error("WebGPU texture and texture_view must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto textures_status = validate_borrowed_textures(
+    descriptor->textures, descriptor->texture_count,
+    [](const mln_webgpu_borrowed_texture& entry) { return entry.texture; },
+    "WebGPU texture and texture_view must not be null"
+  );
+  if (textures_status != MLN_STATUS_OK) {
+    return textures_status;
+  }
+  for (size_t index = 0; index < descriptor->texture_count; ++index) {
+    if (descriptor->textures[index].texture_view == nullptr) {
+      set_thread_error("WebGPU texture and texture_view must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
   // WGPUTextureFormat_Undefined is zero; the WebGPU build asserts that.
   if (descriptor->format == 0) {
@@ -237,11 +285,11 @@ auto validate_metal_borrowed_texture_descriptor(
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
-  if (descriptor->texture == nullptr) {
-    set_thread_error("Metal texture must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
+  return validate_borrowed_textures(
+    descriptor->textures, descriptor->texture_count,
+    [](const mln_metal_borrowed_texture& entry) { return entry.texture; },
+    "Metal texture must not be null"
+  );
 }
 
 auto validate_vulkan_owned_texture_descriptor(
@@ -291,12 +339,22 @@ auto validate_vulkan_borrowed_texture_descriptor(
   if (context_status != MLN_STATUS_OK) {
     return context_status;
   }
-  if (
-    descriptor->image == MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL ||
-    descriptor->image_view == MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL
-  ) {
-    set_thread_error("Vulkan handles must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto textures_status = validate_borrowed_textures(
+    descriptor->textures, descriptor->texture_count,
+    [](const mln_vulkan_borrowed_texture& entry) { return entry.image; },
+    "Vulkan handles must not be null"
+  );
+  if (textures_status != MLN_STATUS_OK) {
+    return textures_status;
+  }
+  for (size_t index = 0; index < descriptor->texture_count; ++index) {
+    if (
+      descriptor->textures[index].image_view ==
+      MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL
+    ) {
+      set_thread_error("Vulkan handles must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
   // VK_FORMAT_UNDEFINED and VK_IMAGE_LAYOUT_UNDEFINED are both zero; the Vulkan
   // build asserts that, since this file is built without the Vulkan headers.
@@ -402,11 +460,15 @@ auto validate_opengl_borrowed_texture_descriptor(
   if (ownership_status != MLN_STATUS_OK) {
     return ownership_status;
   }
-  if (descriptor->texture == 0 || descriptor->target == 0) {
+  if (descriptor->target == 0) {
     set_thread_error("OpenGL texture and target must be specified");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  return MLN_STATUS_OK;
+  return validate_borrowed_textures(
+    descriptor->textures, descriptor->texture_count,
+    [](const mln_opengl_borrowed_texture& entry) { return entry.texture; },
+    "OpenGL texture and target must be specified"
+  );
 }
 
 auto validate_texture(
@@ -608,25 +670,25 @@ auto acquired_frame_get_backend(mln_acquired_frame handle, Frame* out_frame)
 }  // namespace
 
 auto acquired_frame_get_metal_texture(
-  mln_acquired_frame frame, mln_metal_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_metal_texture_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }
 
 auto acquired_frame_get_vulkan_texture(
-  mln_acquired_frame frame, mln_vulkan_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_vulkan_texture_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }
 
 auto acquired_frame_get_opengl_texture(
-  mln_acquired_frame frame, mln_opengl_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_opengl_texture_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }
 
 auto acquired_frame_get_webgpu_texture(
-  mln_acquired_frame frame, mln_webgpu_owned_texture_frame* out_frame
+  mln_acquired_frame frame, mln_webgpu_texture_frame* out_frame
 ) -> mln_status {
   return acquired_frame_get_backend(frame, out_frame);
 }

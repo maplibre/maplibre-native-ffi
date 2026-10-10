@@ -48,7 +48,11 @@ internal class VulkanGraphicsContext private constructor(private var handle: Lon
     if (handle == 0L) {
       return
     }
-    VulkanNativeBridge.destroy(handle)
+    // Objects that an abandoned session kept are children of the device and the surface, which then
+    // stay until the process exits, as does their instance.
+    if (!SurfaceRenderTarget.graphicsKept) {
+      VulkanNativeBridge.destroy(handle)
+    }
     handle = 0
   }
 

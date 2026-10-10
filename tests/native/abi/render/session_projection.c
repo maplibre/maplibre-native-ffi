@@ -1,7 +1,9 @@
 // A render session's projection: a standalone copy of the transform its last
 // frame rendered with, which later map changes do not reach and which outlives
-// the session.
+// the session. It also shows what a frame gated on a command's render update
+// draws.
 
+#include "support/frames.h"
 #include "support/style.h"
 #include "support/test_support.h"
 
@@ -176,6 +178,83 @@ static void a_session_projection_copies_the_last_rendered_frame(void) {
   MLN_TEST_OK(mln_map_projection_close(projection, NULL));
 }
 
+// Requests render-if-needed demands that wait for a map update until one
+// renders an update at or past `generation`, as a host gates presentation on a
+// command.
+static void render_through_update(
+  const mln_test_render_fixture* fixture, uint64_t generation
+) {
+  const mln_test_deadline deadline = mln_test_deadline_default();
+  for (uint64_t token = 1; !mln_test_deadline_passed(deadline); token += 1) {
+    mln_frame_demand demand = mln_frame_demand_default();
+    demand.flags =
+      MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+    demand.token = token;
+    demand.coalescing_boundary = token;
+    MLN_TEST_OK(
+      mln_render_session_request_frame(fixture->session, &demand, NULL)
+    );
+    const mln_render_frame_batch batch =
+      mln_test_render_wait_for_results(fixture, 1);
+    const mln_render_frame_result result =
+      mln_test_render_batch_result(batch, 0);
+    mln_render_frame_batch_release(batch);
+    if (
+      result.disposition == MLN_RENDER_RESULT_RENDERED &&
+      result.map_update_generation >= generation
+    ) {
+      return;
+    }
+  }
+  TEST_FAIL_MESSAGE("no frame rendered the command's render update");
+}
+
+// A committed command's snapshot names the latest render update, and the
+// first frame that renders that update or a later one draws the command.
+static void a_frame_at_a_commands_render_update_draws_the_command(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_load_style_and_wait(runtime, map, mln_test_background_style_json);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  render_one_frame(&fixture);
+  mln_render_session_snapshot before = {
+    .size = sizeof(mln_render_session_snapshot)
+  };
+  MLN_TEST_OK(mln_render_session_get_snapshot(fixture.session, &before, NULL));
+
+  mln_camera_update update = mln_camera_update_default();
+  update.camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  update.camera.center.latitude = -21.0;
+  update.camera.center.longitude = 43.0;
+  update.camera.zoom = 2.0;
+  mln_test_completion jump = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_map_update_camera(map, &update, &jump.descriptor, NULL));
+  MLN_TEST_OK(mln_test_completion_finish(&jump));
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_COMMAND_DISPOSITION_COMMITTED, mln_test_completion_disposition(&jump)
+  );
+  const uint64_t committed = mln_test_completion_generation(&jump);
+  mln_test_completion_destroy(&jump);
+  mln_map_snapshot snapshot = {.size = sizeof(mln_map_snapshot)};
+  MLN_TEST_OK(mln_map_get_snapshot(map, &snapshot, NULL));
+  TEST_ASSERT_GREATER_OR_EQUAL_UINT64(committed, snapshot.generation);
+  // The command published its render update before it completed.
+  TEST_ASSERT_GREATER_THAN_UINT64(
+    before.rendered_update_generation, snapshot.latest_render_update_generation
+  );
+
+  render_through_update(&fixture, snapshot.latest_render_update_generation);
+  mln_map_projection projection = create_session_projection(&fixture);
+  expect_center(projection, -21.0, 43.0, 2.0);
+  MLN_TEST_OK(mln_map_projection_close(projection, NULL));
+
+  mln_test_render_fixture_destroy(&fixture);
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(a_session_projection_copies_the_last_rendered_frame);
+  RUN_TEST(a_frame_at_a_commands_render_update_draws_the_command);
 }

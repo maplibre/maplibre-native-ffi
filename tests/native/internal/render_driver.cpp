@@ -1,5 +1,6 @@
 // A render session's driver while it is busy: demands that arrive during a
-// driver call, deadlines measured on the render clock, and abandon.
+// driver call, deadlines measured on the render clock, demands that wait for
+// a map update, and abandon.
 
 #include <atomic>
 #include <chrono>
@@ -13,6 +14,10 @@
 #include "support/frames.h"
 #include "support/test_support.h"
 #include "testing/render_clock.hpp"
+
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#include "support/host_graphics.h"
+#endif
 
 namespace {
 
@@ -309,9 +314,20 @@ void abandon_after_a_published_frame_waits_for_a_core_worker_call() {
     mln_test_thread_join(thread);
     TEST_ASSERT_TRUE(release.abandon_waited);
     MLN_TEST_OK(release.abandon_status);
+    // The session rendered, so it holds a renderer and a backend. Abandon
+    // destroys both on Vulkan and Metal, and keeps both on OpenGL and WebGPU,
+    // whose objects only their graphics thread may destroy.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+    TEST_ASSERT_EQUAL_UINT32(
+      MLN_RENDER_ABANDON_DISPOSITION_CLEAN, result.disposition
+    );
+    TEST_ASSERT_EQUAL_UINT32(0, result.quarantined_resource_count);
+#else
     TEST_ASSERT_EQUAL_UINT32(
       MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
     );
+    TEST_ASSERT_EQUAL_UINT32(2, result.quarantined_resource_count);
+#endif
   } else {
     // Servicing the attach already passed the exit point, so the held call is
     // the next exit.
@@ -537,6 +553,129 @@ void an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake() {
   destroy_fixture(fixture);
 }
 
+// A frame release that the host made before abandon lets go of its slot even
+// while the driver has yet to run it, because CPU_COMPLETE attests that the
+// host's GPU read is done. Abandon runs the queued release before it decides
+// what to keep, so it destroys a Vulkan or Metal ring with the rest. Holding
+// the driver keeps the release queued until the abandon, which no public fence
+// reaches.
+void abandon_destroys_a_ring_whose_frame_release_is_still_queued() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto frame = mln_test_render_and_acquire(&fixture.render, 141);
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  MLN_TEST_OK(mln_acquired_frame_release(&frame, nullptr, nullptr));
+
+  auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
+  auto* releasing =
+    mln_test_thread_start(release_blocker_when_abandon_waits, &release);
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  const auto abandon_status =
+    mln_render_session_abandon(fixture.render.session, &result, nullptr);
+  release.abandon_returned.store(true);
+  mln_test_pulse();
+  mln_test_thread_join(releasing);
+  MLN_TEST_OK(abandon_status);
+  // OpenGL and WebGPU keep the renderer and the backend, which only their
+  // graphics thread may destroy.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_CLEAN, result.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(0, result.quarantined_resource_count);
+#else
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT32(2, result.quarantined_resource_count);
+#endif
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&blocker.completion, -1));
+  mln_test_completion_destroy(&blocker.completion);
+  blocker.submitted = false;
+  destroy_fixture(fixture);
+}
+
+// Releases the host's frame with a GPU wait from the completion of an
+// operation that abandon discards, which runs after abandon took the session's
+// backend and before it decides what to keep.
+struct RacingRelease {
+  mln_acquired_frame frame = MLN_HANDLE_NULL;
+  mln_status completion_status = MLN_STATUS_NATIVE_ERROR;
+  mln_status release_status = MLN_STATUS_NATIVE_ERROR;
+};
+
+void release_with_a_gpu_wait(
+  void* user_data, const mln_completion_result* result
+) {
+  auto& racing = *static_cast<RacingRelease*>(user_data);
+  racing.completion_status = static_cast<mln_status>(result->status);
+  auto sync = mln_gpu_sync_default();
+  sync.kind = MLN_GPU_SYNC_VULKAN_TIMELINE_SEMAPHORE;
+  sync.value = 1;
+  racing.release_status =
+    mln_acquired_frame_release(&racing.frame, &sync, nullptr);
+}
+
+// A frame release can reach a session after abandon took its backend and
+// before abandon decides what to keep, when no backend checks the release's
+// sync kind. Native never runs the GPU wait that such a release hands over,
+// so the host's GPU may still read the slot, and abandon keeps the ring. The
+// blocked driver keeps the operation queued until abandon discards it, which
+// no public fence reaches.
+void abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  auto racing =
+    RacingRelease{.frame = mln_test_render_and_acquire(&fixture.render, 142)};
+  auto blocker = DriverBlocker{};
+  block_driver(fixture, blocker);
+  const auto completion = mln_completion{
+    .size = sizeof(mln_completion),
+    .callback = release_with_a_gpu_wait,
+    .user_data = &racing,
+    .release_user_data = nullptr,
+  };
+  MLN_TEST_OK(mln_render_session_reduce_memory_use(
+    fixture.render.session, &completion, nullptr
+  ));
+
+  auto release = BlockerRelease{.points = &points, .gate = blocker.gate.get()};
+  auto* releasing =
+    mln_test_thread_start(release_blocker_when_abandon_waits, &release);
+  auto result =
+    mln_render_abandon_result{.size = sizeof(mln_render_abandon_result)};
+  const auto abandon_status =
+    mln_render_session_abandon(fixture.render.session, &result, nullptr);
+  release.abandon_returned.store(true);
+  mln_test_pulse();
+  mln_test_thread_join(releasing);
+  MLN_TEST_OK(abandon_status);
+  MLN_TEST_STATUS(MLN_STATUS_TARGET_LOST, racing.completion_status);
+  MLN_TEST_OK(racing.release_status);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, racing.frame);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, result.disposition
+  );
+  // OpenGL and WebGPU keep the renderer too, which only their graphics thread
+  // may destroy.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(1, result.quarantined_resource_count);
+#else
+  TEST_ASSERT_EQUAL_UINT32(2, result.quarantined_resource_count);
+#endif
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&blocker.completion, -1));
+  mln_test_completion_destroy(&blocker.completion);
+  blocker.submitted = false;
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
+#endif
+  destroy_fixture(fixture);
+}
+
 struct ParkedDisposal {
   SyncPointScope* points;
   mln_acquired_frame first;
@@ -593,6 +732,223 @@ void a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result() {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_TARGET_NOT_READY, result.disposition
   );
+  // Detach keeps the quarantined ring, and a kept Vulkan ring is a child of
+  // the host's device.
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture.render);
+#endif
+  destroy_fixture(fixture);
+}
+
+auto request_waiting(
+  const Fixture& fixture, uint64_t token, uint64_t timeout_ns = 0
+) -> mln_status {
+  auto demand = mln_frame_demand_default();
+  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.token = token;
+  demand.timeout_ns = timeout_ns;
+  return request_frame(fixture, demand);
+}
+
+void render_until_idle(const Fixture& fixture) {
+  static_cast<void>(
+    mln_test_render_until_idle(fixture.runtime, &fixture.render, nullptr)
+  );
+}
+
+// Runs after every work item that the driver already holds. Dumping debug
+// logs publishes no map update, which would end a demand's wait.
+void fence_driver(const Fixture& fixture) {
+  auto fence = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_dump_debug_logs(
+    fixture.render.session, &fence.descriptor, nullptr
+  ));
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &fence)
+  );
+  mln_test_completion_destroy(&fence);
+}
+
+auto latest_update_generation(mln_map map) -> uint64_t {
+  auto snapshot = mln_map_snapshot{.size = sizeof(mln_map_snapshot)};
+  if (mln_map_get_snapshot(map, &snapshot, nullptr) != MLN_STATUS_OK) return 0;
+  return snapshot.latest_render_update_generation;
+}
+
+auto submit_camera_zoom(mln_map map, double zoom, mln_test_completion& done)
+  -> mln_status {
+  auto update = mln_camera_update_default();
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = zoom;
+  return mln_map_update_camera(map, &update, &done.descriptor, nullptr);
+}
+
+struct HeldCameraMove {
+  SyncPointScope* points;
+  mln_map map;
+  uint64_t generation_before = 0;
+  bool held = false;
+  mln_status status = MLN_STATUS_NATIVE_ERROR;
+  bool published = false;
+};
+
+// Publishes a map update while the driver is held after a waiting demand
+// found nothing to render, then lets the driver go.
+void move_camera_while_the_demand_looks(void* argument) {
+  auto& move = *static_cast<HeldCameraMove*>(argument);
+  move.held = move.points->wait_for_hits(SyncPoint::RenderDemandWaits, 1);
+  auto done = mln_test_completion_default(0);
+  move.status = submit_camera_zoom(move.map, 3.0, done);
+  if (move.status == MLN_STATUS_OK) {
+    static_cast<void>(mln_test_completion_wait(&done, -1));
+  } else {
+    mln_test_completion_reject(&done);
+  }
+  mln_test_completion_destroy(&done);
+  move.published = await(
+    [&] { return latest_update_generation(move.map) > move.generation_before; },
+    "the camera update to be published"
+  );
+  move.points->release(SyncPoint::RenderDemandWaits);
+}
+
+// A map update can land after a waiting demand found nothing to render and
+// before the demand waits, when the session's update notice finds no demand
+// waiting. The demand reads the map's generation again under the lock that
+// the notice takes, so it runs again and renders the update instead of
+// waiting for one that already came. It looks once: the update it renders
+// ends it. Holding the driver between the look and the wait is the window
+// that no public fence reaches.
+void a_waiting_demand_renders_an_update_that_lands_as_it_looks() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  render_until_idle(fixture);
+  auto move = HeldCameraMove{
+    .points = &points,
+    .map = fixture.map,
+    .generation_before = latest_update_generation(fixture.map),
+  };
+  points.hold(SyncPoint::RenderDemandWaits);
+  auto* moving =
+    mln_test_thread_start(move_camera_while_the_demand_looks, &move);
+  MLN_TEST_OK(request_waiting(fixture, 151));
+  if (fixture.render.driver != MLN_RENDER_DRIVER_CORE_WORKER) {
+    // The case's own thread runs the demand, so it is held inside this call
+    // until the camera update lands.
+    auto serviced = std::size_t{0};
+    MLN_TEST_OK(mln_render_session_service_driver_work(
+      fixture.render.session, 0, &serviced, nullptr
+    ));
+  }
+  mln_test_thread_join(moving);
+  TEST_ASSERT_TRUE(move.held);
+  MLN_TEST_OK(move.status);
+  TEST_ASSERT_TRUE(move.published);
+
+  const auto batch = wait_for_results(fixture, 1);
+  const auto result = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(151, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  TEST_ASSERT_GREATER_THAN_UINT64(
+    move.generation_before, result.map_update_generation
+  );
+  TEST_ASSERT_EQUAL_INT(1, points.hits(SyncPoint::RenderDemandWaits));
+  destroy_fixture(fixture);
+}
+
+// A waiting demand keeps the time it was accepted at, so when an update lets
+// it run after its deadline passed on the render clock, it misses the
+// deadline rather than rendering late.
+void a_waiting_demand_misses_a_deadline_that_passes_while_it_waits() {
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  render_until_idle(fixture);
+  MLN_TEST_OK(request_waiting(
+    fixture, 153, std::chrono::nanoseconds{std::chrono::hours{1}}.count()
+  ));
+  // The fence runs after the driver found nothing to render for the demand.
+  fence_driver(fixture);
+  mln::testing::advance_render_clock(std::chrono::hours{2});
+
+  auto done = mln_test_completion_default(0);
+  MLN_TEST_OK(submit_camera_zoom(fixture.map, 3.0, done));
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&done, -1));
+  mln_test_completion_destroy(&done);
+  const auto batch = wait_for_results(fixture, 1);
+  const auto result = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(153, result.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_DEADLINE_MISSED, result.disposition
+  );
+  destroy_fixture(fixture);
+}
+
+// The session learns of a map update from the map's notice, which trails the
+// map storing it. A waiting demand that finds the map's latest update already
+// rendered waits, even while the session has yet to learn of that update,
+// rather than running again until the notice lands. The notice then brings
+// nothing the session has not drawn, so the demand it resumes waits again and
+// renders the next update instead of the same one twice. Holding the notice
+// is the window that no public fence reaches.
+void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  render_until_idle(fixture);
+  const auto before = latest_update_generation(fixture.map);
+  points.hold(SyncPoint::RenderSessionUpdateNoticed);
+  // The map stores the update and advances its snapshot before the notice
+  // parks, which can keep the camera command from finishing until release.
+  auto held_move = mln_test_completion_default(0);
+  MLN_TEST_OK(submit_camera_zoom(fixture.map, 3.0, held_move));
+  TEST_ASSERT_TRUE(await(
+    [&] { return latest_update_generation(fixture.map) > before; },
+    "the camera update to be stored"
+  ));
+  const auto held = latest_update_generation(fixture.map);
+
+  auto forced = mln_frame_demand_default();
+  forced.flags = 0;
+  forced.token = 155;
+  MLN_TEST_OK(request_frame(fixture, forced));
+  auto batch = wait_for_results(fixture, 1);
+  const auto rendered = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(155, rendered.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, rendered.disposition);
+  TEST_ASSERT_EQUAL_UINT64(held, rendered.map_update_generation);
+
+  MLN_TEST_OK(request_waiting(fixture, 156));
+  // The first fence runs after the demand looks, and the second after any
+  // work that the look queued.
+  fence_driver(fixture);
+  fence_driver(fixture);
+  auto snapshot =
+    mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(fixture.render.session, &snapshot, nullptr)
+  );
+  TEST_ASSERT_LESS_THAN_UINT64(held, snapshot.map_update_generation);
+  TEST_ASSERT_EQUAL_UINT64(held, snapshot.rendered_update_generation);
+  TEST_ASSERT_EQUAL_UINT32(1, snapshot.pending_demand_count);
+  TEST_ASSERT_EQUAL_INT(1, points.hits(SyncPoint::RenderDemandWaits));
+
+  points.release(SyncPoint::RenderSessionUpdateNoticed);
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&held_move, -1));
+  mln_test_completion_destroy(&held_move);
+  auto next_move = mln_test_completion_default(0);
+  MLN_TEST_OK(submit_camera_zoom(fixture.map, 4.0, next_move));
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&next_move, -1));
+  mln_test_completion_destroy(&next_move);
+  batch = wait_for_results(fixture, 1);
+  const auto waited = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(156, waited.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, waited.disposition);
+  TEST_ASSERT_GREATER_THAN_UINT64(held, waited.map_update_generation);
   destroy_fixture(fixture);
 }
 
@@ -607,5 +963,12 @@ MLN_TEST_GROUP {
   RUN_TEST(abandon_after_a_published_frame_waits_for_a_core_worker_call);
   RUN_TEST(an_abandon_during_a_detach_submission_completes_the_detach);
   RUN_TEST(an_abandon_wakes_for_results_a_racing_request_has_yet_to_wake);
+  RUN_TEST(abandon_destroys_a_ring_whose_frame_release_is_still_queued);
+  RUN_TEST(abandon_keeps_a_ring_released_with_a_gpu_wait_as_it_abandons);
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
+  RUN_TEST(a_waiting_demand_renders_an_update_that_lands_as_it_looks);
+  RUN_TEST(a_waiting_demand_misses_a_deadline_that_passes_while_it_waits);
+  RUN_TEST(
+    a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of
+  );
 }

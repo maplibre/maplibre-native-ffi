@@ -13,7 +13,8 @@ namespace Maplibre.NativeFfi;
 /// One <c>mln_render_driver_kind</c> value.
 /// </param>
 /// <param name="TextureRingDepth">
-/// Granted owned-texture slot count, or zero for a target without a ring.
+/// Granted texture ring depth: the slot count of a session-owned ring, or the
+/// texture count of a borrowed one. Zero for a surface.
 /// </param>
 /// <param name="Flags">
 /// A bitwise OR of <c>mln_render_session_capability_flag</c> values.

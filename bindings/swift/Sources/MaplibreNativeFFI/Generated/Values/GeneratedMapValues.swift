@@ -1029,6 +1029,9 @@ public struct MapSnapshot: Equatable, Hashable, Sendable {
   /// True while the map is inside a gesture.
   public var gestureInProgress: Bool
   public var eventMask: RuntimeEventMask
+  /// Generation of the latest render update the map published. A rendered frame
+  /// at or past it draws map state that includes every command this snapshot
+  /// observes, though animations and resource loads finish in later frames.
   public var latestRenderUpdateGeneration: UInt64
   public var tile: MapTileOptions
   public var bounds: BoundOptions

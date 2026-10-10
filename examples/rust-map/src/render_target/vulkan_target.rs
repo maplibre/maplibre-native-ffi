@@ -1,20 +1,23 @@
 use std::error::Error as StdError;
 
 use maplibre_native_ffi::{
-    MapHandle, QueueLock, RenderDriverKind, VulkanBorrowedTextureDescriptor,
+    MapHandle, QueueLock, RenderDriverKind, VulkanBorrowedTexture, VulkanBorrowedTextureDescriptor,
     VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 
 use crate::graphics::GraphicsContext;
 use crate::map_state::MapState;
 use crate::render_target::{
-    Mode, Replacements, Session, attach_options, compositor_error, extent,
+    Mode, RING_DEPTH, Replacements, Session, attach_options, compositor_error, extent,
     require_cpu_complete_producer,
 };
 use crate::shell::Wakes;
 use crate::viewport::Viewport;
 use crate::vulkan::{BorrowedImage, VulkanContext};
 use crate::vulkan_texture_compositor::VulkanTextureCompositor;
+
+/// The images of a borrowed ring, one per slot.
+type VulkanRing = [BorrowedImage; RING_DEPTH];
 
 pub enum RenderTarget {
     OwnedTexture {
@@ -24,9 +27,9 @@ pub enum RenderTarget {
     BorrowedTexture {
         session: Session,
         compositor: Box<VulkanTextureCompositor>,
-        /// The image the compositor samples.
-        image: Box<BorrowedImage>,
-        replacements: Replacements<BorrowedImage>,
+        /// The ring the session renders into.
+        ring: Box<VulkanRing>,
+        replacements: Replacements<Box<VulkanRing>>,
     },
     Surface {
         session: Session,
@@ -67,10 +70,8 @@ impl RenderTarget {
                 })
             }
             Mode::BorrowedTexture => {
-                let image = BorrowedImage::new(vk, viewport).map_err(|error| {
-                    compositor_error(format!("Vulkan image creation failed: {error:?}"))
-                })?;
-                let descriptor = borrowed_descriptor(vk, viewport, &image);
+                let ring = ring(vk, viewport)?;
+                let descriptor = borrowed_descriptor(vk, viewport, &ring);
                 let session = Session::new(
                     unsafe { map.attach_vulkan_borrowed_texture(&descriptor, &options) }?,
                     &options,
@@ -80,7 +81,7 @@ impl RenderTarget {
                 Ok(Self::BorrowedTexture {
                     session,
                     compositor: Box::new(compositor(vk, viewport)?),
-                    image: Box::new(image),
+                    ring,
                     replacements: Replacements::default(),
                 })
             }
@@ -132,20 +133,21 @@ impl RenderTarget {
             Self::BorrowedTexture {
                 session,
                 compositor,
+                ring: current,
                 replacements,
-                ..
             } => {
-                let replacement =
-                    BorrowedImage::new(graphics.vulkan(), viewport).map_err(|error| {
-                        compositor_error(format!("Vulkan image creation failed: {error:?}"))
-                    })?;
+                // A replacement is refused while the host holds a frame, and
+                // the window keeps showing what it last presented.
+                session.release_held()?;
+                let replacement = ring(graphics.vulkan(), viewport)?;
                 let descriptor = borrowed_descriptor(graphics.vulkan(), viewport, &replacement);
                 let completion = unsafe {
                     session
                         .handle()
                         .set_vulkan_borrowed_texture_target(&descriptor)
                 }?;
-                replacements.push(completion, replacement, wakes);
+                let retired = std::mem::replace(current, replacement);
+                replacements.push(completion, retired, wakes);
                 compositor.resize(viewport).map_err(|error| {
                     compositor_error(format!("Vulkan resize failed: {error:?}"))
                 })?;
@@ -160,42 +162,43 @@ impl RenderTarget {
         }
     }
 
-    /// Switches the compositor to each replacement a rendered frame has drawn
-    /// into, destroying the image it retires. The session stopped rendering
-    /// into that image when the replacement completed, and the compositor
-    /// waited for its own reads.
-    pub fn show_replacements(
+    /// Destroys each ring that a completed replacement retired. The session
+    /// stopped rendering into it when the replacement completed, and the
+    /// compositor waited for its own reads before the held frame was released.
+    pub fn retire_replaced(
         &mut self,
         _graphics: &GraphicsContext,
         wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
             session,
-            image,
             replacements,
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_shown(session, wakes)? {
-                **image = replacement;
-            }
+            while replacements.take_completed(session, wakes)?.is_some() {}
         }
         Ok(())
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
     /// the window. The compositor's sampling finishes before this returns, so
-    /// the session may render into the sampled image again.
+    /// the session may render into the sampled image again once the frame is
+    /// released.
     pub fn present(
         &mut self,
-        graphics: &GraphicsContext,
-        wakes: &Wakes,
+        _graphics: &GraphicsContext,
+        _wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<bool> {
-        self.show_replacements(graphics, wakes)?;
         let presented = match self {
             Self::OwnedTexture {
                 session,
                 compositor,
+            }
+            | Self::BorrowedTexture {
+                session,
+                compositor,
+                ..
             } => {
                 // Without a new frame, the window keeps the one it already
                 // shows.
@@ -210,17 +213,6 @@ impl RenderTarget {
                     compositor_error(format!("Vulkan consumer wait failed: {error:?}"))
                 })?;
                 presented?
-            }
-            Self::BorrowedTexture {
-                compositor, image, ..
-            } => {
-                let presented = compositor
-                    .draw_image_view(image.view())
-                    .map_err(|error| compositor_error(format!("Vulkan draw failed: {error:?}")))?;
-                compositor.wait_idle().map_err(|error| {
-                    compositor_error(format!("Vulkan consumer wait failed: {error:?}"))
-                })?;
-                presented
             }
             // The driver already presented the frame.
             Self::Surface { .. } => true,
@@ -256,18 +248,28 @@ fn compositor(
         .map_err(|error| compositor_error(format!("Vulkan compositor creation failed: {error:?}")))
 }
 
+fn ring(vk: &VulkanContext, viewport: Viewport) -> maplibre_native_ffi::Result<Box<VulkanRing>> {
+    let image = || {
+        BorrowedImage::new(vk, viewport)
+            .map_err(|error| compositor_error(format!("Vulkan image creation failed: {error:?}")))
+    };
+    Ok(Box::new([image()?, image()?]))
+}
+
 fn borrowed_descriptor(
     vk: &VulkanContext,
     viewport: Viewport,
-    image: &BorrowedImage,
+    ring: &VulkanRing,
 ) -> VulkanBorrowedTextureDescriptor {
     VulkanBorrowedTextureDescriptor {
         extent: extent(viewport),
         physical_width: viewport.physical_width,
         physical_height: viewport.physical_height,
         context: context_descriptor(vk),
-        image: image.image_handle(),
-        image_view: image.view_handle(),
+        textures: ring
+            .iter()
+            .map(|image| VulkanBorrowedTexture::new(image.image_handle(), image.view_handle()))
+            .collect(),
         format: ash::vk::Format::R8G8B8A8_UNORM.as_raw() as u32,
         initial_layout: ash::vk::ImageLayout::UNDEFINED.as_raw() as u32,
         final_layout: ash::vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32,

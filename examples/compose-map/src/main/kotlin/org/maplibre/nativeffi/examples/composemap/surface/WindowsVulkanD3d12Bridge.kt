@@ -75,24 +75,30 @@ import org.lwjgl.vulkan.VkMemoryWin32HandlePropertiesKHR
 import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 
+/**
+ * Lends the session a ring of Vulkan images imported from shared Skiko Direct3D 12 textures, and
+ * draws the Direct3D textures.
+ */
 internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-windows-vulkan-renderer")
   private var vulkan: WindowsVulkanContext? = null
-  private var direct3DTexture = NativeHandle(0)
+
+  // One entry per ring slot, in slot order: the Direct3D texture and the producer's import of it.
+  @Volatile private var direct3DTextures: List<NativeHandle> = emptyList()
   private var direct3DDevice = NativeHandle(0)
-  private var importedTexture: WindowsVulkanImportedD3D12Texture? = null
+  @Volatile private var importedTextures: List<WindowsVulkanImportedD3D12Texture> = emptyList()
   private var currentExtent = SurfaceExtent.Empty
 
   // Read on the Compose thread while the renderer thread writes them.
   @Volatile private var generation = 0L
   @Volatile private var renderedGeneration = 0L
 
-  // The Direct3D texture a frame last landed in, kept alive until one lands in its replacement.
-  // Skiko allocates a new texture for every resize and the map needs a frame or two to fill it, so
-  // this is what the consumer draws in between.
-  private var retiredDirect3DTexture = NativeHandle(0)
-  private var retiredStorageExtent = SurfaceExtent.Empty
+  // The ring a frame last landed in, kept alive until one lands in its replacement. The bridge
+  // allocates a new ring for every resize and the map needs a frame or two to fill it, so this is
+  // what the consumer draws in between.
+  @Volatile private var retiredDirect3DTextures: List<NativeHandle> = emptyList()
+  @Volatile private var retiredStorageExtent = SurfaceExtent.Empty
   @Volatile private var retiredGeneration = 0L
 
   override val backend: ProducerBackend = ProducerBackend.VULKAN
@@ -113,10 +119,10 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   }
 
   private fun resizeOnRendererThread(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
-    if (extent == currentExtent && importedTexture != null) {
+    if (extent == currentExtent && importedTextures.isNotEmpty()) {
       return
     }
-    recreateTexture(extent, device)
+    recreateTextures(extent, device)
     currentExtent = extent
     generation += 1
   }
@@ -126,7 +132,7 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
-    if (importedTexture == null || extent != currentExtent) {
+    if (importedTextures.isEmpty() || extent != currentExtent) {
       resize(extent)
     }
     return NativeSurfaceFrameLease(
@@ -155,19 +161,20 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
       return false
     }
     // Only a texture this bridge still holds is safe to draw.
-    val texture: NativeHandle
+    val held: List<NativeHandle>
     val storageExtent: SurfaceExtent
     when (target.generation) {
       generation -> {
-        texture = direct3DTexture
-        storageExtent = importedTexture?.storageExtent ?: target.extent
+        held = direct3DTextures
+        storageExtent = importedTextures.firstOrNull()?.storageExtent ?: target.extent
       }
       retiredGeneration -> {
-        texture = retiredDirect3DTexture
+        held = retiredDirect3DTextures
         storageExtent = retiredStorageExtent
       }
       else -> return false
     }
+    val texture = held.getOrNull(target.slotIndex) ?: return false
     if (texture.address == 0L) {
       return false
     }
@@ -183,7 +190,7 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
 
   override fun close() {
     try {
-      disposeTexture()
+      disposeTextures()
     } finally {
       val closingVulkan = vulkan
       vulkan = null
@@ -195,12 +202,14 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
     }
   }
 
-  private fun target(generation: Long): NativeSurfaceTarget =
-    checkNotNull(importedTexture) { "Windows Vulkan texture is not initialized" }.target(generation)
+  private fun target(generation: Long): NativeSurfaceTarget {
+    check(importedTextures.isNotEmpty()) { "Windows Vulkan texture is not initialized" }
+    return WindowsVulkanImportedD3D12Texture.ringTarget(importedTextures, generation)
+  }
 
-  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
+  private fun recreateTextures(extent: SurfaceExtent, device: SkikoDirect3DDevice?) {
     if (extent.isEmpty) {
-      disposeTexture()
+      disposeTextures()
       return
     }
 
@@ -210,74 +219,89 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
       checkNotNull(device) { "The Skiko Direct3D device is resolved before this hop" }
     val storageExtent = extent
     // Only the device that allocated a texture can present it.
-    retireTexture(deviceChanged = direct3DDevice.address != requiredDirect3DDevice.ptr)
+    retireTextures(deviceChanged = direct3DDevice.address != requiredDirect3DDevice.ptr)
     direct3DDevice = NativeHandle(requiredDirect3DDevice.ptr)
-    direct3DTexture = WindowsD3D12Interop.createSharedTexture(requiredDirect3DDevice, storageExtent)
-    var sharedHandle = NULL
+    val textures = mutableListOf<NativeHandle>()
+    val imports = mutableListOf<WindowsVulkanImportedD3D12Texture>()
     try {
-      sharedHandle = WindowsD3D12Interop.createSharedHandle(direct3DTexture)
-      val context = vulkan ?: WindowsVulkanContext.create(sharedHandle).also { vulkan = it }
-      importedTexture = context.importD3D12Texture(sharedHandle, storageExtent, extent)
+      repeat(RING_DEPTH) {
+        val texture =
+          WindowsD3D12Interop.createSharedTexture(requiredDirect3DDevice, storageExtent).also {
+            textures += it
+          }
+        var sharedHandle = NULL
+        try {
+          sharedHandle = WindowsD3D12Interop.createSharedHandle(texture)
+          val context = vulkan ?: WindowsVulkanContext.create(sharedHandle).also { vulkan = it }
+          imports += context.importD3D12Texture(sharedHandle, storageExtent, extent)
+        } finally {
+          WindowsD3D12Interop.closeSharedHandle(sharedHandle)
+        }
+      }
+      direct3DTextures = textures
+      importedTextures = imports
     } catch (error: RuntimeException) {
-      disposeTexture()
+      imports.forEach(WindowsVulkanImportedD3D12Texture::close)
+      textures.forEach(::releaseDirect3DTexture)
+      disposeTextures()
       throw error
-    } finally {
-      WindowsD3D12Interop.closeSharedHandle(sharedHandle)
     }
   }
 
-  // Holds the outgoing texture for the consumer to draw while the replacement is still empty.
-  private fun retireTexture(deviceChanged: Boolean) {
-    val outgoingExtent = importedTexture?.storageExtent
+  // Holds the outgoing ring for the consumer to draw while the replacement is still empty.
+  private fun retireTextures(deviceChanged: Boolean) {
+    val outgoingExtent = importedTextures.firstOrNull()?.storageExtent
     if (deviceChanged) {
       // Both belong to the device Skiko replaced.
-      disposeTexture()
+      disposeTextures()
       return
     }
-    if (
-      renderedGeneration != generation || direct3DTexture.address == 0L || outgoingExtent == null
-    ) {
+    if (renderedGeneration != generation || direct3DTextures.isEmpty() || outgoingExtent == null) {
       // This one never held a frame, so whatever is already retired stays.
-      disposeCurrentTexture()
+      disposeCurrentTextures()
       return
     }
-    // The session still names this image until its target replacement completes, after this
-    // returns. Destroying it now is safe only because each draw waits for its own demand's result,
-    // which leaves the core worker idle between draws.
-    importedTexture?.close()
-    importedTexture = null
-    releaseDirect3DTexture(retiredDirect3DTexture)
-    retiredDirect3DTexture = direct3DTexture
+    // The session still names these images until its target replacement completes, after this
+    // returns. Destroying them now is safe only because each draw waits for its own demand's
+    // result, which leaves the core worker idle between draws.
+    closeImports()
+    retiredDirect3DTextures.forEach(::releaseDirect3DTexture)
+    retiredDirect3DTextures = direct3DTextures
     retiredStorageExtent = outgoingExtent
     retiredGeneration = generation
-    direct3DTexture = NativeHandle(0)
+    direct3DTextures = emptyList()
   }
 
   // Released a frame after the replacement rendered, so the consumer's last recorded frame from
-  // the retired texture has been flushed.
+  // the retired ring has been flushed.
   private fun releaseRetiredOnceReplaced() {
-    if (retiredDirect3DTexture.address == 0L || renderedGeneration != generation) {
+    if (retiredDirect3DTextures.isEmpty() || renderedGeneration != generation) {
       return
     }
-    releaseDirect3DTexture(retiredDirect3DTexture)
-    retiredDirect3DTexture = NativeHandle(0)
+    releaseRetiredTextures()
+  }
+
+  private fun disposeTextures() {
+    disposeCurrentTextures()
+    releaseRetiredTextures()
+  }
+
+  private fun releaseRetiredTextures() {
+    retiredDirect3DTextures.forEach(::releaseDirect3DTexture)
+    retiredDirect3DTextures = emptyList()
     retiredStorageExtent = SurfaceExtent.Empty
     retiredGeneration = 0
   }
 
-  private fun disposeTexture() {
-    disposeCurrentTexture()
-    releaseDirect3DTexture(retiredDirect3DTexture)
-    retiredDirect3DTexture = NativeHandle(0)
-    retiredStorageExtent = SurfaceExtent.Empty
-    retiredGeneration = 0
+  private fun disposeCurrentTextures() {
+    closeImports()
+    direct3DTextures.forEach(::releaseDirect3DTexture)
+    direct3DTextures = emptyList()
   }
 
-  private fun disposeCurrentTexture() {
-    importedTexture?.close()
-    importedTexture = null
-    releaseDirect3DTexture(direct3DTexture)
-    direct3DTexture = NativeHandle(0)
+  private fun closeImports() {
+    importedTextures.forEach(WindowsVulkanImportedD3D12Texture::close)
+    importedTextures = emptyList()
   }
 
   private fun releaseDirect3DTexture(texture: NativeHandle) {
@@ -286,6 +310,11 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
     }
     SkikoHost.forgetDirect3DTexture(texture)
     WindowsD3D12Interop.release(texture)
+  }
+
+  private companion object {
+    /** Two images: one the consumer draws, and one the session renders into meanwhile. */
+    const val RING_DEPTH = 2
   }
 }
 
@@ -472,13 +501,16 @@ private class WindowsVulkanContext private constructor(private val sharedHandle:
   }
 
   override fun close() {
+    // Objects that an abandoned session kept are children of the device, which then stays until the
+    // process exits, as does its instance.
+    val destroy = !VulkanDeviceRetention.keepUntilExit
     device?.let {
       vkDeviceWaitIdle(it)
-      vkDestroyDevice(it, null)
+      if (destroy) vkDestroyDevice(it, null)
       device = null
     }
     instance?.let {
-      vkDestroyInstance(it, null)
+      if (destroy) vkDestroyInstance(it, null)
       instance = null
     }
   }
@@ -510,18 +542,8 @@ private constructor(
   private var memory = NULL
   private var view = NULL
 
-  fun target(generation: Long): VulkanImageTarget =
-    VulkanImageTarget(
-      context = context.handles,
-      image = NativeHandle(image),
-      imageView = NativeHandle(view),
-      format = VK_FORMAT_B8G8R8A8_UNORM,
-      initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      finalLayout = VK_IMAGE_LAYOUT_GENERAL,
-      queueFamilyIndex = context.handles.graphicsQueueFamilyIndex,
-      extent = renderExtent,
-      generation = generation,
-    )
+  val slot: VulkanImageSlot
+    get() = VulkanImageSlot(NativeHandle(image), NativeHandle(view))
 
   private fun create() {
     MemoryStack.stackPush().use { stack ->
@@ -633,6 +655,26 @@ private constructor(
   }
 
   companion object {
+    /** The target of a ring of imported images, one per slot in slot order. */
+    fun ringTarget(
+      ring: List<WindowsVulkanImportedD3D12Texture>,
+      generation: Long,
+    ): VulkanImageTarget {
+      val front = ring.first()
+      return VulkanImageTarget(
+        context = front.context.handles,
+        image = front.slot.image,
+        imageView = front.slot.imageView,
+        format = VK_FORMAT_B8G8R8A8_UNORM,
+        initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+        queueFamilyIndex = front.context.handles.graphicsQueueFamilyIndex,
+        extent = front.renderExtent,
+        generation = generation,
+        ring = ring.map { it.slot },
+      )
+    }
+
     fun create(
       context: WindowsVulkanContext,
       sharedHandle: Long,

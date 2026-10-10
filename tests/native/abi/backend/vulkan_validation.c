@@ -20,6 +20,7 @@ MLN_TEST_OVERFLOW_EDIT(vulkan_owned)
 MLN_TEST_DESCRIPTOR_EDITS(
   vulkan_borrowed, mln_vulkan_borrowed_texture_descriptor
 )
+MLN_TEST_BORROWED_EDITS(vulkan_borrowed, vulkan)
 
 static void surface_without_surface(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_surface.surface =
@@ -29,13 +30,28 @@ static void owned_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_owned.context.device = NULL;
 }
 static void borrowed_without_image(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.image =
-    MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
+  mln_test_target_call* edited = call;
+  edited->textures.vulkan[0].image = MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
+  edited->descriptor.vulkan_borrowed.textures = edited->textures.vulkan;
 }
 static void borrowed_without_image_view(void* call) {
-  ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.image_view =
+  mln_test_target_call* edited = call;
+  edited->textures.vulkan[0].image_view =
     MLN_VULKAN_NON_DISPATCHABLE_HANDLE_NULL;
+  edited->descriptor.vulkan_borrowed.textures = edited->textures.vulkan;
 }
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+// A replacement that names two images for a session's ring of one.
+static void borrowed_with_another_depth(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.vulkan[1] = (mln_vulkan_borrowed_texture){
+    .image = high_view_handle,
+    .image_view = high_handle,
+  };
+  edited->descriptor.vulkan_borrowed.textures = edited->textures.vulkan;
+  edited->descriptor.vulkan_borrowed.texture_count = 2;
+}
+#endif
 static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.vulkan_borrowed.physical_width = 0;
 }
@@ -73,20 +89,25 @@ static mln_vulkan_surface_descriptor surface_descriptor(void) {
   return descriptor;
 }
 
-static mln_vulkan_borrowed_texture_descriptor borrowed_descriptor(void) {
-  mln_vulkan_borrowed_texture_descriptor descriptor =
-    mln_vulkan_borrowed_texture_descriptor_default();
-  descriptor.extent = mln_test_target_extent();
-  descriptor.context = fake_context();
-  descriptor.image = high_handle;
-  descriptor.image_view = high_view_handle;
+// A ring of one image, whose entry is in the call's storage.
+static void describe_borrowed(mln_test_target_call* call) {
+  call->textures.vulkan[0] = (mln_vulkan_borrowed_texture){
+    .image = high_handle,
+    .image_view = high_view_handle,
+  };
+  mln_vulkan_borrowed_texture_descriptor* descriptor =
+    &call->descriptor.vulkan_borrowed;
+  *descriptor = mln_vulkan_borrowed_texture_descriptor_default();
+  descriptor->extent = mln_test_target_extent();
+  descriptor->context = fake_context();
+  descriptor->textures = call->textures.vulkan;
+  descriptor->texture_count = 1;
   // VK_FORMAT_R8G8B8A8_UNORM, from undefined to shader-read-only.
-  descriptor.format = 37;
-  descriptor.initial_layout = 0;
-  descriptor.final_layout = 5;
-  descriptor.physical_width = 64;
-  descriptor.physical_height = 64;
-  return descriptor;
+  descriptor->format = 37;
+  descriptor->initial_layout = 0;
+  descriptor->final_layout = 5;
+  descriptor->physical_width = 64;
+  descriptor->physical_height = 64;
 }
 
 // A Vulkan build accepts a well-formed descriptor and leaves the handles to
@@ -134,9 +155,10 @@ static void vulkan_attach_rejects_malformed_calls(void) {
 
   call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
-  call.descriptor.vulkan_borrowed = borrowed_descriptor();
+  describe_borrowed(&call);
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed),
+    MLN_TEST_BORROWED_CASES(vulkan_borrowed),
     {"null image", borrowed_without_image, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null image view", borrowed_without_image_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
@@ -198,17 +220,21 @@ static void vulkan_set_target_rejects_malformed_descriptors(void) {
   );
   call.session = fixture.session;
 #endif
-  call.descriptor.vulkan_borrowed = borrowed_descriptor();
+  describe_borrowed(&call);
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(vulkan_borrowed),
+    MLN_TEST_BORROWED_CASES(vulkan_borrowed),
     {"null image", borrowed_without_image, MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"null image view", borrowed_without_image_view,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     {"zero physical width", borrowed_without_physical_width,
      MLN_STATUS_INVALID_ARGUMENT, "physical texture dimensions"},
-#if !defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+    {"more images than the session's ring has slots",
+     borrowed_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
+#else
     {"a well-formed descriptor with high handles", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
 #endif

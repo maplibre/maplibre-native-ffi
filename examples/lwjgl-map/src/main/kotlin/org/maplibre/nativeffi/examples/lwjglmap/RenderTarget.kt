@@ -83,16 +83,8 @@ internal open class RenderTarget(
   val driverLabel: String
     get() = driver.label
 
-  /**
-   * Set by a target whose texture the session and the compositor take turns on. Such a target keeps
-   * at most one demand outstanding, and holds a wanted frame until the outstanding result arrives.
-   */
-  protected open val exclusiveTexture: Boolean = false
-
   /** Set by a native surface, the only target whose demands ask the session to present. */
   protected open val presents: Boolean = false
-  private var demandOutstanding = false
-  private var wanted: Boolean? = null
 
   /** When a paced retry is due, as a [System.nanoTime] value, or null with none pending. */
   var retryAtNanos: Long? = null
@@ -100,11 +92,6 @@ internal open class RenderTarget(
 
   /** Demands a frame. A forced frame renders even when the map has no newer update. */
   fun requestFrame(force: Boolean = false) {
-    if (exclusiveTexture && demandOutstanding) {
-      wanted = force || wanted == true
-      return
-    }
-    demandOutstanding = true
     var flags = FrameDemandFlag(0u)
     if (!force) flags = flags or FrameDemandFlag.IF_NEEDED
     if (presents) flags = flags or FrameDemandFlag.PRESENT
@@ -139,7 +126,6 @@ internal open class RenderTarget(
     var repaint = false
     batch.use { results ->
       for (result in results.get().results) {
-        demandOutstanding = false
         when (result.disposition) {
           RenderResult.RENDERED -> {
             rendered = true
@@ -155,12 +141,6 @@ internal open class RenderTarget(
       retryAtNanos = System.nanoTime() + RETRY_DELAY_NANOS
     } else if (repaint) {
       requestFrame()
-    }
-    wanted?.let { force ->
-      if (!demandOutstanding) {
-        wanted = null
-        requestFrame(force)
-      }
     }
     return shown
   }
@@ -194,12 +174,7 @@ internal open class RenderTarget(
       await(session.detach())
     } catch (error: RuntimeException) {
       System.err.println("render session detach failed, abandoning: ${error.message}")
-      val abandoned = session.abandon()
-      if (abandoned.quarantinedResourceCount > 0u) {
-        System.err.println(
-          "render session quarantined ${abandoned.quarantinedResourceCount} resources"
-        )
-      }
+      abandon(session)
     } finally {
       session.close()
       closeHost()
@@ -207,11 +182,34 @@ internal open class RenderTarget(
   }
 
   companion object {
-    /** A session-owned texture ring deep enough to keep compositing while the map renders. */
-    const val OWNED_TEXTURE_RING_DEPTH = 2u
+    /**
+     * The depth of a texture ring, session-owned or borrowed: the target holds the newest frame
+     * until a newer one arrives, and the session renders into the other slot meanwhile.
+     */
+    const val TEXTURE_RING_DEPTH = 2
 
     /** How long a frame that did not reach the window waits to retry, about one refresh. */
     const val RETRY_DELAY_NANOS = 16_000_000L
+
+    /**
+     * Whether an abandon kept graphics objects until the process exits. A kept Vulkan object is a
+     * child of the host's device, and a kept swapchain of its surface, so a Vulkan host then keeps
+     * those until the process exits too.
+     */
+    @Volatile
+    var graphicsKept = false
+      private set
+
+    /** Ends the session's graphics work at once. */
+    fun abandon(session: RenderSessionHandle) {
+      val abandoned = session.abandon()
+      if (abandoned.quarantinedResourceCount > 0u) {
+        graphicsKept = true
+        System.err.println(
+          "render session abandon kept ${abandoned.quarantinedResourceCount} resource groups until exit"
+        )
+      }
+    }
 
     /**
      * Selects the driver from the graphics API: a core worker wherever the target accepts one.
@@ -266,7 +264,7 @@ internal class AttachedSession(
       try {
         driver.await(attachment.session, attachment.ready)
       } catch (error: Throwable) {
-        runCatching { attachment.session.abandon() }.onFailure(error::addSuppressed)
+        runCatching { RenderTarget.abandon(attachment.session) }.onFailure(error::addSuppressed)
         runCatching { attachment.session.close() }.onFailure(error::addSuppressed)
         throw error
       }
@@ -282,11 +280,11 @@ internal class NativeSurfaceTarget(attached: AttachedSession) :
 }
 
 /**
- * A session-owned texture ring. After a rendered result, the target acquires every ready frame,
- * keeps the newest, and composes it. It holds that frame until a newer one replaces it, so the
- * session renders into the ring's other slots meanwhile.
+ * A texture ring whose frames the target acquires and composes into the window. After a rendered
+ * result, the target acquires every ready frame, keeps the newest, and composes it. It holds that
+ * frame until a newer one replaces it, so the session renders into the ring's other slot meanwhile.
  */
-internal abstract class OwnedTextureTarget(attached: AttachedSession) :
+internal abstract class TextureTarget(attached: AttachedSession) :
   RenderTarget(attached.session, attached.driver, attached.frames) {
   private var held: AcquiredFrameHandle? = null
 
@@ -312,59 +310,53 @@ internal abstract class OwnedTextureTarget(attached: AttachedSession) :
     return shown
   }
 
-  /** A session resize needs every frame released, so the held frame goes first. */
-  override fun resize(viewport: Viewport) {
-    releaseFrames()
-    resizeHost(viewport)
-    super.resize(viewport)
-  }
-
   override fun releaseFrames() {
     held?.release()
     held = null
   }
 }
 
+/** A session-owned texture ring, which the session sizes and allocates. */
+internal abstract class OwnedTextureTarget(attached: AttachedSession) : TextureTarget(attached) {
+  /** A session resize needs every frame released, so the held frame goes first. */
+  override fun resize(viewport: Viewport) {
+    releaseFrames()
+    resizeHost(viewport)
+    super.resize(viewport)
+  }
+}
+
 /**
- * A caller-owned texture that the session renders into and the compositor samples. The texture
- * belongs to the session from a demand until its result, and to the compositor from a rendered
- * result until the draw returns, so the target keeps one demand outstanding.
+ * A ring of caller-owned textures that the session renders into. The host allocates the ring and
+ * sizes it, so a resize hands the session a new ring.
  */
 internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
   attached: AttachedSession,
   private val map: MapHandle,
-  protected var texture: T,
-) : RenderTarget(attached.session, attached.driver, attached.frames) {
-  override val exclusiveTexture: Boolean = true
-
+  protected var ring: List<T>,
+) : TextureTarget(attached) {
   /** Allocates a texture at the viewport's physical size. */
   protected abstract fun allocate(viewport: Viewport): T
 
   /** Starts handing the session [replacement]. */
-  protected abstract fun setTarget(viewport: Viewport, replacement: T): Deferred<Unit>
-
-  /** Composes [texture] into the window, and reports whether it reached the window. */
-  protected abstract fun draw(texture: T): Boolean
-
-  /** Resizes the swapchain and compositor resources. */
-  protected abstract fun resizeHost(viewport: Viewport)
-
-  override fun present(): Boolean = draw(texture)
+  protected abstract fun setTarget(viewport: Viewport, replacement: List<T>): Deferred<Unit>
 
   /**
-   * Replaces the texture, because its owner sets its size. The outgoing texture stays current until
-   * the replacement completes, and the frames rendered before it are drawn from it. A replacement
-   * that fails once started leaves it unknown which texture the session holds, so the session
-   * detaches before either texture is released.
+   * Replaces the ring, because its owner sets its size. A replacement is refused while the host
+   * holds a frame, so the held one goes first, and the window keeps what it last presented. The
+   * outgoing ring stays alive until the replacement completes. A replacement that fails once
+   * started leaves it unknown which ring the session holds, so the session detaches before either
+   * ring is released.
    */
   override fun resize(viewport: Viewport) {
+    releaseFrames()
     resizeHost(viewport)
-    val replacement = allocate(viewport)
+    val replacement = allocateRing(viewport, ::allocate)
     val handover =
       try {
         setTarget(viewport, replacement)
       } catch (error: RuntimeException) {
-        replacement.close()
+        replacement.forEach(AutoCloseable::close)
         throw error
       }
     // A target replacement leaves the map's extent unchanged.
@@ -373,13 +365,32 @@ internal abstract class BorrowedTextureTarget<T : AutoCloseable>(
       await(handover)
     } catch (error: RuntimeException) {
       runCatching { close() }.onFailure(error::addSuppressed)
-      replacement.close()
+      replacement.forEach(AutoCloseable::close)
       throw error
     }
-    drainFrameResults()
-    texture.close()
-    texture = replacement
+    ring.forEach(AutoCloseable::close)
+    ring = replacement
+    // A replacement publishes no map update, and a frame rendered before it can no longer be
+    // acquired, so the new ring needs a forced frame.
     requestFrame(force = true)
+  }
+
+  override fun closeHost() {
+    ring.forEach(AutoCloseable::close)
+  }
+
+  companion object {
+    /** Allocates a ring of [RenderTarget.TEXTURE_RING_DEPTH] textures with [allocate]. */
+    fun <T : AutoCloseable> allocateRing(viewport: Viewport, allocate: (Viewport) -> T): List<T> {
+      val ring = ArrayList<T>(TEXTURE_RING_DEPTH)
+      try {
+        repeat(TEXTURE_RING_DEPTH) { ring.add(allocate(viewport)) }
+      } catch (error: RuntimeException) {
+        ring.forEach(AutoCloseable::close)
+        throw error
+      }
+      return ring
+    }
   }
 }
 

@@ -20,5 +20,5 @@ func attachOwnedTexture(
 }
 
 func withFrameView(frame *AcquiredFrameHandle, use func(frameView) error) error {
-	return frame.WithMetalTexture(func(view MetalOwnedTextureFrameView) error { return use(view) })
+	return frame.WithMetalTexture(func(view MetalTextureFrameView) error { return use(view) })
 }

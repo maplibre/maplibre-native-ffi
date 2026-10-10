@@ -4183,7 +4183,8 @@ internal val mln_metal_borrowed_texture_descriptor: GroupLayout =
     mln_logical_extent.withName("extent"),
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
-    ADDRESS.withName("texture"),
+    ADDRESS.withName("textures"),
+    JAVA_LONG.withName("texture_count"),
   )
 internal val mln_metal_context_descriptor: GroupLayout = Ffm.struct(ADDRESS.withName("device"))
 internal val mln_metal_owned_texture_descriptor: GroupLayout =
@@ -4242,8 +4243,10 @@ internal val mln_opengl_borrowed_texture_descriptor: GroupLayout =
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
     mln_opengl_context_descriptor.withName("context"),
-    JAVA_INT.withName("texture"),
+    ADDRESS.withName("textures"),
+    JAVA_LONG.withName("texture_count"),
     JAVA_INT.withName("target"),
+    Ffm.pad(4),
   )
 internal val mln_opengl_owned_texture_descriptor: GroupLayout =
   Ffm.struct(
@@ -4407,8 +4410,8 @@ internal val mln_vulkan_borrowed_texture_descriptor: GroupLayout =
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
     mln_vulkan_context_descriptor.withName("context"),
-    JAVA_LONG.withName("image"),
-    JAVA_LONG.withName("image_view"),
+    ADDRESS.withName("textures"),
+    JAVA_LONG.withName("texture_count"),
     JAVA_INT.withName("format"),
     JAVA_INT.withName("initial_layout"),
     JAVA_INT.withName("final_layout"),
@@ -4439,8 +4442,8 @@ internal val mln_webgpu_borrowed_texture_descriptor: GroupLayout =
     JAVA_INT.withName("physical_width"),
     JAVA_INT.withName("physical_height"),
     mln_webgpu_context_descriptor.withName("context"),
-    ADDRESS.withName("texture"),
-    ADDRESS.withName("texture_view"),
+    ADDRESS.withName("textures"),
+    JAVA_LONG.withName("texture_count"),
     JAVA_INT.withName("format"),
     Ffm.pad(4),
   )

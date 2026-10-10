@@ -99,6 +99,32 @@ bool mln_test_transferred_webgl_surface_create(
 );
 #endif
 
+#if defined(MLN_FFI_TEST_BACKEND_WEBGPU)
+// The deepest borrowed ring that mln_test_webgpu_borrowed_ring_create()
+// attaches.
+#define MLN_TEST_WEBGPU_MAX_RING_DEPTH 3U
+
+// Attaches a session to a borrowed ring of `depth` 64x64 RGBA8 textures that
+// the fixture creates on the thread's device and owns.
+bool mln_test_webgpu_borrowed_ring_create(
+  mln_map map, mln_test_render_fixture* fixture, size_t depth
+);
+
+// The WGPUTexture at `index` of a borrowed ring fixture, or null past its end.
+void* mln_test_webgpu_ring_texture(
+  const mln_test_render_fixture* fixture, size_t index
+);
+
+// Copies the ring texture at `index` into a buffer on the device's queue, maps
+// that buffer, and writes its tightly packed RGBA8 pixels to `pixels`, which
+// holds at least `size` bytes. Returns false when the texture, the copy, or
+// the map is unavailable.
+bool mln_test_webgpu_read_ring_texture(
+  const mln_test_render_fixture* fixture, size_t index, uint8_t* pixels,
+  size_t size
+);
+#endif
+
 #if defined(MLN_FFI_TEST_BACKEND_OPENGL) && defined(MLN_FFI_TEST_OPENGL_EGL)
 // Attaches an OpenGL surface session that owns its EGL context, presenting into
 // a pbuffer from tests/graphics. Returns false, attaching nothing, when the EGL

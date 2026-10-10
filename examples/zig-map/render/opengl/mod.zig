@@ -248,7 +248,11 @@ const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
 
     /// Releases any held frame, then detaches the session.
     pub fn detach(self: *PlatformOpenGLRenderTarget) void {
-        if (self.* == .owned_texture) render_target.releaseFrame(&self.owned_texture.held);
+        switch (self.*) {
+            .owned_texture => |*backend| render_target.releaseFrame(&backend.held),
+            .borrowed_texture => |*backend| render_target.releaseFrame(&backend.held),
+            .native_surface => {},
+        }
         self.session().deinit();
     }
 
@@ -271,9 +275,9 @@ const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
         }
     }
 
-    /// Follows a completed borrowed-texture replacement.
-    pub fn showReplacements(self: *PlatformOpenGLRenderTarget) !void {
-        if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
+    /// Follows completed borrowed-ring replacements.
+    pub fn retireReplaced(self: *PlatformOpenGLRenderTarget) !void {
+        if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
@@ -281,11 +285,8 @@ const PlatformOpenGLRenderTarget = union(types.RenderTargetMode) {
     pub fn present(self: *PlatformOpenGLRenderTarget, viewport: types.Viewport) !bool {
         _ = viewport;
         return switch (self.*) {
-            .owned_texture => |*backend| backend.present(),
-            .borrowed_texture => |*backend| blk: {
-                try backend.showReplacements();
-                break :blk backend.compositor.drawTexture(backend.texture.texture);
-            },
+            .owned_texture => |*backend| presentAcquired(&backend.session, &backend.compositor, &backend.held),
+            .borrowed_texture => |*backend| presentAcquired(&backend.session, &backend.compositor, &backend.held),
             // The driver already presented the frame.
             .native_surface => true,
         };
@@ -530,25 +531,27 @@ const OpenGLOwnedTextureBackend = struct {
         render_target.releaseFrame(&self.held);
         try self.session.resize(viewport);
     }
-
-    fn present(self: *OpenGLOwnedTextureBackend) !bool {
-        // Without a new frame, the window keeps the one it already shows.
-        if (!try self.session.acquireNewest(&self.held)) return true;
-        const frame = self.held.?;
-        const Context = struct {
-            backend: *OpenGLOwnedTextureBackend,
-            frame: maplibre.AcquiredFrame,
-            fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
-                if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-                return maplibre.acquiredFrameGetOpenglTexture(bool, context.frame, context, draw, null);
-            }
-            fn draw(context: @This(), info: maplibre.OpenglOwnedTextureFrame) anyerror!bool {
-                return context.backend.compositor.drawTexture(info.texture);
-            }
-        };
-        return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .backend = self, .frame = frame }, Context.producer, null);
-    }
 };
+
+/// Acquires the newest frame into `held` and samples its texture into the
+/// window. Both texture modes hand their frames over this way.
+fn presentAcquired(session: *render_target.Session, compositor: *OpenGLTextureCompositor, held: *?maplibre.AcquiredFrame) !bool {
+    // Without a new frame, the window keeps the one it already shows.
+    if (!try session.acquireNewest(held)) return true;
+    const frame = held.*.?;
+    const Context = struct {
+        compositor: *OpenGLTextureCompositor,
+        frame: maplibre.AcquiredFrame,
+        fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
+            if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
+            return maplibre.acquiredFrameGetOpenglTexture(bool, context.frame, context, draw, null);
+        }
+        fn draw(context: @This(), info: maplibre.OpenglTextureFrame) anyerror!bool {
+            return context.compositor.drawTexture(info.texture);
+        }
+    };
+    return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
+}
 
 const BorrowedTexture = struct {
     texture: gl.uint,
@@ -584,41 +587,70 @@ const BorrowedTexture = struct {
     }
 };
 
+/// The textures of a borrowed ring, one per slot.
+const OpenGLRing = struct {
+    textures: [render_target.borrowed_ring_depth]BorrowedTexture,
+
+    fn init(context: *const OpenGLContext, procs: OpenGLCompositorProcs, viewport: types.Viewport) !OpenGLRing {
+        var ring: OpenGLRing = undefined;
+        var created: usize = 0;
+        errdefer for (ring.textures[0..created]) |*texture| texture.deinit(context, procs);
+        while (created < ring.textures.len) : (created += 1) {
+            ring.textures[created] = try BorrowedTexture.init(context, procs, viewport);
+        }
+        return ring;
+    }
+
+    fn deinit(self: *OpenGLRing, context: *const OpenGLContext, procs: OpenGLCompositorProcs) void {
+        for (&self.textures) |*texture| texture.deinit(context, procs);
+    }
+
+    fn entries(self: OpenGLRing) [render_target.borrowed_ring_depth]maplibre.OpenglBorrowedTexture {
+        var result: [render_target.borrowed_ring_depth]maplibre.OpenglBorrowedTexture = undefined;
+        for (self.textures, &result) |texture, *entry| entry.* = .{ .texture = texture.texture };
+        return result;
+    }
+};
+
 const OpenGLBorrowedTextureBackend = struct {
     compositor: OpenGLTextureCompositor,
     session: render_target.Session = .{},
-    /// The texture the compositor samples.
-    texture: BorrowedTexture,
-    replacements: render_target.Replacements(BorrowedTexture) = .{},
+    /// The newest frame, held until a newer one replaces it.
+    held: ?maplibre.AcquiredFrame = null,
+    /// The ring the session renders into.
+    ring: OpenGLRing,
+    replacements: render_target.Replacements(OpenGLRing) = .{},
 
     fn init(window: *c.SDL_Window, viewport: types.Viewport) !OpenGLBorrowedTextureBackend {
         var compositor = try OpenGLTextureCompositor.init(window, viewport);
         errdefer compositor.deinit();
         return .{
-            .texture = try BorrowedTexture.init(&compositor.context, compositor.procs, viewport),
+            .ring = try OpenGLRing.init(&compositor.context, compositor.procs, viewport),
             .compositor = compositor,
         };
     }
 
     fn deinit(self: *OpenGLBorrowedTextureBackend) void {
+        render_target.releaseFrame(&self.held);
         self.session.deinit();
-        while (self.replacements.takeAny()) |texture| {
-            var retired = texture;
+        while (self.replacements.takeAny()) |ring| {
+            var retired = ring;
             retired.deinit(&self.compositor.context, self.compositor.procs);
         }
         self.replacements.deinit();
-        self.texture.deinit(&self.compositor.context, self.compositor.procs);
+        self.ring.deinit(&self.compositor.context, self.compositor.procs);
         self.compositor.deinit();
     }
 
     fn attach(self: *OpenGLBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
+        const entries = self.ring.entries();
         const attachment = maplibre.mapAttachOpenglBorrowedTexture(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .context = self.compositor.context.descriptor(),
-            .texture = self.texture.texture,
+            .textures = &entries,
             .target = gl_texture_target,
         }, options, &diagnostic) catch |err| {
             diagnostics.logError("OpenGL borrowed texture attach failed", err, &diagnostic);
@@ -627,37 +659,45 @@ const OpenGLBorrowedTextureBackend = struct {
         self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
     }
 
-    /// Follows a resized window: allocates a texture at the new size and hands
-    /// it to the live session, which stays attached.
+    /// Follows a resized window: allocates a ring at the new size and hands it
+    /// to the live session, which stays attached. A replacement is refused
+    /// while the host holds a frame, so the held one goes first; the window
+    /// keeps showing what it last presented.
     fn resize(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
-        var replacement = try BorrowedTexture.init(&self.compositor.context, self.compositor.procs, viewport);
+        render_target.releaseFrame(&self.held);
+        try self.replaceRing(viewport);
+        try self.session.resizeMap(viewport);
+    }
+
+    fn replaceRing(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
+        var replacement = try OpenGLRing.init(&self.compositor.context, self.compositor.procs, viewport);
         errdefer replacement.deinit(&self.compositor.context, self.compositor.procs);
         var diagnostic: maplibre.Diagnostic = .{};
+        const entries = replacement.entries();
         var completion = maplibre.renderSessionSetOpenglBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .context = self.compositor.context.descriptor(),
-            .texture = replacement.texture,
+            .textures = &entries,
             .target = gl_texture_target,
         }, &diagnostic) catch |err| {
             diagnostics.logError("OpenGL borrowed texture set target failed", err, &diagnostic);
             return types.AppError.ResizeFailed;
         };
-        self.replacements.push(completion, replacement) catch |err| {
+        self.replacements.push(completion, self.ring) catch |err| {
             completion.deinit();
             return err;
         };
-        try self.session.resizeMap(viewport);
+        self.ring = replacement;
     }
 
-    /// Switches the compositor to each replacement a rendered frame has
-    /// drawn into, destroying the texture it retires.
-    fn showReplacements(self: *OpenGLBorrowedTextureBackend) !void {
-        while (try self.replacements.takeShown(&self.session)) |replacement| {
-            self.texture.deinit(&self.compositor.context, self.compositor.procs);
-            self.texture = replacement;
+    /// Destroys each ring that a completed replacement retired.
+    fn retireReplaced(self: *OpenGLBorrowedTextureBackend) !void {
+        while (try self.replacements.takeCompleted(&self.session)) |ring| {
+            var retired = ring;
+            retired.deinit(&self.compositor.context, self.compositor.procs);
         }
     }
 };

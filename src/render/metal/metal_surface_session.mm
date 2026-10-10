@@ -293,6 +293,13 @@ class MetalSurfaceSessionBackend final
     return backend_;
   }
 
+  // Command buffers retain the objects they use, so their GPU work keeps
+  // those objects alive and destruction needs no wait.
+  [[nodiscard]] auto allows_off_thread_teardown() const noexcept
+    -> bool override {
+    return true;
+  }
+
   void resize(uint32_t physical_width, uint32_t physical_height) override {
     backend_.setSize(mln::Size{physical_width, physical_height});
   }

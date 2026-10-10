@@ -16,7 +16,9 @@ public struct FrameDemand: Equatable, Hashable, Sendable {
   /// Demands coalesce only when this value and their flags match.
   public var coalescingBoundary: UInt64
   /// Positive time allowed before driver work begins, in nanoseconds; zero has
-  /// no limit.
+  /// no limit. A demand that waits, for a free texture slot or for a map
+  /// update, is checked against its timeout when it runs again; a wait has no
+  /// timer of its own.
   public var timeoutNs: UInt64
   public static var `default`: Self {
     Self(raw: mln_frame_demand_default())
@@ -69,9 +71,21 @@ public struct FrameDemandFlag: OptionSet, NativeOpenValue, Equatable, Hashable,
   /// presenting target whose demand clears this bit still renders and keeps
   /// whatever it presented last. Ignored by targets without presentation.
   public static let present: FrameDemandFlag = .init(rawValue: 2)
+  /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+  /// `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits
+  /// instead, and runs again after the map's next update, a target replacement,
+  /// or an applied resize. A waiting demand holds no ring slot. A later demand
+  /// with the same flags and coalescing boundary supersedes it, a barrier ends
+  /// its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach, abandon, or the
+  /// quarantine of the ring's last usable slot end it with
+  /// `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow
+  /// the results of demands accepted after it. The flag does not pace: a host
+  /// that re-arms a waiting demand as each result arrives renders every update
+  /// the map publishes.
+  public static let waitForUpdate: FrameDemandFlag = .init(rawValue: 4)
 }
 
-/// Result of irreversible CPU-side target abandonment.
+/// What abandon did with a session's graphics resources.
 ///
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
@@ -83,9 +97,9 @@ public struct RenderAbandonDisposition: RawRepresentable, NativeOpenValue,
     self.rawValue = rawValue
   }
 
-  /// No graphics resources remained when control was abandoned.
+  /// Abandon destroyed every graphics resource, or none remained.
   public static let clean: RenderAbandonDisposition = .init(rawValue: 0)
-  /// Graphics resources could not be destroyed and were quarantined.
+  /// Abandon kept graphics resources that it could not safely destroy.
   public static let quarantined: RenderAbandonDisposition = .init(rawValue: 1)
 }
 
@@ -168,6 +182,10 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// One `mln_render_result` value.
   public var disposition: RenderResult
   public var token: UInt64
+  /// Generation of the map render update the demand evaluated. When disposition
+  /// is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
+  /// with `mln_map_snapshot.latest_render_update_generation` to find the first
+  /// frame that includes a command.
   public var mapUpdateGeneration: UInt64
   public var extentGeneration: UInt64
   /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
@@ -180,7 +198,9 @@ public struct RenderFrameResult: Equatable, Hashable, Sendable {
   /// re-arm its frame loop without the runtime event round trip. A camera
   /// transition does not set it by itself: the map publishes a new update after
   /// each of the transition's frames instead, which a render-if-needed demand
-  /// renders.
+  /// renders. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each
+  /// transition update without a runtime-event round trip; the host re-arms the
+  /// demand as each result arrives.
   public var needsRepaint: Bool
   public static var `default`: Self {
     Self(raw: mln_render_frame_result())
@@ -239,10 +259,14 @@ public struct RenderResult: RawRepresentable, NativeOpenValue, Equatable,
   /// A frame was rendered for acquisition, presentation, or ordered readback.
   public static let rendered: RenderResult = .init(rawValue: 0)
   /// No newer map update was available, or the map had no complete frame to
-  /// draw yet. The map publishes another update when it has one.
+  /// draw yet. The map publishes another update when it has one. A demand with
+  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead, and
+  /// finishes with this result only when a barrier ends its wait.
   public static let noUpdate: RenderResult = .init(rawValue: 1)
   /// An ordered extent change had not reached the map. The map publishes an
-  /// update at the new extent.
+  /// update at the new extent, which a demand with
+  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing with
+  /// this result.
   public static let sizePending: RenderResult = .init(rawValue: 2)
   /// The target could not produce a frame. The attempt consumes nothing, so a
   /// later demand with the same flags renders what this one would have. This

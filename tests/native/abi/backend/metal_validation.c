@@ -6,11 +6,17 @@
 #include "support/host_graphics.h"
 #include "support/test_support.h"
 
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+#include <objc/message.h>
+#include <objc/runtime.h>
+#endif
+
 MLN_TEST_DESCRIPTOR_EDITS(metal_surface, mln_metal_surface_descriptor)
 MLN_TEST_OVERFLOW_EDIT(metal_surface)
 MLN_TEST_DESCRIPTOR_EDITS(metal_owned, mln_metal_owned_texture_descriptor)
 MLN_TEST_OVERFLOW_EDIT(metal_owned)
 MLN_TEST_DESCRIPTOR_EDITS(metal_borrowed, mln_metal_borrowed_texture_descriptor)
+MLN_TEST_BORROWED_EDITS(metal_borrowed, metal)
 
 static void surface_without_layer(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_surface.layer = NULL;
@@ -19,7 +25,9 @@ static void owned_without_device(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_owned.context.device = NULL;
 }
 static void borrowed_without_texture(void* call) {
-  ((mln_test_target_call*)call)->descriptor.metal_borrowed.texture = NULL;
+  mln_test_target_call* edited = call;
+  edited->textures.metal[0].texture = NULL;
+  edited->descriptor.metal_borrowed.textures = edited->textures.metal;
 }
 static void borrowed_without_physical_width(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_borrowed.physical_width = 0;
@@ -27,6 +35,56 @@ static void borrowed_without_physical_width(void* call) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
 static void borrowed_with_another_physical_size(void* call) {
   ((mln_test_target_call*)call)->descriptor.metal_borrowed.physical_height = 32;
+}
+
+// The second texture of a ring of two, in a pixel format the first does not
+// have.
+static void* other_format_texture = NULL;
+
+static void borrowed_with_two_pixel_formats(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.metal[1].texture = other_format_texture;
+  edited->descriptor.metal_borrowed.textures = edited->textures.metal;
+  edited->descriptor.metal_borrowed.texture_count = 2;
+}
+
+// Makes a render-target texture in RGBA order, where tests/graphics makes
+// BGRA8Unorm textures.
+static void* new_rgba_texture(void* device) {
+  // MTLPixelFormatRGBA8Unorm.
+  const unsigned long rgba8_unorm = 70;
+  id descriptor = ((
+    id (*)(Class, SEL, unsigned long, unsigned long, unsigned long, bool)
+  )objc_msgSend)(
+    objc_getClass("MTLTextureDescriptor"),
+    sel_registerName(
+      "texture2DDescriptorWithPixelFormat:width:height:"
+      "mipmapped:"
+    ),
+    rgba8_unorm, 64, 64, false
+  );
+  // MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget.
+  ((void (*)(id, SEL, unsigned long))objc_msgSend)(
+    descriptor, sel_registerName("setUsage:"), 5
+  );
+  return ((void* (*)(id, SEL, id))objc_msgSend)(
+    (id)device, sel_registerName("newTextureWithDescriptor:"), descriptor
+  );
+}
+
+static void release_object(void* object) {
+  ((void (*)(id, SEL))objc_msgSend)((id)object, sel_registerName("release"));
+}
+
+// Another texture of the session's format, which a replacement deeper than
+// the session's ring names second.
+static void* second_texture = NULL;
+
+static void borrowed_with_another_depth(void* call) {
+  mln_test_target_call* edited = call;
+  edited->textures.metal[1].texture = second_texture;
+  edited->descriptor.metal_borrowed.textures = edited->textures.metal;
+  edited->descriptor.metal_borrowed.texture_count = 2;
 }
 #endif
 
@@ -53,18 +111,19 @@ static mln_metal_surface_descriptor surface_descriptor(void) {
   return descriptor;
 }
 
-// A Metal build reads the texture's size and usage when it validates a
-// borrowed descriptor, so there the descriptor names a real texture.
-static mln_metal_borrowed_texture_descriptor borrowed_descriptor(
-  void* texture
-) {
-  mln_metal_borrowed_texture_descriptor descriptor =
-    mln_metal_borrowed_texture_descriptor_default();
-  descriptor.extent = mln_test_target_extent();
-  descriptor.texture = texture;
-  descriptor.physical_width = 64;
-  descriptor.physical_height = 64;
-  return descriptor;
+// A Metal build reads the textures' size and usage when it validates a
+// borrowed descriptor, so there the descriptor names a real texture: a ring of
+// one, whose entry is in the call's storage.
+static void describe_borrowed(mln_test_target_call* call, void* texture) {
+  call->textures.metal[0] = (mln_metal_borrowed_texture){.texture = texture};
+  mln_metal_borrowed_texture_descriptor* descriptor =
+    &call->descriptor.metal_borrowed;
+  *descriptor = mln_metal_borrowed_texture_descriptor_default();
+  descriptor->extent = mln_test_target_extent();
+  descriptor->textures = call->textures.metal;
+  descriptor->texture_count = 1;
+  descriptor->physical_width = 64;
+  descriptor->physical_height = 64;
 }
 
 static void metal_attach_rejects_malformed_calls(void) {
@@ -120,9 +179,16 @@ static void metal_attach_rejects_malformed_calls(void) {
 
   call =
     mln_test_target_call_default(map, MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD);
-  call.descriptor.metal_borrowed = borrowed_descriptor(borrowed_texture);
+  describe_borrowed(&call, borrowed_texture);
+#if defined(MLN_FFI_TEST_BACKEND_METAL)
+  mln_test_graphics_context context = {0};
+  TEST_ASSERT_TRUE(mln_test_graphics_get_context(graphics, &context));
+  other_format_texture = new_rgba_texture(context.metal_device);
+  TEST_ASSERT_NOT_NULL(other_format_texture);
+#endif
   static const mln_test_validation_case borrowed_rows[] = {
     MLN_TEST_DESCRIPTOR_CASES(metal_borrowed),
+    MLN_TEST_BORROWED_CASES(metal_borrowed),
     {"null texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
     {"zero physical width", borrowed_without_physical_width,
@@ -131,6 +197,8 @@ static void metal_attach_rejects_malformed_calls(void) {
     {"a physical size the texture does not have",
      borrowed_with_another_physical_size, MLN_STATUS_INVALID_ARGUMENT,
      "must match descriptor physical size"},
+    {"textures of two pixel formats", borrowed_with_two_pixel_formats,
+     MLN_STATUS_INVALID_ARGUMENT, "share a device and a pixel format"},
 #else
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
@@ -142,6 +210,8 @@ static void metal_attach_rejects_malformed_calls(void) {
   );
 
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  release_object(other_format_texture);
+  other_format_texture = NULL;
   mln_test_graphics_texture_destroy(texture);
   mln_test_graphics_destroy(graphics);
 #endif
@@ -196,15 +266,23 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
   TEST_ASSERT_TRUE(
     mln_test_graphics_texture_get_info(replacement, &replacement_info)
   );
-  call.descriptor.metal_borrowed =
-    borrowed_descriptor(replacement_info.metal_texture);
+  describe_borrowed(&call, replacement_info.metal_texture);
+  // A second texture of the same format, for a replacement deeper than the
+  // session's ring of one.
+  mln_test_graphics_texture* second =
+    mln_test_render_fixture_new_texture(&fixture);
+  TEST_ASSERT_NOT_NULL_MESSAGE(second, mln_test_graphics_last_error());
+  mln_test_graphics_texture_info second_info = {0};
+  TEST_ASSERT_TRUE(mln_test_graphics_texture_get_info(second, &second_info));
+  second_texture = second_info.metal_texture;
 #else
-  call.descriptor.metal_borrowed = borrowed_descriptor(MLN_TEST_FAKE_HANDLE);
+  describe_borrowed(&call, MLN_TEST_FAKE_HANDLE);
 #endif
   static const mln_test_validation_case borrowed_rows[] = {
     {"null descriptor", mln_test_call_without_descriptor,
      MLN_STATUS_INVALID_ARGUMENT, NULL},
     MLN_TEST_DESCRIPTOR_CASES(metal_borrowed),
+    MLN_TEST_BORROWED_CASES(metal_borrowed),
     {"null texture", borrowed_without_texture, MLN_STATUS_INVALID_ARGUMENT,
      NULL},
     {"zero physical width", borrowed_without_physical_width,
@@ -213,6 +291,8 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
     {"a physical size the texture does not have",
      borrowed_with_another_physical_size, MLN_STATUS_INVALID_ARGUMENT,
      "must match descriptor physical size"},
+    {"more textures than the session's ring has slots",
+     borrowed_with_another_depth, MLN_STATUS_INVALID_ARGUMENT, "ring depth"},
 #else
     {"a well-formed descriptor", NULL, MLN_STATUS_UNSUPPORTED,
      "not supported by this build"},
@@ -223,6 +303,7 @@ static void metal_set_target_rejects_malformed_descriptors(void) {
     sizeof(call), submit_borrowed_set_target, NULL
   );
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
+  second_texture = NULL;
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

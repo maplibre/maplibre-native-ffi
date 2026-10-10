@@ -26,15 +26,15 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * See `mln_acquired_frame_get_metal_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun <T> withMetalTexture(block: (MetalOwnedTextureFrame) -> T): T =
+  public fun <T> withMetalTexture(block: (MetalTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_metal_texture", Access.READ) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(w(56, 64), 8)
+        val out = sized(w(64, 72), 8)
         check(C.mln_acquired_frame_get_metal_texture(handle, out, diagnostic))
-        block(readMetalOwnedTextureFrame(out, scope))
+        block(readMetalTextureFrame(out, scope))
       }
     }
 
@@ -44,7 +44,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * See `mln_acquired_frame_get_opengl_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun <T> withOpenglTexture(block: (OpenglOwnedTextureFrame) -> T): T =
+  public fun <T> withOpenglTexture(block: (OpenglTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_opengl_texture", Access.READ) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
@@ -52,7 +52,7 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
       ) { scope ->
         val out = sized(64, 8)
         check(C.mln_acquired_frame_get_opengl_texture(handle, out, diagnostic))
-        block(readOpenglOwnedTextureFrame(out, scope))
+        block(readOpenglTextureFrame(out, scope))
       }
     }
 
@@ -93,15 +93,15 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * See `mln_acquired_frame_get_vulkan_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun <T> withVulkanTexture(block: (VulkanOwnedTextureFrame) -> T): T =
+  public fun <T> withVulkanTexture(block: (VulkanTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_vulkan_texture", Access.READ) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(72, 8)
+        val out = sized(80, 8)
         check(C.mln_acquired_frame_get_vulkan_texture(handle, out, diagnostic))
-        block(readVulkanOwnedTextureFrame(out, scope))
+        block(readVulkanTextureFrame(out, scope))
       }
     }
 
@@ -111,15 +111,15 @@ public abstract class GeneratedAcquiredFrameOperations internal constructor() {
    * See `mln_acquired_frame_get_webgpu_texture` in the
    * [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
    */
-  public fun <T> withWebgpuTexture(block: (WebgpuOwnedTextureFrame) -> T): T =
+  public fun <T> withWebgpuTexture(block: (WebgpuTextureFrame) -> T): T =
     nativeCall(this, binding, "mln_acquired_frame_get_webgpu_texture", Access.READ) {
       borrowView(
         { C.mln_acquired_frame_view_begin(handle, it, diagnostic) },
         { C.mln_acquired_frame_view_end(it) },
       ) { scope ->
-        val out = sized(w(56, 72), 8)
+        val out = sized(w(64, 80), 8)
         check(C.mln_acquired_frame_get_webgpu_texture(handle, out, diagnostic))
-        block(readWebgpuOwnedTextureFrame(out, scope))
+        block(readWebgpuTextureFrame(out, scope))
       }
     }
 

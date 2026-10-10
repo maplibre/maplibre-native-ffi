@@ -361,13 +361,19 @@ internal unsafe struct mln_map_viewport_options
     public mln_edge_insets frustum_offset;
 }
 
+internal unsafe struct mln_metal_borrowed_texture
+{
+    public void* texture;
+}
+
 internal unsafe struct mln_metal_borrowed_texture_descriptor
 {
     public uint size;
     public mln_logical_extent extent;
     public uint physical_width;
     public uint physical_height;
-    public void* texture;
+    public mln_metal_borrowed_texture* textures;
+    public nuint texture_count;
 }
 
 internal unsafe struct mln_metal_context_descriptor
@@ -382,7 +388,15 @@ internal unsafe struct mln_metal_owned_texture_descriptor
     public mln_metal_context_descriptor context;
 }
 
-internal unsafe struct mln_metal_owned_texture_frame
+internal unsafe struct mln_metal_surface_descriptor
+{
+    public uint size;
+    public mln_logical_extent extent;
+    public mln_metal_context_descriptor context;
+    public void* layer;
+}
+
+internal unsafe struct mln_metal_texture_frame
 {
     public uint size;
     public ulong generation;
@@ -390,17 +404,10 @@ internal unsafe struct mln_metal_owned_texture_frame
     public uint height;
     public double scale_factor;
     public ulong frame_id;
+    public uint slot;
     public void* texture;
     public void* device;
     public ulong pixel_format;
-}
-
-internal unsafe struct mln_metal_surface_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_metal_context_descriptor context;
-    public void* layer;
 }
 
 internal unsafe struct mln_offline_geometry_region_definition
@@ -461,6 +468,11 @@ internal unsafe struct mln_offline_tile_pyramid_region_definition
     public byte include_ideographs;
 }
 
+internal unsafe struct mln_opengl_borrowed_texture
+{
+    public uint texture;
+}
+
 internal unsafe struct mln_opengl_borrowed_texture_descriptor
 {
     public uint size;
@@ -468,7 +480,8 @@ internal unsafe struct mln_opengl_borrowed_texture_descriptor
     public uint physical_width;
     public uint physical_height;
     public mln_opengl_context_descriptor context;
-    public uint texture;
+    public mln_opengl_borrowed_texture* textures;
+    public nuint texture_count;
     public uint target;
 }
 
@@ -499,7 +512,15 @@ internal unsafe struct mln_opengl_owned_texture_descriptor
     public mln_opengl_context_descriptor context;
 }
 
-internal unsafe struct mln_opengl_owned_texture_frame
+internal unsafe struct mln_opengl_surface_descriptor
+{
+    public uint size;
+    public mln_logical_extent extent;
+    public mln_opengl_context_descriptor context;
+    public void* surface;
+}
+
+internal unsafe struct mln_opengl_texture_frame
 {
     public uint size;
     public ulong generation;
@@ -507,19 +528,12 @@ internal unsafe struct mln_opengl_owned_texture_frame
     public uint height;
     public double scale_factor;
     public ulong frame_id;
+    public uint slot;
     public uint texture;
     public uint target;
     public uint internal_format;
     public uint format;
     public uint type;
-}
-
-internal unsafe struct mln_opengl_surface_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_opengl_context_descriptor context;
-    public void* surface;
 }
 
 internal unsafe struct mln_premultiplied_rgba8_image
@@ -1000,6 +1014,12 @@ internal unsafe struct mln_vec3
     public double z;
 }
 
+internal unsafe struct mln_vulkan_borrowed_texture
+{
+    public ulong image;
+    public ulong image_view;
+}
+
 internal unsafe struct mln_vulkan_borrowed_texture_descriptor
 {
     public uint size;
@@ -1007,8 +1027,8 @@ internal unsafe struct mln_vulkan_borrowed_texture_descriptor
     public uint physical_width;
     public uint physical_height;
     public mln_vulkan_context_descriptor context;
-    public ulong image;
-    public ulong image_view;
+    public mln_vulkan_borrowed_texture* textures;
+    public nuint texture_count;
     public uint format;
     public uint initial_layout;
     public uint final_layout;
@@ -1032,7 +1052,15 @@ internal unsafe struct mln_vulkan_owned_texture_descriptor
     public mln_vulkan_context_descriptor context;
 }
 
-internal unsafe struct mln_vulkan_owned_texture_frame
+internal unsafe struct mln_vulkan_surface_descriptor
+{
+    public uint size;
+    public mln_logical_extent extent;
+    public mln_vulkan_context_descriptor context;
+    public ulong surface;
+}
+
+internal unsafe struct mln_vulkan_texture_frame
 {
     public uint size;
     public ulong generation;
@@ -1040,19 +1068,12 @@ internal unsafe struct mln_vulkan_owned_texture_frame
     public uint height;
     public double scale_factor;
     public ulong frame_id;
+    public uint slot;
     public ulong image;
     public ulong image_view;
     public void* device;
     public uint format;
     public uint layout;
-}
-
-internal unsafe struct mln_vulkan_surface_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_vulkan_context_descriptor context;
-    public ulong surface;
 }
 
 internal unsafe struct mln_wake
@@ -1069,6 +1090,12 @@ internal unsafe struct mln_webgl_context_descriptor
     public mln_buffer_view canvas_selector;
 }
 
+internal unsafe struct mln_webgpu_borrowed_texture
+{
+    public void* texture;
+    public void* texture_view;
+}
+
 internal unsafe struct mln_webgpu_borrowed_texture_descriptor
 {
     public uint size;
@@ -1076,8 +1103,8 @@ internal unsafe struct mln_webgpu_borrowed_texture_descriptor
     public uint physical_width;
     public uint physical_height;
     public mln_webgpu_context_descriptor context;
-    public void* texture;
-    public void* texture_view;
+    public mln_webgpu_borrowed_texture* textures;
+    public nuint texture_count;
     public uint format;
 }
 
@@ -1095,7 +1122,16 @@ internal unsafe struct mln_webgpu_owned_texture_descriptor
     public mln_webgpu_context_descriptor context;
 }
 
-internal unsafe struct mln_webgpu_owned_texture_frame
+internal unsafe struct mln_webgpu_surface_descriptor
+{
+    public uint size;
+    public mln_logical_extent extent;
+    public mln_webgpu_context_descriptor context;
+    public void* surface;
+    public uint format;
+}
+
+internal unsafe struct mln_webgpu_texture_frame
 {
     public uint size;
     public ulong generation;
@@ -1103,18 +1139,10 @@ internal unsafe struct mln_webgpu_owned_texture_frame
     public uint height;
     public double scale_factor;
     public ulong frame_id;
+    public uint slot;
     public void* texture;
     public void* texture_view;
     public void* device;
-    public uint format;
-}
-
-internal unsafe struct mln_webgpu_surface_descriptor
-{
-    public uint size;
-    public mln_logical_extent extent;
-    public mln_webgpu_context_descriptor context;
-    public void* surface;
     public uint format;
 }
 
@@ -1238,6 +1266,7 @@ internal enum mln_frame_demand_flag : uint
 {
     MLN_FRAME_DEMAND_IF_NEEDED = 1,
     MLN_FRAME_DEMAND_PRESENT = 2,
+    MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4,
 }
 
 internal enum mln_free_camera_option_field : uint

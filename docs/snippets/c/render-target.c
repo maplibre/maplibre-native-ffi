@@ -49,13 +49,19 @@ mln_status attach_to_own_texture(
   // #endregion owned
 }
 
-mln_status attach_to_host_texture(
-  mln_map map, const mln_opengl_context_descriptor* context, uint32_t texture,
-  uint32_t texture_target, uint32_t logical_width, uint32_t logical_height,
-  double scale_factor, mln_render_session* out_session,
+mln_status attach_to_host_textures(
+  mln_map map, const mln_opengl_context_descriptor* context,
+  const uint32_t textures[2], uint32_t texture_target, uint32_t logical_width,
+  uint32_t logical_height, double scale_factor, mln_render_session* out_session,
   const mln_completion* completion
 ) {
   // #region borrowed
+  // Two textures let the host hold the newest frame while the session renders
+  // the next one into the other.
+  const mln_opengl_borrowed_texture ring[2] = {
+    {.texture = textures[0]},
+    {.texture = textures[1]},
+  };
   mln_opengl_borrowed_texture_descriptor descriptor =
     mln_opengl_borrowed_texture_descriptor_default();
   descriptor.extent.width = logical_width;
@@ -64,7 +70,8 @@ mln_status attach_to_host_texture(
   descriptor.physical_width = (uint32_t)(logical_width * scale_factor);
   descriptor.physical_height = (uint32_t)(logical_height * scale_factor);
   descriptor.context = *context;
-  descriptor.texture = texture;
+  descriptor.textures = ring;
+  descriptor.texture_count = 2;
   descriptor.target = texture_target;
   const mln_render_session_attach_options options = caller_driver();
   return mln_map_attach_opengl_borrowed_texture(

@@ -32,8 +32,6 @@ internal sealed unsafe class VulkanBorrowedImage : IDisposable
 
     public ulong ViewHandle => view.Handle;
 
-    public ImageView View => view;
-
     public void Dispose()
     {
         var vk = context.Api;

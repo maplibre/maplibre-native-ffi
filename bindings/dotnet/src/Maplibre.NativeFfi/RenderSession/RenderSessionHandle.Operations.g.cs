@@ -70,7 +70,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Irreversibly closes control and mailboxes without graphics calls.
+    /// Irreversibly closes control and mailboxes and disposes of the session's
+    /// graphics objects.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_abandon</c> in the <see
@@ -111,7 +112,9 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
 
     /// <summary>
     /// Starts a barrier that completes after all render work accepted before it
-    /// has a terminal result. A barrier does not request a frame.
+    /// has a terminal result. A barrier does not request a frame. Accepting a
+    /// barrier ends the wait of every earlier demand that waits for a map
+    /// update.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_barrier</c> in the <see
@@ -487,7 +490,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned Metal texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned Metal
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_set_metal_borrowed_texture_target</c> in the
@@ -507,7 +511,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_metal_borrowed_texture_target(
                     Handle,
-                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeMetalBorrowedTextureDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
                 ),
@@ -541,7 +545,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned OpenGL texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned OpenGL
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_set_opengl_borrowed_texture_target</c> in the
@@ -595,7 +600,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned Vulkan texture replacement.
+    /// Starts an ordered replacement of every image of a caller-owned Vulkan
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_set_vulkan_borrowed_texture_target</c> in the
@@ -615,7 +621,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_vulkan_borrowed_texture_target(
                     Handle,
-                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeVulkanBorrowedTextureDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
                 ),
@@ -649,7 +655,8 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
     }
 
     /// <summary>
-    /// Starts an ordered caller-owned WebGPU texture replacement.
+    /// Starts an ordered replacement of every texture of a caller-owned WebGPU
+    /// ring.
     /// </summary>
     /// <remarks>
     /// See <c>mln_render_session_set_webgpu_borrowed_texture_target</c> in the
@@ -669,7 +676,7 @@ public sealed unsafe partial class RenderSessionHandle : IDisposable, INativeOwn
             (completion, diagnostic) =>
                 NativeMethods.mln_render_session_set_webgpu_borrowed_texture_target(
                     Handle,
-                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor)),
+                    scope.Value(NativeWebgpuBorrowedTextureDescriptor(descriptor, scope)),
                     completion,
                     diagnostic
                 ),

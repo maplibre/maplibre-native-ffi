@@ -56,7 +56,11 @@ pub const MetalRenderTarget = union(types.RenderTargetMode) {
 
     /// Releases any held frame, then detaches the session.
     pub fn detach(self: *MetalRenderTarget) void {
-        if (self.* == .owned_texture) render_target.releaseFrame(&self.owned_texture.held);
+        switch (self.*) {
+            .owned_texture => |*backend| render_target.releaseFrame(&backend.held),
+            .borrowed_texture => |*backend| render_target.releaseFrame(&backend.held),
+            .native_surface => {},
+        }
         self.session().deinit();
     }
 
@@ -79,9 +83,9 @@ pub const MetalRenderTarget = union(types.RenderTargetMode) {
         }
     }
 
-    /// Follows a completed borrowed-texture replacement.
-    pub fn showReplacements(self: *MetalRenderTarget) !void {
-        if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
+    /// Follows completed borrowed-ring replacements.
+    pub fn retireReplaced(self: *MetalRenderTarget) !void {
+        if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
@@ -89,11 +93,8 @@ pub const MetalRenderTarget = union(types.RenderTargetMode) {
     pub fn present(self: *MetalRenderTarget, viewport: types.Viewport) !bool {
         _ = viewport;
         return switch (self.*) {
-            .owned_texture => |*backend| backend.present(),
-            .borrowed_texture => |*backend| blk: {
-                try backend.showReplacements();
-                break :blk backend.compositor.drawMetalTexture(backend.texture.value.?, .{ .kind = .cpu_complete });
-            },
+            .owned_texture => |*backend| presentAcquired(&backend.session, &backend.compositor, &backend.held),
+            .borrowed_texture => |*backend| presentAcquired(&backend.session, &backend.compositor, &backend.held),
             // The driver already presented the frame.
             .native_surface => true,
         };
@@ -255,59 +256,90 @@ const MetalOwnedTextureBackend = struct {
         render_target.releaseFrame(&self.held);
         try self.session.resize(viewport);
     }
+};
 
-    fn present(self: *MetalOwnedTextureBackend) !bool {
-        // Without a new frame, the window keeps the one it already shows.
-        if (!try self.session.acquireNewest(&self.held)) return true;
-        const frame = self.held.?;
-        const Context = struct {
-            backend: *MetalOwnedTextureBackend,
-            frame: maplibre.AcquiredFrame,
-            sync: maplibre.GpuSync = .{},
-            fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
-                var with_sync = context;
-                with_sync.sync = sync;
-                return maplibre.acquiredFrameGetMetalTexture(bool, context.frame, with_sync, draw, null);
-            }
-            fn draw(context: @This(), info: maplibre.MetalOwnedTextureFrame) anyerror!bool {
-                return context.backend.compositor.drawMetalTexture(info.texture orelse return types.AppError.BackendDrawFailed, context.sync);
-            }
-        };
-        return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .backend = self, .frame = frame }, Context.producer, null);
+/// Acquires the newest frame into `held` and samples its texture into the
+/// window. Both texture modes hand their frames over this way.
+fn presentAcquired(session: *render_target.Session, compositor: *MetalTextureCompositor, held: *?maplibre.AcquiredFrame) !bool {
+    // Without a new frame, the window keeps the one it already shows.
+    if (!try session.acquireNewest(held)) return true;
+    const frame = held.*.?;
+    const Context = struct {
+        compositor: *MetalTextureCompositor,
+        frame: maplibre.AcquiredFrame,
+        sync: maplibre.GpuSync = .{},
+        fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
+            var with_sync = context;
+            with_sync.sync = sync;
+            return maplibre.acquiredFrameGetMetalTexture(bool, context.frame, with_sync, draw, null);
+        }
+        fn draw(context: @This(), info: maplibre.MetalTextureFrame) anyerror!bool {
+            return context.compositor.drawMetalTexture(info.texture orelse return types.AppError.BackendDrawFailed, context.sync);
+        }
+    };
+    return maplibre.acquiredFrameGetProducerSync(bool, frame, Context{ .compositor = compositor, .frame = frame }, Context.producer, null);
+}
+
+/// The textures of a borrowed ring, one per slot.
+const MetalRing = struct {
+    textures: [render_target.borrowed_ring_depth]objc.Object,
+
+    fn init(device: objc.Object, viewport: types.Viewport) !MetalRing {
+        var ring: MetalRing = undefined;
+        var created: usize = 0;
+        errdefer for (ring.textures[0..created]) |texture| texture.release();
+        while (created < ring.textures.len) : (created += 1) {
+            ring.textures[created] = try createBorrowedTexture(device, viewport);
+        }
+        return ring;
+    }
+
+    fn deinit(self: MetalRing) void {
+        for (self.textures) |texture| texture.release();
+    }
+
+    fn entries(self: MetalRing) [render_target.borrowed_ring_depth]maplibre.MetalBorrowedTexture {
+        var result: [render_target.borrowed_ring_depth]maplibre.MetalBorrowedTexture = undefined;
+        for (self.textures, &result) |texture, *entry| entry.* = .{ .texture = texture.value.? };
+        return result;
     }
 };
 
 const MetalBorrowedTextureBackend = struct {
     compositor: MetalTextureCompositor,
     session: render_target.Session = .{},
-    /// The texture the compositor samples.
-    texture: objc.Object,
-    replacements: render_target.Replacements(objc.Object) = .{},
+    /// The newest frame, held until a newer one replaces it.
+    held: ?maplibre.AcquiredFrame = null,
+    /// The ring the session renders into.
+    ring: MetalRing,
+    replacements: render_target.Replacements(MetalRing) = .{},
 
     fn init(window: *c.SDL_Window, viewport: types.Viewport) !MetalBorrowedTextureBackend {
         var compositor = try MetalTextureCompositor.init(window, viewport);
         errdefer compositor.deinit();
         return .{
             .compositor = compositor,
-            .texture = try createBorrowedTexture(compositor.view.device, viewport),
+            .ring = try MetalRing.init(compositor.view.device, viewport),
         };
     }
 
     fn deinit(self: *MetalBorrowedTextureBackend) void {
+        render_target.releaseFrame(&self.held);
         self.session.deinit();
-        while (self.replacements.takeAny()) |texture| texture.release();
+        while (self.replacements.takeAny()) |retired| retired.deinit();
         self.replacements.deinit();
-        self.texture.release();
+        self.ring.deinit();
         self.compositor.deinit();
     }
 
     fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
+        const entries = self.ring.entries();
         const attachment = maplibre.mapAttachMetalBorrowedTexture(std.heap.smp_allocator, map.*, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
-            .texture = (self.texture.value.?),
+            .textures = &entries,
         }, options, &diagnostic) catch |err| {
             diagnostics.logError("Metal borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
@@ -315,36 +347,41 @@ const MetalBorrowedTextureBackend = struct {
         self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
     }
 
-    /// Follows a resized window: allocates a texture at the new size and hands
-    /// it to the live session, which stays attached.
+    /// Follows a resized window: allocates a ring at the new size and hands it
+    /// to the live session, which stays attached. A replacement is refused
+    /// while the host holds a frame, so the held one goes first; the window
+    /// keeps showing what it last presented.
     fn resize(self: *MetalBorrowedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
-        const replacement = try createBorrowedTexture(self.compositor.view.device, viewport);
-        errdefer replacement.release();
+        render_target.releaseFrame(&self.held);
+        try self.replaceRing(viewport);
+        try self.session.resizeMap(viewport);
+    }
+
+    fn replaceRing(self: *MetalBorrowedTextureBackend, viewport: types.Viewport) !void {
+        const replacement = try MetalRing.init(self.compositor.view.device, viewport);
+        errdefer replacement.deinit();
         var diagnostic: maplibre.Diagnostic = .{};
+        const entries = replacement.entries();
         var completion = maplibre.renderSessionSetMetalBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
-            .texture = (replacement.value.?),
+            .textures = &entries,
         }, &diagnostic) catch |err| {
             diagnostics.logError("Metal borrowed texture set target failed", err, &diagnostic);
             return types.AppError.ResizeFailed;
         };
-        self.replacements.push(completion, replacement) catch |err| {
+        self.replacements.push(completion, self.ring) catch |err| {
             completion.deinit();
             return err;
         };
-        try self.session.resizeMap(viewport);
+        self.ring = replacement;
     }
 
-    /// Switches the compositor to each replacement a rendered frame has
-    /// drawn into, releasing the texture it retires.
-    fn showReplacements(self: *MetalBorrowedTextureBackend) !void {
-        while (try self.replacements.takeShown(&self.session)) |replacement| {
-            self.texture.release();
-            self.texture = replacement;
-        }
+    /// Releases each ring that a completed replacement retired.
+    fn retireReplaced(self: *MetalBorrowedTextureBackend) !void {
+        while (try self.replacements.takeCompleted(&self.session)) |retired| retired.deinit();
     }
 };
 

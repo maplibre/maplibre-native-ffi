@@ -1095,7 +1095,9 @@ pub struct FrameDemand {
     /// Demands coalesce only when this value and their flags match.
     pub coalescing_boundary: u64,
     /// Positive time allowed before driver work begins, in nanoseconds; zero
-    /// has no limit.
+    /// has no limit. A demand that waits, for a free texture slot or for a map
+    /// update, is checked against its timeout when it runs again; a wait has no
+    /// timer of its own.
     pub timeout_ns: u64,
 }
 impl Default for FrameDemand {
@@ -1152,6 +1154,18 @@ pub struct FrameDemandFlag: u32 {
     /// presenting target whose demand clears this bit still renders and keeps
     /// whatever it presented last. Ignored by targets without presentation.
     const PRESENT = 2;
+    /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+    /// `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits
+    /// instead, and runs again after the map's next update, a target
+    /// replacement, or an applied resize. A waiting demand holds no ring slot.
+    /// A later demand with the same flags and coalescing boundary supersedes
+    /// it, a barrier ends its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and
+    /// detach, abandon, or the quarantine of the ring's last usable slot end it
+    /// with `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can
+    /// follow the results of demands accepted after it. The flag does not pace:
+    /// a host that re-arms a waiting demand as each result arrives renders
+    /// every update the map publishes.
+    const WAIT_FOR_UPDATE = 4;
 }
 }
 
@@ -1446,7 +1460,9 @@ native_enum! {
 /// See `mln_gpu_sync_kind` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__target_8h.html).
 pub enum GpuSyncKind: u32 {
-    /// The producer or consumer has completed before the API call returns.
+    /// The host needs no synchronization object. The work completed, or on
+    /// WebGPU was submitted to the device's queue, before the frame became
+    /// acquirable or before the release call.
     CpuComplete = 0,
     /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
     MetalSharedEvent = 1,
@@ -2007,6 +2023,10 @@ pub struct MapSnapshot {
     /// True while the map is inside a gesture.
     pub gesture_in_progress: bool,
     pub event_mask: RuntimeEventMask,
+    /// Generation of the latest render update the map published. A rendered
+    /// frame at or past it draws map state that includes every command this
+    /// snapshot observes, though animations and resource loads finish in later
+    /// frames.
     pub latest_render_update_generation: u64,
     pub tile: MapTileOptions,
     pub bounds: BoundOptions,
@@ -2250,11 +2270,40 @@ impl FromNative<sys::mln_map_viewport_options> for MapViewportOptions {
     }
 }
 
+/// One caller-owned Metal texture of a borrowed texture ring.
+///
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MetalBorrowedTexture {
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+    pub texture: *mut std::ffi::c_void,
+}
+impl MetalBorrowedTexture {
+    pub const fn new(texture: *mut std::ffi::c_void) -> Self {
+        Self { texture }
+    }
+}
+impl ToNative<sys::mln_metal_borrowed_texture> for MetalBorrowedTexture {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_metal_borrowed_texture> {
+        let mut raw: sys::mln_metal_borrowed_texture = unsafe { std::mem::zeroed() };
+        raw.texture = self.texture;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_metal_borrowed_texture> for MetalBorrowedTexture {
+    unsafe fn from_native(raw: sys::mln_metal_borrowed_texture) -> Result<Self> {
+        Ok(Self {
+            texture: raw.texture,
+        })
+    }
+}
+
 /// Metal attachment options for a borrowed texture target.
 ///
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MetalBorrowedTextureDescriptor {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
@@ -2267,27 +2316,12 @@ pub struct MetalBorrowedTextureDescriptor {
     /// Physical texture height in device pixels. Must be positive. Defaults to
     /// 256.
     pub physical_height: u32,
-    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
-    pub texture: *mut std::ffi::c_void,
+    /// The ring's textures, one per slot, in slot order. Required.
+    pub textures: Vec<MetalBorrowedTexture>,
 }
 impl Default for MetalBorrowedTextureDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_metal_borrowed_texture_descriptor_default() })
-    }
-}
-impl MetalBorrowedTextureDescriptor {
-    pub const fn new(
-        extent: LogicalExtent,
-        physical_width: u32,
-        physical_height: u32,
-        texture: *mut std::ffi::c_void,
-    ) -> Self {
-        Self {
-            extent,
-            physical_width,
-            physical_height,
-            texture,
-        }
     }
 }
 impl ToNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTextureDescriptor {
@@ -2301,7 +2335,8 @@ impl ToNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTextu
         raw.extent = to_native(&self.extent, arena)?;
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
-        raw.texture = self.texture;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         Ok(raw)
     }
 }
@@ -2311,7 +2346,7 @@ impl FromNative<sys::mln_metal_borrowed_texture_descriptor> for MetalBorrowedTex
             extent: unsafe { from_native(raw.extent) }?,
             physical_width: raw.physical_width,
             physical_height: raw.physical_height,
-            texture: raw.texture,
+            textures: unsafe { convert::copy_array(raw.textures, raw.texture_count) }?,
         })
     }
 }
@@ -2384,67 +2419,6 @@ impl FromNative<sys::mln_metal_owned_texture_descriptor> for MetalOwnedTextureDe
     }
 }
 
-/// Metal frame acquired from a session-owned texture target.
-///
-/// See `mln_metal_owned_texture_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct MetalOwnedTextureFrame {
-    /// Session generation that produced this frame.
-    pub generation: u64,
-    /// Physical Metal texture width in device pixels.
-    pub width: u32,
-    /// Physical Metal texture height in device pixels.
-    pub height: u32,
-    /// UI-to-device pixel scale used for this frame.
-    pub scale_factor: f64,
-    /// Opaque frame identity used to reject stale releases.
-    pub frame_id: u64,
-    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
-    pub texture: *mut std::ffi::c_void,
-    /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
-    pub device: *mut std::ffi::c_void,
-    /// Backend-native pixel format value. Metal uses MTLPixelFormat.
-    pub pixel_format: u64,
-}
-impl MetalOwnedTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        texture: *mut std::ffi::c_void,
-        device: *mut std::ffi::c_void,
-        pixel_format: u64,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            texture,
-            device,
-            pixel_format,
-        }
-    }
-}
-impl FromNative<sys::mln_metal_owned_texture_frame> for MetalOwnedTextureFrame {
-    unsafe fn from_native(raw: sys::mln_metal_owned_texture_frame) -> Result<Self> {
-        Ok(Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            texture: raw.texture,
-            device: raw.device,
-            pixel_format: raw.pixel_format,
-        })
-    }
-}
-
 /// Metal attachment options for a native surface.
 ///
 /// See `mln_metal_surface_descriptor` in the
@@ -2494,6 +2468,73 @@ impl FromNative<sys::mln_metal_surface_descriptor> for MetalSurfaceDescriptor {
             extent: unsafe { from_native(raw.extent) }?,
             context: unsafe { from_native(raw.context) }?,
             layer: raw.layer,
+        })
+    }
+}
+
+/// Metal frame acquired from a texture ring.
+///
+/// See `mln_metal_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MetalTextureFrame {
+    /// Session generation that produced this frame.
+    pub generation: u64,
+    /// Physical Metal texture width in device pixels.
+    pub width: u32,
+    /// Physical Metal texture height in device pixels.
+    pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
+    pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
+    pub frame_id: u64,
+    /// Ring slot that holds this frame. For a borrowed target, the index of its
+    /// texture in the descriptor's textures array.
+    pub slot: u32,
+    /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
+    pub texture: *mut std::ffi::c_void,
+    /// Borrowed `id<MTLDevice>` / `MTL::Device*`. Valid until frame release.
+    pub device: *mut std::ffi::c_void,
+    /// Backend-native pixel format value. Metal uses MTLPixelFormat.
+    pub pixel_format: u64,
+}
+impl MetalTextureFrame {
+    pub const fn new(
+        generation: u64,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        frame_id: u64,
+        slot: u32,
+        texture: *mut std::ffi::c_void,
+        device: *mut std::ffi::c_void,
+        pixel_format: u64,
+    ) -> Self {
+        Self {
+            generation,
+            width,
+            height,
+            scale_factor,
+            frame_id,
+            slot,
+            texture,
+            device,
+            pixel_format,
+        }
+    }
+}
+impl FromNative<sys::mln_metal_texture_frame> for MetalTextureFrame {
+    unsafe fn from_native(raw: sys::mln_metal_texture_frame) -> Result<Self> {
+        Ok(Self {
+            generation: raw.generation,
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: raw.frame_id,
+            slot: raw.slot,
+            texture: raw.texture,
+            device: raw.device,
+            pixel_format: raw.pixel_format,
         })
     }
 }
@@ -2783,6 +2824,35 @@ impl FromNative<sys::mln_offline_tile_pyramid_region_definition>
     }
 }
 
+/// One caller-owned OpenGL texture of a borrowed texture ring.
+///
+/// See `mln_opengl_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct OpenglBorrowedTexture {
+    /// Borrowed OpenGL texture object name. Required.
+    pub texture: u32,
+}
+impl OpenglBorrowedTexture {
+    pub const fn new(texture: u32) -> Self {
+        Self { texture }
+    }
+}
+impl ToNative<sys::mln_opengl_borrowed_texture> for OpenglBorrowedTexture {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_opengl_borrowed_texture> {
+        let mut raw: sys::mln_opengl_borrowed_texture = unsafe { std::mem::zeroed() };
+        raw.texture = self.texture;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_opengl_borrowed_texture> for OpenglBorrowedTexture {
+    unsafe fn from_native(raw: sys::mln_opengl_borrowed_texture) -> Result<Self> {
+        Ok(Self {
+            texture: raw.texture,
+        })
+    }
+}
+
 /// OpenGL attachment options for a borrowed texture target.
 ///
 /// See `mln_opengl_borrowed_texture_descriptor` in the
@@ -2800,12 +2870,12 @@ pub struct OpenglBorrowedTextureDescriptor {
     /// Physical texture height in device pixels. Must be positive. Defaults to
     /// 256.
     pub physical_height: u32,
-    /// Borrowed OpenGL context provider data. The texture must belong to this
+    /// Borrowed OpenGL context provider data. The textures must belong to this
     /// context or a context in the same share group.
     pub context: OpenglContextDescriptor,
-    /// Borrowed OpenGL texture object name. Required.
-    pub texture: u32,
-    /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
+    /// The ring's textures, one per slot, in slot order. Required.
+    pub textures: Vec<OpenglBorrowedTexture>,
+    /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
     pub target: u32,
 }
 impl Default for OpenglBorrowedTextureDescriptor {
@@ -2825,7 +2895,8 @@ impl ToNative<sys::mln_opengl_borrowed_texture_descriptor> for OpenglBorrowedTex
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = to_native(&self.context, arena)?;
-        raw.texture = self.texture;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         raw.target = self.target;
         Ok(raw)
     }
@@ -2837,7 +2908,7 @@ impl FromNative<sys::mln_opengl_borrowed_texture_descriptor> for OpenglBorrowedT
             physical_width: raw.physical_width,
             physical_height: raw.physical_height,
             context: unsafe { from_native(raw.context) }?,
-            texture: raw.texture,
+            textures: unsafe { convert::copy_array(raw.textures, raw.texture_count) }?,
             target: raw.target,
         })
     }
@@ -3017,77 +3088,6 @@ impl FromNative<sys::mln_opengl_owned_texture_descriptor> for OpenglOwnedTexture
     }
 }
 
-/// OpenGL frame acquired from a session-owned texture target.
-///
-/// See `mln_opengl_owned_texture_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct OpenglOwnedTextureFrame {
-    /// Session generation that produced this frame.
-    pub generation: u64,
-    /// Physical OpenGL texture width in device pixels.
-    pub width: u32,
-    /// Physical OpenGL texture height in device pixels.
-    pub height: u32,
-    /// UI-to-device pixel scale used for this frame.
-    pub scale_factor: f64,
-    /// Opaque frame identity used to reject stale releases.
-    pub frame_id: u64,
-    /// Borrowed OpenGL texture object name. Valid until frame release.
-    pub texture: u32,
-    /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
-    pub target: u32,
-    /// OpenGL internal format, such as GL_RGBA8.
-    pub internal_format: u32,
-    /// OpenGL pixel format, such as GL_RGBA.
-    pub format: u32,
-    /// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
-    pub r#type: u32,
-}
-impl OpenglOwnedTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        texture: u32,
-        target: u32,
-        internal_format: u32,
-        format: u32,
-        r#type: u32,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            texture,
-            target,
-            internal_format,
-            format,
-            r#type,
-        }
-    }
-}
-impl FromNative<sys::mln_opengl_owned_texture_frame> for OpenglOwnedTextureFrame {
-    unsafe fn from_native(raw: sys::mln_opengl_owned_texture_frame) -> Result<Self> {
-        Ok(Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            texture: raw.texture,
-            target: raw.target,
-            internal_format: raw.internal_format,
-            format: raw.format,
-            r#type: raw.type_,
-        })
-    }
-}
-
 /// OpenGL attachment options for a native surface.
 ///
 /// See `mln_opengl_surface_descriptor` in the
@@ -3126,6 +3126,85 @@ impl FromNative<sys::mln_opengl_surface_descriptor> for OpenglSurfaceDescriptor 
             extent: unsafe { from_native(raw.extent) }?,
             context: unsafe { from_native(raw.context) }?,
             surface: raw.surface,
+        })
+    }
+}
+
+/// OpenGL frame acquired from a texture ring.
+///
+/// See `mln_opengl_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct OpenglTextureFrame {
+    /// Session generation that produced this frame.
+    pub generation: u64,
+    /// Physical OpenGL texture width in device pixels.
+    pub width: u32,
+    /// Physical OpenGL texture height in device pixels.
+    pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
+    pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
+    pub frame_id: u64,
+    /// Ring slot that holds this frame. For a borrowed target, the index of its
+    /// texture in the descriptor's textures array.
+    pub slot: u32,
+    /// Borrowed OpenGL texture object name. Valid until frame release.
+    pub texture: u32,
+    /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
+    pub target: u32,
+    /// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
+    /// whose format the host chose.
+    pub internal_format: u32,
+    /// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
+    pub format: u32,
+    /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed
+    /// texture.
+    pub r#type: u32,
+}
+impl OpenglTextureFrame {
+    pub const fn new(
+        generation: u64,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        frame_id: u64,
+        slot: u32,
+        texture: u32,
+        target: u32,
+        internal_format: u32,
+        format: u32,
+        r#type: u32,
+    ) -> Self {
+        Self {
+            generation,
+            width,
+            height,
+            scale_factor,
+            frame_id,
+            slot,
+            texture,
+            target,
+            internal_format,
+            format,
+            r#type,
+        }
+    }
+}
+impl FromNative<sys::mln_opengl_texture_frame> for OpenglTextureFrame {
+    unsafe fn from_native(raw: sys::mln_opengl_texture_frame) -> Result<Self> {
+        Ok(Self {
+            generation: raw.generation,
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: raw.frame_id,
+            slot: raw.slot,
+            texture: raw.texture,
+            target: raw.target,
+            internal_format: raw.internal_format,
+            format: raw.format,
+            r#type: raw.type_,
         })
     }
 }
@@ -3421,14 +3500,14 @@ impl ToNative<sys::mln_queue_lock> for QueueLock {
 }
 
 native_enum! {
-/// Result of irreversible CPU-side target abandonment.
+/// What abandon did with a session's graphics resources.
 ///
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 pub enum RenderAbandonDisposition: u32 {
-    /// No graphics resources remained when control was abandoned.
+    /// Abandon destroyed every graphics resource, or none remained.
     Clean = 0,
-    /// Graphics resources could not be destroyed and were quarantined.
+    /// Abandon kept graphics resources that it could not safely destroy.
     Quarantined = 1,
 } Unknown
 }
@@ -3518,6 +3597,10 @@ pub struct RenderFrameResult {
     /// One `mln_render_result` value.
     pub disposition: RenderResult,
     pub token: u64,
+    /// Generation of the map render update the demand evaluated. When
+    /// disposition is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update;
+    /// compare it with `mln_map_snapshot.latest_render_update_generation` to
+    /// find the first frame that includes a command.
     pub map_update_generation: u64,
     pub extent_generation: u64,
     /// Zero unless disposition is `MLN_RENDER_RESULT_RENDERED`.
@@ -3530,7 +3613,10 @@ pub struct RenderFrameResult {
     /// host can re-arm its frame loop without the runtime event round trip. A
     /// camera transition does not set it by itself: the map publishes a new
     /// update after each of the transition's frames instead, which a
-    /// render-if-needed demand renders.
+    /// render-if-needed demand renders. A demand with
+    /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each transition update
+    /// without a runtime-event round trip; the host re-arms the demand as each
+    /// result arrives.
     pub needs_repaint: bool,
 }
 impl RenderFrameResult {
@@ -3585,10 +3671,14 @@ pub enum RenderResult: u32 {
     /// A frame was rendered for acquisition, presentation, or ordered readback.
     Rendered = 0,
     /// No newer map update was available, or the map had no complete frame to
-    /// draw yet. The map publishes another update when it has one.
+    /// draw yet. The map publishes another update when it has one. A demand
+    /// with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead,
+    /// and finishes with this result only when a barrier ends its wait.
     NoUpdate = 1,
     /// An ordered extent change had not reached the map. The map publishes an
-    /// update at the new extent.
+    /// update at the new extent, which a demand with
+    /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing with
+    /// this result.
     SizePending = 2,
     /// The target could not produce a frame. The attempt consumes nothing, so a
     /// later demand with the same flags renders what this one would have. This
@@ -3611,9 +3701,10 @@ pub struct RenderSessionAttachOptions {
     /// One `mln_render_driver_kind` value. Defaults to
     /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
     pub driver: RenderDriverKind,
-    /// Requested host-acquirable owned-texture slot count. Private targets
-    /// grant one slot regardless of this value. Ignored by other targets.
-    /// Defaults to 1.
+    /// Requested slot count of a session-owned texture ring, from one to three.
+    /// Private targets grant one slot regardless of this value. A borrowed
+    /// texture ring's depth is its texture count, so borrowed and other targets
+    /// ignore this value. Defaults to 1.
     pub requested_texture_ring_depth: u32,
     /// Wakes the receiver when the frame-result queue becomes nonempty.
     pub frame_wake: Wake,
@@ -3662,7 +3753,8 @@ impl FromNative<sys::mln_render_session_attach_options> for RenderSessionAttachO
 pub struct RenderSessionCapabilities {
     /// One `mln_render_driver_kind` value.
     pub driver: RenderDriverKind,
-    /// Granted owned-texture slot count, or zero for a target without a ring.
+    /// Granted texture ring depth: the slot count of a session-owned ring, or
+    /// the texture count of a borrowed one. Zero for a surface.
     pub texture_ring_depth: u32,
     /// A bitwise OR of `mln_render_session_capability_flag` values.
     pub flags: RenderSessionCapabilityFlag,
@@ -5989,11 +6081,45 @@ pub enum ViewportMode: u32 {
 } Unknown
 }
 
+/// One caller-owned Vulkan image of a borrowed texture ring.
+///
+/// See `mln_vulkan_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct VulkanBorrowedTexture {
+    /// Borrowed VkImage. Required.
+    pub image: u64,
+    /// Borrowed VkImageView for image. Required. The view must be a 2D color
+    /// view that matches image and the descriptor's format.
+    pub image_view: u64,
+}
+impl VulkanBorrowedTexture {
+    pub const fn new(image: u64, image_view: u64) -> Self {
+        Self { image, image_view }
+    }
+}
+impl ToNative<sys::mln_vulkan_borrowed_texture> for VulkanBorrowedTexture {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_vulkan_borrowed_texture> {
+        let mut raw: sys::mln_vulkan_borrowed_texture = unsafe { std::mem::zeroed() };
+        raw.image = self.image;
+        raw.image_view = self.image_view;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_vulkan_borrowed_texture> for VulkanBorrowedTexture {
+    unsafe fn from_native(raw: sys::mln_vulkan_borrowed_texture) -> Result<Self> {
+        Ok(Self {
+            image: raw.image,
+            image_view: raw.image_view,
+        })
+    }
+}
+
 /// Vulkan attachment options for a borrowed texture target.
 ///
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VulkanBorrowedTextureDescriptor {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
@@ -6008,11 +6134,10 @@ pub struct VulkanBorrowedTextureDescriptor {
     pub physical_height: u32,
     /// Borrowed Vulkan context. All handles are required.
     pub context: VulkanContextDescriptor,
-    /// Borrowed VkImage. Required.
-    pub image: u64,
-    /// Borrowed VkImageView for image. Required.
-    pub image_view: u64,
-    /// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
+    /// The ring's images, one per slot, in slot order. Required.
+    pub textures: Vec<VulkanBorrowedTexture>,
+    /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
+    /// invalid.
     pub format: u32,
     /// Backend-native VkImageLayout value expected at render-pass begin.
     pub initial_layout: u32,
@@ -6023,31 +6148,6 @@ pub struct VulkanBorrowedTextureDescriptor {
 impl Default for VulkanBorrowedTextureDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() })
-    }
-}
-impl VulkanBorrowedTextureDescriptor {
-    pub const fn new(
-        extent: LogicalExtent,
-        physical_width: u32,
-        physical_height: u32,
-        context: VulkanContextDescriptor,
-        image: u64,
-        image_view: u64,
-        format: u32,
-        initial_layout: u32,
-        final_layout: u32,
-    ) -> Self {
-        Self {
-            extent,
-            physical_width,
-            physical_height,
-            context,
-            image,
-            image_view,
-            format,
-            initial_layout,
-            final_layout,
-        }
     }
 }
 impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTextureDescriptor {
@@ -6062,8 +6162,8 @@ impl ToNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedTex
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = to_native(&self.context, arena)?;
-        raw.image = self.image;
-        raw.image_view = self.image_view;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         raw.format = self.format;
         raw.initial_layout = self.initial_layout;
         raw.final_layout = self.final_layout;
@@ -6077,8 +6177,7 @@ impl FromNative<sys::mln_vulkan_borrowed_texture_descriptor> for VulkanBorrowedT
             physical_width: raw.physical_width,
             physical_height: raw.physical_height,
             context: unsafe { from_native(raw.context) }?,
-            image: raw.image,
-            image_view: raw.image_view,
+            textures: unsafe { convert::copy_array(raw.textures, raw.texture_count) }?,
             format: raw.format,
             initial_layout: raw.initial_layout,
             final_layout: raw.final_layout,
@@ -6202,77 +6301,6 @@ impl FromNative<sys::mln_vulkan_owned_texture_descriptor> for VulkanOwnedTexture
     }
 }
 
-/// Vulkan frame acquired from a session-owned texture target.
-///
-/// See `mln_vulkan_owned_texture_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct VulkanOwnedTextureFrame {
-    /// Session generation that produced this frame.
-    pub generation: u64,
-    /// Physical Vulkan image width in device pixels.
-    pub width: u32,
-    /// Physical Vulkan image height in device pixels.
-    pub height: u32,
-    /// UI-to-device pixel scale used for this frame.
-    pub scale_factor: f64,
-    /// Opaque frame identity used to reject stale releases.
-    pub frame_id: u64,
-    /// Borrowed VkImage bit pattern. Valid until frame release.
-    pub image: u64,
-    /// Borrowed VkImageView bit pattern. Valid until frame release.
-    pub image_view: u64,
-    /// Borrowed VkDevice. Valid until frame release.
-    pub device: *mut std::ffi::c_void,
-    /// Backend-native VkFormat value.
-    pub format: u32,
-    /// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
-    pub layout: u32,
-}
-impl VulkanOwnedTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        image: u64,
-        image_view: u64,
-        device: *mut std::ffi::c_void,
-        format: u32,
-        layout: u32,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            image,
-            image_view,
-            device,
-            format,
-            layout,
-        }
-    }
-}
-impl FromNative<sys::mln_vulkan_owned_texture_frame> for VulkanOwnedTextureFrame {
-    unsafe fn from_native(raw: sys::mln_vulkan_owned_texture_frame) -> Result<Self> {
-        Ok(Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            image: raw.image,
-            image_view: raw.image_view,
-            device: raw.device,
-            format: raw.format,
-            layout: raw.layout,
-        })
-    }
-}
-
 /// Vulkan attachment options for a native surface.
 ///
 /// See `mln_vulkan_surface_descriptor` in the
@@ -6324,6 +6352,85 @@ impl FromNative<sys::mln_vulkan_surface_descriptor> for VulkanSurfaceDescriptor 
             extent: unsafe { from_native(raw.extent) }?,
             context: unsafe { from_native(raw.context) }?,
             surface: raw.surface,
+        })
+    }
+}
+
+/// Vulkan frame acquired from a texture ring.
+///
+/// See `mln_vulkan_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct VulkanTextureFrame {
+    /// Session generation that produced this frame.
+    pub generation: u64,
+    /// Physical Vulkan image width in device pixels.
+    pub width: u32,
+    /// Physical Vulkan image height in device pixels.
+    pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
+    pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
+    pub frame_id: u64,
+    /// Ring slot that holds this frame. For a borrowed target, the index of its
+    /// image in the descriptor's textures array.
+    pub slot: u32,
+    /// Borrowed VkImage bit pattern. Valid until frame release.
+    pub image: u64,
+    /// Borrowed VkImageView bit pattern. Valid until frame release.
+    pub image_view: u64,
+    /// Borrowed VkDevice. Valid until frame release.
+    pub device: *mut std::ffi::c_void,
+    /// Backend-native VkFormat value.
+    pub format: u32,
+    /// Backend-native VkImageLayout value that the image is in:
+    /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and
+    /// the descriptor's final_layout for a borrowed one.
+    pub layout: u32,
+}
+impl VulkanTextureFrame {
+    pub const fn new(
+        generation: u64,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        frame_id: u64,
+        slot: u32,
+        image: u64,
+        image_view: u64,
+        device: *mut std::ffi::c_void,
+        format: u32,
+        layout: u32,
+    ) -> Self {
+        Self {
+            generation,
+            width,
+            height,
+            scale_factor,
+            frame_id,
+            slot,
+            image,
+            image_view,
+            device,
+            format,
+            layout,
+        }
+    }
+}
+impl FromNative<sys::mln_vulkan_texture_frame> for VulkanTextureFrame {
+    unsafe fn from_native(raw: sys::mln_vulkan_texture_frame) -> Result<Self> {
+        Ok(Self {
+            generation: raw.generation,
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: raw.frame_id,
+            slot: raw.slot,
+            image: raw.image,
+            image_view: raw.image_view,
+            device: raw.device,
+            format: raw.format,
+            layout: raw.layout,
         })
     }
 }
@@ -6429,11 +6536,48 @@ pub enum WebglContextKind: u32 {
 } Unknown
 }
 
+/// One caller-owned WebGPU texture of a borrowed texture ring.
+///
+/// See `mln_webgpu_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct WebgpuBorrowedTexture {
+    /// Borrowed WGPUTexture. Required.
+    pub texture: *mut std::ffi::c_void,
+    /// Borrowed WGPUTextureView for texture. Required. The view must be a 2D
+    /// color view compatible with texture and the descriptor's format.
+    pub texture_view: *mut std::ffi::c_void,
+}
+impl WebgpuBorrowedTexture {
+    pub const fn new(texture: *mut std::ffi::c_void, texture_view: *mut std::ffi::c_void) -> Self {
+        Self {
+            texture,
+            texture_view,
+        }
+    }
+}
+impl ToNative<sys::mln_webgpu_borrowed_texture> for WebgpuBorrowedTexture {
+    fn to_native(&self, _arena: &mut InputArena) -> Result<sys::mln_webgpu_borrowed_texture> {
+        let mut raw: sys::mln_webgpu_borrowed_texture = unsafe { std::mem::zeroed() };
+        raw.texture = self.texture;
+        raw.texture_view = self.texture_view;
+        Ok(raw)
+    }
+}
+impl FromNative<sys::mln_webgpu_borrowed_texture> for WebgpuBorrowedTexture {
+    unsafe fn from_native(raw: sys::mln_webgpu_borrowed_texture) -> Result<Self> {
+        Ok(Self {
+            texture: raw.texture,
+            texture_view: raw.texture_view,
+        })
+    }
+}
+
 /// WebGPU attachment options for a borrowed texture target.
 ///
 /// See `mln_webgpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WebgpuBorrowedTextureDescriptor {
     /// Logical texture extent. The map viewport uses width and height and the
     /// renderer uses scale_factor; the physical size is stated separately
@@ -6444,39 +6588,18 @@ pub struct WebgpuBorrowedTextureDescriptor {
     pub physical_width: u32,
     /// Physical texture height in device pixels. Defaults to 256.
     pub physical_height: u32,
-    /// Borrowed WebGPU context. device is required.
+    /// Borrowed WebGPU context. device is required. Rendering is submitted
+    /// through context.queue or that device's default queue.
     pub context: WebgpuContextDescriptor,
-    /// Borrowed WGPUTexture. Required.
-    pub texture: *mut std::ffi::c_void,
-    /// Borrowed WGPUTextureView for texture. Required.
-    pub texture_view: *mut std::ffi::c_void,
-    /// Backend-native WGPUTextureFormat value. Undefined is invalid.
+    /// The ring's textures, one per slot, in slot order. Required.
+    pub textures: Vec<WebgpuBorrowedTexture>,
+    /// Backend-native WGPUTextureFormat value of every texture. Undefined is
+    /// invalid.
     pub format: u32,
 }
 impl Default for WebgpuBorrowedTextureDescriptor {
     fn default() -> Self {
         convert::native_default(unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() })
-    }
-}
-impl WebgpuBorrowedTextureDescriptor {
-    pub const fn new(
-        extent: LogicalExtent,
-        physical_width: u32,
-        physical_height: u32,
-        context: WebgpuContextDescriptor,
-        texture: *mut std::ffi::c_void,
-        texture_view: *mut std::ffi::c_void,
-        format: u32,
-    ) -> Self {
-        Self {
-            extent,
-            physical_width,
-            physical_height,
-            context,
-            texture,
-            texture_view,
-            format,
-        }
     }
 }
 impl ToNative<sys::mln_webgpu_borrowed_texture_descriptor> for WebgpuBorrowedTextureDescriptor {
@@ -6491,8 +6614,8 @@ impl ToNative<sys::mln_webgpu_borrowed_texture_descriptor> for WebgpuBorrowedTex
         raw.physical_width = self.physical_width;
         raw.physical_height = self.physical_height;
         raw.context = to_native(&self.context, arena)?;
-        raw.texture = self.texture;
-        raw.texture_view = self.texture_view;
+        raw.textures = convert::array(&self.textures, arena)?;
+        raw.texture_count = convert::count(self.textures.len())?;
         raw.format = self.format;
         Ok(raw)
     }
@@ -6504,8 +6627,7 @@ impl FromNative<sys::mln_webgpu_borrowed_texture_descriptor> for WebgpuBorrowedT
             physical_width: raw.physical_width,
             physical_height: raw.physical_height,
             context: unsafe { from_native(raw.context) }?,
-            texture: raw.texture,
-            texture_view: raw.texture_view,
+            textures: unsafe { convert::copy_array(raw.textures, raw.texture_count) }?,
             format: raw.format,
         })
     }
@@ -6601,72 +6723,6 @@ impl FromNative<sys::mln_webgpu_owned_texture_descriptor> for WebgpuOwnedTexture
     }
 }
 
-/// WebGPU frame acquired from a session-owned texture target.
-///
-/// See `mln_webgpu_owned_texture_frame` in the
-/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct WebgpuOwnedTextureFrame {
-    /// Session generation that produced this frame.
-    pub generation: u64,
-    /// Physical WebGPU texture width in device pixels.
-    pub width: u32,
-    /// Physical WebGPU texture height in device pixels.
-    pub height: u32,
-    /// UI-to-device pixel scale used for this frame.
-    pub scale_factor: f64,
-    /// Opaque frame identity used to reject stale releases.
-    pub frame_id: u64,
-    /// Borrowed WGPUTexture. Valid until frame release.
-    pub texture: *mut std::ffi::c_void,
-    /// Borrowed WGPUTextureView. Valid until frame release.
-    pub texture_view: *mut std::ffi::c_void,
-    /// Borrowed WGPUDevice. Valid until frame release.
-    pub device: *mut std::ffi::c_void,
-    /// Backend-native WGPUTextureFormat value.
-    pub format: u32,
-}
-impl WebgpuOwnedTextureFrame {
-    pub const fn new(
-        generation: u64,
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        frame_id: u64,
-        texture: *mut std::ffi::c_void,
-        texture_view: *mut std::ffi::c_void,
-        device: *mut std::ffi::c_void,
-        format: u32,
-    ) -> Self {
-        Self {
-            generation,
-            width,
-            height,
-            scale_factor,
-            frame_id,
-            texture,
-            texture_view,
-            device,
-            format,
-        }
-    }
-}
-impl FromNative<sys::mln_webgpu_owned_texture_frame> for WebgpuOwnedTextureFrame {
-    unsafe fn from_native(raw: sys::mln_webgpu_owned_texture_frame) -> Result<Self> {
-        Ok(Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            texture: raw.texture,
-            texture_view: raw.texture_view,
-            device: raw.device,
-            format: raw.format,
-        })
-    }
-}
-
 /// WebGPU attachment options for a native surface.
 ///
 /// See `mln_webgpu_surface_descriptor` in the
@@ -6724,6 +6780,78 @@ impl FromNative<sys::mln_webgpu_surface_descriptor> for WebgpuSurfaceDescriptor 
             extent: unsafe { from_native(raw.extent) }?,
             context: unsafe { from_native(raw.context) }?,
             surface: raw.surface,
+            format: raw.format,
+        })
+    }
+}
+
+/// WebGPU frame acquired from a texture ring.
+///
+/// See `mln_webgpu_texture_frame` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct WebgpuTextureFrame {
+    /// Session generation that produced this frame.
+    pub generation: u64,
+    /// Physical WebGPU texture width in device pixels.
+    pub width: u32,
+    /// Physical WebGPU texture height in device pixels.
+    pub height: u32,
+    /// UI-to-device pixel scale used for this frame.
+    pub scale_factor: f64,
+    /// Opaque frame identity used to reject stale releases.
+    pub frame_id: u64,
+    /// Ring slot that holds this frame. For a borrowed target, the index of its
+    /// texture in the descriptor's textures array.
+    pub slot: u32,
+    /// Borrowed WGPUTexture. Valid until frame release.
+    pub texture: *mut std::ffi::c_void,
+    /// Borrowed WGPUTextureView. Valid until frame release.
+    pub texture_view: *mut std::ffi::c_void,
+    /// Borrowed WGPUDevice. Valid until frame release.
+    pub device: *mut std::ffi::c_void,
+    /// Backend-native WGPUTextureFormat value.
+    pub format: u32,
+}
+impl WebgpuTextureFrame {
+    pub const fn new(
+        generation: u64,
+        width: u32,
+        height: u32,
+        scale_factor: f64,
+        frame_id: u64,
+        slot: u32,
+        texture: *mut std::ffi::c_void,
+        texture_view: *mut std::ffi::c_void,
+        device: *mut std::ffi::c_void,
+        format: u32,
+    ) -> Self {
+        Self {
+            generation,
+            width,
+            height,
+            scale_factor,
+            frame_id,
+            slot,
+            texture,
+            texture_view,
+            device,
+            format,
+        }
+    }
+}
+impl FromNative<sys::mln_webgpu_texture_frame> for WebgpuTextureFrame {
+    unsafe fn from_native(raw: sys::mln_webgpu_texture_frame) -> Result<Self> {
+        Ok(Self {
+            generation: raw.generation,
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: raw.frame_id,
+            slot: raw.slot,
+            texture: raw.texture,
+            texture_view: raw.texture_view,
+            device: raw.device,
             format: raw.format,
         })
     }

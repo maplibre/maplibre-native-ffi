@@ -620,6 +620,10 @@ final class mln_map_viewport_options extends Struct {
   external mln_edge_insets frustum_offset;
 }
 
+final class mln_metal_borrowed_texture extends Struct {
+  external Pointer<Void> texture;
+}
+
 final class mln_metal_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -628,7 +632,9 @@ final class mln_metal_borrowed_texture_descriptor extends Struct {
   external int physical_width;
   @Uint32()
   external int physical_height;
-  external Pointer<Void> texture;
+  external Pointer<mln_metal_borrowed_texture> textures;
+  @Size()
+  external int texture_count;
 }
 
 final class mln_metal_context_descriptor extends Struct {
@@ -642,7 +648,15 @@ final class mln_metal_owned_texture_descriptor extends Struct {
   external mln_metal_context_descriptor context;
 }
 
-final class mln_metal_owned_texture_frame extends Struct {
+final class mln_metal_surface_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_extent extent;
+  external mln_metal_context_descriptor context;
+  external Pointer<Void> layer;
+}
+
+final class mln_metal_texture_frame extends Struct {
   @Uint32()
   external int size;
   @Uint64()
@@ -655,18 +669,12 @@ final class mln_metal_owned_texture_frame extends Struct {
   external double scale_factor;
   @Uint64()
   external int frame_id;
+  @Uint32()
+  external int slot;
   external Pointer<Void> texture;
   external Pointer<Void> device;
   @Uint64()
   external int pixel_format;
-}
-
-final class mln_metal_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_metal_context_descriptor context;
-  external Pointer<Void> layer;
 }
 
 final class mln_offline_geometry_region_definition extends Struct {
@@ -738,6 +746,11 @@ final class mln_offline_tile_pyramid_region_definition extends Struct {
   external bool include_ideographs;
 }
 
+final class mln_opengl_borrowed_texture extends Struct {
+  @Uint32()
+  external int texture;
+}
+
 final class mln_opengl_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -747,8 +760,9 @@ final class mln_opengl_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int physical_height;
   external mln_opengl_context_descriptor context;
-  @Uint32()
-  external int texture;
+  external Pointer<mln_opengl_borrowed_texture> textures;
+  @Size()
+  external int texture_count;
   @Uint32()
   external int target;
 }
@@ -774,7 +788,15 @@ final class mln_opengl_owned_texture_descriptor extends Struct {
   external mln_opengl_context_descriptor context;
 }
 
-final class mln_opengl_owned_texture_frame extends Struct {
+final class mln_opengl_surface_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_extent extent;
+  external mln_opengl_context_descriptor context;
+  external Pointer<Void> surface;
+}
+
+final class mln_opengl_texture_frame extends Struct {
   @Uint32()
   external int size;
   @Uint64()
@@ -788,6 +810,8 @@ final class mln_opengl_owned_texture_frame extends Struct {
   @Uint64()
   external int frame_id;
   @Uint32()
+  external int slot;
+  @Uint32()
   external int texture;
   @Uint32()
   external int target;
@@ -797,14 +821,6 @@ final class mln_opengl_owned_texture_frame extends Struct {
   external int format;
   @Uint32()
   external int type;
-}
-
-final class mln_opengl_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_opengl_context_descriptor context;
-  external Pointer<Void> surface;
 }
 
 final class mln_premultiplied_rgba8_image extends Struct {
@@ -1384,6 +1400,13 @@ final class mln_vec3 extends Struct {
   external double z;
 }
 
+final class mln_vulkan_borrowed_texture extends Struct {
+  @Uint64()
+  external int image;
+  @Uint64()
+  external int image_view;
+}
+
 final class mln_vulkan_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -1393,10 +1416,9 @@ final class mln_vulkan_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int physical_height;
   external mln_vulkan_context_descriptor context;
-  @Uint64()
-  external int image;
-  @Uint64()
-  external int image_view;
+  external Pointer<mln_vulkan_borrowed_texture> textures;
+  @Size()
+  external int texture_count;
   @Uint32()
   external int format;
   @Uint32()
@@ -1423,7 +1445,16 @@ final class mln_vulkan_owned_texture_descriptor extends Struct {
   external mln_vulkan_context_descriptor context;
 }
 
-final class mln_vulkan_owned_texture_frame extends Struct {
+final class mln_vulkan_surface_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_extent extent;
+  external mln_vulkan_context_descriptor context;
+  @Uint64()
+  external int surface;
+}
+
+final class mln_vulkan_texture_frame extends Struct {
   @Uint32()
   external int size;
   @Uint64()
@@ -1436,6 +1467,8 @@ final class mln_vulkan_owned_texture_frame extends Struct {
   external double scale_factor;
   @Uint64()
   external int frame_id;
+  @Uint32()
+  external int slot;
   @Uint64()
   external int image;
   @Uint64()
@@ -1445,15 +1478,6 @@ final class mln_vulkan_owned_texture_frame extends Struct {
   external int format;
   @Uint32()
   external int layout;
-}
-
-final class mln_vulkan_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_vulkan_context_descriptor context;
-  @Uint64()
-  external int surface;
 }
 
 final class mln_wake extends Struct {
@@ -1470,6 +1494,11 @@ final class mln_webgl_context_descriptor extends Struct {
   external mln_buffer_view canvas_selector;
 }
 
+final class mln_webgpu_borrowed_texture extends Struct {
+  external Pointer<Void> texture;
+  external Pointer<Void> texture_view;
+}
+
 final class mln_webgpu_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int size;
@@ -1479,8 +1508,9 @@ final class mln_webgpu_borrowed_texture_descriptor extends Struct {
   @Uint32()
   external int physical_height;
   external mln_webgpu_context_descriptor context;
-  external Pointer<Void> texture;
-  external Pointer<Void> texture_view;
+  external Pointer<mln_webgpu_borrowed_texture> textures;
+  @Size()
+  external int texture_count;
   @Uint32()
   external int format;
 }
@@ -1498,7 +1528,17 @@ final class mln_webgpu_owned_texture_descriptor extends Struct {
   external mln_webgpu_context_descriptor context;
 }
 
-final class mln_webgpu_owned_texture_frame extends Struct {
+final class mln_webgpu_surface_descriptor extends Struct {
+  @Uint32()
+  external int size;
+  external mln_logical_extent extent;
+  external mln_webgpu_context_descriptor context;
+  external Pointer<Void> surface;
+  @Uint32()
+  external int format;
+}
+
+final class mln_webgpu_texture_frame extends Struct {
   @Uint32()
   external int size;
   @Uint64()
@@ -1511,19 +1551,11 @@ final class mln_webgpu_owned_texture_frame extends Struct {
   external double scale_factor;
   @Uint64()
   external int frame_id;
+  @Uint32()
+  external int slot;
   external Pointer<Void> texture;
   external Pointer<Void> texture_view;
   external Pointer<Void> device;
-  @Uint32()
-  external int format;
-}
-
-final class mln_webgpu_surface_descriptor extends Struct {
-  @Uint32()
-  external int size;
-  external mln_logical_extent extent;
-  external mln_webgpu_context_descriptor context;
-  external Pointer<Void> surface;
   @Uint32()
   external int format;
 }
@@ -1664,6 +1696,7 @@ const MLN_FEATURE_STATE_SELECTOR_STATE_KEY = 4;
 // mln_frame_demand_flag
 const MLN_FRAME_DEMAND_IF_NEEDED = 1;
 const MLN_FRAME_DEMAND_PRESENT = 2;
+const MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 4;
 
 // mln_free_camera_option_field
 const MLN_FREE_CAMERA_OPTION_POSITION = 1;
@@ -2099,26 +2132,26 @@ external int mln_acquired_frame_dispose(
 @Native<
   Int32 Function(
     mln_acquired_frame,
-    Pointer<mln_metal_owned_texture_frame>,
+    Pointer<mln_metal_texture_frame>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_metal_texture(
   int frame,
-  Pointer<mln_metal_owned_texture_frame> out_frame,
+  Pointer<mln_metal_texture_frame> out_frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @Native<
   Int32 Function(
     mln_acquired_frame,
-    Pointer<mln_opengl_owned_texture_frame>,
+    Pointer<mln_opengl_texture_frame>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_opengl_texture(
   int frame,
-  Pointer<mln_opengl_owned_texture_frame> out_frame,
+  Pointer<mln_opengl_texture_frame> out_frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -2151,26 +2184,26 @@ external int mln_acquired_frame_get_result(
 @Native<
   Int32 Function(
     mln_acquired_frame,
-    Pointer<mln_vulkan_owned_texture_frame>,
+    Pointer<mln_vulkan_texture_frame>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_vulkan_texture(
   int frame,
-  Pointer<mln_vulkan_owned_texture_frame> out_frame,
+  Pointer<mln_vulkan_texture_frame> out_frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
 @Native<
   Int32 Function(
     mln_acquired_frame,
-    Pointer<mln_webgpu_owned_texture_frame>,
+    Pointer<mln_webgpu_texture_frame>,
     Pointer<mln_diagnostic>,
   )
 >()
 external int mln_acquired_frame_get_webgpu_texture(
   int frame,
-  Pointer<mln_webgpu_owned_texture_frame> out_frame,
+  Pointer<mln_webgpu_texture_frame> out_frame,
   Pointer<mln_diagnostic> out_diagnostic,
 );
 
@@ -2416,6 +2449,19 @@ external Pointer<Void> mln_adapter_owner_token_create(int handle);
 
 @Native<Void Function(Pointer<Void>)>()
 external void mln_adapter_owner_token_destroy(Pointer<Void> token);
+
+@Native<
+  Int32 Function(
+    mln_render_session,
+    Pointer<mln_render_abandon_result>,
+    Pointer<mln_diagnostic>,
+  )
+>()
+external int mln_adapter_render_session_abandon_at_exit(
+  int session,
+  Pointer<mln_render_abandon_result> out_result,
+  Pointer<mln_diagnostic> out_diagnostic,
+);
 
 @Native<
   Uint32 Function(

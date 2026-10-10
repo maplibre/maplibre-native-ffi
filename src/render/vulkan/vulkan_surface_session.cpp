@@ -347,6 +347,7 @@ class VulkanSurfaceBackend final : private mln::core::VulkanQueueAccess,
     getThreadPool().runRenderJobs(true);
   }
 
+  using mln::core::VulkanQueueAccess::drain_for_teardown;
   using mln::core::VulkanQueueAccess::release_queue_access;
 
   auto getDefaultRenderable() -> mln::gfx::Renderable& override {
@@ -517,6 +518,15 @@ class VulkanSurfaceSessionBackend final
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
     backend_.resize(mln::Size{physical_width, physical_height});
+  }
+
+  [[nodiscard]] auto allows_off_thread_teardown() const noexcept
+    -> bool override {
+    return true;
+  }
+
+  auto prepare_off_thread_teardown() noexcept -> bool override {
+    return backend_.drain_for_teardown();
   }
 
   void quarantine() noexcept override { backend_.release_queue_access(); }

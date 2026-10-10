@@ -14,14 +14,14 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_metal_texture(
         MlnAcquiredFrame frame,
-        mln_metal_owned_texture_frame* out_frame,
+        mln_metal_texture_frame* out_frame,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_opengl_texture(
         MlnAcquiredFrame frame,
-        mln_opengl_owned_texture_frame* out_frame,
+        mln_opengl_texture_frame* out_frame,
         mln_diagnostic* out_diagnostic
     );
 
@@ -42,14 +42,14 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_vulkan_texture(
         MlnAcquiredFrame frame,
-        mln_vulkan_owned_texture_frame* out_frame,
+        mln_vulkan_texture_frame* out_frame,
         mln_diagnostic* out_diagnostic
     );
 
     [LibraryImport(LibraryName)]
     internal static partial mln_status mln_acquired_frame_get_webgpu_texture(
         MlnAcquiredFrame frame,
-        mln_webgpu_owned_texture_frame* out_frame,
+        mln_webgpu_texture_frame* out_frame,
         mln_diagnostic* out_diagnostic
     );
 

@@ -6,11 +6,14 @@ use crate::graphics::GraphicsContext;
 use crate::map_state::MapState;
 use crate::metal::{MetalBorrowedTexture, MetalTextureCompositor};
 use crate::render_target::{
-    Mode, Replacements, Session, attach_options, compositor_error, extent,
+    Mode, RING_DEPTH, Replacements, Session, attach_options, compositor_error, extent,
     require_cpu_complete_producer,
 };
 use crate::shell::Wakes;
 use crate::viewport::Viewport;
+
+/// The textures of a borrowed ring, one per slot.
+type MetalRing = [MetalBorrowedTexture; RING_DEPTH];
 
 pub enum RenderTarget {
     OwnedTexture {
@@ -20,9 +23,9 @@ pub enum RenderTarget {
     BorrowedTexture {
         session: Session,
         compositor: Box<MetalTextureCompositor>,
-        /// The texture the compositor samples.
-        texture: Box<MetalBorrowedTexture>,
-        replacements: Replacements<MetalBorrowedTexture>,
+        /// The ring the session renders into.
+        ring: Box<MetalRing>,
+        replacements: Replacements<Box<MetalRing>>,
     },
     Surface {
         session: Session,
@@ -59,11 +62,11 @@ impl RenderTarget {
                 })
             }
             Mode::BorrowedTexture => {
-                let texture = MetalBorrowedTexture::new(metal, viewport)?;
+                let ring = ring(metal, viewport)?;
                 let session = Session::new(
                     unsafe {
                         map.attach_metal_borrowed_texture(
-                            &borrowed_descriptor(&texture, viewport),
+                            &borrowed_descriptor(&ring, viewport),
                             &options,
                         )
                     }?,
@@ -74,7 +77,7 @@ impl RenderTarget {
                 Ok(Self::BorrowedTexture {
                     session,
                     compositor: Box::new(compositor(metal, viewport)?),
-                    texture: Box::new(texture),
+                    ring,
                     replacements: Replacements::default(),
                 })
             }
@@ -115,11 +118,15 @@ impl RenderTarget {
         match self {
             Self::BorrowedTexture {
                 session,
+                ring: current,
                 replacements,
                 ..
             } => {
                 graphics.metal().resize(viewport);
-                let replacement = MetalBorrowedTexture::new(graphics.metal(), viewport)?;
+                // A replacement is refused while the host holds a frame, and
+                // the window keeps showing what it last presented.
+                session.release_held()?;
+                let replacement = ring(graphics.metal(), viewport)?;
                 let completion = unsafe {
                     session
                         .handle()
@@ -128,7 +135,8 @@ impl RenderTarget {
                             viewport,
                         ))
                 }?;
-                replacements.push(completion, replacement, wakes);
+                let retired = std::mem::replace(current, replacement);
+                replacements.push(completion, retired, wakes);
                 // Target replacement changes only the graphics resource, so
                 // the map takes the new extent directly.
                 map.resize(viewport)
@@ -146,23 +154,19 @@ impl RenderTarget {
         }
     }
 
-    /// Switches the compositor to each replacement a rendered frame has drawn
-    /// into, releasing the texture it retires.
-    pub fn show_replacements(
+    /// Releases each ring that a completed replacement retired.
+    pub fn retire_replaced(
         &mut self,
         _graphics: &GraphicsContext,
         wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<()> {
         if let Self::BorrowedTexture {
             session,
-            texture,
             replacements,
             ..
         } = self
         {
-            while let Some(replacement) = replacements.take_shown(session, wakes)? {
-                **texture = replacement;
-            }
+            while replacements.take_completed(session, wakes)?.is_some() {}
         }
         Ok(())
     }
@@ -171,14 +175,18 @@ impl RenderTarget {
     /// the window.
     pub fn present(
         &mut self,
-        graphics: &GraphicsContext,
-        wakes: &Wakes,
+        _graphics: &GraphicsContext,
+        _wakes: &Wakes,
     ) -> maplibre_native_ffi::Result<bool> {
-        self.show_replacements(graphics, wakes)?;
         match self {
             Self::OwnedTexture {
                 session,
                 compositor,
+            }
+            | Self::BorrowedTexture {
+                session,
+                compositor,
+                ..
             } => {
                 // Without a new frame, the window keeps the one it already
                 // shows.
@@ -188,11 +196,6 @@ impl RenderTarget {
                 require_cpu_complete_producer(frame)?;
                 compositor.draw(frame)
             }
-            Self::BorrowedTexture {
-                compositor,
-                texture,
-                ..
-            } => compositor.draw_texture(texture.texture()),
             // The driver already presented the frame.
             Self::Surface { .. } => Ok(true),
         }
@@ -218,14 +221,27 @@ fn compositor(
         .map_err(|error| compositor_error(format!("Metal compositor creation failed: {error:?}")))
 }
 
+fn ring(
+    metal: &crate::metal::MetalContext,
+    viewport: Viewport,
+) -> maplibre_native_ffi::Result<Box<MetalRing>> {
+    Ok(Box::new([
+        MetalBorrowedTexture::new(metal, viewport)?,
+        MetalBorrowedTexture::new(metal, viewport)?,
+    ]))
+}
+
 fn borrowed_descriptor(
-    texture: &MetalBorrowedTexture,
+    ring: &MetalRing,
     viewport: Viewport,
 ) -> maplibre_native_ffi::MetalBorrowedTextureDescriptor {
     maplibre_native_ffi::MetalBorrowedTextureDescriptor {
         extent: extent(viewport),
         physical_width: viewport.physical_width,
         physical_height: viewport.physical_height,
-        texture: texture.pointer(),
+        textures: ring
+            .iter()
+            .map(|texture| maplibre_native_ffi::MetalBorrowedTexture::new(texture.pointer()))
+            .collect(),
     }
 }

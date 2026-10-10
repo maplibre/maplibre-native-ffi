@@ -46,7 +46,11 @@ pub const VulkanRenderTarget = union(types.RenderTargetMode) {
 
     /// Releases any held frame, then detaches the session.
     pub fn detach(self: *VulkanRenderTarget) void {
-        if (self.* == .owned_texture) render_target.releaseFrame(&self.owned_texture.held);
+        switch (self.*) {
+            .owned_texture => |*backend| render_target.releaseFrame(&backend.held),
+            .borrowed_texture => |*backend| render_target.releaseFrame(&backend.held),
+            .native_surface => {},
+        }
         self.session().deinit();
     }
 
@@ -77,9 +81,9 @@ pub const VulkanRenderTarget = union(types.RenderTargetMode) {
         }
     }
 
-    /// Follows a completed borrowed-texture replacement.
-    pub fn showReplacements(self: *VulkanRenderTarget) !void {
-        if (self.* == .borrowed_texture) try self.borrowed_texture.showReplacements();
+    /// Follows completed borrowed-ring replacements.
+    pub fn retireReplaced(self: *VulkanRenderTarget) !void {
+        if (self.* == .borrowed_texture) try self.borrowed_texture.retireReplaced();
     }
 
     /// Shows the newest rendered frame, reporting false when no frame reached
@@ -87,11 +91,8 @@ pub const VulkanRenderTarget = union(types.RenderTargetMode) {
     pub fn present(self: *VulkanRenderTarget, viewport: types.Viewport) !bool {
         _ = viewport;
         return switch (self.*) {
-            .owned_texture => |*backend| backend.present(),
-            .borrowed_texture => |*backend| blk: {
-                try backend.showReplacements();
-                break :blk backend.compositor.presentImageView(backend.image.view);
-            },
+            .owned_texture => |*backend| presentAcquired(&backend.session, &backend.compositor, &backend.held),
+            .borrowed_texture => |*backend| presentAcquired(&backend.session, &backend.compositor, &backend.held),
             // The driver already presented the frame.
             .native_surface => true,
         };
@@ -307,25 +308,27 @@ const VulkanOwnedTextureBackend = struct {
         };
         self.session = try render_target.Session.attach(map, attachment, options, .owned_texture);
     }
-
-    fn present(self: *VulkanOwnedTextureBackend) !bool {
-        // Without a new frame, the window keeps the one it already shows.
-        if (!try self.session.acquireNewest(&self.held)) return true;
-        const frame = self.held.?;
-        const FrameContext = struct {
-            backend: *VulkanOwnedTextureBackend,
-            frame: maplibre.AcquiredFrame,
-            fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
-                if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
-                return maplibre.acquiredFrameGetVulkanTexture(bool, context.frame, context, draw, null);
-            }
-            fn draw(context: @This(), info: maplibre.VulkanOwnedTextureFrame) anyerror!bool {
-                return context.backend.compositor.presentImageView(vulkanHandleFromBits(c.VkImageView, info.image_view));
-            }
-        };
-        return maplibre.acquiredFrameGetProducerSync(bool, frame, FrameContext{ .backend = self, .frame = frame }, FrameContext.producer, null);
-    }
 };
+
+/// Acquires the newest frame into `held` and samples its image into the
+/// window. Both texture modes hand their frames over this way.
+fn presentAcquired(session: *render_target.Session, compositor: *VulkanTextureCompositor, held: *?maplibre.AcquiredFrame) !bool {
+    // Without a new frame, the window keeps the one it already shows.
+    if (!try session.acquireNewest(held)) return true;
+    const frame = held.*.?;
+    const FrameContext = struct {
+        compositor: *VulkanTextureCompositor,
+        frame: maplibre.AcquiredFrame,
+        fn producer(context: @This(), sync: maplibre.GpuSync) anyerror!bool {
+            if (sync.kind != .cpu_complete) return types.AppError.BackendDrawFailed;
+            return maplibre.acquiredFrameGetVulkanTexture(bool, context.frame, context, draw, null);
+        }
+        fn draw(context: @This(), info: maplibre.VulkanTextureFrame) anyerror!bool {
+            return context.compositor.presentImageView(vulkanHandleFromBits(c.VkImageView, info.image_view));
+        }
+    };
+    return maplibre.acquiredFrameGetProducerSync(bool, frame, FrameContext{ .compositor = compositor, .frame = frame }, FrameContext.producer, null);
+}
 
 const BorrowedImage = struct {
     image: c.VkImage,
@@ -416,12 +419,42 @@ const BorrowedImage = struct {
     }
 };
 
+/// The images of a borrowed ring, one per slot.
+const VulkanRing = struct {
+    images: [render_target.borrowed_ring_depth]BorrowedImage,
+
+    fn init(context: *const Context, viewport: types.Viewport) !VulkanRing {
+        var ring: VulkanRing = undefined;
+        var created: usize = 0;
+        errdefer for (ring.images[0..created]) |*image| image.deinit(context.device);
+        while (created < ring.images.len) : (created += 1) {
+            ring.images[created] = try BorrowedImage.init(context, viewport);
+        }
+        return ring;
+    }
+
+    fn deinit(self: *VulkanRing, device: c.VkDevice) void {
+        for (&self.images) |*image| image.deinit(device);
+    }
+
+    fn entries(self: VulkanRing) [render_target.borrowed_ring_depth]maplibre.VulkanBorrowedTexture {
+        var result: [render_target.borrowed_ring_depth]maplibre.VulkanBorrowedTexture = undefined;
+        for (self.images, &result) |image, *entry| entry.* = .{
+            .image = vulkanHandleToBinding(image.image),
+            .image_view = vulkanHandleToBinding(image.view),
+        };
+        return result;
+    }
+};
+
 const VulkanBorrowedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
     session: render_target.Session = .{},
-    /// The image the compositor samples.
-    image: BorrowedImage,
-    replacements: render_target.Replacements(BorrowedImage) = .{},
+    /// The newest frame, held until a newer one replaces it.
+    held: ?maplibre.AcquiredFrame = null,
+    /// The ring the session renders into.
+    ring: VulkanRing,
+    replacements: render_target.Replacements(VulkanRing) = .{},
 
     fn init(
         allocator: std.mem.Allocator,
@@ -431,69 +464,79 @@ const VulkanBorrowedTextureBackend = struct {
         var compositor = try VulkanTextureCompositor.init(allocator, window, viewport);
         errdefer compositor.deinit();
         return .{
-            .image = try BorrowedImage.init(&compositor.context, viewport),
+            .ring = try VulkanRing.init(&compositor.context, viewport),
             .compositor = compositor,
         };
     }
 
     fn deinit(self: *VulkanBorrowedTextureBackend) void {
+        render_target.releaseFrame(&self.held);
         self.session.deinit();
         const device = self.compositor.context.device;
-        while (self.replacements.takeAny()) |image| {
-            var retired = image;
+        while (self.replacements.takeAny()) |ring| {
+            var retired = ring;
             retired.deinit(device);
         }
         self.replacements.deinit();
-        self.image.deinit(device);
+        self.ring.deinit(device);
         self.compositor.deinit();
     }
 
     fn attach(self: *VulkanBorrowedTextureBackend, map: *maplibre.Map, viewport: types.Viewport, options: maplibre.RenderSessionAttachOptions) !void {
         var diagnostic: maplibre.Diagnostic = .{};
-        const attachment = maplibre.mapAttachVulkanBorrowedTexture(std.heap.smp_allocator, map.*, self.descriptor(self.image, viewport), options, &diagnostic) catch |err| {
+        const entries = self.ring.entries();
+        const attachment = maplibre.mapAttachVulkanBorrowedTexture(std.heap.smp_allocator, map.*, self.descriptor(&entries, viewport), options, &diagnostic) catch |err| {
             diagnostics.logError("Vulkan borrowed texture attach failed", err, &diagnostic);
             return types.AppError.AttachFailed;
         };
         self.session = try render_target.Session.attach(map, attachment, options, .borrowed_texture);
     }
 
-    /// Follows a resized window: allocates an image at the new size and hands
-    /// it to the live session, which stays attached.
+    /// Follows a resized window: allocates a ring at the new size and hands it
+    /// to the live session, which stays attached. A replacement is refused
+    /// while the host holds a frame, so the held one goes first; the window
+    /// keeps showing what it last presented.
     fn resize(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
         self.compositor.resize(viewport);
-        var replacement = try BorrowedImage.init(&self.compositor.context, viewport);
-        errdefer replacement.deinit(self.compositor.context.device);
-        var diagnostic: maplibre.Diagnostic = .{};
-        var completion = maplibre.renderSessionSetVulkanBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, self.descriptor(replacement, viewport), &diagnostic) catch |err| {
-            diagnostics.logError("Vulkan borrowed texture set target failed", err, &diagnostic);
-            return types.AppError.ResizeFailed;
-        };
-        self.replacements.push(completion, replacement) catch |err| {
-            completion.deinit();
-            return err;
-        };
+        render_target.releaseFrame(&self.held);
+        try self.replaceRing(viewport);
         try self.session.resizeMap(viewport);
     }
 
-    /// Switches the compositor to each replacement a rendered frame has
-    /// drawn into, destroying the image it retires. The session stopped
-    /// rendering into that image when the replacement completed, and the
-    /// compositor waited for its own reads.
-    fn showReplacements(self: *VulkanBorrowedTextureBackend) !void {
-        while (try self.replacements.takeShown(&self.session)) |replacement| {
-            self.image.deinit(self.compositor.context.device);
-            self.image = replacement;
+    fn replaceRing(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
+        var replacement = try VulkanRing.init(&self.compositor.context, viewport);
+        errdefer replacement.deinit(self.compositor.context.device);
+        var diagnostic: maplibre.Diagnostic = .{};
+        const entries = replacement.entries();
+        var completion = maplibre.renderSessionSetVulkanBorrowedTextureTarget(std.heap.smp_allocator, self.session.handle.?, self.descriptor(&entries, viewport), &diagnostic) catch |err| {
+            diagnostics.logError("Vulkan borrowed texture set target failed", err, &diagnostic);
+            return types.AppError.ResizeFailed;
+        };
+        self.replacements.push(completion, self.ring) catch |err| {
+            completion.deinit();
+            return err;
+        };
+        self.ring = replacement;
+    }
+
+    /// Destroys each ring that a completed replacement retired. The session
+    /// stopped rendering into it when the replacement completed, and the
+    /// compositor waited for its own reads before the held frame was
+    /// released.
+    fn retireReplaced(self: *VulkanBorrowedTextureBackend) !void {
+        while (try self.replacements.takeCompleted(&self.session)) |ring| {
+            var retired = ring;
+            retired.deinit(self.compositor.context.device);
         }
     }
 
-    fn descriptor(self: *const VulkanBorrowedTextureBackend, image: BorrowedImage, viewport: types.Viewport) maplibre.VulkanBorrowedTextureDescriptor {
+    fn descriptor(self: *const VulkanBorrowedTextureBackend, entries: []const maplibre.VulkanBorrowedTexture, viewport: types.Viewport) maplibre.VulkanBorrowedTextureDescriptor {
         return .{
             .extent = render_target.extent(viewport),
             .physical_width = viewport.physical_width,
             .physical_height = viewport.physical_height,
             .context = vulkanContextDescriptor(&self.compositor.context),
-            .image = vulkanHandleToBinding(image.image),
-            .image_view = vulkanHandleToBinding(image.view),
+            .textures = entries,
             .format = c.VK_FORMAT_R8G8B8A8_UNORM,
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,

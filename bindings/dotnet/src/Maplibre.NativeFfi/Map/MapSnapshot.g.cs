@@ -18,6 +18,11 @@ namespace Maplibre.NativeFfi;
 /// <param name="GestureInProgress">
 /// True while the map is inside a gesture.
 /// </param>
+/// <param name="LatestRenderUpdateGeneration">
+/// Generation of the latest render update the map published. A rendered frame
+/// at or past it draws map state that includes every command this snapshot
+/// observes, though animations and resource loads finish in later frames.
+/// </param>
 public readonly partial record struct MapSnapshot(
     MapDebugOption DebugOptions,
     ulong Generation,

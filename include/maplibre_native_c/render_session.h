@@ -41,17 +41,26 @@ MLN_API mln_status mln_render_session_create_projection(
 
 /** Terminal disposition of one accepted frame demand. */
 typedef enum mln_render_result : uint32_t {
-  /** A frame was rendered for acquisition, presentation, or ordered readback.
+  /**
+   * A frame was rendered for acquisition, presentation, or ordered readback.
+   *
+   * The result states nothing about GPU completion. On a texture ring, the
+   * acquired frame's producer synchronization states when the GPU writes to
+   * its texture are complete. See mln_acquired_frame_get_producer_sync().
    */
   MLN_RENDER_RESULT_RENDERED = 0,
   /**
    * No newer map update was available, or the map had no complete frame to
-   * draw yet. The map publishes another update when it has one.
+   * draw yet. The map publishes another update when it has one. A demand
+   * with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for that update instead, and
+   * finishes with this result only when a barrier ends its wait.
    */
   MLN_RENDER_RESULT_NO_UPDATE = 1,
   /**
    * An ordered extent change had not reached the map. The map publishes an
-   * update at the new extent.
+   * update at the new extent, which a demand with
+   * MLN_FRAME_DEMAND_WAIT_FOR_UPDATE waits for instead of finishing with this
+   * result.
    */
   MLN_RENDER_RESULT_SIZE_PENDING = 2,
   /**
@@ -87,6 +96,20 @@ typedef enum MLN_BINDING("kind=bitmask") mln_frame_demand_flag : uint32_t {
    * whatever it presented last. Ignored by targets without presentation.
    */
   MLN_FRAME_DEMAND_PRESENT = 1U << 1U,
+  /**
+   * With MLN_FRAME_DEMAND_IF_NEEDED, a demand that would finish with
+   * MLN_RENDER_RESULT_NO_UPDATE or MLN_RENDER_RESULT_SIZE_PENDING waits
+   * instead, and runs again after the map's next update, a target
+   * replacement, or an applied resize. A waiting demand holds no ring slot. A
+   * later demand with the same flags and coalescing boundary supersedes it, a
+   * barrier ends its wait with MLN_RENDER_RESULT_NO_UPDATE, and detach,
+   * abandon, or the quarantine of the ring's last usable slot end it with
+   * MLN_RENDER_RESULT_TARGET_NOT_READY. A waiting demand's result can follow
+   * the results of demands accepted after it. The flag does not pace: a host
+   * that re-arms a waiting demand as each result arrives renders every update
+   * the map publishes.
+   */
+  MLN_FRAME_DEMAND_WAIT_FOR_UPDATE = 1U << 2U,
 } mln_frame_demand_flag;
 
 /** One nonblocking request for a frame. */
@@ -103,8 +126,12 @@ typedef struct mln_frame_demand {
   uint64_t token;
   /** Demands coalesce only when this value and their flags match. */
   uint64_t coalescing_boundary;
-  /** Positive time allowed before driver work begins, in nanoseconds; zero has
-   * no limit. */
+  /**
+   * Positive time allowed before driver work begins, in nanoseconds; zero has
+   * no limit. A demand that waits, for a free texture slot or for a map
+   * update, is checked against its timeout when it runs again; a wait has no
+   * timer of its own.
+   */
   uint64_t timeout_ns;
 } mln_frame_demand;
 
@@ -121,6 +148,12 @@ typedef struct mln_render_frame_result {
   /** One mln_render_result value. */
   uint32_t disposition MLN_BINDING("enum=mln_render_result");
   uint64_t token;
+  /**
+   * Generation of the map render update the demand evaluated. When disposition
+   * is MLN_RENDER_RESULT_RENDERED, the frame drew that update; compare it with
+   * mln_map_snapshot.latest_render_update_generation to find the first frame
+   * that includes a command.
+   */
   uint64_t map_update_generation;
   uint64_t extent_generation;
   /** Zero unless disposition is MLN_RENDER_RESULT_RENDERED. */
@@ -134,7 +167,9 @@ typedef struct mln_render_frame_result {
    * re-arm its frame loop without the runtime event round trip. A camera
    * transition does not set it by itself: the map publishes a new update
    * after each of the transition's frames instead, which a render-if-needed
-   * demand renders.
+   * demand renders. A demand with MLN_FRAME_DEMAND_WAIT_FOR_UPDATE renders
+   * each transition update without a runtime-event round trip; the host
+   * re-arms the demand as each result arrives.
    */
   bool needs_repaint;
 } mln_render_frame_result;
@@ -184,11 +219,11 @@ typedef struct mln_render_session_snapshot {
   bool pending_changes;
 } mln_render_session_snapshot;
 
-/** Result of irreversible CPU-side target abandonment. */
+/** What abandon did with a session's graphics resources. */
 typedef enum mln_render_abandon_disposition : uint32_t {
-  /** No graphics resources remained when control was abandoned. */
+  /** Abandon destroyed every graphics resource, or none remained. */
   MLN_RENDER_ABANDON_DISPOSITION_CLEAN = 0U,
-  /** Graphics resources could not be destroyed and were quarantined. */
+  /** Abandon kept graphics resources that it could not safely destroy. */
   MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED = 1U,
 } mln_render_abandon_disposition;
 
@@ -250,7 +285,8 @@ MLN_API mln_status mln_render_session_get_snapshot(
  * - MLN_STATUS_OK when the demand is accepted.
  * - MLN_STATUS_INVALID_ARGUMENT when session is an invalid handle, demand is
  *   null or undersized, or demand->flags carries a bit outside
- *   mln_frame_demand_flag.
+ *   mln_frame_demand_flag, or carries MLN_FRAME_DEMAND_WAIT_FOR_UPDATE without
+ *   MLN_FRAME_DEMAND_IF_NEEDED.
  * - MLN_STATUS_INVALID_STATE when session has been released or is not attached,
  *   or every slot of its texture ring is quarantined.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -314,7 +350,8 @@ MLN_API void mln_render_frame_batch_release(
  *
  * Returns:
  * - MLN_STATUS_OK when a frame is published in *out_frame.
- * - MLN_STATUS_NOT_READY when no rendered frame is available. This is not an
+ * - MLN_STATUS_NOT_READY when no rendered frame is available, which includes
+ *   while a replacement of a borrowed texture ring is pending. This is not an
  *   error: *out_frame is left unchanged, and the caller retries after the next
  *   demand reports MLN_RENDER_RESULT_RENDERED. Bindings return their
  *   language's empty form instead of an error.
@@ -351,6 +388,11 @@ MLN_API mln_status mln_acquired_frame_get_result(
 
 /**
  * Copies the producer synchronization for an acquired texture frame.
+ *
+ * The synchronization states when the producer's GPU writes to the frame's
+ * texture are complete, for frames of session-owned and borrowed rings alike.
+ * The host waits on it before it reads the texture. See mln_gpu_sync_kind for
+ * what each kind promises.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -465,7 +507,8 @@ MLN_API mln_status mln_render_session_resize(
 
 /**
  * Starts a barrier that completes after all render work accepted before it has
- * a terminal result. A barrier does not request a frame.
+ * a terminal result. A barrier does not request a frame. Accepting a barrier
+ * ends the wait of every earlier demand that waits for a map update.
  *
  * Returns:
  * - MLN_STATUS_OK when the barrier is accepted.
@@ -582,11 +625,15 @@ MLN_API mln_status mln_render_session_service_driver_work(
  * leave the session attached. Once accepted, earlier mailbox operations reach
  * a terminal result before graphics resources are destroyed.
  *
- * When a disposed frame or a failed release quarantined a slot of the texture
- * ring, the host's GPU may still read that slot's texture. Detach then releases
- * the ring and its graphics context without destroying them, and they stay
- * allocated until the process exits. Detach waits for the map's in-flight tile
- * work in that case, so the host may destroy its device once detach completes.
+ * When a disposed frame or a failed release quarantined a slot of a
+ * session-owned texture ring, the host's GPU may still read that slot's
+ * texture. Detach then keeps the ring and its graphics context until the
+ * process exits, and destroys the rest. When it keeps a ring, detach waits for
+ * the map's in-flight tile work, and once detach completes the host may
+ * destroy its graphics objects. The one exception is a kept Vulkan ring: it is
+ * a child of the host's VkDevice, so the host keeps the device until the
+ * process exits. A borrowed ring's textures belong to the host, so detach
+ * keeps nothing for its quarantined slots.
  *
  * Returns:
  * - MLN_STATUS_OK when the detach is accepted.
@@ -609,7 +656,8 @@ MLN_API mln_status mln_render_session_detach(
 ) MLN_NOEXCEPT;
 
 /**
- * Irreversibly closes control and mailboxes without graphics calls.
+ * Irreversibly closes control and mailboxes and disposes of the session's
+ * graphics objects.
  *
  * A core worker can still be inside the driver call that published a frame
  * result or completion the host already observed. The call waits for that
@@ -618,15 +666,30 @@ MLN_API mln_status mln_render_session_detach(
  * MLN_STATUS_BUSY instead, as does abandon from inside any of the session's
  * driver calls, such as from a completion that the core worker delivers.
  *
- * Before returning, the call also waits for the map's in-flight tile work,
- * which can still reference quarantined renderer resources and through them
- * the host's graphics objects. After it returns, no library thread touches the
- * session's target or device, so the host may destroy them immediately. Do
- * not call from a MapLibre worker callback.
+ * Before returning, the call waits for the map's in-flight tile work and then
+ * disposes of the session's graphics objects. It destroys Vulkan and Metal
+ * objects on the calling thread. For a Vulkan session it first waits for the
+ * work the session submitted to its queue, taking the host's queue lock only
+ * to submit that wait, never across it. It keeps an object, until the process
+ * exits, when destroying it is not safe: the texture ring of a session-owned
+ * target while a frame of it is acquired or a slot is quarantined; every
+ * object when the process has begun to exit; and OpenGL and WebGPU objects,
+ * which only their graphics thread may destroy. *out_result reports what was
+ * kept. Release acquired frames before abandon to let it destroy a
+ * session-owned ring.
+ *
+ * The host keeps the target's graphics objects valid until the call returns,
+ * and must not hold the queue lock while it waits on the abandoning thread.
+ * After the call returns, no library thread touches them and the host may
+ * destroy them. The one exception is a kept Vulkan object: it is a child of
+ * the host's VkDevice, and a kept swapchain is also a child of its
+ * VkSurfaceKHR, so the host keeps those parents until the process exits. A
+ * Vulkan GPU that hangs without reporting device loss blocks the call. Do not
+ * call from a MapLibre worker callback.
  *
  * Returns:
  * - MLN_STATUS_OK when control is abandoned and *out_result describes what was
- *   quarantined.
+ *   kept.
  * - MLN_STATUS_BUSY when a scope from mln_acquired_frame_view_begin() is
  *   active, a caller-driver call is in flight, or the caller is inside one of
  *   the session's driver calls. Nothing changes.
@@ -670,12 +733,16 @@ MLN_API mln_status mln_render_session_destroy(
  * session that is attached and has no acquired frame detaches on its worker
  * after the in-flight call, which frees its graphics resources. Every other
  * session is abandoned on the cleanup worker once its in-flight driver work and
- * its scopes from mln_acquired_frame_view_begin() end, which quarantines its
- * graphics resources. A session that waits for those does not delay other
- * sessions' retirement. Either way, retirement releases the
- * map attachment. The host keeps its graphics objects alive until the session's
- * wake release callbacks run. Acquired frame accessors report target loss after
- * acceptance; their owners still release or dispose those frames.
+ * its scopes from mln_acquired_frame_view_begin() end, which disposes of its
+ * graphics resources as mln_render_session_abandon() does. A session that
+ * waits for those does not delay other sessions' retirement. Either way,
+ * retirement releases the map attachment. The host keeps its graphics objects
+ * alive until the session's wake release callbacks run. Disposal reports
+ * nothing about what it keeps, so a Vulkan host keeps its VkDevice and
+ * VkSurfaceKHR, and their VkInstance, until the process exits. The exception
+ * is a session whose target an earlier detach or abandon already released:
+ * the rules of that call apply. Acquired frame accessors report target loss
+ * after acceptance; their owners still release or dispose those frames.
  *
  * Returns MLN_STATUS_OK on acceptance, MLN_STATUS_INVALID_ARGUMENT for an
  * invalid handle, or MLN_STATUS_INVALID_STATE for a session that has been
@@ -690,12 +757,14 @@ MLN_API mln_status mln_render_session_dispose(
  *
  * This cleanup path supplies no consumer GPU synchronization, so the host's
  * GPU may still read the frame's texture. The session keeps that texture and
- * never renders into its slot again. Rendering continues on the other slots,
- * and a view already open on the frame stays valid until it ends. Once every
- * slot is quarantined, frame requests return MLN_STATUS_INVALID_STATE. Detach
- * of a session with a quarantined slot keeps the ring allocated until the
- * process exits; see mln_render_session_detach(). An explicit release with
- * consumer synchronization returns the slot to the ring instead.
+ * never renders into its slot again, unless a replacement of a borrowed ring
+ * gives the slot a new texture. Rendering continues on the other slots, and a
+ * view already open on the frame stays valid until it ends. Once every slot
+ * is quarantined, frame requests return MLN_STATUS_INVALID_STATE. Detach of a
+ * session with a quarantined slot of a session-owned ring keeps the ring
+ * allocated until the process exits; see mln_render_session_detach(). An
+ * explicit release with consumer synchronization returns the slot to the ring
+ * instead.
  *
  * The call is CPU-only and may run on any native thread. It starts no thread.
  * It allocates only when it quarantines the last slot while a frame demand

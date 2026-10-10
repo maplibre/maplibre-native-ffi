@@ -50,9 +50,11 @@ abandon the session, or detach it and wait for the detach completion. For a
 session that a host graphics thread drives, stop driver service first. Abandon
 is synchronous, so an exit path can use it on a session that is mid-frame. The
 Python binding abandons every session that it still holds when the interpreter
-shuts down. A Dart isolate's shutdown finalizes its open sessions without
-starting graphics calls, but a driver call already in flight can outlast it, so
-a Dart host ends its sessions' graphics calls itself before exit.
+shuts down, without graphics calls: it keeps the sessions' graphics objects
+until the process exits, so a Vulkan host keeps its device that long. A Dart
+isolate's shutdown finalizes its open sessions without starting graphics calls,
+but a driver call already in flight can outlast it, so a Dart host ends its
+sessions' graphics calls itself before exit.
 
 ## Map
 
@@ -122,7 +124,7 @@ Render targets come in three kinds:
 | ----------------------- | -------- | ------------------------------------------ |
 | native surface          | caller   | To a window, view, or canvas, and presents |
 | owned texture target    | session  | Offscreen, into a session allocation       |
-| borrowed texture target | caller   | Offscreen, into a caller allocation        |
+| borrowed texture target | caller   | Offscreen, into a ring of caller textures  |
 
 Keeping render sessions separate from maps lets the host manage the graphics
 backend lifecycle independently.
@@ -164,22 +166,38 @@ presentation callbacks are paused.
 A frame demand carries a host token, an optional timeout, and a coalescing
 boundary. Every accepted demand produces one terminal result. Result records
 identify the token and the map-update, extent, and frame generations that the
-driver used. A direct frame-result wake callback remains armed until the host
-drains all frame results, so coalesced wakeups do not lose results.
+driver used. A render-if-needed demand can also wait for the map's next update
+instead of finishing without a frame, so a host that keeps one such demand armed
+renders each update without a runtime-event round trip. A direct frame-result
+wake callback remains armed until the host drains all frame results, so
+coalesced wakeups do not lose results.
+
+To find the first frame that includes a command, read a map snapshot at or past
+the command's completion generation. A rendered frame whose map-update
+generation is at or past the snapshot's latest render-update generation draws
+map state that includes the command. Animated camera changes and resource loads
+reach later frames.
 
 Disposing a session, as a binding does for a handle that it reclaims, ends the
 session without a completion. A core-worker session that is attached and has no
 acquired frame detaches on its worker and frees its graphics resources. Disposal
-abandons any other session, which quarantines those resources. In both cases the
-host keeps its graphics objects alive until the session's wakes are released.
+abandons any other session, which destroys those resources where abandon can. In
+both cases the host keeps its graphics objects alive until the session's wakes
+are released. Disposal reports nothing about the objects that it keeps, so a
+Vulkan host keeps its device, surface, and instance until the process exits. To
+destroy them sooner, detach or abandon the session before disposing of it, and
+follow what that call reports.
 
-Host-acquirable owned texture targets negotiate a ring of one to three slots.
+Host-acquirable owned texture targets negotiate a ring of one to three slots,
+and a borrowed texture target lends one to three textures, one per slot.
 Acquiring a frame leases one slot and returns producer-completion
-synchronization. Releasing the frame supplies consumer-completion
-synchronization when the host submitted GPU reads. The driver reuses the slot
-only after the host released the handle and those reads completed. A private
-OpenGL owned texture target fixes its ring depth at one and exposes CPU readback
-instead of frame acquisition.
+synchronization, for borrowed and owned rings alike. The host waits on that
+synchronization, not on a rendered result, before it reads the frame's texture,
+and needs no GPU fence of its own. Releasing the frame supplies
+consumer-completion synchronization when the host submitted GPU reads. The
+driver reuses the slot only after the host released the handle and those reads
+completed. A private OpenGL owned texture target fixes its ring depth at one and
+exposes CPU readback instead of frame acquisition.
 
 ### OpenGL context ownership
 

@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.internal.lifecycle
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import org.maplibre.nativeffi.generated.MetalOwnedTextureFrame
+import org.maplibre.nativeffi.generated.MetalTextureFrame
 import org.maplibre.nativeffi.render.NativePointer
 
 class ViewScopeTest {
@@ -12,7 +12,7 @@ class ViewScopeTest {
     val scope = ViewScope()
     val texture = NativePointer.scoped(0x10L, scope)
     val frame =
-      MetalOwnedTextureFrame(
+      MetalTextureFrame(
           texture = texture,
           device = NativePointer.scoped(0x20L, scope),
           width = 2u,

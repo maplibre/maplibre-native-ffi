@@ -105,25 +105,31 @@ import org.lwjgl.vulkan.VkPhysicalDeviceIDProperties
 import org.lwjgl.vulkan.VkPhysicalDeviceProperties2
 import org.lwjgl.vulkan.VkQueue
 
+/**
+ * Lends the session a ring of exportable Vulkan images, which Skiko's OpenGL context imports, and
+ * draws the imports.
+ */
 internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-linux-vulkan-renderer")
   private var vulkan: LinuxVulkanContext? = null
-  private var exportedTexture: LinuxExportedVulkanTexture? = null
-  private var importedTexture: LinuxOpenGlImportedTexture? = null
+
+  // One entry per ring slot, in slot order: the Vulkan image and the consumer's import of it.
+  private var exportedTextures: List<LinuxExportedVulkanTexture> = emptyList()
+  @Volatile private var importedTextures: List<LinuxOpenGlImportedTexture> = emptyList()
   private var currentExtent = SurfaceExtent.Empty
 
   @Volatile private var generation = 0L
   @Volatile private var renderedGeneration = 0L
 
-  // The consumer texture a frame last landed in, kept alive until one lands in its replacement.
-  // Skiko allocates a new texture for every resize and the map needs a frame or two to fill it, so
-  // this is what the consumer draws in between.
-  private var retiredImportedTexture: LinuxOpenGlImportedTexture? = null
-  private var retiredExportedTexture: LinuxExportedVulkanTexture? = null
+  // The ring a frame last landed in, kept alive until one lands in its replacement. The bridge
+  // allocates a new ring for every resize and the map needs a frame or two to fill it, so this is
+  // what the consumer draws in between.
+  @Volatile private var retiredImportedTextures: List<LinuxOpenGlImportedTexture> = emptyList()
+  private var retiredExportedTextures: List<LinuxExportedVulkanTexture> = emptyList()
   @Volatile private var retiredGeneration = 0L
 
-  // The Skiko OpenGL context both imports were made in. A GL name means nothing in a context that
+  // The Skiko OpenGL context the imports were made in. A GL name means nothing in a context that
   // did not issue it, and Skiko replaces this context with its redrawer.
   private var consumerContext: SkikoOpenGlContext? = null
 
@@ -150,13 +156,13 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
     abandonTexturesIfConsumerContextChanged()
-    // The retired texture is released only a frame after the replacement rendered, so its last
+    // The retired ring is released only a frame after the replacement rendered, so its last
     // recorded frame has been flushed. Skiko's context is current here, which closing it needs.
-    if (retiredImportedTexture != null && renderedGeneration == generation) {
-      disposeRetiredTexture(consumerContextCurrent = true)
+    if (retiredImportedTextures.isNotEmpty() && renderedGeneration == generation) {
+      disposeRetiredTextures(consumerContextCurrent = true)
     }
-    if (importedTexture == null || exportedTexture == null || extent != currentExtent) {
-      recreateTexture(extent)
+    if (importedTextures.isEmpty() || exportedTextures.isEmpty() || extent != currentExtent) {
+      recreateTextures(extent)
     }
     return NativeSurfaceFrameLease(
       frameId = frameId,
@@ -181,12 +187,13 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
       return false
     }
     // Only a texture this bridge still holds is safe to draw.
-    val texture =
+    val held =
       when (target.generation) {
-        generation -> importedTexture
-        retiredGeneration -> retiredImportedTexture
-        else -> null
-      } ?: return false
+        generation -> importedTextures
+        retiredGeneration -> retiredImportedTextures
+        else -> emptyList()
+      }
+    val texture = held.getOrNull(target.slotIndex) ?: return false
     return SkikoHost.drawOpenGlTexture(scope, texture.target(target.generation))
   }
 
@@ -195,8 +202,8 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
       // Skiko may have replaced the context these were imported into, and a name deleted there is
       // an unrelated object in whatever context is current now.
       if (consumerContextStillCurrent()) {
-        disposeTexture(consumerContextCurrent = false)
-        disposeRetiredTexture(consumerContextCurrent = false)
+        disposeTextures(consumerContextCurrent = false)
+        disposeRetiredTextures(consumerContextCurrent = false)
       } else {
         abandonTextures()
       }
@@ -211,31 +218,37 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     }
   }
 
-  private fun target(generation: Long): NativeSurfaceTarget =
-    checkNotNull(exportedTexture) { "Linux Vulkan texture is not initialized" }.target(generation)
+  private fun target(generation: Long): NativeSurfaceTarget {
+    check(exportedTextures.isNotEmpty()) { "Linux Vulkan texture is not initialized" }
+    return LinuxExportedVulkanTexture.ringTarget(exportedTextures, generation)
+  }
 
-  private fun recreateTexture(extent: SurfaceExtent) {
+  private fun recreateTextures(extent: SurfaceExtent) {
     if (extent.isEmpty) {
-      disposeTexture(consumerContextCurrent = true)
+      disposeTextures(consumerContextCurrent = true)
       currentExtent = SurfaceExtent.Empty
       generation += 1
       return
     }
 
-    retireTexture()
+    retireTextures()
     val context =
       vulkan ?: LinuxVulkanContext.create(currentOpenGlDeviceUuids()).also { vulkan = it }
-    val exported = context.createExportedTexture(extent)
+    val exported = mutableListOf<LinuxExportedVulkanTexture>()
+    val imported = mutableListOf<LinuxOpenGlImportedTexture>()
     try {
-      val imported =
-        LinuxOpenGlImportedTexture.create(exported.exportFd(), exported.memorySize(), extent)
-      exportedTexture = exported
-      importedTexture = imported
+      repeat(RING_DEPTH) {
+        val image = context.createExportedTexture(extent).also { exported += it }
+        imported += LinuxOpenGlImportedTexture.create(image.exportFd(), image.memorySize(), extent)
+      }
+      exportedTextures = exported
+      importedTextures = imported
       consumerContext = SkikoHost.requireLinuxOpenGlContext()
       currentExtent = extent
       generation += 1
     } catch (error: RuntimeException) {
-      exported.close()
+      imported.forEach(LinuxOpenGlImportedTexture::close)
+      exported.forEach(LinuxExportedVulkanTexture::close)
       throw error
     }
   }
@@ -259,64 +272,71 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   }
 
   private fun abandonTextures() {
-    importedTexture?.abandon()
-    importedTexture = null
-    retiredImportedTexture?.abandon()
-    retiredImportedTexture = null
+    importedTextures.forEach(LinuxOpenGlImportedTexture::abandon)
+    importedTextures = emptyList()
+    retiredImportedTextures.forEach(LinuxOpenGlImportedTexture::abandon)
+    retiredImportedTextures = emptyList()
     retiredGeneration = 0
     consumerContext = null
     // The images belong to this bridge's own Vulkan device, which Skiko's context change leaves
     // alone, so they are released.
-    exportedTexture?.close()
-    exportedTexture = null
-    retiredExportedTexture?.close()
-    retiredExportedTexture = null
+    exportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    exportedTextures = emptyList()
+    retiredExportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    retiredExportedTextures = emptyList()
     currentExtent = SurfaceExtent.Empty
     generation += 1
   }
 
-  // Holds the outgoing consumer texture for drawing while the replacement is still empty.
-  private fun retireTexture() {
-    if (renderedGeneration != generation || importedTexture == null) {
-      // The session still names this image until its target replacement completes, after this
-      // returns. Destroying it now is safe only because each draw waits for its own demand's
+  // Holds the outgoing consumer textures for drawing while the replacement is still empty.
+  private fun retireTextures() {
+    if (renderedGeneration != generation || importedTextures.isEmpty()) {
+      // The session still names these images until its target replacement completes, after this
+      // returns. Destroying them now is safe only because each draw waits for its own demand's
       // result, which leaves the core worker idle between draws.
-      disposeTexture(consumerContextCurrent = true)
+      disposeTextures(consumerContextCurrent = true)
       return
     }
-    disposeRetiredTexture(consumerContextCurrent = true)
-    retiredImportedTexture = importedTexture
-    retiredExportedTexture = exportedTexture
+    disposeRetiredTextures(consumerContextCurrent = true)
+    retiredImportedTextures = importedTextures
+    retiredExportedTextures = exportedTextures
     retiredGeneration = generation
-    importedTexture = null
-    exportedTexture = null
+    importedTextures = emptyList()
+    exportedTextures = emptyList()
   }
 
-  private fun disposeRetiredTexture(consumerContextCurrent: Boolean = true) {
-    retiredImportedTexture?.let { texture ->
-      if (consumerContextCurrent) {
-        texture.close()
-      } else {
-        SkikoHost.withLinuxOpenGlContext { texture.close() }
-      }
-    }
-    retiredImportedTexture = null
-    retiredExportedTexture?.close()
-    retiredExportedTexture = null
+  private fun disposeRetiredTextures(consumerContextCurrent: Boolean = true) {
+    closeImports(retiredImportedTextures, consumerContextCurrent)
+    retiredImportedTextures = emptyList()
+    retiredExportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    retiredExportedTextures = emptyList()
     retiredGeneration = 0
   }
 
-  private fun disposeTexture(consumerContextCurrent: Boolean = true) {
-    importedTexture?.let { texture ->
-      if (consumerContextCurrent) {
-        texture.close()
-      } else {
-        SkikoHost.withLinuxOpenGlContext { texture.close() }
-      }
+  private fun disposeTextures(consumerContextCurrent: Boolean = true) {
+    closeImports(importedTextures, consumerContextCurrent)
+    importedTextures = emptyList()
+    exportedTextures.forEach(LinuxExportedVulkanTexture::close)
+    exportedTextures = emptyList()
+  }
+
+  private fun closeImports(
+    textures: List<LinuxOpenGlImportedTexture>,
+    consumerContextCurrent: Boolean,
+  ) {
+    if (textures.isEmpty()) {
+      return
     }
-    importedTexture = null
-    exportedTexture?.close()
-    exportedTexture = null
+    if (consumerContextCurrent) {
+      textures.forEach(LinuxOpenGlImportedTexture::close)
+    } else {
+      SkikoHost.withLinuxOpenGlContext { textures.forEach(LinuxOpenGlImportedTexture::close) }
+    }
+  }
+
+  private companion object {
+    /** Two images: one the consumer draws, and one the session renders into meanwhile. */
+    const val RING_DEPTH = 2
   }
 }
 
@@ -498,13 +518,16 @@ private constructor(private val requiredDeviceUuids: Set<String>) : AutoCloseabl
   }
 
   override fun close() {
+    // Objects that an abandoned session kept are children of the device, which then stays until the
+    // process exits, as does its instance.
+    val destroy = !VulkanDeviceRetention.keepUntilExit
     device?.let {
       vkDeviceWaitIdle(it)
-      vkDestroyDevice(it, null)
+      if (destroy) vkDestroyDevice(it, null)
       device = null
     }
     instance?.let {
-      vkDestroyInstance(it, null)
+      if (destroy) vkDestroyInstance(it, null)
       instance = null
     }
   }
@@ -548,18 +571,8 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
     }
   }
 
-  fun target(generation: Long): VulkanImageTarget =
-    VulkanImageTarget(
-      context = context.handles,
-      image = NativeHandle(image),
-      imageView = NativeHandle(view),
-      format = VK_FORMAT_R8G8B8A8_UNORM,
-      initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-      finalLayout = VK_IMAGE_LAYOUT_GENERAL,
-      queueFamilyIndex = context.handles.graphicsQueueFamilyIndex,
-      extent = extent,
-      generation = generation,
-    )
+  val slot: VulkanImageSlot
+    get() = VulkanImageSlot(NativeHandle(image), NativeHandle(view))
 
   private fun create() {
     MemoryStack.stackPush().use { stack ->
@@ -659,6 +672,23 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
   }
 
   companion object {
+    /** The target of a ring of exported images, one per slot in slot order. */
+    fun ringTarget(ring: List<LinuxExportedVulkanTexture>, generation: Long): VulkanImageTarget {
+      val front = ring.first()
+      return VulkanImageTarget(
+        context = front.context.handles,
+        image = front.slot.image,
+        imageView = front.slot.imageView,
+        format = VK_FORMAT_R8G8B8A8_UNORM,
+        initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        finalLayout = VK_IMAGE_LAYOUT_GENERAL,
+        queueFamilyIndex = front.context.handles.graphicsQueueFamilyIndex,
+        extent = front.extent,
+        generation = generation,
+        ring = ring.map { it.slot },
+      )
+    }
+
     fun create(context: LinuxVulkanContext, extent: SurfaceExtent): LinuxExportedVulkanTexture {
       val texture = LinuxExportedVulkanTexture(context, extent)
       try {

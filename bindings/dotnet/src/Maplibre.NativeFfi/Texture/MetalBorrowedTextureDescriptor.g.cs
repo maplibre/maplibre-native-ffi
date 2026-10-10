@@ -9,31 +9,33 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_metal_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical texture extent. The map viewport uses width and height and the
-/// renderer uses scale_factor; the physical size is stated separately below. A
-/// scale_factor that differs from the map's is accepted and logged as a
-/// warning.
-/// </param>
-/// <param name="PhysicalWidth">
-/// Physical texture width in device pixels. Must be positive. Defaults to 256.
-/// </param>
-/// <param name="PhysicalHeight">
-/// Physical texture height in device pixels. Must be positive. Defaults to 256.
-/// </param>
-/// <param name="Texture">
-/// Borrowed <c>id&lt;MTLTexture&gt;</c> / <c>MTL::Texture*</c>. Required.
-/// </param>
-public readonly partial record struct MetalBorrowedTextureDescriptor(
-    LogicalExtent Extent,
-    uint PhysicalWidth,
-    uint PhysicalHeight,
-    NativePointer Texture
-)
+public readonly record struct MetalBorrowedTextureDescriptor
 {
     public MetalBorrowedTextureDescriptor()
-        : this(new LogicalExtent(), 256, 256, default) { }
+        : this(new LogicalExtent(), 256, 256, default!) { }
 
+    public MetalBorrowedTextureDescriptor(
+        LogicalExtent Extent,
+        uint PhysicalWidth,
+        uint PhysicalHeight,
+        MetalBorrowedTexture[] Textures
+    )
+    {
+        this.Extent = Extent;
+        this.PhysicalWidth = PhysicalWidth;
+        this.PhysicalHeight = PhysicalHeight;
+        this.Textures = Textures;
+    }
+
+    public LogicalExtent Extent { get; init; }
+    public uint PhysicalWidth { get; init; }
+    public uint PhysicalHeight { get; init; }
+    public MetalBorrowedTexture[] Textures
+    {
+        get => TexturesStorage.ToArray();
+        init => TexturesStorage = ValueArray.Copy(value);
+    }
+    internal ValueArray<MetalBorrowedTexture> TexturesStorage { get; init; }
     public static MetalBorrowedTextureDescriptor Default
     {
         get

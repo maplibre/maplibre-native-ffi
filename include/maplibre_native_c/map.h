@@ -928,6 +928,22 @@ typedef struct mln_map_snapshot {
    */
   bool gesture_in_progress;
   uint64_t event_mask MLN_BINDING("enum=mln_runtime_event_mask");
+  /**
+   * Generation of the latest render update the map published. A rendered
+   * frame at or past it draws map state that includes every command this
+   * snapshot observes, though animations and resource loads finish in later
+   * frames.
+   *
+   * A command publishes the render update for its change before it reports
+   * its completion. When this snapshot's generation is at or past a command's
+   * completion, a frame result with disposition MLN_RENDER_RESULT_RENDERED and
+   * a map_update_generation at or past this value was rendered from map state
+   * that includes the command. For a camera command with a duration, that
+   * state is the transition's first step; the commanded camera appears in the
+   * update after the transition's last frame. Resources a command starts
+   * loading, such as a style or source URL, appear in later updates as they
+   * load.
+   */
   uint64_t latest_render_update_generation;
   mln_map_tile_options tile;
   mln_bound_options bounds;

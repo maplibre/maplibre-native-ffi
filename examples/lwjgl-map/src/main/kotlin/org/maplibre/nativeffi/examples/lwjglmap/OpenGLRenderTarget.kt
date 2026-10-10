@@ -5,6 +5,7 @@ import org.maplibre.nativeffi.generated.AcquiredFrameHandle
 import org.maplibre.nativeffi.generated.EglContextDescriptor
 import org.maplibre.nativeffi.generated.GpuSyncKind
 import org.maplibre.nativeffi.generated.MapHandle
+import org.maplibre.nativeffi.generated.OpenglBorrowedTexture
 import org.maplibre.nativeffi.generated.OpenglBorrowedTextureDescriptor
 import org.maplibre.nativeffi.generated.OpenglClientApi
 import org.maplibre.nativeffi.generated.OpenglContextDescriptor
@@ -51,7 +52,7 @@ internal object OpenGLRenderTarget {
     val compositor = OpenGLTextureCompositor(context, viewport)
     try {
       val attached =
-        AttachedSession.attach(driver, RenderTarget.OWNED_TEXTURE_RING_DEPTH) { options ->
+        AttachedSession.attach(driver, RenderTarget.TEXTURE_RING_DEPTH.toUInt()) { options ->
           map.attachOpenglOwnedTexture(
             OpenglOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context)),
             options,
@@ -70,18 +71,18 @@ internal object OpenGLRenderTarget {
     viewport: Viewport,
     driver: SessionDriver,
   ): RenderTarget {
-    val texture = OpenGLBorrowedTexture(context, viewport)
+    val ring = BorrowedTextureTarget.allocateRing(viewport) { OpenGLBorrowedTexture(context, it) }
     var compositor: OpenGLTextureCompositor? = null
     try {
       compositor = OpenGLTextureCompositor(context, viewport)
       val attached =
-        AttachedSession.attach(driver) { options ->
-          map.attachOpenglBorrowedTexture(borrowedDescriptor(context, viewport, texture), options)
+        AttachedSession.attach(driver, RenderTarget.TEXTURE_RING_DEPTH.toUInt()) { options ->
+          map.attachOpenglBorrowedTexture(borrowedDescriptor(context, viewport, ring), options)
         }
-      return BorrowedTexture(attached, map, context, compositor, texture)
+      return BorrowedTexture(attached, map, context, compositor, ring)
     } catch (error: RuntimeException) {
       runCatching { compositor?.close() }.onFailure(error::addSuppressed)
-      texture.close()
+      ring.forEach(AutoCloseable::close)
       throw error
     }
   }
@@ -89,15 +90,15 @@ internal object OpenGLRenderTarget {
   private fun borrowedDescriptor(
     context: OpenGLContext,
     viewport: Viewport,
-    texture: OpenGLBorrowedTexture,
+    ring: List<OpenGLBorrowedTexture>,
   ): OpenglBorrowedTextureDescriptor =
     OpenglBorrowedTextureDescriptor(
       RenderTarget.extent(viewport),
       viewport.framebufferWidth().toUInt(),
       viewport.framebufferHeight().toUInt(),
       descriptor(context),
-      texture.texture().toUInt(),
-      texture.target().toUInt(),
+      ring.map { OpenglBorrowedTexture(it.texture().toUInt()) },
+      OpenGLTextureCompositor.TEXTURE_TARGET.toUInt(),
     )
 
   private fun descriptor(context: OpenGLContext): OpenglContextDescriptor =
@@ -125,27 +126,30 @@ internal object OpenGLRenderTarget {
         },
     )
 
+  /** Composes a frame of either texture mode, whose producer work is complete. */
+  private fun draw(compositor: OpenGLTextureCompositor, frame: AcquiredFrameHandle): Boolean {
+    frame.withProducerSync { sync ->
+      check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
+        "OpenGL compositor requires CPU-complete producer work"
+      }
+      frame.withOpenglTexture { view ->
+        check(view.width > 0u && view.height > 0u) {
+          "MapLibre returned an empty OpenGL texture frame"
+        }
+        check(view.target == OpenGLTextureCompositor.TEXTURE_TARGET.toUInt()) {
+          "MapLibre texture target is ${view.target}, expected GL_TEXTURE_2D"
+        }
+        compositor.drawTexture(view.texture.toInt())
+      }
+    }
+    return true
+  }
+
   private class OwnedTexture(
     attached: AttachedSession,
     private val compositor: OpenGLTextureCompositor,
   ) : OwnedTextureTarget(attached) {
-    override fun draw(frame: AcquiredFrameHandle): Boolean {
-      frame.withProducerSync { sync ->
-        check(sync.kind == GpuSyncKind.CPU_COMPLETE) {
-          "OpenGL compositor requires CPU-complete producer work"
-        }
-        frame.withOpenglTexture { view ->
-          check(view.width > 0u && view.height > 0u) {
-            "MapLibre returned an empty OpenGL owned texture frame"
-          }
-          check(view.target == OpenGLTextureCompositor.TEXTURE_TARGET.toUInt()) {
-            "MapLibre owned texture target is ${view.target}, expected GL_TEXTURE_2D"
-          }
-          compositor.drawTexture(view.texture.toInt())
-        }
-      }
-      return true
-    }
+    override fun draw(frame: AcquiredFrameHandle): Boolean = draw(compositor, frame)
 
     override fun resizeHost(viewport: Viewport) {
       compositor.resize(viewport)
@@ -161,18 +165,18 @@ internal object OpenGLRenderTarget {
     map: MapHandle,
     private val context: OpenGLContext,
     private val compositor: OpenGLTextureCompositor,
-    texture: OpenGLBorrowedTexture,
-  ) : BorrowedTextureTarget<OpenGLBorrowedTexture>(attached, map, texture) {
+    ring: List<OpenGLBorrowedTexture>,
+  ) : BorrowedTextureTarget<OpenGLBorrowedTexture>(attached, map, ring) {
     override fun allocate(viewport: Viewport): OpenGLBorrowedTexture =
       OpenGLBorrowedTexture(context, viewport)
 
-    override fun setTarget(viewport: Viewport, replacement: OpenGLBorrowedTexture): Deferred<Unit> =
+    override fun setTarget(
+      viewport: Viewport,
+      replacement: List<OpenGLBorrowedTexture>,
+    ): Deferred<Unit> =
       session.setOpenglBorrowedTextureTarget(borrowedDescriptor(context, viewport, replacement))
 
-    override fun draw(texture: OpenGLBorrowedTexture): Boolean {
-      compositor.drawTexture(texture.texture())
-      return true
-    }
+    override fun draw(frame: AcquiredFrameHandle): Boolean = draw(compositor, frame)
 
     override fun resizeHost(viewport: Viewport) {
       compositor.resize(viewport)
@@ -180,7 +184,7 @@ internal object OpenGLRenderTarget {
 
     override fun closeHost() {
       compositor.close()
-      texture.close()
+      super.closeHost()
     }
   }
 }

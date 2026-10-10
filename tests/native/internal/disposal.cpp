@@ -27,6 +27,10 @@
 #include "support/wait.h"
 #include "unity.h"
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#include "support/host_graphics.h"
+#endif
+
 namespace {
 
 using mln::native_tests::AllocationFaults;
@@ -569,7 +573,8 @@ void disposal_detaches_an_attached_core_worker_session() {
 }
 
 // A session whose frame the host still holds keeps its target in the host's
-// hands, so disposal abandons it on every driver.
+// hands, so disposal abandons it on every driver. The abandon keeps the ring,
+// and a kept Vulkan ring is a child of the host's device.
 void disposal_abandons_a_session_with_an_acquired_frame() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();
@@ -585,14 +590,18 @@ void disposal_abandons_a_session_with_an_acquired_frame() {
   MLN_TEST_OK(mln_acquired_frame_dispose(frame, nullptr));
   TEST_ASSERT_TRUE(wake_released(released));
   TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture);
+#endif
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }
 
 // A finalizer can run while the process exits, when nothing waits for the
-// wake releases, so a finalized core-worker session quarantines its graphics
-// resources rather than detaching through graphics calls.
+// wake releases, so a finalized core-worker session keeps its graphics
+// resources rather than detaching through graphics calls. Kept Vulkan objects
+// are children of the host's device.
 void finalization_abandons_an_attached_session() {
   auto sync_points = SyncPointScope{};
   const auto runtime = mln_test_create_runtime();
@@ -608,6 +617,9 @@ void finalization_abandons_an_attached_session() {
   mln_adapter_owner_finalize(token);
   TEST_ASSERT_TRUE(wake_released(released));
   TEST_ASSERT_EQUAL_INT(0, sync_points.hits(SyncPoint::RenderDisposalDetached));
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(&fixture);
+#endif
   mln_test_render_fixture_destroy(&fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);

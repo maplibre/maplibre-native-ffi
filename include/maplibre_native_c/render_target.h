@@ -68,17 +68,21 @@ typedef void (*mln_queue_lock_callback)(void* user_data);
  * thread, so a host that also uses that queue passes a lock here. Native code
  * calls lock and then unlock on the driver thread around each submission and
  * presentation on the queue, including the empty submission that waits for
- * the queue to drain. It holds the lock only for that call, never across a
- * wait. The host takes the same lock around its own calls on the queue.
+ * the queue to drain. Abandon also takes it on the thread that abandons, which
+ * is the cleanup worker when mln_render_session_dispose() abandons the
+ * session, around the drains that its teardown submits. Native code holds the
+ * lock only for that call, never across a wait. The host takes the same lock
+ * around its own calls on the queue.
  *
  * Both callbacks are null to disable the lock, or both are set. A disabled
  * lock must not carry release_user_data. A session without a lock assumes that
  * the host leaves the queue alone while the session is attached.
  *
- * The callbacks must not call the C API. The host must not hold the lock while
- * it calls the C API, because the driver may need the lock to finish the call:
- * a caller-graphics-thread driver takes it inside driver service, and abandon
- * and teardown wait for a core worker that may be waiting for it. Sessions
+ * The callbacks must not call the C API. The host never holds the lock while
+ * it calls the C API, or while it waits on a thread that does, because the
+ * call may need the lock to finish: a caller-graphics-thread driver takes it
+ * inside driver service, abandon takes it to drain the queue, and abandon and
+ * teardown wait for a core worker that may be waiting for it. Sessions
  * that share a queue each take their own lock, so give them all a lock on the
  * same host mutex.
  *
@@ -118,8 +122,10 @@ typedef struct mln_render_session_attach_options {
     "default=MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD"
   );
   /**
-   * Requested host-acquirable owned-texture slot count. Private targets grant
-   * one slot regardless of this value. Ignored by other targets. Defaults to 1.
+   * Requested slot count of a session-owned texture ring, from one to three.
+   * Private targets grant one slot regardless of this value. A borrowed
+   * texture ring's depth is its texture count, so borrowed and other targets
+   * ignore this value. Defaults to 1.
    */
   uint32_t requested_texture_ring_depth MLN_BINDING("default=1");
   uint32_t reserved MLN_BINDING("kind=reserved");
@@ -140,7 +146,10 @@ typedef struct mln_render_session_capabilities {
   uint32_t size;
   /** One mln_render_driver_kind value. */
   uint32_t driver MLN_BINDING("enum=mln_render_driver_kind");
-  /** Granted owned-texture slot count, or zero for a target without a ring. */
+  /**
+   * Granted texture ring depth: the slot count of a session-owned ring, or the
+   * texture count of a borrowed one. Zero for a surface.
+   */
   uint32_t texture_ring_depth;
   /** A bitwise OR of mln_render_session_capability_flag values. */
   uint32_t flags MLN_BINDING("enum=mln_render_session_capability_flag");
@@ -148,7 +157,21 @@ typedef struct mln_render_session_capabilities {
 
 /** Synchronization payload kind for acquired texture frames. */
 typedef enum mln_gpu_sync_kind : uint32_t {
-  /** The producer or consumer has completed before the API call returns. */
+  /**
+   * The host needs no synchronization object. The work completed, or on WebGPU
+   * was submitted to the device's queue, before the frame became acquirable or
+   * before the release call.
+   *
+   * As producer synchronization of an acquired frame: on Metal, Vulkan, and
+   * OpenGL, the producer's GPU writes to the frame's texture completed before
+   * the frame became acquirable. On OpenGL, a host that samples the texture
+   * from another context of the share group binds it again after acquisition.
+   * On WebGPU, the writes were submitted to the device's queue, which orders
+   * them before any work that the host submits afterwards.
+   *
+   * As consumer synchronization: the host's GPU reads completed before the
+   * release call, or on WebGPU were submitted to the device's queue before it.
+   */
   MLN_GPU_SYNC_CPU_COMPLETE = 0U,
   /** `id<MTLSharedEvent>` plus a monotonically increasing signal value. */
   MLN_GPU_SYNC_METAL_SHARED_EVENT = 1U,

@@ -10,6 +10,10 @@
 #include "support/style.h"
 #include "support/test_support.h"
 
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+#include "support/host_graphics.h"
+#endif
+
 static void attach(
   mln_runtime* runtime, mln_map* map, mln_test_render_fixture* fixture,
   mln_buffer_view style
@@ -26,6 +30,18 @@ static void detach(
   mln_test_render_fixture_destroy(fixture);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
+// detach() for a session that keeps its texture ring until the process exits,
+// as detach and abandon do once the host's GPU may still read a slot. A kept
+// Vulkan ring is a child of the host's device, so the device stays too.
+static void detach_keeping_the_ring(
+  mln_runtime runtime, mln_map map, mln_test_render_fixture* fixture
+) {
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN)
+  mln_test_render_fixture_keep_graphics_until_exit(fixture);
+#endif
+  detach(runtime, map, fixture);
 }
 
 // A readback is accepted before any frame renders, and its completion reports
@@ -80,10 +96,10 @@ enum frame_backend { METAL, VULKAN, OPENGL, WEBGPU };
 // Every backend's frame record, so one call site can take any getter.
 typedef union frame_record {
   uint32_t size;
-  mln_metal_owned_texture_frame metal;
-  mln_vulkan_owned_texture_frame vulkan;
-  mln_opengl_owned_texture_frame opengl;
-  mln_webgpu_owned_texture_frame webgpu;
+  mln_metal_texture_frame metal;
+  mln_vulkan_texture_frame vulkan;
+  mln_opengl_texture_frame opengl;
+  mln_webgpu_texture_frame webgpu;
   mln_render_frame_result result;
   mln_gpu_sync sync;
 } frame_record;
@@ -141,13 +157,13 @@ typedef struct accessor_entry {
 
 // The texture getters come first, indexed by frame_backend.
 static const accessor_entry accessors[] = {
-  {"metal texture", get_metal, sizeof(mln_metal_owned_texture_frame),
+  {"metal texture", get_metal, sizeof(mln_metal_texture_frame),
    PRESET_FRAME_BACKEND == METAL},
-  {"vulkan texture", get_vulkan, sizeof(mln_vulkan_owned_texture_frame),
+  {"vulkan texture", get_vulkan, sizeof(mln_vulkan_texture_frame),
    PRESET_FRAME_BACKEND == VULKAN},
-  {"opengl texture", get_opengl, sizeof(mln_opengl_owned_texture_frame),
+  {"opengl texture", get_opengl, sizeof(mln_opengl_texture_frame),
    PRESET_FRAME_BACKEND == OPENGL},
-  {"webgpu texture", get_webgpu, sizeof(mln_webgpu_owned_texture_frame),
+  {"webgpu texture", get_webgpu, sizeof(mln_webgpu_texture_frame),
    PRESET_FRAME_BACKEND == WEBGPU},
   {"result", get_result, sizeof(mln_render_frame_result), true},
   {"producer sync", get_producer_sync, sizeof(mln_gpu_sync), true},
@@ -169,24 +185,24 @@ static uint64_t expect_preset_texture(
   const frame_record* record, uint64_t generation
 ) {
 #if defined(MLN_FFI_TEST_BACKEND_METAL)
-  const mln_metal_owned_texture_frame* frame = &record->metal;
+  const mln_metal_texture_frame* frame = &record->metal;
   TEST_ASSERT_NOT_NULL(frame->texture);
   TEST_ASSERT_NOT_NULL(frame->device);
   TEST_ASSERT_NOT_EQUAL_UINT64(0, frame->pixel_format);
 #elif defined(MLN_FFI_TEST_BACKEND_VULKAN)
-  const mln_vulkan_owned_texture_frame* frame = &record->vulkan;
+  const mln_vulkan_texture_frame* frame = &record->vulkan;
   TEST_ASSERT_NOT_EQUAL_UINT64(0, frame->image);
   TEST_ASSERT_NOT_EQUAL_UINT64(0, frame->image_view);
   TEST_ASSERT_NOT_NULL(frame->device);
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->format);
 #elif defined(MLN_FFI_TEST_BACKEND_OPENGL)
-  const mln_opengl_owned_texture_frame* frame = &record->opengl;
+  const mln_opengl_texture_frame* frame = &record->opengl;
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->texture);
   // GL_TEXTURE_2D.
   TEST_ASSERT_EQUAL_HEX32(0x0DE1, frame->target);
   TEST_ASSERT_NOT_EQUAL_UINT32(0, frame->internal_format);
 #else
-  const mln_webgpu_owned_texture_frame* frame = &record->webgpu;
+  const mln_webgpu_texture_frame* frame = &record->webgpu;
   TEST_ASSERT_NOT_NULL(frame->texture);
   TEST_ASSERT_NOT_NULL(frame->texture_view);
   TEST_ASSERT_NOT_NULL(frame->device);
@@ -372,8 +388,11 @@ static void accessors_and_release_reject_a_broken_frame_or_record(void) {
 }
 
 // Abandon right after the host acquires a frame succeeds even though a core
-// worker may still be inside the call that rendered it. The frame then
-// reports target loss, and releasing it is CPU-only.
+// worker may still be inside the call that rendered it. The host's GPU may
+// still read the frame's texture, so abandon keeps the ring's backend. It
+// destroys a Vulkan or Metal renderer, whose objects the host never reads,
+// and keeps an OpenGL or WebGPU one, which only its graphics thread may
+// destroy. The frame then reports target loss, and releasing it is CPU-only.
 static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   mln_runtime runtime;
   mln_map map;
@@ -388,13 +407,17 @@ static void acquired_frame_release_after_abandon_is_cpu_only(void) {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_ABANDON_DISPOSITION_QUARANTINED, abandoned.disposition
   );
-  TEST_ASSERT_GREATER_THAN_UINT32(0, abandoned.quarantined_resource_count);
+#if defined(MLN_FFI_TEST_BACKEND_VULKAN) || defined(MLN_FFI_TEST_BACKEND_METAL)
+  TEST_ASSERT_EQUAL_UINT32(1, abandoned.quarantined_resource_count);
+#else
+  TEST_ASSERT_EQUAL_UINT32(2, abandoned.quarantined_resource_count);
+#endif
   mln_render_frame_result invalid = {.size = sizeof(mln_render_frame_result)};
   MLN_TEST_STATUS(
     MLN_STATUS_TARGET_LOST, mln_acquired_frame_get_result(frame, &invalid, NULL)
   );
   mln_test_render_release_frame(&frame);
-  detach(runtime, map, &fixture);
+  detach_keeping_the_ring(runtime, map, &fixture);
 }
 
 // Each scope holds the frame: an explicit release reports busy, and leaves
@@ -506,7 +529,7 @@ static void disposing_a_frame_quarantines_only_its_slot(void) {
   mln_render_frame_batch_release(batch);
   TEST_ASSERT_EQUAL_UINT64(4, result.token);
   TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
-  detach(runtime, map, &fixture);
+  detach_keeping_the_ring(runtime, map, &fixture);
 }
 
 // Once disposed frames quarantine every slot, no frame can render again. Every
@@ -547,7 +570,7 @@ static void a_fully_quarantined_ring_takes_no_more_demands(void) {
   TEST_ASSERT_NOT_NULL_MESSAGE(
     strstr(mln_test_last_error(), "quarantined"), mln_test_last_error()
   );
-  detach(runtime, map, &fixture);
+  detach_keeping_the_ring(runtime, map, &fixture);
 }
 
 // With both slots of the two-deep ring holding textures of the old size, a

@@ -1,6 +1,7 @@
 // Frame demands: result batches and the frame wake, the texture ring's
 // backpressure, barriers and resizes ordered with demands, demands past the
-// ring depth, and the keep-alive demands a still image needs.
+// ring depth, the keep-alive demands a still image needs, and demands that
+// wait for a map update.
 
 #include "support/frames.h"
 #include "support/test_support.h"
@@ -439,6 +440,119 @@ static void still_image_completes_under_if_needed_keepalive_demands(void) {
   detach(runtime, map, &fixture);
 }
 
+// Requests a demand that renders only if needed and waits for a map update.
+static void request_waiting(
+  const mln_test_render_fixture* fixture, uint64_t token
+) {
+  mln_frame_demand demand = mln_frame_demand_default();
+  demand.flags = MLN_FRAME_DEMAND_IF_NEEDED | MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  demand.token = token;
+  MLN_TEST_OK(
+    mln_render_session_request_frame(fixture->session, &demand, NULL)
+  );
+}
+
+// The fence runs after the driver evaluated every earlier demand, so a
+// demand that is still pending then waits for a map update. Dumping debug
+// logs publishes no map update, which would end the wait.
+static void expect_waiting(const mln_test_render_fixture* fixture) {
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, fixture,
+    mln_render_session_dump_debug_logs(
+      fixture->session, &completion.descriptor, NULL
+    )
+  );
+  mln_render_frame_batch batch = MLN_HANDLE_NULL;
+  MLN_TEST_STATUS(
+    MLN_STATUS_NOT_READY,
+    mln_render_session_drain_frame_results(fixture->session, &batch, NULL)
+  );
+  TEST_ASSERT_EQUAL_UINT32(
+    1, read_snapshot(fixture->session).pending_demand_count
+  );
+}
+
+static void move_camera(mln_map map, double zoom) {
+  mln_camera_update update = mln_camera_update_default();
+  update.camera.fields = MLN_CAMERA_OPTION_ZOOM;
+  update.camera.zoom = zoom;
+  MLN_TEST_AWAIT_OK(
+    mln_map_update_camera(map, &update, &completion.descriptor, NULL)
+  );
+}
+
+// A demand that waits for a map update finds nothing to render on an idle
+// map and stays pending until the map publishes an update, which it then
+// renders without another demand.
+static void a_waiting_demand_renders_the_next_map_update(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture);
+  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+  const uint64_t idle_generation =
+    read_snapshot(fixture.session).rendered_update_generation;
+
+  request_waiting(&fixture, 601);
+  expect_waiting(&fixture);
+  move_camera(map, 2.0);
+  const mln_render_frame_result result = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(601, result.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, result.disposition);
+  TEST_ASSERT_GREATER_THAN_UINT64(
+    idle_generation, result.map_update_generation
+  );
+  detach(runtime, map, &fixture);
+}
+
+// A newer matching demand supersedes a waiting one, a barrier ends the wait
+// with no update, and detach ends it with target not ready. A demand that
+// waits must also render only if needed.
+static void a_waiting_demand_ends_by_supersession_barrier_or_detach(void) {
+  mln_runtime runtime;
+  mln_map map;
+  mln_test_render_fixture fixture = {0};
+  attach(&runtime, &map, &fixture);
+  mln_frame_demand forced_wait = mln_frame_demand_default();
+  forced_wait.flags = MLN_FRAME_DEMAND_WAIT_FOR_UPDATE;
+  MLN_TEST_INVALID(
+    mln_render_session_request_frame(fixture.session, &forced_wait, NULL)
+  );
+  (void)mln_test_render_until_idle(runtime, &fixture, NULL);
+
+  request_waiting(&fixture, 611);
+  expect_waiting(&fixture);
+  request_waiting(&fixture, 612);
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_barrier(fixture.session, &completion.descriptor, NULL)
+  );
+  mln_render_frame_batch batch = mln_test_render_wait_for_results(&fixture, 2);
+  const mln_render_frame_result superseded =
+    mln_test_render_batch_result(batch, 0);
+  const mln_render_frame_result ended = mln_test_render_batch_result(batch, 1);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(611, superseded.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_SUPERSEDED, superseded.disposition
+  );
+  TEST_ASSERT_EQUAL_UINT64(612, ended.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_NO_UPDATE, ended.disposition);
+
+  request_waiting(&fixture, 613);
+  expect_waiting(&fixture);
+  MLN_TEST_RENDER_AWAIT(
+    MLN_STATUS_OK, &fixture,
+    mln_render_session_detach(fixture.session, &completion.descriptor, NULL)
+  );
+  const mln_render_frame_result stranded = take_one_result(&fixture);
+  TEST_ASSERT_EQUAL_UINT64(613, stranded.token);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_RENDER_RESULT_TARGET_NOT_READY, stranded.disposition
+  );
+  detach(runtime, map, &fixture);
+}
+
 MLN_TEST_GROUP {
   RUN_TEST(frame_results_wake_the_host_and_drain_into_an_owned_batch);
   RUN_TEST(a_full_ring_parks_demands_until_a_release_or_detach);
@@ -446,4 +560,6 @@ MLN_TEST_GROUP {
   RUN_TEST(resizes_order_extent_generations_and_supersede_each_other);
   RUN_TEST(a_session_resizes_at_its_own_scale_factor_over_a_different_map);
   RUN_TEST(still_image_completes_under_if_needed_keepalive_demands);
+  RUN_TEST(a_waiting_demand_renders_the_next_map_update);
+  RUN_TEST(a_waiting_demand_ends_by_supersession_barrier_or_detach);
 }

@@ -211,6 +211,19 @@ final class FrameDemandFlag extends _Flags<FrameDemandFlag> {
   /// presenting target whose demand clears this bit still renders and keeps
   /// whatever it presented last. Ignored by targets without presentation.
   static const present = FrameDemandFlag.fromRawValue(2);
+
+  /// With `MLN_FRAME_DEMAND_IF_NEEDED`, a demand that would finish with
+  /// `MLN_RENDER_RESULT_NO_UPDATE` or `MLN_RENDER_RESULT_SIZE_PENDING` waits
+  /// instead, and runs again after the map's next update, a target replacement,
+  /// or an applied resize. A waiting demand holds no ring slot. A later demand
+  /// with the same flags and coalescing boundary supersedes it, a barrier ends
+  /// its wait with `MLN_RENDER_RESULT_NO_UPDATE`, and detach, abandon, or the
+  /// quarantine of the ring's last usable slot end it with
+  /// `MLN_RENDER_RESULT_TARGET_NOT_READY`. A waiting demand's result can follow
+  /// the results of demands accepted after it. The flag does not pace: a host
+  /// that re-arms a waiting demand as each result arrives renders every update
+  /// the map publishes.
+  static const waitForUpdate = FrameDemandFlag.fromRawValue(4);
   @override
   FrameDemandFlag _of(int rawValue) => FrameDemandFlag.fromRawValue(rawValue);
 }
@@ -283,7 +296,9 @@ final class GesturePhase extends _Enum {
 final class GpuSyncKind extends _Enum {
   const GpuSyncKind.fromRawValue(super.rawValue);
 
-  /// The producer or consumer has completed before the API call returns.
+  /// The host needs no synchronization object. The work completed, or on WebGPU
+  /// was submitted to the device's queue, before the frame became acquirable or
+  /// before the release call.
   static const cpuComplete = GpuSyncKind.fromRawValue(0);
 
   /// `id<MTLSharedEvent>` plus a monotonically increasing signal value.
@@ -550,17 +565,17 @@ final class QueriedFeatureField extends _Flags<QueriedFeatureField> {
       QueriedFeatureField.fromRawValue(rawValue);
 }
 
-/// Result of irreversible CPU-side target abandonment.
+/// What abandon did with a session's graphics resources.
 ///
 /// See `mln_render_abandon_disposition` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/render__session_8h.html).
 final class RenderAbandonDisposition extends _Enum {
   const RenderAbandonDisposition.fromRawValue(super.rawValue);
 
-  /// No graphics resources remained when control was abandoned.
+  /// Abandon destroyed every graphics resource, or none remained.
   static const clean = RenderAbandonDisposition.fromRawValue(0);
 
-  /// Graphics resources could not be destroyed and were quarantined.
+  /// Abandon kept graphics resources that it could not safely destroy.
   static const quarantined = RenderAbandonDisposition.fromRawValue(1);
 }
 
@@ -616,11 +631,15 @@ final class RenderResult extends _Enum {
   static const rendered = RenderResult.fromRawValue(0);
 
   /// No newer map update was available, or the map had no complete frame to
-  /// draw yet. The map publishes another update when it has one.
+  /// draw yet. The map publishes another update when it has one. A demand with
+  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for that update instead, and
+  /// finishes with this result only when a barrier ends its wait.
   static const noUpdate = RenderResult.fromRawValue(1);
 
   /// An ordered extent change had not reached the map. The map publishes an
-  /// update at the new extent.
+  /// update at the new extent, which a demand with
+  /// `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` waits for instead of finishing with
+  /// this result.
   static const sizePending = RenderResult.fromRawValue(2);
 
   /// The target could not produce a frame. The attempt consumes nothing, so a
@@ -1188,17 +1207,18 @@ final class WebglContextKind extends _Enum {
   static const transferredCanvas = WebglContextKind.fromRawValue(1);
 }
 
-/// Metal frame acquired from a session-owned texture target.
+/// Metal frame acquired from a texture ring.
 ///
-/// See `mln_metal_owned_texture_frame` in the
+/// See `mln_metal_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class MetalOwnedTextureFrame extends _Value {
-  const MetalOwnedTextureFrame({
+final class MetalTextureFrame extends _Value {
+  const MetalTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     this.texture = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
     required this.pixelFormat,
@@ -1219,6 +1239,10 @@ final class MetalOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Valid until frame release.
   final NativePointer texture;
 
@@ -1235,23 +1259,25 @@ final class MetalOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     texture,
     device,
     pixelFormat,
   ];
 }
 
-/// OpenGL frame acquired from a session-owned texture target.
+/// OpenGL frame acquired from a texture ring.
 ///
-/// See `mln_opengl_owned_texture_frame` in the
+/// See `mln_opengl_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class OpenglOwnedTextureFrame extends _Value {
-  const OpenglOwnedTextureFrame({
+final class OpenglTextureFrame extends _Value {
+  const OpenglTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     this.texture = 0,
     this.target = 0,
     this.internalFormat = 0,
@@ -1274,19 +1300,24 @@ final class OpenglOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed OpenGL texture object name. Valid until frame release.
   final int texture;
 
   /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
   final int target;
 
-  /// OpenGL internal format, such as GL_RGBA8.
+  /// OpenGL internal format, such as GL_RGBA8. Zero for a borrowed texture,
+  /// whose format the host chose.
   final int internalFormat;
 
-  /// OpenGL pixel format, such as GL_RGBA.
+  /// OpenGL pixel format, such as GL_RGBA. Zero for a borrowed texture.
   final int format;
 
-  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE.
+  /// OpenGL pixel type, such as GL_UNSIGNED_BYTE. Zero for a borrowed texture.
   final int type;
 
   @override
@@ -1296,6 +1327,7 @@ final class OpenglOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     texture,
     target,
     internalFormat,
@@ -1346,6 +1378,11 @@ final class RenderFrameResult extends _Value {
   /// One `mln_render_result` value.
   final RenderResult disposition;
   final BigInt token;
+
+  /// Generation of the map render update the demand evaluated. When disposition
+  /// is `MLN_RENDER_RESULT_RENDERED`, the frame drew that update; compare it
+  /// with `mln_map_snapshot.latest_render_update_generation` to find the first
+  /// frame that includes a command.
   final BigInt mapUpdateGeneration;
   final BigInt extentGeneration;
 
@@ -1360,7 +1397,9 @@ final class RenderFrameResult extends _Value {
   /// re-arm its frame loop without the runtime event round trip. A camera
   /// transition does not set it by itself: the map publishes a new update after
   /// each of the transition's frames instead, which a render-if-needed demand
-  /// renders.
+  /// renders. A demand with `MLN_FRAME_DEMAND_WAIT_FOR_UPDATE` renders each
+  /// transition update without a runtime-event round trip; the host re-arms the
+  /// demand as each result arrives.
   final bool needsRepaint;
 
   @override
@@ -1374,17 +1413,18 @@ final class RenderFrameResult extends _Value {
   ];
 }
 
-/// Vulkan frame acquired from a session-owned texture target.
+/// Vulkan frame acquired from a texture ring.
 ///
-/// See `mln_vulkan_owned_texture_frame` in the
+/// See `mln_vulkan_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class VulkanOwnedTextureFrame extends _Value {
-  const VulkanOwnedTextureFrame({
+final class VulkanTextureFrame extends _Value {
+  const VulkanTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     required this.image,
     required this.imageView,
     this.device = NativePointer.nullPointer,
@@ -1407,6 +1447,10 @@ final class VulkanOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// image in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed VkImage bit pattern. Valid until frame release.
   final BigInt image;
 
@@ -1419,7 +1463,9 @@ final class VulkanOwnedTextureFrame extends _Value {
   /// Backend-native VkFormat value.
   final int format;
 
-  /// Backend-native VkImageLayout value; Vulkan frames are host-sampleable.
+  /// Backend-native VkImageLayout value that the image is in:
+  /// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL for a session-owned ring, and the
+  /// descriptor's final_layout for a borrowed one.
   final int layout;
 
   @override
@@ -1429,6 +1475,7 @@ final class VulkanOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     image,
     imageView,
     device,
@@ -1437,17 +1484,18 @@ final class VulkanOwnedTextureFrame extends _Value {
   ];
 }
 
-/// WebGPU frame acquired from a session-owned texture target.
+/// WebGPU frame acquired from a texture ring.
 ///
-/// See `mln_webgpu_owned_texture_frame` in the
+/// See `mln_webgpu_texture_frame` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
-final class WebgpuOwnedTextureFrame extends _Value {
-  const WebgpuOwnedTextureFrame({
+final class WebgpuTextureFrame extends _Value {
+  const WebgpuTextureFrame({
     required this.generation,
     this.width = 0,
     this.height = 0,
     this.scaleFactor = 0,
     required this.frameId,
+    this.slot = 0,
     this.texture = NativePointer.nullPointer,
     this.textureView = NativePointer.nullPointer,
     this.device = NativePointer.nullPointer,
@@ -1469,6 +1517,10 @@ final class WebgpuOwnedTextureFrame extends _Value {
   /// Opaque frame identity used to reject stale releases.
   final BigInt frameId;
 
+  /// Ring slot that holds this frame. For a borrowed target, the index of its
+  /// texture in the descriptor's textures array.
+  final int slot;
+
   /// Borrowed WGPUTexture. Valid until frame release.
   final NativePointer texture;
 
@@ -1488,6 +1540,7 @@ final class WebgpuOwnedTextureFrame extends _Value {
     height,
     scaleFactor,
     frameId,
+    slot,
     texture,
     textureView,
     device,
@@ -2189,7 +2242,9 @@ final class FrameDemand extends _Value {
   final BigInt coalescingBoundary;
 
   /// Positive time allowed before driver work begins, in nanoseconds; zero has
-  /// no limit.
+  /// no limit. A demand that waits, for a free texture slot or for a map
+  /// update, is checked against its timeout when it runs again; a wait has no
+  /// timer of its own.
   final BigInt timeoutNs;
 
   @override
@@ -2442,17 +2497,31 @@ final class StyleTileSourceOptions extends _Value {
   ];
 }
 
+/// One caller-owned Metal texture of a borrowed texture ring.
+///
+/// See `mln_metal_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class MetalBorrowedTexture extends _Value {
+  const MetalBorrowedTexture({this.texture = NativePointer.nullPointer});
+
+  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
+  final NativePointer texture;
+
+  @override
+  List<Object?> get _members => [texture];
+}
+
 /// Metal attachment options for a borrowed texture target.
 ///
 /// See `mln_metal_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class MetalBorrowedTextureDescriptor extends _Value {
-  const MetalBorrowedTextureDescriptor({
+  MetalBorrowedTextureDescriptor({
     this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
-    this.texture = NativePointer.nullPointer,
-  });
+    required List<MetalBorrowedTexture> textures,
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -2468,15 +2537,15 @@ final class MetalBorrowedTextureDescriptor extends _Value {
   /// 256.
   final int physicalHeight;
 
-  /// Borrowed `id<MTLTexture>` / `MTL::Texture*`. Required.
-  final NativePointer texture;
+  /// The ring's textures, one per slot, in slot order. Required.
+  final List<MetalBorrowedTexture> textures;
 
   @override
   List<Object?> get _members => [
     extent,
     physicalWidth,
     physicalHeight,
-    texture,
+    textures,
   ];
 }
 
@@ -2511,9 +2580,10 @@ final class RenderSessionAttachOptions extends _Value {
   /// `MLN_RENDER_DRIVER_CALLER_GRAPHICS_THREAD`.
   final RenderDriverKind driver;
 
-  /// Requested host-acquirable owned-texture slot count. Private targets grant
-  /// one slot regardless of this value. Ignored by other targets. Defaults to
-  /// 1.
+  /// Requested slot count of a session-owned texture ring, from one to three.
+  /// Private targets grant one slot regardless of this value. A borrowed
+  /// texture ring's depth is its texture count, so borrowed and other targets
+  /// ignore this value. Defaults to 1.
   final int requestedTextureRingDepth;
 
   /// Wakes the receiver when the frame-result queue becomes nonempty.
@@ -2728,19 +2798,33 @@ final class OpenglContextDescriptorDataUnknown
   final Uint8List rawRecord;
 }
 
+/// One caller-owned OpenGL texture of a borrowed texture ring.
+///
+/// See `mln_opengl_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class OpenglBorrowedTexture extends _Value {
+  const OpenglBorrowedTexture({this.texture = 0});
+
+  /// Borrowed OpenGL texture object name. Required.
+  final int texture;
+
+  @override
+  List<Object?> get _members => [texture];
+}
+
 /// OpenGL attachment options for a borrowed texture target.
 ///
 /// See `mln_opengl_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class OpenglBorrowedTextureDescriptor extends _Value {
-  const OpenglBorrowedTextureDescriptor({
+  OpenglBorrowedTextureDescriptor({
     this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     required this.context,
-    this.texture = 0,
+    required List<OpenglBorrowedTexture> textures,
     this.target = 0,
-  });
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -2756,14 +2840,14 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
   /// 256.
   final int physicalHeight;
 
-  /// Borrowed OpenGL context provider data. The texture must belong to this
+  /// Borrowed OpenGL context provider data. The textures must belong to this
   /// context or a context in the same share group.
   final OpenglContextDescriptor context;
 
-  /// Borrowed OpenGL texture object name. Required.
-  final int texture;
+  /// The ring's textures, one per slot, in slot order. Required.
+  final List<OpenglBorrowedTexture> textures;
 
-  /// OpenGL texture target. GL_TEXTURE_2D is the expected target.
+  /// OpenGL texture target of every texture. Must be GL_TEXTURE_2D.
   final int target;
 
   @override
@@ -2772,7 +2856,7 @@ final class OpenglBorrowedTextureDescriptor extends _Value {
     physicalWidth,
     physicalHeight,
     context,
-    texture,
+    textures,
     target,
   ];
 }
@@ -2877,22 +2961,39 @@ final class VulkanContextDescriptor extends _Value {
   ];
 }
 
+/// One caller-owned Vulkan image of a borrowed texture ring.
+///
+/// See `mln_vulkan_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class VulkanBorrowedTexture extends _Value {
+  const VulkanBorrowedTexture({required this.image, required this.imageView});
+
+  /// Borrowed VkImage. Required.
+  final BigInt image;
+
+  /// Borrowed VkImageView for image. Required. The view must be a 2D color view
+  /// that matches image and the descriptor's format.
+  final BigInt imageView;
+
+  @override
+  List<Object?> get _members => [image, imageView];
+}
+
 /// Vulkan attachment options for a borrowed texture target.
 ///
 /// See `mln_vulkan_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class VulkanBorrowedTextureDescriptor extends _Value {
-  const VulkanBorrowedTextureDescriptor({
+  VulkanBorrowedTextureDescriptor({
     this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     this.context = const VulkanContextDescriptor(),
-    required this.image,
-    required this.imageView,
+    required List<VulkanBorrowedTexture> textures,
     this.format = 0,
     this.initialLayout = 0,
     this.finalLayout = 5,
-  });
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -2909,13 +3010,11 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
   /// Borrowed Vulkan context. All handles are required.
   final VulkanContextDescriptor context;
 
-  /// Borrowed VkImage. Required.
-  final BigInt image;
+  /// The ring's images, one per slot, in slot order. Required.
+  final List<VulkanBorrowedTexture> textures;
 
-  /// Borrowed VkImageView for image. Required.
-  final BigInt imageView;
-
-  /// Backend-native VkFormat value for image. VK_FORMAT_UNDEFINED is invalid.
+  /// Backend-native VkFormat value of every image. VK_FORMAT_UNDEFINED is
+  /// invalid.
   final int format;
 
   /// Backend-native VkImageLayout value expected at render-pass begin.
@@ -2931,8 +3030,7 @@ final class VulkanBorrowedTextureDescriptor extends _Value {
     physicalWidth,
     physicalHeight,
     context,
-    image,
-    imageView,
+    textures,
     format,
     initialLayout,
     finalLayout,
@@ -3012,20 +3110,40 @@ final class WebgpuContextDescriptor extends _Value {
   List<Object?> get _members => [instance, device, queue];
 }
 
+/// One caller-owned WebGPU texture of a borrowed texture ring.
+///
+/// See `mln_webgpu_borrowed_texture` in the
+/// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
+final class WebgpuBorrowedTexture extends _Value {
+  const WebgpuBorrowedTexture({
+    this.texture = NativePointer.nullPointer,
+    this.textureView = NativePointer.nullPointer,
+  });
+
+  /// Borrowed WGPUTexture. Required.
+  final NativePointer texture;
+
+  /// Borrowed WGPUTextureView for texture. Required. The view must be a 2D
+  /// color view compatible with texture and the descriptor's format.
+  final NativePointer textureView;
+
+  @override
+  List<Object?> get _members => [texture, textureView];
+}
+
 /// WebGPU attachment options for a borrowed texture target.
 ///
 /// See `mln_webgpu_borrowed_texture_descriptor` in the
 /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
 final class WebgpuBorrowedTextureDescriptor extends _Value {
-  const WebgpuBorrowedTextureDescriptor({
+  WebgpuBorrowedTextureDescriptor({
     this.extent = const LogicalExtent(),
     this.physicalWidth = 256,
     this.physicalHeight = 256,
     this.context = const WebgpuContextDescriptor(),
-    this.texture = NativePointer.nullPointer,
-    this.textureView = NativePointer.nullPointer,
+    required List<WebgpuBorrowedTexture> textures,
     this.format = 0,
-  });
+  }) : textures = List.unmodifiable(textures);
 
   /// Logical texture extent. The map viewport uses width and height and the
   /// renderer uses scale_factor; the physical size is stated separately below.
@@ -3039,16 +3157,15 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
   /// Physical texture height in device pixels. Defaults to 256.
   final int physicalHeight;
 
-  /// Borrowed WebGPU context. device is required.
+  /// Borrowed WebGPU context. device is required. Rendering is submitted
+  /// through context.queue or that device's default queue.
   final WebgpuContextDescriptor context;
 
-  /// Borrowed WGPUTexture. Required.
-  final NativePointer texture;
+  /// The ring's textures, one per slot, in slot order. Required.
+  final List<WebgpuBorrowedTexture> textures;
 
-  /// Borrowed WGPUTextureView for texture. Required.
-  final NativePointer textureView;
-
-  /// Backend-native WGPUTextureFormat value. Undefined is invalid.
+  /// Backend-native WGPUTextureFormat value of every texture. Undefined is
+  /// invalid.
   final int format;
 
   @override
@@ -3057,8 +3174,7 @@ final class WebgpuBorrowedTextureDescriptor extends _Value {
     physicalWidth,
     physicalHeight,
     context,
-    texture,
-    textureView,
+    textures,
     format,
   ];
 }
@@ -3285,6 +3401,10 @@ final class MapSnapshot extends _Value {
   /// True while the map is inside a gesture.
   final bool gestureInProgress;
   final RuntimeEventMask eventMask;
+
+  /// Generation of the latest render update the map published. A rendered frame
+  /// at or past it draws map state that includes every command this snapshot
+  /// observes, though animations and resource loads finish in later frames.
   final BigInt latestRenderUpdateGeneration;
   final MapTileOptions tile;
   final BoundOptions bounds;
@@ -3713,7 +3833,8 @@ final class RenderSessionCapabilities extends _Value {
   /// One `mln_render_driver_kind` value.
   final RenderDriverKind driver;
 
-  /// Granted owned-texture slot count, or zero for a target without a ring.
+  /// Granted texture ring depth: the slot count of a session-owned ring, or the
+  /// texture count of a borrowed one. Zero for a surface.
   final int textureRingDepth;
 
   /// A bitwise OR of `mln_render_session_capability_flag` values.

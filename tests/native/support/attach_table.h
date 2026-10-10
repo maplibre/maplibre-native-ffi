@@ -20,6 +20,9 @@
 // A handle value for descriptor fields that only validation reads.
 #define MLN_TEST_FAKE_HANDLE ((void*)(uintptr_t)1)
 
+// How many textures a call's borrowed descriptor can name.
+#define MLN_TEST_RING_TEXTURES 4
+
 // One call's arguments around any backend's descriptor.
 typedef struct mln_test_target_call {
   mln_map map;
@@ -43,6 +46,15 @@ typedef struct mln_test_target_call {
     mln_webgpu_owned_texture_descriptor webgpu_owned;
     mln_webgpu_borrowed_texture_descriptor webgpu_borrowed;
   } descriptor;
+  // Storage for a borrowed descriptor's textures array. A row works on a copy
+  // of the call whose array still points at the original's storage, so an edit
+  // that changes an entry first points the array here, at the copy's own.
+  union {
+    mln_metal_borrowed_texture metal[MLN_TEST_RING_TEXTURES];
+    mln_vulkan_borrowed_texture vulkan[MLN_TEST_RING_TEXTURES];
+    mln_opengl_borrowed_texture opengl[MLN_TEST_RING_TEXTURES];
+    mln_webgpu_borrowed_texture webgpu[MLN_TEST_RING_TEXTURES];
+  } textures;
 } mln_test_target_call;
 
 // A backend's attach function, with its descriptor type erased.
@@ -188,6 +200,43 @@ static inline void mln_test_run_attach_table(
      "must be positive"},                                                     \
     {"infinite scale factor", member##_infinite_scale,                        \
      MLN_STATUS_INVALID_ARGUMENT, "must be positive"}
+
+// Defines the edits every borrowed descriptor shares, for the union member
+// `member` whose entries live in the call's `textures.entries`: no textures
+// array, a zero count, one texture named twice, and a ring deeper than three.
+// Each starts from a ring of one texture. MLN_TEST_BORROWED_CASES(member)
+// names their rows.
+#define MLN_TEST_BORROWED_EDITS(member, entries)                        \
+  static void member##_without_textures(void* call) {                   \
+    ((mln_test_target_call*)call)->descriptor.member.textures = NULL;   \
+  }                                                                     \
+  static void member##_without_texture_count(void* call) {              \
+    ((mln_test_target_call*)call)->descriptor.member.texture_count = 0; \
+  }                                                                     \
+  static void member##_with_a_texture_twice(void* call) {               \
+    mln_test_target_call* edited = call;                                \
+    edited->textures.entries[1] = edited->textures.entries[0];          \
+    edited->descriptor.member.textures = edited->textures.entries;      \
+    edited->descriptor.member.texture_count = 2;                        \
+  }                                                                     \
+  static void member##_four_deep(void* call) {                          \
+    mln_test_target_call* edited = call;                                \
+    for (size_t index = 1; index < 4; index += 1) {                     \
+      edited->textures.entries[index] = edited->textures.entries[0];    \
+    }                                                                   \
+    edited->descriptor.member.textures = edited->textures.entries;      \
+    edited->descriptor.member.texture_count = 4;                        \
+  }
+
+#define MLN_TEST_BORROWED_CASES(member)                      \
+  {"null textures array", member##_without_textures,         \
+   MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},     \
+    {"zero texture count", member##_without_texture_count,   \
+     MLN_STATUS_INVALID_ARGUMENT, "at least one texture"},   \
+    {"a texture named twice", member##_with_a_texture_twice, \
+     MLN_STATUS_INVALID_ARGUMENT, "distinct textures"},      \
+    {"a ring four textures deep", member##_four_deep,        \
+     MLN_STATUS_INVALID_ARGUMENT, "at most 3"}
 
 // For a target whose physical size follows from its extent: an extent that
 // overflows 32 bits once scaled. MLN_TEST_OVERFLOW_CASE(member) names its row.

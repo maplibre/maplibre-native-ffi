@@ -266,17 +266,20 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
   }
 
   override fun close() {
+    // Objects that an abandoned session kept are children of the device and the surface, which then
+    // stay until the process exits, as does their instance.
+    val destroy = !RenderTarget.graphicsKept
     device?.let {
       withQueue { vkDeviceWaitIdle(it) }
-      vkDestroyDevice(it, null)
+      if (destroy) vkDestroyDevice(it, null)
       device = null
     }
     if (surface != NULL) {
-      vkDestroySurfaceKHR(instance(), surface, null)
+      if (destroy) vkDestroySurfaceKHR(instance(), surface, null)
       surface = NULL
     }
     instance?.let {
-      vkDestroyInstance(it, null)
+      if (destroy) vkDestroyInstance(it, null)
       instance = null
     }
     if (window != NULL) {

@@ -41,8 +41,6 @@ internal class VulkanBorrowedImage private constructor(graphicsContext: Graphics
   private var memory = NULL
   private var view = NULL
 
-  fun view(): Long = view
-
   fun imageAddress(): Long = image
 
   fun viewAddress(): Long = view

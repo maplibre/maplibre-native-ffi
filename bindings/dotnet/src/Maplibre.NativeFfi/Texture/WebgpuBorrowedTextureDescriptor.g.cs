@@ -9,43 +9,39 @@ namespace Maplibre.NativeFfi;
 /// See <c>mln_webgpu_borrowed_texture_descriptor</c> in the <see
 /// href="https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html">C API reference</see>.
 /// </remarks>
-/// <param name="Extent">
-/// Logical texture extent. The map viewport uses width and height and the
-/// renderer uses scale_factor; the physical size is stated separately below. A
-/// scale_factor that differs from the map's is accepted and logged as a
-/// warning.
-/// </param>
-/// <param name="PhysicalWidth">
-/// Physical texture width in device pixels. Defaults to 256.
-/// </param>
-/// <param name="PhysicalHeight">
-/// Physical texture height in device pixels. Defaults to 256.
-/// </param>
-/// <param name="Context">
-/// Borrowed WebGPU context. device is required.
-/// </param>
-/// <param name="Texture">
-/// Borrowed WGPUTexture. Required.
-/// </param>
-/// <param name="TextureView">
-/// Borrowed WGPUTextureView for texture. Required.
-/// </param>
-/// <param name="Format">
-/// Backend-native WGPUTextureFormat value. Undefined is invalid.
-/// </param>
-public readonly partial record struct WebgpuBorrowedTextureDescriptor(
-    LogicalExtent Extent,
-    uint PhysicalWidth,
-    uint PhysicalHeight,
-    WebgpuContextDescriptor Context,
-    NativePointer Texture,
-    NativePointer TextureView,
-    uint Format
-)
+public readonly record struct WebgpuBorrowedTextureDescriptor
 {
     public WebgpuBorrowedTextureDescriptor()
-        : this(new LogicalExtent(), 256, 256, default, default, default, default) { }
+        : this(new LogicalExtent(), 256, 256, default, default!, default) { }
 
+    public WebgpuBorrowedTextureDescriptor(
+        LogicalExtent Extent,
+        uint PhysicalWidth,
+        uint PhysicalHeight,
+        WebgpuContextDescriptor Context,
+        WebgpuBorrowedTexture[] Textures,
+        uint Format
+    )
+    {
+        this.Extent = Extent;
+        this.PhysicalWidth = PhysicalWidth;
+        this.PhysicalHeight = PhysicalHeight;
+        this.Context = Context;
+        this.Textures = Textures;
+        this.Format = Format;
+    }
+
+    public LogicalExtent Extent { get; init; }
+    public uint PhysicalWidth { get; init; }
+    public uint PhysicalHeight { get; init; }
+    public WebgpuContextDescriptor Context { get; init; }
+    public WebgpuBorrowedTexture[] Textures
+    {
+        get => TexturesStorage.ToArray();
+        init => TexturesStorage = ValueArray.Copy(value);
+    }
+    internal ValueArray<WebgpuBorrowedTexture> TexturesStorage { get; init; }
+    public uint Format { get; init; }
     public static WebgpuBorrowedTextureDescriptor Default
     {
         get

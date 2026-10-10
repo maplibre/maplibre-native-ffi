@@ -4,7 +4,7 @@ internal import CMaplibreNativeC
 import Foundation
 
 public extension MapHandle {
-  /// Starts attachment of a caller-owned Metal texture target.
+  /// Starts attachment of a ring of caller-owned Metal textures.
   ///
   /// See `mln_map_attach_metal_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -19,7 +19,7 @@ public extension MapHandle {
     ) { raw, arena, completion, diagnostic in
       try mln_map_attach_metal_borrowed_texture(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),
         &value0,
         completion,
@@ -52,7 +52,7 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Starts attachment of a caller-owned OpenGL texture target.
+  /// Starts attachment of a ring of caller-owned OpenGL textures.
   ///
   /// See `mln_map_attach_opengl_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -100,7 +100,7 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Starts attachment of a caller-owned Vulkan texture target.
+  /// Starts attachment of a ring of caller-owned Vulkan images.
   ///
   /// See `mln_map_attach_vulkan_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -115,7 +115,7 @@ public extension MapHandle {
     ) { raw, arena, completion, diagnostic in
       try mln_map_attach_vulkan_borrowed_texture(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),
         &value0,
         completion,
@@ -148,7 +148,7 @@ public extension MapHandle {
     } adopt: { try RenderSessionHandle(adopting: value0, parent: self) }
   }
 
-  /// Starts attachment of a caller-owned WebGPU texture target.
+  /// Starts attachment of a ring of caller-owned WebGPU textures.
   ///
   /// See `mln_map_attach_webgpu_borrowed_texture` in the
   /// [C API reference](https://maplibre.org/maplibre-native-ffi/reference/c/texture_8h.html).
@@ -163,7 +163,7 @@ public extension MapHandle {
     ) { raw, arena, completion, diagnostic in
       try mln_map_attach_webgpu_borrowed_texture(
         raw,
-        arena.store(bindingArg0.nativeValue()),
+        arena.store(bindingArg0.nativeValue(arena: arena)),
         arena.store(bindingArg1.nativeValue(arena: arena)),
         &value0,
         completion,

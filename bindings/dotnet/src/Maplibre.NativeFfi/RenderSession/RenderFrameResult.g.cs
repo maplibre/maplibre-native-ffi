@@ -13,6 +13,12 @@ namespace Maplibre.NativeFfi;
 /// <param name="Disposition">
 /// One <c>mln_render_result</c> value.
 /// </param>
+/// <param name="MapUpdateGeneration">
+/// Generation of the map render update the demand evaluated. When disposition
+/// is <c>MLN_RENDER_RESULT_RENDERED</c>, the frame drew that update; compare it
+/// with <c>mln_map_snapshot.latest_render_update_generation</c> to find the
+/// first frame that includes a command.
+/// </param>
 /// <param name="FrameGeneration">
 /// Zero unless disposition is <c>MLN_RENDER_RESULT_RENDERED</c>.
 /// </param>
@@ -25,7 +31,9 @@ namespace Maplibre.NativeFfi;
 /// host can re-arm its frame loop without the runtime event round trip. A
 /// camera transition does not set it by itself: the map publishes a new update
 /// after each of the transition's frames instead, which a render-if-needed
-/// demand renders.
+/// demand renders. A demand with <c>MLN_FRAME_DEMAND_WAIT_FOR_UPDATE</c>
+/// renders each transition update without a runtime-event round trip; the host
+/// re-arms the demand as each result arrives.
 /// </param>
 public readonly partial record struct RenderFrameResult(
     RenderResult Disposition,
