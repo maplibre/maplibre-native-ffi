@@ -176,6 +176,8 @@ runs:
     - name: Use Windows OpenGL software driver
       if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-wgl') }}
       uses: ./.github/actions/setup-windows-opengl-software
+      with:
+        scope: system
 
     - name: Cache Cargo packages
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -447,6 +449,14 @@ runs:
           ~/.rustup
           ~/.cargo/bin
         key: ${{ steps.toolchain-key.outputs.key }}
+
+    # This adds a driver to the pinned JDK, so it follows the save above to keep
+    # the job-local change out of the shared toolchain cache.
+    - name: Use Windows OpenGL software driver in the JVM
+      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-wgl') }}
+      uses: ./.github/actions/setup-windows-opengl-software
+      with:
+        scope: jvm
 
     # The R2 backend lives here rather than in mise.toml, because its keys carry
     # the toolchain paths of the runner that produced them; a contributor

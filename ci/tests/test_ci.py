@@ -413,31 +413,48 @@ class WorkflowTest(unittest.TestCase):
         self.assertTrue(linux["zig"])
         self.assertTrue(linux["gradle"])
 
-    def test_a_command_environment_reaches_only_its_own_step(self):
+    def test_a_suite_environment_reaches_its_commands_in_the_listed_targets(self):
         source = copy.deepcopy(self.source)
-        command = "mise run //examples/c-map:smoke windows-x64-wgl"
         source["suites"].append(
             {
                 "platforms": ["windows"],
                 "commands": [
-                    {
-                        "task": "//examples/c-map:smoke",
-                        "include": ["windows-x64-wgl"],
-                        "env": {"STEP_PROBE": "1"},
-                    }
+                    {"task": "//examples/c-map:check"},
+                    {"task": "//examples/c-map:smoke"},
+                ],
+                "environments": [
+                    {"include": ["windows-x64-wgl"], "env": {"STEP_PROBE": "1"}}
                 ],
             }
         )
         jobs = suite(source, self.presets, "extended")["jobs"]
-        environments = [
-            step.get("env", {})
-            for job in jobs.values()
+        environments = {
+            (name, step["run"]): step.get("env", {})
+            for name, job in jobs.items()
             for step in job.get("steps", [])
-            if "STEP_PROBE" in step.get("env", {}) or step.get("run") == command
-        ]
+            if "STEP_PROBE" in step.get("env", {})
+            or (
+                name.startswith("target-windows-")
+                and "//examples/c-map:" in step.get("run", "")
+            )
+        }
         # The packaged target's consumer environment still applies.
+        probed = {"MISE_TASK_SKIP": "//:build", "STEP_PROBE": "1"}
+        plain = {"MISE_TASK_SKIP": "//:build"}
         self.assertEqual(
-            environments, [{"MISE_TASK_SKIP": "//:build", "STEP_PROBE": "1"}]
+            environments,
+            {
+                (f"target-{preset}", f"mise run //examples/c-map:{task} {preset}"): (
+                    probed if preset == "windows-x64-wgl" else plain
+                )
+                for preset in (
+                    "windows-x64-wgl",
+                    "windows-x64-vulkan",
+                    "windows-arm64-wgl",
+                    "windows-arm64-vulkan",
+                )
+                for task in ("check", "smoke")
+            },
         )
 
     def test_every_android_emulator_target_smoke_runs_the_map_example(self):

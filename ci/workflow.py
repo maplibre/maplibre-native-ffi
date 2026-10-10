@@ -98,7 +98,7 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
 
 
 def suite_environment(source: dict[str, object], preset: str) -> dict[str, dict]:
-    """The step environment of each suite command that sets one, by command."""
+    """The step environment of each suite command that has one, by command."""
     return {line: env for line, env in suite_steps(source, preset) if env}
 
 
@@ -111,6 +111,10 @@ def suite_steps(
             continue
         if preset in suite.get("exclude", []):
             continue
+        env = {}
+        for environment in suite.get("environments", []):
+            if preset in environment["include"]:
+                env.update(environment["env"])
         for command in suite["commands"]:
             if (
                 command.get("platforms")
@@ -130,7 +134,7 @@ def suite_steps(
             line = f"mise run {shlex.join(arguments)}"
             if command.get("display") and platform(preset) == "linux-gnu":
                 line = f"{XVFB_RUN} {line}"
-            commands.append((line, dict(command.get("env", {}))))
+            commands.append((line, dict(env)))
     return commands
 
 
