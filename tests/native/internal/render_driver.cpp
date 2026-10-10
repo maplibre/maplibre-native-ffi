@@ -754,6 +754,25 @@ auto request_waiting(
   return request_frame(fixture, demand);
 }
 
+void render_until_idle(const Fixture& fixture) {
+  static_cast<void>(
+    mln_test_render_until_idle(fixture.runtime, &fixture.render, nullptr)
+  );
+}
+
+// Runs after every work item that the driver already holds. Dumping debug
+// logs publishes no map update, which would end a demand's wait.
+void fence_driver(const Fixture& fixture) {
+  auto fence = mln_test_completion_default(0);
+  MLN_TEST_OK(mln_render_session_dump_debug_logs(
+    fixture.render.session, &fence.descriptor, nullptr
+  ));
+  MLN_TEST_OK(
+    mln_test_render_fixture_finish_operation(&fixture.render, &fence)
+  );
+  mln_test_completion_destroy(&fence);
+}
+
 auto latest_update_generation(mln_map map) -> uint64_t {
   auto snapshot = mln_map_snapshot{.size = sizeof(mln_map_snapshot)};
   if (mln_map_snapshot_get(map, &snapshot, nullptr) != MLN_STATUS_OK) return 0;
@@ -808,7 +827,7 @@ void a_waiting_demand_renders_an_update_that_lands_as_it_looks() {
   auto points = SyncPointScope{};
   auto fixture = Fixture{};
   create_fixture(fixture);
-  mln_test_render_until_idle(fixture.runtime, &fixture.render);
+  render_until_idle(fixture);
   auto move = HeldCameraMove{
     .points = &points,
     .map = fixture.map,
@@ -849,20 +868,12 @@ void a_waiting_demand_renders_an_update_that_lands_as_it_looks() {
 void a_waiting_demand_misses_a_deadline_that_passes_while_it_waits() {
   auto fixture = Fixture{};
   create_fixture(fixture);
-  mln_test_render_until_idle(fixture.runtime, &fixture.render);
+  render_until_idle(fixture);
   MLN_TEST_OK(request_waiting(
     fixture, 153, std::chrono::nanoseconds{std::chrono::hours{1}}.count()
   ));
   // The fence runs after the driver found nothing to render for the demand.
-  // Dumping debug logs publishes no map update, which would end the wait.
-  auto fence = mln_test_completion_default(0);
-  MLN_TEST_OK(mln_render_session_dump_debug_logs(
-    fixture.render.session, &fence.descriptor, nullptr
-  ));
-  MLN_TEST_OK(
-    mln_test_render_fixture_finish_operation(&fixture.render, &fence)
-  );
-  mln_test_completion_destroy(&fence);
+  fence_driver(fixture);
   mln::testing::advance_render_clock(std::chrono::hours{2});
 
   auto done = mln_test_completion_default(0);
@@ -876,6 +887,72 @@ void a_waiting_demand_misses_a_deadline_that_passes_while_it_waits() {
   TEST_ASSERT_EQUAL_UINT32(
     MLN_RENDER_RESULT_DEADLINE_MISSED, result.disposition
   );
+  destroy_fixture(fixture);
+}
+
+// The session learns of a map update from the map's notice, which trails the
+// map storing it. A waiting demand that finds the map's latest update already
+// rendered waits, even while the session has yet to learn of that update,
+// rather than running again until the notice lands. The notice then brings
+// nothing the session has not drawn, so the demand it resumes waits again and
+// renders the next update instead of the same one twice. Holding the notice
+// is the window that no public fence reaches.
+void a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of() {
+  auto points = SyncPointScope{};
+  auto fixture = Fixture{};
+  create_fixture(fixture);
+  render_until_idle(fixture);
+  const auto before = latest_update_generation(fixture.map);
+  points.hold(SyncPoint::RenderSessionUpdateNoticed);
+  // The map stores the update and advances its snapshot before the notice
+  // parks, which can keep the camera command from finishing until release.
+  auto held_move = mln_test_completion_default(0);
+  MLN_TEST_OK(submit_camera_zoom(fixture.map, 3.0, held_move));
+  TEST_ASSERT_TRUE(await(
+    [&] { return latest_update_generation(fixture.map) > before; },
+    "the camera update to be stored"
+  ));
+  const auto held = latest_update_generation(fixture.map);
+
+  auto forced = mln_frame_demand_default();
+  forced.flags = 0;
+  forced.token = 155;
+  MLN_TEST_OK(request_frame(fixture, forced));
+  auto batch = wait_for_results(fixture, 1);
+  const auto rendered = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(155, rendered.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, rendered.disposition);
+  TEST_ASSERT_EQUAL_UINT64(held, rendered.map_update_generation);
+
+  MLN_TEST_OK(request_waiting(fixture, 156));
+  // The first fence runs after the demand looks, and the second after any
+  // work that the look queued.
+  fence_driver(fixture);
+  fence_driver(fixture);
+  auto snapshot =
+    mln_render_session_snapshot{.size = sizeof(mln_render_session_snapshot)};
+  MLN_TEST_OK(
+    mln_render_session_get_snapshot(fixture.render.session, &snapshot, nullptr)
+  );
+  TEST_ASSERT_LESS_THAN_UINT64(held, snapshot.map_update_generation);
+  TEST_ASSERT_EQUAL_UINT64(held, snapshot.rendered_update_generation);
+  TEST_ASSERT_EQUAL_UINT32(1, snapshot.pending_demand_count);
+  TEST_ASSERT_EQUAL_INT(1, points.hits(SyncPoint::RenderDemandWaits));
+
+  points.release(SyncPoint::RenderSessionUpdateNoticed);
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&held_move, -1));
+  mln_test_completion_destroy(&held_move);
+  auto next_move = mln_test_completion_default(0);
+  MLN_TEST_OK(submit_camera_zoom(fixture.map, 4.0, next_move));
+  TEST_ASSERT_TRUE(mln_test_completion_wait(&next_move, -1));
+  mln_test_completion_destroy(&next_move);
+  batch = wait_for_results(fixture, 1);
+  const auto waited = batch_result(batch, 0);
+  mln_render_frame_batch_release(batch);
+  TEST_ASSERT_EQUAL_UINT64(156, waited.token);
+  TEST_ASSERT_EQUAL_UINT32(MLN_RENDER_RESULT_RENDERED, waited.disposition);
+  TEST_ASSERT_GREATER_THAN_UINT64(held, waited.map_update_generation);
   destroy_fixture(fixture);
 }
 
@@ -895,4 +972,7 @@ MLN_TEST_GROUP {
   RUN_TEST(a_demand_parked_as_disposal_quarantines_the_ring_gets_a_result);
   RUN_TEST(a_waiting_demand_renders_an_update_that_lands_as_it_looks);
   RUN_TEST(a_waiting_demand_misses_a_deadline_that_passes_while_it_waits);
+  RUN_TEST(
+    a_waiting_demand_waits_for_an_update_the_session_has_yet_to_learn_of
+  );
 }

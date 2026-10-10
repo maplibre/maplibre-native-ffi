@@ -61,6 +61,11 @@ enum class SyncPoint : std::uint8_t {
   // for a map update, and is about to take the session's control lock to
   // decide whether the demand waits or runs again. No lock is held.
   RenderDemandWaits,
+  // A map stored a render update and published its snapshot, and the update
+  // notice to its render session is about to take the session's control lock.
+  // The map's thread parks here before the update's runtime event is queued.
+  // No lock is held.
+  RenderSessionUpdateNoticed,
   // A section that published a frame result under a render session's control
   // lock has released the lock and is about to invoke the frame wake it owes.
   // No lock is held.

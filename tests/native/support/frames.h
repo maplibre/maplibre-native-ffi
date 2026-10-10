@@ -11,6 +11,7 @@
 // Reducing memory use makes the map publish an update, so a case whose demand
 // waits for one fences with mln_render_session_dump_debug_logs() instead.
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -43,12 +44,15 @@ mln_render_frame_result mln_test_render_batch_result(
   mln_render_frame_batch batch, size_t index
 );
 
-// Renders each update that the map publishes, with render-if-needed demands,
+// Renders each update that the map publishes, one frame per batch of updates,
 // until the map reports idle and the session has rendered its latest update.
 // After it returns, no update reaches a demand until the case publishes one.
 // The case drains the runtime's events only through this call meanwhile.
-void mln_test_render_until_idle(
-  mln_runtime runtime, const mln_test_render_fixture* fixture
+// Returns whether a frame finished on the way, and copies the statistics of
+// the latest one to `latest_stats` unless it is null.
+bool mln_test_render_until_idle(
+  mln_runtime runtime, const mln_test_render_fixture* fixture,
+  mln_rendering_stats* latest_stats
 );
 
 // Requests a forced frame, waits for it to render, and acquires it.

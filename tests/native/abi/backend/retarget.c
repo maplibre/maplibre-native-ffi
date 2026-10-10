@@ -503,7 +503,7 @@ static void a_borrowed_retarget_renders_a_waiting_demand(void) {
   retarget_map map = {0};
   open_map(TARGET_BORROWED, &map);
   const mln_test_render_fixture* fixture = &map.fixture;
-  mln_test_render_until_idle(map.runtime, fixture);
+  (void)mln_test_render_until_idle(map.runtime, fixture, NULL);
   mln_test_graphics_texture* replacement =
     mln_test_render_fixture_new_texture(fixture);
   TEST_ASSERT_NOT_NULL_MESSAGE(replacement, mln_test_graphics_last_error());

@@ -1169,9 +1169,33 @@ auto run_frame_demand(
   const std::shared_ptr<mln_render_session_object>& session
 ) noexcept -> void;
 
+// Queues a work item that runs the session's front demand, on the queue that
+// push_driver_work_locked() would choose. Queueing allocates; when it fails,
+// this queues nothing and returns false, and the demand stays in `demands`
+// until a later work item or detach gives it a result.
+auto queue_frame_demand_work_locked(
+  mln_render_session_object& session, DeferredWakes& wakes
+) noexcept -> bool {
+  auto& queue = session.waiting_update_work.empty()
+                  ? session.driver_work
+                  : session.waiting_update_work;
+  try {
+    queue.push_back(
+      RenderDriverWork{
+        [owner = session.shared_from_this()]() { run_frame_demand(owner); }, {}
+      }
+    );
+  } catch (...) {
+    return false;
+  }
+  if (session.waiting_update_work.empty())
+    publish_driver_work_locked(session, wakes);
+  return true;
+}
+
 // Moves every demand that waits for a map update back to the front of the
-// queue, ahead of the later demands there, in acceptance order. Returns how
-// many moved.
+// queue, ahead of the later demands there, in the order they began waiting.
+// Returns how many moved.
 auto requeue_update_waiting_demands_locked(mln_render_session_object& session)
   -> std::size_t {
   auto& waiting = session.update_waiting_demands;
@@ -1190,13 +1214,8 @@ auto resume_update_waiting_demands_locked(
   mln_render_session_object& session, DeferredWakes& wakes
 ) -> void {
   const auto count = requeue_update_waiting_demands_locked(session);
-  if (count == 0) return;
-  const auto owner = session.shared_from_this();
   for (auto index = std::size_t{0}; index < count; ++index) {
-    push_driver_work_locked(
-      session, RenderDriverWork{[owner]() { run_frame_demand(owner); }, {}},
-      wakes
-    );
+    if (!queue_frame_demand_work_locked(session, wakes)) return;
   }
 }
 
@@ -1720,10 +1739,14 @@ auto notify_render_session_map_update(
   if (session == nullptr) {
     return;
   }
+  mln::testing::hit(mln::testing::SyncPoint::RenderSessionUpdateNoticed);
   auto wakes = DeferredWakes{};
   const auto lock = std::scoped_lock{session->control_mutex};
   session->map_update_generation = map_latest_update_generation(session->map);
-  session->pending_changes = true;
+  // A demand can render an update between the map storing it and this notice,
+  // which then brings nothing the session has not drawn.
+  if (session->map_update_generation != session->rendered_generation)
+    session->pending_changes = true;
   if (!session->waiting_update_work.empty()) {
     splice_work(session->waiting_update_work, session->driver_work);
     publish_driver_work_locked(*session, wakes);
@@ -2588,8 +2611,11 @@ auto publish_frame_result(
 }
 
 // The barriers whose earlier demands have all reached a terminal result.
-// Demands run, wait, and are queued in acceptance order, so the lowest
-// outstanding epoch is the oldest one running, waiting, or still queued.
+// Demands run and are queued in acceptance order, so the lowest outstanding
+// epoch is the oldest one either running or at the front of a queue. A demand
+// that waits for a map update can return ahead of older ones, but every such
+// demand carries the current barrier epoch, because a barrier ends each
+// earlier wait, so the order it returns in never settles a barrier early.
 auto take_settled_barriers_locked(mln_render_session_object& session)
   -> std::vector<std::shared_ptr<OperationObject>> {
   auto oldest = std::numeric_limits<std::uint64_t>::max();
@@ -2694,6 +2720,8 @@ auto wait_for_map_update(
     result.disposition = MLN_RENDER_RESULT_NO_UPDATE;
     return true;
   }
+  // Waiting and queueing allocate. A demand that can do neither finishes as it
+  // found the map.
   try {
     // Read from the map under the lock that notify takes after the map
     // stores an update, so an update this read misses finds the demand
@@ -2701,17 +2729,16 @@ auto wait_for_map_update(
     // with it would run the demand again until notify catches up.
     if (map_latest_update_generation(session->map) == evaluated) {
       session->update_waiting_demands.push_back(pending);
-    } else {
-      // An update landed after the demand looked, so the demand runs again
-      // ahead of the demands accepted after it.
-      auto work =
-        RenderDriverWork{[session]() { run_frame_demand(session); }, {}};
-      session->demands.push_front(pending);
-      push_driver_work_locked(*session, std::move(work), wakes);
+      return false;
     }
+    // An update landed after the demand looked, so the demand runs again
+    // ahead of the demands accepted after it.
+    session->demands.push_front(pending);
   } catch (...) {
-    // Queueing allocates. A demand that cannot wait finishes as it found the
-    // map.
+    return true;
+  }
+  if (!queue_frame_demand_work_locked(*session, wakes)) {
+    session->demands.pop_front();
     return true;
   }
   return false;
@@ -3070,8 +3097,10 @@ auto render_session_request_frame(
       wakes
     );
   };
-  // Waiting demands are older than every queued one, so their results come
-  // first.
+  // Every waiting demand carries the current barrier epoch, because a barrier
+  // ends each earlier wait, so any of them can be superseded. Their results
+  // can reach the host out of acceptance order, as the flag's documentation
+  // allows.
   auto& waiting = live->update_waiting_demands;
   for (auto entry = waiting.begin(); entry != waiting.end();) {
     if (supersedes(*entry)) {
@@ -4394,23 +4423,9 @@ auto acquired_frame_dispose(mln_acquired_frame frame) -> mln_status {
   );
   // A demand parked behind a full ring waits for a release. Once no slot can
   // take a frame, no release can come, so the driver gives the demand its
-  // terminal result now. Queueing allocates; if it fails, detach resolves the
-  // demand instead. The queue choice matches push_driver_work_locked().
-  if (session.demands.empty()) return MLN_STATUS_OK;
-  auto& queue = session.waiting_update_work.empty()
-                  ? session.driver_work
-                  : session.waiting_update_work;
-  try {
-    queue.push_back(
-      RenderDriverWork{
-        [owner = live->session]() { run_frame_demand(owner); }, {}
-      }
-    );
-  } catch (...) {
-    return MLN_STATUS_OK;
-  }
-  if (session.waiting_update_work.empty())
-    publish_driver_work_locked(session, wakes);
+  // terminal result now, or detach does if the work cannot be queued.
+  if (!session.demands.empty())
+    static_cast<void>(queue_frame_demand_work_locked(session, wakes));
   return MLN_STATUS_OK;
 }
 

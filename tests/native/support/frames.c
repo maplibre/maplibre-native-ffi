@@ -97,9 +97,12 @@ typedef struct idle_wait {
   const mln_test_render_fixture* fixture;
   bool updated;
   bool idle;
+  bool has_stats;
+  mln_rendering_stats stats;
 } idle_wait;
 
-// An update clears an earlier idle, and an idle after it ends the wait.
+// An update clears an earlier idle, and an idle after it ends the wait. Each
+// finished frame's statistics replace the ones before.
 static bool note_update_or_idle(
   const mln_runtime_event* event, const char* messages, void* context
 ) {
@@ -110,6 +113,9 @@ static bool note_update_or_idle(
     wait->idle = false;
   } else if (event->type == MLN_RUNTIME_EVENT_MAP_IDLE) {
     wait->idle = true;
+  } else if (event->type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED) {
+    wait->has_stats = true;
+    wait->stats = event->payload.render_frame.stats;
   }
   return false;
 }
@@ -123,8 +129,9 @@ static bool update_or_idle_arrived(void* context) {
   return wait->updated || wait->idle;
 }
 
-void mln_test_render_until_idle(
-  mln_runtime runtime, const mln_test_render_fixture* fixture
+bool mln_test_render_until_idle(
+  mln_runtime runtime, const mln_test_render_fixture* fixture,
+  mln_rendering_stats* latest_stats
 ) {
   MLN_TEST_OK(mln_test_runtime_barrier(runtime));
   idle_wait wait = {.runtime = runtime, .fixture = fixture};
@@ -145,7 +152,10 @@ void mln_test_render_until_idle(
         mln_render_session_get_snapshot(fixture->session, &snapshot, NULL)
       );
       if (!snapshot.pending_changes) {
-        return;
+        if (latest_stats != NULL && wait.has_stats) {
+          *latest_stats = wait.stats;
+        }
+        return wait.has_stats;
       }
     }
     mln_frame_demand demand = mln_frame_demand_default();
