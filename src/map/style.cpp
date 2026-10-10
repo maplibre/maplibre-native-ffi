@@ -3111,6 +3111,7 @@ auto map_get_style_light_property(
   MapObject& live, mln_buffer_view property_name, std::string& out_value,
   bool& out_found
 ) -> mln_status {
+  out_found = false;
   auto* light = map_native(live).getStyle().getLight();
   if (light == nullptr) {
     set_thread_error("style light does not exist");
@@ -3240,6 +3241,7 @@ auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   std::string& out_value, bool& out_found
 ) -> mln_status {
+  out_found = false;
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {
@@ -3284,6 +3286,7 @@ auto map_get_layer_filter(
   MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
   bool& out_found
 ) -> mln_status {
+  out_found = false;
   auto* layer =
     map_native(live).getStyle().getLayer(string_from_view(layer_id));
   if (layer == nullptr) {

@@ -459,8 +459,8 @@ auto map_set_style_light_json(MapObject& live, mln_buffer_view light_json)
 auto map_set_style_light_property(
   MapObject& live, mln_buffer_view property_name, mln_buffer_view value
 ) -> mln_status;
-// Writes the property's JSON and sets out_found, which stays false when the
-// property is unset.
+// Writes the property's JSON, or sets out_found false when the property is
+// unset.
 auto map_get_style_light_property(
   MapObject& live, mln_buffer_view property_name, std::string& out_value,
   bool& out_found
@@ -475,8 +475,8 @@ auto map_set_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   mln_buffer_view value
 ) -> mln_status;
-// Writes the property's JSON and sets out_found, which stays false when the
-// property is unset.
+// Writes the property's JSON, or sets out_found false when the property is
+// unset.
 auto map_get_layer_property(
   MapObject& live, mln_buffer_view layer_id, mln_buffer_view property_name,
   std::string& out_value, bool& out_found
@@ -484,8 +484,8 @@ auto map_get_layer_property(
 auto map_set_layer_filter(
   MapObject& live, mln_buffer_view layer_id, const mln_buffer_view* filter
 ) -> mln_status;
-// Writes the filter's JSON and sets out_found, which stays false when the layer
-// has no filter.
+// Writes the filter's JSON, or sets out_found false when the layer has no
+// filter.
 auto map_get_layer_filter(
   MapObject& live, mln_buffer_view layer_id, std::string& out_filter,
   bool& out_found
