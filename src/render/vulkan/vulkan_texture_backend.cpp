@@ -43,6 +43,15 @@ auto owned_descriptor_from_borrowed(
   };
 }
 
+// Waits on the frame fence. A failed wait, such as a lost device, leaves the
+// frame's GPU work unfinished, so the render or readback fails instead of
+// publishing that frame as complete.
+void wait_frame(const mln::vulkan::Context& context) {
+  if (!context.waitFrame()) {
+    throw std::runtime_error("Vulkan frame fence wait failed");
+  }
+}
+
 }  // namespace
 
 namespace mln::core {
@@ -136,7 +145,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     // This resource is only used by VulkanTextureBackend, so the downcast is
     // invariant within this file.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    static_cast<mln::vulkan::Context&>(backend.getContext()).waitFrame();
+    wait_frame(static_cast<mln::vulkan::Context&>(backend.getContext()));
   }
 
   [[nodiscard]] auto image() const -> VkImage {
@@ -335,7 +344,7 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
     auto& context_impl =
       static_cast<mln::vulkan::Context&>(backend.getContext());
-    context_impl.waitFrame();
+    wait_frame(context_impl);
     const auto rendered = slots_.at(selected_).image;
     context_impl.submitOneTimeCommand(
       [&](const vk::UniqueCommandBuffer& command_buffer) -> void {
@@ -449,9 +458,7 @@ void VulkanTextureBackend::set_borrowed_target(
   if (context) {
     // VulkanTextureBackend always constructs a Vulkan renderer context.
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast)
-    if (!static_cast<mln::vulkan::Context&>(*context).waitFrame()) {
-      throw std::runtime_error("Vulkan frame fence wait failed");
-    }
+    wait_frame(static_cast<mln::vulkan::Context&>(*context));
   }
   borrowed_descriptor_ = target.descriptor;
   borrowed_images_ = target.textures;
@@ -508,7 +515,7 @@ auto VulkanTextureBackend::readStillImage() -> mln::PremultipliedImage {
   auto& context_impl = static_cast<mln::vulkan::Context&>(getContext());
   auto& resource_impl = getResource<VulkanTextureRenderableResource>();
   const auto source_image = vk::Image(resource_impl.image());
-  context_impl.waitFrame();
+  wait_frame(context_impl);
   context_impl.submitOneTimeCommand(
     [&](const vk::UniqueCommandBuffer& command_buffer) -> void {
       const auto to_transfer =

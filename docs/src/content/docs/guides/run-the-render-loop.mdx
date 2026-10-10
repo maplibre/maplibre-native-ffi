@@ -87,7 +87,8 @@ them in host pacing.
 Texture acquisition, from an owned or a borrowed ring, is nonblocking and
 leases the oldest rendered slot that is not already acquired. Read the texture
 after its producer sync. A CPU-complete producer sync needs no wait or fence
-from the host. Release the acquired handle with consumer-completion sync when
+from the host. On OpenGL, a host that samples the texture from another context
+of the share group binds it again after acquisition. Release the acquired handle with consumer-completion sync when
 host GPU work reads the texture. CPU-complete sync is valid only when that work
 completed before release, or on WebGPU was submitted to the device's queue
 before release. The session retires the slot through its selected driver before

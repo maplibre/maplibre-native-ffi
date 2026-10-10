@@ -174,9 +174,10 @@ typedef enum mln_gpu_sync_kind : uint32_t {
    *
    * As producer synchronization of an acquired frame: on Metal, Vulkan, and
    * OpenGL, the producer's GPU writes to the frame's texture completed before
-   * the frame became acquirable. On WebGPU, they were submitted to the
-   * device's queue, which orders them before any work that the host submits
-   * afterwards.
+   * the frame became acquirable. On OpenGL, a host that samples the texture
+   * from another context of the share group binds it again after acquisition.
+   * On WebGPU, the writes were submitted to the device's queue, which orders
+   * them before any work that the host submits afterwards.
    *
    * As consumer synchronization: the host's GPU reads completed before the
    * release call, or on WebGPU were submitted to the device's queue before it.
