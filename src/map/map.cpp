@@ -810,12 +810,10 @@ class HeadlessFrontend final : public mln::RendererFrontend {
 
   // Holds render state while a hold is open, and otherwise publishes it.
   void update(std::shared_ptr<mln::UpdateParameters> update) override {
-    {
+    if (hold_depth_ > 0) {
       const std::scoped_lock lock(latest_update_mutex_);
-      if (hold_depth_ > 0) {
-        held_update_ = std::move(update);
-        return;
-      }
+      held_update_ = std::move(update);
+      return;
     }
     publish_update(std::move(update));
   }
@@ -946,16 +944,18 @@ class HeadlessFrontend final : public mln::RendererFrontend {
   std::shared_ptr<mln::core::MapEventState> event_state_;
   std::unique_ptr<ForwardingRendererObserver> observer_;
   mln::TaggedScheduler thread_pool_;
+  // Guards every field from latest_update_ through repaint_demand_. Render
+  // sessions read the published update from their own threads, and reset() can
+  // touch held_update_ outside a command when a disposed map retires.
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mln::UpdateParameters> latest_update_;
-  // Guarded by latest_update_mutex_, because reset() can run outside a
-  // command when a disposed map retires.
   std::shared_ptr<mln::UpdateParameters> held_update_;
   std::function<void()> publish_;
   std::function<void()> session_publish_;
   uint64_t latest_update_generation_ = 0;
   bool repaint_demand_ = false;
-  // Touched only by commands and mbgl callbacks on the map's run loop.
+  // Not guarded: only commands and mbgl callbacks on the map's run loop touch
+  // it.
   uint32_t hold_depth_ = 0;
 };
 

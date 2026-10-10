@@ -102,7 +102,9 @@ partly applied. A command group extends this to several commands, such as a
 layer and its filter. Between `mln_map_begin_command_group()` and the matching
 end, each command still commits and completes on its own, while the map holds
 its render updates. The end publishes the latest held update, so a frame shows
-either none of the group or all of it.
+either none of the group or all of it. A group also holds camera, gesture, and
+loading updates, so submit its commands and its end together, without waiting in
+between.
 
 ## Render session
 

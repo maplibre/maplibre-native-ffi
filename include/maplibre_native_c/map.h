@@ -1037,9 +1037,13 @@ MLN_API mln_status mln_map_request_repaint(
  * command that fails inside a group leaves the group open and leaves the
  * other commands applied.
  *
- * An operation that waits for a render update finishes only after the group
- * ends: a render-session resize, and a still-image request that was already in
- * flight. Do not wait for such an operation between the begin and the end.
+ * While a group is open the map publishes no render update, including those
+ * that camera changes, gestures, resource loading, and transitions raise, so
+ * attached render targets show nothing new. A render-session resize, and a
+ * still image already in flight, finish only after the group ends. Submit the
+ * commands and the matching end without waiting for any completion in between,
+ * and submit the end on every path, including when a command between them
+ * fails to submit.
  *
  * Returns:
  * - MLN_STATUS_OK when the command was accepted.
