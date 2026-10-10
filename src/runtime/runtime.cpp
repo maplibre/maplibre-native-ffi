@@ -15,7 +15,6 @@
 #include <shared_mutex>
 #include <stdexcept>
 #include <string>
-#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
@@ -2438,16 +2437,6 @@ auto clear_resource_provider(
 
 namespace {
 
-auto wait_for_prior_runtime_submissions(
-  const std::shared_ptr<RuntimeObject>& runtime, uint64_t sequence
-) noexcept -> void {
-  auto lock = std::unique_lock{runtime->terminal_mutex};
-  runtime->terminal_condition.wait(lock, [&]() noexcept -> bool {
-    return runtime->pending_submissions.empty() ||
-           *runtime->pending_submissions.begin() >= sequence;
-  });
-}
-
 auto release_runtime_reachable_state(RuntimeObject* runtime) -> void {
   replace_registration(
     *runtime->resource_transform_state, &ResourceTransformState::registration,
@@ -2534,48 +2523,57 @@ auto runtime_barrier_start(
   return MLN_STATUS_OK;
 }
 
-auto dispose_runtime(mln_runtime runtime) -> mln_status {
-  auto live = lease_runtime(runtime);
-  if (live == nullptr) return recorded_handle_fault_status();
-  {
-    const auto lock = std::scoped_lock{live->submission_mutex};
-    const auto status = live->control.begin_close(true);
-    if (status != MLN_STATUS_OK) return status;
-    live->disposal_owner = live;
-    live->disposal_task.context = live.get();
-    live->disposal_task.run = [](RetirementTask* task) noexcept {
-      auto* retiring = static_cast<RuntimeObject*>(task->context);
-      auto owned = std::move(retiring->disposal_owner);
-      static_cast<void>(handle_table<RuntimeObject>().remove(owned->self));
-      unregister_platform_context(owned->platform_context);
-      owned->disposal_worker_task.context = owned.get();
-      owned->disposal_worker_task.run = [](RetirementTask* node) noexcept {
-        auto* state = static_cast<RuntimeObject*>(node->context);
-        // The cleanup lane keeps this object alive until the worker reports.
-        release_runtime_reachable_state(state);
-        {
-          const auto lock = std::scoped_lock{state->terminal_mutex};
-          state->disposal_state_retired = true;
-        }
-        state->terminal_condition.notify_all();
-      };
-      owned->executor.invoke_retirement(owned->disposal_worker_task);
+namespace {
+
+// Retires a runtime whose close has begun: once its submission leases,
+// children, and pending submissions have drained, the disposal lane removes
+// its handle, releases the state its worker reaches, stops the worker, and
+// then reports `completion` when one is given. Nothing here blocks the caller
+// or the lane while the runtime drains.
+auto retire_runtime(
+  std::shared_ptr<RuntimeObject> live, std::shared_ptr<Completion> completion
+) noexcept -> void {
+  live->release_completion = std::move(completion);
+  live->disposal_owner = live;
+  live->disposal_task.context = live.get();
+  live->disposal_task.run = [](RetirementTask* task) noexcept {
+    auto* retiring = static_cast<RuntimeObject*>(task->context);
+    auto owned = std::move(retiring->disposal_owner);
+    static_cast<void>(handle_table<RuntimeObject>().remove(owned->self));
+    unregister_platform_context(owned->platform_context);
+    owned->disposal_worker_task.context = owned.get();
+    owned->disposal_worker_task.run = [](RetirementTask* node) noexcept {
+      auto* state = static_cast<RuntimeObject*>(node->context);
+      // The cleanup lane keeps this object alive until the worker reports.
+      release_runtime_reachable_state(state);
       {
-        auto lock = std::unique_lock{owned->terminal_mutex};
-        owned->terminal_condition.wait(lock, [&] {
-          return owned->disposal_state_retired;
-        });
+        const auto lock = std::scoped_lock{state->terminal_mutex};
+        state->disposal_state_retired = true;
       }
-      owned->executor.stop();
+      state->terminal_condition.notify_all();
     };
+    owned->executor.invoke_retirement(owned->disposal_worker_task);
     {
-      const auto terminal_lock = std::scoped_lock{live->terminal_mutex};
-      live->disposal_requested = true;
+      auto lock = std::unique_lock{owned->terminal_mutex};
+      owned->terminal_condition.wait(lock, [&] {
+        return owned->disposal_state_retired;
+      });
     }
+    owned->executor.stop();
+    // Drop the lane's reference before reporting, so a host that waits for
+    // the completion and then exits cannot race member destruction. Nothing
+    // after complete() touches library state.
+    auto release_completion = std::move(owned->release_completion);
+    owned.reset();
+    if (release_completion) complete(release_completion, MLN_STATUS_OK);
+  };
+  {
+    const auto terminal_lock = std::scoped_lock{live->terminal_mutex};
+    live->disposal_requested = true;
   }
   auto* retiring = live.get();
   live.reset();
-  retiring->control.notify_when_drained(
+  const auto drained = retiring->control.notify_when_drained(
     [](void* context) noexcept {
       auto& state = *static_cast<RuntimeObject*>(context);
       bool dispose;
@@ -2588,6 +2586,22 @@ auto dispose_runtime(mln_runtime runtime) -> mln_status {
     },
     retiring
   );
+  if (!drained) {
+    mln::testing::hit(mln::testing::SyncPoint::RuntimeRetirementDeferred);
+  }
+}
+
+}  // namespace
+
+auto dispose_runtime(mln_runtime runtime) -> mln_status {
+  auto live = lease_runtime(runtime);
+  if (live == nullptr) return recorded_handle_fault_status();
+  {
+    const auto lock = std::scoped_lock{live->submission_mutex};
+    const auto status = live->control.begin_close(true);
+    if (status != MLN_STATUS_OK) return status;
+  }
+  retire_runtime(std::move(live), nullptr);
   return MLN_STATUS_OK;
 }
 
@@ -2599,9 +2613,9 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
   }
   auto live = lease_runtime(runtime);
   if (live == nullptr) return recorded_handle_fault_status();
-  auto teardown_completion = std::shared_ptr<Completion>{};
+  auto release_completion = std::shared_ptr<Completion>{};
   try {
-    teardown_completion = std::make_shared<Completion>(*completion);
+    release_completion = std::make_shared<Completion>(*completion);
   } catch (...) {
     set_thread_error("runtime release could not allocate its completion");
     return MLN_STATUS_NATIVE_ERROR;
@@ -2610,80 +2624,17 @@ auto release_runtime(mln_runtime runtime, const mln_completion* completion)
     const std::scoped_lock commit_lock(live->submission_mutex);
     const auto release_status = live->control.begin_close();
     if (release_status != MLN_STATUS_OK) {
-      teardown_completion->reject();
+      release_completion->reject();
       return release_status;
     }
-  }
-  struct ReleaseGate {
-    std::mutex mutex;
-    std::condition_variable condition;
-    bool committed = false;
-    uint64_t sequence = 0;
-    std::shared_ptr<RuntimeObject> live;
-    std::shared_ptr<Completion> teardown_completion;
-  };
-  auto gate = std::shared_ptr<ReleaseGate>{};
-  try {
-    gate = std::make_shared<ReleaseGate>();
-  } catch (...) {
-    live->control.abort_close();
-    teardown_completion->reject();
-    set_thread_error("runtime release could not allocate its teardown gate");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  gate->live = live;
-  gate->teardown_completion = teardown_completion;
-  auto waiter = std::thread{};
-  try {
-    // Teardown stops and joins the executor, so it cannot run on that executor
-    // or on the caller that may also service host callbacks.
-    waiter = std::thread([gate]() mutable -> void {
-      {
-        auto lock = std::unique_lock{gate->mutex};
-        gate->condition.wait(lock, [&]() noexcept -> bool {
-          return gate->committed;
-        });
-      }
-      auto live = std::move(gate->live);
-      wait_for_prior_runtime_submissions(live, gate->sequence);
-      live->control.wait_for_submissions([]() noexcept -> void {
-        mln::testing::hit(mln::testing::SyncPoint::RuntimeReleaseWaits);
-      });
-      unregister_platform_context(live->platform_context);
-      try {
-        live->executor.invoke_sync([live]() -> void {
-          release_runtime_reachable_state(live.get());
-        });
-      } catch (...) {
-        // The public handle is already retired, so teardown failures are not
-        // actionable by its former owner.
-      }
-      live->executor.stop();
-      // Drop this thread's reference before reporting, so a host that waits
-      // for the completion and then exits cannot race member destruction.
-      // Nothing after complete() touches library state.
-      live.reset();
-      complete(gate->teardown_completion, MLN_STATUS_OK);
-    });
-  } catch (...) {
-    live->control.abort_close();
-    teardown_completion->reject();
-    set_thread_error("runtime release could not start its teardown waiter");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  waiter.detach();
-
-  {
-    const std::scoped_lock commit_lock(live->submission_mutex);
-    gate->sequence = live->next_submission_sequence++;
     static_cast<void>(handle_table<RuntimeObject>().remove(runtime));
   }
-  {
-    const std::scoped_lock lock(gate->mutex);
-    gate->committed = true;
-  }
-  gate->condition.notify_one();
-  teardown_completion->accept();
+  // Nothing after close can fail. Accepting first keeps the completion on the
+  // disposal lane even when the runtime has already drained. Close rejects
+  // every later submission, so retirement, which waits for the pending ones,
+  // reports after every earlier accepted submission has finished.
+  release_completion->accept();
+  retire_runtime(std::move(live), std::move(release_completion));
   return MLN_STATUS_OK;
 }
 

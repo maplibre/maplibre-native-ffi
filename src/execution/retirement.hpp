@@ -2,7 +2,8 @@
 
 #include <condition_variable>
 #include <mutex>
-#include <thread>
+
+#include "execution/worker_thread.hpp"
 
 namespace mln::core {
 
@@ -18,8 +19,10 @@ struct RetirementTask {
 // embedded node requires neither allocation nor a new thread.
 class RetirementLane {
  public:
+  // The lane runs MapLibre destructors, so it takes a worker-sized stack.
+  // Throws std::system_error when the thread cannot be created.
   RetirementLane() {
-    std::thread([this]() noexcept {
+    WorkerThread([this]() noexcept {
       for (;;) {
         RetirementTask* task;
         {

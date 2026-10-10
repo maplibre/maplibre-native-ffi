@@ -233,6 +233,8 @@ struct RuntimeObject {
   RetirementTask disposal_task;
   RetirementTask disposal_worker_task;
   std::shared_ptr<RuntimeObject> disposal_owner;
+  // Reported by the disposal lane once retirement finishes; null for dispose.
+  std::shared_ptr<Completion> release_completion;
   bool disposal_state_retired = false;
   std::atomic_bool disposal_requested = false;
   bool disposal_drained = false;

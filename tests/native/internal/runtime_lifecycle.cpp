@@ -10,16 +10,19 @@ namespace {
 using mln::native_tests::SyncPoint;
 using mln::native_tests::SyncPointScope;
 
-// A released map completes before its worker pool shuts down, and the runtime
-// release waits for that shutdown. The case parks the shutdown, then waits for
-// the runtime's teardown to report that it is waiting on outstanding cleanup,
-// which it reports only when it has to wait.
-void runtime_release_waits_for_retired_map_cleanup() {
-  auto sync_points = SyncPointScope{};
-  sync_points.hold(SyncPoint::MapPoolShutdown);
+auto create_runtime() -> mln_runtime {
   const auto options = mln_runtime_options_default();
   auto runtime = mln_runtime{MLN_HANDLE_NULL};
   MLN_TEST_OK(mln_runtime_create(&options, &runtime, nullptr));
+  return runtime;
+}
+
+// Creates a map on `runtime` and releases it, leaving its worker pool shutdown
+// parked at the held MapPoolShutdown point. Returns whether the shutdown
+// parked and the map's own release completed.
+auto release_map_with_parked_cleanup(
+  SyncPointScope& sync_points, mln_runtime runtime
+) -> bool {
   auto create_map = mln_test_completion_default(sizeof(mln_map));
   MLN_TEST_OK(
     mln_map_create(runtime, nullptr, &create_map.descriptor, nullptr)
@@ -32,31 +35,87 @@ void runtime_release_waits_for_retired_map_cleanup() {
   const auto cleanup_parked =
     sync_points.wait_for_hits(SyncPoint::MapPoolShutdown, 1);
   const auto map_closed = mln_test_completion_wait(&map_close, -1);
+  MLN_TEST_OK(mln_test_completion_settle(&map_close));
+  return cleanup_parked && map_closed;
+}
+
+// A released map completes before its worker pool shuts down, and the runtime
+// release waits for that shutdown. The case parks the shutdown, then waits for
+// the runtime's release to report that it deferred retirement on outstanding
+// cleanup, which it reports only when it has to defer.
+void runtime_release_waits_for_retired_map_cleanup() {
+  auto sync_points = SyncPointScope{};
+  sync_points.hold(SyncPoint::MapPoolShutdown);
+  const auto runtime = create_runtime();
+  const auto cleanup_parked =
+    release_map_with_parked_cleanup(sync_points, runtime);
+
   auto runtime_close = mln_test_completion_default(0);
   const auto runtime_accepted =
     mln_runtime_release(runtime, &runtime_close.descriptor, nullptr);
-  const auto runtime_waited =
-    sync_points.wait_for_hits(SyncPoint::RuntimeReleaseWaits, 1);
+  const auto runtime_deferred =
+    sync_points.wait_for_hits(SyncPoint::RuntimeRetirementDeferred, 1);
   const auto runtime_closed_early = mln_test_completion_poll(&runtime_close);
   sync_points.release(SyncPoint::MapPoolShutdown);
-  const auto map_status = mln_test_completion_settle(&map_close);
   const auto runtime_status = mln_test_completion_settle(&runtime_close);
 
   TEST_ASSERT_TRUE(cleanup_parked);
-  TEST_ASSERT_TRUE(map_closed);
   MLN_TEST_OK(runtime_accepted);
   TEST_ASSERT_TRUE_MESSAGE(
-    runtime_waited,
-    "the runtime release never waited for a map's parked cleanup"
+    runtime_deferred,
+    "the runtime release never deferred for a map's parked cleanup"
   );
   TEST_ASSERT_FALSE_MESSAGE(
     runtime_closed_early,
     "the runtime release completed while a map's cleanup was parked"
   );
-  MLN_TEST_OK(map_status);
   MLN_TEST_OK(runtime_status);
+}
+
+// Runtime retirement shares one native lane. A release that waits for a map's
+// cleanup defers instead of occupying that lane, so another runtime's release
+// still completes while the first one waits.
+void a_deferred_runtime_release_does_not_hold_other_retirements() {
+  auto sync_points = SyncPointScope{};
+  sync_points.hold(SyncPoint::MapPoolShutdown);
+  const auto waiting = create_runtime();
+  const auto other = create_runtime();
+  const auto cleanup_parked =
+    release_map_with_parked_cleanup(sync_points, waiting);
+
+  auto waiting_close = mln_test_completion_default(0);
+  const auto waiting_accepted =
+    mln_runtime_release(waiting, &waiting_close.descriptor, nullptr);
+  const auto waiting_deferred =
+    sync_points.wait_for_hits(SyncPoint::RuntimeRetirementDeferred, 1);
+  auto other_close = mln_test_completion_default(0);
+  const auto other_accepted =
+    mln_runtime_release(other, &other_close.descriptor, nullptr);
+  const auto other_closed = mln_test_completion_wait(&other_close, -1);
+  const auto waiting_closed_early = mln_test_completion_poll(&waiting_close);
+  sync_points.release(SyncPoint::MapPoolShutdown);
+  const auto other_status = mln_test_completion_settle(&other_close);
+  const auto waiting_status = mln_test_completion_settle(&waiting_close);
+
+  TEST_ASSERT_TRUE(cleanup_parked);
+  MLN_TEST_OK(waiting_accepted);
+  TEST_ASSERT_TRUE(waiting_deferred);
+  MLN_TEST_OK(other_accepted);
+  TEST_ASSERT_TRUE_MESSAGE(
+    other_closed,
+    "a runtime release waited behind another runtime's deferred retirement"
+  );
+  TEST_ASSERT_FALSE_MESSAGE(
+    waiting_closed_early,
+    "the runtime release completed while a map's cleanup was parked"
+  );
+  MLN_TEST_OK(other_status);
+  MLN_TEST_OK(waiting_status);
 }
 
 }  // namespace
 
-MLN_TEST_GROUP { RUN_TEST(runtime_release_waits_for_retired_map_cleanup); }
+MLN_TEST_GROUP {
+  RUN_TEST(runtime_release_waits_for_retired_map_cleanup);
+  RUN_TEST(a_deferred_runtime_release_does_not_hold_other_retirements);
+}
