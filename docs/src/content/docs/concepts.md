@@ -53,11 +53,13 @@ Python binding abandons every session that it still holds when the interpreter
 shuts down. The Kotlin binding on the JVM and Android abandons every session
 that it still holds from a shutdown hook, so `System.exit` and a return from
 `main` need no host step. It skips this when exit starts inside a MapLibre
-callback. A Kotlin/Native host, a host whose own graphics thread is inside
-driver service at exit, and a host that exits from a callback still end those
-sessions themselves. A Dart isolate's shutdown finalizes its open sessions
-without starting graphics calls, but a driver call already in flight can outlast
-it, so a Dart host ends its sessions' graphics calls itself before exit.
+callback. The JVM runs a host's own shutdown hooks concurrently with this one,
+so a host hook that still uses a session can find it abandoned. A Kotlin/Native
+host, a host whose own graphics thread is inside driver service at exit, and a
+host that exits from a callback still end those sessions themselves. A Dart
+isolate's shutdown finalizes its open sessions without starting graphics calls,
+but a driver call already in flight can outlast it, so a Dart host ends its
+sessions' graphics calls itself before exit.
 
 ## Map
 
